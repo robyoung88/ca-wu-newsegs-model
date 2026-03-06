@@ -1,0 +1,2 @@
+from src.newsegsgeneration.newsegsgeneration import NewsegsGeneration
+from src.newsegsgeneration.testnewsegsgeneration import TestNewsegsGeneration

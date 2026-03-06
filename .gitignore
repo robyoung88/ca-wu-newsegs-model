@@ -1,0 +1,14 @@
+
+# Ignore dynaconf secret files
+.secrets.*
+
+# Ignore .pyc files
+/**/*.pyc
+
+**_files/*
+temp_*.py
+~$*
+**/__pycache__/*
+
+# Ignore jupyter notebook checkpoint files
+/**/.ipynb_checkpoints/

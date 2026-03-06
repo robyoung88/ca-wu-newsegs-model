@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ca_wu_newsegs_model"
+version = "0.0.1"
+authors = [
+  { name="Robert Young", email="robert.young@wrexham.ac.uk" },
+]
+description = "A model for single-site energy generation, storage, consumption, import and export in support of the North Wales Social Housing Newbuild on-Site Energy Generation and Storage project."
+readme = "README.md"
+requires-python = ">=3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/robyoung88/ca-wu-newsegs-model"
+Issues = "https://github.com/robyoung88/ca-wu-newsegs-model/issues"
