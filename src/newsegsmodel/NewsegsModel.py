@@ -1,36 +1,11 @@
 # Abstract base class for NewSEGS model and environment data
 
 from abc import ABCMeta
-from newsegsgeneration import NewsegsGeneration
-from newsegsgrid import NewsegsGrid
-from newsegsconsumption import NewsegsConsumption
-from newsegsstorage import NewsegsStorage
-
-class NewsegsLocalEnvironment(metaclass=ABCMeta):
-    @abstractmethod
-    def get_wind_speeds(self, heights, start_datetime, end_datetime):
-        ...
-
-    @abstractmethod
-    def get_horizontal_solar_flux(self, start_datetime, end_datetime):
-        ...
-
-    @abstractmethod
-    def get_external_temperature(self, start_datetime, end_datetime):
-        ...
-    
-    @abstractmethod
-    def get_solar_flux_on_plane(self, collector_facing, start_datetime, end_datetime):
-        ...
-
-class NewsegsWiderEnvironment(metaclass=ABCMeta):
-    @abstractmethod
-    def get_temperature(self, start_datetime, end_datetime):
-        ...
-    
-    @abstractmethod
-    def get_horizontal_solar_flux(self, start_datetime, end_datetime):
-        ...
+from src.core import TimeSpan
+from src.core import NewsegsLocalEnvironment,NewsegsWiderEnvironment
+from src.newsegsgeneration import NewsegsGeneration
+from src.newsegsgrid import NewsegsGrid
+from src.newsegscs import NewsegsCS
 
 class NewsegsModel(metaclass=ABCMeta):
     @abstractmethod
@@ -38,7 +13,7 @@ class NewsegsModel(metaclass=ABCMeta):
         ...
     
     @abstractmethod
-    def set_run_period(self, start_datetime, end_datetime):
+    def set_run_period(self, timespan:TimeSpan):
         ...
     
     @property
@@ -63,22 +38,12 @@ class NewsegsModel(metaclass=ABCMeta):
     
     @property
     @abstractmethod
-    def consumption(self) -> NewsegsConsumption:
+    def consumption_storage(self) -> NewsegsCS:
         ...
     
-    @consumption.setter
+    @consumption_storage.setter
     @abstractmethod
-    def consumption(self, consumption_module:NewsegsConsumption):
-        ...
-
-    @property
-    @abstractmethod
-    def storage(self) -> NewsegsStorage:
-        ...
-    
-    @storage.setter
-    @abstractmethod
-    def storage(self, storage_module:NewsegsStorage):
+    def consumption_storage(self, cs_module:NewsegsCS):
         ...
 
     @property
@@ -88,7 +53,7 @@ class NewsegsModel(metaclass=ABCMeta):
 
     @local_env.setter
     @abstractmethod
-    def local_env(self, local_environment_module:NewsegsLocalEnvironment):
+    def local_env(self, local_environment_server:NewsegsLocalEnvironment):
         ...
     
     @property
@@ -98,5 +63,5 @@ class NewsegsModel(metaclass=ABCMeta):
     
     @wider_env.setter
     @abstractmethod
-    def wider_env(self, wider_env_module:NewsegsWiderEnvironment):
+    def wider_env(self, wider_env_server:NewsegsWiderEnvironment):
         ...

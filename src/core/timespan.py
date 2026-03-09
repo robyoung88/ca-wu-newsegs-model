@@ -183,7 +183,7 @@ class TimeSpan:
         """
         return (self.end > other.end)
     
-    def __add__(self:T, time_delta:TimedeltaScalar):
+    def __add__(self, time_delta:TimedeltaScalar):
         o = copy(self)
         o.end = o.end + pd.Timedelta(time_delta)
         return o
@@ -208,7 +208,7 @@ class RegTimeSpan(TimeSpan):
     A TimeSpan which strides between its start and end in equally-spaced TimeDeltas
     """
 
-    def __init__(self, other:TimeSpan|None) -> None:
+    def __init__(self, other:TimeSpan|None=None) -> None:
         super().__init__(other)
         if not (other is None):
             if isinstance(other, RegTimeSpan):
@@ -237,8 +237,17 @@ class RegTimeSpan(TimeSpan):
         elif not unit is None:
             self._timestep = pd.Timedelta(timestep, unit = unit)
         else:
-            self._timestep = pd.Timedelta(timestep, unit = "h")
+            if isinstance(timestep, str):
+                self._timestep = pd.Timedelta(timestep)
+            else:
+                self._timestep = pd.Timedelta(timestep, unit = "h")
         self._post_calc()
+
+    @classmethod
+    def from_dates(cls, start_datetime: DatetimeScalar, end_datetime: DatetimeScalar, timestep:TimedeltaScalar, tz:TimeZoneScalar|None='utc', unit=None):
+        o = super(RegTimeSpan, cls).from_dates(start_datetime,end_datetime,tz)
+        o.set_timestep(timestep, unit)
+        return o
 
     @property
     def n_interval(self):
@@ -253,8 +262,22 @@ class RegTimeSpan(TimeSpan):
         """
         The actual final time of the time series - may differ from end depending on timestep
         """
-        return self.to_pandas()[-1]
+        return self.start + self.n_interval * self.timestep
 
     def to_pandas(self):
         return pd.date_range(self.start,self.end,freq=self.timestep)
     
+    def __str__(self):
+        return str(self.start) + " - " + str(self.end) + ", timestep: " + str(self.timestep)
+
+    def __eq__(self, other:RegTimeSpan) -> bool:
+        """
+        Do start, end and timestep of time spans match?
+        """
+        return (self.start == other.start) and (self.end == other.end) and (self.timestep == other.timestep)
+
+    def __ne__(self, other:RegTimeSpan) -> bool:
+        """
+        Do not start, end and timestep of time spans match?
+        """
+        return not(self == other)

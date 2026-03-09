@@ -1,18 +1,38 @@
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
+from src.core import Location,RaisedLocation,AspectLocation
+from src.core import TimeSpan
 
 class NewsegsLocalEnvironment(metaclass=ABCMeta):
     @abstractmethod
-    def get_wind_speeds(self, heights, start_datetime, end_datetime):
+    def get_wind_speeds(self, 
+                        location:RaisedLocation|tuple[RaisedLocation, ...]|list[RaisedLocation], 
+                        timespan:TimeSpan):
         ...
 
     @abstractmethod
-    def get_horizontal_solar_flux(self, start_datetime, end_datetime):
+    def get_horizontal_solar_flux(self,
+                                  location:Location|tuple[Location, ...]|list[Location],
+                                  timespan:TimeSpan):
         ...
 
     @abstractmethod
-    def get_external_temperature(self, start_datetime, end_datetime):
+    def get_external_temperature(self,
+                                 location:Location|tuple[Location, ...]|list[Location],
+                                 timespan:TimeSpan):
         ...
     
     @abstractmethod
-    def get_solar_flux_on_plane(self, collector_facing, start_datetime, end_datetime):
+    def get_solar_flux_on_plane(self,
+                                location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
+                                timespan:TimeSpan):
         ...
+
+class NewsegsWiderEnvironment(metaclass=ABCMeta):
+    @abstractmethod
+    def get_temperature(self, timespan:TimeSpan):
+        ...
+    
+    @abstractmethod
+    def get_horizontal_solar_flux(self, timespan:TimeSpan):
+        ...
+    
