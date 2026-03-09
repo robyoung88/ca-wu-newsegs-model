@@ -12,3 +12,5 @@ temp_*.py
 
 # Ignore jupyter notebook checkpoint files
 /**/.ipynb_checkpoints/
+
+.vscode/*
