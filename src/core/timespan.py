@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from copy import copy
 import operator
-from typing import TypeAlias
+from typing import TypeAlias,overload
 import numpy as np
 import pandas as pd
 from datetime import timedelta, tzinfo
@@ -11,6 +11,7 @@ import zoneinfo
 import pytz
 import dateutil
 from pandas.core.tools.datetimes import DatetimeScalar, Timedelta
+import numpy.typing as npt
 
 # -----------------------------------------------------------------------------
 # Ways of defining and comparing blocks of time
@@ -281,3 +282,73 @@ class RegTimeSpan(TimeSpan):
         Do not start, end and timestep of time spans match?
         """
         return not(self == other)
+
+class OffsetRegTimeSpan(RegTimeSpan):
+    """
+    A regular timespan which is offset from another timespan by a fixed number of timesteps
+
+    The purpose of this class is to allow a small timeseries to be repeated (with offset) to represent a longer timeseries which may start at a different time.
+    """
+    def __init__(self, other:TimeSpan|None=None) -> None:
+        super().__init__(other)
+        if not (other is None):
+            if isinstance(other, OffsetRegTimeSpan):
+                self._local_start = other.local_start
+                self._remote_start = other.remote_start
+
+    @property
+    def local_start(self) -> pd.Timestamp:
+        return self._local_start
+    
+    @property
+    def remote_start(self) -> pd.Timestamp:
+        return self._remote_start
+
+    def set_offset(self, 
+                   local_start:DatetimeScalar, 
+                   remote_start:DatetimeScalar):
+        if not(isinstance(local_start, pd.Timestamp)):
+            local_start = pd.Timestamp(local_start, tz=self.tz)
+        if not(isinstance(remote_start, pd.Timestamp)):
+            remote_start = pd.Timestamp(remote_start, tz=self.tz)
+        self._local_start = local_start
+        self._remote_start = remote_start
+
+    @property
+    def offset_local(self) -> int:
+        """
+        How many strides to get to the start at the local side of the anchor.
+
+        Ideally, this would be within the local TimeSpan, but that is not enforced
+        """
+        return self.normalise_index(int((self.local_start - self.start)//self.timestep))
+
+    @overload
+    def normalise_index(self, index:int) -> int:
+        ...
+
+    @overload
+    def normalise_index(self, index:npt.ArrayLike[np.int64]) -> npt.ArrayLike[np.int64]:
+        ...
+
+    def normalise_index(self, index):
+        """
+        Get the retrievable index from the (wrapped) local timespan.
+
+        NB - the timespan is assumed wrapped with overlapping end and start, so the end index is never realised.
+        e.g. if the timespan covers 1 year from 2020-01-01T00:00:00 to 2021-01-01T00:00:00, then the index for the latter date will never be returned
+        """
+        return index % self.n_interval
+
+    def get_local_index(self, remote_timespan:TimeSpan) -> npt.NDArray[np.int64]:
+        """
+        A vector of indices for the local timeseries corresponding to the remote timespan
+        """
+        delta = remote_timespan.delta
+        n_interval = delta // self.timestep
+
+        # How far to move from our reference offset to reach the requested timespan start
+        start_off = int((remote_timespan.start - self.remote_start) // self.timestep)
+        i0 = self.offset_local + start_off
+        i1 = i0 + n_interval + 1
+        return self.normalise_index(np.arange(i0, i1))
