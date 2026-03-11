@@ -34,3 +34,17 @@ class NewsegsModule(metaclass=ABCMeta):
     @abstractmethod
     def model(self, callback_model:newsegsmodel.NewsegsModel):
         ...
+
+    @abstractmethod
+    def to_dict(self):
+        """
+        Configuration as a dictionary
+        """
+        ...
+    
+    @abstractmethod
+    def load_dict(self):
+        """
+        Update configuration using a dictionary
+        """
+        ...

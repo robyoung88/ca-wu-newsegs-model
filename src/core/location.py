@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import re
 from pyproj import Transformer
 
 # -----------------------------------------------------------------------------
 # Ways of storing location information
 
 class Location:
+    _default_name = "Site 1"
     def __init__(self, other:Location|None=None) -> None:
         """
             Initialise a Location using another Location
@@ -17,6 +19,11 @@ class Location:
             latlon = other.latlon
             self._lat = latlon[0]
             self._lon = latlon[1]
+            self._name = other.name
+        else:
+            self._lat = 53.46
+            self._lon = -3.80
+            self._name = self._default_name
         
         self._crs = "EPSG:4326"
 
@@ -37,9 +44,12 @@ class Location:
         self._lon = lon
 
     @property
-    def latlon(self):
+    def latlon(self) :
         return (self._lat, self._lon)
     
+    def get_latlon(self) -> tuple:
+        return (self._lat, self._lon)
+
     @latlon.setter
     def latlon(self, latlon):
         self._lat = latlon[0]
@@ -53,8 +63,13 @@ class Location:
     def crs(self):
         return self._crs
 
-    def get_latlon(self) -> tuple:
-        return (self._lat, self._lon)
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, name:str) -> None:
+        self._name = name    
 
     def get_osgb(self) -> tuple:
         trans_togb = Transformer.from_crs(self.crs, "EPSG:27700")
@@ -103,6 +118,35 @@ class Location:
         o2 = (-other[0], -other[1])
         return self + o2
 
+    @classmethod
+    def from_characteristics(cls,
+                             name:str,
+                             lat:float,
+                             lon:float,
+                             crs:str) -> Location:
+        o = cls()
+        
+        o.name = name
+        o.lat = lat
+        o.lon = lon
+        o._crs = crs
+        
+        return o
+
+    def to_dict(self) -> dict:
+        odict = {
+            'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
+            'name': self._name,
+            'lat': self._lat,
+            'lon': self._lon,
+            'crs': self._crs
+        }
+        return odict
+
+    @classmethod
+    def from_dict(cls, input:dict) -> Location:
+        return cls.from_characteristics(**input)
+
 class RaisedLocation(Location):
     def __init__(self, other:Location|RaisedLocation|None=None) -> None:
         super().__init__(other)
@@ -148,6 +192,27 @@ class RaisedLocation(Location):
             return super().__neq__(other) or (self.height_agl != other.height_agl)
         else:
             return super().__neq__(other)
+
+    @classmethod
+    def from_characteristics(cls,
+                             name:str,
+                             lat:float,
+                             lon:float,
+                             crs:str,
+                             height_agl:float) -> Location:
+        a = locals()
+        del a['height_agl']
+        del a['cls']
+        del a['__class__']
+        o = super(RaisedLocation, cls).from_characteristics(**a)
+        o.height_agl = height_agl
+        
+        return o
+
+    def to_dict(self) -> dict:
+        odict = super().to_dict()
+        odict['height_agl'] = self._height
+        return odict
 
 class AspectLocation(RaisedLocation):
     def __init__(self, other:Location|None=None) -> None:
@@ -215,3 +280,42 @@ class AspectLocation(RaisedLocation):
             return super().__neq__(other) or (self.azimuth != other.azimuth) and (self.pitch != other.pitch)
         else:
             return super().__neq__(other)
+
+    @classmethod
+    def from_characteristics(cls,
+                             name:str,
+                             lat:float,
+                             lon:float,
+                             crs:str,
+                             height_agl:float,
+                             azimuth:float,
+                             pitch:float) -> Location:
+        a = locals()
+        del a['azimuth']
+        del a['pitch']
+        del a['cls']
+        del a['__class__']
+        o = super(AspectLocation, cls).from_characteristics(**a)
+        o.azimuth = azimuth
+        o.pitch = pitch
+
+        return o
+
+    def to_dict(self) -> dict:
+        odict = super().to_dict()
+        odict['azimuth'] = self._azimuth
+        odict['pitch'] = self._pitch
+        return odict
+
+location_constructors = {
+    'Location': Location,
+    'RaisedLocation': RaisedLocation,
+    'AspectLocation': AspectLocation
+}
+
+def location_from_dict(input:dict):
+    classname = input.pop('class')
+    constructor = location_constructors.get(classname, None)
+    if constructor is None:
+        return constructor
+    return constructor.from_dict(input)

@@ -67,7 +67,7 @@ class TimeSpan:
         if hasattr(start_datetime, 'tz'):
             self.set_start(start_datetime)
         elif hasattr(self, '_tz'):
-            self.set_start(start_datetime, self.__tz)
+            self.set_start(start_datetime, self._tz)
         else:
             self.set_start(start_datetime)
 
@@ -95,7 +95,10 @@ class TimeSpan:
 
     @property
     def tz(self):
-        return self._tz
+        if hasattr(self, "_tz"):
+            return self._tz
+        else:
+            return None
 
     @tz.setter
     def tz(self, tz:TimeZoneScalar|None):
@@ -290,11 +293,17 @@ class OffsetRegTimeSpan(RegTimeSpan):
     The purpose of this class is to allow a small timeseries to be repeated (with offset) to represent a longer timeseries which may start at a different time.
     """
     def __init__(self, other:TimeSpan|None=None) -> None:
+        self._offset_initialised = False
         super().__init__(other)
         if not (other is None):
             if isinstance(other, OffsetRegTimeSpan):
+                self._offset_initialised = other.offset_initialised
                 self._local_start = other.local_start
                 self._remote_start = other.remote_start
+
+    @property 
+    def offset_initialised(self):
+        return self._offset_initialised    
 
     @property
     def local_start(self) -> pd.Timestamp:
@@ -313,6 +322,7 @@ class OffsetRegTimeSpan(RegTimeSpan):
             remote_start = pd.Timestamp(remote_start, tz=self.tz)
         self._local_start = local_start
         self._remote_start = remote_start
+        self._offset_initialised = True
 
     @property
     def offset_local(self) -> int:
@@ -352,3 +362,11 @@ class OffsetRegTimeSpan(RegTimeSpan):
         i0 = self.offset_local + start_off
         i1 = i0 + n_interval + 1
         return self.normalise_index(np.arange(i0, i1))
+
+    def _post_calc(self):
+        super()._post_calc()
+        if not self._offset_initialised:
+            if hasattr(self, "_start_dt"):
+                self._local_start = self._start_dt
+                self._remote_start = self._start_dt
+
