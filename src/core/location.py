@@ -150,11 +150,10 @@ class Location:
 class RaisedLocation(Location):
     def __init__(self, other:Location|RaisedLocation|None=None) -> None:
         super().__init__(other)
+        self._height = 0.0
         if not (other is None):
             if isinstance(other, RaisedLocation):
                 self._height = other.height_agl
-            else:
-                self._height = 0.0
     
     @property
     def height_agl(self):
@@ -217,13 +216,12 @@ class RaisedLocation(Location):
 class AspectLocation(RaisedLocation):
     def __init__(self, other:Location|None=None) -> None:
         super().__init__(other)
+        self._azimuth = 180.0
+        self._pitch = 90.0
         if not (other is None):
             if isinstance(other, AspectLocation):
                 self._azimuth = other.azimuth
                 self._pitch = other.pitch
-            else:
-                self._azimuth = 180.0
-                self._pitch = 90.0
     
     @property
     def azimuth(self):

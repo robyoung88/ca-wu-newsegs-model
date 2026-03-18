@@ -1,7 +1,9 @@
+from __future__ import annotations
 # Very simple environment servers that provide in-memory stores for timeseries data which are returned on request
 
-from src.core import NewsegsLocalEnvironment,NewsegsWiderEnvironment
-from src.core import Location,RaisedLocation,AspectLocation,RegTimeSpan,OffsetRegTimeSpan
+from src.core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
+from src.core.location import Location,RaisedLocation,AspectLocation
+from src.core.timespan import RegTimeSpan,OffsetRegTimeSpan
 import numpy as np
 import numpy.typing as npt
 from collections.abc import Iterable
@@ -56,12 +58,12 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         srs = self.access_wind_series(location)
         if srs is None:
             return srs
-        idxs = srs.timespan.get_local_index(timespan)
-        return(srs.timeseries[idxs])
+        idxs = srs['timespan'].get_local_index(timespan)
+        return(srs['timeseries'][idxs])
 
     def set_horizontal_solar_flux(self,
                        horizontal_solar_flux:npt.ArrayLike,
-                       location:RaisedLocation,
+                       location:AspectLocation,
                        timespan:OffsetRegTimeSpan):
         # Only store a single series for horizontal solar flux
         self._horizontal_solar_flux_series[None] = {
@@ -148,6 +150,11 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
             return srs
         idxs = srs.timespan.get_local_index(timespan)
         return(srs.timeseries[idxs])
+
+    def get_air_density(self,
+                        location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
+                        timespan:TimeSpan):
+        return 1.225
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
     def __init__(self):

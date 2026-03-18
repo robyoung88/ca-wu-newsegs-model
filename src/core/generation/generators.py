@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable,Mapping
 import numpy as np
@@ -5,9 +6,10 @@ import numpy.typing as npt
 from copy import copy
 from src.core import TimeSpan
 from src.core import Location,RaisedLocation,AspectLocation,location_from_dict
-from src.newsegsmodel.newsegsmodel import NewsegsModel
+#from src.newsegsmodel.newsegsmodel import NewsegsModel
 
-def __cp_interpolant_factory(cp_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]) -> Callable[npt.ArrayLike,npt.ArrayLike]:
+#def __cp_interpolant_factory(cp_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]) -> Callable[npt.ArrayLike,npt.ArrayLike]:
+def _cp_interpolant_factory(cp_curve):
     def interpolant(x):
         return np.interp(x, cp_curve[0,:], cp_curve[1,:], left=0.0, right=0.0)
     return interpolant
@@ -35,8 +37,9 @@ class ABCElecGenerator(metaclass=ABCMeta):
 
     @model.setter
     @abstractmethod
-    def model(self, callback_model:newsegsmodel.NewsegsModel):
+    def model(self, callback_model):
         ...
+    # def model(self, callback_model:newsegsmodel.NewsegsModel):
 
     @abstractmethod
     def to_dict(self):
@@ -45,12 +48,12 @@ class ABCElecGenerator(metaclass=ABCMeta):
         """
         ...
     
-    @abstractmethod
-    def load_dict(self):
-        """
-        Update configuration using a dictionary
-        """
-        ...
+    #@abstractmethod
+    #def load_dict(self):
+    #    """
+    #    Update configuration using a dictionary
+    #    """
+    #    ...
 
     @property
     @abstractmethod
@@ -68,11 +71,11 @@ class ABCElecGenerator(metaclass=ABCMeta):
         ...
 
 class WindTurbineElecGenerator(ABCElecGenerator):
-    _default_cp_curve = __cp_interpolant_factory(np.asarray(
+    _default_cp_curve = np.asarray(
         [
             [0,  3,  5,   10, 25, 26, 50],
             [0.0,0.0,0.25,0.4,0.1,0.0,0.0]
-        ]).reshape((2,-1)))
+        ]).reshape((2,-1))
     _default_name = "Wind Turbine"
     def __init__(self,
                  other:WindTurbineElecGenerator|None = None
@@ -101,11 +104,11 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             raise ValueError("'other' must be a WindTurbineElecGenerator")
 
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self):# -> NewsegsModel|None:
         return self._model
     
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model) -> None:
         self._model = model
 
     @property
@@ -159,7 +162,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     @hub_height.setter
     def hub_height(self, height:float) -> None:
         self._hub_height = height
-        if hasattr(self, _location):
+        if hasattr(self, '_location'):
             self._location.height_agl = height
 
     @property
@@ -191,7 +194,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             cp_curve = copy(cp_curve)
             cp_curve[1,cp_curve[1,:]<0.0] = 0.0
         self._cp_curve = cp_curve
-        self._cp_func = __cp_interpolant_factory(cp_curve)
+        self._cp_func = _cp_interpolant_factory(cp_curve)
     
     def set_power_curve(self,
                         power_curve:np.ndarray[tuple[int,int], np.dtype[np.number]],
@@ -244,7 +247,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             o.location = location
 
         if not (cp_curve is None):
-            p.set_cp_curve(cp_curve)
+            o.set_cp_curve(cp_curve)
         elif not (power_curve is None):
             o.set_power_curve(power_curve)
         else:
@@ -303,11 +306,11 @@ class PowerPlantHomogeneousWind(ABCElecGenerator):
             raise ValueError("`other` should be a `PowerPlantHomogeneousWind` or `WindTurbineElecGenerator`")
         
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self):# -> NewsegsModel|None:
         return self._model
     
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model) -> None:
         self._model = model
         self._turbine.model = model
 
@@ -322,13 +325,13 @@ class PowerPlantHomogeneousWind(ABCElecGenerator):
     @property
     def location(self) -> RaisedLocation:
         return self._location
-    
+
     @location.setter
     def location(self, loc:Location) -> None:
         if (isinstance(loc, RaisedLocation) and loc.height_agl != self._turbine.hub_height):
             raise UserWarning("Provided location includes a height unequal to hub, which will be ignored")
         self._location = RaisedLocation(loc)
-        self._location.height_agl = self.hub_height
+        self._location.height_agl = self._turbine.hub_height
         self._turbine.location = self._location
 
     @property
@@ -412,7 +415,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
             self._model = None
             self._name = self._default_name
             self._peak_power = 1.0
-            self._total_area = self._peak_power_stc / 0.435
+            self._total_area = self._peak_power / 0.435
             self._collector_area = self._total_area * 1.0
             self._frame_factor = None
             self._location = AspectLocation()
@@ -428,11 +431,11 @@ class ABCPVElecGenerator(ABCElecGenerator):
             raise ValueError("`other` must be an `ABCPVElecGenerator`")
 
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self):# -> NewsegsModel|None:
         return self._model
     
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model) -> None:
         self._model = model
 
     @property
@@ -558,7 +561,7 @@ class SprakePVElecGenerator(ABCPVElecGenerator):
     def __init__(self,
                  other:SprakePVElecGenerator|None = None
                  ) -> None:
-        super.__init__(other)
+        super().__init__(other)
         if other is None:
             self._self_consumption = 0.04
             self._aspect_factor = 0.7
@@ -659,7 +662,7 @@ class PowerPlantHomogeneousPV(ABCElecGenerator):
             self._model = None
             self._name = self._default_name
             self._pv_array = SprakePVElecGenerator()
-            self._location = self._pv.location
+            self._location = self._pv_array.location
             self._n_arrays = 1.0
         elif isinstance(other, PowerPlantHomogeneousPV):
             self._model = other.model
@@ -677,11 +680,19 @@ class PowerPlantHomogeneousPV(ABCElecGenerator):
             raise ValueError("`other` should be a `PowerPlantHomogeneousPV` or `ABCPVElecGenerator`")
     
     @property
-    def model(self) -> NewsegsModel|None:
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, name):
+        self._name = name
+
+    @property
+    def model(self):# -> NewsegsModel|None:
         return self._model
     
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model) -> None:
         self._model = model
         self._pv_array.model = model
 
@@ -789,11 +800,11 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
             raise ValueError("`other` should be a `PowerPlantHeterogeneousGenerators")
         
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self):# -> NewsegsModel|None:
         return self._model
 
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model) -> None:
         self._model = model
         for generator in self.generators:
             generator.model = model
@@ -866,8 +877,23 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     @classmethod
     def from_dict(cls, input:Mapping) -> PowerPlantHeterogeneousGenerators:
         if input.get('generators', None) is not None:
-            input['generators'] = [generator_from_dict[x] for x in input['generators']]
+            input['generators'] = [generator_from_dict(x) for x in input['generators']]
         return cls.from_characteristics(**input)
+
+    @property
+    def location(self):
+        return self._generator_list[0].location
+    
+    @location.setter
+    def location(self, newloc):
+        self._generator_list[0].location=newloc
+
+    @property
+    def nameplate_capacity(self):
+        cap = 0
+        for gen in self._generator_list:
+            cap += gen.nameplate_capacity
+        return cap
 
 generator_constructors = {
     'WindTurbineElecGenerator': WindTurbineElecGenerator,

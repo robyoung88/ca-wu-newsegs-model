@@ -1,2 +1,3 @@
 from src.newsegsgeneration.newsegsgeneration import NewsegsGeneration
+from src.newsegsgeneration.sprakegeneration import SprakeGeneration
 from src.newsegsgeneration.testnewsegsgeneration import TestNewsegsGeneration

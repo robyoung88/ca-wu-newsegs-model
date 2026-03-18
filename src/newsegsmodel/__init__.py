@@ -1,0 +1,1 @@
+from src.newsegsmodel.newsegsmodel import NewsegsModel

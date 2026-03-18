@@ -1,8 +1,10 @@
 # Abstract base class for NewSEGS model and environment data
 
-from abc import ABCMeta
-from src.core import TimeSpan
+from abc import ABCMeta, abstractmethod
+
+from src.core import TimeSpan, TimedeltaScalar
 from src.core import NewsegsLocalEnvironment,NewsegsWiderEnvironment
+from src.core import ABCNewsegsModuleResult
 from src.newsegsgeneration import NewsegsGeneration
 from src.newsegsgrid import NewsegsGrid
 from src.newsegscs import NewsegsCS
@@ -26,6 +28,10 @@ class NewsegsModel(metaclass=ABCMeta):
     def generation(self, generation_module:NewsegsGeneration):
         ...
 
+    @abstractmethod
+    def get_generation_result(self) -> ABCNewsegsModuleResult:
+        ...
+
     @property
     @abstractmethod
     def grid(self) -> NewsegsGrid:
@@ -34,6 +40,10 @@ class NewsegsModel(metaclass=ABCMeta):
     @grid.setter
     @abstractmethod
     def grid(self, grid_module:NewsegsGrid):
+        ...
+
+    @abstractmethod
+    def get_grid_result(self) -> ABCNewsegsModuleResult:
         ...
     
     @property
@@ -44,6 +54,10 @@ class NewsegsModel(metaclass=ABCMeta):
     @consumption_storage.setter
     @abstractmethod
     def consumption_storage(self, cs_module:NewsegsCS):
+        ...
+
+    @abstractmethod
+    def get_consumption_storage_result(self) -> ABCNewsegsModuleResult:
         ...
 
     @property
@@ -64,4 +78,8 @@ class NewsegsModel(metaclass=ABCMeta):
     @wider_env.setter
     @abstractmethod
     def wider_env(self, wider_env_server:NewsegsWiderEnvironment):
+        ...
+
+    @abstractmethod
+    def get_default_timestep(self) -> TimedeltaScalar:
         ...

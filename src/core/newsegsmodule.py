@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import numpy as np
 from src.core.timespan import TimeSpan
+from collections.abc import Iterable
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
     @property
@@ -13,13 +14,29 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
     @abstractmethod
     def dsm(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
         ...
+        
+    @abstractmethod
+    def get_meter_names(self) -> Iterable:
+        ...
 
+    @abstractmethod
+    def get_meter_types(self) -> Iterable:
+        ...
+
+    @abstractmethod
+    def get_dsm_names(self) -> Iterable:
+        ...
+
+    @abstractmethod
+    def get_dsm_types(self) -> Iterable:
+        ...
+    
 class NewsegsModule(metaclass=ABCMeta):
     """
     Basic abstract class serving module results
     """
     @abstractmethod
-    def run(self, time_span:TimeSpan) -> ABCNewsegsModuleResult:
+    def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
         ...
     
     @property
@@ -42,9 +59,9 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         ...
     
-    @abstractmethod
-    def load_dict(self):
-        """
-        Update configuration using a dictionary
-        """
-        ...
+    #@abstractmethod
+    #def load_dict(self):
+    #    """
+    #    Update configuration using a dictionary
+    #    """
+    #    ...
