@@ -181,7 +181,7 @@ class SprakeCS(NewsegsCS):
             'seasonal_variance': 0.2,
             'n_households': self._n_units
         }
-        if (os.environ['ENV_FOR_DYNACONF'] == 'spraketest'):
+        if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
             self._spaceheat_params = {
                 'hlp': 0.3,
                 'gfa': 105.0,

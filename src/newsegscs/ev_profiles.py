@@ -14,12 +14,16 @@ lookup_dir = settings.get('SprakeDataLoc')
 # https://smarter.energynetworks.org/projects/nia_ngso0021
 # Notably, 2017 is not a leap year.
 # Regardless, to make these data representative of weekly as well as yearly trend, they need characterisation
+# Timestamp is at half hour within hour of observation
 PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
                                           r'NG EV Charging Behaviour Study - Demand Profiles - V3 - External (11-04-2019 00-00-00).xlsx'),
                                           sheet_name='GB Level Profile',
                                           header = 22,
                                           usecols=[0,2])\
-                            .rename(columns={'Timestamp':'datetime'})
+                            .rename(columns={'Timestamp':'datetime'})  \
+                            .assign(start_day_seconds = lambda df:  (df['datetime'] - df['datetime'].dt.floor('D')).dt.total_seconds() - 1800, 
+                                    end_day_seconds = lambda df:  (df['datetime'] - df['datetime'].dt.floor('D')).dt.total_seconds() + 1800)
+                            
 
 def characterise_dates_evprofile(datetimes,
                                  hols:holidays.HolidayBase = holidays.country_holidays('GB', subdiv='WLS')):
@@ -40,7 +44,6 @@ def characterise_dates_evprofile(datetimes,
         .assign(
             month_n = lambda df: df['datetime'].dt.month,
             day_n = lambda df: df['datetime'].dt.day_of_week,
-            period_hour = lambda df: df['datetime'].dt.hour,
             is_holiday = lambda df: df.apply(lambda rw: rw['datetime'] in hols, axis=1),
             is_sat = lambda df: df['day_n'] == 5,
             is_sun = lambda df: df['day_n'] == 6,
@@ -67,58 +70,53 @@ def characterise_profile_data(profile_data:pd.DataFrame,
     
     return (
         profile_data.pipe(characterise_dates_evprofile, hols)
-        .groupby(['month_n','prof_day','period_hour'])
+        .groupby(['start_day_seconds','end_day_seconds','month_n','prof_day'])
         ['Residential']
         .mean()
     )
 
 PROFILE_DATA_CHARACTERISED = characterise_profile_data(PROFILE_DATA).to_frame().reset_index()
 
+# TODO: This function takes too long
 def ev_profiles_for_time_spans(time_spans,
-                               profile_data_characterised=PROFILE_DATA_CHARACTERISED):
-    time_spans = time_spans.to_frame()
-    normalised_profiles_characterised = profile_data_characterised
-    # Where a span ends at midnight but is not zero-length, set end to 24 
-    # to allow less-than logic to work on filtering
-    time_spans = time_spans \
-        .assign(
-            shifted_end = lambda df: np.logical_and(
-                df['start_hour'] != df['end_hour'],
-                df['end_hour'] == 0),
-            end_hour = lambda df: np.where(df['shifted_end'], 24, df['end_hour'])
-            )
-
-    averaged_profiles = []
-    for _, rw in time_spans.iterrows():
-        profdata = (
-            normalised_profiles_characterised
-            .query('month_n == @rw["month_n"] & prof_day == @rw["prof_day"]')
-            .query('period_hour >= @rw["start_hour"] & period_hour < @rw["end_hour"]')
-            ['Residential']
-            .mean()
-        )
-        
-        averaged_profiles.append(
-            pd.DataFrame(rw.to_dict(),index=[0]).assign(consumption_rate = profdata)
-        )
-
-    retprof = pd.concat(averaged_profiles)
-
-    retprof = retprof \
-        .assign(end_hour = lambda df: np.where(
-            df['shifted_end'],
-            0,
-            df['end_hour']
-        )) \
-        .drop(columns=['shifted_end']) \
-        .fillna(0.0)
+                               profile_data=PROFILE_DATA_CHARACTERISED):
+    import sqlite3
     
-    return retprof
+    with sqlite3.connect(':memory:') as conn:
+        profile_data.loc[:,['start_day_seconds','end_day_seconds',
+                            'month_n', 'prof_day',
+                            'Residential']].to_sql('profile_data', conn, index=False)
+        time_spans.to_sql('time_spans', conn, index = False)
+
+        qry = '''
+        select
+            time_spans.start_day_seconds start_day_seconds,
+            time_spans.end_day_seconds end_day_seconds,
+            profile_data.start_day_seconds prof_sds,
+            profile_data.end_day_seconds prof_eds,
+            profile_data.month_n month_n,
+            profile_data.prof_day prof_day,
+            profile_data.Residential consumption_rate
+        from
+            time_spans join profile_data on
+            not(time_spans.end_day_seconds <= profile_data.start_day_seconds) and not(time_spans.start_day_seconds >= profile_data.end_day_seconds)
+        '''
+
+        df = pd.read_sql_query(qry, conn)\
+            .assign(
+                window_length = lambda df: (np.minimum(df['end_day_seconds'], df['prof_eds']) - np.maximum(df['start_day_seconds'], df['prof_sds']))/3600.0,
+                consumption = lambda df: df['consumption_rate'] * df['window_length']
+            ) \
+            .groupby(['start_day_seconds', 'end_day_seconds','month_n','prof_day']) \
+            ['consumption']\
+            .sum()
+
+        return df
 
 # TODO: this is too slow
 def get_ev_consumption(datetimes,
                        annual_consumption:float = 2000.0,
-                       normalised_profiles_characterised=PROFILE_DATA_CHARACTERISED,
+                       profile_data=PROFILE_DATA_CHARACTERISED,
                        hols:holidays.HolidayBase = holidays.country_holidays('GB', subdiv='WLS')):
     """
     Given a regular timeseries, get the profiled EV consumption between adjacent entries
@@ -130,23 +128,38 @@ def get_ev_consumption(datetimes,
     if len(datetimes) < 2:
         raise ValueError("Consumption is between adjacent times, require at least 2")
     
+    # Our datetimes are retrospective (i.e. are at the end of the interval).
+    # In order to make sure they are assigned the correct elexon period (at midnight), we need to get the start
+    # of the interval
+    start_datetimes = pd.Series(datetimes).shift(1, fill_value=datetimes[0])
     oframe = (
-        characterise_dates_evprofile(datetimes, hols)
-        .assign(end_hour = lambda df: df['period_hour'],
-                start_hour = lambda df: df['end_hour'].shift(1, fill_value = df['end_hour'].iloc[0]))
+        characterise_dates_evprofile(start_datetimes, hols)
+        .rename(columns={'datetime':'start_datetime'})
+        .assign(
+            datetime = datetimes,
+            end_day_seconds = lambda df: (df['datetime'] - df['datetime'].dt.floor('D')).dt.total_seconds(),
+            start_day_seconds = lambda df: df['end_day_seconds'].shift(1, fill_value = df['end_day_seconds'].iloc[0]),
+            time_delta = lambda df: df['datetime'] - df['datetime'].shift(1, fill_value=df['datetime'].iloc[0])
+            )
+        .assign(
+            end_day_seconds = lambda df: df['start_day_seconds'] + df['time_delta'].dt.total_seconds()
+        )
+
     )
 
-    time_spans = oframe.set_index(['month_n','prof_day','start_hour','end_hour']).index.unique()
+    oframe = oframe.set_index(['start_day_seconds', 'end_day_seconds'])
 
-    working_profiles = ev_profiles_for_time_spans(time_spans,normalised_profiles_characterised)
+    time_spans = oframe.index.unique().to_frame()
+
+    working_profiles = ev_profiles_for_time_spans(time_spans, profile_data)
 
     oframe = oframe \
-        .set_index(['month_n','prof_day','start_hour','end_hour']) \
-        .join(working_profiles.set_index(['month_n','prof_day','start_hour','end_hour'])) \
+        .reset_index() \
+        .set_index(['start_day_seconds','end_day_seconds','month_n','prof_day']) \
+        .join(working_profiles) \
         .reset_index() \
         .assign(
-            delta_hrs = lambda df: (df['datetime'] - df['datetime'].shift(1, fill_value = df['datetime'].iloc[0])).dt.total_seconds() / 3600.0,
-            consumption = lambda df: df['consumption_rate'] * df['delta_hrs'] * annual_consumption
+            consumption = lambda df: annual_consumption * np.where(np.isnan(df['consumption']), 0.0, df['consumption'])
         )
     
     return oframe

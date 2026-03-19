@@ -178,7 +178,7 @@ def characterise_dates_elexon(datetimes,
         )
     )
 
-    if (os.environ['ENV_FOR_DYNACONF'] == 'spraketest'):
+    if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
         # Original Sprake model does not consider holidays
         oframe = oframe \
             .assign(
@@ -263,7 +263,7 @@ def get_elexon_consumption(datetimes,
     working_profiles = elexon_profiles_for_time_spans(time_spans, profile_data)
 
     oframe = oframe\
-        .reset_index()\
+        .reset_index() \
         .set_index(['start_day_seconds','end_day_seconds','elexon_season','elexon_day']) \
         .join(working_profiles) \
         .reset_index() \
