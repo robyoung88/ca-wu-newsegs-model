@@ -1,13 +1,15 @@
 from __future__ import annotations
 from collections.abc import Mapping
+import os
 import numpy as np
+import pandas as pd
 import numpy.typing as npt
 
 #from src.newsegsmodel import NewsegsModel
 from src.newsegscs import NewsegsCS
 from src.core import ABCNewsegsModuleResult
 
-from src.core.timespan import OffsetRegTimeSpan
+from src.core.timespan import OffsetRegTimeSpan, RegTimeSpan
 from src.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 
 class SprakeCSResult(ABCNewsegsModuleResult):
@@ -30,7 +32,7 @@ class SprakeCSResult(ABCNewsegsModuleResult):
         self.set_grid_export(grid_export)
 
         # DSM values - i.e. system state values
-        self.get_storage_soc(storage_soc)
+        self.set_storage_soc(storage_soc)
 
     @property
     def meters(self) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
@@ -133,29 +135,29 @@ class SprakeCSResult(ABCNewsegsModuleResult):
     def set_storage_soc(self, storage_soc:np.ndarray[tuple[int], np.dtype[np.number]]):
         self._storage_soc = storage_soc
 
-def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1):
+def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
     from src.newsegscs.elexon_profiles import get_elexon_consumption
-    cons = get_elexon_consumption(model_dates)
-    return cons['consumption'] * (1.0 - efficiency_reduction)
+    cons = get_elexon_consumption(datetimes)
+    return cons['consumption'].values * (1.0 - efficiency_reduction) * n_households
 
-def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0):
+def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
     from src.newsegscs.ev_profiles import get_ev_consumption
     cons = get_ev_consumption(datetimes,
                               annual_consumption=annual_residential_consumption_per_ev)
-    return cons['consumption']
+    return cons['consumption'] * n_evs
 
-def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2):
+def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
     from src.newsegscs.dhw_profiles import get_dhw_energy_consumption
     cons = get_dhw_energy_consumption(datetimes,
                                       ref_daily_consumption,
                                       seasonal_variance)
-    return cons['consumption']
+    return cons['consumption'] * n_households
 
-def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0):
+def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_households=1000):
     from src.newsegscs.sprake_thermal_model import get_spaceheat_energy_consumption
     cons = get_spaceheat_energy_consumption(datetimes,
                                             hlp,gfa)
-    return cons['consumption']                            
+    return cons['consumption'] * n_households                        
 
 class SprakeCS(NewsegsCS):
 
@@ -164,23 +166,37 @@ class SprakeCS(NewsegsCS):
     def __init__(self):
         self._name = self._default_name
         self._n_units = 1000.0
+        self._ev_per_unit = 1.2
         self._model = None
         self._appliance_params = {
-            'efficiency_reduction': 0.1
+            'efficiency_reduction': 0.1,
+            'n_households': self._n_units
         }
         self._ev_params = {
-            'annual_residential_consumption_per_ev': 1760.0
+            'annual_residential_consumption_per_ev': 1313.65683,
+            'n_evs': self._ev_per_unit * self._n_units
         }
         self._dhw_params = {
             'ref_daily_consumption': 4.5,
-            'seasonal_variance': 0.2
+            'seasonal_variance': 0.2,
+            'n_households': self._n_units
         }
-        self._spaceheat_params = {
-            'hlp': 1.1,
-            'gfa': 105.0,
-            'timeseries_hdd_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
-            'timeseries_model_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0]
-        }
+        if (os.environ['ENV_FOR_DYNACONF'] == 'spraketest'):
+            self._spaceheat_params = {
+                'hlp': 0.3,
+                'gfa': 105.0,
+                'timeseries_hdd_start': pd.Timestamp('2018-01-01T00:00:00', tz='utc'),
+                'timeseries_model_start': pd.Timestamp('2002-01-01T00:00:00', tz='utc'),
+                'n_households': self._n_units
+            }
+        else:
+            self._spaceheat_params = {
+                'hlp': 1.1,
+                'gfa': 105.0,
+                'timeseries_hdd_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+                'timeseries_model_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+                'n_households': self._n_units
+            }
         self._storage_params = {
             'storage_capacity': 4000.0,
             'storage_rte': 0.88
@@ -209,6 +225,10 @@ class SprakeCS(NewsegsCS):
     @n_units.setter
     def n_units(self, n_units:float) -> None:
         self._n_units = n_units
+        self._appliance_params['n_households'] = n_units
+        self._ev_params['n_evs'] = n_unit * self._ev_per_unit
+        self._dhw_params['n_households'] = n_units
+        self._spaceheat_params['n_households'] = n_units
     
     @property
     def appliance_params(self) -> dict:
@@ -255,7 +275,7 @@ class SprakeCS(NewsegsCS):
         
         datetimes = timespan.to_pandas()
 
-        cons_arr = np.array(4, len(datetimes), dtype=np.float64)
+        cons_arr = np.empty((4, len(datetimes)), dtype=np.float64)
         cons_arr[0,:] = sprake_appliance_consumption(datetimes, **self._appliance_params)
         cons_arr[1,:] = sprake_ev_consumption(datetimes, **self._ev_params)
         cons_arr[2,:] = sprake_dhw_consumption(datetimes, **self._dhw_params)
@@ -320,7 +340,7 @@ class SprakeCS(NewsegsCS):
                     grid_imp[i] = 0.0
                 else:
                     stor_dis = min(floorroom, -op/storage_rte) # The RTE is applied at discharge only in Sprake model
-                    from_grid = -op * storage_rte * stor_dis
+                    from_grid = -op - (storage_rte * stor_dis)
                     stor_arr[i] = stor_soc - stor_dis
                     stor_imp[i] = 0.0
                     stor_exp[i] = stor_dis * storage_rte
@@ -340,7 +360,7 @@ class SprakeCS(NewsegsCS):
             storage_import=stor_imp,
             storage_export=stor_exp,
             storage_loss = stor_loss,
-            grid_import = gris_imp,
+            grid_import = grid_imp,
             grid_export = grid_exp,
             storage_soc = stor_arr
         )

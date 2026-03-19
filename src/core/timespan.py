@@ -20,6 +20,7 @@ TimedeltaScalar: TypeAlias = Timedelta|timedelta|np.timedelta64|str|int|float
 TimeZoneScalar: TypeAlias = str|tzinfo
 
 class TimeSpan:
+    _tz = 'utc'
     def __init__(self, other:TimeSpan|None=None) -> None:
         """
             Initialise a TimeSpan using another TimeSpan

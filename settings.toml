@@ -1,2 +1,5 @@
 [default]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
+
+[spraketest]
+SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"

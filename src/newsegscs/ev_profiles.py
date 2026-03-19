@@ -72,12 +72,12 @@ def characterise_profile_data(profile_data:pd.DataFrame,
         .mean()
     )
 
-PROFILE_DATA_CHARACTERISED = characterise_profile_data(PROFILE_DATA)
+PROFILE_DATA_CHARACTERISED = characterise_profile_data(PROFILE_DATA).to_frame().reset_index()
 
 def ev_profiles_for_time_spans(time_spans,
                                profile_data_characterised=PROFILE_DATA_CHARACTERISED):
     time_spans = time_spans.to_frame()
-    normalised_profiles_characterised = profile_data_characterised.to_frame().reset_index()
+    normalised_profiles_characterised = profile_data_characterised
     # Where a span ends at midnight but is not zero-length, set end to 24 
     # to allow less-than logic to work on filtering
     time_spans = time_spans \
@@ -138,7 +138,7 @@ def get_ev_consumption(datetimes,
 
     time_spans = oframe.set_index(['month_n','prof_day','start_hour','end_hour']).index.unique()
 
-    working_profiles = ev_profiles_for_time_spans(normalised_profiles_characterised,time_spans)
+    working_profiles = ev_profiles_for_time_spans(time_spans,normalised_profiles_characterised)
 
     oframe = oframe \
         .set_index(['month_n','prof_day','start_hour','end_hour']) \

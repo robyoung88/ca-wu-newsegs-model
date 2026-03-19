@@ -205,7 +205,9 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         """
         available_power = 0.5 * air_density * self.swept_area * power_curve[0,:] * power_curve[0,:] * power_curve[0,:]
         cp_curve = copy(power_curve)
-        cp_curve[1,:] = power_curve[1,:] / available_power
+        with np.errstate(divide='ignore', invalid='ignore'):
+            cp_curve[1,:] = power_curve[1,:] / available_power
+        cp_curve[1,:] = np.where(available_power<=0.0, 0.0, cp_curve[1,:])
         self.set_cp_curve(cp_curve)
 
     @property
@@ -728,7 +730,7 @@ class PowerPlantHomogeneousPV(ABCElecGenerator):
     @n_arrays.setter
     def n_arrays(self, n:float|int) -> None:
         assert n >= 0.0, "Number of PV arrays must be positive"
-        self._n_arrays - float(n)
+        self._n_arrays = float(n)
 
     @property
     def nameplate_capacity(self):

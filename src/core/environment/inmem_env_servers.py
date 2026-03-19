@@ -85,8 +85,8 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         srs = self.access_horizontal_solar_flux_series(location)
         if srs is None:
             return srs
-        idxs = srs.timespan.get_local_index(timespan)
-        return(srs.timeseries[idxs])
+        idxs = srs['timespan'].get_local_index(timespan)
+        return(srs['timeseries'][idxs])
 
     def set_external_temperature(self,
                        external_temperature:npt.ArrayLike,
@@ -112,8 +112,8 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         srs = self.access_external_temperature_series(location)
         if srs is None:
             return srs
-        idxs = srs.timespan.get_local_index(timespan)
-        return(srs.timeseries[idxs])
+        idxs = srs['timespan'].get_local_index(timespan)
+        return(srs['timeseries'][idxs])
 
     def set_solar_flux_on_plane(self,
                                 solar_flux:npt.ArrayLike,
@@ -148,8 +148,8 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         srs = self.access_solar_flux_on_plane_series(location)
         if srs is None:
             return srs
-        idxs = srs.timespan.get_local_index(timespan)
-        return(srs.timeseries[idxs])
+        idxs = srs['timespan'].get_local_index(timespan)
+        return(srs['timeseries'][idxs])
 
     def get_air_density(self,
                         location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
@@ -173,8 +173,8 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         srs = self._temperature_series
         if srs is None:
             return srs
-        idxs = srs.timespan.get_local_index(timespan)
-        return(srs.timeseries[idxs])
+        idxs = srs['timespan'].get_local_index(timespan)
+        return(srs['timeseries'][idxs])
 
     def set_horizontal_solar_flux_series(self,
                                          horizontal_solar_flux:npt.ArrayLike,
@@ -188,6 +188,6 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         srs = self._horizontal_solar_flux_series
         if srs is None:
             return srs
-        idxs = srs.timespan.get_local_index(timespan)
-        return(srs.timeseries[idxs])
+        idxs = srs['timespan'].get_local_index(timespan)
+        return(srs['timeseries'][idxs])
     

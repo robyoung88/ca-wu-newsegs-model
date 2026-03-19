@@ -138,6 +138,7 @@ def get_dhw_energy_consumption(datetimes,
         .join(working_profiles) \
         .reset_index() \
         .assign(
+            fraction_dhw_heat = lambda df: np.where(np.isnan(df['fraction_dhw_heat']), 0.0, df['fraction_dhw_heat']),
             consumption = lambda df: df['fraction_dhw_heat'] * df['daily_consumption']
         ) \
         .loc[:, ['datetime','consumption']]

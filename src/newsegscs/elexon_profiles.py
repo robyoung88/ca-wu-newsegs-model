@@ -11,20 +11,30 @@ from config import settings
 # Where to find elexon profile data
 lookup_dir = settings.get('SprakeDataLoc')
 
+# These data are retrospective, i.e. timestamp marks end of half-hour of demand
 PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir, 
                                           r"Average_Profiling_data_201314_evaluated@10yearNET_v1.0.xlsx"),
                             sheet_name="Average Profile Class data",
-                            header=2,nrows=48 # For Profile 1
+                            header=2, nrows=48, # For Profile 1
+                            dtype={'Settlement period':str}
                             ) \
-                .melt(id_vars='Settlement period',var_name="profile",value_name="consumption_rate") \
+                .assign(
+                    **{'Settlement period': lambda df: pd.to_timedelta(df['Settlement period']),
+                       'end_day_seconds': lambda df: df['Settlement period'].dt.total_seconds()}
+                ) \
+                .assign(
+                    # Because these periods are retrospective, we end at midnight and a 0. Convert it to a 24
+                    end_day_seconds = lambda df: np.where(df['end_day_seconds']==0.0, 24.0*3600.0, df['end_day_seconds']),
+                    start_day_seconds = lambda df: df['end_day_seconds'].shift(1, fill_value = 0.0)
+                ) \
+                .melt(id_vars=['Settlement period','start_day_seconds','end_day_seconds'],
+                      var_name="profile",value_name="consumption_rate") \
                 .assign(
                     split_prof = lambda df: df['profile'].str.split(" "),
                     elexon_season = lambda df: df.apply(lambda rw: rw['split_prof'][0].lower(), axis=1),
                     elexon_day = lambda df: df.apply(lambda rw: rw['split_prof'][1].lower(), axis=1),
-                    settlement_end = lambda df: df['Settlement period'],
-                    settlement_start = lambda df: df['settlement_end'].shift(1, fill_value = datetime.time(0))
                 ) \
-                .loc[:, ['settlement_start', 'settlement_end', 'elexon_season', 'elexon_day', 'consumption_rate']]
+                .loc[:, ['start_day_seconds', 'end_day_seconds', 'elexon_season', 'elexon_day', 'consumption_rate']]
 
 # First elexon season change in year is spring - first day of year of BST
 # This is last Sunday in March
@@ -33,7 +43,7 @@ def get_first_day_bst(year:int) -> pd.Timestamp:
     Return the date of the first day of the year when clocks go forward
     """
     # Step 1: get day of last date in March
-    last_day = pd.Timestamp(f"{year}-03-31")
+    last_day = pd.Timestamp(f"{year}-03-31", tz='utc')
     dow = last_day.day_of_week
     # Step 2: back up to nearest Sunday (day_of_week == 6, Monday = 0)
     if (dow == 6):
@@ -51,7 +61,7 @@ def get_start_elexon_spr(year:int) -> pd.Timestamp:
 # or "Late Summer" bank holiday. This is last Monday in August
 def get_august_bank_holiday(year) -> pd.Timestamp:
     # Step 1: get day of last date in August
-    last_day = pd.Timestamp(f"{year}-08-31")
+    last_day = pd.Timestamp(f"{year}-08-31", tz='utc')
     dow = last_day.day_of_week
     # Step 2: back up to nearest Monday (day_of_week == 0, Monday = 0)
     if (dow == 0):
@@ -87,7 +97,7 @@ def get_first_day_gmt(year:int) -> pd.Timestamp:
     This is the last Sunday in October
     """
     # Step 1: get day of last date in October
-    last_day = pd.Timestamp(f"{year}-10-31")
+    last_day = pd.Timestamp(f"{year}-10-31", tz='utc')
     dow = last_day.day_of_week
     # Step 2: back up to nearest Sunday (day_of_week == 6, Monday = 0)
     if (dow == 6):
@@ -168,49 +178,56 @@ def characterise_dates_elexon(datetimes,
         )
     )
 
+    if (os.environ['ENV_FOR_DYNACONF'] == 'spraketest'):
+        # Original Sprake model does not consider holidays
+        oframe = oframe \
+            .assign(
+                elexon_day = lambda df: np.where(
+                    df['is_weekday'],
+                    'wd',
+                    df['elexon_day']
+
+                )
+            )
+
     return oframe.loc[:,['datetime','elexon_season','elexon_day']]
 
-def elexon_profiles_for_time_spans(profile_data, time_spans):
+def elexon_profiles_for_time_spans(time_spans, profile_data):
     """
     Convert elexon profile data to the averaging periods used in the model time series
     """
-    time_spans = time_spans.to_frame()
-    # Where time_span ends at midnight, will need to set to 23:59:59 to ensure spans increase
-    # over day
-    # but ignore zero-length spans for timeseries start
-    time_spans = time_spans \
-        .assign(shifted_end = lambda df: np.logical_and(df['start_time'] != df['end_time'],
-                           df['end_time'] == datetime.time(0)),
-                end_time = lambda df: np.where(
-                    df['shifted_end'],
-                    datetime.time(23,59,59),
-                    df['end_time']
-                ))
+    import sqlite3
 
-    averaged_profiles = []
-    for _, rw in time_spans.iterrows():
-        # Perform simple mean, assuming that we're going to be aligned to the settlement periods
-        profdata = profile_data.query('((@rw["start_time"] >= settlement_start) & (@rw["start_time"] < settlement_end)) or ((@rw["end_time"] > settlement_start) & (@rw["end_time"] <= settlement_end))')
-        consump = profdata.groupby(['elexon_season', 'elexon_day'])['consumption_rate'].mean().to_frame().reset_index()
-        #avprof = pd.concat([consump, rw.reset_index(drop=True)], axis=1)
-        avprof = consump.assign(
-            start_time = rw['start_time'],
-            end_time = rw['end_time'],
-            shifted_end = rw['shifted_end']
-        )
-        averaged_profiles.append(avprof)
-    
-    retprof = pd.concat(averaged_profiles)
+    with sqlite3.connect(':memory:') as conn:
+        profile_data.loc[:,['start_day_seconds','end_day_seconds',
+                            'elexon_season','elexon_day',
+                            'consumption_rate']].to_sql('profile_data', conn, index = False)
+        time_spans.to_sql('time_spans', conn, index = False)
 
-    retprof = retprof \
-        .assign(end_time = lambda df: np.where(
-            df['shifted_end'],
-            datetime.time(0),
-            df['end_time']
-        )) \
-        .drop(columns=['shifted_end'])
+        qry = '''
+        select
+            time_spans.start_day_seconds start_day_seconds,
+            time_spans.end_day_seconds end_day_seconds,
+            profile_data.start_day_seconds prof_sds,
+            profile_data.end_day_seconds prof_eds,
+            profile_data.elexon_season elexon_season,
+            profile_data.elexon_day elexon_day,
+            profile_data.consumption_rate consumption_rate
+        from
+            time_spans join profile_data on
+            not(time_spans.end_day_seconds <= profile_data.start_day_seconds) and not(time_spans.start_day_seconds >= profile_data.end_day_seconds)
+        '''
 
-    return retprof 
+        df = pd.read_sql_query(qry, conn)\
+            .assign(
+                window_length = lambda df: (np.minimum(df['end_day_seconds'], df['prof_eds']) - np.maximum(df['start_day_seconds'], df['prof_sds']))/3600.0,
+                consumption = lambda df: df['consumption_rate'] * df['window_length']
+            ) \
+            .groupby(['start_day_seconds', 'end_day_seconds','elexon_season','elexon_day']) \
+            ['consumption']\
+            .sum()
+        
+    return df
 
 def get_elexon_consumption(datetimes,
                            profile_data = PROFILE_DATA):
@@ -223,24 +240,35 @@ def get_elexon_consumption(datetimes,
     if len(datetimes) < 2:
         raise ValueError("Consumption is between adjacent times, require at least 2")
 
-    # Do we check and enforce regularity, or do we just assume that it's occurred?
-    oframe = characterise_dates_elexon(datetimes) \
+    # Our datetimes are retrospective (i.e. are at the end of the interval).
+    # In order to make sure they are assigned the correct elexon period (at midnight), we need to get the start
+    # of the interval
+    start_datetimes = pd.Series(datetimes).shift(1, fill_value=datetimes[0])
+    oframe = characterise_dates_elexon(start_datetimes) \
+        .rename(columns={'datetime':'start_datetime'}) \
         .assign(
-            end_time = lambda df: df['datetime'].dt.time,
-            start_time = lambda df: df['end_time'].shift(1, fill_value = df['end_time'].iloc[0])
+            datetime = datetimes,
+            end_day_seconds = lambda df: (df['datetime'] - df['datetime'].dt.floor('D')).dt.total_seconds(),
+            start_day_seconds = lambda df: df['end_day_seconds'].shift(1, fill_value = df['end_day_seconds'].iloc[0]),
+            time_delta = lambda df: df['datetime'] - df['datetime'].shift(1, fill_value=df['datetime'].iloc[0])
+        ) \
+        .assign(
+            end_day_seconds = lambda df: df['start_day_seconds'] + df['time_delta'].dt.total_seconds()
         )
 
-    time_spans = oframe.set_index(['start_time','end_time']).index.unique()
+    oframe = oframe.set_index(['start_day_seconds', 'end_day_seconds'])
 
-    working_profiles = elexon_profiles_for_time_spans(profile_data, time_spans)
+    time_spans = oframe.index.unique().to_frame()
+
+    working_profiles = elexon_profiles_for_time_spans(time_spans, profile_data)
 
     oframe = oframe\
-        .set_index(['elexon_season','elexon_day','start_time','end_time']) \
-        .join(working_profiles.set_index(['elexon_season','elexon_day','start_time','end_time'])) \
+        .reset_index()\
+        .set_index(['start_day_seconds','end_day_seconds','elexon_season','elexon_day']) \
+        .join(working_profiles) \
         .reset_index() \
         .assign(
-            delta_hrs = lambda df: (df['datetime'] - df['datetime'].shift(1, fill_value = df['datetime'].iloc[0])).dt.total_seconds() / 3600.0,
-            consumption = lambda df: df['consumption_rate'] * df['delta_hrs']
+            consumption = lambda df: np.where(np.isnan(df['consumption']), 0.0, df['consumption'])
         )
 
     return oframe

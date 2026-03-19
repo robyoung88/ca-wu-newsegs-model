@@ -9,12 +9,14 @@ lookup_dir = settings.get('SprakeDataLoc')
 CALIBRATION_DEGREE_DAYS = pd.read_excel(os.path.join(lookup_dir,
                                                      'calibration_heating_degree_days.xlsx'),
                                         sheet_name='heating_degree_days',
-                                        header=0)
+                                        header=0) \
+    .assign(timestamp = lambda df: df['timestamp'].dt.tz_localize(tz='utc'))
 
 TIMESERIES_DEGREE_DAYS = pd.read_excel(os.path.join(lookup_dir,
                                                     'heating_degree_days.xlsx'),
                                         sheet_name='heating_degree_days',
-                                        header=0)
+                                        header=0) \
+    .assign(timestamp = lambda df: df['timestamp'].dt.tz_localize(tz='utc'))
 
 # NB - these data are prospective i.e. timestamp marks start of hour of consumption
 PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
@@ -37,7 +39,7 @@ def profiles_for_time_spans(time_spans, profile_data):
     import sqlite3
 
     with sqlite3.connect(':memory:') as conn:
-        PROFILE_DATA.loc[:,['start_day_seconds','end_day_seconds','proportion_space_heating_demand']].to_sql('profile_data', conn, index = False)
+        profile_data.loc[:,['start_day_seconds','end_day_seconds','proportion_space_heating_demand']].to_sql('profile_data', conn, index = False)
         time_spans.to_sql('time_spans', conn, index = False)
 
         qry = '''
@@ -89,7 +91,7 @@ def get_spaceheat_energy_consumption(datetimes,
         .assign(date = lambda df: df['timestamp'].dt.floor("D"))
         .query('date >= @start_day & date <= @end_day')
         .assign(
-            daily_consumption = lambda df: df['hdd_15_5'] * gfa * hlp * 24.0
+            daily_consumption = lambda df: df['hdd_15_5'] * gfa * hlp * 24.0 / 1000.0
         )
     )
 
@@ -102,6 +104,9 @@ def get_spaceheat_energy_consumption(datetimes,
             end_day_seconds = lambda df: (df['datetime'] - df['date']).dt.total_seconds(),
             start_day_seconds = lambda df: df['end_day_seconds'].shift(1, fill_value = df['end_day_seconds'].iloc[0]),
             time_delta = lambda df: df['datetime'] - df['datetime'].shift(1, fill_value=df['datetime'].iloc[0])
+        )
+        .assign(
+            end_day_seconds = lambda df: df['start_day_seconds'] + df['time_delta'].dt.total_seconds()
         )
     )
 
@@ -123,6 +128,7 @@ def get_spaceheat_energy_consumption(datetimes,
         .join(working_profiles) \
         .reset_index() \
         .assign(
+            fraction_heat = lambda df: np.where(np.isnan(df['fraction_heat']), 0.0, df['fraction_heat']),
             consumption = lambda df: df['fraction_heat'] * df['daily_consumption']
         ) \
         .loc[:, ['datetime','consumption']]
