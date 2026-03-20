@@ -389,8 +389,80 @@ def create_layout():
                             html.I(className="bi bi-lightning-charge", style={'padding': "10px", "padding-left":"2px"}),
                             "Generation Costs"
                         ],
-                        className='card-title')
-                    ])
+                        className='card-title'),
+                        html.H4([
+                            "Capital cost = £",
+                            html.Span("0", id="cost-gen-smry-capex"),
+                            "; Ongoing costs = £",
+                            html.Span("0", id="cost-gen-smry-ongoing"),
+                            "/yr"
+                        ],
+                        className='card-subtitle'),
+                        html.Details([
+                            html.Summary(""),
+                            html.Div([
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-wind", style={"padding": "7px"}),
+                                            html.Span("Wind Capex (£/kW)"),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(id='cost-gen-wind-capex-input', 
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                    ])
+                                ),
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-wind", style={"padding": "7px", "padding-right":"2px"}),
+                                            html.I(className="bi bi-arrow-repeat", style={"padding": "7px", "padding-left":"2px"}),
+                                            html.Span("Wind Ongoing (£/kW/yr)"),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(id='cost-gen-wind-ongoing-input', 
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                    ])
+                                ),
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-sun", style={"padding": "7px"}),
+                                            html.Span("Solar PV Capex (£/kWp)"),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(id='cost-gen-pv-capex-input', 
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                    ])
+                                ),
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-sun", style={"padding": "7px", "padding-right":"2px"}),
+                                            html.I(className="bi bi-arrow-repeat", style={"padding": "7px", "padding-left":"2px"}),
+                                            html.Span("Solar PV Ongoing (£/kWp/yr)"),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(id='cost-gen-pv-ongoing-input', 
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                    ])
+                                ),
+
+                            ])
+                        ])
+                    ]),
                 ])
             ],
             lg=6),
@@ -402,7 +474,49 @@ def create_layout():
                             html.I(className="bi bi-battery-half", style={'padding': "10px", "padding-left":"2px"}),
                             "Storage Costs"
                         ],
-                        className='card-title')
+                        className='card-title'),
+                        html.H4([
+                            "Capital cost = £",
+                            html.Span("0", id="cost-stor-smry-capex"),
+                            "; Ongoing costs = £",
+                            html.Span("0", id="cost-stor-smry-ongoing"),
+                            "/yr"
+                        ],
+                        className='card-subtitle'),
+                        html.Details([
+                            html.Summary(""),
+                            html.Div([
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-battery-half", style={"padding": "7px"}),
+                                            html.Span("BESS Capex (£/kWh)"),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(id='cost-stor-bess-capex-input', 
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                    ])
+                                ),
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-battery-half", style={"padding": "7px", "padding-right":"2px"}),
+                                            html.I(className="bi bi-arrow-repeat", style={"padding": "7px", "padding-left":"2px"}),
+                                            html.Span("BESS Ongoing (£/kWh/yr)"),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(id='cost-stor-bess-ongoing-input', 
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                    ])
+                                ),
+                            ])
+                        ])
                     ])
                 ])
             ],
@@ -416,7 +530,63 @@ def create_layout():
                             html.I(className="bi bi-receipt-cutoff", style={'padding': "10px"}),
                             "Sales"
                         ],
-                        className='card-title')
+                        className='card-title'),
+                        html.H4([
+                            html.I(className="bi bi-people", style={"margin-right": "0.1rem"}),
+                            " = £",
+                            html.Span("0", id="cost-sales-smry-residents"),
+                            "/yr; ",
+                            html.I(className="bi bi-box-arrow-up-right", style={"margin-right": "0.1rem"}),
+                            " = £",
+                            html.Span("0", id="cost-sales-smry-export"),
+                            "/yr"
+                        ],
+                        className='card-subtitle'),
+                        html.Details([
+                            html.Summary(""),
+                            html.Div([
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-people", style={"padding": "7px"}),
+                                            html.Span("Standing charge (£/houshold/day): ", style={'margin-right': '0.2rem'}),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),                                            
+                                        dbc.Input(id='resident-standing-charge-input',
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                ])),
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-receipt-cutoff", style={"padding": "7px", "padding-right":"2px"}),
+                                            html.I(className="bi bi-lightning-charge", style={"padding": "7px", "padding-left":"2px"}),
+                                            html.Span("Per unit charge (£/kWh): ", style={'margin-right': '0.2rem'}),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),                                            
+                                        dbc.Input(id='resident-per-unit-charge-input',
+                                                  type='number', 
+                                                  placeholder=0.0, 
+                                                  debounce='True', 
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                ])),
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-box-arrow-up-right", style={"padding": "7px"}),
+                                            html.Span("Grid export - mean per unit charge (£/kWh): ", style={'margin-right': '0.2rem'}),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),                                            
+                                        dbc.Input(id='export-per-unit-charge-input',
+                                                  type='number', 
+                                                  placeholder=0.0, 
+                                                  debounce='True', 
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                ])),
+                            ])
+                        ])
                     ])
                 ])
             ],
@@ -428,7 +598,47 @@ def create_layout():
                             html.I(className="bi bi-box-arrow-in-down-right", style={'padding': "10px"}),
                             "Import Costs"
                         ],
-                        className='card-title')
+                        className='card-title'),
+                        html.H4([
+                            "Fixed costs = £",
+                            html.Span("0", id="cost-import-smry-fixed"),
+                            "/yr; Ongoing costs = £",
+                            html.Span("0", id="cost-import-smry-ongoing"),
+                            "/kWh"
+                        ],
+                        className='card-subtitle'),
+                        html.Details([
+                            html.Summary(""),
+                            html.Div([
+                        dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-cash-coin", style={"padding": "7px"}),
+                                            html.Span("Fixed costs for backup (£/site/day): ", style={'margin-right': '0.2rem'}),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),                                            
+                                        dbc.Input(id='fixed-costs-import-input',
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                ])),
+                        dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className="bi bi-cash-coin", style={"padding": "7px", "padding-right":"2px"}),
+                                            html.I(className="bi bi-box-arrow-in-down-right", style={"padding": "7px", "padding-left":"2px"}),
+                                            html.Span("Per-unit costs for backup (£/kWh): ", style={'margin-right': '0.2rem'}),
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),                                            
+                                        dbc.Input(id='per-unit-costs-import-input',
+                                                  type='number',
+                                                  placeholder=0.0,
+                                                  debounce='True',
+                                                  style={'display':'inline-block', 'float':'right', "width":"30%"})
+                                ])),
+                             ])
+                        ])
                     ])
                 ])
             ],
@@ -443,8 +653,36 @@ def create_layout():
                             html.I(className="bi bi-cpu", style={'padding': "10px"}),
                             "Model Settings"
                         ],
-                        className='card-title')
-                    ])
+                        className='card-title'),
+                        html.H4([
+                            html.I(className='bi bi-calendar3-range', style={"margin-right": "0.1rem"}),
+                            " = ",
+                            html.Span("10", id="mdl-smry-horizon"),
+                            " years"
+                        ],
+                        className='card-subtitle'),
+                        html.Details([
+                            html.Summary(""),
+                            html.Div([
+                                dbc.Row(
+                                    html.Div([
+                                        html.H5([
+                                            html.I(className='bi bi-calendar3-range', style={"padding": "7px"}),
+                                            html.Span("Time horizon (years)")
+                                        ],
+                                        style={'display':'inline', "width":"50%"}),
+                                        dbc.Input(
+                                            id='mdl-timehorizon-input', 
+                                            type='number',
+                                            placeholder=0.0,
+                                            debounce='True',
+                                            style={'display':'inline-block', 'float':'right', "width":"30%"}
+                                        )
+                                    ])
+                                )
+                            ])
+                        ])
+                    ]),
                 ])
             ],
             width=12)
