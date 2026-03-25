@@ -47,6 +47,7 @@ DEFAULT_ICONS = {
     'gen-wind': 'bi bi-wind',
     'gen-pv': 'bi bi-sun',
     'storage': 'bi bi-battery-half',
+    'import-export': 'bi bi-arrow-down-up',
     'consumption-building': 'bi bi-houses',
     'consumption-building-nunits': 'bi bi-houses',
     'consumption-building-hlp': 'bi bi-fire',
@@ -59,6 +60,7 @@ DEFAULT_ICONS = {
     'consumption-direct-appliance-reduction': 'bi bi-graph-down-arrow',
     'consumption-direct-ev-anncharge': 'bi bi-ev-station',
     'consumption-direct-ev-nperunit': 'bi bi-ev-front',
+    'cost': 'bi bi-cash-coin',
     'cost-recurrent': 'bi bi-arrow-repeat',
     'cost-generation': ['bi bi-cash-stack', 'bi bi-lightning-charge'],
     'cost-storage': ['bi bi-cash-stack', 'bi bi-battery-half'],
@@ -198,6 +200,68 @@ _total_default_stat_list = [
                             {'label':'Total',
                              'value':'sum'}
                             ]
+
+_annual_seasonal_stat_list = [
+    {'label':'Year Mean',
+     'value':'mean_year'},
+    {'label':'Year Max',
+     'value':'max_year'},
+    {'label':'Year Min',
+     'value':'min_year'},
+    {'label':'Wtr Mean',
+     'value':'mean_wtr'},
+    {'label':'Wtr Max',
+     'value':'max_wtr'},
+    {'label':'Wtr Min',
+     'value':'min_wtr'},
+    {'label':'Spr Mean',
+     'value':'mean_spr'},
+    {'label':'Spr Max',
+     'value':'max_spr'},
+    {'label':'Spr Min',
+     'value':'min_spr'},
+    {'label':'Smr Mean',
+     'value':'mean_smr'},
+    {'label':'Smr Max',
+     'value':'max_smr'},
+    {'label':'Smr Min',
+     'value':'min_smr'},
+    {'label':'Aut Mean',
+     'value':'mean_aut'},
+    {'label':'Aut Max',
+     'value':'max_aut'},
+    {'label':'Aut Min',
+     'value':'min_aut'}
+]
+
+_total_seasonal_stat_list = [
+    {'label':'Year',
+     'value':'total_year'},
+    {'label':'Wtr',
+     'value':'total_wtr'},
+    {'label':'Spr',
+     'value':'total_spr'},
+    {'label':'Smr',
+     'value':'total_smr'},
+    {'label':'Aut',
+     'value':'total_aut'}
+]
+
+def present_single_stat(data_list,
+                        stat_name,
+                        stat_label,
+                        stat_value='mean',
+                        fmt='{:.2f}',
+                        none_str='-'):
+    n_configs = len(data_list)
+
+    comp_result = [x.get(stat_name, None) for x in data_list]
+    vals = [x.get(stat_value, None) if x is not None else None for x in comp_result]
+    
+    rw = [html.Td(stat_label, colSpan=2)] \
+        + [html.Td(fmt.format(x)) if x is not None else html.Td(none_str) for x in vals]
+
+    return [html.Tr(rw)]
 
 def present_stat_description(data_list,
                              stat_name,
@@ -372,6 +436,18 @@ def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp
         return fmt.format(d.get(value_id),d.get(fraction_id))
     return val_percent_formatter    
 
+def create_tab_head(n_configs):
+    return [
+        html.Thead(
+            html.Tr([
+                html.Th(""),
+                html.Th("")
+            ] + [
+                html.Th(get_icon(f'config-{x+1}')) for x in range(n_configs)
+            ])
+        )
+    ]
+
 def create_wind_results(wind_data=None, annual=True):
     if wind_data is None:
         wind_data = {}
@@ -382,14 +458,7 @@ def create_wind_results(wind_data=None, annual=True):
     else:
         n_configs = len(wind_data)
     
-    tab_head = [html.Thead(
-        html.Tr([
-            html.Th(""),
-            html.Th("")
-        ] + [
-            html.Th(html.I(className=f"bi bi-{x+1}-circle-fill")) for x in range(n_configs)
-        ])
-    )]
+    tab_head = create_tab_head(n_configs)
 
     if (annual):
         ann_gen = present_stat_description(wind_data, 'annual_production', 'Wind production (kWh/yr)', fmt='{:,.0f}')
@@ -407,13 +476,13 @@ def create_wind_results(wind_data=None, annual=True):
                                                       'self-consumption',
                                                       r'Wind-only self-consumption potential (kWh/yr (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=_annual_default_stat_list)
+                                                      stat_list=_annual_seasonal_stat_list)
     else:
         direct_sc = present_stat_description_compound(wind_data,
                                                       'self-consumption',
                                                       r'Wind-only self-consumption potential (kWh (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=_total_default_stat_list)
+                                                      stat_list=_total_seasonal_stat_list)
 
     tab_body = [html.Tbody(ann_gen + hours_in_range + longest_hours_below_5 + longest_hours_above_95 + direct_sc)]
 
@@ -429,14 +498,7 @@ def create_pv_results(pv_data=None, annual=True):
     else:
         n_configs = len(pv_data)
     
-    tab_head = [html.Thead(
-        html.Tr([
-            html.Th(""),
-            html.Th("")
-        ] + [
-            html.Th(html.I(className=f"bi bi-{x+1}-circle-fill")) for x in range(n_configs)
-        ])
-    )]
+    tab_head = create_tab_head(n_configs)
 
     if (annual):
         ann_gen = present_stat_description(pv_data, 'annual_production', 'PV production (kWh/yr)', fmt='{:,.0f}')
@@ -458,13 +520,13 @@ def create_pv_results(pv_data=None, annual=True):
                                                       'self-consumption',
                                                       r'PV-only self-consumption potential (kWh/yr (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=_annual_default_stat_list)
+                                                      stat_list=_annual_seasonal_stat_list)
     else:
         direct_sc = present_stat_description_compound(pv_data,
                                                       'self-consumption',
                                                       r'PV-only self-consumption potential (kWh (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=_total_default_stat_list)
+                                                      stat_list=_total_seasonal_stat_list)
 
     tab_body = [html.Tbody(ann_gen + max_day + min_day + days_in_range + direct_sc)]
 
@@ -479,14 +541,7 @@ def create_combined_generation_results(gen_data=None, annual=True):
     else:
         n_configs = len(gen_data)
     
-    tab_head = [html.Thead(
-        html.Tr([
-            html.Th(""),
-            html.Th("")
-        ] + [
-            html.Th(html.I(className=f"bi bi-{x+1}-circle-fill")) for x in range(n_configs)
-        ])
-    )]
+    tab_head = create_tab_head(n_configs)
 
     if (annual):
         ann_gen = present_stat_description(gen_data, 'annual_production', 'Production (kWh/yr)', fmt='{:,.0f}')
@@ -508,15 +563,358 @@ def create_combined_generation_results(gen_data=None, annual=True):
                                                       'self-consumption',
                                                       r'Without storage self-consumption potential (kWh/yr (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=_annual_default_stat_list)
+                                                      stat_list=_annual_seasonal_stat_list)
     else:
         direct_sc = present_stat_description_compound(gen_data,
                                                       'self-consumption',
                                                       r'Without storage self-consumption potential (kWh (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=_total_default_stat_list)
+                                                      stat_list=_total_seasonal_stat_list)
 
     tab_body = [html.Tbody(ann_gen + max_day + min_day + days_in_range + direct_sc)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_stor_results(stor_data=None, annual=True):
+    if stor_data is None:
+        stor_data = {}
+    
+    if isinstance(stor_data, Mapping):
+        n_configs = 1
+        stor_data = [stor_data]
+    else:
+        n_configs = len(stor_data)
+
+    tab_head = create_tab_head(n_configs)
+
+    if (annual):
+        to_stor = present_stat_description(stor_data, 'annual_tostore', 'Units to storage (kWh/yr)', fmt='{:,.0f}')
+        from_stor = present_stat_description(stor_data, 'annual_fromstore', 'Units from storage (kWh/yr)', fmt='{:,.0f}')
+        loss_stor = present_stat_description(stor_data, 'annual_lossstore', 'Units lost (kWh/yr)', fmt='{:,.0f}')
+        charge_cycles = present_stat_description(stor_data, 'annual_chargecycles', 'Effective charge cycles (N)', fmt='{:,.0f}')
+        hrs_min_soc = present_stat_description_compound(stor_data,
+                                                        'hrs_min_soc',
+                                                        r'Hours at min SoC (hrs, (%))',
+                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
+                                                        stat_list=_annual_default_stat_list
+                                                        )
+        hrs_max_soc = present_stat_description_compound(stor_data,
+                                                        'hrs_max_soc',
+                                                        r'Hours at max SoC (hrs, (%))',
+                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
+                                                        stat_list=_annual_default_stat_list
+                                                        )
+    else:
+        to_stor = present_stat_description(stor_data, 'total_tostore', 'Units to storage (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        from_stor = present_stat_description(stor_data, 'total_fromstore', 'Units from storage (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        loss_stor = present_stat_description(stor_data, 'total_lossstore', 'Units lost (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        charge_cycles = present_stat_description(stor_data, 'total_chargecycles', 'Effective charge cycles (N)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        hrs_min_soc = present_stat_description_compound(stor_data,
+                                                        'hrs_min_soc',
+                                                        r'Hours at min SoC (hrs, (%))',
+                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
+                                                        stat_list=_total_default_stat_list
+                                                        )
+        hrs_max_soc = present_stat_description_compound(stor_data,
+                                                        'hrs_max_soc',
+                                                        r'Hours at max SoC (hrs, (%))',
+                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
+                                                        stat_list=_total_default_stat_list
+                                                        )
+    
+    longest_hrs_min_soc = present_event_and_daterange(stor_data, 'continuous_hrs_min_soc', r'Longest continuous hours at min SoC', 'hours', lambda x: '{:,.1f}'.format(x))
+    longest_hrs_max_soc = present_event_and_daterange(stor_data, 'continuous_hrs_max_soc', r'Longest continuous hours at max SoC', 'hours', lambda x: '{:,.1f}'.format(x))
+
+    tab_body = [html.Tbody(to_stor + from_stor + loss_stor + hrs_min_soc + longest_hrs_min_soc + hrs_max_soc + longest_hrs_max_soc)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_cons_results(cons_data=None, annual=True):
+    if cons_data is None:
+        cons_data = {}
+    
+    if isinstance(cons_data, Mapping):
+        n_configs = 1
+        cons_data = [cons_data]
+    else:
+        n_configs = len(cons_data)
+
+    tab_head = create_tab_head(n_configs)
+    
+    if (annual):
+        app_cons = present_stat_description(cons_data, 'annual_app_cons', 'Appliance consumption (kWh/yr)', fmt='{:,.0f}')
+        dhw_cons = present_stat_description(cons_data, 'annual_dhw_cons', 'DHW consumption (kWh/yr)', fmt='{:,.0f}')
+        spaceheat_cons = present_stat_description(cons_data, 'annual_sh_cons', 'Space heat consumption (kWh/yr)', fmt='{:,.0f}')
+
+        residential_cons = present_stat_description(cons_data, 'annual_resid_cons', 'Total residential consumption (kWh/yr)', fmt='{:,.0f}')
+        perunit_residential_cons = present_stat_description(cons_data, 'annual_resid_cons_perunit', 'Per-unit residential consumption (kWh/yr)', fmt='{:,.0f}')
+
+        ev_cons = present_stat_description(cons_data, 'annual_ev_cons', 'EV consumption (kWh/yr)', fmt='{:,.0f}')
+        site_cons = present_stat_description(cons_data, 'annual_site_cons', 'Site consumption (kWh/yr)', fmt='{:,.0f}')
+
+    else:
+        app_cons = present_stat_description(cons_data, 'total_app_cons', 'Appliance consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        dhw_cons = present_stat_description(cons_data, 'total_dhw_cons', 'DHW consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        spaceheat_cons = present_stat_description(cons_data, 'total_sh_cons', 'Space heat consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+
+        residential_cons = present_stat_description(cons_data, 'total_resid_cons', 'Total residential consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        perunit_residential_cons = present_stat_description(cons_data, 'total_resid_cons_perunit', 'Per-unit residential consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+
+        ev_cons = present_stat_description(cons_data, 'total_ev_cons', 'EV consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+        site_cons = present_stat_description(cons_data, 'total_site_cons', 'Site consumption (kWh)', stat_list=_total_default_stat_list, fmt='{:,.0f}')
+
+    admd = present_single_stat(cons_data, 'admd_computed', 'ADMD - calculated (kW)', 'value', fmt='{:,.0f}')
+    max_demand = present_event_and_date(cons_data, 'max_demand', 'Maximum demand (kW)', 'value', lambda x: '{:,.0f}'.format(x))
+
+    tab_body = [html.Tbody(app_cons + dhw_cons + spaceheat_cons + residential_cons + perunit_residential_cons + ev_cons + site_cons + admd + max_demand)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_seasonal_cons_results(cons_data=None, annual=True):
+    if cons_data is None:
+        cons_data = {}
+    
+    if isinstance(cons_data, Mapping):
+        n_configs = 1
+        cons_data = [cons_data]
+    else:
+        n_configs = len(cons_data)
+
+    tab_head = create_tab_head(n_configs)
+    
+    if (annual):
+        weekday_sitecons = present_stat_description_compound(cons_data,
+                                                             'annual_site_daily_cons_wd',
+                                                             r'Weekday site demand (kWh)',
+                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
+                                                             stat_list=_annual_seasonal_stat_list)
+
+        sat_sitecons = present_stat_description_compound(cons_data,
+                                                             'annual_site_daily_cons_sat',
+                                                             r'Saturday site demand (kWh)',
+                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
+                                                             stat_list=_annual_seasonal_stat_list)
+        
+        sun_sitecons = present_stat_description_compound(cons_data,
+                                                             'annual_site_daily_cons_sun',
+                                                             r'Sunday site demand (kWh)',
+                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
+                                                             stat_list=_annual_seasonal_stat_list)
+    else:
+        weekday_sitecons = present_stat_description_compound(cons_data,
+                                                             'total_site_daily_cons_wd',
+                                                             r'Weekday site demand (kWh)',
+                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
+                                                             stat_list=_total_seasonal_stat_list)
+
+        sat_sitecons = present_stat_description_compound(cons_data,
+                                                             'total_site_daily_cons_sat',
+                                                             r'Saturday site demand (kWh)',
+                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
+                                                             stat_list=_total_seasonal_stat_list)
+        
+        sat_sitecons = present_stat_description_compound(cons_data,
+                                                             'total_site_daily_cons_sun',
+                                                             r'Sunday site demand (kWh)',
+                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
+                                                             stat_list=_total_seasonal_stat_list)
+
+    tab_body = [html.Tbody(weekday_sitecons + sat_sitecons + sun_sitecons)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_net_results(net_data=None, annual=True):
+    if net_data is None:
+        net_data = {}
+    
+    if isinstance(net_data, Mapping):
+        n_configs = 1
+        net_data = [net_data]
+    else:
+        n_configs = len(net_data)
+    
+    tab_head = create_tab_head(n_configs)
+
+    if (annual):
+        export_stats = present_stat_description(net_data, 'annual_export', 'Export to grid (kWh/yr)', fmt='{:,.0f}')
+        import_stats = present_stat_description(net_data, 'annual_import', 'Import from grid (kWh/yr)', fmt='{:,.0f}')
+        loss_stats = present_stat_description(net_data, 'annual_stor_loss', 'Storage losses (kWh/yr)', fmt='{:,.0f}')
+
+        # NB - ensure this stat compensates for daylight savings
+        peak_export = present_stat_description(net_data, 'peak_export', 'Exports 5pm-8pm (kWh/yr)', fmt='{:,.0f}')
+        peak_import = present_stat_description(net_data, 'peak_import', 'Imports 5pm-8pm (kWh/yr)', fmt='{:,.0f}')
+    else:
+        export_stats = present_stat_description(net_data, 'annual_export', 'Export to grid (kWh)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+        import_stats = present_stat_description(net_data, 'annual_import', 'Import from grid (kWh)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+        loss_stats = present_stat_description(net_data, 'annual_stor_loss', 'Storage losses (kWh)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+
+        # NB - ensure this stat compensates for daylight savings
+        peak_export = present_stat_description(net_data, 'peak_export', 'Exports 5pm-8pm (kWh)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+        peak_import = present_stat_description(net_data, 'peak_import', 'Imports 5pm-8pm (kWh)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+    
+    tab_body = [html.Tbody(export_stats + import_stats + loss_stats + peak_export + peak_import)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_seasonal_net_results(net_data=None, annual=True):
+    if net_data is None:
+        net_data = {}
+    
+    if isinstance(net_data, Mapping):
+        n_configs = 1
+        net_data = [net_data]
+    else:
+        n_configs = len(net_data)
+    
+    tab_head = create_tab_head(n_configs)
+
+    if (annual):
+        export_stats = present_stat_description_compound(net_data,
+                                                         'annual_export',
+                                                         r'Export to grid (kWh/yr (% production))',
+                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
+                                                         stat_list=_annual_seasonal_stat_list)
+
+        import_stats = present_stat_description_compound(net_data,
+                                                         'annual_import',
+                                                         r'Import from grid (kWh/yr (% consumption))',
+                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
+                                                         stat_list=_annual_seasonal_stat_list)
+
+        peak_export = present_stat_description_compound(net_data,
+                                                         'peak_export',
+                                                         r'Exports 5pm-8pm (kWh/yr (% production))',
+                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
+                                                         stat_list=_annual_seasonal_stat_list)
+        
+        peak_import = present_stat_description_compound(net_data,
+                                                        'peak_import',
+                                                        r'Imports 5pm-8pm (kWh/yr (% consumption))',
+                                                        stat_formatter = val_percent_formatter_factory('mean', 'frac'),
+                                                        stat_list=_annual_seasonal_stat_list)
+    else:
+        export_stats = present_stat_description_compound(net_data,
+                                                         'annual_export',
+                                                         r'Export to grid (kWh (% production))',
+                                                         stat_formatter = val_percent_formatter_factory('total', 'frac'),
+                                                         stat_list=_total_seasonal_stat_list)
+
+        import_stats = present_stat_description_compound(net_data,
+                                                         'annual_import',
+                                                         r'Import from grid (kWh (% consumption))',
+                                                         stat_formatter = val_percent_formatter_factory('total', 'frac'),
+                                                         stat_list=_total_seasonal_stat_list)
+
+        peak_export = present_stat_description_compound(net_data,
+                                                         'peak_export',
+                                                         r'Exports 5pm-8pm (kWh (% production))',
+                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
+                                                         stat_list=_total_seasonal_stat_list)
+        
+        peak_import = present_stat_description_compound(net_data,
+                                                        'peak_import',
+                                                        r'Imports 5pm-8pm (kWh (% consumption))',
+                                                        stat_formatter = val_percent_formatter_factory('mean', 'frac'),
+                                                        stat_list=_total_seasonal_stat_list)
+
+    tab_body = [html.Tbody(export_stats + import_stats + peak_export + peak_import)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_so_benefits_results(econ_data=None, annual=True):
+    if econ_data is None:
+        econ_data = {}
+    
+    if isinstance(econ_data, Mapping):
+        n_configs = 1
+        econ_data = [econ_data]
+    else:
+        n_configs = len(econ_data)
+    
+    tab_head = create_tab_head(n_configs)
+
+    if (annual):
+        resid_receipts = present_stat_description(econ_data, 'annual_resident_receipts', 'Resident receipts (£/yr)', fmt='{:,.0f}')
+        resid_perunit_receipts = present_stat_description(econ_data, 'annual_resident_perunit_receipts', 'Resident receipts (£/yr/household)', fmt='{:,.0f}')
+
+        ev_receipts = present_stat_description(econ_data, 'annual_ev_receipts', 'EV receipts (£/yr)', fmt='{:,.0f}')
+
+        export_receipts = present_stat_description(econ_data, 'annual_export_receipts', 'Export receipts (£/yr)', fmt='{:,.0f}')
+    else:
+        resid_receipts = present_stat_description(econ_data, 'annual_resident_receipts', 'Resident receipts (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+        resid_perunit_receipts = []
+
+        ev_receipts = present_stat_description(econ_data, 'annual_ev_receipts', 'EV receipts (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+
+        export_receipts = present_stat_description(econ_data, 'annual_export_receipts', 'Export receipts (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+
+    total_benefits = present_stat_description(econ_data, 'total_benefits_undiscounted', 'Total present benefits (undiscounted) (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+    total_benefits_discounted = present_stat_description(econ_data, 'total_benefits_discounted', 'Total present benefits (discounted) (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+
+    tab_body = [html.Tbody(resid_receipts + resid_perunit_receipts + ev_receipts + export_receipts + total_benefits + total_benefits_discounted)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_so_costs_results(econ_data=None, annual=True):
+    if econ_data is None:
+        econ_data = {}
+    
+    if isinstance(econ_data, Mapping):
+        n_configs = 1
+        econ_data = [econ_data]
+    else:
+        n_configs = len(econ_data)
+    
+    tab_head = create_tab_head(n_configs)
+
+    if (annual):
+        import_costs = present_stat_description(econ_data, 'annual_import_costs', 'Import costs (£/yr)', fmt='{:,.2f}')
+        generator_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - generation (£/yr)', fmt='{:,.2f}')
+        storage_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - storage (£/yr)', fmt='{:,.2f}')
+
+        ann_costs = present_stat_description(econ_data, 'annual_recurrent_costs', 'Recurrent costs - total (£/yr)', fmt='{:,.2f}')
+    else:
+        import_costs = present_stat_description(econ_data, 'annual_import_costs', 'Import costs (£r)', fmt='{:,.2f}', stat_list=_total_default_stat_list)
+        generator_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - generation (£/yr)', fmt='{:,.2f}', stat_list=_total_default_stat_list)
+        storage_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - storage (£/yr)', fmt='{:,.2f}', stat_list=_total_default_stat_list)
+
+        ann_costs = present_stat_description(econ_data, 'annual_recurrent_costs', 'Recurrent costs - total (£/yr)', fmt='{:,.2f}', stat_list=_total_default_stat_list)
+
+    capex_generation = present_single_stat(econ_data, 'total_gen_capex', 'Capital costs - generation (£)', 'value', fmt='{:,.2f}')
+    capex_storage = present_single_stat(econ_data, 'total_stor_capex', 'Capital costs - storage (£)', 'value', fmt='{:,.2f}')
+    capex_dist = present_single_stat(econ_data, 'total_dist_capex', 'Capital costs - distribution and switching (£)', 'value', fmt='{:,.2f}')
+    capex_meter = present_single_stat(econ_data, 'total_meter_capex', 'Capital costs - metering (£)', 'value', fmt='{:,.2f}')
+
+    capex_total = present_single_stat(econ_data, 'total_capex', 'Capital costs - total (£)', 'value', fmt='{:,.2f}')
+
+    total_costs = present_stat_description(econ_data, 'total_costs_undiscounted', 'Total present costs (undiscounted) (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+    total_costs_discounted = present_stat_description(econ_data, 'total_costs_discounted', 'Total present costs (discounted) (£)', fmt='{:,.0f}', stat_list=_total_default_stat_list)
+
+    tab_body = [html.Tbody(import_costs + generator_om_costs + storage_om_costs + ann_costs + capex_generation + capex_storage + capex_dist + capex_meter + capex_total + total_costs + total_costs_discounted)]
+
+    return dbc.Table(tab_head + tab_body)
+
+def create_so_value_results(econ_data=None, annual=True):
+    if econ_data is None:
+        econ_data = {}
+    
+    if isinstance(econ_data, Mapping):
+        n_configs = 1
+        econ_data = [econ_data]
+    else:
+        n_configs = len(econ_data)
+    
+    tab_head = create_tab_head(n_configs)
+
+    b_to_c_undiscounted = present_single_stat(econ_data, 'benefits_to_costs_undiscounted', 'Benefits/Costs (undiscounted)', 'value', fmt='{:,.2f}')
+    b_to_c_discounted = present_single_stat(econ_data, 'benefits_to_costs_discounted', 'Benefits/Costs (discounted)', 'value', fmt='{:,.2f}')
+
+    simple_payback_time = present_single_stat(econ_data, 'simple_payback_time', 'Simple payback time (years)', 'value', fmt='{:,.2f}')
+
+    npv_undiscounted = present_single_stat(econ_data, 'npv_undiscounted', 'Net Present Value (undiscounted) (£)', 'value', fmt='{:,.0f}')
+    npv_discounted = present_single_stat(econ_data, 'npv_discounted', 'Net Present Value (discounted) (£)', 'value', fmt='{:,.0f}')
+
+    tab_body = [html.Tbody(b_to_c_undiscounted + b_to_c_discounted + simple_payback_time + npv_undiscounted + npv_discounted)]
 
     return dbc.Table(tab_head + tab_body)
 
@@ -936,6 +1334,32 @@ def create_model_settings_input_card():
         ]),
     ])
 
+def create_results_header():
+    return dbc.Row([
+        html.H1([get_icon('results'), 'Results'],
+        style={
+            'display': 'inline-block',
+            'width':'50%',
+            'float': 'left'
+        }),
+
+        html.Span([
+            html.H5("Per year",style={'display': 'inline-block', 'vertical-align': 'middle'}),
+            daq.ToggleSwitch(style={'display': 'inline-block', 'vertical-align': 'middle','padding': "10px"}),
+            html.H5('To horizon',style={'display': 'inline-block', 'vertical-align': 'middle'})
+        ],
+        style={
+            'display': 'inline-block',
+            'width':'50%',
+            'float': 'right',
+            "justifyContent": "flex-end",
+            "alignItems": "center",
+            'text-align': 'right'
+        })
+    ],
+    style={'display': 'flex'}
+    )
+
 def create_generation_results_card():
     return dbc.Card([
         dbc.CardBody([
@@ -979,6 +1403,150 @@ def create_generation_results_card():
                     ],
                     id="gen-res-combined-tbl")
             ])
+        ])
+    ])
+
+def create_storage_results_card():
+    return dbc.Card([
+        dbc.CardBody([
+            html.H2([get_icon('storage'), 'Storage Results'],
+            className='card-title'),
+
+            html.H4([
+                'Hours full = ',
+                html.Span("0", id='stor-ressmry-hours-full'),
+                "; Hours empty = ",
+                html.Span("0", id='stor-ressmry-hours-empty'),
+                "; Charge cycles = ",
+                html.Span("0", id='stor-ressmry-charge-cycles')
+            ],
+            className='card-subtitle'),
+
+            html.Details([
+                html.Summary('Storage'),
+                html.Div([
+                    create_stor_results()
+                ],
+                id='stor-res-tbl')
+            ])
+        ])
+    ])
+
+def create_consumption_results_card():
+    return dbc.Card([
+        dbc.CardBody([
+            html.H2([get_icon('consumption-direct'), 'Consumption Results'],
+            className='card-title'),
+
+            html.H4([
+                'Annual consumption: ',
+                get_icon('consumption-building'),
+                ' = ',
+                html.Span('0.0', id='cons-ressmry-resident'),
+                ' kWh; ',
+                get_icon('consumption-direct-ev'),
+                ' = ',
+                html.Span('0.0', id='cons-ressmry-ev'),
+                ' kWh'                
+            ],
+            className='card-subtitle'),
+
+            html.Details([
+                html.Summary('Consumption'),
+                html.Div([
+                    create_cons_results()
+                ],
+                id='cons-res-tbl')
+            ]),
+
+            html.Details([
+                html.Summary('Seasonal Consumption'),
+                html.Div([
+                    create_seasonal_cons_results()
+                ],
+                id='cons-res-seasonal-tbl')
+            ])
+        ])
+    ])
+
+def create_net_results_card():
+    return dbc.Card([
+        dbc.CardBody([
+            html.H2([get_icon('import-export'), 'Net Energy Results'],
+            className='card-title'),
+
+            html.H4([
+                'Annual export = ',
+                html.Span('0.0', id = 'net-ressmry-export'),
+                ' kWh; Annual import = ',
+                html.Span('0.0', id = 'net-ressmry-import'),
+                ' kWh; Storage losses = ',
+                html.Span('0.0', id = 'net-ressmry-storloss'),
+                ' kWh'
+            ],
+            className='card-subtitle'),
+
+            html.Details([
+                html.Summary('Overall net energy'),
+                html.Div([
+                    create_net_results()
+                ],
+                id='net-res-tbl')
+            ]),
+
+            html.Details([
+                html.Summary('Seasonal net energy'),
+                html.Div([
+                    create_seasonal_net_results()
+                ],
+                id='net-res-seasonal-tbl')
+            ])
+        ])
+    ])
+
+def create_economic_results_so_card():
+    return dbc.Card([
+        dbc.CardBody([
+            html.H2([get_icon('cost'), 'Financial Results - System Owner'],
+            className='card-title'),
+
+            html.H4([
+                'Total benefits (',
+                html.Span('0%', id='econ-ressmry-dr-benefits'),
+                ') = ',
+                html.Span('£0.00', id='econ-ressmry-npbenefits'),
+                '; Total costs (',
+                html.Span('0%', id='econ-ressmry-dr-costs'),
+                ') = ',
+                html.Span('£0.00', id='econ-ressmry-npcosts'),
+                '; NPV = ',
+                html.Span('£0.00', id='econ-ressmry-npv'),
+            ],
+            className='card-subtitle'),
+
+            html.Details([
+                html.Summary('Benefits'),
+                html.Div([
+                    create_so_benefits_results()
+                ],
+                id='econ-res-benefits-tbl')
+            ]),
+
+            html.Details([
+                html.Summary('Costs'),
+                html.Div([
+                    create_so_costs_results()
+                ],
+                id='econ-res-cost-tbl')
+            ]),
+
+            html.Details([
+                html.Summary('Value'),
+                html.Div([
+                    create_so_value_results()
+                ],
+                id='econ-res-value-tbl')
+            ]),
         ])
     ])
 
@@ -1054,51 +1622,34 @@ def create_layout():
         
         # Results
 
-        dbc.Row([
-            html.H1([get_icon('results'), 'Results'],
-            style={
-                'display': 'inline-block',
-                'width':'50%',
-                'float': 'left'
-            }),
-
-            html.Span([
-                html.H5("Per year",style={'display': 'inline-block', 'vertical-align': 'middle'}),
-                daq.ToggleSwitch(style={'display': 'inline-block', 'vertical-align': 'middle','padding': "10px"}),
-                html.H5('To horizon',style={'display': 'inline-block', 'vertical-align': 'middle'})
-            ],
-            style={
-                'display': 'inline-block',
-                'width':'50%',
-                'float': 'right',
-                "justifyContent": "flex-end",
-                "alignItems": "center",
-                'text-align': 'right'
-            })
-        ],
-        style={
-                'display': 'flex'
-            }),
+        create_results_header(),
 
         create_configuration_selector(),
         
         dbc.Row([
             dbc.Col([
                 create_generation_results_card()
-            ]),
+            ],
+                width=12),
             dbc.Col([
-                dbc.Card([
-                    dbc.CardBody([
-                        html.H2([
-                            html.I(className="bi bi-battery-half")
-                        ])
-                    ])
-                ])
-            ])
+                create_storage_results_card()
+            ],
+                width=12),
+            dbc.Col([
+                create_consumption_results_card()
+            ],
+                width=12),
+            dbc.Col([
+                create_net_results_card()
+            ],
+                width=12),
+            dbc.Col([
+                create_economic_results_so_card()
+            ],
+                width=12)
         ]),
     ])
-        ]
-    
+    ]
 
     return dbc.Container(mapview, fluid=False)
     
