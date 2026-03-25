@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from src.newsegsgeneration import NewsegsGeneration
 from src.core import ABCNewsegsModuleResult
 from src.core import RegTimeSpan

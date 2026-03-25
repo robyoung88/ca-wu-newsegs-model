@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from collections.abc import Mapping
 import numpy as np
 import numpy.typing as npt
