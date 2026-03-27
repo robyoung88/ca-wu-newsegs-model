@@ -6,6 +6,7 @@ from src.core.location import Location,RaisedLocation,AspectLocation
 from src.core.timespan import RegTimeSpan,OffsetRegTimeSpan
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 from collections.abc import Iterable
 
 class InMemoryLocalEnv(NewsegsLocalEnvironment):
@@ -61,6 +62,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
+    def get_wind_timestep(self) -> pd.TimeDelta|None:
+        return self._wind_series.values()[0].get('timespan').timestep
+
     def set_horizontal_solar_flux(self,
                        horizontal_solar_flux:npt.ArrayLike,
                        location:AspectLocation,
@@ -88,6 +92,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
+    def get_horizontal_solar_flux_timestep(self) -> pd.TimeDelta|None:
+        return None
+
     def set_external_temperature(self,
                        external_temperature:npt.ArrayLike,
                        location:RaisedLocation,
@@ -114,6 +121,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
+
+    def get_external_temperature_timestep(self) -> pd.TimeDelta|None:
+        return None
 
     def set_solar_flux_on_plane(self,
                                 solar_flux:npt.ArrayLike,
@@ -151,10 +161,16 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
+    def get_solar_flux_on_plane_timestep(self) -> pd.TimeDelta|None:
+        return self._horizontal_solar_flux_series.values()[0].get('timespan').timestep
+
     def get_air_density(self,
                         location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
                         timespan:TimeSpan):
         return 1.225
+    
+    def get_air_density_timestep(self) -> pd.TimeDelta|None:
+        return None
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
     def __init__(self):

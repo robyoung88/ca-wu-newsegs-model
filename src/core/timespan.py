@@ -384,3 +384,17 @@ def delta_days(datetimes:pd.Series) -> pd.Series:
     delta_day = 1 * np.logical_not(yearday - yearday.shift(1, fill_value=yearday.iloc[0]-1)==0)
     delta_day.iloc[-1] = 0
     return delta_day
+
+def year_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
+    """
+    Return array integers indicating which year datetime belongs to in series
+
+    A year is determined to have passed if the numeric year has increased and the day of year 
+    is >= the first day of the series. This implies that the calendar date of increment may vary 
+    depending on whether the present year is a leap year
+    """
+    yearday = datetimes.dt.day_of_year
+    year = datetimes.dt.year
+    startday = yearday.iloc[0]
+    startyear = year.iloc[0]
+    return ((year - startyear - 1) + 1 *((yearday - startday) >=0)).to_numpy(dtype=np.int32)

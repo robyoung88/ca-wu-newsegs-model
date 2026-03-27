@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from src.core.timespan import year_index
+
 def discount_factor_discrete(datetimes:pd.Series, discount_rate:float) -> pd.Series:
     """
     Return series of (left-aligned) discount factors for times in series
@@ -10,11 +12,7 @@ def discount_factor_discrete(datetimes:pd.Series, discount_rate:float) -> pd.Ser
     day of the series. This implies that the calendar date of increment may vary depending on whether the present
     year is a leap year
     """
-    yearday = datetimes.dt.day_of_year
-    year = datetimes.dt.year
-    startday = yearday.iloc[0]
-    startyear = year.iloc[0]
-    idx = ((year - startyear - 1) + 1 *((yearday - startday) >=0)).to_numpy()
+    idx = year_index(datetimes)
 
     return pd.Series(data = (1.0 + discount_rate)**(-idx), index=datetimes)
 

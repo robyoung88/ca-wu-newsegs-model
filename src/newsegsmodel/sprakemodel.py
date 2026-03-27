@@ -108,8 +108,11 @@ class SprakeModel(NewsegsModel):
         self._cs_result = None
 
     def set_run_period(self, timespan:TimeSpan) -> None:
-        self._run_period = TimeSpan(timespan)
+        self._run_period = RegTimeSpan(timespan)
         self._run_period.timestep = self._default_timestep
+
+    def get_run_period(self) -> TimeSpan:
+        return self._run_period
 
     @property
     def generation(self) -> SprakeGeneration:
@@ -154,7 +157,6 @@ class SprakeModel(NewsegsModel):
     def wider_env(self, wider_env_server:NewsegsWiderEnvironment):
         self._wider_environment_server = wider_env_server
 
-    @property
     def get_default_timestep(self) -> pd.Timedelta:
         return self._default_timestep
 

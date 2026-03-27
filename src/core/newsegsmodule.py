@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import numpy as np
+import pandas as pd
 from src.core.timespan import TimeSpan, RegTimeSpan
 from collections.abc import Iterable
 
@@ -34,7 +35,29 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
     @abstractmethod
     def get_timespan(self) -> RegTimeSpan:
         ...
-    
+
+    def meters_to_pandas(self) -> pd.DataFrame:
+        """
+        Return the meter data as a pandas dataframe
+
+        Caution - this implementation could become unweildy for large results
+        """
+        datetime = self.get_timespan().to_pandas()
+        return pd.DataFrame(data=self.meters.T,
+                            index=datetime,
+                            columns=self.get_meter_names())
+
+    def dsm_to_pandas(self) -> pd.DataFrame:
+        """
+        Return the dsm data as a pandas dataframe
+
+        Caution - this implementation could become unweildy for large results
+        """
+        datetime = self.get_timespan().to_pandas()
+        return pd.DataFrame(data=self.dsm.T,
+                            index=datetime,
+                            columns=self.get_dsm_names())
+
 class NewsegsModule(metaclass=ABCMeta):
     """
     Basic abstract class serving module results

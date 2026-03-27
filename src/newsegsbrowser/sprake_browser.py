@@ -1,58 +1,93 @@
 # A Dash Leaflet map browser for manipulating the Sprake Model
-import json, uuid
-from collections.abc import Mapping, Sequence
-from typing import Literal
+import json
+import uuid
+import datetime
+from collections.abc import Mapping
+#from typing import Literal
 
 from dash import Dash, html, Input, Output, dcc, State, ALL, no_update
 import dash_bootstrap_components as dbc
 import dash_daq as daq
+
+from src.newsegsmodel.sprakemodel import SprakeModel
+from src.newsegsfinance import SprakeFinance
 
 from src.newsegsbrowser.common import get_icon, create_numeric_card_input
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
 
-from config import settings
+#from config import settings
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-
-def create_wind_results(wind_data=None, annual=True):
+def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
+    """
+    Create and format the wind generation results table
+    """
     if wind_data is None:
         wind_data = {}
-    
+
     if isinstance(wind_data, Mapping):
         n_configs = 1
         wind_data = [wind_data]
     else:
         n_configs = len(wind_data)
-    
+
     tbl_head = create_tbl_head(n_configs)
 
     if (annual):
-        ann_gen = present_stat_description(wind_data, 'annual_production', 'Wind production (kWh/yr)', fmt='{:,.0f}')
+        ann_gen = present_stat_description(wind_data,
+                                           'annual_production',
+                                           'Wind production (kWh/yr)',
+                                           fmt='{:,.0f}')
     else:
-        ann_gen = present_stat_description(wind_data, 'total_production', 'Wind production (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
+        ann_gen = present_stat_description(wind_data,
+                                           'total_production',
+                                           'Wind production (kWh)', 
+                                           stat_list=TOTAL_DEFAULT_STATS, 
+                                           fmt='{:,.0f}')
 
-    hours_in_range = present_stat_description_compound(wind_data, 'hrs_in_range', 'Hours in range', hours_in_range_formatter)
+    hours_in_range = present_stat_description_compound(wind_data,
+                                                       'hrs_in_range',
+                                                       'Hours in range',
+                                                       hours_in_range_formatter)
 
-    longest_hours_below_5 = present_event_and_daterange(wind_data, 'continuous_hours_below_5pc', r"Longest continuous hours <5%", "hours", '{:,.1f}'.format)
+    longest_hours_below_5 = present_event_and_daterange(
+        wind_data,
+        'continuous_hours_below_5pc', 
+        r"Longest continuous hours <5%", 
+        "hours",
+        '{:,.1f}'.format
+        )
 
-    longest_hours_above_95 = present_event_and_daterange(wind_data, 'continuous_hours_above_95pc', r"Longest continuous hours ≥95%", "hours", '{:,.1f}'.format)
+    longest_hours_above_95 = present_event_and_daterange(
+        wind_data,
+        'continuous_hours_above_95pc',
+        r"Longest continuous hours ≥95%",
+        "hours",
+        '{:,.1f}'.format
+        )
 
     if (annual):
-        direct_sc = present_stat_description_compound(wind_data,
-                                                      'self-consumption',
-                                                      r'Wind-only self-consumption potential (kWh/yr (% production))',
-                                                      stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=ANNUAL_SEASONAL_STATS)
+        direct_sc = present_stat_description_compound(
+            wind_data,
+            'self-consumption',
+            r'Wind-only self-consumption potential (kWh/yr (% production))',
+            stat_formatter=val_percent_formatter_factory('self_consumption',
+                                                         'frac_self_consumption'),
+            stat_list=ANNUAL_SEASONAL_STATS
+            )
     else:
-        direct_sc = present_stat_description_compound(wind_data,
-                                                      'self-consumption',
-                                                      r'Wind-only self-consumption potential (kWh (% production))',
-                                                      stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=TOTAL_SEASONAL_STATS)
+        direct_sc = present_stat_description_compound(
+            wind_data,
+            'self-consumption',
+            r'Wind-only self-consumption potential (kWh (% production))',
+            stat_formatter=val_percent_formatter_factory('self_consumption',
+                                                         'frac_self_consumption'),
+            stat_list=TOTAL_SEASONAL_STATS
+            )
 
-    tab_body = [html.Tbody(ann_gen + hours_in_range + longest_hours_below_5 + longest_hours_above_95 + direct_sc)]
+    tab_body = [html.Tbody(ann_gen + hours_in_range + longest_hours_below_5 \
+                           + longest_hours_above_95 + direct_sc)]
 
     return dbc.Table(tbl_head + tab_body)
 
@@ -465,13 +500,13 @@ def create_so_costs_results(econ_data=None, annual=True):
 def create_so_value_results(econ_data=None, annual=True):
     if econ_data is None:
         econ_data = {}
-    
+
     if isinstance(econ_data, Mapping):
         n_configs = 1
         econ_data = [econ_data]
     else:
         n_configs = len(econ_data)
-    
+
     tbl_head = create_tbl_head(n_configs)
 
     b_to_c_undiscounted = present_single_stat(econ_data, 'benefits_to_costs_undiscounted', 'Benefits/Costs (undiscounted)', 'value', fmt='{:,.2f}')
@@ -487,6 +522,9 @@ def create_so_value_results(econ_data=None, annual=True):
     return dbc.Table(tbl_head + tab_body)
 
 def create_generation_input_card():
+    """
+    A Bootstrap card holding inputs for generation config
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('generation'), 'Generation'], className='card-title'),
@@ -517,6 +555,9 @@ def create_generation_input_card():
     ])
 
 def create_storage_input_card():
+    """
+    A Bootstrap card holding inputs for storage config
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('storage'), "Storage"], 
@@ -541,6 +582,9 @@ def create_storage_input_card():
     ])
 
 def create_building_consumption_input_card():
+    """
+    A Bootstrap card holding inputs for building consumption config
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('consumption-building'), "Building Consumption"], 
@@ -579,6 +623,9 @@ def create_building_consumption_input_card():
     ])
 
 def create_direct_consumption_input_card():
+    """
+    A Bootstrap card holding inputs for direct consumption config
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('consumption-direct'), 'Direct Consumption'],
@@ -614,6 +661,9 @@ def create_direct_consumption_input_card():
     ])
 
 def create_gen_cost_input_card():
+    """
+    HTML inputs for generation costs (Sprake model)
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('cost-generation'), 'Generation Costs'],
@@ -632,16 +682,24 @@ def create_gen_cost_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('gen-wind', 'Wind Capex (£/kW)', 'cost-gen-wind-capex-input')
+                        create_numeric_card_input('gen-wind',
+                                                  'Wind Capex (£/kW)',
+                                                  'cost-gen-wind-capex-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input(['gen-wind','cost-recurrent'], 'Wind Ongoing (£/kW/yr)', 'cost-gen-wind-ongoing-input')
+                        create_numeric_card_input(['gen-wind','cost-recurrent'],
+                                                  'Wind Ongoing (£/kW/yr)',
+                                                  'cost-gen-wind-recurrent-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('gen-pv', 'Solar PV Capex (£/kWp)', 'cost-gen-pv-capex-input')
+                        create_numeric_card_input('gen-pv',
+                                                  'Solar PV Capex (£/kWp)',
+                                                  'cost-gen-pv-capex-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input(['gen-pv','cost-recurrent'], 'Solar PV Ongoing (£/kWp/yr)', 'cost-gen-pv-ongoing-input')
+                        create_numeric_card_input(['gen-pv','cost-recurrent'],
+                                                  'Solar PV Ongoing (£/kWp/yr)',
+                                                  'cost-gen-pv-recurrent-input')
                     ),
                 ])
             ])
@@ -649,6 +707,9 @@ def create_gen_cost_input_card():
     ])
 
 def create_storage_cost_input_card():
+    """
+    HTML inputs for storage costs (Sprake model)
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('cost-storage'), 'Storage Costs'],
@@ -667,10 +728,14 @@ def create_storage_cost_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('storage', 'BESS Capex (£/kWh)', 'cost-stor-bess-capex-input')
+                        create_numeric_card_input('storage',
+                                                  'BESS Capex (£/kWh)',
+                                                  'cost-stor-bess-capex-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input(['storage', 'cost-recurrent'], 'BESS Ongoing (£/kWh/yr)', 'cost-stor-bess-ongoing-input')
+                        create_numeric_card_input(['storage', 'cost-recurrent'],
+                                                   'BESS Ongoing (£/kWh/yr)',
+                                                   'cost-stor-bess-recurrent-input')
                     ),
                 ])
             ])
@@ -678,6 +743,9 @@ def create_storage_cost_input_card():
     ])
 
 def create_sales_input_card():
+    """
+    HTML inputs for sales value (Sprake model)
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('cost-sales'), 'Sales'],
@@ -699,13 +767,19 @@ def create_sales_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('cost-residents-standing', 'Standing charge (£/houshold/day)', 'resident-standing-charge-input')
+                        create_numeric_card_input('cost-residents-standing',
+                                                  'Standing charge (£/household/day)',
+                                                  'cost-resident-sc-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('cost-residents-perunit', 'Per unit charge (£/kWh)', 'resident-per-unit-charge-input')
+                        create_numeric_card_input('cost-residents-perunit',
+                                                  'Per unit charge (£/kWh)',
+                                                  'cost-resident-var-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('cost-export', '"Grid export - mean per unit charge (£/kWh)', 'export-per-unit-charge-input')
+                        create_numeric_card_input('cost-export',
+                                                  'Grid export - mean per unit charge (£/kWh)',
+                                                  'cost-export-var-input')
                     ),
                 ])
             ])
@@ -713,6 +787,9 @@ def create_sales_input_card():
     ])
 
 def create_import_cost_input_card():
+    """
+    HTML inputs for import costs (Sprake model)
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('cost-import'), 'Import Costs'],
@@ -731,10 +808,14 @@ def create_import_cost_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('cost-import-fixed', 'Fixed costs for backup (£/site/day)', 'fixed-costs-import-input')
+                        create_numeric_card_input('cost-import-fixed',
+                                                  'Fixed costs for backup (£/site/day)',
+                                                  'cost-import-sc-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('cost-import-perunit', 'Per-unit costs for backup (£/kWh)', 'per-unit-costs-import-input')
+                        create_numeric_card_input('cost-import-perunit',
+                                                  'Per-unit costs for backup (£/kWh)', 
+                                                  'cost-import-var-input')
                     ),
                 ])
             ])
@@ -742,6 +823,9 @@ def create_import_cost_input_card():
     ])
 
 def create_model_settings_input_card():
+    """
+    HTML inputs for general model settings (e.g. time horizon)
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('model-settings'), 'Model Settings'],
@@ -759,7 +843,9 @@ def create_model_settings_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('model-settings-time-horizon', 'Time horizon (years)', 'mdl-timehorizon-input')
+                        create_numeric_card_input('model-settings-time-horizon',
+                                                  'Time horizon (years)',
+                                                  'mdl-timehorizon-input')
                     )
                 ])
             ])
@@ -767,6 +853,10 @@ def create_model_settings_input_card():
     ])
 
 def create_results_header():
+    """
+    HTML separating the results and providing controls for setting result format per annum or
+    to horizon
+    """
     return dbc.Row([
         html.H1([get_icon('results'), 'Results'],
         style={
@@ -777,7 +867,9 @@ def create_results_header():
 
         html.Span([
             html.H5("Per year",style={'display': 'inline-block', 'vertical-align': 'middle'}),
-            daq.ToggleSwitch(style={'display': 'inline-block', 'vertical-align': 'middle','padding': "10px"}),
+            daq.ToggleSwitch(style={'display': 'inline-block',
+                                    'vertical-align': 'middle',
+                                    'padding': "10px"}),
             html.H5('To horizon',style={'display': 'inline-block', 'vertical-align': 'middle'})
         ],
         style={
@@ -793,6 +885,9 @@ def create_results_header():
     )
 
 def create_generation_results_card():
+    """
+    A bootstrap card holding generation results
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('generation'), 'Generation Results'],
@@ -818,7 +913,6 @@ def create_generation_results_card():
                     create_wind_results()
                     ],
                     id="gen-res-wind-tbl")
-                
             ]),
             html.Details([
                 html.Summary("Solar PV Generation"),
@@ -839,6 +933,9 @@ def create_generation_results_card():
     ])
 
 def create_storage_results_card():
+    """
+    A bootstrap card holding storage results
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('storage'), 'Storage Results'],
@@ -865,6 +962,9 @@ def create_storage_results_card():
     ])
 
 def create_consumption_results_card():
+    """
+    A bootstrap card holding consumption results
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('consumption-direct'), 'Consumption Results'],
@@ -902,6 +1002,9 @@ def create_consumption_results_card():
     ])
 
 def create_net_results_card():
+    """
+    A bootstrap card holding net energy flow results
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('import-export'), 'Net Energy Results'],
@@ -937,6 +1040,9 @@ def create_net_results_card():
     ])
 
 def create_economic_results_so_card():
+    """
+    A bootstrap card holding economic results from the system owner perspective
+    """
     return dbc.Card([
         dbc.CardBody([
             html.H2([get_icon('cost'), 'Financial Results - System Owner'],
@@ -983,6 +1089,9 @@ def create_economic_results_so_card():
     ])
 
 def create_layout():
+    """
+    Create Sprake Energy Model Interface Layout in HTML
+    """
     mapview = [create_site_selector_map()] \
         + [
             html.Div([
@@ -1015,7 +1124,7 @@ def create_layout():
         ]),
 
         html.Hr(),
-        
+
         # Financial details
 
         dbc.Row([
@@ -1040,7 +1149,7 @@ def create_layout():
         ]),
 
         html.Hr(),
-        
+
         # Model settings
 
         dbc.Row([
@@ -1051,13 +1160,13 @@ def create_layout():
         ]),
 
         html.Hr(),
-        
+
         # Results
 
         create_results_header(),
 
         create_configuration_selector(),
-        
+
         dbc.Row([
             dbc.Col([
                 create_generation_results_card()
@@ -1082,19 +1191,51 @@ def create_layout():
         ]),
 
         html.Div(id='onload-div'), # To trigger first callback
-        dcc.Store(id='model-config')
+
+        # To trigger resync of input fields from model, e.g. after a load
+        dcc.Store(id='live-config-watcher'),
+
+        # To trigger resync of output fields after a model run
+        dcc.Store(id='model-run-watcher'),
+
+        dcc.Store(id='model-config'),
+        dcc.Store(id='finance-config'),
+        dcc.Store(id='res-gen'),
+        dcc.Store(id='res-stor'),
+        dcc.Store(id='res-cons'),
+        dcc.Store(id='res-net'),
+        dcc.Store(id='res-finance-so')
     ])
     ]
 
     return dbc.Container(mapview, fluid=False)
 
 def add_initial_callback(app):
+    """
+    Functions to synchronise app interface with the served model
+    """
     @app.callback(
-        Output('model-config', 'data'),#, allow_duplicate=True),
-        Input('onload-div', 'children')#,
-        #prevent_initial_call='initial_duplicate'
+        Output('live-config-watcher', 'data'),
+        Input('onload-div', 'children')
     )
     def sync_config_init(_):
+        return json.dumps(str(datetime.datetime.now()))
+
+    @app.callback(
+        Output('model-run-watcher', 'data'),
+        Input('onload-div', 'children')
+    )
+    def sync_mdl_run_init(_):
+        app.mdl.run()
+        return json.dumps(str(datetime.datetime.now()))
+
+    @app.callback(
+        Output('model-config', 'data', allow_duplicate=True),
+        Output('finance-config', 'data', allow_duplicate=True),
+        Input('live-config-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_config(_):
         mdl = app.mdl
 
         gen_input = {
@@ -1121,15 +1262,31 @@ def add_initial_callback(app):
 
         dc_input = {
             'efficiency_reduction': app_p.get('efficiency_reduction'),
-            'annual_residential_consumption_per_ev': ev_p.get('annual_residential_consumption_per_ev'),
+            'annual_residential_consumption_per_ev': \
+                ev_p.get('annual_residential_consumption_per_ev'),
             'n_evs_per_household': ev_p.get('n_evs') / cs.n_units
+        }
+
+        # Model config
+
+        # Note that we are only going to allow horizons in multiples
+        # of one year. I may allow the start date to vary later.
+        # As such, we are just going to take the horizon to be the
+        # difference in year between the start and end of the timespan
+        ts = mdl.get_run_period()
+        mc_input = {
+            'horizon': ts.end.year - ts.start.year
         }
 
         odict = {'gen_input': gen_input,
                  'stor_input': stor_input,
                  'bc_input': bc_input,
-                 'dc_input': dc_input}
-        return json.dumps(odict)
+                 'dc_input': dc_input,
+                 'mc_input': mc_input}
+
+        fnc = app.finance
+
+        return json.dumps(odict), json.dumps(fnc.to_dict())
 
     @app.callback(
         Output('gen-smry-wind-cap', 'children'),
@@ -1144,7 +1301,12 @@ def add_initial_callback(app):
             return no_update, no_update, no_update, no_update
         mcfg = json.loads(mcfg)
         gen_input = mcfg.get('gen_input', {})
-        return f"{gen_input.get('wind_capacity', 0.0):,.1f}", f"{gen_input.get('pv_capacity', 0.0):,.1f}", gen_input.get('wind_capacity', 0.0), gen_input.get('pv_capacity', 0.0)
+        return (
+            f"{gen_input.get('wind_capacity', 0.0):,.1f}",
+            f"{gen_input.get('pv_capacity', 0.0):,.1f}",
+            gen_input.get('wind_capacity', 0.0),
+            gen_input.get('pv_capacity', 0.0)
+        )
 
     @app.callback(
         Output('stor-smry-cap', 'children'),
@@ -1157,7 +1319,10 @@ def add_initial_callback(app):
             return no_update, no_update
         mcfg = json.loads(mcfg)
         stor_input = mcfg.get('stor_input', {})
-        return f"{stor_input.get('storage_capacity', 0.0):,.0f}", stor_input.get('storage_capacity', 0.0)
+        return (
+            f"{stor_input.get('storage_capacity', 0.0):,.0f}",
+            stor_input.get('storage_capacity', 0.0)
+        )
 
     @app.callback(
         Output('bc-smry-n-units', 'children'),
@@ -1201,14 +1366,126 @@ def add_initial_callback(app):
             dc_input.get('n_evs_per_household', 0)
         )
 
+    @app.callback(
+        Output('cost-gen-wind-capex-input', 'value'),
+        Output('cost-gen-wind-recurrent-input', 'value'),
+        Output('cost-gen-pv-capex-input', 'value'),
+        Output('cost-gen-pv-recurrent-input', 'value'),
+        Input('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_cost_gen_inputs_to_store(fcfg):
+        if fcfg is None:
+            return no_update, no_update, no_update, no_update
+        fcfg = json.loads(fcfg)
+        uc = fcfg.get('unit_costs', {})
+        return (
+            uc.get('wind_capex_per_kw', 0),
+            uc.get('wind_om_per_kw_year', 0),
+            uc.get('pv_capex_per_kw', 0),
+            uc.get('pv_om_per_kw_year', 0)
+        )
+
+    @app.callback(
+        Output('cost-stor-bess-capex-input', 'value'),
+        Output('cost-stor-bess-recurrent-input', 'value'),
+        Input('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_cost_stor_inputs_to_store(fcfg):
+        if fcfg is None:
+            return no_update, no_update
+        fcfg = json.loads(fcfg)
+        uc = fcfg.get('unit_costs', {})
+        return (
+            uc.get('bess_capex_per_kwh', 0),
+            uc.get('bess_om_per_kwh_year', 0)
+        )
+
+    @app.callback(
+        Output('cost-resident-sc-input', 'value'),
+        Output('cost-resident-var-input', 'value'),
+        Output('cost-export-var-input', 'value'),
+        Input('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_cost_sales_inputs_to_store(fcfg):
+        if fcfg is None:
+            return no_update, no_update, no_update
+        fcfg = json.loads(fcfg)
+        uc = fcfg.get('unit_costs', {})
+        return (
+            uc.get('resident_sc_per_unit_day', 0),
+            uc.get('resident_var_per_unit', 0),
+            uc.get('grid_export_var_per_unit', 0)
+        )
+
+    @app.callback(
+        Output('cost-import-sc-input', 'value'),
+        Output('cost-import-var-input', 'value'),
+        Input('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_cost_imports_inputs_to_store(fcfg):
+        if fcfg is None:
+            return no_update, no_update
+        fcfg = json.loads(fcfg)
+        uc = fcfg.get('unit_costs', {})
+        return (
+            uc.get('grid_import_sc_per_day', 0),
+            uc.get('grid_import_var_per_unit', 0)
+        )
+
+    @app.callback(
+        Output('mdl-smry-horizon', 'children'),
+        Output('mdl-timehorizon-input', 'value'),
+        Input('model-config', 'data'),
+        prevent_intial_call=True
+    )
+    def sync_mc_inputs_to_store(mcfg):
+        if mcfg is None:
+            return no_update, no_update
+        mcfg = json.loads(mcfg)
+        mc_input = mcfg.get('mc_input', {})
+        return (
+            f"{mc_input.get('horizon', 1):.0f}",
+            mc_input.get('horizon', 1)
+        )
+
+    return app
+
+def add_result_callbacks(app):
+    """
+    Callbacks to synchronise app interface with results of the model after run
+    """
+    @app.callback(
+        Output('res-gen', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_gen(_):
+        """
+        Create the generation results data after a completed model run
+        """
+        mdl = app.mdl
+
+        wind_data = {}
+        
+
     return app
 
 def add_model_callbacks(app):
+    """
+    Add callbacks to Dash App to allow for interfacing with a Sprake model
+    """
     app = add_initial_callback(app)
 
     return app
 
 def serve_layout():
+    """
+    Layout server function for Sprake Energy Model Interface Dash App
+    """
     session_id = str(uuid.uuid4())
 
     return html.Div([
@@ -1216,7 +1493,18 @@ def serve_layout():
         dcc.Store(data=session_id, id='session-id')
     ])
 
-def create_app(external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP], run_model=True):
+BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
+
+def create_app(external_stylesheets=None, run_model=False):
+    """
+    Create the Sprake Energy Model Interface Dash App
+    """
+    if external_stylesheets is None:
+        external_stylesheets = BOOTSTRAP_STYLESHEETS
+    else:
+        # Always add on bootstrap
+        external_stylesheets += BOOTSTRAP_STYLESHEETS
+
     app = Dash(external_stylesheets=external_stylesheets)
     app.layout = serve_layout
 
@@ -1224,15 +1512,18 @@ def create_app(external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
     app.mdl = SprakeModel()
     if run_model:
         app.mdl.run()
+    app.finance = SprakeFinance()
+    app.finance.set_model(app.mdl)
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)
-    
+
     app.title = "Sprake Energy Model"
 
     return app
 
-if __name__=="__main__":
-    app = create_app()
-
-    app.run(debug=True)
+# Commented out to prevent PyLint complaining about use of the name "app" in argument lists
+#if __name__=="__main__":
+#    app = create_app()
+#
+#    app.run(debug=True)

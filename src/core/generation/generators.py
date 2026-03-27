@@ -220,6 +220,15 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             raise ValueError("Electrical generator requires a model to serve environmental data")
         wind_speeds = self.model.local_env.get_wind_speeds(self.location, timespan)
         air_density = self.model.local_env.get_air_density(self.location, timespan)
+        
+        # Power in kW. This is retrospective - i.e. is assumed to be a mean over the previous measuring period
+        power = (0.5 * air_density * self.swept_area * self.cp(wind_speeds) * wind_speeds**3)#.reshape((1,-1))
+
+        # Check that our timesteps are aligned
+        # Cannot currently access the time details of the wind or air density server
+        # TODO: Fix this
+        
+
         return (0.5 * air_density * self.swept_area * self.cp(wind_speeds) * wind_speeds**3).reshape((1,-1))
 
     @classmethod
