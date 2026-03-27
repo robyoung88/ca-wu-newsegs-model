@@ -1,5 +1,5 @@
 from __future__ import annotations
-import re
+import re, copy
 from src.newsegsgeneration import NewsegsGeneration
 from src.core import ABCNewsegsModuleResult
 from src.core import RegTimeSpan
@@ -9,12 +9,17 @@ import numpy as np
 import numpy.typing as npt
 
 class SprakeGenerationResult(ABCNewsegsModuleResult):
-    def __init__(self, 
+    def __init__(self,
+                 timespan: RegTimeSpan,
                  wind_energy:np.ndarray[tuple[int], np.dtype[np.number]], 
                  solar_energy:np.ndarray[tuple[int], np.dtype[np.number]]
                  ) -> None:
+        self._timespan = copy.copy(timespan)
         self.set_wind(wind_energy)
         self.set_solar(solar_energy)
+
+    def get_timespan(self) -> RegTimeSpan:
+        return self._timespan
 
     @property
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
@@ -88,7 +93,7 @@ class SprakeGeneration(NewsegsGeneration):
 
     def run(self, timespan:TimeSpan) -> SprakeGenerationResult:
         energy = self._generator.run(timespan)
-        return SprakeGenerationResult(energy[0,:], energy[1,:])
+        return SprakeGenerationResult(timespan, energy[0,:], energy[1,:])
 
     @classmethod
     def from_characteristics(cls,

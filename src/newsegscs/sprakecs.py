@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Mapping
-import os, re
+import os, re, copy
 import numpy as np
 import pandas as pd
 import numpy.typing as npt
@@ -14,6 +14,7 @@ from src.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 
 class SprakeCSResult(ABCNewsegsModuleResult):
     def __init__(self,
+                 timespan: RegTimeSpan,
                  domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]],
                  storage_import:np.ndarray[tuple[int], np.dtype[np.number]],
                  storage_export:np.ndarray[tuple[int], np.dtype[np.number]],
@@ -24,6 +25,7 @@ class SprakeCSResult(ABCNewsegsModuleResult):
                  ) -> None:
         
         # Meter values - i.e. import/export
+        self._timespan = copy.copy(timespan)
         self.set_domestic_consumption(domestic_consumption)
         self.set_storage_import(storage_import)
         self.set_storage_export(storage_export)
@@ -33,6 +35,9 @@ class SprakeCSResult(ABCNewsegsModuleResult):
 
         # DSM values - i.e. system state values
         self.set_storage_soc(storage_soc)
+
+    def get_timespan(self) -> RegTimeSpan:
+        return self._timespan
 
     @property
     def meters(self) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
@@ -356,6 +361,7 @@ class SprakeCS(NewsegsCS):
             grid_exp = np.zeros_like(stor_arr)
         
         res = SprakeCSResult(
+            timespan = timespan,
             domestic_consumption = cons_arr,
             storage_import=stor_imp,
             storage_export=stor_exp,

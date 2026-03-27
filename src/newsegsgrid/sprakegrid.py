@@ -1,5 +1,5 @@
 from __future__ import annotations
-import re
+import re, copy
 from collections.abc import Mapping
 import numpy as np
 import numpy.typing as npt
@@ -10,12 +10,16 @@ from src.core import RegTimeSpan
 
 class SprakeGridResult(ABCNewsegsModuleResult):
     def __init__(self,
+                 timespan: RegTimeSpan,
                  import_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]],
                  export_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]]
                  ) -> None:
+        self._timespan = copy.copy(timespan)
         self.set_import_cost(import_unit_cost)
         self.set_export_cost(export_unit_cost)
 
+    def get_timespan(self) -> RegTimeSpan:
+        return self._timespan
     @property
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
         """
@@ -100,7 +104,8 @@ class SprakeGrid(NewsegsGrid):
             timespan.timestep = self.model.get_default_timestep()
         
         model_length = timespan.n_node
-        return SprakeGridResult(self.import_rate * np.ones(model_length),
+        return SprakeGridResult(timespan,
+                                self.import_rate * np.ones(model_length),
                                 self.export_rate * np.ones(model_length))
 
     @classmethod

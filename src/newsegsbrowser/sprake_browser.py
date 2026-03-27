@@ -14,7 +14,7 @@ from src.newsegsbrowser.stats import *
 
 from config import settings
 
-from src.newsegsmodel.sprakemodel import SprakeModel 
+from src.newsegsmodel.sprakemodel import SprakeModel
 
 def create_wind_results(wind_data=None, annual=True):
     if wind_data is None:
@@ -35,9 +35,9 @@ def create_wind_results(wind_data=None, annual=True):
 
     hours_in_range = present_stat_description_compound(wind_data, 'hrs_in_range', 'Hours in range', hours_in_range_formatter)
 
-    longest_hours_below_5 = present_event_and_daterange(wind_data, 'continuous_hours_below_5pc', r"Longest continuous hours <5%", "hours", lambda x: '{:,.1f}'.format(x))
+    longest_hours_below_5 = present_event_and_daterange(wind_data, 'continuous_hours_below_5pc', r"Longest continuous hours <5%", "hours", '{:,.1f}'.format)
 
-    longest_hours_above_95 = present_event_and_daterange(wind_data, 'continuous_hours_above_95pc', r"Longest continuous hours ≥95%", "hours", lambda x: '{:,.1f}'.format(x))
+    longest_hours_above_95 = present_event_and_daterange(wind_data, 'continuous_hours_above_95pc', r"Longest continuous hours ≥95%", "hours", '{:,.1f}'.format)
 
     if (annual):
         direct_sc = present_stat_description_compound(wind_data,
@@ -50,7 +50,7 @@ def create_wind_results(wind_data=None, annual=True):
                                                       'self-consumption',
                                                       r'Wind-only self-consumption potential (kWh (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=TOIAL_SEASONAL_STATS)
+                                                      stat_list=TOTAL_SEASONAL_STATS)
 
     tab_body = [html.Tbody(ann_gen + hours_in_range + longest_hours_below_5 + longest_hours_above_95 + direct_sc)]
 

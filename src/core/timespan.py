@@ -371,3 +371,16 @@ class OffsetRegTimeSpan(RegTimeSpan):
                 self._local_start = self._start_dt
                 self._remote_start = self._start_dt
 
+def delta_days(datetimes:pd.Series) -> pd.Series:
+    """
+    Return indicator for day changes in timeseries
+
+    Useful for calculating standing charges, this looks for changes in year day
+    between adjacent series entries and indicates "1" if at least one midnight
+    has passed. The last entry is always set to 0 to prevent standing charges
+    on zero-length intervals
+    """
+    yearday = datetimes.dt.day_of_year
+    delta_day = 1 * np.logical_not(yearday - yearday.shift(1, fill_value=yearday.iloc[0]-1)==0)
+    delta_day.iloc[-1] = 0
+    return delta_day

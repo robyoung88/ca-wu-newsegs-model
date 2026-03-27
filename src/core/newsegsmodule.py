@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import numpy as np
-from src.core.timespan import TimeSpan
+from src.core.timespan import TimeSpan, RegTimeSpan
 from collections.abc import Iterable
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
@@ -30,6 +30,10 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
     @abstractmethod
     def get_dsm_types(self) -> Iterable:
         ...
+
+    @abstractmethod
+    def get_timespan(self) -> RegTimeSpan:
+        ...
     
 class NewsegsModule(metaclass=ABCMeta):
     """
@@ -38,7 +42,7 @@ class NewsegsModule(metaclass=ABCMeta):
     @abstractmethod
     def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
         ...
-    
+   
     @property
     @abstractmethod
     def model(self):
@@ -49,7 +53,7 @@ class NewsegsModule(metaclass=ABCMeta):
 
     @model.setter
     @abstractmethod
-    def model(self, callback_model:newsegsmodel.NewsegsModel):
+    def model(self, callback_model:NewsegsModel):
         ...
 
     @abstractmethod
