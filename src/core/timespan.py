@@ -13,6 +13,8 @@ import dateutil
 from pandas.core.tools.datetimes import DatetimeScalar, Timedelta
 import numpy.typing as npt
 
+SECONDS_TO_HOURS = 1.0 / 3600.0
+
 # -----------------------------------------------------------------------------
 # Ways of defining and comparing blocks of time
 
@@ -398,3 +400,32 @@ def year_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
     startday = yearday.iloc[0]
     startyear = year.iloc[0]
     return ((year - startyear - 1) + 1 *((yearday - startday) >=0)).to_numpy(dtype=np.int32)
+
+def season_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
+    """
+    Return array integers indicating which season (0-3) datetime belongs to in series
+
+    Seasons are:
+    0 = Winter = Dec, Jan, Feb
+    1 = Spring = Mar, Apr, May
+    2 = Summer = Jun, Jul, Aug
+    3 = Autumn = Sep, Oct, Nov
+    """
+    monthn = datetimes.dt.month
+    return np.where(
+        monthn >= 12,
+        0,
+        np.where(
+            monthn >= 9,
+            3,
+            np.where(
+                monthn >= 6,
+                2,
+                np.where(
+                    monthn >= 3,
+                    1,
+                    0
+                )
+            )
+        )
+    )

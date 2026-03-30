@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from src.core import Location,RaisedLocation,AspectLocation
-from src.core import TimeSpan
+
 import numpy.typing as npt
 import pandas as pd
+
+from src.core import Location,RaisedLocation,AspectLocation
+from src.core import TimeSpan
 
 class NewsegsLocalEnvironment(metaclass=ABCMeta):
     @abstractmethod
@@ -11,10 +13,10 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
                         timespan:TimeSpan
                         ) -> npt.ArrayLike:
         ...
-    
+
     @abstractmethod
 
-    def get_wind_timestep(self) -> pd.TimeDelta|None:
+    def get_wind_timestep(self) -> pd.Timedelta|None:
         ...
 
     @abstractmethod
@@ -23,9 +25,9 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
                         timespan:TimeSpan
                         ) -> npt.ArrayLike:
         ...
-    
+
     @abstractmethod
-    def get_air_density_timestep(self) -> pd.TimeDelta|None:
+    def get_air_density_timestep(self) -> pd.Timedelta|None:
         ...
 
     @abstractmethod
@@ -34,9 +36,9 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
                                   timespan:TimeSpan
                                   ) -> npt.ArrayLike:
         ...
-    
+
     @abstractmethod
-    def get_horizontal_solar_flux_timestep(self) -> pd.TimeDelta|None:
+    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta|None:
         ...
 
     @abstractmethod
@@ -45,18 +47,20 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
                                  timespan:TimeSpan
                                  ) -> npt.ArrayLike:
         ...
+
     @abstractmethod
-    def get_external_temperature_timestep(self) -> pd.TimeDelta|None:
+    def get_external_temperature_timestep(self) -> pd.Timedelta|None:
         ...
-    
+
     @abstractmethod
     def get_solar_flux_on_plane(self,
                                 location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
                                 timespan:TimeSpan
                                 ) -> npt.ArrayLike:
         ...
+
     @abstractmethod
-    def get_solar_flux_on_plane_timestep(self) -> pd.TimeDelta:
+    def get_solar_flux_on_plane_timestep(self) -> pd.Timedelta:
         ...
 
 class NewsegsWiderEnvironment(metaclass=ABCMeta):
@@ -64,13 +68,12 @@ class NewsegsWiderEnvironment(metaclass=ABCMeta):
     def get_temperature(self, timespan:TimeSpan):
         ...
     @abstractmethod
-    def get_temperature_timestep(self) -> pd.TimeDelta|None:
+    def get_temperature_timestep(self) -> pd.Timedelta|None:
         ...
-    
+
     @abstractmethod
     def get_horizontal_solar_flux(self, timespan:TimeSpan):
         ...
     @abstractmethod
-    def get_horizontal_solar_flux_timestep(self) -> pd.TimeDelta|None:
+    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta|None:
         ...
-    

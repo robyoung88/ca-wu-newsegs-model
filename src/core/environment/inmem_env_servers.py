@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from src.core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
 from src.core.location import Location,RaisedLocation,AspectLocation
-from src.core.timespan import RegTimeSpan,OffsetRegTimeSpan
+from src.core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -50,9 +50,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
     def get_wind_speeds(self, 
                         location:RaisedLocation|tuple[RaisedLocation, ...]|list[RaisedLocation], 
-                        timespan:TimeSpan):
+                        timespan: TimeSpan):
         if (isinstance(location, Iterable)):
-            olist = [self.get_wind_speeds(x) for x in location]
+            olist = [self.get_wind_speeds(x, timespan=timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
 
@@ -63,7 +63,7 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         return(srs['timeseries'][idxs])
 
     def get_wind_timestep(self) -> pd.TimeDelta|None:
-        return self._wind_series.values()[0].get('timespan').timestep
+        return next(iter(self._wind_series.values())).get('timespan').timestep
 
     def set_horizontal_solar_flux(self,
                        horizontal_solar_flux:npt.ArrayLike,

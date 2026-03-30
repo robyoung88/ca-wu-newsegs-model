@@ -1,54 +1,116 @@
+"""
+Representations of energy converters for use in NewsegsGeneration.
+
+A collection of classes used for representation of converters of environmental
+to electrical energy which may be used as part of composition of a 
+NewsegsGeneration module.
+
+Exports:
+    ABCElecGenerator: Abstract base class for all generators.
+    WindTurbineElecGenerator: Simple WTG using a Cp curve for transformation
+                              of average wind speeds (e.g. 10 min).
+    PowerPlantHomogeneousWind: Scaling of WindTurbineElecGenerator to represent
+                               a number of independent homogeneous wind
+                               turbines across a homogeneous site.
+    ABCPVElecGenerator: Extension of ABCElecGenerator as an abstract base class
+                        for solar photovoltaic generators.
+    SprakePVElecGenerator: Extension of ABCPVElecGenerator using the simple PV
+                           model of Sprake dependent only upon horizontal flux.
+    PowerPlantHomogeneousPV: Scaling of an ABCPVElecGenerator to represent
+                             a number of independent modules across a 
+                             homogeneous site.
+    PowerPlantHeterogeneousGenerators: Composition of a number of 
+                                       ABCElecGenerators.
+    
+    GENERATOR_CONSTRUCTORS: A dictionary of all the implementations of
+                            ABCElecGenerator defined in this module.
+
+    generator_from_dict: Returns a generator when provided its dictionary
+                         representation (from .to_dict() method).
+"""
 from __future__ import annotations
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable,Mapping
+from copy import copy
+import warnings
+from typing_extensions import overload, override
+
 import numpy as np
 import numpy.typing as npt
-from copy import copy
-from src.core import TimeSpan
-from src.core import Location,RaisedLocation,AspectLocation,location_from_dict
-#from src.newsegsmodel.newsegsmodel import NewsegsModel
 
-#def __cp_interpolant_factory(cp_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]) -> Callable[npt.ArrayLike,npt.ArrayLike]:
-def _cp_interpolant_factory(cp_curve):
+from src.core import TimeSpan, SECONDS_TO_HOURS
+from src.core import Location,RaisedLocation,AspectLocation,location_from_dict
+
+def _cp_interpolant_factory(
+    cp_curve: np.ndarray[tuple[int,int], np.dtype[np.number]],
+) -> Callable[npt.ArrayLike, npt.ArrayLike]:
+    """
+    Returns a function taking axial mean wind speeds and returning Cp.
+
+    Args:
+        cp_curve: 2D array of Cp data, where row 0 is axial wind speeds (m/s)
+                  and row 1 is Cp value.
+    """
     def interpolant(x):
         return np.interp(x, cp_curve[0,:], cp_curve[1,:], left=0.0, right=0.0)
     return interpolant
 
 class ABCElecGenerator(metaclass=ABCMeta):
+    """
+    Represents a converter of environmental conditions to electrical energy.
+
+    An abstract class which is implemented for the individual or grouped 
+    converters composed in a NewsegsGeneration implementation. The interface
+    allows for the following activities:
+
+    - running (i.e. predicting electrical output over a TimeSpan).
+    - setting and accessing a NewsegsModel used for serving environmental data.
+    - accessing a name for the current generator configuration.
+    - storing the generator configuration as a python dictionary.
+    - setting and accessing the location data for the generator.
+    - accessing the nameplate electrical capacity of the generator.
+    """
+
     @abstractmethod
-    def run(self, timespan:TimeSpan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
-        ...
+    def run(
+        self, timespan: TimeSpan
+    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+        """
+        Returns an array of generation data over the provided TimeSpan.
+
+        By default, the returned data is the number of units produced in the
+        preceding time interval in kWh. Deviations from this are indicated in
+        the override / extension documentation.
+        """
 
     @property
     @abstractmethod
     def name(self) -> str:
         """
-        Something to return a friendly string identifier for the config
+        A friendly string identifier for the configuration.
+
+        Not strictly unique, but used for identification of stored configurations.
         """
-        ...
-    
+
     @property
     @abstractmethod
-    def model(self):
+    def model(self) -> 'NewsegsModel' | None:
         """
-        The callback model associated with the generator
+        The callback NewsegsModel model associated with the generator.
         """
-        ...
 
     @model.setter
     @abstractmethod
-    def model(self, callback_model):
+    def model(self, callback_model: 'NewsegsModel'):
         ...
-    # def model(self, callback_model:newsegsmodel.NewsegsModel):
 
     @abstractmethod
     def to_dict(self):
         """
-        Configuration as a dictionary
+        Returns Generator/Powerplant configuration as a dictionary.
         """
-        ...
-    
+
     #@abstractmethod
     #def load_dict(self):
     #    """
@@ -59,25 +121,53 @@ class ABCElecGenerator(metaclass=ABCMeta):
     @property
     @abstractmethod
     def location(self) -> Location:
-        ...
+        """
+        The Location of the generator for environmental conditions.
+        """
 
     @location.setter
     @abstractmethod
     def location(self, loc:Location):
         ...
-    
+
     @property
     @abstractmethod
     def nameplate_capacity(self) -> float:
-        ...
+        """
+        The total nameplate capacity in kW.
+        """
+
 
 class WindTurbineElecGenerator(ABCElecGenerator):
+    """
+    Simple WTG using a Cp curve for transformation of wind speed.
+
+    This WTG requests wind speeds from the model's local environment server,
+    and applies these directly to a stored, piecewise-linearly interpolated
+    Cp curve.
+
+    Assumptions:
+        
+        - Wind speed averaging intervals from environment server appropriate
+          for Cp Curve.
+        
+        - Axial alignment sufficient at all times for Cp curve accuracy.
+
+            - (Corollary) negliglible vertical component of wind speed.
+        
+        - Wind turbine availability 100%.
+
+        - No degredation in performance over time.
+    """
+
     _default_cp_curve = np.asarray(
         [
             [0,  3,  5,   10, 25, 26, 50],
             [0.0,0.0,0.25,0.4,0.1,0.0,0.0]
         ]).reshape((2,-1))
+
     _default_name = "Wind Turbine"
+
     def __init__(self,
                  other:WindTurbineElecGenerator|None = None
                  ) -> None:
@@ -104,60 +194,92 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         else:
             raise ValueError("'other' must be a WindTurbineElecGenerator")
 
+    @override
     @property
-    def model(self):# -> NewsegsModel|None:
+    def model(self) -> 'NewsegsModel' | None:
         return self._model
-    
+
+    @override
     @model.setter
     def model(self, model) -> None:
         self._model = model
 
     @property
     def cut_in(self) -> float:
+        """
+        Mean wind speed (m/s) below which no output (not enforced in Cp).
+        """
         return self._cut_in
-    
+
     @cut_in.setter
     def cut_in(self, cut_in:float) -> None:
         self._cut_in = cut_in
-    
+
     @property
     def cut_out(self) -> float:
+        """
+        Mean wind speed (m/s) above which no output (not enforced in Cp).
+        """
         return self._cut_out
-    
+
     @cut_out.setter
     def cut_out(self, cut_out:float) -> None:
         self._cut_out = cut_out
-    
+
     @property
     def rated_power(self) -> float:
+        """
+        Alternative name for nameplate_capacity (kW).
+        """
         return self._rated_power
-    
+
     @rated_power.setter
     def rated_power(self, rated_power:float) -> None:
         self._rated_power = rated_power
 
+    @override
     @property
     def nameplate_capacity(self) -> float:
+        """
+        Power (kW) at rated wind speed.
+
+        Not necessarily peak generator output over any averaging period, and
+        not enforced as a maximum in Cp curve.
+        """
         return self.rated_power
 
     @property
     def swept_area(self) -> float:
+        """
+        Area (m²) swept by blades, used in combination with Cp curve for
+        power output.
+        """
         return self._swept_area
-    
+
     @swept_area.setter
     def swept_area(self, swept_area:float) -> None:
         self._swept_area = swept_area
 
     @property
     def rotor_diameter(self) -> float:
+        """
+        Alternative accessor for swept_area. Diameter (m) of swept circle.
+
+        Note that for a coned rotor, this diameter is less than the length of
+        the blade plus half the diameter of the hub. Use the diameter used in
+        Cp calculation.
+        """
         return 2.0 * np.sqrt(self._swept_area) / np.pi
-    
+
     @rotor_diameter.setter
     def rotor_diameter(self, diameter:float) -> None:
         self._swept_area = np.pi * (0.5 * diameter) ** 2
-    
+
     @property
     def hub_height(self) -> float:
+        """
+        Height of rotor centre (m) for environmental data access.
+        """
         return self._hub_height
 
     @hub_height.setter
@@ -166,6 +288,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         if hasattr(self, '_location'):
             self._location.height_agl = height
 
+    @override
     @property
     def name(self) -> str:
         return self._name
@@ -174,75 +297,164 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     def name(self, name:str) -> None:
         self._name = name
 
+    @override
     @property
     def location(self) -> RaisedLocation:
         return self._location
 
+    @override
     @location.setter
     def location(self, loc:Location) -> None:
-        if (isinstance(loc, RaisedLocation) and loc.height_agl != self.hub_height):
-            raise UserWarning("Provided location includes a height unequal to hub, and will be ignored")
+        if (
+            isinstance(loc, RaisedLocation)
+            and loc.height_agl != self.hub_height
+        ):
+            warnings.warn(('Provided location includes a height unequal to '
+                           'hub, and will be ignored.'),
+                          UserWarning)
+
         self._location = RaisedLocation(loc)
         self._location.height_agl = self.hub_height
-    
-    def set_cp_curve(self, 
-                     cp_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]
-                     ) -> None:
+
+    def set_cp_curve(
+        self,
+        cp_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]
+    ) -> None:
+        """
+        Set the Cp function using an array of wind speed - Cp pairs.
+
+        Output power is modelled by:
+            P = Cp * 0.5 * rho * A * U³
+        where rho is air density, A is the swept area of the turbine, and U
+        is the axial wind speed. Cp is the ratio of converted to total kinetic
+        power in the wind and is generally limited to a maximum of 16/27 (i.e.)
+        the 'Betz limit'.
+        """
         if np.any(cp_curve[1,:]> 16/27):
-            raise UserWarning("Cp curve contains entries exceeding the Betz limit. This is implausible with a standard HAWT. Check your power curve")
+            warnings.warn(
+                ('Cp curve contains entries exceeding the Betz limit. This is '
+                'implausible with a standard HAWT. Check your power curve.'),
+                UserWarning)
         if np.any(cp_curve[1,:] < 0.0):
-            raise UserWarning("Cp curve contains negative values. Self-consumption should be handled separately. They will be overwritten by zeros")
+            warnings.warn(
+                ('Cp curve contains negative values. Self-consumption should '
+                'be handled separately. They will be overwritten by zeros.'),
+                UserWarning)
             cp_curve = copy(cp_curve)
             cp_curve[1,cp_curve[1,:]<0.0] = 0.0
         self._cp_curve = cp_curve
         self._cp_func = _cp_interpolant_factory(cp_curve)
-    
+
     def set_power_curve(self,
-                        power_curve:np.ndarray[tuple[int,int], np.dtype[np.number]],
-                        air_density:float=1.225
+                        power_curve:
+                            np.ndarray[tuple[int,int], np.dtype[np.number]],
+                        air_density: float = 1.225
                         ) -> None:
         """
-        The power curve is used to derive the coefficient of performance. Air density should be that used for derivation of the power curve.
+        Set Cp using a power curve.
+
+        Note that this calculation is dependent upon swept area. If the swept
+        area has not been set prior to use of this method, the Cp curve will be
+        incorrect.
+
+        Args:
+            power_curve: 2D array of power data, where row 0 is axial wind 
+                         speeds (m/s) and row 1 is output power (kW).
+            air_density: The air density (kg/m³) used for determination of
+                         the power curve.
         """
-        available_power = 0.5 * air_density * self.swept_area * power_curve[0,:] * power_curve[0,:] * power_curve[0,:]
+        available_power = (
+            0.5 * air_density * self.swept_area
+            * power_curve[0,:] * power_curve[0,:] * power_curve[0,:]
+        )
+
         cp_curve = copy(power_curve)
+
         with np.errstate(divide='ignore', invalid='ignore'):
             cp_curve[1,:] = power_curve[1,:] / available_power
+
         cp_curve[1,:] = np.where(available_power<=0.0, 0.0, cp_curve[1,:])
+
         self.set_cp_curve(cp_curve)
 
     @property
     def cp(self) -> Callable:
+        """
+        Function taking axial wind speeds and returning Cp.
+        """
         return self._cp_func
 
-    def run(self, timespan:TimeSpan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    @override
+    def run(
+        self, timespan:TimeSpan
+    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+        """
+        Returns an array of generation data over the provided TimeSpan.
+
+        Returned array is a timeseries of electrical energy (kWh) produced by
+        the WTG under idealised conditions, assuming the provided Cp or power
+        curve is applicable at all times.
+
+        Output power is modelled by:
+            P = Cp * 0.5 * rho * A * U³
+        where rho is air density, A is the swept area of the turbine, and U
+        is the axial wind speed.
+
+        Assumptions:
+            - Wind speed averaging intervals from environment server 
+              appropriate for Cp Curve.
+        
+            - Axial alignment sufficient at all times for Cp curve accuracy.
+                - (Corollary) negliglible vertical component of wind speed.
+        
+            - Wind turbine availability 100%.
+
+            - No degredation in performance over time.
+        """
         if self.model is None:
-            raise ValueError("Electrical generator requires a model to serve environmental data")
-        wind_speeds = self.model.local_env.get_wind_speeds(self.location, timespan)
-        air_density = self.model.local_env.get_air_density(self.location, timespan)
-        
-        # Power in kW. This is retrospective - i.e. is assumed to be a mean over the previous measuring period
-        power = (0.5 * air_density * self.swept_area * self.cp(wind_speeds) * wind_speeds**3)#.reshape((1,-1))
+            raise ValueError(
+                (
+                    'Generator %s requires a model to serve environmental data' # pylint: disable=consider-using-f-string
+                ) % self._name
+            )
+        lenvs = self.model.local_env
+        wind_speeds = lenvs.get_wind_speeds(self.location, timespan)
+        air_density = lenvs.get_air_density(self.location, timespan)
 
-        # Check that our timesteps are aligned
-        # Cannot currently access the time details of the wind or air density server
-        # TODO: Fix this
-        
+        # Power in kW. This is retrospective - i.e. is assumed to be a mean 
+        # over the previous measuring period
+        power = (0.5 * air_density * self.swept_area * self.cp(wind_speeds)
+                 * wind_speeds**3)
 
-        return (0.5 * air_density * self.swept_area * self.cp(wind_speeds) * wind_speeds**3).reshape((1,-1))
+        deltatime = lenvs.get_wind_timestep().seconds * SECONDS_TO_HOURS
+
+        # Assumption: returned timeseries is regular and indexed to the wind
+        # speed times
+        energy = power * deltatime
+
+        # First time has no preceding interval
+        energy[0] = 0.0
+
+        return energy.reshape((1,-1))
 
     @classmethod
-    def from_characteristics(cls,
-                             cut_in:float,
-                             cut_out:float,
-                             rated_power:float,
-                             swept_area:float,
-                             hub_height:float,
-                             name:str|None=None,
-                             location:Location|None=None,
-                             cp_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]|None=None,
-                             power_curve:np.ndarray[tuple[int,int], np.dtype[np.number]]|None=None
-                             ) -> WindTurbineElecGenerator:
+    def from_characteristics(
+        cls,
+        cut_in: float,
+        cut_out: float,
+        rated_power: float,
+        swept_area: float,
+        hub_height: float,
+        name: str | None = None,
+        location: Location | None = None,
+        cp_curve:
+            np.ndarray[tuple[int,int], np.dtype[np.number]] | None = None,
+        power_curve:
+            np.ndarray[tuple[int,int], np.dtype[np.number]] | None = None,
+    ) -> WindTurbineElecGenerator:
+        """
+        Return a new WindTurbineElecGenerator given its key characteristics.
+        """
         o = cls()
 
         o.cut_in = cut_in
@@ -251,22 +463,23 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         o.swept_area = swept_area
         o.hub_height = hub_height
         if name is None:
-            o_name = cls._default_name
+            o._name = cls._default_name
         else:
             o.name = name
 
         if not location is None:
             o.location = location
 
-        if not (cp_curve is None):
+        if not cp_curve is None:
             o.set_cp_curve(cp_curve)
-        elif not (power_curve is None):
+        elif not power_curve is None:
             o.set_power_curve(power_curve)
         else:
             raise ValueError("Either cp_curve or power_curve must be specified")
 
         return o
 
+    @override
     def to_dict(self) -> dict:
         odict = {
             'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
@@ -281,12 +494,16 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         }
 
         return odict
-    
+
     @classmethod
-    def from_dict(cls, input:dict) -> WindTurbineElecGenerator:
-        if input.get('location', None) is not None:
-            input['location'] = location_from_dict(input['location'])
-        return cls.from_characteristics(**input)
+    def from_dict(cls, ip:dict) -> WindTurbineElecGenerator:
+        """
+        Return a WindTurbineElecGenerator from a dictionary.
+        """
+        if ip.get('location', None) is not None:
+            ip['location'] = location_from_dict(ip['location'])
+        return cls.from_characteristics(**ip)
+
 
 class PowerPlantHomogeneousWind(ABCElecGenerator):
     """
@@ -302,7 +519,7 @@ class PowerPlantHomogeneousWind(ABCElecGenerator):
             self._turbine = WindTurbineElecGenerator()
             self._location = self._turbine.location
             self._n_turbines = 1.0
-        elif isinstance(other, PowerPlantHomogenousWind):
+        elif isinstance(other, PowerPlantHomogeneousWind):
             self._model = other.model
             self._name = other.name
             self._turbine = other.turbine
@@ -318,7 +535,7 @@ class PowerPlantHomogeneousWind(ABCElecGenerator):
             raise ValueError("`other` should be a `PowerPlantHomogeneousWind` or `WindTurbineElecGenerator`")
         
     @property
-    def model(self):# -> NewsegsModel|None:
+    def model(self) -> 'NewsegsModel' | None:
         return self._model
     
     @model.setter
@@ -377,7 +594,7 @@ class PowerPlantHomogeneousWind(ABCElecGenerator):
     def swept_area(self):
         return self._turbine.swept_area * self._n_turbines
     
-    def run(self, timespan:Timespan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    def run(self, timespan: TimeSpan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
         return self.n_turbines * self.turbine.run(timespan)
 
     @classmethod
@@ -407,12 +624,12 @@ class PowerPlantHomogeneousWind(ABCElecGenerator):
         return odict
     
     @classmethod
-    def from_dict(cls, input:Mapping) -> PowerPlantHomogeneousWind:
-        if input.get('turbine', None) is not None:
-            input['turbine'] = generator_from_dict(input['turbine'])
-        if input.get('location', None) is not None:
-            input['location'] = location_from_dict(input['location'])
-        return cls.from_characteristics(**input)
+    def from_dict(cls, ip:Mapping) -> PowerPlantHomogeneousWind:
+        if ip.get('turbine', None) is not None:
+            ip['turbine'] = generator_from_dict(ip['turbine'])
+        if ip.get('location', None) is not None:
+            ip['location'] = location_from_dict(ip['location'])
+        return cls.from_characteristics(**ip)
 
 class ABCPVElecGenerator(ABCElecGenerator):
     """
@@ -562,10 +779,10 @@ class ABCPVElecGenerator(ABCElecGenerator):
         return odict
 
     @classmethod
-    def from_dict(cls, input:Mapping) -> ABCPVElecGenerator:
-        if input.get('location', None) is not None:
-            input['location'] = location_from_dict(input['location'])
-        return cls.from_characteristics(**input)
+    def from_dict(cls, ip:Mapping) -> ABCPVElecGenerator:
+        if ip.get('location', None) is not None:
+            ip['location'] = location_from_dict(ip['location'])
+        return cls.from_characteristics(**ip)
 
 class SprakePVElecGenerator(ABCPVElecGenerator):
     _default_name = "Simple PV Panel"
@@ -754,7 +971,7 @@ class PowerPlantHomogeneousPV(ABCElecGenerator):
     def collector_area(self):
         return self._pv_array.collector_area * self._n_arrays
 
-    def run(self, timespan:Timespan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    def run(self, timespan: TimeSpan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
         return self.n_arrays * self.pv_array.run(timespan)
 
     @classmethod
@@ -784,12 +1001,12 @@ class PowerPlantHomogeneousPV(ABCElecGenerator):
         return odict
 
     @classmethod
-    def from_dict(cls, input:Mapping) -> PowerPlantHomogeneousPV:
-        if input.get('pv_array', None) is not None:
-            input['pv_array'] = generator_from_dict(input['pv_array'])
-        if input.get('location', None) is not None:
-            input['location'] = location_from_dict(input['location'])
-        return cls.from_characteristics(**input)
+    def from_dict(cls, ip: Mapping) -> PowerPlantHomogeneousPV:
+        if ip.get('pv_array', None) is not None:
+            ip['pv_array'] = generator_from_dict(ip['pv_array'])
+        if ip.get('location', None) is not None:
+            ip['location'] = location_from_dict(ip['location'])
+        return cls.from_characteristics(**ip)
 
 class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     """
@@ -887,10 +1104,10 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         return odict
 
     @classmethod
-    def from_dict(cls, input:Mapping) -> PowerPlantHeterogeneousGenerators:
-        if input.get('generators', None) is not None:
-            input['generators'] = [generator_from_dict(x) for x in input['generators']]
-        return cls.from_characteristics(**input)
+    def from_dict(cls, ip:Mapping) -> PowerPlantHeterogeneousGenerators:
+        if ip.get('generators', None) is not None:
+            ip['generators'] = [generator_from_dict(x) for x in ip['generators']]
+        return cls.from_characteristics(**ip)
 
     @property
     def location(self):
@@ -907,16 +1124,16 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
             cap += gen.nameplate_capacity
         return cap
 
-generator_constructors = {
+GENERATOR_CONSTRUCTORS = {
     'WindTurbineElecGenerator': WindTurbineElecGenerator,
     'PowerPlantHomogeneousWind': PowerPlantHomogeneousWind,
     'SprakePVElecGenerator': SprakePVElecGenerator,
     'PowerPlantHomogeneousPV': PowerPlantHomogeneousPV
 }
 
-def generator_from_dict(input:Mapping):
-    classname = input.pop('class')
-    constructor = generator_constructors.get(classname, None)
+def generator_from_dict(ip:Mapping):
+    classname = ip.pop('class')
+    constructor = GENERATOR_CONSTRUCTORS.get(classname, None)
     if constructor is None:
         return constructor
-    return constructor.from_dict(input)
+    return constructor.from_dict(ip)

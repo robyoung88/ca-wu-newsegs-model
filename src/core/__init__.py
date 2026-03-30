@@ -1,4 +1,4 @@
 from src.core.location import Location,RaisedLocation,AspectLocation,location_from_dict
-from src.core.timespan import TimeSpan,RegTimeSpan,OffsetRegTimeSpan,TimedeltaScalar
+from src.core.timespan import TimeSpan,RegTimeSpan,OffsetRegTimeSpan,TimedeltaScalar,SECONDS_TO_HOURS
 from src.core.environment.environment_servers import NewsegsLocalEnvironment,NewsegsWiderEnvironment
 from src.core.newsegsmodule import NewsegsModule,ABCNewsegsModuleResult
