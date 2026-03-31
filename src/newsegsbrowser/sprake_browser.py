@@ -129,7 +129,7 @@ def create_pv_results(pv_data=None, annual=True):
                                                       'self-consumption',
                                                       r'PV-only self-consumption potential (kWh (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=TOIAL_SEASONAL_STATS)
+                                                      stat_list=TOTAL_SEASONAL_STATS)
 
     tab_body = [html.Tbody(ann_gen + max_day + min_day + days_in_range + direct_sc)]
 
@@ -172,7 +172,7 @@ def create_combined_generation_results(gen_data=None, annual=True):
                                                       'self-consumption',
                                                       r'Without storage self-consumption potential (kWh (% production))',
                                                       stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=TOIAL_SEASONAL_STATS)
+                                                      stat_list=TOTAL_SEASONAL_STATS)
 
     tab_body = [html.Tbody(ann_gen + max_day + min_day + days_in_range + direct_sc)]
 
@@ -308,19 +308,19 @@ def create_seasonal_cons_results(cons_data=None, annual=True):
                                                              'total_site_daily_cons_wd',
                                                              r'Weekday site demand (kWh)',
                                                              stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=TOIAL_SEASONAL_STATS)
+                                                             stat_list=TOTAL_SEASONAL_STATS)
 
         sat_sitecons = present_stat_description_compound(cons_data,
                                                              'total_site_daily_cons_sat',
                                                              r'Saturday site demand (kWh)',
                                                              stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=TOIAL_SEASONAL_STATS)
+                                                             stat_list=TOTAL_SEASONAL_STATS)
         
         sat_sitecons = present_stat_description_compound(cons_data,
                                                              'total_site_daily_cons_sun',
                                                              r'Sunday site demand (kWh)',
                                                              stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=TOIAL_SEASONAL_STATS)
+                                                             stat_list=TOTAL_SEASONAL_STATS)
 
     tab_body = [html.Tbody(weekday_sitecons + sat_sitecons + sun_sitecons)]
 
@@ -400,25 +400,25 @@ def create_seasonal_net_results(net_data=None, annual=True):
                                                          'annual_export',
                                                          r'Export to grid (kWh (% production))',
                                                          stat_formatter = val_percent_formatter_factory('total', 'frac'),
-                                                         stat_list=TOIAL_SEASONAL_STATS)
+                                                         stat_list=TOTAL_SEASONAL_STATS)
 
         import_stats = present_stat_description_compound(net_data,
                                                          'annual_import',
                                                          r'Import from grid (kWh (% consumption))',
                                                          stat_formatter = val_percent_formatter_factory('total', 'frac'),
-                                                         stat_list=TOIAL_SEASONAL_STATS)
+                                                         stat_list=TOTAL_SEASONAL_STATS)
 
         peak_export = present_stat_description_compound(net_data,
                                                          'peak_export',
                                                          r'Exports 5pm-8pm (kWh (% production))',
                                                          stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                         stat_list=TOIAL_SEASONAL_STATS)
+                                                         stat_list=TOTAL_SEASONAL_STATS)
         
         peak_import = present_stat_description_compound(net_data,
                                                         'peak_import',
                                                         r'Imports 5pm-8pm (kWh (% consumption))',
                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                        stat_list=TOIAL_SEASONAL_STATS)
+                                                        stat_list=TOTAL_SEASONAL_STATS)
 
     tab_body = [html.Tbody(export_stats + import_stats + peak_export + peak_import)]
 
