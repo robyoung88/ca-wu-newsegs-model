@@ -368,6 +368,33 @@ class OffsetRegTimeSpan(RegTimeSpan):
 
     # Setting the offset is all done post-intialisation apart from in copy
     # so no need to override __init__
+    # However, need to make sure is caught by singledispatchmethod
+    # otherwise copy constructor will replace parent class'
+    # and as a result of this, will need to reattach all the methods
+    # which is done after the fact
+    @singledispatchmethod
+    def __init__(
+        self, 
+        start: TimeSpan | DatetimeScalar,
+        end: DatetimeScalar | None = None,
+        tz: TimeZoneScalar|None = None,
+        timestep: TimedeltaScalar|None = None
+    ) -> None:
+        """
+        Default assumes we have None
+        """
+        raise ValueError('`start` must be an identifiable date, is %s', start)
+    
+    # There may be a smarter way of doing this. I do not know it.
+    @override
+    @__init__.register(DatetimeScalar)
+    def _from_dates(self, 
+        start: DatetimeScalar,
+        end: DatetimeScalar, 
+        tz: TimeZoneScalar|None = None,
+        timestep: TimedeltaScalar|None = None
+    ):
+        super().__init__(start, end, tz, timestep)
     
     @property 
     def offset_initialised(self):
