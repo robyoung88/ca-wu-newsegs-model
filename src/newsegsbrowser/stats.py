@@ -72,7 +72,7 @@ DEFAULT_HOURS_IN_RANGE_STATS = [
     {'label':r'75%≤x<95%',
      'value':'hrs_075_to_095'},
     {'label':r'95%≤x≤100%',
-     'value':'hrs_095_to_0100'}
+     'value':'hrs_095_to_999'}
     ]
 
 DEFAULT_DAYS_IN_RANGE_STATS = [

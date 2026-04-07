@@ -28,30 +28,31 @@ class TimeSpan:
     @singledispatchmethod
     def __init__(
         self, 
-        start: TimeSpan | DatetimeScalar | None = None,
-        end: DatetimeScalar | None = None
+        start: TimeSpan | DatetimeScalar,
+        end: DatetimeScalar | None = None,
+        tz: TimeZoneScalar|None = None
     ) -> None:
         """
         Default assumes we have None
         """
-        self.set_start("2002-01-01T00:00:00")
-        self.set_end("2015-01-01T00:00:00")
-
-    @__init__.register('TimeSpan')
-    def _from_other(self, start: 'TimeSpan', end: None = None):
-        """
-        Initialise a TimeSpan using another TimeSpan
-        """
-        self._start_dt = start.start
-        self._end_dt = start.end
-        self._tz = start.tz
-        self._post_calc()
+        raise ValueError('`start` must be an identifiable date, is %s', start)
+        
+    # Copy constructor is registered at the bottom
+    # for late-binding
     
     @__init__.register(DatetimeScalar)
-    def _from_dates(self, start: DatetimeScalar, end: DatetimeScalar):
+    def _from_dates(self, start: DatetimeScalar, end: DatetimeScalar, tz: TimeZoneScalar|None = None):
         self.start = start
         self.end = end
-        self._post_calc()
+        if tz is not None:
+            self.tz = tz
+    
+    # If we are using single dispatch, then we are unable
+    # to use a "None" first argument for a default constructor
+    # To get around this, we will use a class method
+    @classmethod
+    def from_none(cls):
+        return cls("2002-01-01T00:00:00", "2015-01-01T00:00:00")
 
     def _post_calc(self):
         """
@@ -226,6 +227,19 @@ class TimeSpan:
         o = copy(self)
         o.end = o.start + o.delta / denom
         return o
+
+# TimeSpan copy constructor
+@TimeSpan.__init__.register(TimeSpan)
+def TimeSpan_from_other(self, start: TimeSpan, end: None = None):
+    """
+    Initialise a TimeSpan using another TimeSpan
+    """
+    self._start_dt = start.start
+    self._end_dt = start.end
+    self._tz = start.tz
+    self._post_calc()
+
+setattr(TimeSpan, '_from_other', TimeSpan_from_other)
 
 class RegTimeSpan(TimeSpan):
     """
