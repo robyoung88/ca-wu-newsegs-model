@@ -4,7 +4,7 @@ from __future__ import annotations
 from copy import copy
 from functools import singledispatchmethod
 import operator
-from typing import TypeAlias,overload
+from typing import TypeAlias, overload, override
 import numpy as np
 import pandas as pd
 from datetime import timedelta, tzinfo
@@ -246,12 +246,38 @@ class RegTimeSpan(TimeSpan):
     A TimeSpan which strides between its start and end in equally-spaced TimeDeltas
     """
 
-    def __init__(self, other:TimeSpan|None=None) -> None:
-        super().__init__(other)
-        if not (other is None):
-            if isinstance(other, RegTimeSpan):
-                self._timestep = other.timestep
-    
+    @singledispatchmethod
+    def __init__(
+        self, 
+        start: TimeSpan | DatetimeScalar,
+        end: DatetimeScalar | None = None,
+        tz: TimeZoneScalar|None = None,
+        timestep: TimedeltaScalar|None = None
+    ) -> None:
+        """
+        Default assumes we have None
+        """
+        raise ValueError('`start` must be an identifiable date, is %s', start)
+
+    @override
+    @__init__.register(DatetimeScalar)
+    def _from_dates(self, 
+        start: DatetimeScalar,
+        end: DatetimeScalar, 
+        tz: TimeZoneScalar|None = None,
+        timestep: TimedeltaScalar|None = None
+    ):
+        super().__init__(start, end, tz)
+        if timestep is not None:
+            self.timestep = timestep
+        
+    @override
+    @classmethod
+    def from_none(cls):
+        o = super(RegTimeSpan, cls).from_none()
+        o.set_timestep(1, "h")
+        return o
+            
     def _post_calc(self):
         """
         Calculations that should occur once a change in a key property has occurred
@@ -320,21 +346,29 @@ class RegTimeSpan(TimeSpan):
         """
         return not(self == other)
 
+# RegTimeSpan copy constructor
+@RegTimeSpan.__init__.register(TimeSpan)
+def RegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
+    super(RegTimeSpan, self).__init__(start)
+    if isinstance(start, RegTimeSpan):
+        self._timestep = start.timestep
+
+setattr(RegTimeSpan, '_from_other', RegTimeSpan_from_other)
+
 class OffsetRegTimeSpan(RegTimeSpan):
     """
-    A regular timespan which is offset from another timespan by a fixed number of timesteps
+    A regular timespan offset from another timespan by a number of timesteps.
 
-    The purpose of this class is to allow a small timeseries to be repeated (with offset) to represent a longer timeseries which may start at a different time.
+    The purpose of this class is to allow a small timeseries to be repeated 
+    (with offset) to represent a longer timeseries which may start at a 
+    different time.
     """
-    def __init__(self, other:TimeSpan|None=None) -> None:
-        self._offset_initialised = False
-        super().__init__(other)
-        if not (other is None):
-            if isinstance(other, OffsetRegTimeSpan):
-                self._offset_initialised = other.offset_initialised
-                self._local_start = other.local_start
-                self._remote_start = other.remote_start
 
+    _offset_initialised = False
+
+    # Setting the offset is all done post-intialisation apart from in copy
+    # so no need to override __init__
+    
     @property 
     def offset_initialised(self):
         return self._offset_initialised    
@@ -403,6 +437,15 @@ class OffsetRegTimeSpan(RegTimeSpan):
             if hasattr(self, "_start_dt"):
                 self._local_start = self._start_dt
                 self._remote_start = self._start_dt
+
+# OffsetRegTimeSpan copy constructor
+@OffsetRegTimeSpan.__init__.register(TimeSpan)
+def OffsetRegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
+    super(OffsetRegTimeSpan, self).__init__(start)
+    if isinstance(start, OffsetRegTimeSpan):
+        self._offset_initialised = start.offset_initialised
+        self._local_start = start.local_start
+        self._remote_start = start.remote_start
 
 def delta_days(datetimes:pd.Series) -> pd.Series:
     """

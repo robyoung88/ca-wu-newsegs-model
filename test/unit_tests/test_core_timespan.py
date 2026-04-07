@@ -9,7 +9,7 @@ import pandas as pd
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.core.timespan import TimeSpan
+from src.core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
 
 class TestBasicTimespan(unittest.TestCase):
     def test_null_construction(self):
@@ -53,3 +53,52 @@ class TestBasicTimespan(unittest.TestCase):
         # And ensure we have delta preserved
         dt_real = (t2 - t1).value
         self.assertEqual(ts.delta.value, dt_real)
+
+    def test_copy_construction(self):
+        t1 = pd.Timestamp('2002-01-01T00:00:00', tz='utc')
+        t2 = pd.Timestamp('2003-01-01T00:00:00', tz='Etc/GMT-9')
+        ts_1 = TimeSpan(t1, t2)
+        ts_2 = TimeSpan(ts_1)
+
+        self.assertEqual(ts_1.start, ts_2.start)
+        self.assertEqual(ts_1.end, ts_2.end)
+        self.assertEqual(ts_1, ts_2)
+
+    def test_regts_null_construction(self):
+        ts = RegTimeSpan.from_none()
+        self.assertIsNotNone(ts)
+        self.assertIsInstance(ts, TimeSpan)
+        self.assertIsInstance(ts, RegTimeSpan)
+        self.assertIsNotNone(ts.start)
+        self.assertIsNotNone(ts.end)
+        self.assertIsNotNone(ts.timestep)
+        self.assertGreater(ts.n_interval, 0)
+
+    def test_regts_copy_construction(self):
+        t1 = pd.Timestamp('2002-01-01T00:00:00', tz='utc')
+        t2 = pd.Timestamp('2003-01-01T00:00:00', tz='Etc/GMT-9')
+        ts_1 = RegTimeSpan(t1, t2, timestep = pd.Timedelta(0.5,'h'))
+        ts_2 = RegTimeSpan(ts_1)
+
+        self.assertEqual(ts_1.start, ts_2.start)
+        self.assertEqual(ts_1.end, ts_2.end)
+        self.assertEqual(ts_1.timestep, ts_2.timestep)
+        self.assertEqual(ts_1, ts_2)
+
+    def test_osregts_null_construction(self):
+        ts = OffsetRegTimeSpan.from_none()
+        self.assertIsNotNone(ts)
+        self.assertIsInstance(ts, TimeSpan)
+        self.assertIsInstance(ts, RegTimeSpan)
+        self.assertIsInstance(ts, OffsetRegTimeSpan)
+        self.assertIsNotNone(ts.start)
+        self.assertIsNotNone(ts.end)
+        self.assertIsNotNone(ts.timestep)
+        self.assertGreater(ts.n_interval, 0)
+        self.assertFalse(ts.offset_initialised)
+        ts.set_offset(pd.Timestamp('2003-01-01T00:00:00', tz='utc'),
+                      pd.Timestamp('2002-01-01T00:00:00', tz='utc'))
+        self.assertTrue(ts.offset_initialised)
+
+        ts2 = OffsetRegTimeSpan.from_none()
+        self.assertFalse(ts2.offset_initialised)
