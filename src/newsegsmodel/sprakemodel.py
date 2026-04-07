@@ -29,9 +29,10 @@ def get_sprake_environment_server():
                               header=0)
     windloc = RaisedLocation()
     windloc.height_agl = _NOMINAL_WT_HEIGHT
-    wind_ts = OffsetRegTimeSpan()
-    wind_ts.start = pd.Timestamp(wind_data['timestamp'].iloc[0], tz='utc')
-    wind_ts.end = pd.Timestamp(wind_data['timestamp'].iloc[-1], tz='utc')
+    wind_ts = OffsetRegTimeSpan(
+        pd.Timestamp(wind_data['timestamp'].iloc[0], tz='utc'),
+        pd.Timestamp(wind_data['timestamp'].iloc[-1], tz='utc')
+    )
     wind_ts.timestep = _DEFAULT_TS
     wind_ts.set_offset(wind_ts.start, wind_ts.start)
 
@@ -45,9 +46,10 @@ def get_sprake_environment_server():
                                sheet_name='global_horizontal_radiation',
                                header=0)
     solarloc = AspectLocation()
-    solar_ts = OffsetRegTimeSpan()
-    solar_ts.start = pd.Timestamp(solar_data['timestamp'].iloc[0],tz='utc')
-    solar_ts.end = pd.Timestamp(solar_data['timestamp'].iloc[-1],tz='utc')
+    solar_ts = OffsetRegTimeSpan(
+        pd.Timestamp(solar_data['timestamp'].iloc[0],tz='utc'),
+        pd.Timestamp(solar_data['timestamp'].iloc[-1],tz='utc')
+    )
     solar_ts.timestep = _DEFAULT_TS
     solar_ts.set_offset(solar_ts.start, solar_ts.start)
 
@@ -98,9 +100,10 @@ class SprakeModel(NewsegsModel):
         self._mod_cs.model = self
 
         self._default_timestep = _DEFAULT_TS
-        self._run_period = RegTimeSpan()
-        self._run_period.start = pd.Timestamp('2002-01-01T00:00:00',tz='utc')
-        self._run_period.end = pd.Timestamp('2012-01-01T00:00:00', tz='utc')
+        self._run_period = RegTimeSpan(
+            pd.Timestamp('2002-01-01T00:00:00',tz='utc'),
+            pd.Timestamp('2012-01-01T00:00:00', tz='utc')
+        )
         self._run_period.timestep = self._default_timestep
 
         self._generation_result = None

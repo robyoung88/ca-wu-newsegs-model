@@ -288,10 +288,11 @@ class SprakeCS(NewsegsCS):
         # The space heating requires a little more finess, simply because the time series may require repetition
         shp = self._spaceheat_params.copy()
         
-        spaceheat_timespan = OffsetRegTimeSpan()
-        spaceheat_timespan.start = TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0]
-        spaceheat_timespan.end = TIMESERIES_DEGREE_DAYS['timestamp'].iloc[-1]
-        spaceheat_timespan.timestep = timespan.timestep
+        spaceheat_timespan = OffsetRegTimeSpan(
+            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[-1],
+            timestep = timespan.timestep
+        )
 
         # In this context, 'local' is the heating degree day ts, and remote is the model ts
         spaceheat_timespan.set_offset(local_start=shp.pop('timeseries_hdd_start'),

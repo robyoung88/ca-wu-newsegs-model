@@ -1,18 +1,22 @@
-name: ca-wu-newsegs
+name: ca-wu-newsegs-mod
 channels:
   - conda-forge
   - defaults
 dependencies:
   - dash
   - dash-leaflet
+  - dynaconf
+  - holidays
+  - ipykernel
   - ipython=9.7.0
   - jupyter=1.1.1
   - numpy=2.4.3
+  - openpyxl
   - pandas=2.3.3
   - pip=26.0.1
   - pyproj
-  - python=3.13.9
+  - python=3.13.12
   - quarto
   - scipy
   - sf-hamilton
-prefix: C:\Users\YoungR2\AppData\Local\anaconda3\envs\ca-wu-newsegs
+prefix: C:\Users\YoungR2\AppData\Local\anaconda3\envs\ca-wu-newsegs-mod
