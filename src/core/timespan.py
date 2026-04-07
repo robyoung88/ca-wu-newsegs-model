@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import copy
+from functools import singledispatchmethod
 import operator
 from typing import TypeAlias,overload
 import numpy as np
@@ -23,19 +24,35 @@ TimeZoneScalar: TypeAlias = str|tzinfo
 
 class TimeSpan:
     _tz = 'utc'
-    def __init__(self, other:TimeSpan|None=None) -> None:
+
+    @singledispatchmethod
+    def __init__(
+        self, 
+        start: TimeSpan | DatetimeScalar | None = None,
+        end: DatetimeScalar | None = None
+    ) -> None:
         """
-            Initialise a TimeSpan using another TimeSpan
+        Default assumes we have None
         """
-        if not(other is None):
-            if not (isinstance(other, TimeSpan)):
-                raise ValueError("timespan " + str(other) + " is not a TimeSpan instance")
-            
-            self._start_dt = other.start
-            self._end_dt = other.end
-            self._tz = other.tz
-            self._post_calc()
-        
+        self.set_start("2002-01-01T00:00:00")
+        self.set_end("2015-01-01T00:00:00")
+
+    @__init__.register('TimeSpan')
+    def _from_other(self, start: 'TimeSpan', end: None = None):
+        """
+        Initialise a TimeSpan using another TimeSpan
+        """
+        self._start_dt = start.start
+        self._end_dt = start.end
+        self._tz = start.tz
+        self._post_calc()
+    
+    @__init__.register(DatetimeScalar)
+    def _from_dates(self, start: DatetimeScalar, end: DatetimeScalar):
+        self.start = start
+        self.end = end
+        self._post_calc()
+
     def _post_calc(self):
         """
         Calculations that should occur once a change in a key property has occurred
