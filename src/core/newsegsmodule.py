@@ -58,6 +58,16 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
                             index=datetime,
                             columns=self.get_dsm_names())
 
+def filter_meters(results: ABCNewsegsModuleResult,
+                  meter_type: str
+) -> Iterable:
+    """
+    The meters which match a particular type.
+    """
+    nms = results.get_meter_names()
+    typs = results.get_meter_types()
+    return [mtr for mtr, typ in zip(nms, typs) if typ == meter_type]
+
 class NewsegsModule(metaclass=ABCMeta):
     """
     Basic abstract class serving module results

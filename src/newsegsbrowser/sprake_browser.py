@@ -16,6 +16,7 @@ from src.newsegsbrowser.common import get_icon, create_numeric_card_input
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
+from src.newsegsbrowser.postprocess import post_sprake_gen_results
 
 #from config import settings
 
@@ -36,55 +37,56 @@ def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
 
     if (annual):
         ann_gen = present_stat_description(wind_data,
-                                           'annual_production',
+                                           ['generator_meter_summary','wind_export'],
                                            'Wind production (kWh/yr)',
+                                           stat_list=ANNUAL_DEFAULT_STATS,
                                            fmt='{:,.0f}')
     else:
         ann_gen = present_stat_description(wind_data,
-                                           'total_production',
+                                           ['generator_meter_summary', 'wind_export'],
                                            'Wind production (kWh)', 
                                            stat_list=TOTAL_DEFAULT_STATS, 
                                            fmt='{:,.0f}')
 
-    hours_in_range = present_stat_description_compound(wind_data,
-                                                       'hrs_in_range',
-                                                       'Hours in range',
-                                                       hours_in_range_formatter)
+    hours_in_range = present_stat_description_compound(
+        wind_data,
+        'wind_production_categorised',
+        'Hours in range',
+        hours_in_range_formatter
+    )
 
     longest_hours_below_5 = present_event_and_daterange(
         wind_data,
-        'continuous_hours_below_5pc', 
+        'wind_continuous_hours_below_5pc', 
         r"Longest continuous hours <5%", 
         "hours",
         '{:,.1f}'.format
-        )
+    )
 
     longest_hours_above_95 = present_event_and_daterange(
         wind_data,
-        'continuous_hours_above_95pc',
+        'wind_continuous_hours_above_95pc',
         r"Longest continuous hours ≥95%",
         "hours",
         '{:,.1f}'.format
-        )
+    )
 
     if (annual):
-        direct_sc = present_stat_description_compound(
+        direct_sc = present_self_consumption_data(
             wind_data,
-            'self-consumption',
+            ['self-consumption','yearly'],
             r'Wind-only self-consumption potential (kWh/yr (% production))',
-            stat_formatter=val_percent_formatter_factory('self_consumption',
-                                                         'frac_self_consumption'),
-            stat_list=ANNUAL_SEASONAL_STATS
-            )
+            stat_list=ANNUAL_SC_STATS,
+            index_filter='wind_export'
+        )
     else:
-        direct_sc = present_stat_description_compound(
+        direct_sc = present_self_consumption_data(
             wind_data,
-            'self-consumption',
+            ['self-consumption','horizon'],
             r'Wind-only self-consumption potential (kWh (% production))',
-            stat_formatter=val_percent_formatter_factory('self_consumption',
-                                                         'frac_self_consumption'),
-            stat_list=TOTAL_SEASONAL_STATS
-            )
+            stat_list=HORIZON_SC_STATS,
+            index_filter='wind_export'
+        )
 
     tab_body = [html.Tbody(ann_gen + hours_in_range + longest_hours_below_5 \
                            + longest_hours_above_95 + direct_sc)]
@@ -104,33 +106,63 @@ def create_pv_results(pv_data=None, annual=True):
     tbl_head = create_tbl_head(n_configs)
 
     if (annual):
-        ann_gen = present_stat_description(pv_data, 'annual_production', 'PV production (kWh/yr)', fmt='{:,.0f}')
+        ann_gen = present_stat_description(
+            pv_data,
+            ['generator_meter_summary','solar_export'],
+            'PV production (kWh/yr)',
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
     else:
-        ann_gen = present_stat_description(pv_data, 'total_production', 'PV production (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
+        ann_gen = present_stat_description(
+            pv_data,
+            ['generator_meter_summary','solar_export'],
+            'PV production (kWh)',
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
 
-    max_day = present_event_and_date(pv_data, 'max_daily_production', r'Maximum daily production (kWh)', 'production', lambda x: '{:,.1f}'.format(x))
+    max_day = present_event_and_date(
+        pv_data,
+        'max_solar_day',
+        r'Maximum daily production (kWh)',
+        'value',
+        lambda x: '{:,.1f}'.format(x)
+    )
 
-    min_day = present_event_and_date(pv_data, 'min_daily_production', r'Minimum daily production (kWh)', 'production', lambda x: '{:,.1f}'.format(x))
+    min_day = present_event_and_date(
+        pv_data,
+        'min_solar_day',
+        r'Minimum daily production (kWh)',
+        'value',
+        lambda x: '{:,.1f}'.format(x)
+    )
 
-    days_in_range = present_stat_description_compound(pv_data, 
-                                                      'days_in_range', 
-                                                      r'Daily production distribution (% of max)', 
-                                                      stat_formatter=days_in_range_formatter,
-                                                      stat_list=DEFAULT_DAYS_IN_RANGE_STATS)
+    days_in_range = present_stat_description_compound(
+        pv_data,
+        'pv_production_categorised',
+        r'Daily production distribution as % of max [kWh range] days (%days)',
+        stat_formatter=days_in_range_formatter,
+        stat_list=DEFAULT_DAYS_IN_RANGE_STATS
+    )
 
     if (annual):
-        direct_sc = present_stat_description_compound(pv_data,
-                                                      'self-consumption',
-                                                      r'PV-only self-consumption potential (kWh/yr (% production))',
-                                                      stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=ANNUAL_SEASONAL_STATS)
+        direct_sc = present_self_consumption_data(
+            pv_data,
+            ['self-consumption','yearly'],
+            r'PV-only self-consumption potential (kWh/yr (% production))',
+            stat_list=ANNUAL_SC_STATS,
+            index_filter='solar_export'
+        )
     else:
-        direct_sc = present_stat_description_compound(pv_data,
-                                                      'self-consumption',
-                                                      r'PV-only self-consumption potential (kWh (% production))',
-                                                      stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=TOTAL_SEASONAL_STATS)
-
+        direct_sc = present_self_consumption_data(
+            pv_data,
+            ['self-consumption','horizon'],
+            r'PV-only self-consumption potential (kWh (% production))',
+            stat_list=HORIZON_SC_STATS,
+            index_filter='solar_export'
+        )
+        
     tab_body = [html.Tbody(ann_gen + max_day + min_day + days_in_range + direct_sc)]
 
     return dbc.Table(tbl_head + tab_body)
@@ -147,32 +179,61 @@ def create_combined_generation_results(gen_data=None, annual=True):
     tbl_head = create_tbl_head(n_configs)
 
     if (annual):
-        ann_gen = present_stat_description(gen_data, 'annual_production', 'Production (kWh/yr)', fmt='{:,.0f}')
+        ann_gen = present_stat_description(
+            gen_data,
+            ['generator_meter_summary','generation_export'],
+            'Production (kWh/yr)',
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
     else:
-        ann_gen = present_stat_description(gen_data, 'total_production', 'Production (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
+        ann_gen = present_stat_description(
+            gen_data,
+            ['generator_meter_summary','generation_export'],
+            'Production (kWh/yr)',
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
 
-    max_day = present_event_and_date(gen_data, 'max_daily_production', r'Maximum daily production (kWh)', 'production', lambda x: '{:,.1f}'.format(x))
+    max_day = present_event_and_date(
+        gen_data,
+        'max_generation_day',
+        r'Maximum daily production (kWh)',
+        'value',
+        lambda x: '{:,.1f}'.format(x)
+    )
 
-    min_day = present_event_and_date(gen_data, 'min_daily_production', r'Minimum daily production (kWh)', 'production', lambda x: '{:,.1f}'.format(x))
+    min_day = present_event_and_date(
+        gen_data,
+        'min_generation_day',
+        r'Minimum daily production (kWh)',
+        'value',
+        lambda x: '{:,.1f}'.format(x)
+    )
 
-    days_in_range = present_stat_description_compound(gen_data, 
-                                                      'days_in_range', 
-                                                      r'Daily production distribution (% of max)', 
-                                                      stat_formatter=days_in_range_formatter,
-                                                      stat_list=DEFAULT_DAYS_IN_RANGE_STATS)
+    days_in_range = present_stat_description_compound(
+        gen_data,
+        'generation_production_categorised', 
+        r'Daily production distribution (% of max) [kWh range] days (%days)', 
+        stat_formatter=days_in_range_formatter,
+        stat_list=DEFAULT_DAYS_IN_RANGE_STATS)
 
     if (annual):
-        direct_sc = present_stat_description_compound(gen_data,
-                                                      'self-consumption',
-                                                      r'Without storage self-consumption potential (kWh/yr (% production))',
-                                                      stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=ANNUAL_SEASONAL_STATS)
+        direct_sc = present_self_consumption_data(
+            gen_data,
+            ['self-consumption','yearly'],
+            r'Without storage self-consumption potential (kWh/yr (% production))',
+            stat_list=ANNUAL_SC_STATS,
+            index_filter='generation_export'
+        )
     else:
-        direct_sc = present_stat_description_compound(gen_data,
-                                                      'self-consumption',
-                                                      r'Without storage self-consumption potential (kWh (% production))',
-                                                      stat_formatter=val_percent_formatter_factory('self_consumption','frac_self_consumption'),
-                                                      stat_list=TOTAL_SEASONAL_STATS)
+        direct_sc = present_self_consumption_data(
+            gen_data,
+            ['self-consumption','horizon'],
+            r'Without storage self-consumption potential (kWh/yr (% production))',
+            stat_list=HORIZON_SC_STATS,
+            index_filter='generation_export'
+        )
 
     tab_body = [html.Tbody(ann_gen + max_day + min_day + days_in_range + direct_sc)]
 
@@ -869,7 +930,8 @@ def create_results_header():
             html.H5("Per year",style={'display': 'inline-block', 'vertical-align': 'middle'}),
             daq.ToggleSwitch(style={'display': 'inline-block',
                                     'vertical-align': 'middle',
-                                    'padding': "10px"}),
+                                    'padding': "10px"},
+                             id='annual-horizon-toggle'),
             html.H5('To horizon',style={'display': 'inline-block', 'vertical-align': 'middle'})
         ],
         style={
@@ -1227,6 +1289,7 @@ def add_initial_callback(app):
     )
     def sync_mdl_run_init(_):
         app.mdl.run()
+        print('run complete')
         return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
@@ -1440,7 +1503,7 @@ def add_initial_callback(app):
         Output('mdl-smry-horizon', 'children'),
         Output('mdl-timehorizon-input', 'value'),
         Input('model-config', 'data'),
-        prevent_intial_call=True
+        prevent_initial_call=True
     )
     def sync_mc_inputs_to_store(mcfg):
         if mcfg is None:
@@ -1450,6 +1513,24 @@ def add_initial_callback(app):
         return (
             f"{mc_input.get('horizon', 1):.0f}",
             mc_input.get('horizon', 1)
+        )
+
+    @app.callback(
+        Output('gen-res-wind-tbl', 'children'),
+        Output('gen-res-pv-tbl', 'children'),
+        Output('gen-res-combined-tbl', 'children'),
+        Input('res-gen', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_gen_results_to_store(res, ann_hori_toggle):
+        if res is None:
+            return no_update
+        res = json.loads(res)
+        return (
+            create_wind_results(res, not(ann_hori_toggle)),
+            create_pv_results(res, not(ann_hori_toggle)),
+            create_combined_generation_results(res, not(ann_hori_toggle))
         )
 
     return app
@@ -1469,8 +1550,9 @@ def add_result_callbacks(app):
         """
         mdl = app.mdl
 
-        wind_data = {}
-        
+        print ("making gen results")
+        gen_results = post_sprake_gen_results.gen_results_to_interface_sprake(mdl)
+        return json.dumps(gen_results)
 
     return app
 
@@ -1479,6 +1561,7 @@ def add_model_callbacks(app):
     Add callbacks to Dash App to allow for interfacing with a Sprake model
     """
     app = add_initial_callback(app)
+    app = add_result_callbacks(app)
 
     return app
 
@@ -1510,6 +1593,8 @@ def create_app(external_stylesheets=None, run_model=False):
 
     # Load model
     app.mdl = SprakeModel()
+    # Temp - override default PV array size
+    app.mdl.generation.generator.generators[1].n_arrays=100
     if run_model:
         app.mdl.run()
     app.finance = SprakeFinance()

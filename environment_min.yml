@@ -4,6 +4,8 @@ channels:
   - defaults
 dependencies:
   - dash
+  - dash-bootstrap-components
+  - dash-daq
   - dash-leaflet
   - dynaconf
   - holidays

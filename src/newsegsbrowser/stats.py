@@ -1,4 +1,9 @@
+import copy
+
 from dash import html
+from functools import reduce, partial
+
+import pandas as pd
 
 ANNUAL_DEFAULT_STATS = [
                                 {'label':'Mean',
@@ -13,6 +18,104 @@ TOTAL_DEFAULT_STATS = [
                             {'label':'Total',
                              'value':'sum'}
                             ]
+
+def format_val_and_proportion(
+    val,
+    prop
+):
+    return f'{val:,.0f} ({prop:0.1%})'
+
+def format_val_and_proportion_with_range(
+    mean_val,
+    min_val,
+    max_val,
+    mean_prop,
+    min_prop,
+    max_prop
+):
+    return f'{mean_val:,.0f} ({min_val:,.0f}, {max_val:,.0f}) - {mean_prop:,.1%} ({min_prop:,.1%}, {max_prop:,.1%})'
+
+def annual_selfconsumption_format(rw):
+    return format_val_and_proportion_with_range(
+        rw[('self_consumption', 'mean')],
+        rw[('self_consumption', 'min')],
+        rw[('self_consumption', 'max')],
+        rw[('prop_gen_self_consumption', 'mean')],
+        rw[('prop_gen_self_consumption', 'min')],
+        rw[('prop_gen_self_consumption', 'max')]
+        )
+
+def annual_selfconsumption_format_single(rw, stat='mean'):
+    return format_val_and_proportion(
+        rw[('self_consumption', stat)].iloc[0],
+        rw[('prop_gen_self_consumption', stat)].iloc[0]
+        )
+
+ANNUAL_SC_STATS = [
+    {'label': 'Year Mean',
+     'season': 'Year',
+     'formatter': partial(annual_selfconsumption_format_single, stat='mean')},
+    {'label': 'Year Max',
+     'season': 'Year',
+     'formatter': partial(annual_selfconsumption_format_single, stat='max')},
+    {'label': 'Year Min',
+     'season': 'Year',
+     'formatter': partial(annual_selfconsumption_format_single, stat='min')},
+    {'label': 'Wtr Mean',
+     'season': 'Wtr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='mean')},
+    {'label': 'Wtr Max',
+     'season': 'Wtr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='max')},
+    {'label': 'Wtr Min',
+     'season': 'Wtr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='min')},
+    {'label': 'Spr Mean',
+     'season': 'Spr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='mean')},
+    {'label': 'Spr Max',
+     'season': 'Spr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='max')},
+    {'label': 'Spr Min',
+     'season': 'Spr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='min')},
+    {'label': 'Smr Mean',
+     'season': 'Smr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='mean')},
+    {'label': 'Smr Max',
+     'season': 'Smr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='max')},
+    {'label': 'Smr Min',
+     'season': 'Smr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='min')},
+    {'label': 'Aut Mean',
+     'season': 'Aut',
+     'formatter': partial(annual_selfconsumption_format_single, stat='mean')},
+    {'label': 'Aut Max',
+     'season': 'Aut',
+     'formatter': partial(annual_selfconsumption_format_single, stat='max')},
+    {'label': 'Aut Min',
+     'season': 'Aut',
+     'formatter': partial(annual_selfconsumption_format_single, stat='min')},
+]
+
+HORIZON_SC_STATS = [
+    {'label': 'Total',
+     'season': 'Year',
+     'formatter': partial(annual_selfconsumption_format_single, stat='sum')},
+    {'label': 'Wtr',
+     'season': 'Wtr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='sum')},
+    {'label': 'Spr',
+     'season': 'Spr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='sum')},
+    {'label': 'Smr',
+     'season': 'Smr',
+     'formatter': partial(annual_selfconsumption_format_single, stat='sum')},
+    {'label': 'Aut',
+     'season': 'Aut',
+     'formatter': partial(annual_selfconsumption_format_single, stat='sum')},
+]
 
 ANNUAL_SEASONAL_STATS = [
     {'label':'Year Mean',
@@ -93,6 +196,9 @@ DEFAULT_DAYS_IN_RANGE_STATS = [
 def DEFAULT_STAT_FORMATTER(stat_dict):
     return str(stat_dict)
 
+def recursive_get(d, *keys):
+    return reduce(lambda c, k: c.get(k, {}), keys, d)
+
 def present_single_stat(data_list,
                         stat_name,
                         stat_label,
@@ -101,7 +207,11 @@ def present_single_stat(data_list,
                         none_str='-'):
     n_configs = len(data_list)
 
-    comp_result = [x.get(stat_name, None) for x in data_list]
+    if isinstance(stat_name, str):
+        comp_result = [x.get(stat_name, None) for x in data_list]
+    else:
+        comp_result = [recursive_get(x, stat_name) for x in data_list]
+        
     vals = [x.get(stat_value, None) if x is not None else None for x in comp_result]
     
     rw = [html.Td(stat_label, colSpan=2)] \
@@ -128,7 +238,10 @@ def present_stat_description(data_list,
     # Make a list of the dictionaries of computational results for this stat,
     # e.g. if stat_name is annual_production,
     # then comp_result may consist of dicts of {'mean': xxx, 'min': yyy, 'max': zzz}
-    comp_result = [x.get(stat_name, None) for x in data_list]
+    if isinstance(stat_name, str):
+        comp_result = [x.get(stat_name, None) for x in data_list]
+    else:
+        comp_result = [recursive_get(x, *stat_name) for x in data_list]
 
     def get_Tr(idx):
         stat = stat_list[idx]
@@ -161,7 +274,10 @@ def present_stat_description_compound(data_list,
     n_configs = len(data_list)
 
     # Grab the computed results for the desired stat
-    comp_result = [x.get(stat_name, None) for x in data_list]
+    if isinstance(stat_name, str):
+        comp_result = [x.get(stat_name, None) for x in data_list]
+    else:
+        comp_result = [recursive_get(x, *stat_name) for x in data_list]
 
     def transform_stats(config_results):
         def trans_stat(idx):
@@ -183,9 +299,56 @@ def present_stat_description_compound(data_list,
 
         return {stat_list[i].get('value'): trans_stat(i) for i in range(n_rows)}
 
-    trans_stats = [{stat_name: transform_stats(x)} for x in comp_result]
+    trans_stats = [{str(stat_name): transform_stats(x)} for x in comp_result]
 
-    return present_stat_description(trans_stats, stat_name, stat_label, stat_list, fmt="{}")
+    return present_stat_description(trans_stats, str(stat_name), stat_label, stat_list, fmt="{}")
+
+def present_self_consumption_data(data_list,
+                                  table_name,
+                                  stat_label,
+                                  stat_list=ANNUAL_SC_STATS,
+                                  index_filter='generation_export'):
+    """
+    Process a list of generation data to extract self-consumption into a table
+
+
+    """
+    n_rows = len(stat_list)
+    n_configs = len(data_list)
+
+    # Get the list of tight dictionary representations of dataframes
+    if isinstance(table_name, str):
+        dict_data = [x.get(table_name, None) for x in data_list]
+    else:
+        dict_data = [recursive_get(x, *table_name) for x in data_list]
+
+    def transform_stats(table_data):
+        if table_data is None or table_data == {}:
+            df = None
+        else:
+            df = pd.DataFrame.from_dict(table_data, orient='tight').loc[index_filter, :]
+
+        def trans_stat(idx):
+            if df is None:
+                return None
+            
+            stat = stat_list[idx]
+            season = stat.get('season')
+            formatter = stat.get('formatter')
+
+            fdf = df.loc[df['season']==season, :]
+
+            return formatter(fdf)
+        
+        return {stat_list[i].get('label'): trans_stat(i) for i in range(n_rows)}
+
+    trans_stats = [{str(table_name): transform_stats(x)} for x in dict_data]
+
+    stat_list = copy.copy(stat_list)
+    for i in range(len(stat_list)):
+        stat_list[i]['value'] = stat_list[i]['label']
+
+    return present_stat_description(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")
 
 def present_event_and_date(data_list,
                            event_name,
@@ -198,13 +361,18 @@ def present_event_and_date(data_list,
                            nonedate_str='#/#/#'):
     n_configs = len(data_list)
 
-    comp_result = [x.get(event_name, None) for x in data_list]
+    if isinstance(event_name, str):
+        comp_result = [x.get(event_name, None) for x in data_list]
+    else:
+        comp_result = [recursive_get(x, event_name) for x in data_list]
 
     val_row = html.Tr([html.Td(event_label,colSpan=2)] + 
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
 
+    #date_row = html.Tr([html.Td(date_label, colSpan=2, style={'text-align':'end'})] 
+    #    + [html.Td(f'{x.get(event_date).strftime("%Y/%m/%d")}') if x is not None else html.Td(none_str) for x in comp_result])
     date_row = html.Tr([html.Td(date_label, colSpan=2, style={'text-align':'end'})] 
-        + [html.Td(f'{x.get(event_date).strftime("%Y/%m/%d")}') if x is not None else html.Td(none_str) for x in comp_result])
+        + [html.Td(f'{x.get(event_date)[:-15]}') if x is not None else html.Td(none_str) for x in comp_result])
 
     return [val_row, date_row]    
 
@@ -221,25 +389,28 @@ def present_event_and_daterange(data_list,
     #n_rows = 2
     n_configs = len(data_list)
 
-    comp_result = [x.get(event_name, None) for x in data_list]
+    if isinstance(event_name, str):
+        comp_result = [x.get(event_name, None) for x in data_list]
+    else:
+        comp_result = [recursive_get(x, event_name) for x in data_list]
 
     val_row = html.Tr([html.Td(event_label,colSpan=2)] + 
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
 
     date_row = html.Tr([html.Td(range_label, colSpan=2, style={'text-align':'end'})] 
-        + [html.Td(f'{x.get(event_start)} - {x.get(event_end)}') if x is not None else html.Td(none_str) for x in comp_result])
+        + [html.Td(f'{x.get(event_start)[:-9]} - {x.get(event_end)[:-9]}') if x is not None else html.Td(none_str) for x in comp_result])
 
     return [val_row, date_row]
 
 def hours_in_range_formatter(d):
     if d is None:
         return "( -  kW) - (%)"
-    return f"({d.get('min_power'):,.2f} - {d.get('max_power'):,.2f}) {d.get('hours'):,.1f} ({d.get('ann_fraction'):,.1%})"
+    return f"({d.get('min_power'):,.0f} - {d.get('max_power'):,.0f}) {d.get('hours'):,.1f} ({d.get('horizon_fraction'):,.1%})"
 
 def days_in_range_formatter(d):
     if d is None:
         return "( - kWh) - (%)"
-    return f"({d.get('min_production'):,.0f} - {d.get('max_production'):,.0f}) {d.get('days'):,.0f} ({d.get('ann_fraction'):,.1%})"
+    return f"({d.get('min_value'):,.0f} - {d.get('max_value'):,.0f}) {d.get('days'):,.0f} ({d.get('horizon_fraction'):,.1%})"
 
 def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
     fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"

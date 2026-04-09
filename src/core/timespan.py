@@ -14,7 +14,18 @@ import dateutil
 from pandas.core.tools.datetimes import DatetimeScalar, Timedelta
 import numpy.typing as npt
 
+SECONDS_IN_DAY = (24 * 3600)
+
 SECONDS_TO_HOURS = 1.0 / 3600.0
+SECONDS_TO_DAYS = 1.0 / SECONDS_IN_DAY
+NANOSECONDS_TO_DAYS = SECONDS_TO_DAYS / 1e9
+
+SEASON_NAMES = [
+    'Wtr',
+    'Spr',
+    'Smr',
+    'Aut'
+]
 
 # -----------------------------------------------------------------------------
 # Ways of defining and comparing blocks of time
@@ -530,3 +541,21 @@ def season_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
             )
         )
     )
+
+def day_index(datetimes:pd.Series,
+              ref_datetime: pd.Timestamp|None = None) -> npt.NDArray[np.int32]:
+    """
+    Return array integers indicating which day datetime belongs to in series
+
+    A day is determined to have passed if 24 hours have passed
+    """
+    if ref_datetime is None:
+        ref_datetime = datetimes.iloc[0]
+    
+    deltas = (
+        (datetimes - ref_datetime)
+        .dt.total_seconds()
+        .to_numpy(dtype=np.int32)
+    )
+    return deltas // SECONDS_IN_DAY
+    

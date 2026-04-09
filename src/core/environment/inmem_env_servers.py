@@ -90,7 +90,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         if srs is None:
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
-        return(srs['timeseries'][idxs])
+        # The global horizontal flux is being stored as kJ/m²/timestep, so we will convert it to kWh/m²/timestep here
+        # assuming equal timesteps
+        return(srs['timeseries'][idxs] / 3600.0)
 
     def get_horizontal_solar_flux_timestep(self) -> pd.TimeDelta|None:
         return None

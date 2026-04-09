@@ -14,6 +14,13 @@ WIND_PRODUCTION_CATEGORIES = pd.DataFrame(
     }
 )
 
+SOLAR_PRODUCTION_CATEGORIES = pd.DataFrame(
+    {
+        'frac_maxday_min': [0.0, 0.05, 0.25, 0.5, 0.75, 0.95],
+        'frac_maxday_max': [0.05, 0.25, 0.5, 0.75, 0.95, 9.99] # NB - high but finite final bin edge
+    }
+)
+
 def categorise_meter_by_capacity(
     meter_timeseries: pd.DataFrame|pd.Series,
     rated_capacity: float,
@@ -24,7 +31,7 @@ def categorise_meter_by_capacity(
     Augment production with categories based upon nameplate capacity.
 
     Args:
-        ann_production_timeseries: A datetime-indexed dataframe
+        meter_timeseries: A datetime-indexed dataframe
     """
     
     cat_labels = categories.apply(
@@ -51,9 +58,9 @@ def categorise_meter_by_capacity(
         .query('delta_hours > 0')
         .assign(
             power = lambda df: (df[meter_variable] / df['delta_hours']),
-            relative_production = lambda df: df['power'] / rated_capacity,
+            relative_utilisation = lambda df: df['power'] / rated_capacity,
             capacity_factor_range = lambda df: pd.cut(
-                df['relative_production'],
+                df['relative_utilisation'],
                 bins=bins,
                 include_lowest=True,
                 right=False,
@@ -64,8 +71,8 @@ def categorise_meter_by_capacity(
 
     return working_df
 
-def capacity_categorised_production_summary(
-    categorised_production: pd.DataFrame,
+def capacity_categorised_meter_summary(
+    categorised_meter: pd.DataFrame,
     rated_capacity: float,
     categories: pd.DataFrame = WIND_PRODUCTION_CATEGORIES,
 ) -> pd.DataFrame:
@@ -73,18 +80,18 @@ def capacity_categorised_production_summary(
     Summary stats per production category.
     """
     # No need to do summaries by year, so we just run through a value count
-    hrs_in_range = categorised_production.groupby('capacity_factor_range')['delta_hours'].sum()
+    hrs_in_range = categorised_meter.groupby('capacity_factor_range', observed=False)['delta_hours'].sum()
     tot_hrs = hrs_in_range.sum()
     p_hrs_in_range = hrs_in_range / tot_hrs
 
-    max_rel_production = categorised_production.loc[:,'relative_production'].max()
+    max_rel_production = categorised_meter.loc[:,'relative_utilisation'].max()
     max_power = max_rel_production * rated_capacity
 
     # Currently of the opinion that we just report back the full hours,
     # rather than normalise it to the length of a year.
     odf = (
         pd.DataFrame(p_hrs_in_range)
-        .rename(columns={'delta_hours': 'ann_fraction'})
+        .rename(columns={'delta_hours': 'horizon_fraction'})
         .assign(
             hours = hrs_in_range,
             min_power = categories.loc[:, 'cf_min'].values * rated_capacity,
@@ -95,10 +102,88 @@ def capacity_categorised_production_summary(
 
     return odf
 
-def capacity_categorised_production_summary_to_interface(
+def capacity_categorised_meter_summary_to_interface(
         ccps: pd.DataFrame
 ) -> dict:
     """
     Converts the summary dataframe into the format expected by the interface
     """
     return ccps.to_dict(orient='index')
+
+def categorise_meter_by_max_record(
+    meter_timeseries: pd.DataFrame|pd.Series,
+    max_record: float,
+    meter_variable: str,
+    categories: pd.DataFrame = SOLAR_PRODUCTION_CATEGORIES
+) -> pd.DataFrame:
+    """
+    Augment meter data with categories based upon maximum production
+
+    Args:
+        meter_timeseries: A datetime-indexed series or dataframe
+    """
+
+    cat_labels = categories.apply(
+        lambda rw: f"days_{rw['frac_maxday_min']*100:03.0f}_to_{rw['frac_maxday_max']*100:03.0f}",
+        axis=1
+    )
+
+    # Divisions for the pd.cut function
+    bins = np.concatenate([
+        categories.loc[:,'frac_maxday_min'].values, 
+        categories.loc[:,'frac_maxday_max'].values[-1:]
+    ])
+
+    working_df = (
+        meter_timeseries
+        .reset_index()
+        .assign(
+            relative_value = lambda df: df[meter_variable] / max_record,
+            value_category = lambda df: \
+                pd.cut(
+                    df['relative_value'],
+                    bins=bins,
+                    include_lowest=True,
+                    right=False,
+                    labels=cat_labels
+                )
+        )
+    )
+
+    return working_df
+
+def max_record_categorised_meter_summary(
+    categorised_meter: pd.DataFrame,
+    max_record: float,
+    categories: pd.DataFrame = SOLAR_PRODUCTION_CATEGORIES,
+) -> pd.DataFrame:
+    """
+    Summary stats per value category
+    """
+    days_in_range = categorised_meter.groupby('value_category', observed=False)['day_index'].count()
+    tot_days = days_in_range.sum()
+    p_days_in_range = days_in_range / tot_days
+
+    max_relative_value = categorised_meter['relative_value'].max() # Most cases, will be 1
+    max_value = max_record * max_relative_value
+
+    odf = (
+        pd.DataFrame(p_days_in_range)
+        .rename(columns={'day_index': 'horizon_fraction'})
+        .assign(
+            days = days_in_range,
+            min_value = categories['frac_maxday_min'].values * max_record,
+            max_value = categories['frac_maxday_max'].values * max_record
+        )
+    )
+    odf.loc[odf.index[-1], 'max_value'] = max_value
+
+    return odf
+
+def max_record_categorised_meter_summary_to_interface(
+        mrcps: pd.DataFrame
+) -> dict:
+    """
+    Converts the summary dataframe into the format expected by the interface
+    """
+    return mrcps.to_dict(orient='index')
