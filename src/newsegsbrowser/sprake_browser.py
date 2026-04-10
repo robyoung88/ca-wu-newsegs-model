@@ -3,6 +3,7 @@ import json
 import uuid
 import datetime
 from collections.abc import Mapping
+from functools import partial
 #from typing import Literal
 
 from dash import Dash, html, Input, Output, dcc, State, ALL, no_update
@@ -16,7 +17,7 @@ from src.newsegsbrowser.common import get_icon, create_numeric_card_input
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
-from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results
+from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results, post_sprake_consumption_results
 
 #from config import settings
 
@@ -395,32 +396,117 @@ def create_cons_results(cons_data=None, annual=True):
 
     tbl_head = create_tbl_head(n_configs)
     
+    if annual:
+        psd = partial(
+            present_stat_description,
+            data_list = cons_data,
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+    else:
+        psd = partial(
+            present_stat_description,
+            data_list = cons_data,
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+
     if (annual):
-        app_cons = present_stat_description(cons_data, 'annual_app_cons', 'Appliance consumption (kWh/yr)', fmt='{:,.0f}')
-        dhw_cons = present_stat_description(cons_data, 'annual_dhw_cons', 'DHW consumption (kWh/yr)', fmt='{:,.0f}')
-        spaceheat_cons = present_stat_description(cons_data, 'annual_sh_cons', 'Space heat consumption (kWh/yr)', fmt='{:,.0f}')
+        app_cons = psd( 
+            stat_name=['consumption_meter_summaries','appliance_import'],
+            stat_label='Appliance consumption (kWh/yr)'
+        )
+        dhw_cons = psd(
+            stat_name=['consumption_meter_summaries','dhw_import'],
+            stat_label='DHW consumption (kWh/yr)'
+        )
+        spaceheat_cons = psd(
+            stat_name=['consumption_meter_summaries','spaceheat_import'],
+            stat_label='Space heat consumption (kWh/yr)'
+        )
 
-        residential_cons = present_stat_description(cons_data, 'annual_resid_cons', 'Total residential consumption (kWh/yr)', fmt='{:,.0f}')
-        perunit_residential_cons = present_stat_description(cons_data, 'annual_resid_cons_perunit', 'Per-unit residential consumption (kWh/yr)', fmt='{:,.0f}')
+        residential_cons = psd(
+            stat_name=['consumption_meter_summaries','residential'],
+            stat_label='Total residential consumption (kWh/yr)'
+        )
+        perunit_residential_cons = psd(
+            stat_name=['consumption_meter_summaries','residential_pu'],
+            stat_label='Per-unit residential consumption (kWh/yr)'
+        )
 
-        ev_cons = present_stat_description(cons_data, 'annual_ev_cons', 'EV consumption (kWh/yr)', fmt='{:,.0f}')
-        site_cons = present_stat_description(cons_data, 'annual_site_cons', 'Site consumption (kWh/yr)', fmt='{:,.0f}')
+        ev_cons = psd(
+            stat_name=['consumption_meter_summaries','evcharge_import'],
+            stat_label='EV consumption (kWh/yr)'
+        )
+        site_cons = psd(
+            stat_name=['consumption_meter_summaries','consumption'],
+            stat_label='Site consumption (kWh/yr)'
+        )
 
     else:
-        app_cons = present_stat_description(cons_data, 'total_app_cons', 'Appliance consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        dhw_cons = present_stat_description(cons_data, 'total_dhw_cons', 'DHW consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        spaceheat_cons = present_stat_description(cons_data, 'total_sh_cons', 'Space heat consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
+        app_cons = psd( 
+            stat_name=['consumption_meter_summaries','appliance_import'],
+            stat_label='Appliance consumption (kWh)'
+        )
+        dhw_cons = psd(
+            stat_name=['consumption_meter_summaries','dhw_import'],
+            stat_label='DHW consumption (kWh)'
+        )
+        spaceheat_cons = psd(
+            stat_name=['consumption_meter_summaries','spaceheat_import'],
+            stat_label='Space heat consumption (kWh)'
+        )
 
-        residential_cons = present_stat_description(cons_data, 'total_resid_cons', 'Total residential consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        perunit_residential_cons = present_stat_description(cons_data, 'total_resid_cons_perunit', 'Per-unit residential consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
+        residential_cons = psd(
+            stat_name=['consumption_meter_summaries','residential'],
+            stat_label='Total residential consumption (kWh)'
+        )
+        perunit_residential_cons = psd(
+            stat_name=['consumption_meter_summaries','residential_pu'],
+            stat_label='Per-unit residential consumption (kWh)'
+        )
 
-        ev_cons = present_stat_description(cons_data, 'total_ev_cons', 'EV consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        site_cons = present_stat_description(cons_data, 'total_site_cons', 'Site consumption (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
+        ev_cons = psd(
+            stat_name=['consumption_meter_summaries','evcharge_import'],
+            stat_label='EV consumption (kWh)'
+        )
+        site_cons = psd(
+            stat_name=['consumption_meter_summaries','consumption'],
+            stat_label='Site consumption (kWh)'
+        )
 
-    admd = present_single_stat(cons_data, 'admd_computed', 'ADMD - calculated (kW)', 'value', fmt='{:,.0f}')
-    max_demand = present_event_and_date(cons_data, 'max_demand', 'Maximum demand (kW)', 'value', lambda x: '{:,.0f}'.format(x))
+    max_day = present_event_and_date(
+        cons_data,
+        'max_consumption_day',
+        r'Maximum daily consumption (kWh)',
+        'value',
+        '{:,.1f}'.format
+    )
 
-    tab_body = [html.Tbody(app_cons + dhw_cons + spaceheat_cons + residential_cons + perunit_residential_cons + ev_cons + site_cons + admd + max_demand)]
+    min_day = present_event_and_date(
+        cons_data,
+        'min_consumption_day',
+        r'Minimum daily consumption (kWh)',
+        'value',
+        '{:,.1f}'.format
+    )
+
+    admd = present_single_stat(
+        cons_data,
+        'admd_calculated',
+        'ADMD - calculated (kW)',
+        'value',
+        fmt='{:,.0f}'
+    )
+    max_demand = present_event_and_date(
+        cons_data, 
+        'admd_observed',
+        'Maximum demand (kW)',
+        'value',
+        '{:,.0f}'.format
+    )
+    
+    tab_body = [html.Tbody(app_cons + dhw_cons + spaceheat_cons + residential_cons + perunit_residential_cons + ev_cons + site_cons + admd + max_demand + min_day + max_day)]
 
     return dbc.Table(tbl_head + tab_body)
 
@@ -437,41 +523,48 @@ def create_seasonal_cons_results(cons_data=None, annual=True):
     tbl_head = create_tbl_head(n_configs)
     
     if (annual):
-        weekday_sitecons = present_stat_description_compound(cons_data,
-                                                             'annual_site_daily_cons_wd',
-                                                             r'Weekday site demand (kWh)',
-                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=ANNUAL_SEASONAL_STATS)
+        weekday_sitecons = present_seasonal_consumption_data(
+            cons_data,
+            ['seasonal_consumption','wd'],
+            r'Weekday site demand (kWh/yr | kWh/day)',
+            stat_list=ANNUAL_CONS_STATS
+        )
 
-        sat_sitecons = present_stat_description_compound(cons_data,
-                                                             'annual_site_daily_cons_sat',
-                                                             r'Saturday site demand (kWh)',
-                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=ANNUAL_SEASONAL_STATS)
-        
-        sun_sitecons = present_stat_description_compound(cons_data,
-                                                             'annual_site_daily_cons_sun',
-                                                             r'Sunday site demand (kWh)',
-                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=ANNUAL_SEASONAL_STATS)
+        sat_sitecons = present_seasonal_consumption_data(
+            cons_data,
+            ['seasonal_consumption','sat'],
+            r'Saturday site demand (kWh/yr | kWh/day)',
+            stat_list=ANNUAL_CONS_STATS
+        )
+
+        sun_sitecons = present_seasonal_consumption_data(
+            cons_data,
+            ['seasonal_consumption','sun'],
+            r'Sunday/holiday site demand (kWh/yr | kWh/day)',
+            stat_list=ANNUAL_CONS_STATS
+        )
+
     else:
-        weekday_sitecons = present_stat_description_compound(cons_data,
-                                                             'total_site_daily_cons_wd',
-                                                             r'Weekday site demand (kWh)',
-                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=TOTAL_SEASONAL_STATS)
+        weekday_sitecons = present_seasonal_consumption_data(
+            cons_data,
+            ['seasonal_consumption','wd'],
+            r'Weekday site demand (kWh | kWh/day)',
+            stat_list=HORIZON_CONS_STATS
+        )
 
-        sat_sitecons = present_stat_description_compound(cons_data,
-                                                             'total_site_daily_cons_sat',
-                                                             r'Saturday site demand (kWh)',
-                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=TOTAL_SEASONAL_STATS)
-        
-        sat_sitecons = present_stat_description_compound(cons_data,
-                                                             'total_site_daily_cons_sun',
-                                                             r'Sunday site demand (kWh)',
-                                                             stat_formatter = lambda x: '{:,.1f}'.format(x.get('consumption')),
-                                                             stat_list=TOTAL_SEASONAL_STATS)
+        sat_sitecons = present_seasonal_consumption_data(
+            cons_data,
+            ['seasonal_consumption','sat'],
+            r'Saturday site demand (kWh | kWh/day)',
+            stat_list=HORIZON_CONS_STATS
+        )
+
+        sun_sitecons = present_seasonal_consumption_data(
+            cons_data,
+            ['seasonal_consumption','sun'],
+            r'Sunday/holiday site demand (kWh | kWh/day)',
+            stat_list=HORIZON_CONS_STATS
+        )
 
     tab_body = [html.Tbody(weekday_sitecons + sat_sitecons + sun_sitecons)]
 
@@ -1635,6 +1728,19 @@ def add_initial_callback(app):
         res = json.loads(res)
         return create_stor_results(res, not(ann_hori_toggle))        
 
+    @app.callback(
+        Output('cons-res-tbl', 'children'),
+        Output('cons-res-seasonal-tbl', 'children'),
+        Input('res-cons', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_cons_results_to_store(res, ann_hori_toggle):
+        if res is None:
+            return no_update, no_update
+        res = json.loads(res)
+        return create_cons_results(res, not(ann_hori_toggle)), create_seasonal_cons_results(res, not(ann_hori_toggle))
+
     return app
 
 def add_result_callbacks(app):
@@ -1661,7 +1767,7 @@ def add_result_callbacks(app):
         Input('model-run-watcher', 'data'),
         prevent_initial_call=True
     )
-    def set_res_gen(_):
+    def set_res_stor(_):
         """
         Create the storage results data after a completed model run
         """
@@ -1670,6 +1776,21 @@ def add_result_callbacks(app):
         print ("making stor results")
         stor_results = post_sprake_storage_results.stor_results_to_interface_sprake(mdl)
         return json.dumps(stor_results)
+
+    @app.callback(
+        Output('res-cons', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_cons(_):
+        """
+        Create the consumption results data after a completed model run.
+        """
+        mdl = app.mdl
+
+        print ("making consumption results")
+        cons_results = post_sprake_consumption_results.consumption_results_to_interface_sprake(mdl)
+        return json.dumps(cons_results)
 
     return app
 

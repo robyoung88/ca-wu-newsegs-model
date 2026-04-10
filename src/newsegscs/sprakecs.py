@@ -282,8 +282,8 @@ class SprakeCS(NewsegsCS):
 
         cons_arr = np.empty((4, len(datetimes)), dtype=np.float64)
         cons_arr[0,:] = sprake_appliance_consumption(datetimes, **self._appliance_params)
-        cons_arr[1,:] = sprake_ev_consumption(datetimes, **self._ev_params)
-        cons_arr[2,:] = sprake_dhw_consumption(datetimes, **self._dhw_params)
+        cons_arr[3,:] = sprake_ev_consumption(datetimes, **self._ev_params)
+        cons_arr[1,:] = sprake_dhw_consumption(datetimes, **self._dhw_params)
 
         # The space heating requires a little more finess, simply because the time series may require repetition
         shp = self._spaceheat_params.copy()
@@ -300,7 +300,7 @@ class SprakeCS(NewsegsCS):
 
         spaceheat_datetimes = spaceheat_timespan.to_pandas()[spaceheat_timespan.get_local_index(timespan)]
         
-        cons_arr[3,:] = sprake_spaceheat_consumption(spaceheat_datetimes, **shp)
+        cons_arr[2,:] = sprake_spaceheat_consumption(spaceheat_datetimes, **shp)
 
         storage_cap = self._storage_params.get('storage_capacity', 0.0)
         if storage_cap > 0.0:

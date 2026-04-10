@@ -17,7 +17,7 @@ def stor_results_to_interface_sprake(
     mdl: SprakeModel
 ) -> dict:
     """
-    Extracts the storage results required fro the Dash interface to Sprake model.
+    Extracts the storage results required for the Dash interface to Sprake model.
     """
     # This holds our final returned data structure
     results_to_interface = {}

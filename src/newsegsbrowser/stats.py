@@ -25,6 +25,12 @@ def format_val_and_proportion(
 ):
     return f'{val:,.0f} ({prop:0.1%})'
 
+def format_twoval(
+    val1,
+    val2
+):
+    return f'{val1:,.0f} | {val2:,.0f}'
+
 def format_val_and_proportion_with_range(
     mean_val,
     min_val,
@@ -49,6 +55,12 @@ def annual_selfconsumption_format_single(rw, stat='mean'):
     return format_val_and_proportion(
         rw[('self_consumption', stat)].iloc[0],
         rw[('prop_gen_self_consumption', stat)].iloc[0]
+        )
+
+def annual_consumption_format_single(rw):
+    return format_twoval(
+        rw['consumption'].iloc[0],
+        rw['per_day'].iloc[0]
         )
 
 ANNUAL_SC_STATS = [
@@ -115,6 +127,92 @@ HORIZON_SC_STATS = [
     {'label': 'Aut',
      'season': 'Aut',
      'formatter': partial(annual_selfconsumption_format_single, stat='sum')},
+]
+
+ANNUAL_CONS_STATS = [
+    {'label': 'Year Mean',
+     'season': 'Year',
+     'statistic': 'mean',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Year Max',
+     'season': 'Year',
+     'statistic': 'max',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Year Min',
+     'season': 'Year',
+     'statistic': 'min',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Wtr Mean',
+     'season': 'Wtr',
+     'statistic': 'mean',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Wtr Max',
+     'season': 'Wtr',
+     'statistic': 'max',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Wtr Min',
+     'season': 'Wtr',
+     'statistic': 'min',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Spr Mean',
+     'season': 'Spr',
+     'statistic': 'mean',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Spr Max',
+     'season': 'Spr',
+     'statistic': 'max',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Spr Min',
+     'season': 'Spr',
+     'statistic': 'min',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Smr Mean',
+     'season': 'Smr',
+     'statistic': 'mean',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Smr Max',
+     'season': 'Smr',
+     'statistic': 'max',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Smr Min',
+     'season': 'Smr',
+     'statistic': 'min',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Aut Mean',
+     'season': 'Aut',
+     'statistic': 'mean',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Aut Max',
+     'season': 'Aut',
+     'statistic': 'max',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Aut Min',
+     'season': 'Aut',
+     'statistic': 'min',
+     'formatter': annual_consumption_format_single},
+]
+
+HORIZON_CONS_STATS = [
+    {'label': 'Total',
+     'season': 'Year',
+     'statistic': 'sum',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Wtr',
+     'season': 'Wtr',
+     'statistic': 'sum',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Spr',
+     'season': 'Spr',
+     'statistic': 'sum',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Smr',
+     'season': 'Smr',
+     'statistic': 'sum',
+     'formatter': annual_consumption_format_single},
+    {'label': 'Aut',
+     'season': 'Aut',
+     'statistic': 'sum',
+     'formatter': annual_consumption_format_single},
 ]
 
 ANNUAL_SEASONAL_STATS = [
@@ -406,6 +504,52 @@ def present_self_consumption_data(data_list,
         stat_list[i]['value'] = stat_list[i]['label']
 
     return present_stat_description(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")
+
+def present_seasonal_consumption_data(
+    data_list,
+    table_name,
+    stat_label,
+    stat_list=ANNUAL_CONS_STATS
+):
+    """
+    Process a list of seasonal consumption data into a table
+    """
+    n_rows = len(stat_list)
+    n_configs = len(data_list)
+
+    # Get the list of tight dictionary representations of dataframes
+    if isinstance(table_name, str):
+        dict_data = [x.get(table_name, None) for x in data_list]
+    else:
+        dict_data = [recursive_get(x, *table_name) for x in data_list]
+
+    def transform_stats(table_data):
+        if table_data is None or table_data == {}:
+            df = None
+        else:
+            df = pd.DataFrame.from_dict(table_data, orient='tight')
+
+        def trans_stat(idx):
+            if df is None:
+                return None
+            
+            stat = stat_list[idx]
+            season = stat.get('season')
+            statistic = stat.get('statistic')
+            formatter = stat.get('formatter')
+            fdf = df.loc[df['season']==season, :]
+            fdf = fdf.loc[fdf['statistic']==statistic, :]
+
+            return formatter(fdf)
+        return {stat_list[i].get('label'): trans_stat(i) for i in range(n_rows)}
+
+    trans_stats = [{str(table_name): transform_stats(x)} for x in dict_data]
+
+    stat_list = copy.copy(stat_list)
+    for i in range(len(stat_list)):
+        stat_list[i]['value'] = stat_list[i]['label']
+
+    return present_stat_description(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")        
 
 def present_event_and_date(data_list,
                            event_name,
