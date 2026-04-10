@@ -415,7 +415,8 @@ def present_event_and_date(data_list,
                            date_label='On:',
                            event_date='datetime',
                            none_str='-',
-                           nonedate_str='#/#/#'):
+                           nonedate_str='#/#/#',
+                           trimdate=15):
     n_configs = len(data_list)
 
     if isinstance(event_name, str):
@@ -423,13 +424,13 @@ def present_event_and_date(data_list,
     else:
         comp_result = [recursive_get(x, event_name) for x in data_list]
 
-    val_row = html.Tr([html.Td(event_label,colSpan=2)] + 
+    val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] +
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
 
     #date_row = html.Tr([html.Td(date_label, colSpan=2, style={'text-align':'end'})] 
     #    + [html.Td(f'{x.get(event_date).strftime("%Y/%m/%d")}') if x is not None else html.Td(none_str) for x in comp_result])
-    date_row = html.Tr([html.Td(date_label, colSpan=2, style={'text-align':'end'})] 
-        + [html.Td(f'{x.get(event_date)[:-15]}') if x is not None else html.Td(none_str) for x in comp_result])
+    date_row = html.Tr([html.Td(date_label, style={'text-align':'end'})] 
+        + [html.Td(f'{x.get(event_date)[:-trimdate]}') if x is not None else html.Td(none_str) for x in comp_result])
 
     return [val_row, date_row]    
 
@@ -451,10 +452,10 @@ def present_event_and_daterange(data_list,
     else:
         comp_result = [recursive_get(x, event_name) for x in data_list]
 
-    val_row = html.Tr([html.Td(event_label,colSpan=2)] + 
+    val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] + 
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
 
-    date_row = html.Tr([html.Td(range_label, colSpan=2, style={'text-align':'end'})] 
+    date_row = html.Tr([html.Td(range_label, style={'text-align':'end'})] 
         + [html.Td(f'{x.get(event_start)[:-9]} - {x.get(event_end)[:-9]}') if x is not None else html.Td(none_str) for x in comp_result])
 
     return [val_row, date_row]

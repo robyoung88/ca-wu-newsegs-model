@@ -140,7 +140,7 @@ def stor_results_to_interface_sprake(
         )
         .loc[:, 'discharge_power']
     )
-    results_to_interface['max_dicharge_rate_time'] = (
+    results_to_interface['max_discharge_rate_time'] = (
         locate_timeseries_extrema.report_ts_max(
             maximum_discharge_rate
         )

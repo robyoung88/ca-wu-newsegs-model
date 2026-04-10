@@ -127,7 +127,7 @@ def create_pv_results(pv_data=None, annual=True):
         'max_solar_day',
         r'Maximum daily production (kWh)',
         'value',
-        lambda x: '{:,.1f}'.format(x)
+        '{:,.1f}'.format
     )
 
     min_day = present_event_and_date(
@@ -135,7 +135,7 @@ def create_pv_results(pv_data=None, annual=True):
         'min_solar_day',
         r'Minimum daily production (kWh)',
         'value',
-        lambda x: '{:,.1f}'.format(x)
+        '{:,.1f}'.format
     )
 
     days_in_range = present_stat_description_compound(
@@ -361,7 +361,25 @@ def create_stor_results(stor_data=None, annual=True):
         '{:,.1f}'.format
     )
 
-    tab_body = [html.Tbody(to_stor + from_stor + loss_stor + charge_cycles + hrs_min_soc + longest_hrs_min_soc + hrs_max_soc + longest_hrs_max_soc)]
+    max_charge_rate = present_event_and_date(
+        stor_data,
+        'max_charge_rate_time',
+        r'Maximum charge rate (kW)',
+        'value',
+        '{:,.1f}'.format,
+        trimdate=9
+    )
+
+    max_discharge_rate = present_event_and_date(
+        stor_data,
+        'max_discharge_rate_time',
+        r'Maximum discharge rate (kW)',
+        'value',
+        '{:,.1f}'.format,
+        trimdate=9
+    )
+
+    tab_body = [html.Tbody(to_stor + from_stor + loss_stor + charge_cycles + hrs_min_soc + longest_hrs_min_soc + hrs_max_soc + longest_hrs_max_soc + max_charge_rate + max_discharge_rate)]
 
     return dbc.Table(tbl_head + tab_body)
 
