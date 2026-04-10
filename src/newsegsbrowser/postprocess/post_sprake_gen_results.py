@@ -32,6 +32,9 @@ def gen_results_to_interface_sprake(
     Extracts the generation results required for the Dash interface to Sprake model.
     """
 
+    # This holds our final returned data structure
+    results_to_interface = {}
+
     genr = mdl.get_generation_result()
     conr = mdl.get_consumption_storage_result()
 
@@ -42,9 +45,6 @@ def gen_results_to_interface_sprake(
     rated_capacity_pv = \
         mdl.generation.generator.generators[1].nameplate_capacity
     ts = mdl.get_default_timestep()
-
-    # This holds our final returned data structure
-    results_to_interface = {}
 
     gen_data_ann = gen_data.pipe(assign_year_index).query('year_index >= 0')
 

@@ -99,7 +99,7 @@ class SprakeCSResult(ABCNewsegsModuleResult):
         minlength = len(self._storage_soc)
 
         o_arr = np.empty((1, minlength), dtype = np.float64)
-        o_arr[1, :] = self._storage_soc
+        o_arr[0, :] = self._storage_soc
 
         return o_arr
 
@@ -114,10 +114,10 @@ class SprakeCSResult(ABCNewsegsModuleResult):
                 'import', 'export')
 
     def get_dsm_names(self):
-        return ('storage_soc')
+        return ('storage_soc',)
 
     def get_dsm_types(self):
-        return ('system_state')
+        return ('system_state',)
 
     def set_domestic_consumption(self, domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]]):
         self._domestic_consumption = domestic_consumption

@@ -16,7 +16,7 @@ from src.newsegsbrowser.common import get_icon, create_numeric_card_input
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
-from src.newsegsbrowser.postprocess import post_sprake_gen_results
+from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results
 
 #from config import settings
 
@@ -252,44 +252,116 @@ def create_stor_results(stor_data=None, annual=True):
     tbl_head = create_tbl_head(n_configs)
 
     if (annual):
-        to_stor = present_stat_description(stor_data, 'annual_tostore', 'Units to storage (kWh/yr)', fmt='{:,.0f}')
-        from_stor = present_stat_description(stor_data, 'annual_fromstore', 'Units from storage (kWh/yr)', fmt='{:,.0f}')
-        loss_stor = present_stat_description(stor_data, 'annual_lossstore', 'Units lost (kWh/yr)', fmt='{:,.0f}')
-        charge_cycles = present_stat_description(stor_data, 'annual_chargecycles', 'Effective charge cycles (N)', fmt='{:,.0f}')
-        hrs_min_soc = present_stat_description_compound(stor_data,
-                                                        'hrs_min_soc',
-                                                        r'Hours at min SoC (hrs, (%))',
-                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
-                                                        stat_list=ANNUAL_DEFAULT_STATS
-                                                        )
-        hrs_max_soc = present_stat_description_compound(stor_data,
-                                                        'hrs_max_soc',
-                                                        r'Hours at max SoC (hrs, (%))',
-                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
-                                                        stat_list=ANNUAL_DEFAULT_STATS
-                                                        )
-    else:
-        to_stor = present_stat_description(stor_data, 'total_tostore', 'Units to storage (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        from_stor = present_stat_description(stor_data, 'total_fromstore', 'Units from storage (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        loss_stor = present_stat_description(stor_data, 'total_lossstore', 'Units lost (kWh)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        charge_cycles = present_stat_description(stor_data, 'total_chargecycles', 'Effective charge cycles (N)', stat_list=TOTAL_DEFAULT_STATS, fmt='{:,.0f}')
-        hrs_min_soc = present_stat_description_compound(stor_data,
-                                                        'hrs_min_soc',
-                                                        r'Hours at min SoC (hrs, (%))',
-                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
-                                                        stat_list=TOTAL_DEFAULT_STATS
-                                                        )
-        hrs_max_soc = present_stat_description_compound(stor_data,
-                                                        'hrs_max_soc',
-                                                        r'Hours at max SoC (hrs, (%))',
-                                                        stat_formatter=val_percent_formatter_factory('hours', 'frac_hours'),
-                                                        stat_list=TOTAL_DEFAULT_STATS
-                                                        )
-    
-    longest_hrs_min_soc = present_event_and_daterange(stor_data, 'continuous_hrs_min_soc', r'Longest continuous hours at min SoC', 'hours', lambda x: '{:,.1f}'.format(x))
-    longest_hrs_max_soc = present_event_and_daterange(stor_data, 'continuous_hrs_max_soc', r'Longest continuous hours at max SoC', 'hours', lambda x: '{:,.1f}'.format(x))
+        to_stor = present_stat_description(
+            stor_data, 
+            ['to_stor_meter_summary', 'storage_import'],
+            'Units to storage (kWh/yr)',
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+        from_stor = present_stat_description(
+            stor_data,
+            ['from_stor_meter_summary', 'storage_export'],
+            'Units from storage (kWh/yr)',
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+        loss_stor = present_stat_description(
+            stor_data,
+            ['loss_stor_meter_summary', 'storage_loss'],
+            'Units lost (kWh/yr)',
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
 
-    tab_body = [html.Tbody(to_stor + from_stor + loss_stor + hrs_min_soc + longest_hrs_min_soc + hrs_max_soc + longest_hrs_max_soc)]
+        charge_cycles = present_stat_description(
+            stor_data,
+            ['no_charge_cycles', 'charge_cycles'],
+            'Effective charge cycles (N/yr)',
+            stat_list=ANNUAL_DEFAULT_STATS,
+            fmt='{:,.0f}')
+
+        hrs_min_soc = present_stat_description_parallel(
+            stor_data,
+            'stor_hours_at_min',
+            r'Hours at min SoC (hrs/yr, (%))',
+            'hrs_at_min_soc',
+            'prop_hrs_at_min_soc',
+            stat_list=ANNUAL_DEFAULT_STATS
+        )
+
+        hrs_max_soc = present_stat_description_parallel(
+            stor_data,
+            'stor_hours_at_max',
+            r'Hours at max SoC (hrs/yr, (%))',
+            'hrs_at_max_soc',
+            'prop_hrs_at_max_soc',
+            stat_list=ANNUAL_DEFAULT_STATS
+        )
+    else:
+        to_stor = present_stat_description(
+            stor_data, 
+            ['to_stor_meter_summary', 'storage_import'],
+            'Units to storage (kWh)',
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+        from_stor = present_stat_description(
+            stor_data,
+            ['from_stor_meter_summary', 'storage_export'],
+            'Units from storage (kWh)',
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+        loss_stor = present_stat_description(
+            stor_data,
+            ['loss_stor_meter_summary', 'storage_loss'],
+            'Units lost (kWh)',
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}'
+        )
+
+        charge_cycles = present_stat_description(
+            stor_data,
+            ['no_charge_cycles','charge_cycles'],
+            'Effective charge cycles (N)',
+            stat_list=TOTAL_DEFAULT_STATS,
+            fmt='{:,.0f}')
+
+        hrs_min_soc = present_stat_description_parallel(
+            stor_data,
+            'stor_hours_at_min',
+            r'Hours at min SoC (hrs, (%))',
+            'hrs_at_min_soc',
+            'prop_hrs_at_min_soc',
+            stat_list=TOTAL_DEFAULT_STATS
+        )
+
+        hrs_max_soc = present_stat_description_parallel(
+            stor_data,
+            'stor_hours_at_max',
+            r'Hours at max SoC (hrs, (%))',
+            'hrs_at_max_soc',
+            'prop_hrs_at_max_soc',
+            stat_list=TOTAL_DEFAULT_STATS
+        )
+    
+    longest_hrs_min_soc = present_event_and_daterange(
+        stor_data, 
+        'max_continuous_hours_min_soc',
+        r'Longest continuous hours at min SoC',
+        'hours',
+        '{:,.1f}'.format)
+
+    longest_hrs_max_soc = present_event_and_daterange(
+        stor_data,
+        'max_continuous_hours_max_soc',
+        r'Longest continuous hours at max SoC',
+        'hours', 
+        '{:,.1f}'.format
+    )
+
+    tab_body = [html.Tbody(to_stor + from_stor + loss_stor + charge_cycles + hrs_min_soc + longest_hrs_min_soc + hrs_max_soc + longest_hrs_max_soc)]
 
     return dbc.Table(tbl_head + tab_body)
 
@@ -1525,13 +1597,25 @@ def add_initial_callback(app):
     )
     def sync_gen_results_to_store(res, ann_hori_toggle):
         if res is None:
-            return no_update
+            return no_update, no_update, no_update
         res = json.loads(res)
         return (
             create_wind_results(res, not(ann_hori_toggle)),
             create_pv_results(res, not(ann_hori_toggle)),
             create_combined_generation_results(res, not(ann_hori_toggle))
         )
+
+    @app.callback(
+        Output('stor-res-tbl', 'children'),
+        Input('res-stor', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_stor_results_to_store(res, ann_hori_toggle):
+        if res is None:
+            return no_update
+        res = json.loads(res)
+        return create_stor_results(res, not(ann_hori_toggle))        
 
     return app
 
@@ -1553,6 +1637,21 @@ def add_result_callbacks(app):
         print ("making gen results")
         gen_results = post_sprake_gen_results.gen_results_to_interface_sprake(mdl)
         return json.dumps(gen_results)
+
+    @app.callback(
+        Output('res-stor', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_gen(_):
+        """
+        Create the storage results data after a completed model run
+        """
+        mdl = app.mdl
+
+        print ("making stor results")
+        stor_results = post_sprake_storage_results.stor_results_to_interface_sprake(mdl)
+        return json.dumps(stor_results)
 
     return app
 

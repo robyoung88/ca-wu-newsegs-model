@@ -190,7 +190,7 @@ DEFAULT_DAYS_IN_RANGE_STATS = [
     {'label':r'75%≤x<95%',
      'value':'days_075_to_095'},
     {'label':r'95%≤x≤100%',
-     'value':'days_095_to_0100'}
+     'value':'days_095_to_999'}
     ]
 
 def DEFAULT_STAT_FORMATTER(stat_dict):
@@ -198,6 +198,32 @@ def DEFAULT_STAT_FORMATTER(stat_dict):
 
 def recursive_get(d, *keys):
     return reduce(lambda c, k: c.get(k, {}), keys, d)
+
+def hours_in_range_formatter(d):
+    if d is None:
+        return "( -  kW) - (%)"
+    return f"({d.get('min_power'):,.0f} - {d.get('max_power'):,.0f}) {d.get('hours'):,.1f} ({d.get('horizon_fraction'):,.1%})"
+
+def days_in_range_formatter(d):
+    if d is None:
+        return "( - kWh) - (%)"
+    return f"({d.get('min_value'):,.0f} - {d.get('max_value'):,.0f}) {d.get('days'):,.0f} ({d.get('horizon_fraction'):,.1%})"
+
+def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
+    fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
+    def val_percent_formatter(d):
+        if d is None:
+            return "- (-%)"
+        return fmt.format(d.get(value_id),d.get(fraction_id))
+    return val_percent_formatter
+
+def recursive_val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
+    fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
+    def val_percent_formatter(d):
+        if d is None:
+            return "- (-%)"
+        return fmt.format(recursive_get(d, *value_id), recursive_get(d, *fraction_id))
+    return val_percent_formatter
 
 def present_single_stat(data_list,
                         stat_name,
@@ -222,14 +248,7 @@ def present_single_stat(data_list,
 def present_stat_description(data_list,
                              stat_name,
                              stat_label,
-                             stat_list=[
-                                {'label':'Mean',
-                                 'value':'mean'},
-                                {'label':'Max',
-                                 'value':'max'},
-                                {'label':'Min',
-                                 'value':'min'}
-                             ],
+                             stat_list=ANNUAL_DEFAULT_STATS,
                              fmt='{:,.2f}',
                              none_str='-'):
     n_rows = len(stat_list)
@@ -261,6 +280,44 @@ def present_stat_description(data_list,
         rw = rw + [html.Td(val_fmt.format(x)) if x is not None else html.Td(none_str) for x in vals]
         return html.Tr(rw)
 
+    rws = [get_Tr(i) for i in range(n_rows)]
+    return rws
+
+def present_stat_description_parallel(
+    data_list,
+    container_name,
+    stat_label,
+    stat1_name,
+    stat2_name,
+    stat_list = ANNUAL_DEFAULT_STATS,
+    fmt1='{:,.0f}',
+    fmt2='{:,.1%}',
+    none_str='-'
+):
+    n_rows = len(stat_list)
+    n_configs = len(data_list)
+
+    if isinstance(container_name, str):
+        config_containers = [x.get(container_name, None) for x in data_list]
+    else:
+        config_containers = [recursive_get(x, *container_name) for x in data_list]
+    
+    def get_Tr(idx):
+        stat = stat_list[idx]
+        if (idx == 0):
+            rw = [html.Td(stat_label, rowSpan=n_rows)]
+        else:
+            rw = []
+        rw = rw + [html.Td(stat['label'])]
+
+        val_lookup = stat.get('value')
+        
+        vals_1 = [x.get(stat1_name,{}).get(val_lookup) if x is not None else None for x in config_containers]
+        vals_2 = [x.get(stat2_name,{}).get(val_lookup) if x is not None else None for x in config_containers]
+
+        rw = rw + [html.Td(fmt1.format(x)+' ('+fmt2.format(y)+")") if x is not None else html.Td(none_str) for x, y in zip(vals_1, vals_2)]
+        return html.Tr(rw)
+    
     rws = [get_Tr(i) for i in range(n_rows)]
     return rws
 
@@ -401,22 +458,3 @@ def present_event_and_daterange(data_list,
         + [html.Td(f'{x.get(event_start)[:-9]} - {x.get(event_end)[:-9]}') if x is not None else html.Td(none_str) for x in comp_result])
 
     return [val_row, date_row]
-
-def hours_in_range_formatter(d):
-    if d is None:
-        return "( -  kW) - (%)"
-    return f"({d.get('min_power'):,.0f} - {d.get('max_power'):,.0f}) {d.get('hours'):,.1f} ({d.get('horizon_fraction'):,.1%})"
-
-def days_in_range_formatter(d):
-    if d is None:
-        return "( - kWh) - (%)"
-    return f"({d.get('min_value'):,.0f} - {d.get('max_value'):,.0f}) {d.get('days'):,.0f} ({d.get('horizon_fraction'):,.1%})"
-
-def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
-    fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
-    def val_percent_formatter(d):
-        if d is None:
-            return "- (-%)"
-        return fmt.format(d.get(value_id),d.get(fraction_id))
-    return val_percent_formatter
-    
