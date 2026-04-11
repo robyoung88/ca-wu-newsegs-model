@@ -7,6 +7,7 @@ import operator
 from typing import TypeAlias, overload, override
 import numpy as np
 import pandas as pd
+import datetime
 from datetime import timedelta, tzinfo
 import zoneinfo
 import pytz
@@ -25,6 +26,13 @@ SEASON_NAMES = [
     'Spr',
     'Smr',
     'Aut'
+]
+
+PEAK_PERIODS = [
+    {'start': datetime.time(17,00),
+     'end': datetime.time(20,00),
+     'bst': True,
+     'index': 1}
 ]
 
 # -----------------------------------------------------------------------------
@@ -558,4 +566,20 @@ def day_index(datetimes:pd.Series,
         .to_numpy(dtype=np.int32)
     )
     return deltas // SECONDS_IN_DAY
+
+def peaktime_index(datetimes,
+                   peak_periods = PEAK_PERIODS):
+    """
+    Return integer array of peak period indicators
+    """
+    retval = np.zeros(len(datetimes), dtype=np.int32)
+    for prd in peak_periods:
+        if prd.get('bst'):
+            tms = datetimes.tz_convert(pytz.timezone('Europe/London')).time
+            is_interval = np.logical_and(
+                tms > prd.get('start'),
+                tms <= prd.get('end')
+            )
+            retval[is_interval] = prd.get('index')
+    return retval
     

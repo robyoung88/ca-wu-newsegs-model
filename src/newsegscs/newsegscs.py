@@ -85,3 +85,41 @@ def get_storage_loss_meters(
         )
     )
     return cons_data
+
+def get_site_import_meters(
+    cs_results: ABCNewsegsModuleResult
+) -> pd.DataFrame:
+    """ 
+    Extract site grid import meters from a cs module results.
+
+    Also augments with a total grid_imports 'grid_import'.
+    NB, this may overwrite any existing 'grid_import' meter.
+    """
+    cons_meters = filter_meters(cs_results, 'import')
+    cons_data = (
+        cs_results.meters_to_pandas()
+        .loc[:, cons_meters]
+        .assign(
+            grid_import = lambda df: df.apply(sum, axis=1)
+        )
+    )
+    return cons_data
+
+def get_site_export_meters(
+    cs_results: ABCNewsegsModuleResult
+) -> pd.DataFrame:
+    """ 
+    Extract site grid export meters from a cs module results.
+
+    Also augments with a total grid_exports 'grid_export'.
+    NB, this may overwrite any existing 'grid_export' meter.
+    """
+    cons_meters = filter_meters(cs_results, 'export')
+    cons_data = (
+        cs_results.meters_to_pandas()
+        .loc[:, cons_meters]
+        .assign(
+            grid_export = lambda df: df.apply(sum, axis=1)
+        )
+    )
+    return cons_data

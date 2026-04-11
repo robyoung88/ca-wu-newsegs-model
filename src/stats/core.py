@@ -6,7 +6,7 @@ import numpy.typing as npt
 import pandas as pd
 
 from src.core import SECONDS_TO_HOURS
-from src.core.timespan import year_index, season_index, day_index
+from src.core.timespan import year_index, season_index, day_index, peaktime_index, PEAK_PERIODS
 
 def assign_delta_hours(
     data: pd.DataFrame|pd.Series
@@ -79,6 +79,29 @@ def assign_season_index(
         ann_data = ann_data.assign(season_index = lambda df: df['season_index'].shift(shift, fill_value=df['season_index'].iloc[0]))
     elif shift <0:
         ann_data = ann_data.assign(season_index = lambda df: df['season_index'].shift(shift, fill_value=df['season_index'].iloc[-1]))
+    
+    return ann_data
+
+def assign_peaktime_index(
+    data: pd.DataFrame|pd.Series,
+    shift: int = 0,
+    peak_periods = PEAK_PERIODS
+) -> pd.DataFrame:
+    """
+    Augment a datetime-indexed meter dataframe with an indicator for peak times.
+    """
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+
+    if "peaktime_index" in data.columns:
+        raise UserWarning('peaktime_index is already present in data')
+    
+    ann_data = data.assign(peaktime_index = lambda df: peaktime_index(df.index, peak_periods=peak_periods))
+
+    if shift > 0:
+        ann_data = ann_data.assign(season_index = lambda df: df['peaktime_index'].shift(shift, fill_value=df['peaktime_index'].iloc[0]))
+    elif shift < 0:
+        ann_data = ann_data.assign(season_index = lambda df: df['peaktime_index'].shift(shift, fill_value=df['peaktime_index'].iloc[-1]))
     
     return ann_data
 
