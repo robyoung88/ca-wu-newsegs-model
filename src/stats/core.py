@@ -1,6 +1,8 @@
 """
 Core functions used by multiple statistical procedures.
 """
+from collections.abc import Collection
+
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -150,3 +152,73 @@ def assign_day_index(
             )
     
     return day_data
+
+def grouped_default_stats(
+    df: pd.DataFrame,
+    grouping_vars = 'season_index',
+    agg_operations = ['sum','mean','min','max']
+) -> pd.DataFrame:
+    """
+    Default format for statistics grouped by at least one variable.
+    """
+    return (
+        df
+        .groupby(grouping_vars)
+        .agg(agg_operations)
+        .melt(ignore_index=False)
+        .rename(columns = {
+            'variable_0': 'variable',
+            'variable_1': 'statistic'
+        })
+        .reset_index()
+    )
+
+def index_by(df: pd.DataFrame|pd.Series, index_vars: Collection) -> pd.DataFrame:
+    """
+    Ensure that dataframe is indexed by some list of variables
+    """
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
+
+    if isinstance(index_vars, str):
+        if len(df.index.names) == 1:
+            if df.index.names[0] is None:
+                return df.set_index(index_vars)
+            if df.index.names[0] == index_vars:
+                return df
+            return df.reset_index().set_index(index_vars)
+        else:
+            return df.reset_index().set_index(index_vars)
+
+    if set(df.index.names) == set(index_vars):
+        return df
+    
+    if df.index.names is None:
+        return df.set_index(index_vars)
+    
+    return df.reset_index().set_index(index_vars)
+
+def normalise_common_index(
+    df: pd.DataFrame,
+    denom: pd.DataFrame,
+    index_vars: Collection,
+    norm_cols: Collection|None = None
+) -> pd.DataFrame:
+    """
+    Matching the denom by index, divide through df by denom.
+
+    The first non-index column of the denom dataframe will be the denominator.
+    """
+    df = index_by(df, index_vars)
+    denominator = (
+        denom
+        .pipe(index_by, index_vars = index_vars)
+        .loc[df.index, :]
+        .iloc[:, 0]
+        .values
+    )
+
+    if norm_cols is None:
+        norm_cols = list(df.columns)
+
+    return df.apply(lambda col: col/denominator if col.name in norm_cols else col, axis = 0).reset_index()

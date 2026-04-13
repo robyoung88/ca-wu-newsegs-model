@@ -1,9 +1,25 @@
 import copy
+from typing import List
+from collections.abc import Callable, Mapping, Iterable
 
 from dash import html
 from functools import reduce, partial
 
 import pandas as pd
+
+from src.core.timespan import SEASON_NAMES
+
+DEFAULT_SEASON_MAPPER = {k: v for k,v in enumerate(SEASON_NAMES)}
+
+DEFAULT_STATISTIC_MAPPER = {
+    'mean': 'Mean',
+    'min': 'Min',
+    'max': 'Max',
+    'sum': 'Total',
+}
+
+DEFAULT_STATISTICS_ANNUAL = ['mean', 'min', 'max']
+DEFAULT_STATISTICS_HORIZON = ['sum']
 
 ANNUAL_DEFAULT_STATS = [
                                 {'label':'Mean',
@@ -343,6 +359,160 @@ def present_single_stat(data_list,
 
     return [html.Tr(rw)]
 
+def as_df(
+    df: None|pd.DataFrame|dict,
+    orient: str = 'columns',
+    index_variables: list = ['variable', 'statistic']
+) -> pd.DataFrame:
+    if df is None:
+        return None
+    if isinstance(df, pd.DataFrame):
+        if set(df.index.names) == set(index_variables):
+            return df
+        else:
+            if df.index.names[0] is None:
+                df.set_index(index_variables)
+            else:
+                df.reset_index().set_index(index_variables)
+    return pd.DataFrame.from_dict(df, orient=orient).set_index(index_variables)
+
+def _label_demap(str_list:Iterable, mapper: None|Callable|Mapping = None) -> Iterable:
+    if mapper is None:
+        return str_list
+    elif isinstance(mapper, Callable):
+        return [mapper(x) for x in str_list]
+    elif isinstance(mapper, Mapping):
+        return [mapper[x] for x in str_list]
+    elif isinstance(mapper, pd.DataFrame):
+        return [mapper.loc[x,:] for x in str_list]
+    else:
+        raise ValueError("`mapper` must be a mapping or callable, is ", type(mapper))
+
+def present_single_stat_per_row(
+    data_list,
+    table_name,
+    variable_names,
+    statistic_names=DEFAULT_STATISTICS_ANNUAL,
+    fmt='{:,.2f}',
+    none_str='-',
+    variable_mapper: None|Callable|Mapping = None,
+    statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER
+) -> pd.DataFrame:
+    n_configs = len(data_list)
+
+    src_data = [as_df(x.get(table_name)) for x in data_list]
+
+    if isinstance(variable_names, str):
+        variable_names = [variable_names]
+    if isinstance(statistic_names, str):
+        statistic_names = [statistic_names]
+
+    extract_mi = pd.MultiIndex.from_product(
+        [variable_names, statistic_names], 
+        names=['variable','statistic']
+    )
+
+    def extract_from_table(idx):
+        tbl = src_data[idx]
+        if tbl is None:
+            subtable = (
+                pd.DataFrame({'value':[none_str]*len(extract_mi)})
+                .set_index(extract_mi)
+            )
+        else:
+            subtable = (
+                tbl.loc[extract_mi, ['value']]
+                .assign(value = lambda df: df['value'].apply(lambda x: fmt.format(x)))
+            )
+        subtable = (
+            subtable
+            .rename(columns = {'value': 'config-'+str(idx+1)})
+        )
+        return subtable
+    
+    otbl = pd.concat([extract_from_table(i) for i in range(n_configs)], axis=1)
+
+    variable_labels = _label_demap(variable_names, variable_mapper)
+    statistic_labels = _label_demap(statistic_names, statistic_mapper)
+    
+    label_mi = pd.MultiIndex.from_product(
+        [variable_labels, statistic_labels], 
+        names=['variable','statistic']
+    )
+
+    otbl.index = label_mi
+    
+    return otbl
+
+def present_paired_seasonal_stats(
+    data_list,
+    table1_name,
+    table2_name,
+    variable_names,
+    statistic_names = DEFAULT_STATISTICS_ANNUAL,
+    season_indices = range(len(SEASON_NAMES)),
+    fmt='{:,.2f} ({:,.1%})',
+    none_str='-',
+    variable_mapper: None|Callable|Mapping = None,
+    statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER,
+    season_mapper: None|Callable|Mapping = DEFAULT_SEASON_MAPPER,
+) -> pd.DataFrame:
+    n_configs = len(data_list)
+
+    src_data1 = [as_df(x.get(table1_name), index_variables=['variable', 'season_index', 'statistic']) for x in data_list]
+    src_data2 = [as_df(x.get(table2_name), index_variables=['variable', 'season_index', 'statistic']) for x in data_list]
+
+    if isinstance(variable_names, str):
+        variable_names = [variable_names]
+    if isinstance(statistic_names, str):
+        statistic_names = [statistic_names]
+
+    extract_mi = pd.MultiIndex.from_product(
+        [variable_names, season_indices, statistic_names],
+        names=['variable', 'season', 'statistic']
+    )
+
+    def extract_from_table(idx):
+        tbl1 = src_data1[idx]
+        tbl2 = src_data2[idx]
+        if tbl1 is None:
+            subtable =  (
+                pd.DataFrame({'value':[none_str]*len(extract_mi)})
+                .set_index(extract_mi)
+            )
+        else:
+            subtable = (
+                pd.merge(
+                    tbl1.loc[extract_mi, ['value']].rename(columns={'value':'v1'}),
+                    tbl2.loc[extract_mi, ['value']].rename(columns={'value':'v2'}),
+                    left_index=True,
+                    right_index=True
+                )
+                .assign(value = lambda df: df.apply(lambda rw: fmt.format(rw['v1'], rw['v2']), axis=1))
+                .drop(columns=['v1', 'v2'])
+            )
+        
+        subtable = (
+            subtable
+            .rename(columns = {'value': 'config-'+str(idx+1)})
+        )
+        return subtable
+    
+    otbl = pd.concat([extract_from_table(i) for i in range(n_configs)], axis=1)
+
+    variable_labels = _label_demap(variable_names, variable_mapper)
+    season_labels = _label_demap(season_indices, season_mapper)
+    statistic_labels = _label_demap(statistic_names, statistic_mapper)
+
+    label_mi = pd.MultiIndex.from_product(
+        [variable_labels, season_labels, statistic_labels], 
+        names=['variable', 'season', 'statistic']
+    )
+
+    otbl.index = label_mi
+
+    return otbl
+    
 def present_stat_description(data_list,
                              stat_name,
                              stat_label,

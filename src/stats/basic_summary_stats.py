@@ -41,6 +41,39 @@ def meter_annual_summary(data: pd.DataFrame|pd.Series) -> pd.DataFrame:
 
     return ann_smry
 
+def meter_annual_summary2(
+    data: pd.DataFrame|pd.Series,
+    agg_operations = ['sum','mean','min','max']
+) -> pd.DataFrame:
+    """
+    Summary stats for generation or consumption meters.
+
+    Args:
+        data: 
+            A datetime-indexed dataframe consisting only of meter data.
+            If a year_index column is present, it will be used,
+            else it shall be generated and used.
+
+    Returns:
+
+    """
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+    
+    if not 'year_index' in data.columns:
+        data = data.pipe(assign_year_index).query('year_index >= 0')
+
+    return (
+        data
+        .groupby('year_index')
+        .agg('sum')
+        .agg(agg_operations)
+        .melt(ignore_index=False)
+        .reset_index()
+        .rename(columns={'index': 'statistic'})
+        .loc[:, ['variable', 'statistic', 'value']]
+    )
+
 def meter_annual_summary_to_interface(
         meter_annual_summary: pd.DataFrame
     ) -> dict:
@@ -48,6 +81,14 @@ def meter_annual_summary_to_interface(
     Converts the summary dataframe into the format expected by the interface
     """
     return meter_annual_summary.to_dict()
+
+def meter_annual_summary2_to_interface(
+        meter_annual_summary: pd.DataFrame
+    ) -> dict:
+    """
+    Converts the summary dataframe into the format expected by the interface
+    """
+    return meter_annual_summary.to_dict(orient='list')
 
 def meter_perday_summary(data: pd.DataFrame|pd.Series) -> pd.DataFrame:
     """

@@ -20,7 +20,7 @@ from src.newsegscs import elexon_profiles
 SEASON_NAMES_MAP = (
     pd.DataFrame(
         {
-            'season_index': np.arange(4),
+            'season_index': np.arange(len(SEASON_NAMES)),
             'season': SEASON_NAMES
         }
     )

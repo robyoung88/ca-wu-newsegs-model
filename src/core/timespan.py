@@ -22,6 +22,7 @@ SECONDS_TO_DAYS = 1.0 / SECONDS_IN_DAY
 NANOSECONDS_TO_DAYS = SECONDS_TO_DAYS / 1e9
 
 SEASON_NAMES = [
+    'Year',
     'Wtr',
     'Spr',
     'Smr',
@@ -523,28 +524,29 @@ def year_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
 
 def season_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
     """
-    Return array integers indicating which season (0-3) datetime belongs to in series
+    Return array integers indicating which season (1-4) datetime belongs to in series
 
     Seasons are:
-    0 = Winter = Dec, Jan, Feb
-    1 = Spring = Mar, Apr, May
-    2 = Summer = Jun, Jul, Aug
-    3 = Autumn = Sep, Oct, Nov
+    0 = Year = Jan - Dec; used for summaries
+    1 = Winter = Dec, Jan, Feb
+    2 = Spring = Mar, Apr, May
+    3 = Summer = Jun, Jul, Aug
+    4 = Autumn = Sep, Oct, Nov
     """
     monthn = datetimes.dt.month
     return np.where(
         monthn >= 12,
-        0,
+        1,
         np.where(
             monthn >= 9,
-            3,
+            4,
             np.where(
                 monthn >= 6,
-                2,
+                3,
                 np.where(
                     monthn >= 3,
-                    1,
-                    0
+                    2,
+                    1
                 )
             )
         )

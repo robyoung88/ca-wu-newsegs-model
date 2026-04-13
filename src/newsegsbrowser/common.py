@@ -197,3 +197,11 @@ def create_numeric_card_input(icon_name,
                     'width':'30%'
                   })
     ])
+
+def unescape_html_icons(html_text):
+    return (
+        html_text
+        .replace('<th>&lt;','<th><')
+        .replace('"&gt;&lt;','"><')
+        .replace('i&gt;', 'i>')
+    )

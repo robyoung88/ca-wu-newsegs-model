@@ -9,15 +9,17 @@ from functools import partial
 from dash import Dash, html, Input, Output, dcc, State, ALL, no_update
 import dash_bootstrap_components as dbc
 import dash_daq as daq
+from dash_extensions import Purify
 
 from src.newsegsmodel.sprakemodel import SprakeModel
 from src.newsegsfinance import SprakeFinance
 
-from src.newsegsbrowser.common import get_icon, create_numeric_card_input
+from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
 from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results, post_sprake_consumption_results
+from src.newsegsbrowser.postprocess import post_sprake_net_results
 
 #from config import settings
 
@@ -574,39 +576,56 @@ def create_net_results(net_data=None, annual=True):
     if net_data is None:
         net_data = {}
     
+    # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
     if isinstance(net_data, Mapping):
         n_configs = 1
         net_data = [net_data]
     else:
         n_configs = len(net_data)
     
-    tbl_head = create_tbl_head(n_configs)
-
     if (annual):
-        export_stats = present_stat_description(net_data, 'annual_export', 'Export to grid (kWh/yr)', fmt='{:,.0f}')
-        import_stats = present_stat_description(net_data, 'annual_import', 'Import from grid (kWh/yr)', fmt='{:,.0f}')
-        loss_stats = present_stat_description(net_data, 'annual_stor_loss', 'Storage losses (kWh/yr)', fmt='{:,.0f}')
-
-        # NB - ensure this stat compensates for daylight savings
-        peak_export = present_stat_description(net_data, 'peak_export', 'Exports 5pm-8pm (kWh/yr)', fmt='{:,.0f}')
-        peak_import = present_stat_description(net_data, 'peak_import', 'Imports 5pm-8pm (kWh/yr)', fmt='{:,.0f}')
+        meter_stats = present_single_stat_per_row(
+            net_data,
+            'meter_summaries',
+            ['grid_export', 'grid_import', 'storage_loss', 'peak_grid_export', 'peak_grid_import'],
+            statistic_names = DEFAULT_STATISTICS_ANNUAL,
+            fmt='{:,.0f}',
+            variable_mapper = {
+                'grid_export' : 'Export to grid (kWh/yr)',
+                'grid_import' : 'Import from grid (kWh/yr)',
+                'storage_loss' : 'Storage losses (kWh/yr)',
+                'peak_grid_export': 'Exports 5pm-8pm (kWh/yr)',
+                'peak_grid_import': 'Imports 5pm-8pm (kWh/yr)',
+            }
+        )
+        
     else:
-        export_stats = present_stat_description(net_data, 'annual_export', 'Export to grid (kWh)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-        import_stats = present_stat_description(net_data, 'annual_import', 'Import from grid (kWh)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-        loss_stats = present_stat_description(net_data, 'annual_stor_loss', 'Storage losses (kWh)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
+        meter_stats = present_single_stat_per_row(
+            net_data,
+            'meter_summaries',
+            ['grid_export', 'grid_import', 'storage_loss', 'peak_grid_export', 'peak_grid_import'],
+            statistic_names = DEFAULT_STATISTICS_HORIZON,
+            fmt='{:,.0f}',
+            variable_mapper = {
+                'grid_export' : 'Export to grid (kWh)',
+                'grid_import' : 'Import from grid (kWh)',
+                'storage_loss' : 'Storage losses (kWh)',
+                'peak_grid_export': 'Exports 5pm-8pm (kWh)',
+                'peak_grid_import': 'Imports 5pm-8pm (kWh)',
+            }
+        )
 
-        # NB - ensure this stat compensates for daylight savings
-        peak_export = present_stat_description(net_data, 'peak_export', 'Exports 5pm-8pm (kWh)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-        peak_import = present_stat_description(net_data, 'peak_import', 'Imports 5pm-8pm (kWh)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-    
-    tab_body = [html.Tbody(export_stats + import_stats + loss_stats + peak_export + peak_import)]
+    out_table = meter_stats
+    out_table.index.names = [None, None]
+    out_table.columns = ['<i class="' + get_icon(x, style_name='raw') + ' p-1 m-2"></i>' for x in out_table.columns]
 
-    return dbc.Table(tbl_head + tab_body)
+    return Purify(html = unescape_html_icons(out_table.to_html(classes='table', border=False)))
 
 def create_seasonal_net_results(net_data=None, annual=True):
     if net_data is None:
         net_data = {}
     
+    # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
     if isinstance(net_data, Mapping):
         n_configs = 1
         net_data = [net_data]
@@ -616,57 +635,62 @@ def create_seasonal_net_results(net_data=None, annual=True):
     tbl_head = create_tbl_head(n_configs)
 
     if (annual):
-        export_stats = present_stat_description_compound(net_data,
-                                                         'annual_export',
-                                                         r'Export to grid (kWh/yr (% production))',
-                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                         stat_list=ANNUAL_SEASONAL_STATS)
+        export_stats = present_paired_seasonal_stats(
+            net_data,
+            'export_seasonal_statistics',
+            'export_seasonal_statistics_normalised',
+            ['grid_export', 'peak_grid_export'],
+            statistic_names = DEFAULT_STATISTICS_ANNUAL,
+            variable_mapper = {
+                'grid_export': r'Export to grid (kWh/yr (% production))',
+                'peak_grid_export': r'Exports 5pm-8pm (kWh/yr (% production))'
+            }
+        )
 
-        import_stats = present_stat_description_compound(net_data,
-                                                         'annual_import',
-                                                         r'Import from grid (kWh/yr (% consumption))',
-                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                         stat_list=ANNUAL_SEASONAL_STATS)
-
-        peak_export = present_stat_description_compound(net_data,
-                                                         'peak_export',
-                                                         r'Exports 5pm-8pm (kWh/yr (% production))',
-                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                         stat_list=ANNUAL_SEASONAL_STATS)
-        
-        peak_import = present_stat_description_compound(net_data,
-                                                        'peak_import',
-                                                        r'Imports 5pm-8pm (kWh/yr (% consumption))',
-                                                        stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                        stat_list=ANNUAL_SEASONAL_STATS)
+        import_stats = present_paired_seasonal_stats(
+            net_data,
+            'import_seasonal_statistics',
+            'import_seasonal_statistics_normalised',
+            ['grid_import', 'peak_grid_import'],
+            statistic_names = DEFAULT_STATISTICS_ANNUAL,
+            variable_mapper = {
+                'grid_import': r'Import from grid (kWh/yr (% consumption))',
+                'peak_grid_import': r'Imports 5pm-8pm (kWh/yr (% consumption))'
+            }
+        )
     else:
-        export_stats = present_stat_description_compound(net_data,
-                                                         'annual_export',
-                                                         r'Export to grid (kWh (% production))',
-                                                         stat_formatter = val_percent_formatter_factory('total', 'frac'),
-                                                         stat_list=TOTAL_SEASONAL_STATS)
+        export_stats = present_paired_seasonal_stats(
+            net_data,
+            'export_seasonal_statistics',
+            'export_seasonal_statistics_normalised',
+            ['grid_export', 'peak_grid_export'],
+            statistic_names = DEFAULT_STATISTICS_HORIZON,
+            variable_mapper = {
+                'grid_export': r'Export to grid (kWh (% production))',
+                'peak_grid_export': r'Exports 5pm-8pm (kWh (% production))'
+            }
+        )
 
-        import_stats = present_stat_description_compound(net_data,
-                                                         'annual_import',
-                                                         r'Import from grid (kWh (% consumption))',
-                                                         stat_formatter = val_percent_formatter_factory('total', 'frac'),
-                                                         stat_list=TOTAL_SEASONAL_STATS)
+        import_stats = present_paired_seasonal_stats(
+            net_data,
+            'import_seasonal_statistics',
+            'import_seasonal_statistics_normalised',
+            ['grid_import', 'peak_grid_import'],
+            statistic_names = DEFAULT_STATISTICS_HORIZON,
+            variable_mapper = {
+                'grid_import': r'Import from grid (kWh (% consumption))',
+                'peak_grid_import': r'Imports 5pm-8pm (kWh (% consumption))'
+            }
+        )
 
-        peak_export = present_stat_description_compound(net_data,
-                                                         'peak_export',
-                                                         r'Exports 5pm-8pm (kWh (% production))',
-                                                         stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                         stat_list=TOTAL_SEASONAL_STATS)
-        
-        peak_import = present_stat_description_compound(net_data,
-                                                        'peak_import',
-                                                        r'Imports 5pm-8pm (kWh (% consumption))',
-                                                        stat_formatter = val_percent_formatter_factory('mean', 'frac'),
-                                                        stat_list=TOTAL_SEASONAL_STATS)
+    out_table = pd.concat([
+        export_stats,
+        import_stats
+    ])
+    out_table.index.names = [None, None, None]
+    out_table.columns = ['<i class="' + get_icon(x, style_name='raw') + ' p-1 m-2"></i>' for x in out_table.columns]
 
-    tab_body = [html.Tbody(export_stats + import_stats + peak_export + peak_import)]
-
-    return dbc.Table(tbl_head + tab_body)
+    return Purify(html = unescape_html_icons(out_table.to_html(classes='table', border=False)))
 
 def create_so_benefits_results(econ_data=None, annual=True):
     if econ_data is None:
@@ -1157,14 +1181,14 @@ def create_generation_results_card():
                 html.Div([
                     create_wind_results()
                     ],
-                    id="gen-res-wind-tbl")
+                    id="res-gen-wind-tbl")
             ]),
             html.Details([
                 html.Summary("Solar PV Generation"),
                 html.Div([
                     create_pv_results()
                     ],
-                    id="gen-res-pv-tbl")
+                    id="res-gen-pv-tbl")
             ]),
 
             html.Details([
@@ -1172,7 +1196,7 @@ def create_generation_results_card():
                 html.Div([
                     create_combined_generation_results()
                     ],
-                    id="gen-res-combined-tbl")
+                    id="res-gen-combined-tbl")
             ])
         ])
     ])
@@ -1201,7 +1225,7 @@ def create_storage_results_card():
                 html.Div([
                     create_stor_results()
                 ],
-                id='stor-res-tbl')
+                id='res-stor-tbl')
             ])
         ])
     ])
@@ -1233,7 +1257,7 @@ def create_consumption_results_card():
                 html.Div([
                     create_cons_results()
                 ],
-                id='cons-res-tbl')
+                id='res-cons-tbl')
             ]),
 
             html.Details([
@@ -1241,7 +1265,7 @@ def create_consumption_results_card():
                 html.Div([
                     create_seasonal_cons_results()
                 ],
-                id='cons-res-seasonal-tbl')
+                id='res-cons-seasonal-tbl')
             ])
         ])
     ])
@@ -1271,7 +1295,7 @@ def create_net_results_card():
                 html.Div([
                     create_net_results()
                 ],
-                id='net-res-tbl')
+                id='res-net-tbl')
             ]),
 
             html.Details([
@@ -1279,7 +1303,7 @@ def create_net_results_card():
                 html.Div([
                     create_seasonal_net_results()
                 ],
-                id='net-res-seasonal-tbl')
+                id='res-net-seasonal-tbl')
             ])
         ])
     ])
@@ -1699,9 +1723,9 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('gen-res-wind-tbl', 'children'),
-        Output('gen-res-pv-tbl', 'children'),
-        Output('gen-res-combined-tbl', 'children'),
+        Output('res-gen-wind-tbl', 'children'),
+        Output('res-gen-pv-tbl', 'children'),
+        Output('res-gen-combined-tbl', 'children'),
         Input('res-gen', 'data'),
         Input('annual-horizon-toggle', 'value'),
         prevent_initial_call=True
@@ -1717,7 +1741,7 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('stor-res-tbl', 'children'),
+        Output('res-stor-tbl', 'children'),
         Input('res-stor', 'data'),
         Input('annual-horizon-toggle', 'value'),
         prevent_initial_call=True
@@ -1729,8 +1753,8 @@ def add_initial_callback(app):
         return create_stor_results(res, not(ann_hori_toggle))        
 
     @app.callback(
-        Output('cons-res-tbl', 'children'),
-        Output('cons-res-seasonal-tbl', 'children'),
+        Output('res-cons-tbl', 'children'),
+        Output('res-cons-seasonal-tbl', 'children'),
         Input('res-cons', 'data'),
         Input('annual-horizon-toggle', 'value'),
         prevent_initial_call=True
@@ -1740,6 +1764,22 @@ def add_initial_callback(app):
             return no_update, no_update
         res = json.loads(res)
         return create_cons_results(res, not(ann_hori_toggle)), create_seasonal_cons_results(res, not(ann_hori_toggle))
+
+    @app.callback(
+        Output('res-net-tbl', 'children'),
+        Output('res-net-seasonal-tbl', 'children'),
+        Input('res-net', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_net_results_to_store(net, ann_hori_toggle):
+        if net is None:
+            return no_update, no_update
+        net = json.loads(net)
+        return (
+            create_net_results(net, not(ann_hori_toggle)), 
+            create_seasonal_net_results(net, not(ann_hori_toggle))
+        )
 
     return app
 
@@ -1791,6 +1831,21 @@ def add_result_callbacks(app):
         print ("making consumption results")
         cons_results = post_sprake_consumption_results.consumption_results_to_interface_sprake(mdl)
         return json.dumps(cons_results)
+
+    @app.callback(
+        Output('res-net', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_net(_):
+        """
+        Create the net energy results data after a completed model run.
+        """
+        mdl = app.mdl
+
+        print ("making net energy results")
+        net_results = post_sprake_net_results.net_results_to_interface_sprake(mdl)
+        return json.dumps(net_results)
 
     return app
 

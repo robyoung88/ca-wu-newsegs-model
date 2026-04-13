@@ -7,66 +7,17 @@ from src.newsegsgeneration import newsegsgeneration
 from src.newsegscs import newsegscs
 from src.stats.core import assign_year_index, assign_peaktime_index, assign_season_index
 from src.stats import basic_summary_stats
+from src.stats import seasonal_statistics
 
-SEASON_NAMES_MAP = (
-    pd.DataFrame(
-        {
-            'season_index': np.arange(4),
-            'season': SEASON_NAMES
-        }
-    )
-    .set_index('season_index')
-)
-
-def augment_indices_and_trim(df):
-    return (
-        df
-        .pipe(assign_year_index)
-        .pipe(assign_season_index)
-        .query('year_index >= 0')
-        .assign(season = lambda df: SEASON_NAMES_MAP.loc[df['season_index'],'season'].values)
-        .drop(columns='season_index')
-    )
-
-def get_meters_by_year(df):
-    return(
-        df
-        .drop(columns='season')
-        .groupby('year_index')
-        .sum()
-    )
-
-def get_meters_by_year_season(df):
-    return (
-        df
-        .groupby(['year_index','season'])
-        .sum()
-    )
-
-def combined_summary_year_season(df):
-    yr = (
-        get_meters_by_year(df)
-        .assign(season='Year')
-        .reset_index()
-    )
-    yrsn = (
-        get_meters_by_year_season(df)
-        .reset_index()
-    )
-    return (
-        pd.concat([yr, yrsn])
-        #.assign(season = lambda df: )
-        .sort_values(['season','year_index'])
-        .reset_index(drop=True)
-    )
-
-def get_seasonal_statistics(df):
-    return(
-        df
-        .drop(columns='year_index')
-        .groupby('season')
-        .agg(['sum','mean','min','max'])
-    )
+#SEASON_NAMES_MAP = (
+#    pd.DataFrame(
+#        {
+#            'season_index': np.arange(len(SEASON_NAMES)),
+#            'season': SEASON_NAMES
+#        }
+#    )
+#    .set_index('season_index')
+#)
 
 def net_results_to_interface_sprake(
     mdl: SprakeModel
@@ -104,103 +55,26 @@ def net_results_to_interface_sprake(
 
     results_to_interface['meter_summaries'] = (
         energy_ann
-        .pipe(basic_summary_stats.meter_annual_summary)
-        .pipe(basic_summary_stats.meter_annual_summary_to_interface)
+        .pipe(basic_summary_stats.meter_annual_summary2)
+        .pipe(basic_summary_stats.meter_annual_summary2_to_interface)
     )
 
-
-    energy_ann = (
-        energy_ann
-        .pipe(assign_season_index)
-        .assign(season = lambda df: SEASON_NAMES_MAP.loc[df['season_index'],'season'].values)
-        .drop(columns='season_index')
+    export_seas_stats, export_seas_stats_norm = seasonal_statistics.summarise_normalise_meters_by_season(
+        energy_combined.loc[:, ['grid_export', 'peak_grid_export']],
+        newsegsgeneration.get_generation_meters(genr).loc[:, 'generation_export']
     )
 
-    #### Production for denominators
-
-    energy_generated_ann = (
-        newsegsgeneration.get_generation_meters(genr)
-        .loc[:, 'generation_export']
-        .pipe(augment_indices_and_trim)
+    import_seas_stats, import_seas_stats_norm = seasonal_statistics.summarise_normalise_meters_by_season(
+        energy_combined.loc[:, ['grid_import', 'peak_grid_import']],
+        newsegscs.get_consumption_meters(conr).loc[:, 'consumption']
     )
 
-    production_summary = combined_summary_year_season(energy_generated_ann)
+    results_to_interface['export_seasonal_statistics'] = export_seas_stats.to_dict(orient='list')
 
-    #### Consumption for denominators
+    results_to_interface['export_seasonal_statistics_normalised'] = export_seas_stats_norm.to_dict(orient='list')
 
-    energy_consumed_ann = (
-        newsegscs.get_consumption_meters(conr)
-        .loc[:, 'consumption']
-        .pipe(augment_indices_and_trim)
-    )
+    results_to_interface['import_seasonal_statistics'] = import_seas_stats.to_dict(orient='list')
 
-    consumption_summary = combined_summary_year_season(energy_consumed_ann)
-
-    ####  
-
-    energy_summary = combined_summary_year_season(energy_ann)
-
-    energy_statistics = energy_summary.pipe(get_seasonal_statistics)
-
-    def normalise_sums(meter_sums, denom_sums):
-        df1 = meter_sums.set_index(['season', 'year_index'])
-        denom = (
-            denom_sums
-            .set_index(['season', 'year_index'])
-            .loc[df1.index,:]
-            .iloc[:,0]
-            .values
-        )
-        return df1.apply(lambda col: col/denom, axis = 0).reset_index()
-
-    exports_normalised = normalise_sums(
-        energy_summary.loc[:, ['grid_export', 'peak_grid_export', 'season', 'year_index']],
-        production_summary
-    )
-
-    imports_normalised = normalise_sums(
-        energy_summary.loc[:, ['grid_import', 'peak_grid_import', 'season', 'year_index']],
-        consumption_summary
-    )
-
-    exports_norm_statistics = exports_normalised.pipe(get_seasonal_statistics)
-
-    imports_norm_statistics = imports_normalised.pipe(get_seasonal_statistics)
-
-    # For the sum statistics, need to overwrite with the appropriate sums
-    production_seasonal_sum = production_summary.groupby('season')['generation_export'].sum()
-    consumption_seasonal_sum = consumption_summary.groupby('season')['consumption'].sum()
-
-    export_sums = energy_summary.loc[:, ['grid_export', 'peak_grid_export', 'season']].groupby('season').sum()
-    import_sums = energy_summary.loc[:, ['grid_import', 'peak_grid_import', 'season']].groupby('season').sum()
-
-    export_sums_normalised = (
-        export_sums.apply(lambda col: col / production_seasonal_sum.values, axis=0)
-    )
-    export_sums_normalised.columns = pd.MultiIndex.from_product([export_sums_normalised.columns, ['sum']])
-
-    import_sums_normalised = (
-        import_sums.apply(lambda col: col / consumption_seasonal_sum.values, axis=0)
-    )
-    import_sums_normalised.columns = pd.MultiIndex.from_product([import_sums_normalised.columns, ['sum']])
-
-    # Replace the offending columns
-    exports_norm_statistics = (
-        exports_norm_statistics
-        .drop('sum', axis=1, level=1)
-        .join(export_sums_normalised)
-    )
-
-    imports_norm_statistics = (
-        imports_norm_statistics
-        .drop('sum', axis=1, level=1)
-        .join(import_sums_normalised)
-    )
-
-    results_to_interface['seasonal_statistics'] = energy_statistics
-
-    results_to_interface['seasonal_statistics_normalised_export'] = exports_norm_statistics
-
-    results_to_interface['seasonal_statistics_normalised_import'] = imports_norm_statistics
+    results_to_interface['import_seasonal_statistics_normalised'] = import_seas_stats_norm.to_dict(orient='list')
 
     return results_to_interface
