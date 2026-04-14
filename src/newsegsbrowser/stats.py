@@ -554,6 +554,71 @@ def present_paired_seasonal_stats(
     otbl.index = label_mi
 
     return otbl
+
+def present_single_stat_per_row_plus_paired_scalars(
+    data_list,
+    table_name,
+    variable_names,
+    scalar_value1_name,
+    scalar_value2_name,
+    statistic_names=DEFAULT_STATISTICS_ANNUAL,
+    variable_mapper: None|Callable|Mapping = None,
+    statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER,
+    fmt = '{:,.2f} ({:,.1%}/{:,.1%})',
+    none_str = '-',
+) -> pd.DataFrame:
+    """
+    Used primarily for discounted ratios in the form "val (num%/den%)"
+    """
+    n_configs = len(data_list)
+
+    src_data = [as_df(x.get(table_name)) for x in data_list]
+    scalar_data_1 = [x.get(scalar_value1_name) for x in data_list]
+    scalar_data_2 = [x.get(scalar_value2_name) for x in data_list]
+
+    if isinstance(variable_names, str):
+        variable_names = [variable_names]
+    if isinstance(statistic_names, str):
+        statistic_names = [statistic_names]
+
+    extract_mi = pd.MultiIndex.from_product(
+        [variable_names, statistic_names], 
+        names=['variable','statistic']
+    )
+
+    def extract_from_table(idx):
+        tbl = src_data[idx]
+        if tbl is None:
+            subtable = (
+                pd.DataFrame({'value':[none_str]*len(extract_mi)})
+                .set_index(extract_mi)
+            )
+        else:
+            scl1 = scalar_data_1[idx]
+            scl2 = scalar_data_2[idx]
+            subtable = (
+                tbl.loc[extract_mi, ['value']]
+                .assign(value = lambda df: df['value'].apply(lambda x: fmt.format(x, scl1, scl2)))
+            )
+        subtable = (
+            subtable
+            .rename(columns = {'value': 'config-'+str(idx+1)})
+        )
+        return subtable
+    
+    otbl = pd.concat([extract_from_table(i) for i in range(n_configs)], axis=1)
+
+    variable_labels = _label_demap(variable_names, variable_mapper)
+    statistic_labels = _label_demap(statistic_names, statistic_mapper)
+    
+    label_mi = pd.MultiIndex.from_product(
+        [variable_labels, statistic_labels], 
+        names=['variable','statistic']
+    )
+
+    otbl.index = label_mi
+    
+    return otbl
     
 def present_stat_description(data_list,
                              stat_name,

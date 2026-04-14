@@ -6,6 +6,7 @@ dependencies:
   - dash
   - dash-bootstrap-components
   - dash-daq
+  - dash-extensions
   - dash-leaflet
   - dynaconf
   - holidays

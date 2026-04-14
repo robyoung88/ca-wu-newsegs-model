@@ -640,16 +640,15 @@ class SprakeFinance(NewsegsFinance):
         capex = self.all_capex_costs_undiscounted.apply(sum, axis=1)
         net_revenue = self.all_receipts_undiscounted.apply(sum, axis=1) - self.all_recurrent_costs_undiscounted.apply(sum, axis=1)
 
-        simple_debt = net_revenue - capex
+        simple_debt = (net_revenue - capex).cumsum().values.flatten()
 
         payback = simple_debt >= 0
         # We may want to add a restriction that payback cannot occur within a certain timeframe in
         # more complex models where not all capex is spent day 0
         if np.any(payback):
-            payback_index = np.where(payback)[0]
-            dts = pd.Series(net_revenue.index)
-            payback_date = dts.iloc(payback_index)
-            payback_delta = payback_date - dts.iloc[0]
+            payback_index = np.flatnonzero(payback)[0]
+            payback_date = net_revenue.index[payback_index]
+            payback_delta = payback_date - net_revenue.index[0]
             return payback_delta.days + payback_delta.seconds / 3600.0 / 24.0
         
         max_debt_index = np.argmin(simple_debt)

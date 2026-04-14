@@ -18,9 +18,10 @@ from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unesc
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
-from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results, post_sprake_consumption_results
-from src.newsegsbrowser.postprocess import post_sprake_net_results, post_sprake_finance_benefits_results
-from src.newsegsbrowser.postprocess import post_sprake_finance_costs_results
+from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results
+from src.newsegsbrowser.postprocess import post_sprake_consumption_results, post_sprake_net_results
+from src.newsegsbrowser.postprocess import post_sprake_finance_benefits_results, post_sprake_finance_costs_results
+from src.newsegsbrowser.postprocess import post_sprake_finance_value_results
 
 #from config import settings
 
@@ -850,25 +851,51 @@ def create_so_value_results(econ_data=None, annual=True):
     if econ_data is None:
         econ_data = {}
 
+    # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
     if isinstance(econ_data, Mapping):
         n_configs = 1
         econ_data = [econ_data]
     else:
         n_configs = len(econ_data)
+    
+    simple_stats = present_single_stat_per_row(
+        econ_data,
+        'value_summaries',
+        ['benefit_cost_ratio_undiscounted', 'net_present_value_undiscounted', 'simple_payback_time_yrs'],
+        statistic_names = DEFAULT_STATISTICS_HORIZON,
+        fmt='{:,.2f}',
+        variable_mapper = {
+            'benefit_cost_ratio_undiscounted': 'Benefits/Costs (undiscounted)',
+            'net_present_value_undiscounted': 'Net Present Value (£) (undiscounted)',
+            'simple_payback_time_yrs': 'Simple payback time (years)'
+        }
+    )
 
-    tbl_head = create_tbl_head(n_configs)
+    compound_stats = present_single_stat_per_row_plus_paired_scalars(
+        econ_data,
+        'value_summaries',
+        ['benefit_cost_ratio_discounted', 'net_present_value_discounted'],
+        'benefits_discount_rate',
+        'costs_discount_rate',
+        statistic_names = DEFAULT_STATISTICS_HORIZON,
+        variable_mapper = {
+            'benefit_cost_ratio_discounted': 'Benefits/Costs (benefit discount / cost discount)',
+            'net_present_value_discounted': 'Net Present Value (£) (benefit discount / cost discount)',
+        }
+    )
 
-    b_to_c_undiscounted = present_single_stat(econ_data, 'benefits_to_costs_undiscounted', 'Benefits/Costs (undiscounted)', 'value', fmt='{:,.2f}')
-    b_to_c_discounted = present_single_stat(econ_data, 'benefits_to_costs_discounted', 'Benefits/Costs (discounted)', 'value', fmt='{:,.2f}')
+    out_table = (
+        pd.concat([
+            simple_stats,
+            compound_stats
+        ])
+        .iloc[[0,3,1,4,2],:]
+    )
 
-    simple_payback_time = present_single_stat(econ_data, 'simple_payback_time', 'Simple payback time (years)', 'value', fmt='{:,.2f}')
+    out_table.index.names = [None, None]
+    out_table.columns = ['<i class="' + get_icon(x, style_name='raw') + ' p-1 m-2"></i>' for x in out_table.columns]
 
-    npv_undiscounted = present_single_stat(econ_data, 'npv_undiscounted', 'Net Present Value (undiscounted) (£)', 'value', fmt='{:,.0f}')
-    npv_discounted = present_single_stat(econ_data, 'npv_discounted', 'Net Present Value (discounted) (£)', 'value', fmt='{:,.0f}')
-
-    tab_body = [html.Tbody(b_to_c_undiscounted + b_to_c_discounted + simple_payback_time + npv_undiscounted + npv_discounted)]
-
-    return dbc.Table(tbl_head + tab_body)
+    return Purify(html = unescape_html_icons(out_table.to_html(classes='table', border=False)))
 
 def create_generation_input_card():
     """
@@ -1556,8 +1583,7 @@ def create_layout():
         dcc.Store(id='res-net'),
         dcc.Store(id='res-finance-so-benefits'),
         dcc.Store(id='res-finance-so-costs'),
-        dcc.Store(id='res-finance-so-net'),
-        dcc.Store(id='res-finance-so')
+        dcc.Store(id='res-finance-so-value'),
     ])
     ]
 
@@ -1889,9 +1915,19 @@ def add_initial_callback(app):
         if fnc is None:
             return no_update
         fnc = json.loads(fnc)
-        return (
-            create_so_costs_results(fnc, not(ann_hori_toggle))
-        )
+        return create_so_costs_results(fnc, not(ann_hori_toggle))
+
+    @app.callback(
+        Output('res-finance-so-value-tbl', 'children'),
+        Input('res-finance-so-value', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_so_value_to_store(fnc, ann_hori_toggle):
+        if fnc is None:
+            return no_update
+        fnc = json.loads(fnc)
+        return create_so_value_results(fnc, not(ann_hori_toggle))
 
     return app
 
@@ -1996,6 +2032,25 @@ def add_result_callbacks(app):
             .finance_costs_results_to_interface_sprake(mdl,fnc)
         )
         return json.dumps(fnc_costs_results)
+
+    @app.callback(
+        Output('res-finance-so-value', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_finance_value_so(_):
+        """
+        Create the system owner financial value results after a completed model run.
+        """
+        mdl = app.mdl
+        fnc = app.finance
+
+        print ("making so financial value results")
+        fnc_value_results = (
+            post_sprake_finance_value_results
+            .finance_value_results_to_interface_sprake(mdl,fnc)
+        )
+        return json.dumps(fnc_value_results)
 
     return app
 
