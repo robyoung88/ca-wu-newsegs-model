@@ -130,6 +130,7 @@ class SprakeFinance(NewsegsFinance):
             'datetime': csr.get_timespan().to_pandas(),
         }).set_index('datetime')
 
+    # TODO: Something is very wrong here. Update it to latest API and see if it works better
     def _get_consumption(self, meter_names) -> pd.DataFrame:
         if self._model is None:
             return pd.DataFrame()

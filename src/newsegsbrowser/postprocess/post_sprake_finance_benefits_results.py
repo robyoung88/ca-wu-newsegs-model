@@ -1,5 +1,3 @@
-import pandas as pd
-
 from src.newsegsmodel.sprakemodel import SprakeModel
 from src.newsegsfinance.sprakefinance import SprakeFinance
 

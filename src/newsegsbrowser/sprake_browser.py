@@ -20,6 +20,7 @@ from src.newsegsbrowser.results_table import create_tbl_head, create_configurati
 from src.newsegsbrowser.stats import *
 from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results, post_sprake_consumption_results
 from src.newsegsbrowser.postprocess import post_sprake_net_results, post_sprake_finance_benefits_results
+from src.newsegsbrowser.postprocess import post_sprake_finance_costs_results
 
 #from config import settings
 
@@ -763,41 +764,88 @@ def create_so_costs_results(econ_data=None, annual=True):
     if econ_data is None:
         econ_data = {}
     
+    # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
     if isinstance(econ_data, Mapping):
         n_configs = 1
         econ_data = [econ_data]
     else:
         n_configs = len(econ_data)
     
-    tbl_head = create_tbl_head(n_configs)
-
+    
     if (annual):
-        import_costs = present_stat_description(econ_data, 'annual_import_costs', 'Import costs (£/yr)', fmt='{:,.2f}')
-        generator_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - generation (£/yr)', fmt='{:,.2f}')
-        storage_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - storage (£/yr)', fmt='{:,.2f}')
-
-        ann_costs = present_stat_description(econ_data, 'annual_recurrent_costs', 'Recurrent costs - total (£/yr)', fmt='{:,.2f}')
+        recurring_stats = present_single_stat_per_row(
+            econ_data,
+            'undiscounted_variable_costs_summaries',
+            ['import_costs', 'om_costs_gen', 'om_costs_stor', 'variable_costs'],
+            statistic_names = DEFAULT_STATISTICS_ANNUAL,
+            fmt='{:,.0f}',
+            variable_mapper = {
+                'import_costs': 'Import costs (£/yr)',
+                'om_costs_gen': 'O&M costs - generation (£/yr)',
+                'om_costs_stor': 'O&M costs - storage (£/yr)',
+                'variable_costs': 'Recurrent costs - total (£/yr)',
+            }
+        )
+        
     else:
-        import_costs = present_stat_description(econ_data, 'annual_import_costs', 'Import costs (£r)', fmt='{:,.2f}', stat_list=TOTAL_DEFAULT_STATS)
-        generator_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - generation (£/yr)', fmt='{:,.2f}', stat_list=TOTAL_DEFAULT_STATS)
-        storage_om_costs = present_stat_description(econ_data, 'annual_gen_om_costs', 'O&M costs - storage (£/yr)', fmt='{:,.2f}', stat_list=TOTAL_DEFAULT_STATS)
+        recurring_stats = present_single_stat_per_row(
+            econ_data,
+            'undiscounted_variable_costs_summaries',
+            ['import_costs', 'om_costs_gen', 'om_costs_stor', 'variable_costs'],
+            statistic_names = DEFAULT_STATISTICS_HORIZON,
+            fmt='{:,.0f}',
+            variable_mapper = {
+                'import_costs': 'Undiscounted import costs (£)',
+                'om_costs_gen': 'Undiscounted O&M costs - generation (£)',
+                'om_costs_stor': 'Undiscounted O&M costs - storage (£)',
+                'variable_costs': 'Undiscounted recurrent costs - total (£)',
+            }
+        )
 
-        ann_costs = present_stat_description(econ_data, 'annual_recurrent_costs', 'Recurrent costs - total (£/yr)', fmt='{:,.2f}', stat_list=TOTAL_DEFAULT_STATS)
+    
+    capex_stats = present_single_stat_per_row(
+        econ_data,
+        'undiscounted_capex_summaries',
+        ['capex_costs_gen', 'capex_costs_stor', 'capex_costs_dist', 'capex_costs_metering', 'capex_costs_total'],
+        statistic_names = DEFAULT_STATISTICS_HORIZON,
+        fmt='{:,.0f}',
+        variable_mapper = {
+            'capex_costs_gen': 'Capital costs - generation (£)',
+            'capex_costs_stor': 'Capital costs - storage (£)',
+            'capex_costs_dist': 'Capital costs - distribution and switching (£)',
+            'capex_costs_metering': 'Capital costs - metering (£)',
+            'capex_costs_total': 'Capital costs - total (£)'
+        }
+    )
 
-    capex_generation = present_single_stat(econ_data, 'total_gen_capex', 'Capital costs - generation (£)', 'value', fmt='{:,.2f}')
-    capex_storage = present_single_stat(econ_data, 'total_stor_capex', 'Capital costs - storage (£)', 'value', fmt='{:,.2f}')
-    capex_dist = present_single_stat(econ_data, 'total_dist_capex', 'Capital costs - distribution and switching (£)', 'value', fmt='{:,.2f}')
-    capex_meter = present_single_stat(econ_data, 'total_meter_capex', 'Capital costs - metering (£)', 'value', fmt='{:,.2f}')
+    total_costs = present_single_scalar(
+        econ_data,
+        'present_costs_undiscounted',
+        'Present costs (undiscounted) (£)',
+        'Total'
+    )
 
-    capex_total = present_single_stat(econ_data, 'total_capex', 'Capital costs - total (£)', 'value', fmt='{:,.2f}')
+    total_costs_discounted = present_paired_scalars(
+        econ_data,
+        'present_costs_discounted',
+        'costs_discount_rate',
+        'Present costs (discounted) (£)',
+        'Total',
+        fmt='{:,.2f} (@{:,.1%})'
+    )
 
-    total_costs = present_stat_description(econ_data, 'total_costs_undiscounted', 'Total present costs (undiscounted) (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-    total_costs_discounted = present_stat_description(econ_data, 'total_costs_discounted', 'Total present costs (discounted) (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
+    out_table = pd.concat([
+        recurring_stats,
+        capex_stats,
+        total_costs,
+        total_costs_discounted,
+    ])
 
-    tab_body = [html.Tbody(import_costs + generator_om_costs + storage_om_costs + ann_costs + capex_generation + capex_storage + capex_dist + capex_meter + capex_total + total_costs + total_costs_discounted)]
+    out_table.index.names = [None, None]
+    out_table.columns = ['<i class="' + get_icon(x, style_name='raw') + ' p-1 m-2"></i>' for x in out_table.columns]
 
-    return dbc.Table(tbl_head + tab_body)
-
+    return Purify(html = unescape_html_icons(out_table.to_html(classes='table', border=False)))
+    
 def create_so_value_results(econ_data=None, annual=True):
     if econ_data is None:
         econ_data = {}
@@ -1377,7 +1425,7 @@ def create_economic_results_so_card():
                 html.Div([
                     create_so_costs_results()
                 ],
-                id='res-finance-so-cost-tbl')
+                id='res-finance-so-costs-tbl')
             ]),
 
             html.Details([
@@ -1830,6 +1878,20 @@ def add_initial_callback(app):
         return (
             create_so_benefits_results(fnc, not(ann_hori_toggle))
         )
+    
+    @app.callback(
+        Output('res-finance-so-costs-tbl', 'children'),
+        Input('res-finance-so-costs', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_so_costs_to_store(fnc, ann_hori_toggle):
+        if fnc is None:
+            return no_update
+        fnc = json.loads(fnc)
+        return (
+            create_so_costs_results(fnc, not(ann_hori_toggle))
+        )
 
     return app
 
@@ -1915,6 +1977,25 @@ def add_result_callbacks(app):
             .finance_benefits_results_to_interface_sprake(mdl,fnc)
         )
         return json.dumps(fnc_benefits_results)
+    
+    @app.callback(
+        Output('res-finance-so-costs', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_finance_costs_so(_):
+        """
+        Create the system owner financial costs results after a completed model run.
+        """
+        mdl = app.mdl
+        fnc = app.finance
+
+        print ("making so financial costs results")
+        fnc_costs_results = (
+            post_sprake_finance_costs_results
+            .finance_costs_results_to_interface_sprake(mdl,fnc)
+        )
+        return json.dumps(fnc_costs_results)
 
     return app
 
