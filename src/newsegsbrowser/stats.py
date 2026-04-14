@@ -388,6 +388,48 @@ def _label_demap(str_list:Iterable, mapper: None|Callable|Mapping = None) -> Ite
     else:
         raise ValueError("`mapper` must be a mapping or callable, is ", type(mapper))
 
+def present_single_scalar(
+    data_list,
+    value_name,
+    variable_label,
+    statistic_label,
+    fmt='{:,.2f}',
+    none_str = '-'
+) -> pd.DataFrame:
+    
+    src_data = [x.get(value_name) for x in data_list]
+
+    odata = {f'config-{i+1}': [fmt.format(x)] if x is not None else [none_str] for i,x in enumerate(src_data)}
+    odata['variable'] = [variable_label]
+    odata['statistic'] = [statistic_label]
+    
+    return (
+        pd.DataFrame
+        .from_dict(odata, orient='columns')
+        .set_index(['variable', 'statistic'])
+    )
+
+def present_paired_scalars(
+    data_list,
+    value1_name,
+    value2_name,
+    variable_label,
+    statistic_label,
+    fmt='{:,.2f} ({:,.1%})',
+    none_str = '-'
+) -> pd.DataFrame:
+    src_data_1 = [x.get(value1_name) for x in data_list]
+    src_data_2 = [x.get(value2_name) for x in data_list]
+    odata = {f'config-{i+1}': [fmt.format(src_data_1[i], src_data_2[i])] if src_data_1[i] is not None else [none_str] for i,_ in enumerate(src_data_1)}
+
+    odata['variable'] = [variable_label]
+    odata['statistic'] = [statistic_label]
+    return (
+        pd.DataFrame
+        .from_dict(odata, orient='columns')
+        .set_index(['variable', 'statistic'])
+    )
+
 def present_single_stat_per_row(
     data_list,
     table_name,

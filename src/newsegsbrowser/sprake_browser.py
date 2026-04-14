@@ -19,7 +19,7 @@ from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_c
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
 from src.newsegsbrowser.stats import *
 from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results, post_sprake_consumption_results
-from src.newsegsbrowser.postprocess import post_sprake_net_results
+from src.newsegsbrowser.postprocess import post_sprake_net_results, post_sprake_finance_benefits_results
 
 #from config import settings
 
@@ -696,35 +696,68 @@ def create_so_benefits_results(econ_data=None, annual=True):
     if econ_data is None:
         econ_data = {}
     
+    # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
     if isinstance(econ_data, Mapping):
         n_configs = 1
         econ_data = [econ_data]
     else:
         n_configs = len(econ_data)
-    
-    tbl_head = create_tbl_head(n_configs)
 
     if (annual):
-        resid_receipts = present_stat_description(econ_data, 'annual_resident_receipts', 'Resident receipts (£/yr)', fmt='{:,.0f}')
-        resid_perunit_receipts = present_stat_description(econ_data, 'annual_resident_perunit_receipts', 'Resident receipts (£/yr/household)', fmt='{:,.0f}')
-
-        ev_receipts = present_stat_description(econ_data, 'annual_ev_receipts', 'EV receipts (£/yr)', fmt='{:,.0f}')
-
-        export_receipts = present_stat_description(econ_data, 'annual_export_receipts', 'Export receipts (£/yr)', fmt='{:,.0f}')
+        receipt_stats = present_single_stat_per_row(
+            econ_data,
+            'undiscounted_receipts_summaries',
+            ['receipts_resident', 'receipts_resident_perunit', 'receipts_ev', 'receipts_exports'],
+            statistic_names = DEFAULT_STATISTICS_ANNUAL,
+            fmt='{:,.0f}',
+            variable_mapper = {
+                'receipts_resident': 'Resident receipts (£/yr)',
+                'receipts_resident_perunit': 'Resident receipts (£/yr/household)',
+                'receipts_ev': 'EV receipts (£/yr)',
+                'receipts_exports': 'Export receipts (£/yr)',
+            }
+        )
     else:
-        resid_receipts = present_stat_description(econ_data, 'annual_resident_receipts', 'Resident receipts (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-        resid_perunit_receipts = []
+        receipt_stats = present_single_stat_per_row(
+            econ_data,
+            'undiscounted_receipts_summaries',
+            ['receipts_resident', 'receipts_resident_perunit', 'receipts_ev', 'receipts_exports'],
+            statistic_names = DEFAULT_STATISTICS_HORIZON,
+            fmt='{:,.0f}',
+            variable_mapper = {
+                'receipts_resident': 'Undiscounted resident receipts (£)',
+                'receipts_resident_perunit': 'Undiscounted resident receipts (£/household)',
+                'receipts_ev': 'Undiscounted EV receipts (£)',
+                'receipts_exports': 'Undiscounted export receipts (£)',
+            }
+        )
 
-        ev_receipts = present_stat_description(econ_data, 'annual_ev_receipts', 'EV receipts (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
+    total_benefits = present_single_scalar(
+        econ_data,
+        'present_benefits_undiscounted',
+        'Present benefits (undiscounted) (£)',
+        'Total'
+    )
 
-        export_receipts = present_stat_description(econ_data, 'annual_export_receipts', 'Export receipts (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
+    total_benefits_discounted = present_paired_scalars(
+        econ_data,
+        'present_benefits_discounted',
+        'benefits_discount_rate',
+        'Present benefits (discounted) (£)',
+        'Total',
+        fmt='{:,.2f} (@{:,.1%})'
+    )
 
-    total_benefits = present_stat_description(econ_data, 'total_benefits_undiscounted', 'Total present benefits (undiscounted) (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
-    total_benefits_discounted = present_stat_description(econ_data, 'total_benefits_discounted', 'Total present benefits (discounted) (£)', fmt='{:,.0f}', stat_list=TOTAL_DEFAULT_STATS)
+    out_table = pd.concat([
+        receipt_stats,
+        total_benefits,
+        total_benefits_discounted
+    ])
 
-    tab_body = [html.Tbody(resid_receipts + resid_perunit_receipts + ev_receipts + export_receipts + total_benefits + total_benefits_discounted)]
+    out_table.index.names = [None, None]
+    out_table.columns = ['<i class="' + get_icon(x, style_name='raw') + ' p-1 m-2"></i>' for x in out_table.columns]
 
-    return dbc.Table(tbl_head + tab_body)
+    return Purify(html = unescape_html_icons(out_table.to_html(classes='table', border=False)))
 
 def create_so_costs_results(econ_data=None, annual=True):
     if econ_data is None:
@@ -1336,7 +1369,7 @@ def create_economic_results_so_card():
                 html.Div([
                     create_so_benefits_results()
                 ],
-                id='econ-res-benefits-tbl')
+                id='res-finance-so-benefits-tbl')
             ]),
 
             html.Details([
@@ -1344,7 +1377,7 @@ def create_economic_results_so_card():
                 html.Div([
                     create_so_costs_results()
                 ],
-                id='econ-res-cost-tbl')
+                id='res-finance-so-cost-tbl')
             ]),
 
             html.Details([
@@ -1352,7 +1385,7 @@ def create_economic_results_so_card():
                 html.Div([
                     create_so_value_results()
                 ],
-                id='econ-res-value-tbl')
+                id='res-finance-so-value-tbl')
             ]),
         ])
     ])
@@ -1473,6 +1506,9 @@ def create_layout():
         dcc.Store(id='res-stor'),
         dcc.Store(id='res-cons'),
         dcc.Store(id='res-net'),
+        dcc.Store(id='res-finance-so-benefits'),
+        dcc.Store(id='res-finance-so-costs'),
+        dcc.Store(id='res-finance-so-net'),
         dcc.Store(id='res-finance-so')
     ])
     ]
@@ -1781,6 +1817,20 @@ def add_initial_callback(app):
             create_seasonal_net_results(net, not(ann_hori_toggle))
         )
 
+    @app.callback(
+        Output('res-finance-so-benefits-tbl', 'children'),
+        Input('res-finance-so-benefits', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_so_benefits_to_store(fnc, ann_hori_toggle):
+        if fnc is None:
+            return no_update
+        fnc = json.loads(fnc)
+        return (
+            create_so_benefits_results(fnc, not(ann_hori_toggle))
+        )
+
     return app
 
 def add_result_callbacks(app):
@@ -1846,6 +1896,25 @@ def add_result_callbacks(app):
         print ("making net energy results")
         net_results = post_sprake_net_results.net_results_to_interface_sprake(mdl)
         return json.dumps(net_results)
+    
+    @app.callback(
+        Output('res-finance-so-benefits', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call=True
+    )
+    def set_res_finance_benefits_so(_):
+        """
+        Create the system owner financial benefits results after a completed model run.
+        """
+        mdl = app.mdl
+        fnc = app.finance
+
+        print ("making so financial benefits results")
+        fnc_benefits_results = (
+            post_sprake_finance_benefits_results
+            .finance_benefits_results_to_interface_sprake(mdl,fnc)
+        )
+        return json.dumps(fnc_benefits_results)
 
     return app
 
