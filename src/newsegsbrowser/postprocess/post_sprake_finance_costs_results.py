@@ -14,9 +14,9 @@ def finance_costs_results_to_interface_sprake(
     """
     Extracts the financial costs results required for the Dash interface
     """
-
     # This holds our final returned data structure
     results_to_interface = {}
+
     import_costs = fnc.import_costs_undiscounted
     om_costs_gen = fnc.om_costs_generation_undiscounted
     om_costs_stor = fnc.om_costs_storage_undiscounted
@@ -40,11 +40,15 @@ def finance_costs_results_to_interface_sprake(
         )
     )
 
-    results_to_interface['undiscounted_variable_costs_summaries'] = (
+    undiscounted_variable_costs_summaries = (
         variable_costs
         .pipe(assign_year_index)
         .query('year_index >= 0')
         .pipe(basic_summary_stats.meter_annual_summary2)
+    )
+
+    results_to_interface['undiscounted_variable_costs_summaries'] = (
+        undiscounted_variable_costs_summaries
         .pipe(basic_summary_stats.meter_annual_summary2_to_interface)
     )
 
@@ -79,5 +83,18 @@ def finance_costs_results_to_interface_sprake(
     results_to_interface['present_costs_undiscounted'] = fnc.get_total_present_costs_undiscounted()
     results_to_interface['present_costs_discounted'] = fnc.get_total_present_costs_discounted()
     results_to_interface['costs_discount_rate'] = fnc.cost_discount_rate
+
+    # Results used by the summary headers
+    import_costs = (
+        fnc.import_costs_undiscounted
+        .drop(columns='costs')
+        .pipe(assign_year_index)
+        .query('year_index >= 0')
+        .pipe(basic_summary_stats.meter_annual_summary2)
+        .set_index(['variable','statistic'])
+    )
+
+    results_to_interface['smry_import_fixed_cost_peryear'] = import_costs.loc[('fixed_costs','mean'),'value']
+    results_to_interface['smry_import_variable_cost_peryear'] = import_costs.loc[('var_costs','mean'),'value']
 
     return results_to_interface

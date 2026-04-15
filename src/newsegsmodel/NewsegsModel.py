@@ -157,3 +157,14 @@ class NewsegsModel(metaclass=ABCMeta):
         market closure times). This method is provided for convenience when sychronising
         such modules
         """
+
+    @property
+    def dirty(self) -> bool:
+        """
+        Is the model aware of config changes since last run?
+        """
+        return (
+            self.generation.dirty or
+            self.grid.dirty or
+            self.consumption_storage.dirty
+        )

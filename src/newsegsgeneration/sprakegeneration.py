@@ -78,6 +78,7 @@ class SprakeGeneration(NewsegsGeneration):
     def model(self, model:NewsegsModel) -> None:
         self._model = model
         self._generator.model = model
+        self.dirty = True
     
     @property
     def name(self) -> str:
@@ -93,6 +94,7 @@ class SprakeGeneration(NewsegsGeneration):
 
     def run(self, timespan:TimeSpan) -> SprakeGenerationResult:
         energy = self._generator.run(timespan)
+        self.dirty = False
         return SprakeGenerationResult(timespan, energy[0,:], energy[1,:])
 
     @classmethod

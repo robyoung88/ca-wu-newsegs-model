@@ -71,6 +71,7 @@ class SprakeGrid(NewsegsGrid):
     @model.setter
     def model(self, model:NewsegsModel) -> None:
         self._model = model
+        self.dirty = True
 
     @property
     def name(self) -> str:
@@ -87,6 +88,7 @@ class SprakeGrid(NewsegsGrid):
     @import_rate.setter
     def import_rate(self, rate:float):
         self._import_rate = rate
+        self.dirty = True
 
     @property
     def export_rate(self) -> float:
@@ -95,6 +97,7 @@ class SprakeGrid(NewsegsGrid):
     @export_rate.setter
     def export_rate(self, rate:float):
         self._export_rate = rate
+        self.dirty = True
 
     def run(self, timespan:TimeSpan):
         if not isinstance(timespan, RegTimeSpan):
@@ -104,6 +107,8 @@ class SprakeGrid(NewsegsGrid):
             timespan.timestep = self.model.get_default_timestep()
         
         model_length = timespan.n_node
+
+        self.dirty = False
         return SprakeGridResult(timespan,
                                 self.import_rate * np.ones(model_length),
                                 self.export_rate * np.ones(model_length))

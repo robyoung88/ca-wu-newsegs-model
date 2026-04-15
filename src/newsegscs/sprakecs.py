@@ -214,6 +214,7 @@ class SprakeCS(NewsegsCS):
     @model.setter
     def model(self, model:NewsegsModel) -> None:
         self._model = model
+        self.dirty = True
 
     @property
     def name(self) -> str:
@@ -234,6 +235,7 @@ class SprakeCS(NewsegsCS):
         self._ev_params['n_evs'] = n_unit * self._ev_per_unit
         self._dhw_params['n_households'] = n_units
         self._spaceheat_params['n_households'] = n_units
+        self.dirty = True
     
     @property
     def appliance_params(self) -> dict:
@@ -242,6 +244,7 @@ class SprakeCS(NewsegsCS):
     # Keep property as read-only, use explicit setter as dict is mutable anyway
     def set_appliance_params(self, params:dict) -> None:
         self._appliance_params = params
+        self.dirty = True
 
     @property
     def ev_params(self) -> dict:
@@ -249,6 +252,7 @@ class SprakeCS(NewsegsCS):
 
     def set_ev_params(self, params:dict) -> None:
         self._ev_params = params
+        self.dirty = True
 
     @property
     def dhw_params(self) -> dict:
@@ -256,6 +260,7 @@ class SprakeCS(NewsegsCS):
 
     def set_dhw_params(self, params:dict) -> None:
         self._dhw_params = params
+        self.dirty = True
 
     @property
     def spaceheat_params(self) -> dict:
@@ -263,6 +268,7 @@ class SprakeCS(NewsegsCS):
 
     def set_spaceheat_params(self, params:dict) -> None:
         self._spaceheat_params = params
+        self.dirty = True
 
     @property
     def storage_params(self) -> dict:
@@ -270,6 +276,7 @@ class SprakeCS(NewsegsCS):
     
     def set_storage_params(self, params:dict) -> None:
         self._storage_params = params
+        self.dirty = True
 
     def run(self, timespan:TimeSpan) -> SprakeCSResult:
         if not isinstance(timespan, RegTimeSpan):
@@ -371,6 +378,8 @@ class SprakeCS(NewsegsCS):
             grid_export = grid_exp,
             storage_soc = stor_arr
         )
+
+        self.dirty = False
 
         return res
 

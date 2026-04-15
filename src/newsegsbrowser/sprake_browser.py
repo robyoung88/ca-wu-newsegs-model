@@ -1,4 +1,5 @@
 # A Dash Leaflet map browser for manipulating the Sprake Model
+import os
 import json
 import uuid
 import datetime
@@ -23,7 +24,15 @@ from src.newsegsbrowser.postprocess import post_sprake_consumption_results, post
 from src.newsegsbrowser.postprocess import post_sprake_finance_benefits_results, post_sprake_finance_costs_results
 from src.newsegsbrowser.postprocess import post_sprake_finance_value_results
 
+from src.newsegsbrowser import ROOTDIR
 #from config import settings
+
+_CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
+
+with open(_CONST_FILE, 'r') as f:
+    MODEL_CONSTANTS = json.load(f)
+
+print(MODEL_CONSTANTS)
 
 def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
     """
@@ -1011,11 +1020,11 @@ def create_direct_consumption_input_card():
                 get_icon('consumption-direct-appliance'),
                 " = ",
                 html.Span("0.0", id="cons-smry-app"),
-                " kWh/yr; ",
+                " kWh/yr/household; ",
                 get_icon('consumption-direct-ev'),
                 " = ",
                 html.Span("0.0", id="cons-smry-ev"),
-                " kWh/yr"
+                " kWh/yr/household"
             ],
             className='card-subtitle'),
 
@@ -1176,7 +1185,7 @@ def create_import_cost_input_card():
                 html.Span("0", id="cost-import-smry-fixed"),
                 "/yr; Ongoing costs = £",
                 html.Span("0", id="cost-import-smry-ongoing"),
-                "/kWh"
+                "/yr"
             ],
             className='card-subtitle'),
 
@@ -1274,11 +1283,11 @@ def create_generation_results_card():
                 'Annual generation: ',
                 get_icon('gen-wind'),
                 " = ",
-                html.Span("0.0", id='gen-ressmry-wind-prod'),
+                html.Span("0.0"),
                 " kWh; ",
                 get_icon('gen-pv'),
                 " = ",
-                html.Span("0.0", id='gen-ressmry-solar-prod'),
+                html.Span("0.0"),
                 " kWh"
             ],
             id='gen-ressmry-container',
@@ -1320,12 +1329,13 @@ def create_storage_results_card():
 
             html.H4([
                 'Hours full = ',
-                html.Span("0", id='stor-ressmry-hours-full'),
+                html.Span("0"),
                 "; Hours empty = ",
-                html.Span("0", id='stor-ressmry-hours-empty'),
+                html.Span("0"),
                 "; Charge cycles = ",
-                html.Span("0", id='stor-ressmry-charge-cycles')
+                html.Span("0")
             ],
+            id='stor-ressmry-container',
             className='card-subtitle'),
 
             html.Details([
@@ -1351,13 +1361,14 @@ def create_consumption_results_card():
                 'Annual consumption: ',
                 get_icon('consumption-building'),
                 ' = ',
-                html.Span('0.0', id='cons-ressmry-resident'),
+                html.Span('0.0'),
                 ' kWh; ',
                 get_icon('consumption-direct-ev'),
                 ' = ',
-                html.Span('0.0', id='cons-ressmry-ev'),
+                html.Span('0.0'),
                 ' kWh'                
             ],
+            id='cons-ressmry-container',
             className='card-subtitle'),
 
             html.Details([
@@ -1389,13 +1400,14 @@ def create_net_results_card():
 
             html.H4([
                 'Annual export = ',
-                html.Span('0.0', id = 'net-ressmry-export'),
+                html.Span('0.0'),
                 ' kWh; Annual import = ',
-                html.Span('0.0', id = 'net-ressmry-import'),
+                html.Span('0.0'),
                 ' kWh; Storage losses = ',
-                html.Span('0.0', id = 'net-ressmry-storloss'),
+                html.Span('0.0'),
                 ' kWh'
             ],
+            id='net-ressmry-container',
             className='card-subtitle'),
 
             html.Details([
@@ -1427,16 +1439,17 @@ def create_economic_results_so_card():
 
             html.H4([
                 'Total benefits (',
-                html.Span('0%', id='econ-ressmry-dr-benefits'),
+                html.Span('0%'),
                 ') = ',
-                html.Span('£0.00', id='econ-ressmry-npbenefits'),
+                html.Span('£0.00'),
                 '; Total costs (',
-                html.Span('0%', id='econ-ressmry-dr-costs'),
+                html.Span('0%'),
                 ') = ',
-                html.Span('£0.00', id='econ-ressmry-npcosts'),
+                html.Span('£0.00'),
                 '; NPV = ',
-                html.Span('£0.00', id='econ-ressmry-npv'),
+                html.Span('£0.00'),
             ],
+            id='finance-ressmry-container',
             className='card-subtitle'),
 
             html.Details([
@@ -1732,18 +1745,28 @@ def add_initial_callback(app):
         Output('dc-app-efficiency-reduction-input', 'value'),
         Output('ev-ann-charge-input', 'value'),
         Output('ev-per-unit-input', 'value'),
+        Output('cons-smry-app','children'),
+        Output('cons-smry-ev','children'),
         Input('model-config', 'data'),
         prevent_initial_call=True
     )
     def sync_dc_inputs_to_store(mcfg):
         if mcfg is None:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update, no_update
         mcfg = json.loads(mcfg)
         dc_input = mcfg.get('dc_input', {})
+        ann_appliance = (
+            (1.0 - float(dc_input.get('efficiency_reduction', 0))) * MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
+        )
+        ann_ev = (
+            dc_input.get('n_evs_per_household', 0) * dc_input.get('annual_residential_consumption_per_ev', 0)
+        )
         return (
             dc_input.get('efficiency_reduction', 0),
             dc_input.get('annual_residential_consumption_per_ev', 0),
-            dc_input.get('n_evs_per_household', 0)
+            dc_input.get('n_evs_per_household', 0),
+            '{:,.0f}'.format(ann_appliance),
+            '{:,.0f}'.format(ann_ev)
         )
 
     @app.callback(
@@ -1751,35 +1774,62 @@ def add_initial_callback(app):
         Output('cost-gen-wind-recurrent-input', 'value'),
         Output('cost-gen-pv-capex-input', 'value'),
         Output('cost-gen-pv-recurrent-input', 'value'),
+        Output('cost-gen-smry-capex', 'children'),
+        Output('cost-gen-smry-ongoing', 'children'),
+        Input('model-config', 'data'),
         Input('finance-config', 'data'),
         prevent_initial_call=True
     )
-    def sync_cost_gen_inputs_to_store(fcfg):
-        if fcfg is None:
-            return no_update, no_update, no_update, no_update
+    def sync_cost_gen_inputs_to_store(mcfg, fcfg):
+        if fcfg is None or mcfg is None:
+            return no_update, no_update, no_update, no_update, no_update, no_update
+        mcfg = json.loads(mcfg)
         fcfg = json.loads(fcfg)
+        gen_input = mcfg.get('gen_input', {})
         uc = fcfg.get('unit_costs', {})
+        wind_cap = gen_input.get('wind_capacity', 0.0)
+        pv_cap = gen_input.get('pv_capacity', 0.0)
+        tot_capex = (
+            uc.get('wind_capex_per_kw', 0) * wind_cap
+            + uc.get('pv_capex_per_kw', 0) * pv_cap
+        )
+        tot_ongoing = (
+            uc.get('wind_om_per_kw_year', 0) * wind_cap
+            + uc.get('pv_om_per_kw_year', 0) * pv_cap
+        )
         return (
             uc.get('wind_capex_per_kw', 0),
             uc.get('wind_om_per_kw_year', 0),
             uc.get('pv_capex_per_kw', 0),
-            uc.get('pv_om_per_kw_year', 0)
+            uc.get('pv_om_per_kw_year', 0),
+            '{:,.0f}'.format(tot_capex),
+            '{:,.0f}'.format(tot_ongoing)
         )
 
     @app.callback(
         Output('cost-stor-bess-capex-input', 'value'),
         Output('cost-stor-bess-recurrent-input', 'value'),
+        Output('cost-stor-smry-capex', 'children'),
+        Output('cost-stor-smry-ongoing', 'children'),
+        Input('model-config', 'data'),
         Input('finance-config', 'data'),
         prevent_initial_call=True
     )
-    def sync_cost_stor_inputs_to_store(fcfg):
-        if fcfg is None:
-            return no_update, no_update
+    def sync_cost_stor_inputs_to_store(mcfg, fcfg):
+        if fcfg is None or mcfg is None:
+            return no_update, no_update, no_update, no_update
+        mcfg = json.loads(mcfg)
         fcfg = json.loads(fcfg)
+        stor_input = mcfg.get('stor_input', {})
         uc = fcfg.get('unit_costs', {})
+        bess_cap = stor_input.get('storage_capacity', 0.0)
+        tot_capex = bess_cap * uc.get('bess_capex_per_kwh', 0)
+        tot_ongoing = bess_cap * uc.get('bess_om_per_kwh_year', 0)
         return (
             uc.get('bess_capex_per_kwh', 0),
-            uc.get('bess_om_per_kwh_year', 0)
+            uc.get('bess_om_per_kwh_year', 0),
+            '{:,.0f}'.format(tot_capex),
+            '{:,.0f}'.format(tot_ongoing)
         )
 
     @app.callback(
@@ -1893,29 +1943,40 @@ def add_initial_callback(app):
 
     @app.callback(
         Output('res-finance-so-benefits-tbl', 'children'),
+        Output('cost-sales-smry-residents', 'children'),
+        Output('cost-sales-smry-export', 'children'),
         Input('res-finance-so-benefits', 'data'),
         Input('annual-horizon-toggle', 'value'),
         prevent_initial_call=True
     )
     def sync_fnc_so_benefits_to_store(fnc, ann_hori_toggle):
         if fnc is None:
-            return no_update
+            return no_update, no_update, no_update
         fnc = json.loads(fnc)
+        bnfts = create_so_benefits_results(fnc, not(ann_hori_toggle))
         return (
-            create_so_benefits_results(fnc, not(ann_hori_toggle))
+            bnfts,
+            '{:,.0f}'.format(fnc.get('smry_residential_peryear')),
+            '{:,.0f}'.format(fnc.get('smry_exports_peryear')),
         )
     
     @app.callback(
         Output('res-finance-so-costs-tbl', 'children'),
+        Output('cost-import-smry-fixed', 'children'),
+        Output('cost-import-smry-ongoing', 'children'),
         Input('res-finance-so-costs', 'data'),
         Input('annual-horizon-toggle', 'value'),
         prevent_initial_call=True
     )
     def sync_fnc_so_costs_to_store(fnc, ann_hori_toggle):
         if fnc is None:
-            return no_update
+            return no_update, no_update, no_update
         fnc = json.loads(fnc)
-        return create_so_costs_results(fnc, not(ann_hori_toggle))
+        return (
+            create_so_costs_results(fnc, not(ann_hori_toggle)),
+            '{:,.0f}'.format(fnc.get('smry_import_fixed_cost_peryear')),
+            '{:,.0f}'.format(fnc.get('smry_import_variable_cost_peryear'))
+        )
 
     @app.callback(
         Output('res-finance-so-value-tbl', 'children'),
@@ -2054,12 +2115,188 @@ def add_result_callbacks(app):
 
     return app
 
+def add_result_header_callbacks(app):
+    
+    @app.callback(
+        Output('gen-ressmry-container', 'children'),
+        Input('res-gen', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def update_generation_results_header(res, ann_hori_toggle):
+        if res is None:
+            return no_update
+        res = json.loads(res)
+        gm = res.get('generator_meter_summary')
+        if ann_hori_toggle:
+            str_1 = 'Total generation: '
+            wind_ann = gm.get('wind_export').get('sum')
+            pv_ann = gm.get('solar_export').get('sum')
+        else:
+            str_1 = 'Annual generation: '
+            wind_ann = gm.get('wind_export').get('mean')
+            pv_ann = gm.get('solar_export').get('mean')
+        return [
+            str_1,
+            get_icon('gen-wind'),
+            " = ",
+            html.Span(f'{wind_ann:,.1f}'),
+            " kWh; ",
+            get_icon('gen-pv'),
+            " = ",
+            html.Span(f'{pv_ann:,.1f}'),
+            " kWh"
+        ]
+
+    @app.callback(
+        Output('stor-ressmry-container', 'children'),
+        Input('res-stor', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def update_storage_results_header(res, ann_hori_toggle):
+        if res is None:
+            return no_update
+        res = json.loads(res)
+        hrs_full = res.get('stor_hours_at_max').get('hrs_at_max_soc')
+        hrs_empty = res.get('stor_hours_at_min').get('hrs_at_min_soc')
+        cc = res.get('no_charge_cycles').get('charge_cycles')
+        
+        if ann_hori_toggle:
+            stat='sum'
+        else:
+            stat='mean'
+        
+        hrs_full = hrs_full.get(stat)
+        hrs_empty = hrs_empty.get(stat)
+        cc = cc.get(stat)
+
+        return [
+            'Hours full = ',
+            html.Span(f'{hrs_full:,.0f}'),
+            "; Hours empty = ",
+            html.Span(f'{hrs_empty:,.0f}'),
+            "; Charge cycles = ",
+            html.Span(f'{cc:,.0f}')
+        ]
+
+    @app.callback(
+        Output('cons-ressmry-container', 'children'),
+        Input('res-cons', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def update_consumption_results_header(res, ann_hori_toggle):
+        if res is None:
+            return no_update
+        res = json.loads(res)
+        if ann_hori_toggle:
+            str_1 = 'Total consumption: '
+            stat='sum'
+        else:
+            str_1 = 'Annual consumption: '
+            stat='mean'
+        residential_cons = res.get('consumption_meter_summaries').get('residential').get(stat)
+        ev_cons = res.get('consumption_meter_summaries').get('evcharge_import').get(stat)
+
+        return [
+            str_1,
+            get_icon('consumption-building'),
+            ' = ',
+            html.Span(f'{residential_cons:,.1f}'),
+            ' kWh; ',
+            get_icon('consumption-direct-ev'),
+            ' = ',
+            html.Span(f'{ev_cons:,.1f}'),
+            ' kWh'                
+        ]
+
+    @app.callback(
+        Output('net-ressmry-container', 'children'),
+        Input('res-net', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        prevent_initial_call=True
+    )
+    def update_net_results_header(res, ann_hori_toggle):
+        if res is None:
+            return no_update
+        res = json.loads(res)
+        if ann_hori_toggle:
+            str_1 = 'Total export = '
+            str_2 = 'Total import = '
+            stat = 'sum'
+        else:
+            str_1 = 'Annual export = '
+            str_2 = 'Annual import = '
+            stat = 'mean'
+        
+        ms = (
+            pd.DataFrame
+            .from_dict(res['meter_summaries'], orient='columns')
+            .set_index(['variable', 'statistic'])
+        )
+        energy_export = ms.loc[('grid_export',stat),'value']
+        energy_import = ms.loc[('grid_import',stat),'value']
+        storage_loss = ms.loc[('storage_loss',stat),'value']
+
+        return [
+            str_1,
+            html.Span(f'{energy_export:,.1f}'),
+            ' kWh; ',
+            str_2,
+            html.Span(f'{energy_import:,.1f}'),
+            ' kWh; Storage losses = ',
+            html.Span(f'{storage_loss:,.1f}'),
+            ' kWh'
+        ]
+
+    @app.callback(
+        Output('finance-ressmry-container', 'children'),
+        Input('res-finance-so-benefits', 'data'),
+        Input('res-finance-so-costs', 'data'),
+        Input('res-finance-so-value', 'data'),
+        prevent_initial_call=True
+    )
+    def update_finance_results_header(res_benefits, res_costs, res_value):
+        if (res_benefits is None) or (res_costs is None) or (res_value is None):
+            return no_update
+        res_benefits = json.loads(res_benefits)
+        res_costs = json.loads(res_costs)
+        res_value = json.loads(res_value)
+
+        dr_benefits = res_benefits.get('benefits_discount_rate')
+        prval_benefits = res_benefits.get('present_benefits_discounted')
+        dr_costs = res_costs.get('costs_discount_rate')
+        prval_costs = res_costs.get('present_costs_discounted')
+        value = (
+            pd.DataFrame
+            .from_dict(res_value.get('value_summaries'), orient='columns')
+            .set_index(['variable', 'statistic'])
+        )
+        npv = value.loc[('net_present_value_discounted','sum'),'value']
+
+        return [
+            'Total benefits (',
+            html.Span(f'{dr_benefits:,.1%}'),
+            ') = ',
+            html.Span(f'£{prval_benefits:,.2f}'),
+            '; Total costs (',
+            html.Span(f'{dr_costs:,.1%}'),
+            ') = ',
+            html.Span(f'£{prval_costs:,.2f}'),
+            '; NPV = ',
+            html.Span(f'£{npv:,.2f}'),
+        ]
+
+    return app
+
 def add_model_callbacks(app):
     """
     Add callbacks to Dash App to allow for interfacing with a Sprake model
     """
     app = add_initial_callback(app)
     app = add_result_callbacks(app)
+    app = add_result_header_callbacks(app)
 
     return app
 

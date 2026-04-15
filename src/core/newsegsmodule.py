@@ -72,6 +72,9 @@ class NewsegsModule(metaclass=ABCMeta):
     """
     Basic abstract class serving module results
     """
+
+    _dirty_flag = True
+
     @abstractmethod
     def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
         ...
@@ -102,3 +105,14 @@ class NewsegsModule(metaclass=ABCMeta):
     #    Update configuration using a dictionary
     #    """
     #    ...
+
+    @property
+    def dirty(self) -> bool:
+        """
+        Has the model configuration changed since last run?
+        """
+        return self._dirty_flag
+
+    @dirty.setter
+    def dirty(self, val:bool) -> None:
+        self._dirty_flag = val
