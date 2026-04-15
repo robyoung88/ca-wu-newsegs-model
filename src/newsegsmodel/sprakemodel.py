@@ -110,9 +110,12 @@ class SprakeModel(NewsegsModel):
         self._grid_result = None
         self._cs_result = None
 
+        self._dirty_flag = True
+
     def set_run_period(self, timespan:TimeSpan) -> None:
         self._run_period = RegTimeSpan(timespan)
         self._run_period.timestep = self._default_timestep
+        self._dirty_flag = True
 
     def get_run_period(self) -> TimeSpan:
         return self._run_period
@@ -179,3 +182,5 @@ class SprakeModel(NewsegsModel):
         self._generation_result = self._mod_gen.run(self._run_period)
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)
+        self._dirty_flag = False
+    

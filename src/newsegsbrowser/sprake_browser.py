@@ -1,10 +1,12 @@
 # A Dash Leaflet map browser for manipulating the Sprake Model
 import os
+import copy
 import json
 import uuid
 import datetime
 from collections.abc import Mapping
 from functools import partial
+from typing import Tuple
 #from typing import Literal
 
 from dash import Dash, html, Input, Output, dcc, State, ALL, no_update
@@ -1602,6 +1604,97 @@ def create_layout():
 
     return dbc.Container(mapview, fluid=False)
 
+def sprake_model_set_gen_input(gen_input:dict, mdl:SprakeModel):
+    mdl.generation.generator.generators[0].nameplate_capacity = gen_input.get('wind_capacity', 0.0)
+    mdl.generation.generator.generators[1].nameplate_capacity = gen_input.get('pv_capacity', 0.0)
+    mdl.generation.dirty = True
+
+def sprake_model_set_stor_input(stor_input:dict, mdl:SprakeModel):
+    mdl.consumption_storage.set_storage_params(stor_input.copy())
+    # consumption storage will be dirtied by this method
+
+def sprake_model_set_bc_input(bc_input:dict, mdl:SprakeModel):
+    cs = mdl.consumption_storage
+    spaceheat_p = cs.spaceheat_params
+    dhw_p = cs.dhw_params
+
+    cs.n_units = bc_input.get('n_units', 1.0)
+    spaceheat_p['hlp'] = bc_input.get('hlp', 1.1)
+    spaceheat_p['gfa'] = bc_input.get('gfa', 1.0)
+    dhw_p['ref_daily_consumption'] = bc_input.get('ref_daily_consumption', 0.0)
+    dhw_p['seasonal_variance'] = bc_input.get('seasonal_variance', 0.01)
+    cs.dirty = True
+
+def sprake_model_set_dc_input(dc_input:dict, mdl:SprakeModel):
+    cs = mdl.consumption_storage
+    app_p = cs.appliance_params
+    ev_p = cs.ev_params
+
+    app_p['efficiency_reduction'] = dc_input.get('efficiency_reduction', 0.0)
+    ev_p['annual_residential_consumption_per_ev'] = dc_input.get('annual_residential_consumption_per_ev', 0.0)
+    ev_p['n_evs'] = dc_input.get('n_evs_per_household', 0.0) * cs.n_units
+    cs.dirty = True
+
+def sprake_model_set_mc_input(mc_input:dict, mdl:SprakeModel):
+    ts = mdl.get_run_period()
+    ts.end = ts.start + pd.Timedelta(mc_input.get('horizon',1)*365, unit='d') 
+    while ts.end.day != ts.start.day:
+        ts.end = ts.end + pd.Timedelta(1, unit='d')
+    mdl.set_run_period(ts)
+
+def sprake_model_to_interface_configs(mdl) -> Tuple(dict, dict):
+    gen_input = {
+        'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
+        'pv_capacity': mdl.generation.generator.generators[1].nameplate_capacity
+    }
+
+    cs = mdl.consumption_storage
+
+    stor_input = cs.storage_params
+
+    spaceheat_p = cs.spaceheat_params
+    dhw_p = cs.dhw_params
+    app_p = cs.appliance_params
+    ev_p = cs.ev_params
+
+    bc_input = {
+        'n_units': cs.n_units,
+        'hlp': spaceheat_p.get('hlp'),
+        'gfa': spaceheat_p.get('gfa'),
+        'ref_daily_consumption': dhw_p.get('ref_daily_consumption'),
+        'seasonal_variance': dhw_p.get('seasonal_variance')
+    }
+
+    dc_input = {
+        'efficiency_reduction': app_p.get('efficiency_reduction'),
+        'annual_residential_consumption_per_ev': \
+            ev_p.get('annual_residential_consumption_per_ev'),
+        'n_evs_per_household': ev_p.get('n_evs') / cs.n_units
+    }
+
+    # Model config
+
+    # Note that we are only going to allow horizons in multiples
+    # of one year. I may allow the start date to vary later.
+    # As such, we are just going to take the horizon to be the
+    # difference in year between the start and end of the timespan
+    ts = mdl.get_run_period()
+    mc_input = {
+        'horizon': ts.end.year - ts.start.year
+    }
+
+    mcfg = {
+        'gen_input': gen_input,
+        'stor_input': stor_input,
+        'bc_input': bc_input,
+        'dc_input': dc_input,
+        'mc_input': mc_input
+    }
+
+    fcfg = app.finance.to_dict()
+
+    return mcfg, fcfg
+
 def add_initial_callback(app):
     """
     Functions to synchronise app interface with the served model
@@ -1631,55 +1724,9 @@ def add_initial_callback(app):
     def sync_config(_):
         mdl = app.mdl
 
-        gen_input = {
-            'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
-            'pv_capacity': mdl.generation.generator.generators[1].nameplate_capacity
-        }
+        mcfg, fcfg = sprake_model_to_interface_configs(mdl)
 
-        cs = mdl.consumption_storage
-
-        stor_input = cs.storage_params
-
-        spaceheat_p = cs.spaceheat_params
-        dhw_p = cs.dhw_params
-        app_p = cs.appliance_params
-        ev_p = cs.ev_params
-
-        bc_input = {
-            'n_units': cs.n_units,
-            'hlp': spaceheat_p.get('hlp'),
-            'gfa': spaceheat_p.get('gfa'),
-            'ref_daily_consumption': dhw_p.get('ref_daily_consumption'),
-            'seasonal_variance': dhw_p.get('seasonal_variance')
-        }
-
-        dc_input = {
-            'efficiency_reduction': app_p.get('efficiency_reduction'),
-            'annual_residential_consumption_per_ev': \
-                ev_p.get('annual_residential_consumption_per_ev'),
-            'n_evs_per_household': ev_p.get('n_evs') / cs.n_units
-        }
-
-        # Model config
-
-        # Note that we are only going to allow horizons in multiples
-        # of one year. I may allow the start date to vary later.
-        # As such, we are just going to take the horizon to be the
-        # difference in year between the start and end of the timespan
-        ts = mdl.get_run_period()
-        mc_input = {
-            'horizon': ts.end.year - ts.start.year
-        }
-
-        odict = {'gen_input': gen_input,
-                 'stor_input': stor_input,
-                 'bc_input': bc_input,
-                 'dc_input': dc_input,
-                 'mc_input': mc_input}
-
-        fnc = app.finance
-
-        return json.dumps(odict), json.dumps(fnc.to_dict())
+        return json.dumps(mcfg), json.dumps(fcfg)
 
     @app.callback(
         Output('gen-smry-wind-cap', 'children'),
@@ -2290,6 +2337,339 @@ def add_result_header_callbacks(app):
 
     return app
 
+def add_input_callbacks(app):
+    """
+    Functions to synchronise configurations with inputs.
+    """
+    @app.callback(
+        Output('model-config', 'data', allow_duplicate=True),
+        Input('wind-capacity-input', 'value'),
+        Input('pv-capacity-input', 'value'),
+        State('model-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_gen_config(wind_cap, pv_cap, mcfg):
+        if mcfg is None:
+            mcfg = {
+                'gen_input': {}
+            }
+        else:
+            mcfg = json.loads(mcfg)
+
+        gen_input = copy.copy(mcfg.get('gen_input', {}))
+
+        if not wind_cap is None:
+            gen_input['wind_capacity'] = float(wind_cap)
+        if not pv_cap is None:
+            gen_input['pv_capacity'] = float(pv_cap)
+
+        if (gen_input == mcfg['gen_input']):
+            return no_update
+        
+        mcfg['gen_input'] = gen_input
+
+        return json.dumps(mcfg)
+    
+    @app.callback(
+        Output('model-config', 'data', allow_duplicate=True),
+        Input('stor-capacity-input', 'value'),
+        State('model-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_stor_config(stor_cap, mcfg):
+        if mcfg is None:
+            mcfg = {
+                'stor_input': {}
+            }
+        else:
+            mcfg = json.loads(mcfg)
+
+        stor_input = copy.copy(mcfg.get('stor_input', {}))
+
+        if not stor_cap is None:
+            stor_input['storage_capacity'] = float(stor_cap)
+        
+        if stor_input == mcfg.get('stor_input', {}):
+            return no_update
+        
+        mcfg['stor_input'] = stor_input
+        return json.dumps(mcfg)
+
+    @app.callback(
+        Output('model-config', 'data', allow_duplicate=True),
+        Input('bc-n-unit-input', 'value'),
+        Input('bc-hlp-input', 'value'),
+        Input('bc-gfa-input', 'value'),
+        Input('bc-dhw-ref-daily-cons-input', 'value'),
+        Input('bc-dhw-seasonal-variance-input', 'value'),
+        State('model-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_bc_config(
+        bc_n_unit,
+        bc_hlp,
+        bc_gfa,
+        bc_dhw_ref_daily_cons,
+        bc_dhw_seasonal_variance,
+        mcfg
+    ):
+        if mcfg is None:
+            mcfg = {
+                'bc_input': {}
+            }
+        else:
+            mcfg = json.loads(mcfg)
+        
+        bc_input = copy.copy(mcfg.get('bc_input', {}))
+
+        if not bc_n_unit is None:
+            bc_input['n_units'] = float(bc_n_unit)
+        if not bc_hlp is None:
+            bc_input['hlp'] = float(bc_hlp)
+        if not bc_gfa is None:
+            bc_input['gfa'] = float(bc_gfa)
+        if not bc_dhw_ref_daily_cons is None:
+            bc_input['ref_daily_consumption'] = bc_dhw_ref_daily_cons
+        if not bc_dhw_seasonal_variance is None:
+            bc_input['seasonal_variance'] = bc_dhw_seasonal_variance
+        
+        if bc_input == mcfg.get('bc_input', {}):
+            return no_update
+        
+        mcfg['bc_input'] = bc_input
+        return json.dumps(mcfg)
+
+    @app.callback(
+        Output('model-config', 'data', allow_duplicate=True),
+        Input('dc-app-efficiency-reduction-input', 'value'),
+        Input('ev-ann-charge-input', 'value'),
+        Input('ev-per-unit-input', 'value'),
+        State('model-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_dc_config(
+        dc_app_efficiency_reduction,
+        ev_ann_charge,
+        ev_per_unit,
+        mcfg
+    ):
+        if mcfg is None:
+            mcfg = {
+                'bc_input': {}
+            }
+        else:
+            mcfg = json.loads(mcfg)
+        
+        dc_input = copy.copy(mcfg.get('dc_input', {}))
+
+        if not dc_app_efficiency_reduction is None:
+            dc_input['efficiency_reduction'] = float(dc_app_efficiency_reduction)
+        if not ev_ann_charge is None:
+            dc_input['annual_residential_consumption_per_ev'] = float(ev_ann_charge)
+        if not ev_per_unit is None:
+            dc_input['n_evs_per_household'] = float(ev_per_unit)
+        
+        if dc_input == mcfg.get('dc_input', {}):
+            return no_update
+        
+        mcfg['dc_input'] = dc_input
+        return json.dumps(mcfg)
+
+    @app.callback(
+        Output('finance-config', 'data', allow_duplicate=True),
+        Input('cost-gen-wind-capex-input', 'value'),
+        Input('cost-gen-wind-recurrent-input', 'value'),
+        Input('cost-gen-pv-capex-input', 'value'),
+        Input('cost-gen-pv-recurrent-input', 'value'),
+        State('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_gen_costs(
+        gen_wind_capex,
+        gen_wind_recurrent,
+        gen_pv_capex,
+        gen_pv_recurrent,
+        fcfg
+    ):
+        if fcfg is None:
+            fcfg = {
+                'unit_costs': {}
+            }
+        else:
+            fcfg = json.loads(fcfg)
+        
+        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
+
+        if not gen_wind_capex is None:
+            unit_costs['wind_capex_per_kw'] = float(gen_wind_capex)
+        if not gen_wind_recurrent is None:
+            unit_costs['wind_om_per_kw_year'] = float(gen_wind_recurrent)
+        if not gen_pv_capex is None:
+            unit_costs['pv_capex_per_kw'] = float(gen_pv_capex)
+        if not gen_pv_recurrent is None:
+            unit_costs['pv_om_per_kw_year'] = float(gen_pv_recurrent)
+        
+        if unit_costs == fcfg.get('unit_costs', {}):
+            return no_update
+        
+        fcfg['unit_costs'] = unit_costs
+        return json.dumps(fcfg)
+
+    @app.callback(
+        Output('finance-config', 'data', allow_duplicate=True),
+        Input('cost-stor-bess-capex-input', 'value'),
+        Input('cost-stor-bess-recurrent-input', 'value'),
+        State('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_stor_costs(
+        stor_capex,
+        stor_recurrent,
+        fcfg
+    ):
+        if fcfg is None:
+            fcfg = {
+                'unit_costs': {}
+            }
+        else:
+            fcfg = json.loads(fcfg)
+
+        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
+
+        if not stor_capex is None:
+            unit_costs['bess_capex_per_kwh'] = float(stor_capex)
+        if not stor_recurrent is None:
+            unit_costs['bess_om_per_kwh_year'] = float(stor_recurrent)
+        
+        if unit_costs == fcfg.get('unit_costs', {}):
+            return no_update
+        
+        fcfg['unit_costs'] = unit_costs
+        return json.dumps(fcfg)
+
+    @app.callback(
+        Output('finance-config', 'data', allow_duplicate=True),
+        Input('cost-resident-sc-input', 'value'),
+        Input('cost-resident-var-input', 'value'),
+        Input('cost-export-var-input', 'value'),
+        State('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_sales_costs(
+        resident_sc,
+        resident_var,
+        export_var,
+        fcfg
+    ):
+        if fcfg is None:
+            fcfg = {
+                'unit_costs': {}
+            }
+        else:
+            fcfg = json.loads(fcfg)
+
+        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
+
+        if not resident_sc is None:
+            unit_costs['resident_sc_per_unit_day'] = float(resident_sc)
+        if not resident_var is None:
+            unit_costs['resident_var_per_unit'] = float(resident_var)
+        if not export_var is None:
+            unit_costs['grid_export_var_per_unit'] = float(export_var)
+        
+        if unit_costs == fcfg.get('unit_costs', {}):
+            return no_update
+        
+        fcfg['unit_costs'] = unit_costs
+        return json.dumps(fcfg)
+
+    @app.callback(
+        Output('finance-config', 'data', allow_duplicate=True),
+        Input('cost-import-sc-input', 'value'),
+        Input('cost-import-var-input', 'value'),
+        State('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_import_costs(
+        import_sc,
+        import_var,
+        fcfg
+    ):
+        if fcfg is None:
+            fcfg = {
+                'unit_costs': {}
+            }
+        else:
+            fcfg = json.loads(fcfg)
+
+        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
+
+        if not import_sc is None:
+            unit_costs['grid_import_sc_per_day'] = float(import_sc)
+        if not import_var is None:
+            unit_costs['grid_import_var_per_unit'] = float(import_var)
+        
+        if unit_costs == fcfg.get('unit_costs', {}):
+            return no_update
+        
+        fcfg['unit_costs'] = unit_costs
+        return json.dumps(fcfg)
+
+    @app.callback(
+        Output('model-config', 'data', allow_duplicate=True),
+        Input('mdl-timehorizon-input', 'value'),
+        State('model-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_model_settings(
+        timehorizon,
+        mcfg
+    ):
+        if mcfg is None:
+            mcfg = {
+                'mc_input': {}
+            }
+        else:
+            mcfg = json.loads(mcfg)
+        
+        mc_input = copy.copy(mcfg.get('mc_input', {}))
+
+        if not timehorizon is None:
+            mc_input['horizon'] = int(timehorizon)
+        
+        if mc_input == mcfg.get('mc_input', {}):
+            return no_update
+        
+        mcfg['mc_input'] = mc_input
+        return json.dumps(mcfg)
+
+    def sync_configs_to_model(mcfg, fcfg) -> Tuple[bool, bool]:
+        """
+        Pass the configuration dictionaries into the Sprake model
+        """
+        mdl = app.mdl
+        fnc = app.finance
+
+        # Get the existing configs to check against
+        w_mcfg, w_fcfg = sprake_model_to_interface_configs(mdl)
+
+        if not w_mcfg.get('gen_input') == mcfg.get('gen_input'):
+            sprake_model_set_gen_input(mcfg.get('gen_input', {}), mdl)
+        
+        if not w_mcfg.get('stor_input') == mcfg.get('stor_input'):
+            sprake_model_set_stor_input(mcfg.get('stor_input', {}), mdl)
+
+        if not w_mcfg.get('bc_input') == mcfg.get('bc_input'):
+            sprake_model_set_bc_input(mcfg.get('bc_input', {}), mdl)
+        
+        if not w_mcfg.get('dc_input') == mcfg.get('dc_input'):
+            sprake_model_set_dc_input(mcfg.get('dc_input', {}), mdl)
+        
+        if not w_mcfg.get('mc_input') == mcfg.get('mc_input'):
+            sprake_model_set_mc_input(mcfg.get('mc_input', {}), mdl)
+
+    return app
+
 def add_model_callbacks(app):
     """
     Add callbacks to Dash App to allow for interfacing with a Sprake model
@@ -2297,6 +2677,7 @@ def add_model_callbacks(app):
     app = add_initial_callback(app)
     app = add_result_callbacks(app)
     app = add_result_header_callbacks(app)
+    app = add_input_callbacks(app)
 
     return app
 

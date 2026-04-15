@@ -8,6 +8,8 @@ import numpy.typing as npt
 
 class NewsegsFinance(metaclass=ABCMeta):
 
+    _dirty_flag = True
+
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
     def set_model(self, mdl:NewsegsModel):
@@ -280,3 +282,14 @@ class NewsegsFinance(metaclass=ABCMeta):
         Configuration as a dictionary
         """
         ...
+
+    @property
+    def dirty(self) -> bool:
+        """
+        Has the model configuration changed since last run?
+        """
+        return self._dirty_flag
+
+    @dirty.setter
+    def dirty(self, val:bool) -> None:
+        self._dirty_flag = val

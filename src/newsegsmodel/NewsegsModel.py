@@ -36,6 +36,9 @@ class NewsegsModel(metaclass=ABCMeta):
     When restoring state from dictionary, then the configuration of the submodules should be
     passed down
     """
+
+    _dirty_flag = False
+
     @abstractmethod
     def run(self):
         """
@@ -166,5 +169,6 @@ class NewsegsModel(metaclass=ABCMeta):
         return (
             self.generation.dirty or
             self.grid.dirty or
-            self.consumption_storage.dirty
+            self.consumption_storage.dirty or
+            self._dirty_flag
         )

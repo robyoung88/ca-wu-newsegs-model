@@ -190,7 +190,7 @@ def create_numeric_card_input(icon_name,
         dbc.Input(id=input_id,
                   type='number',
                   placeholder=0.0,
-                  debounce='true',
+                  debounce=True,
                   style={
                     'display':'inline-block',
                     'float':'right',
