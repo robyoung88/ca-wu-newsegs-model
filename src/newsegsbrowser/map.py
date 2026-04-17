@@ -29,23 +29,23 @@ def create_map_layout(map_id='sitemap',
 
 def create_latlon_input():
     return [
-        html.Span(get_icon('latlon'), style={'font-size':'1.5rem'}),
-        html.Span("(", style={'margin-right': '0.2rem'}),
+        html.Span(get_icon('latlon'), style={'fontSize':'1.5rem'}),
+        html.Span("(", style={'marginRight': '0.2rem'}),
         dcc.Input(id="site-lat-input", type="text", debounce=True, placeholder="Lat", style={'width': "7rem", 'margin-right': '0.2rem'}),
         html.Span(", "),
         dcc.Input(id="site-lon-input", type="text", debounce=True, placeholder="Lon", style={'width': "7rem", 'margin-left': '0.2rem'}),
-        html.Span(")", style={'margin-left': '0.2rem'})
+        html.Span(")", style={'marginLeft': '0.2rem'})
     ]
 
 def create_osgb_feedback():
     return [
-        html.Span(get_icon('osgb'), style={'font-size':'1.3rem'}),
-        html.Span("OSGB:", style={'margin-right': '0.2rem'}),
-        html.Span("(", style={'margin-right': '0.2rem'}),
+        html.Span(get_icon('osgb'), style={'fontSize':'1.3rem'}),
+        html.Span("OSGB:", style={'marginRight': '0.2rem'}),
+        html.Span("(", style={'marginRight': '0.2rem'}),
         html.Span("easting", id="site-osgb-easting-text"),
         html.Span(", "),
         html.Span("northing", id="site-osgb-northing-text"),
-        html.Span(")", style={'margin-left': '0.2rem'})
+        html.Span(")", style={'marginLeft': '0.2rem'})
     ]
 
 def create_site_selector_map(map_id='sitemap',
@@ -193,7 +193,7 @@ def add_potential_site_change_callback(app):
                                     ],
                                     style = {
                                         "display": "table-cell",
-                                        "text-align": "center"
+                                        "textAlign": "center"
                                     }
                                 )
                              ]

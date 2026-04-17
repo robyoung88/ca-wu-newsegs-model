@@ -10,6 +10,7 @@ from typing import Tuple
 #from typing import Literal
 
 from dash import Dash, html, Input, Output, dcc, State, ALL, no_update
+from dash import clientside_callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
@@ -1244,32 +1245,44 @@ def create_results_header():
     HTML separating the results and providing controls for setting result format per annum or
     to horizon
     """
-    return dbc.Row([
-        html.H1([get_icon('results'), 'Results'],
-        style={
-            'display': 'inline-block',
-            'width':'50%',
-            'float': 'left'
-        }),
+    return html.Div(
+        [
+            html.Div(id='resize-handle'),
 
-        html.Span([
-            html.H5("Per year",style={'display': 'inline-block', 'vertical-align': 'middle'}),
-            daq.ToggleSwitch(style={'display': 'inline-block',
-                                    'vertical-align': 'middle',
-                                    'padding': "10px"},
-                             id='annual-horizon-toggle'),
-            html.H5('To horizon',style={'display': 'inline-block', 'vertical-align': 'middle'})
+            html.Div(
+                dbc.Container(
+                    dbc.Row([
+                        html.H1([get_icon('results'), 'Results'],
+                        style={
+                            'display': 'inline-block',
+                            'width':'50%',
+                            'float': 'left'
+                        }),
+
+                        html.Span([
+                            html.H5("Per year",style={'display': 'inline-block', 'verticalAlign': 'middle'}),
+                            daq.ToggleSwitch(style={'display': 'inline-block',
+                                                    'verticalAlign': 'middle',
+                                                    'padding': "10px"},
+                                            id='annual-horizon-toggle'),
+                            html.H5('To horizon',style={'display': 'inline-block', 'verticalAlign': 'middle'})
+                        ],
+                        style={
+                            'display': 'inline-block',
+                            'width':'50%',
+                            'float': 'right',
+                            "justifyContent": "flex-end",
+                            "alignItems": "center",
+                            'textAlign': 'right'
+                        },
+                        id='annual-horizon-toggle-container'
+                        ),
+                    ]),
+                ),
+            id = 'drawer-title',
+        )
         ],
-        style={
-            'display': 'inline-block',
-            'width':'50%',
-            'float': 'right',
-            "justifyContent": "flex-end",
-            "alignItems": "center",
-            'text-align': 'right'
-        })
-    ],
-    style={'display': 'flex'}
+    id='drawer-header'
     )
 
 def create_generation_results_card():
@@ -1555,32 +1568,46 @@ def create_layout():
 
         # Results
 
-        create_results_header(),
+        html.Div(
+            [
+                create_results_header(),
+                html.Div(
+                    [
+                        create_configuration_selector(),
 
-        create_configuration_selector(),
+                        dbc.Row([
+                            dbc.Col([
+                                create_generation_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_storage_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_consumption_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_net_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_economic_results_so_card()
+                            ],
+                                width=12)
+                        ]),
 
-        dbc.Row([
-            dbc.Col([
-                create_generation_results_card()
+                        html.Div(
+                            id='post-drawer-attach',
+                            style={'display':'none'}
+                        )
+                    ],
+                    id = 'drawer-content',
+                )
             ],
-                width=12),
-            dbc.Col([
-                create_storage_results_card()
-            ],
-                width=12),
-            dbc.Col([
-                create_consumption_results_card()
-            ],
-                width=12),
-            dbc.Col([
-                create_net_results_card()
-            ],
-                width=12),
-            dbc.Col([
-                create_economic_results_so_card()
-            ],
-                width=12)
-        ]),
+            id='drawer-container',
+        ),
 
         html.Div(id='onload-div'), # To trigger first callback
 
@@ -1724,6 +1751,15 @@ def add_initial_callback(app):
     )
     def sync_config_init(_):
         return json.dumps(str(datetime.datetime.now()))
+
+    clientside_callback(
+        ClientsideFunction(
+            namespace='clientside',
+            function_name = 'attach_drawer'
+        ),
+        Output('post-drawer-attach', 'children'),
+        Input('onload-div', 'children')
+    )
 
     @app.callback(
         Output('model-firstrun-watcher', 'data'),
@@ -2761,9 +2797,11 @@ def serve_layout():
     session_id = str(uuid.uuid4())
 
     return html.Div([
+        html.H1('OI!', id='oi'),
         create_layout(),
         dcc.Store(data=session_id, id='session-id')
     ])
+    
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
@@ -2777,7 +2815,21 @@ def create_app(external_stylesheets=None, run_model=False):
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
-    app = Dash(external_stylesheets=external_stylesheets)
+    assets_path = os.path.join(
+        ROOTDIR,
+        'newsegsbrowser',
+        'assets'
+    )
+    print (assets_path)
+    print (os.getcwd())
+    #assets_path = '/newsegsbrowser/assets'
+    assets_path = '/assets'
+    app = Dash(
+        __name__,
+        title = "Sprake Energy Model",
+        external_stylesheets=external_stylesheets,
+        assets_url_path = assets_path
+    )
     app.layout = serve_layout
 
     # Load model
@@ -2791,8 +2843,6 @@ def create_app(external_stylesheets=None, run_model=False):
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)
-
-    app.title = "Sprake Energy Model"
 
     return app
 

@@ -83,6 +83,7 @@ class SprakeFinance(NewsegsFinance):
     @benefit_discount_rate.setter
     def benefit_discount_rate(self, v:float) -> None:
         self._benefit_discount_rate = v
+        self.dirty = True
 
     @property
     def cost_discount_rate(self) -> float:
@@ -91,6 +92,7 @@ class SprakeFinance(NewsegsFinance):
     @cost_discount_rate.setter
     def cost_discount_rate(self, v:float) -> None:
         self._cost_discount_rate = v
+        self.dirty = True
     
     def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
         """
@@ -118,6 +120,7 @@ class SprakeFinance(NewsegsFinance):
             argdict.update(kwdrs)
             self._benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
             self._cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
+        self.dirty = True
 
     def _get_empty_df(self) -> pd.DataFrame:
         if self._model is None:
