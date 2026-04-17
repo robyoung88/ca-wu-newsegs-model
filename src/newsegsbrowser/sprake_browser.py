@@ -1587,8 +1587,19 @@ def create_layout():
         # To trigger resync of input fields from model, e.g. after a load
         dcc.Store(id='live-config-watcher'),
 
+        # Updated when the model configuration is updated.
+        # Used to indicate that a new run is necessary to update results.
+        dcc.Store(id='model-config-watcher'),
+
+        # Updated when either:
+        # 1) The finance module has been set to a new configuration or
+        # 2) The model has finished running
+        # In either case, a refresh of the financial results is required.
+        dcc.Store(id='finance-config-watcher'),
+
         # To trigger resync of output fields after a model run
         dcc.Store(id='model-run-watcher'),
+        dcc.Store(id='model-firstrun-watcher'),
 
         dcc.Store(id='model-config'),
         dcc.Store(id='finance-config'),
@@ -1642,7 +1653,15 @@ def sprake_model_set_mc_input(mc_input:dict, mdl:SprakeModel):
         ts.end = ts.end + pd.Timedelta(1, unit='d')
     mdl.set_run_period(ts)
 
-def sprake_model_to_interface_configs(mdl) -> Tuple(dict, dict):
+def sprake_finance_set_finance_config(fcfg: dict, fnc: SprakeFinance):
+    fnc.set_unit_costs_from_dict(fcfg.get('unit_costs'))
+    fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0))
+    fnc.cost_discount_rate = float(fcfg.get('cost_discount_rate', 0.0))
+
+def sprake_model_to_interface_configs(
+    mdl: SprakeModel, 
+    fnc: SprakeFinance
+) -> Tuple[dict, dict]:
     gen_input = {
         'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
         'pv_capacity': mdl.generation.generator.generators[1].nameplate_capacity
@@ -1691,7 +1710,7 @@ def sprake_model_to_interface_configs(mdl) -> Tuple(dict, dict):
         'mc_input': mc_input
     }
 
-    fcfg = app.finance.to_dict()
+    fcfg = fnc.to_dict()
 
     return mcfg, fcfg
 
@@ -1707,7 +1726,7 @@ def add_initial_callback(app):
         return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
-        Output('model-run-watcher', 'data'),
+        Output('model-firstrun-watcher', 'data'),
         Input('onload-div', 'children')
     )
     def sync_mdl_run_init(_):
@@ -1716,6 +1735,28 @@ def add_initial_callback(app):
         return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
+        Output('model-run-watcher', 'data'),
+        Input('model-config-watcher', 'data'),
+        prevent_initial_call = True
+    )
+    def trigger_mdl_run(_):
+        """Config change - run the model now"""
+        print('Starting normally triggered run')
+        app.mdl.run()
+        print('Normal run complete')
+        return json.dumps(str(datetime.datetime.now()))
+
+    @app.callback(
+        Output('finance-config-watcher', 'data', allow_duplicate=True),
+        Input('model-firstrun-watcher', 'data'),
+        Input('model-run-watcher', 'data'),
+        prevent_initial_call = True
+    )
+    def trigger_financial_results_post_run(_, _2):
+        app.finance.dirty = False
+        return json.dumps(str(datetime.datetime.now()))
+    
+    @app.callback(
         Output('model-config', 'data', allow_duplicate=True),
         Output('finance-config', 'data', allow_duplicate=True),
         Input('live-config-watcher', 'data'),
@@ -1723,8 +1764,9 @@ def add_initial_callback(app):
     )
     def sync_config(_):
         mdl = app.mdl
+        fnc = app.finance
 
-        mcfg, fcfg = sprake_model_to_interface_configs(mdl)
+        mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
         return json.dumps(mcfg), json.dumps(fcfg)
 
@@ -2045,10 +2087,11 @@ def add_result_callbacks(app):
     """
     @app.callback(
         Output('res-gen', 'data'),
+        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         prevent_initial_call=True
     )
-    def set_res_gen(_):
+    def set_res_gen(_,_2):
         """
         Create the generation results data after a completed model run
         """
@@ -2060,10 +2103,11 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-stor', 'data'),
+        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         prevent_initial_call=True
     )
-    def set_res_stor(_):
+    def set_res_stor(_,_2):
         """
         Create the storage results data after a completed model run
         """
@@ -2075,10 +2119,11 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-cons', 'data'),
+        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         prevent_initial_call=True
     )
-    def set_res_cons(_):
+    def set_res_cons(_,_2):
         """
         Create the consumption results data after a completed model run.
         """
@@ -2090,10 +2135,11 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-net', 'data'),
+        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         prevent_initial_call=True
     )
-    def set_res_net(_):
+    def set_res_net(_,_2):
         """
         Create the net energy results data after a completed model run.
         """
@@ -2105,7 +2151,7 @@ def add_result_callbacks(app):
     
     @app.callback(
         Output('res-finance-so-benefits', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('finance-config-watcher', 'data'),
         prevent_initial_call=True
     )
     def set_res_finance_benefits_so(_):
@@ -2124,7 +2170,7 @@ def add_result_callbacks(app):
     
     @app.callback(
         Output('res-finance-so-costs', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('finance-config-watcher', 'data'),
         prevent_initial_call=True
     )
     def set_res_finance_costs_so(_):
@@ -2143,7 +2189,7 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-finance-so-value', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('finance-config-watcher', 'data'),
         prevent_initial_call=True
     )
     def set_res_finance_value_so(_):
@@ -2643,7 +2689,7 @@ def add_input_callbacks(app):
         mcfg['mc_input'] = mc_input
         return json.dumps(mcfg)
 
-    def sync_configs_to_model(mcfg, fcfg) -> Tuple[bool, bool]:
+    def sync_configs_to_model(mcfg: dict, fcfg: dict) -> Tuple[bool, bool]:
         """
         Pass the configuration dictionaries into the Sprake model
         """
@@ -2651,7 +2697,7 @@ def add_input_callbacks(app):
         fnc = app.finance
 
         # Get the existing configs to check against
-        w_mcfg, w_fcfg = sprake_model_to_interface_configs(mdl)
+        w_mcfg, w_fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
         if not w_mcfg.get('gen_input') == mcfg.get('gen_input'):
             sprake_model_set_gen_input(mcfg.get('gen_input', {}), mdl)
@@ -2667,6 +2713,33 @@ def add_input_callbacks(app):
         
         if not w_mcfg.get('mc_input') == mcfg.get('mc_input'):
             sprake_model_set_mc_input(mcfg.get('mc_input', {}), mdl)
+
+        if not w_fcfg == fcfg:
+            sprake_finance_set_finance_config(fcfg, fnc)
+        
+        return mdl.dirty, fnc.dirty
+
+    @app.callback(
+        Output('model-config-watcher', 'data'),
+        Output('finance-config-watcher', 'data', allow_duplicate=True),
+        Input('model-config', 'data'),
+        Input('finance-config', 'data'),
+        prevent_initial_call = True
+    )
+    def update_model_configs(mcfg, fcfg):
+        if mcfg is None or fcfg is None:
+            return no_update, no_update
+        mcfg = json.loads(mcfg)
+        fcfg = json.loads(fcfg)
+
+        mdl_dirty, finance_dirty = sync_configs_to_model(mcfg, fcfg)
+
+        if mdl_dirty:
+            return json.dumps(str(datetime.datetime.now())), no_update
+        if finance_dirty:
+            return no_update, json.dumps(str(datetime.datetime.now()))
+        
+        return no_update, no_update
 
     return app
 

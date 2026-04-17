@@ -232,7 +232,7 @@ class SprakeCS(NewsegsCS):
     def n_units(self, n_units:float) -> None:
         self._n_units = n_units
         self._appliance_params['n_households'] = n_units
-        self._ev_params['n_evs'] = n_unit * self._ev_per_unit
+        self._ev_params['n_evs'] = n_units * self._ev_per_unit
         self._dhw_params['n_households'] = n_units
         self._spaceheat_params['n_households'] = n_units
         self.dirty = True
