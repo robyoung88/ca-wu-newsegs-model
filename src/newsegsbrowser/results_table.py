@@ -29,7 +29,7 @@ def create_configuration_selector():
     dbc.Row(
         dbc.Col([
             html.H2([
-                html.I(className="bi bi-arrow-return-right text-secondary", style={"margin-left":"1.0rem", "margin-right":"1.0rem"}),
+                html.I(className="bi bi-arrow-return-right text-secondary", style={"marginLeft":"1.0rem", "marginRight":"1.0rem"}),
                 dbc.Button(html.I(className="bi bi-plus-circle"), color="primary", id='add-comparator-btn', outline=True, disabled=True, className="rounded-circle")
             ])
             
