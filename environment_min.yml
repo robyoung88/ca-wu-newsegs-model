@@ -13,6 +13,8 @@ dependencies:
   - ipykernel
   - ipython=9.7.0
   - jupyter=1.1.1
+  - matplotlib
+  - netcdf4
   - numpy=2.4.3
   - openpyxl
   - pandas=2.3.3
@@ -21,5 +23,7 @@ dependencies:
   - python=3.13.12
   - quarto
   - scipy
+  - seaborn
   - sf-hamilton
+  - xarray
 prefix: C:\Users\YoungR2\AppData\Local\anaconda3\envs\ca-wu-newsegs-mod

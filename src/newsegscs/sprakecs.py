@@ -170,7 +170,7 @@ class SprakeCS(NewsegsCS):
 
     def __init__(self):
         self._name = self._default_name
-        self._n_units = 1000.0
+        self._n_units = 100.0
         self._ev_per_unit = 1.2
         self._model = None
         self._appliance_params = {
@@ -178,7 +178,7 @@ class SprakeCS(NewsegsCS):
             'n_households': self._n_units
         }
         self._ev_params = {
-            'annual_residential_consumption_per_ev': 1313.65683,
+            'annual_residential_consumption_per_ev': 1760.0*0.747,
             'n_evs': self._ev_per_unit * self._n_units
         }
         self._dhw_params = {
@@ -203,7 +203,7 @@ class SprakeCS(NewsegsCS):
                 'n_households': self._n_units
             }
         self._storage_params = {
-            'storage_capacity': 4000.0,
+            'storage_capacity': 1000.0,
             'storage_rte': 0.88
         }
         

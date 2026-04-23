@@ -16,6 +16,7 @@ from src.core.generation import WindTurbineElecGenerator
 from config import settings
 lookup_dir = settings.get('SprakeDataLoc')
 
+# TODO: Fix that changing this prevents construction. Hub height must be somewhere fixed at 10m before location is set.
 _NOMINAL_WT_HEIGHT = 10.0
 _DEFAULT_TS = pd.Timedelta(hours=1)
 
@@ -23,10 +24,26 @@ def get_sprake_environment_server():
     server = InMemoryLocalEnv()
 
     ### Wind
-    wind_data = pd.read_excel(os.path.join(lookup_dir,
-                                           'wind_resource.xlsx'),
-                              sheet_name='Sheet1',
-                              header=0)
+    wind_data = (
+        pd.read_csv(
+            os.path.join(
+                lookup_dir,
+                'default_wind_speeds.csv'
+            )
+        )
+        .rename(
+            columns={
+                'datetime': 'timestamp',
+                'ws_hub': 'wind_speed'
+            }
+        )
+        .query('hub_height==20')
+        .loc[:,['timestamp','wind_speed']]
+    )
+    #wind_data = pd.read_excel(os.path.join(lookup_dir,
+    #                                       'wind_resource.xlsx'),
+    #                          sheet_name='Sheet1',
+    #                          header=0)
     windloc = RaisedLocation()
     windloc.height_agl = _NOMINAL_WT_HEIGHT
     wind_ts = OffsetRegTimeSpan(
@@ -79,6 +96,35 @@ def get_sprake_gamesa_126():
 
     return turbine
 
+def get_sprake_ned100():
+    cpcurve = (
+        pd.read_excel(
+            os.path.join(
+                lookup_dir,
+                'power-curve-ned-100.xlsx'
+            ),
+            sheet_name='power_curve',
+            header=0
+        )
+        .loc[:,['wind_speed','coeff_power']]
+    )
+    tloc = RaisedLocation()
+    tloc.height_agl = _NOMINAL_WT_HEIGHT
+    turbine = WindTurbineElecGenerator.from_characteristics(
+        cut_in=3.0,
+        cut_out=20.0,
+        rated_power=100.0,
+        swept_area=np.pi*(0.5 * 24)**2,
+        hub_height=_NOMINAL_WT_HEIGHT,
+        name="Norvento nED 100 (Sprake)",
+        location = tloc,
+        cp_curve=cpcurve.to_numpy().T
+    )
+
+    return turbine
+
+
+
 class SprakeModel(NewsegsModel):
     _default_name = "Sprake Model"
 
@@ -88,9 +134,9 @@ class SprakeModel(NewsegsModel):
         self._local_environment_server = get_sprake_environment_server()
         self._wider_environment_server = None
 
-        self._mod_gen = SprakeGeneration(turbine=get_sprake_gamesa_126())
+        self._mod_gen = SprakeGeneration(turbine=get_sprake_ned100())
         self._mod_gen.model = self
-        self._mod_gen.generator.generators[0].n_turbines=2.0
+        self._mod_gen.generator.generators[0].n_turbines=1.0
         self._mod_gen.generator.generators[1].n_arrays=0.0
         
         self._mod_grid = SprakeGrid()

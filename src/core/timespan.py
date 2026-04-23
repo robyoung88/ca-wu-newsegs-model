@@ -248,6 +248,9 @@ class TimeSpan:
         o.end = o.start + o.delta / denom
         return o
 
+    def __repr__(self):
+        return "" + re.search(r"\.(\w+)\'>$", str(type(self))).group(1) + "(" + self.start + ", " + self.end, ")"
+
 # TimeSpan copy constructor
 @TimeSpan.__init__.register(TimeSpan)
 def TimeSpan_from_other(self, start: TimeSpan, end: None = None):
@@ -354,6 +357,9 @@ class RegTimeSpan(TimeSpan):
     def __str__(self):
         return str(self.start) + " - " + str(self.end) + ", timestep: " + str(self.timestep)
 
+    def __repr__(self):
+        return "" + re.search(r"\.(\w+)\'>$", str(type(self))).group(1) + "(" + self.start + ", " + self.end, " timestep = " + self.timestep + ")"
+
     def __eq__(self, other:RegTimeSpan) -> bool:
         """
         Do start, end and timestep of time spans match?
@@ -415,6 +421,7 @@ class OffsetRegTimeSpan(RegTimeSpan):
         timestep: TimedeltaScalar|None = None
     ):
         super().__init__(start, end, tz, timestep)
+        self.wrap_right = True # Default to keeping the last element and dropping the first, useful for retrospective meter readings.
     
     @property 
     def offset_initialised(self):
@@ -460,10 +467,21 @@ class OffsetRegTimeSpan(RegTimeSpan):
         """
         Get the retrievable index from the (wrapped) local timespan.
 
-        NB - the timespan is assumed wrapped with overlapping end and start, so the end index is never realised.
+        NB - the timespan is assumed wrapped with overlapping end and start, so the either the start index or the end index is never realised.
+        By default, this is the start index.
         e.g. if the timespan covers 1 year from 2020-01-01T00:00:00 to 2021-01-01T00:00:00, then the index for the latter date will never be returned
         """
-        return index % self.n_interval
+        if self.wrap_right:
+            idx = index % self.n_interval
+            if isinstance(idx, int):
+                if idx==0:
+                    return self.n_interval
+                return idx
+            else:
+                idx[idx==0] = self.n_interval
+                return idx
+        else:
+            return index % self.n_interval
 
     def get_local_index(self, remote_timespan:TimeSpan) -> npt.NDArray[np.int64]:
         """

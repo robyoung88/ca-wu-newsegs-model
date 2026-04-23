@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.core.timespan import delta_days
+from src.core.newsegsmodule import filter_meter_indices
 from src.newsegsfinance import NewsegsFinance, apply_discount_factor, sum_all_to_horizon
 from src.newsegsmodel import NewsegsModel
 
@@ -135,6 +136,9 @@ class SprakeFinance(NewsegsFinance):
 
     # TODO: Something is very wrong here. Update it to latest API and see if it works better
     def _get_consumption(self, meter_names) -> pd.DataFrame:
+        """
+        Summarise consumption meters to a simple dataframe
+        """
         if self._model is None:
             return pd.DataFrame()
         
@@ -142,9 +146,8 @@ class SprakeFinance(NewsegsFinance):
         if csr is None:
             return pd.DataFrame()
 
-        meter_names = csr.get_meter_names()
+        meter_indices = filter_meter_indices(csr, meter_name = meter_names)
 
-        meter_indices = [meter_names.index(x) for x in meter_names]
         return pd.DataFrame({
             'datetime': csr.get_timespan().to_pandas(),
             'consumption': csr.meters[meter_indices,:].sum(axis=0),

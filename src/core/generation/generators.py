@@ -363,10 +363,11 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             air_density: The air density (kg/m³) used for determination of
                          the power curve.
         """
+        
         available_power = (
             0.5 * air_density * self.swept_area
             * power_curve[0,:] * power_curve[0,:] * power_curve[0,:]
-        )
+        ) / 1000.0 # in kW, to match power curve
 
         cp_curve = copy(power_curve)
 
@@ -424,7 +425,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         # Power in kW. This is retrospective - i.e. is assumed to be a mean 
         # over the previous measuring period
         power = (0.5 * air_density * self.swept_area * self.cp(wind_speeds)
-                 * wind_speeds**3)
+                 * wind_speeds**3) / 1000.0
 
         deltatime = lenvs.get_wind_timestep().seconds * SECONDS_TO_HOURS
 

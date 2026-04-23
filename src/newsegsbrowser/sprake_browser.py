@@ -1643,8 +1643,15 @@ def create_layout():
     return dbc.Container(mapview, fluid=False)
 
 def sprake_model_set_gen_input(gen_input:dict, mdl:SprakeModel):
-    mdl.generation.generator.generators[0].nameplate_capacity = gen_input.get('wind_capacity', 0.0)
-    mdl.generation.generator.generators[1].nameplate_capacity = gen_input.get('pv_capacity', 0.0)
+    turbine_size = mdl.generation.generator.generators[0].turbine.nameplate_capacity
+    n_turbines = gen_input.get('wind_capacity', 0.0) / turbine_size
+    
+    pv_size = mdl.generation.generator.generators[1].pv_array.nameplate_capacity
+    n_arrays = gen_input.get('pv_capacity', 0.0) / pv_size
+
+    mdl.generation.generator.generators[0].n_turbines = n_turbines
+    mdl.generation.generator.generators[1].n_arrays = n_arrays
+    
     mdl.generation.dirty = True
 
 def sprake_model_set_stor_input(stor_input:dict, mdl:SprakeModel):
@@ -2797,11 +2804,9 @@ def serve_layout():
     session_id = str(uuid.uuid4())
 
     return html.Div([
-        html.H1('OI!', id='oi'),
         create_layout(),
         dcc.Store(data=session_id, id='session-id')
     ])
-    
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
@@ -2815,14 +2820,6 @@ def create_app(external_stylesheets=None, run_model=False):
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
-    assets_path = os.path.join(
-        ROOTDIR,
-        'newsegsbrowser',
-        'assets'
-    )
-    print (assets_path)
-    print (os.getcwd())
-    #assets_path = '/newsegsbrowser/assets'
     assets_path = '/assets'
     app = Dash(
         __name__,

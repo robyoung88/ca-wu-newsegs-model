@@ -76,7 +76,11 @@ def get_spaceheat_energy_consumption(datetimes,
             {'datetime': pd.to_datetime(datetimes)}
         )
         .assign(
-            date = lambda df: df['datetime'].dt.floor("D")
+            shift_midnight = lambda df: df['datetime'] - pd.Timedelta(1, 'm'),
+            date = lambda df: df['shift_midnight'].dt.floor("D")
+        )
+        .drop(
+            columns = ['shift_midnight']
         )
     )
 
@@ -84,7 +88,7 @@ def get_spaceheat_energy_consumption(datetimes,
     end_day = oframe['date'].max()
     
     if start_day < hdd['timestamp'].min() or end_day > hdd['timestamp'].max():
-        raise ValueError('Requested datetimes are outside of degree day support')
+        raise ValueError('Requested datetimes are outside of degree day support; requested: ', start_day, ' to ', end_day, '; have ', hdd['timestamp'].min(), ' to ', hdd['timestamp'].max())
     
     working_hdd = (
         hdd
@@ -101,7 +105,7 @@ def get_spaceheat_energy_consumption(datetimes,
         .join(working_hdd.loc[:,['date','daily_consumption']].set_index('date'))
         .reset_index()
         .assign(
-            end_day_seconds = lambda df: (df['datetime'] - df['date']).dt.total_seconds(),
+            end_day_seconds = lambda df: (df['datetime'] - df['datetime'].dt.floor("D")).dt.total_seconds(),
             start_day_seconds = lambda df: df['end_day_seconds'].shift(1, fill_value = df['end_day_seconds'].iloc[0]),
             time_delta = lambda df: df['datetime'] - df['datetime'].shift(1, fill_value=df['datetime'].iloc[0])
         )

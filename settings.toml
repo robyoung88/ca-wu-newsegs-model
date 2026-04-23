@@ -1,5 +1,9 @@
 [default]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
 
+NEWAEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/microscale-atlas/v1/"
+NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1/"
+NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/"
+
 [spraketest]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"
