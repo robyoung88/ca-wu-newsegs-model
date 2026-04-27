@@ -9,6 +9,16 @@ import numpy.typing as npt
 import pandas as pd
 from collections.abc import Iterable
 
+def _get_true_datetimes_srs(
+    srs: dict,
+    timespan: TimeSpan
+) -> pd.DatetimeIndex:
+    if srs is None:
+        return None
+    idx = srs['timespan'].get_local_index(timespan)
+
+    return srs['timespan'].to_pandas()[idx]
+
 class InMemoryLocalEnv(NewsegsLocalEnvironment):
     def __init__(self):
         self._wind_series = {}
@@ -173,6 +183,37 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
     def get_air_density_timestep(self) -> pd.TimeDelta|None:
         return None
+    
+    def get_true_datetimes(
+        self,
+        measure: Literal[
+            'wind_speeds',
+            'air_density',
+            'horizontal_solar_flux',
+            'external_temperature',
+            'solar_flux_on_plane'
+        ],
+        location: Location|tuple[Location, ...]|list[Location],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex|list[pd.DatetimeIndex]:
+        if (isinstance(location, Iterable)):
+            olist = [self.get_true_datetimes(measure, x, timespan = timespan) for x in location]
+            return olist
+        
+        match measure:
+            case 'wind_speeds':
+                return _get_true_datetimes_srs(self.access_wind_series(location), timespan)
+            case 'horizontal_solar_flux':
+                return _get_true_datetimes_srs(self.access_horizontal_solar_flux_series(location), timespan)
+            case 'external_temperature':
+                return _get_true_datetimes_srs(self.access_external_temperature_series(location), timespan)
+            case 'solar_flux_on_plane':
+                return _get_true_datetimes_srs(self.access_solar_flux_on_plane_series(location), timespan)
+            case _:
+                timestep = self.get_wind_timestep()
+                ts2 = RegTimeSpan(timespan)
+                ts2.timestep = timestep
+                return ts2.to_pandas()
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
     def __init__(self):
@@ -208,4 +249,21 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
+
+    def get_true_datetimes(
+        self,
+        measure: Literal[
+            'temperature',
+            'horizontal_solar_flux'
+        ],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex:
+        
+        match measure:
+            case 'temperature':
+                return _get_true_datetimes_srs(self._temperature_series, timespan)
+            case 'horizontal_solar_flux':
+                return _get_true_datetimes_srs(self._horizontal_solar_flux_series, timespan)
+            case _:
+                return None
     

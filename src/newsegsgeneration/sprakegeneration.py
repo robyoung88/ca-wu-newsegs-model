@@ -3,7 +3,9 @@ import re, copy
 from src.newsegsgeneration import NewsegsGeneration
 from src.core import ABCNewsegsModuleResult
 from src.core import RegTimeSpan
-from src.core.generation import PowerPlantHeterogeneousGenerators, PowerPlantHomogeneousPV, PowerPlantHomogeneousWind, generator_from_dict, WindTurbineElecGenerator, SprakePVElecGenerator
+from src.core.generation import PowerPlantHeterogeneousGenerators, PowerPlantHomogeneousPV
+from src.core.generation import PowerPlantHomogeneousWind, generator_from_dict
+from src.core.generation import WindTurbineElecGenerator, SprakePVGISElecGenerator
 #from src.newsegsmodel.newsegsmodel import NewsegsModel
 import numpy as np
 import numpy.typing as npt
@@ -67,7 +69,7 @@ class SprakeGeneration(NewsegsGeneration):
         self._generator.append(PowerPlantHomogeneousPV())
         self._generator.generators[0].location = turbine.location
         self._generator.generators[0].turbine = turbine
-        self._generator.generators[1].pv_array = SprakePVElecGenerator()
+        self._generator.generators[1].pv_array = SprakePVGISElecGenerator()
         self._name = self._default_name
 
     @property

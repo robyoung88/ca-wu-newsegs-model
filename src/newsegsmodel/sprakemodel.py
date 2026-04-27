@@ -40,10 +40,7 @@ def get_sprake_environment_server():
         .query('hub_height==20')
         .loc[:,['timestamp','wind_speed']]
     )
-    #wind_data = pd.read_excel(os.path.join(lookup_dir,
-    #                                       'wind_resource.xlsx'),
-    #                          sheet_name='Sheet1',
-    #                          header=0)
+   
     windloc = RaisedLocation()
     windloc.height_agl = _NOMINAL_WT_HEIGHT
     wind_ts = OffsetRegTimeSpan(
@@ -58,21 +55,54 @@ def get_sprake_environment_server():
                           wind_ts)
     
     ### Solar
-    solar_data = pd.read_excel(os.path.join(lookup_dir,
-                                            'solar_resource.xlsx'),
-                               sheet_name='global_horizontal_radiation',
-                               header=0)
-    solarloc = AspectLocation()
-    solar_ts = OffsetRegTimeSpan(
-        pd.Timestamp(solar_data['timestamp'].iloc[0],tz='utc'),
-        pd.Timestamp(solar_data['timestamp'].iloc[-1],tz='utc')
+    pv_data = (
+        pd.read_csv(
+            os.path.join(
+                lookup_dir,
+                'default_irradiance.csv'
+            )
+        )
+        .rename(
+            columns = {
+                'time': 'timestamp'
+            }
+        )
     )
-    solar_ts.timestep = _DEFAULT_TS
-    solar_ts.set_offset(solar_ts.start, solar_ts.start)
 
-    server.set_horizontal_solar_flux(solar_data['horizontal_irradiation_per_hour_kJ_per_sqm'].values,
-                                     solarloc,
-                                     solar_ts)
+    pvloc = RaisedLocation()
+    pvloc.set_lat_lon(
+        settings.get('SprakeValidationLat'), 
+        settings.get('SprakeValidationLon')
+        )
+    pvloc.height_agl = 2.
+    #solar_data = pd.read_excel(os.path.join(lookup_dir,
+    #                                        'solar_resource.xlsx'),
+    #                           sheet_name='global_horizontal_radiation',
+    #                           header=0)
+    #solarloc = AspectLocation()
+    pv_ts = OffsetRegTimeSpan(
+        pd.Timestamp(pv_data['timestamp'].iloc[0], tz='utc'),
+        pd.Timestamp(pv_data['timestamp'].iloc[-1], tz='utc')
+    )
+    pv_ts.timestep = _DEFAULT_TS
+    pv_ts.set_offset(pv_ts.start, pv_ts.start)
+
+    server.set_horizontal_solar_flux(
+        pv_data['poa_global'].values,
+        pvloc,
+        pv_ts)
+    
+    server.set_wind_speed(
+        pv_data['wind_speed'].values,
+        pvloc,
+        pv_ts
+    )
+
+    server.set_external_temperature(
+        pv_data['temp_air'].values,
+        pvloc,
+        pv_ts
+    )
 
     return server
 
@@ -123,8 +153,6 @@ def get_sprake_ned100():
 
     return turbine
 
-
-
 class SprakeModel(NewsegsModel):
     _default_name = "Sprake Model"
 
@@ -138,6 +166,9 @@ class SprakeModel(NewsegsModel):
         self._mod_gen.model = self
         self._mod_gen.generator.generators[0].n_turbines=1.0
         self._mod_gen.generator.generators[1].n_arrays=0.0
+        pv_loc = self._mod_gen.generator.generators[1].location
+        pv_loc.height_agl = 2.
+        self._mod_gen.generator.generators[1].location = pv_loc
         
         self._mod_grid = SprakeGrid()
         self._mod_grid.model = self
@@ -147,8 +178,8 @@ class SprakeModel(NewsegsModel):
 
         self._default_timestep = _DEFAULT_TS
         self._run_period = RegTimeSpan(
-            pd.Timestamp('2002-01-01T00:00:00',tz='utc'),
-            pd.Timestamp('2012-01-01T00:00:00', tz='utc')
+            pd.Timestamp('2005-01-01T00:00:00',tz='utc'),
+            pd.Timestamp('2015-01-01T00:00:00', tz='utc')
         )
         self._run_period.timestep = self._default_timestep
 

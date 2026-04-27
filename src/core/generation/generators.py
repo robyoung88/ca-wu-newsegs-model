@@ -38,6 +38,8 @@ from typing_extensions import overload, override
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
+import pvlib
 
 from src.core import TimeSpan, SECONDS_TO_HOURS
 from src.core import Location,RaisedLocation,AspectLocation,location_from_dict
@@ -876,6 +878,210 @@ class SprakePVElecGenerator(ABCPVElecGenerator):
         odict = super().to_dict()
         odict['self_consumption'] = self._self_consumption
         odict['aspect_factor'] = self._aspect_factor
+
+        return odict
+
+class SprakePVGISElecGenerator(ABCPVElecGenerator):
+    """
+    An alternative Sprake PV generator for enhanced generation modelling.
+
+    Matches up with the "enhance_gen" version of the excel model
+    """
+    _default_name = "Reduced PVGIS modelled panel"
+
+    def __init__(
+        self,
+        other:SprakePVGISElecGenerator|None = None
+    ) -> None:
+        
+        super().__init__(other)
+        if other is None:
+            from config import settings
+            
+            self._location = AspectLocation()
+            self._location.lat = settings.get('SprakeValidationLat')
+            self._location.lon = settings.get('SprakeValidationLon')
+            self._location.azimuth = 180.
+            self._location.pitch = 35.
+
+            self._dc_efficiency = 0.98
+            self._inverter_efficiency = 0.96
+
+        elif isinstance(other, SprakePVGISElecGenerator):
+            self._location = copy.copy(other._location)
+            self._dc_efficiency = other._dc_efficiency
+            self._inverter_efficiency = other._inverter_efficiency
+
+        else:
+            raise ValueError("'other' must be a SprakePVGISElecGenerator")
+        
+    def _set_pvlib_location(self):
+        self._pvlib_location = pvlib.location.Location(
+            self._location.lat,
+            self._location.lon
+        )
+
+    def _set_module_parameters(self):
+        self._module_parameters = {
+            'pdc0': self.peak_power,
+            'cell_type': 'csi',
+            'a_r': 0.16 # Martin-Ruiz AOI modifier parameter
+        }
+
+    def _set_temperature_model_parameters(self):
+        # NB - this temperature model is not actually used for DC output, 
+        # but corresponds to the Faiman model.
+        self._temperature_model_parameters = {
+            'u0': 20.0, # c-Si Roof added or building integrated https://joint-research-centre.ec.europa.eu/photovoltaic-geographical-information-system-pvgis/getting-started-pvgis/pvgis-data-sources-calculation-methods_en#references
+            'u1': 3.2
+        }
+
+    def _set_losses_parameters(self):
+        self._losses_parameters = {
+            'dc_efficiency': self._dc_efficiency
+        }
+
+    def _set_inverter_parameters(self):
+        self._inverter_parameters = {
+            'pdc0': self.peak_power,
+            'eta_inv_nom': self._inverter_efficiency
+        }
+
+    def _create_system(self):
+        self._system = pvlib.pvsystem.PVSystem(
+            surface_tilt = self.location.pitch,
+            surface_azimuth = self.location.azimuth,
+            module_parameters = self._module_parameters,
+            temperature_model_parameters = self._temperature_model_parameters,
+            losses_parameters = self._losses_parameters,
+            inverter_parameters = self._inverter_parameters
+        )
+
+    def _create_modelchain(self):
+        import src.core.generation.generation_utils as generation_utils
+
+        self._mc = pvlib.modelchain.ModelChain(
+            self._system,
+            self._pvlib_location,
+            transposition_model = 'isotropic',
+            aoi_model = 'martin_ruiz',
+            spectral_model = 'no_loss',
+            temperature_model = 'faiman',
+            dc_model = generation_utils.huld_dcmodel_wrapper,
+            losses_model = generation_utils.fixed_percent_dc_loss,
+            ac_model = 'pvwatts'
+        )
+
+    @property
+    def dc_efficiency(self) -> float:
+        return self._dc_efficiency
+    
+    @dc_efficiency.setter
+    def dc_efficiency(self, eta:float ) -> None:
+        self._dc_efficiency = eta
+    
+    @property
+    def inverter_efficiency(self) -> float:
+        return self._inverter_efficiency
+    
+    @inverter_efficiency.setter
+    def inverter_efficiency(self, eta: float) -> None:
+        self._inverter_efficiency = eta
+    
+    def run(self, timespan: TimeSpan) -> np.ndarray[tuple[int, int], np.dtype[np.number]]:
+        if self.model is None:
+            raise ValueError("Electrical generator requires a model to serve environmental data")
+        
+        global_horizontal_flux = (
+            self.model.local_env.get_horizontal_solar_flux(
+                self.location,
+                timespan
+            )
+        )
+        temp_air = (
+            self.model.local_env.get_external_temperature(
+                self.location,
+                timespan
+            )
+        )
+        wind_speed = (
+            self.model.local_env.get_wind_speeds(
+                self.location,
+                timespan
+            )
+        )
+
+        rad_times = self.model.local_env.get_true_datetimes(
+            'horizontal_solar_flux',
+            self.location,
+            timespan
+        )
+        print(timespan)
+
+        self._set_pvlib_location()
+
+        solarpos = self._pvlib_location.get_solarposition(rad_times)
+        radiation_components = pvlib.irradiance.erbs(
+            global_horizontal_flux,
+            solarpos['zenith'].values,
+            rad_times
+        )
+
+        weather = (
+            pd.DataFrame(
+                dict(
+                    ghi = global_horizontal_flux,
+                    temp_air = temp_air,
+                    wind_speed = wind_speed,
+                    time = rad_times
+                )
+            )
+            .set_index('time')
+            .join(radiation_components.loc[:, ['dni', 'dhi']])
+            .assign(albedo = 0.25)
+        )
+
+        print(weather)
+
+        self._set_module_parameters()
+        self._set_temperature_model_parameters()
+        self._set_losses_parameters()
+        self._set_inverter_parameters()
+        self._create_system()
+        self._create_modelchain()
+
+        self._mc.run_model(weather)
+
+        return self._mc.results.ac.values.reshape((1,-1))
+    
+    @classmethod
+    def from_characteristics(
+        cls,
+        name: str,
+        peak_power: float,
+        total_area: float,
+        collector_area: float,
+        frame_factor: float|Nope,
+        location: AspectLocation,
+        dc_efficiency: float,
+        ac_efficiency: float
+    ) -> ABCPVElecGenerator:
+        a = locals()
+        del a['dc_efficiency']
+        del a['ac_efficiency']
+        del a['cls']
+        del a['__class__']
+        o = super(SprakePVElecGenerator, cls).from_characteristics(**a)
+
+        o.dc_efficiency = dc_efficiency
+        o.ac_efficiency = ac_efficiency
+
+        return o
+
+    def to_dict(self) -> Mapping:
+        odict = super().to_dict()
+        odict['dc_efficiency'] = self._dc_efficiency
+        odict['ac_efficiency'] = self._ac_efficiency
 
         return odict
 

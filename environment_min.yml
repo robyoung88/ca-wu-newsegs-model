@@ -19,6 +19,7 @@ dependencies:
   - openpyxl
   - pandas=2.3.3
   - pip=26.0.1
+  - pvlib
   - pyproj
   - python=3.13.12
   - quarto

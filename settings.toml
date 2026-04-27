@@ -1,5 +1,9 @@
 [default]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
+SprakeStartDatetime = "2005-01-01T00:00:00"
+SprakeEndDatetime = "2015-01-01T00:00:00"
+SprakeValidationLat = 53.25535
+SprakeValidationLon = -3.47697
 
 NEWAEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/microscale-atlas/v1/"
 NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1/"

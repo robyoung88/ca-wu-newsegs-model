@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from typing import Literal
 
 import numpy.typing as npt
 import pandas as pd
@@ -62,6 +63,21 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
     @abstractmethod
     def get_solar_flux_on_plane_timestep(self) -> pd.Timedelta:
         ...
+    
+    @abstractmethod
+    def get_true_datetimes(
+        self,
+        measure: Literal[
+            'wind_speeds',
+            'air_density',
+            'horizontal_solar_flux',
+            'external_temperature',
+            'solar_flux_on_plane'
+        ],
+        location: Location|tuple[Location, ...]|list[Location],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex:
+        ...
 
 class NewsegsWiderEnvironment(metaclass=ABCMeta):
     @abstractmethod
@@ -76,4 +92,15 @@ class NewsegsWiderEnvironment(metaclass=ABCMeta):
         ...
     @abstractmethod
     def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta|None:
+        ...
+
+    @abstractmethod
+    def get_true_datetimes(
+        self,
+        measure: Literal[
+            'temperature',
+            'horizontal_solar_flux'
+        ],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex:
         ...
