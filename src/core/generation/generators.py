@@ -1016,15 +1016,21 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
             self.location,
             timespan
         )
-        print(timespan)
+        # This is a kludge to estimate solar position. Suffers particularly around sunrise/sunset.
+        rad_times_centered = (
+            rad_times - self.model.local_env.get_horizontal_solar_flux_timestep() / 2
+        )
 
         self._set_pvlib_location()
 
-        solarpos = self._pvlib_location.get_solarposition(rad_times)
-        radiation_components = pvlib.irradiance.erbs(
-            global_horizontal_flux,
-            solarpos['zenith'].values,
-            rad_times
+        solarpos = self._pvlib_location.get_solarposition(rad_times_centered)
+
+        radiation_components = (
+            pvlib.irradiance.erbs(
+                global_horizontal_flux,
+                solarpos['zenith'].values,
+                rad_times_centered # for extraterrestrial radiation
+            )
         )
 
         weather = (
@@ -1033,15 +1039,13 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
                     ghi = global_horizontal_flux,
                     temp_air = temp_air,
                     wind_speed = wind_speed,
-                    time = rad_times
+                    time = rad_times_centered
                 )
             )
             .set_index('time')
             .join(radiation_components.loc[:, ['dni', 'dhi']])
             .assign(albedo = 0.25)
         )
-
-        print(weather)
 
         self._set_module_parameters()
         self._set_temperature_model_parameters()
@@ -1052,7 +1056,11 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
         self._mc.run_model(weather)
 
-        return self._mc.results.ac.values.reshape((1,-1))
+        generation = self._mc.results.ac.values.reshape((1,-1))
+        # No energy in first pseudo-timestep
+        generation[:,0] = 0.0
+
+        return generation
     
     @classmethod
     def from_characteristics(

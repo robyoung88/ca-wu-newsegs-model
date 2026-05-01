@@ -80,26 +80,29 @@ def get_sprake_environment_server():
     #                           sheet_name='global_horizontal_radiation',
     #                           header=0)
     #solarloc = AspectLocation()
+    
+    # The PV time series holds mean values at half past the hour.
+    # Need to extend back one (first obs carried back)
     pv_ts = OffsetRegTimeSpan(
-        pd.Timestamp(pv_data['timestamp'].iloc[0], tz='utc'),
-        pd.Timestamp(pv_data['timestamp'].iloc[-1], tz='utc')
+        pd.Timestamp(pv_data['timestamp'].iloc[0], tz='utc') - pd.Timedelta(30, 'm'),
+        pd.Timestamp(pv_data['timestamp'].iloc[-1], tz='utc') + pd.Timedelta(30, 'm')
     )
     pv_ts.timestep = _DEFAULT_TS
     pv_ts.set_offset(pv_ts.start, pv_ts.start)
 
     server.set_horizontal_solar_flux(
-        pv_data['poa_global'].values,
+        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].values),
         pvloc,
         pv_ts)
     
     server.set_wind_speed(
-        pv_data['wind_speed'].values,
+        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].values),
         pvloc,
         pv_ts
     )
 
     server.set_external_temperature(
-        pv_data['temp_air'].values,
+        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].values),
         pvloc,
         pv_ts
     )
@@ -167,6 +170,8 @@ class SprakeModel(NewsegsModel):
         self._mod_gen.generator.generators[0].n_turbines=1.0
         self._mod_gen.generator.generators[1].n_arrays=0.0
         pv_loc = self._mod_gen.generator.generators[1].location
+        pv_loc.set_lat_lon(settings.get('SprakeValidationLat'),
+                           settings.get('SprakeValidationLon'))
         pv_loc.height_agl = 2.
         self._mod_gen.generator.generators[1].location = pv_loc
         

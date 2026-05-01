@@ -9,6 +9,7 @@ from src.core.timespan import delta_days
 from src.core.newsegsmodule import filter_meter_indices
 from src.newsegsfinance import NewsegsFinance, apply_discount_factor, sum_all_to_horizon
 from src.newsegsmodel import NewsegsModel
+from src.stats.core import assign_month_index
 
 HOURS_IN_YEAR = 8760.0
 
@@ -20,10 +21,10 @@ class SprakeFinance(NewsegsFinance):
         'wind_om_per_kw_year': 46.0,
 
         'pv_capex_per_kw': 1000.0,
-        'pv_om_per_kw_year': 19.719,
+        'pv_om_per_kw_year': 10.5,
 
         'bess_capex_per_kwh': 191.772,
-        'bess_om_per_kwh_year': 19.719,
+        'bess_om_per_kwh_year': 16.719,
 
         'resident_sc_per_unit_day': 0.0,
         'resident_var_per_unit': 0.35,
@@ -134,7 +135,6 @@ class SprakeFinance(NewsegsFinance):
             'datetime': csr.get_timespan().to_pandas(),
         }).set_index('datetime')
 
-    # TODO: Something is very wrong here. Update it to latest API and see if it works better
     def _get_consumption(self, meter_names) -> pd.DataFrame:
         """
         Summarise consumption meters to a simple dataframe
@@ -300,34 +300,34 @@ class SprakeFinance(NewsegsFinance):
     @property
     def om_costs_generation_undiscounted(self) -> pd.DataFrame:
         """
-        In Sprake model, we will just accrue O&M costs at an hourly rate from first timestep
-
-        It is acknowledged that leapyears will result in additional cost
+        Accrue O&M costs monthly
         """
         odf = self._get_empty_df()
         if len(odf) == 0:
             return odf
-        wind_om_per_kw_hour = self.wind_om_per_kw_year / HOURS_IN_YEAR
-        pv_om_per_kw_hour = self.pv_om_per_kw_year / HOURS_IN_YEAR
+        wind_om_per_kw_month = self.wind_om_per_kw_year / 12
+        pv_om_per_kw_month = self.pv_om_per_kw_year / 12
         
         # Capacity in Sprake model is constant, so this is fine:
-        wind_om_per_hour = wind_om_per_kw_hour * self._model.generation.generator.generators[0].nameplate_capacity
-        pv_om_per_hour = pv_om_per_kw_hour * self._model.generation.generator.generators[1].nameplate_capacity
+        wind_om_per_month = wind_om_per_kw_month * self._model.generation.generator.generators[0].nameplate_capacity
+        pv_om_per_month = pv_om_per_kw_month * self._model.generation.generator.generators[1].nameplate_capacity
 
+        # Shift the costs to the end of the first timestep in each month so that it can be
+        # picked up in the meter summary statistics
         odf = (
             odf
-            .reset_index()
+            .pipe(assign_month_index, shift=0)
             .assign(
-                deltat = lambda df: (df['datetime'] -df['datetime'].shift(1, fill_value=df['datetime'].iloc[0])).dt.seconds/3600.0,
-                wind_costs = lambda df: df['deltat'] * wind_om_per_hour,
-                pv_costs = lambda df: df['deltat'] * pv_om_per_hour,
+                deltamonth = lambda df: (df['month_index'] - df['month_index'].shift(1, fill_value = df['month_index'].iloc[0]-1)),
+                wind_costs = lambda df: (df['deltamonth'] * wind_om_per_month).shift(1, fill_value = 0.0),
+                pv_costs = lambda df: (df['deltamonth'] * pv_om_per_month).shift(1, fill_value = 0.0),
                 costs = lambda df: df['wind_costs'] + df['pv_costs']
             )
-            .set_index('datetime')
             .loc[:,['wind_costs','pv_costs','costs']]
         )
+        
         return odf
-    
+
     @property
     def om_costs_generation_discounted(self) -> pd.DataFrame:
         return apply_discount_factor(self.om_costs_generation_undiscounted, self._cost_discount_rate, shift=1)
@@ -335,29 +335,29 @@ class SprakeFinance(NewsegsFinance):
     @property
     def om_costs_storage_undiscounted(self) -> pd.DataFrame:
         """
-        In Sprake model, we will just accrue O&M costs at an hourly rate from first timestep
-
-        It is acknowledged that leapyears will result in additional cost
+        Accrue O&M costs monthly.
         """
         odf = self._get_empty_df()
         if len(odf) == 0:
             return odf
-        bess_om_per_kwh_hour = self.bess_om_per_kwh_year / HOURS_IN_YEAR
+        bess_om_per_kwh_month = self.bess_om_per_kwh_year / 12
 
         # Capacity in Sprake model is constant
-        bess_om_per_hour = bess_om_per_kwh_hour * self._model.consumption_storage.storage_params.get('storage_capacity')
+        bess_om_per_month = bess_om_per_kwh_month * self._model.consumption_storage.storage_params.get('storage_capacity')
 
+        # Shift the costs to the end of the first timestep in each month so that it can be
+        # picked up in the meter summary statistics
         odf = (
             odf
-            .reset_index()
+            .pipe(assign_month_index, shift=0)
             .assign(
-                deltat = lambda df: (df['datetime'] -df['datetime'].shift(1, fill_value=df['datetime'].iloc[0])).dt.seconds/3600.0,
-                bess_costs = lambda df: df['deltat'] * bess_om_per_hour,
+                deltamonth = lambda df: (df['month_index'] - df['month_index'].shift(1, fill_value = df['month_index'].iloc[0]-1)),
+                bess_costs = lambda df: (df['deltamonth'] * bess_om_per_month).shift(1, fill_value = 0.0),
                 costs = lambda df: df['bess_costs']
             )
-            .set_index('datetime')
             .loc[:,['bess_costs','costs']]
         )
+
 
         return odf
 
@@ -413,10 +413,16 @@ class SprakeFinance(NewsegsFinance):
         other = self.om_costs_other_undiscounted
         other.columns = pd.MultiIndex.from_product([['other'], other.columns], names=mi_names)
 
-        return generation \
-            .join(storage) \
-            .join(billing) \
+        grid_import = self.import_costs_undiscounted
+        grid_import.columns = pd.MultiIndex.from_product([['grid_import'], grid_import.columns], names=mi_names)
+
+        return (
+            generation 
+            .join(storage) 
+            .join(billing) 
             .join(other)
+            .join(grid_import)
+        )
 
     @property
     def all_recurrent_costs_discounted(self) -> pd.DataFrame:
@@ -586,25 +592,25 @@ class SprakeFinance(NewsegsFinance):
 
     # Summary vectors
     def get_benefits_series_undiscounted(self) -> pd.Series:
-        benefits = self.all_receipts_undiscounted
+        benefits = self.all_receipts_undiscounted.loc[:,(slice(None), 'receipts')]
         srs = benefits.apply(sum, axis=1)
         srs.name = 'benefits'
         return srs
 
     def get_benefits_series_discounted(self) -> pd.Series:
-        benefits = self.all_receipts_discounted
+        benefits = self.all_receipts_discounted.loc[:,(slice(None), 'receipts')]
         srs = benefits.apply(sum, axis=1)
         srs.name = 'benefits'
         return srs
     
     def get_costs_series_undiscounted(self) -> pd.Series:
-        costs = self.all_costs_undiscounted
+        costs = self.all_costs_undiscounted.loc[:,(slice(None), 'costs')]
         srs = costs.apply(sum, axis=1)
         srs.name = 'costs'
         return srs
 
     def get_costs_series_discounted(self) -> pd.Series:
-        costs = self.all_costs_discounted
+        costs = self.all_costs_discounted.loc[:,(slice(None), 'costs')]
         srs = costs.apply(sum, axis=1)
         srs.name = 'costs'
         return srs
@@ -658,9 +664,9 @@ class SprakeFinance(NewsegsFinance):
             return payback_delta.days + payback_delta.seconds / 3600.0 / 24.0
         
         max_debt_index = np.argmin(simple_debt)
-        max_debt = simple_debt.iloc[max_debt_index]
+        max_debt = simple_debt[max_debt_index]
 
-        debt_reduction = simple_debt.iloc[-1] - simple_debt.iloc[max_debt_index]
+        debt_reduction = simple_debt[-1] - simple_debt[max_debt_index]
         if debt_reduction <= 0:
             return np.inf
         

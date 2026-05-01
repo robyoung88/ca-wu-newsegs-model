@@ -1,7 +1,8 @@
 # Avoid problem of TimeSpan __init__ annotation referencing TimeSpan before it is in namespace
 from __future__ import annotations
 
-from copy import copy
+import copy
+
 from functools import singledispatchmethod
 import operator
 from typing import TypeAlias, overload, override
@@ -229,22 +230,22 @@ class TimeSpan:
         return (self.end > other.end)
     
     def __add__(self, time_delta:TimedeltaScalar):
-        o = copy(self)
+        o = copy.copy(self)
         o.end = o.end + pd.Timedelta(time_delta)
         return o
     
     def __sub__(self, time_delta:TimedeltaScalar):
-        o = copy(self)
+        o = copy.copy(self)
         o.end = o.end - pd.Timedelta(time_delta)
         return o
 
     def __mul__(self, times:int|float):
-        o = copy(self)
+        o = copy.copy(self)
         o.end = o.start + o.delta * times
         return o
     
     def __truediv__(self, denom:int|float):
-        o = copy(self)
+        o = copy.copy(self)
         o.end = o.start + o.delta / denom
         return o
 
@@ -268,6 +269,7 @@ class RegTimeSpan(TimeSpan):
     """
     A TimeSpan which strides between its start and end in equally-spaced TimeDeltas
     """
+    _default_timestep = pd.Timedelta(1, 'h')
 
     @singledispatchmethod
     def __init__(
@@ -293,6 +295,8 @@ class RegTimeSpan(TimeSpan):
         super().__init__(start, end, tz)
         if timestep is not None:
             self.timestep = timestep
+        else:
+            self.timestep = copy.copy(self._default_timestep)
         
     @override
     @classmethod
@@ -331,7 +335,14 @@ class RegTimeSpan(TimeSpan):
         self._post_calc()
 
     @classmethod
-    def from_dates(cls, start_datetime: DatetimeScalar, end_datetime: DatetimeScalar, timestep:TimedeltaScalar, tz:TimeZoneScalar|None='utc', unit=None):
+    def from_dates(
+        cls,
+        start_datetime: DatetimeScalar,
+        end_datetime: DatetimeScalar,
+        timestep:TimedeltaScalar,
+        tz:TimeZoneScalar|None='utc',
+        unit=None
+    ):
         o = super(RegTimeSpan, cls).from_dates(start_datetime,end_datetime,tz)
         o.set_timestep(timestep, unit)
         return o
@@ -472,13 +483,19 @@ class OffsetRegTimeSpan(RegTimeSpan):
         e.g. if the timespan covers 1 year from 2020-01-01T00:00:00 to 2021-01-01T00:00:00, then the index for the latter date will never be returned
         """
         if self.wrap_right:
+            if isinstance(index, int) and index == 0:
+                # Even on a wrap_right, if starting at the start of the local ts, return that index
+                return index
+            
             idx = index % self.n_interval
             if isinstance(idx, int):
                 if idx==0:
+                    # We have wrapped at least once, so must return the last index
                     return self.n_interval
                 return idx
             else:
-                idx[idx==0] = self.n_interval
+                # Only return the last index if we have wrapped
+                idx[np.logical_and(idx==0, index != 0)] = self.n_interval
                 return idx
         else:
             return index % self.n_interval
@@ -568,6 +585,42 @@ def season_index(datetimes:pd.Series) -> npt.NDArray[np.int32]:
                 )
             )
         )
+    )
+
+def month_index(
+    datetimes: pd.Series|pd.DatetimeIndex,
+    ref_datetime: pd.Timestamp|None = None
+) -> npt.NDArray[np.int32]:
+    """
+    An array of integers indicating sequential month datetime belongs to in series
+
+    A month is determined to have passed if the month or year number has
+    increased and the day is greater than or equal to the reference. If the
+    reference is > 28, then the month will change at the last day of the month
+    if the month day is not achievable.
+
+    Not timezone safe.
+    """
+    if isinstance(datetimes, pd.DatetimeIndex):
+        datetimes = pd.Series(datetimes)
+    
+    if ref_datetime is None:
+        ref_datetime = datetimes.iloc[0]
+
+    ref_day = ref_datetime.day
+    ref_month = ref_datetime.month
+    ref_year = ref_datetime.year
+
+    return (
+        (
+            (datetimes.dt.year - ref_year) * 12 +
+            (datetimes.dt.month - ref_month) +
+            -1 * (
+                (datetimes.dt.daysinmonth >= ref_day) * (datetimes.dt.day < ref_day) +
+                (datetimes.dt.daysinmonth < ref_day) * (np.logical_not(datetimes.dt.is_month_end))
+            )
+        )
+        .to_numpy(dtype = np.int32)
     )
 
 def day_index(datetimes:pd.Series,
