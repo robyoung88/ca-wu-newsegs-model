@@ -1,7 +1,9 @@
 # Avoid problem of TimeSpan __init__ annotation referencing TimeSpan before it is in namespace
 from __future__ import annotations
 
+import re
 import copy
+from typing import Mapping
 
 from functools import singledispatchmethod
 import operator
@@ -15,6 +17,8 @@ import pytz
 import dateutil
 from pandas.core.tools.datetimes import DatetimeScalar, Timedelta
 import numpy.typing as npt
+
+from src.util import classfuncs
 
 SECONDS_IN_DAY = (24 * 3600)
 
@@ -42,6 +46,23 @@ PEAK_PERIODS = [
 
 TimedeltaScalar: TypeAlias = Timedelta|timedelta|np.timedelta64|str|int|float
 TimeZoneScalar: TypeAlias = str|tzinfo
+
+def timestamp_to_dict(ts: pd.Timestamp) -> Mapping:
+    return {
+        'ts_input' : str(ts),
+        'tz': str(ts.tz)
+    }
+
+def timestamp_from_dict(ts_dict: Mapping) -> pd.Timestamp:
+    return pd.Timestamp(**ts_dict)
+
+def timedelta_to_dict(td: pd.Timedelta) -> Mapping:
+    return{
+        'value': str(td)
+    }
+
+def timedelta_from_dict(td_dict: Mapping) -> pd.Timedelta:
+    return pd.Timedelta(**td_dict)
 
 class TimeSpan:
     _tz = 'utc'
@@ -190,9 +211,6 @@ class TimeSpan:
     def from_timespan(cls, timespan:TimeSpan):
         return cls(timespan)
 
-    def __str__(self):
-        return str(self.start) + " - " + str(self.end)
-
     def __lt__(self, other:TimeSpan) -> bool:
         """
         Does this time span start before other?
@@ -249,8 +267,41 @@ class TimeSpan:
         o.end = o.start + o.delta / denom
         return o
 
+    def __str__(self):
+        return str(self.start) + " - " + str(self.end)
+
     def __repr__(self):
-        return "" + re.search(r"\.(\w+)\'>$", str(type(self))).group(1) + "(" + self.start + ", " + self.end, ")"
+        return (
+            "" + classfuncs.get_class(self)
+            +  "(" + repr(self.start) + ", " 
+            + repr(self.end) + ")"
+        )
+    
+    def to_dict(self) -> Mapping:
+        odict = {
+            'class': classfuncs.get_class(self),
+            'start': timestamp_to_dict(self._start_dt),
+            'end': timestamp_to_dict(self._end_dt)
+        }
+        if hasattr(self, '_tz'):
+            odict['tz'] = str(self._tz)
+        return odict
+    
+    @classmethod
+    def from_dict(cls, ip: Mapping) -> TimeSpan:
+        ip = copy.copy(ip)
+
+        ip['start'] = timestamp_from_dict(ip.get('start'))
+        ip['end'] = timestamp_from_dict(ip.get('end'))
+
+        # To allow for the self-dispatch magic, need to
+        # set start as a positional arg
+        posargs = (ip.pop('start'),)
+
+        if ('class' in ip.keys()):
+            ip.pop('class')
+        
+        return cls(*posargs, **ip)
 
 # TimeSpan copy constructor
 @TimeSpan.__init__.register(TimeSpan)
@@ -365,23 +416,54 @@ class RegTimeSpan(TimeSpan):
     def to_pandas(self):
         return pd.date_range(self.start,self.end,freq=self.timestep)
     
-    def __str__(self):
-        return str(self.start) + " - " + str(self.end) + ", timestep: " + str(self.timestep)
-
-    def __repr__(self):
-        return "" + re.search(r"\.(\w+)\'>$", str(type(self))).group(1) + "(" + self.start + ", " + self.end, " timestep = " + self.timestep + ")"
-
-    def __eq__(self, other:RegTimeSpan) -> bool:
+    def __eq__(self, other: TimeSpan|RegTimeSpan) -> bool:
         """
         Do start, end and timestep of time spans match?
-        """
-        return (self.start == other.start) and (self.end == other.end) and (self.timestep == other.timestep)
 
-    def __ne__(self, other:RegTimeSpan) -> bool:
+        Reduces to start and end if other is a TimeSpan, for symmetry.
+        """
+        if not isinstance(other, TimeSpan):
+            raise ValueError('Other must be a TimeSpan instance, is ', type(other))
+        
+        ok = super().__eq__(other)
+
+        if isinstance(other, RegTimeSpan):
+            ok = ok and (self.timestep == other.timestep)
+        
+        return ok
+
+    def __ne__(self, other: TimeSpan|RegTimeSpan) -> bool:
         """
         Do not start, end and timestep of time spans match?
         """
         return not(self == other)
+
+    def __str__(self):
+        return (
+            str(self.start) 
+            + " - " + str(self.end) 
+            + ", timestep: " + str(self.timestep)
+        )
+
+    def __repr__(self):
+        return (
+            "" + classfuncs.get_class(self) 
+            + "(" + repr(self.start) + ", "
+            + repr(self.end) 
+            + " timestep = " + repr(self.timestep) + ")"
+        )
+    
+    def to_dict(self) -> Mapping:
+        odict = super().to_dict()
+        odict['timestep'] = timedelta_to_dict(self._timestep)
+        return odict
+    
+    @classmethod
+    def from_dict(cls, ip: Mapping) -> RegTimeSpan:
+        ip = copy.copy(ip)
+
+        ip['timestep'] = timedelta_from_dict(ip.get('timestep'))
+        return super(RegTimeSpan, cls).from_dict(ip)
 
 # RegTimeSpan copy constructor
 @RegTimeSpan.__init__.register(TimeSpan)
@@ -520,6 +602,86 @@ class OffsetRegTimeSpan(RegTimeSpan):
                 self._local_start = self._start_dt
                 self._remote_start = self._start_dt
 
+    def __eq__(self, other: TimeSpan) -> bool:
+        """
+        Do start, end and timestep of time spans match?
+
+        Reduces to start and end if other is a TimeSpan, for symmetry.
+        """
+        if not isinstance(other, TimeSpan):
+            raise ValueError('Other must be a TimeSpan instance, is ', type(other))
+        
+        ok = super().__eq__(other)
+
+        if isinstance(other, OffsetRegTimeSpan):
+            if self._offset_initialised:
+                ok = (
+                    ok 
+                    and (self._local_start == other._local_start) 
+                    and (self._remote_start == other._remote_start)
+                )
+        
+        return ok
+
+    def __ne__(self, other: TimeSpan) -> bool:
+        """
+        Do not time spans match?
+        """
+        return not(self == other)
+
+    def __str__(self):
+        root_str = super().__str__()
+        if (self._offset_initialised):
+            return (
+                root_str 
+                + ', offset: ' 
+                + str(self._local_start), " local to " 
+                + str(self._remote_start), " remote"
+            )
+        else:
+            return (
+                root_str
+                + ', offset not initialised'
+            )
+
+    def __repr__(self):
+        root_str = (
+            "" + classfuncs.get_class(self) 
+            + "(" + repr(self.start) + ", "
+            + repr(self.end) 
+            + " timestep = " + repr(self.timestep)
+        )
+        if self._offset_initialised:
+            return (
+                root_str
+                + ", local_start = " + self._local_start 
+                + ", remote_start = " + self._remote_start 
+                + ")"
+            )
+        return root_str + ")"
+
+    def to_dict(self) -> Mapping:
+        odict = super().to_dict()
+        if self._offset_initialised:
+            odict['local_start'] = timestamp_to_dict(self._local_start)
+            odict['remote_start'] = timestamp_to_dict(self._remote_start)
+        return odict
+    
+    @classmethod
+    def from_dict(cls, ip: Mapping) -> OffsetRegTimeSpan:
+        ip = copy.copy(ip)
+
+        local_start = ip.pop('local_start', None)
+        remote_start = ip.pop('remote_start', None)
+        o = super(OffsetRegTimeSpan, cls).from_dict(ip)
+
+        if local_start is not None:
+            o.set_offset(
+                timestamp_from_dict(local_start),
+                timestamp_from_dict(remote_start)
+            )
+        return o
+
 # OffsetRegTimeSpan copy constructor
 @OffsetRegTimeSpan.__init__.register(TimeSpan)
 def OffsetRegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
@@ -528,6 +690,23 @@ def OffsetRegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
         self._offset_initialised = start.offset_initialised
         self._local_start = start.local_start
         self._remote_start = start.remote_start
+
+_TIMESPAN_CONSTRUCTORS = {
+    'TimeSpan': TimeSpan,
+    'RegTimeSpan': RegTimeSpan,
+    'OffsetRegTimeSpan': OffsetRegTimeSpan
+}
+
+def timespan_from_dict(ip: Mapping):
+    """
+    Returns an instance of the correct timespan from a dictionary.
+    """
+    ip = copy.copy(ip)
+    classname = ip.pop('class')
+    constructor = _TIMESPAN_CONSTRUCTORS.get(classname)
+    if constructor is None:
+        raise ValueError('No timespan class found for ', classname)
+    return constructor.from_dict(ip)
 
 def delta_days(datetimes:pd.Series) -> pd.Series:
     """
