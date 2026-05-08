@@ -20,6 +20,9 @@ def _get_true_datetimes_srs(
     return srs['timespan'].to_pandas()[idx]
 
 class InMemoryLocalEnv(NewsegsLocalEnvironment):
+    _version = '0.0.1'
+    _name = 'Local environment'
+
     def __init__(self):
         self._wind_series = {}
         self._horizontal_solar_flux_series = {}
@@ -212,8 +215,14 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
                 ts2 = RegTimeSpan(timespan)
                 ts2.timestep = timestep
                 return ts2.to_pandas()
+    
+    def __str__(self) -> str:
+        return super().__str__() + "; name: " + self._name
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
+    _version = '0.0.1'
+    _name = 'Wider environment'
+
     def __init__(self):
         self._temperature_series = None
         self._horizontal_solar_flux_series = None
@@ -264,4 +273,6 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
                 return _get_true_datetimes_srs(self._horizontal_solar_flux_series, timespan)
             case _:
                 return None
-    
+
+    def __str__(self) -> str:
+        return super().__str__() + "; name: " + self._name

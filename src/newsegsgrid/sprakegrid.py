@@ -1,16 +1,22 @@
 from __future__ import annotations
-import re, copy
+import copy
 from collections.abc import Mapping
+from typing_extensions import override
+from numbers import Number
+from functools import singledispatchmethod
+
 import numpy as np
 import numpy.typing as npt
 
-from src.newsegsgrid import NewsegsGrid
-from src.core import ABCNewsegsModuleResult
-from src.core import RegTimeSpan
+from src.newsegsgrid.newsegsgrid import NewsegsGrid
+from src.util import classfuncs
+from src.core import newsegsmodule
+from src.core import timespan as modtimespan
+from src.newsegsmodel import newsegsmodel
 
-class SprakeGridResult(ABCNewsegsModuleResult):
+class SprakeGridResult(newsegsmodule.ABCNewsegsModuleResult):
     def __init__(self,
-                 timespan: RegTimeSpan,
+                 timespan: modtimespan.RegTimeSpan,
                  import_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]],
                  export_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]]
                  ) -> None:
@@ -18,7 +24,7 @@ class SprakeGridResult(ABCNewsegsModuleResult):
         self.set_import_cost(import_unit_cost)
         self.set_export_cost(export_unit_cost)
 
-    def get_timespan(self) -> RegTimeSpan:
+    def get_timespan(self) -> modtimespan.RegTimeSpan:
         return self._timespan
     @property
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
@@ -55,21 +61,50 @@ class SprakeGridResult(ABCNewsegsModuleResult):
     def set_export_cost(self, export_unit_cost:npt.ArrayLike) -> None:
         self._export = np.asarray(export_unit_cost).flatten()
 
+
 class SprakeGrid(NewsegsGrid):
 
-    _default_name = "Sprake Grid Module"
+    _name = "Sprake Grid Module"
 
-    def __init__(self, import_per_unit:float=0.20, export_per_unit:float=0.07):
-        self._name = self._default_name
+    @singledispatchmethod
+    def __init__(
+        self,
+        import_per_unit: Number | SprakeGrid,
+        export_per_unit: Number | None = None,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None
+    ) -> None:
+        raise ValueError('First argument must be a number or a SprakeGrid, is %s', type(import_per_unit))
+
+    # Copy constructor is registered underneath class definition for late-bind.
+    
+    @__init__.register(Number)
+    def _from_Number(
+        self,
+        import_per_unit: Number,
+        export_per_unit: Number = 0.07,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None
+    ) -> None:
         self.import_rate = import_per_unit
         self.export_rate = export_per_unit
 
+        if name is not None:
+            self.name = name
+        
+        if model is not None:
+            self.model = model
+
+    @classmethod
+    def from_none(cls):
+        return cls(0.20)
+
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self) -> newsegsmodel.NewsegsModel | None:
         return self._model
 
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model: newsegsmodel.NewsegsModel) -> None:
         self._model = model
         self.dirty = True
 
@@ -99,41 +134,84 @@ class SprakeGrid(NewsegsGrid):
         self._export_rate = rate
         self.dirty = True
 
-    def run(self, timespan:TimeSpan):
-        if not isinstance(timespan, RegTimeSpan):
+    def run(self, timespan: modtimespan.TimeSpan):
+        if not isinstance(timespan, modtimespan.RegTimeSpan):
             if self.model is None:
                 raise ValueError("Grid module requires a model to serve timestep")
-            timespan = RegTimeSpan(timespan)
+            timespan = modtimespan.RegTimeSpan(timespan)
             timespan.timestep = self.model.get_default_timestep()
         
         model_length = timespan.n_node
 
         self.dirty = False
-        return SprakeGridResult(timespan,
-                                self.import_rate * np.ones(model_length),
-                                self.export_rate * np.ones(model_length))
+        return SprakeGridResult(
+            timespan,
+            self.import_rate * np.ones(model_length),
+            self.export_rate * np.ones(model_length)
+        )
 
     @classmethod
-    def from_characteristics(cls,
-                                name:str,
-                                import_rate:float,
-                                export_rate:float
-                                ) -> SprakeGrid:
+    def from_characteristics(
+        cls,
+        import_rate: Number,
+        export_rate: Number,
+        name: str|None,
+        model: newsegsmodel.NewsegsModel | None = None
+    ) -> SprakeGrid:
         
-        o = cls(import_rate,export_rate)
-        o.name = name
+        o = cls(import_rate, export_rate)
+        if name is not None:
+            o.name = name
+        if model is not None:
+            o.model = model
         return o
 
+    @override
     def to_dict(self) -> Mapping:
         odict = {
-            'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
+            'class': classfuncs.get_class(self),
             'name': self._name,
             'import_rate': self._import_rate,
             'export_rate': self._export_rate
         }
 
         return odict
+    
+    @override
+    def sync_with_dict(self, config: Mapping) -> None:
+        config = copy.copy(config)
 
+        conf_keys = config.keys()
+        for k in conf_keys:
+            if hasattr(self, k):
+                v = config.get(k)
+
+                # If the attribute is a read-write property, its class attribute 
+                # will have an fset
+                try:
+                    prop = getattr(type(self), k)
+                    if hasattr(prop, 'fset'):
+                        getattr(prop, 'fset')(self, v)
+                    else:
+                        # Otherwise, we assume it is a simple attribute that may be overwritten
+                        setattr(self, k, v)
+                except AttributeError:
+                    setattr(self, k, v)
+
+    @override
     @classmethod
-    def from_dict(cls, input:dict) -> SprakeGrid:
+    def from_dict(cls, input: dict) -> SprakeGrid:
+        input = copy.copy(input)
+        input.pop('class', None)
         return cls.from_characteristics(**input)
+
+# SprakeGrid copy constructor
+@SprakeGrid.__init__.register(SprakeGrid)
+def _SprakeGrid_from_other(
+    self,
+    other: SprakeGrid
+) -> None:
+    self.import_rate = other.import_rate
+    self.export_rate = other.export_rate
+    self.name = other.name
+    self.model = other.model

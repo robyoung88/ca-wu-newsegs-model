@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import pandas as pd
 from src.core.timespan import TimeSpan, RegTimeSpan
-from collections.abc import Iterable, Collection
+from collections.abc import Iterable, Collection, Mapping
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
     @property
@@ -124,6 +124,7 @@ class NewsegsModule(metaclass=ABCMeta):
     """
 
     _dirty_flag = True
+    _model = None
 
     @abstractmethod
     def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
@@ -135,11 +136,10 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         The callback model associated with the module
         """
-        ...
 
     @model.setter
     @abstractmethod
-    def model(self, callback_model:NewsegsModel):
+    def model(self, model: NewsegsModel):
         ...
 
     @abstractmethod
@@ -149,12 +149,18 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         ...
     
-    #@abstractmethod
-    #def load_dict(self):
-    #    """
-    #    Update configuration using a dictionary
-    #    """
-    #    ...
+    @abstractmethod
+    def sync_with_dict(self, config: Mapping) -> None:
+        """
+        Update configuration using a dictionary.
+        """
+
+    @classmethod
+    @abstractmethod
+    def from_dict(cls, config: Mapping) -> NewsegsModule:
+        """
+        An instance of the module configured per a dictionary.
+        """
 
     @property
     def dirty(self) -> bool:

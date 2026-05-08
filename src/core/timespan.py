@@ -1,7 +1,9 @@
+"""
+Ways of defining and comparing blocks of time.
+"""
 # Avoid problem of TimeSpan __init__ annotation referencing TimeSpan before it is in namespace
 from __future__ import annotations
 
-import re
 import copy
 from typing import Mapping
 
@@ -40,9 +42,6 @@ PEAK_PERIODS = [
      'bst': True,
      'index': 1}
 ]
-
-# -----------------------------------------------------------------------------
-# Ways of defining and comparing blocks of time
 
 TimedeltaScalar: TypeAlias = Timedelta|timedelta|np.timedelta64|str|int|float
 TimeZoneScalar: TypeAlias = str|tzinfo
@@ -423,7 +422,7 @@ class RegTimeSpan(TimeSpan):
         Reduces to start and end if other is a TimeSpan, for symmetry.
         """
         if not isinstance(other, TimeSpan):
-            raise ValueError('Other must be a TimeSpan instance, is ', type(other))
+            raise ValueError('Other must be a TimeSpan instance, is %s', type(other))
         
         ok = super().__eq__(other)
 
