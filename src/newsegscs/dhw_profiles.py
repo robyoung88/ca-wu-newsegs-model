@@ -65,6 +65,11 @@ def get_dhw_energy_consumption(datetimes,
             year = lambda df: df['datetime'].dt.year,
             doy = lambda df: df['datetime'].dt.day_of_year
         )
+        # Shift up one, as the indices apply to the metered intervals which are ended by the current timeindex
+        .assign(
+            year = lambda df: df['year'].shift(1, fill_value = df['year'].iloc[0]),
+            doy = lambda df: df['doy'].shift(1, fill_value = df['doy'].iloc[0])
+        )
     )
 
     years = oframe['year'].unique()

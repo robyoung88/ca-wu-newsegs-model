@@ -1,5 +1,8 @@
 import pandas as pd
 
+from common import setup_script_env
+setup_script_env()
+
 from config import settings
 
 from src.newsegscs.ev_profiles import characterise_dates_evprofile
@@ -12,6 +15,7 @@ if __name__ == '__main__':
 
     fn = os.path.join(
             settings.get('SprakeExcelValidationLoc'),
+            'Input sheets',
             'sprake_profile_ev_days.csv'
         )
     
@@ -33,6 +37,7 @@ if __name__ == '__main__':
 
     fn = os.path.join(
             settings.get('SprakeExcelValidationLoc'),
+            'Input sheets',
             'sprake_model_ev_days.csv'
         )
     

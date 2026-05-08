@@ -2930,7 +2930,7 @@ def create_app(external_stylesheets=None, run_model=False):
     app.layout = serve_layout
 
     # Load model
-    app.mdl = SprakeModel()
+    app.mdl = SprakeModel.from_none()
     # Temp - override default PV array size
     app.mdl.generation.generator.generators[1].n_arrays=100
     if run_model:

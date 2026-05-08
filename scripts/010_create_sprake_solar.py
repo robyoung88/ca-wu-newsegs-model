@@ -9,6 +9,9 @@ Assume at venue 72, St Asaph
 import pandas as pd
 import pvlib
 
+from common import setup_script_env
+setup_script_env()
+
 from config import settings
 
 if __name__ == '__main__':

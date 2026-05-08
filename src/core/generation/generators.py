@@ -996,7 +996,21 @@ class ABCPVElecGenerator(ABCElecGenerator):
 
     @location.setter
     def location(self, loc: location.Location) -> None:
-        self._location = location.AspectLocation(loc)
+        if isinstance(loc, location.AspectLocation):
+            self._location = location.AspectLocation(loc)
+        else:
+            az = self._location.azimuth
+            pt = self._location.pitch
+            
+            if isinstance(loc, location.RaisedLocation):
+                self._location = location.AspectLocation(loc)
+            else:
+                ht = self._location.height_agl
+                self._location = location.AspectLocation(loc)
+                self._location.height_agl = ht
+                        
+            self._location.azimuth = az
+            self._location.pitch = pt
 
     @classmethod
     def from_characteristics(

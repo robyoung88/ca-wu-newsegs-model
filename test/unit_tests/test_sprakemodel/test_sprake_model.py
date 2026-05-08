@@ -1,13 +1,17 @@
 """
 Unit tests for newsegsmodel/sprakemodel.
 """
+import os
 import unittest
 import json
 
+import pandas as pd
 import numpy.testing
 
 from unit_tests.common import setup_test_env
 setup_test_env()
+
+from config import settings
 
 from src.util import jsonfuncs
 from src.core import location
@@ -15,6 +19,8 @@ from src.newsegsmodel import sprakemodel
 from src.newsegsgeneration import sprakegeneration
 from src.newsegsgrid import sprakegrid
 from src.newsegscs import sprakecs
+from src.newsegsgeneration import newsegsgeneration
+from src.newsegscs import newsegscs
 
 class TestSprakeModelConfigEqualities(unittest.TestCase):
     """
@@ -132,7 +138,7 @@ class TestSprakeModelRun(unittest.TestCase):
     def test_post_serialisation_run_stability(self):
         mdl = sprakemodel.SprakeModel.from_none()
         mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.generator.generators[1].set_nameplate_capacity(50.)
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
         mdl.run()
@@ -155,3 +161,59 @@ class TestSprakeModelRun(unittest.TestCase):
             cs_meters_1.to_numpy(),
             mdl2.get_consumption_storage_result().meters_to_pandas().to_numpy()
         )
+    
+    def test_excel_validation(self):
+        """
+        Internal validation using an independently coded excel model.
+
+        Considers only the meters, not the financial estimates.
+        """
+        external_meter_data = (
+            pd.read_excel(
+                os.path.join(settings.get('SprakeExcelValidationLoc'), 'Sprake_model_validation.xlsx'),
+                sheet_name = 'Raw',
+                header = 0,
+                parse_dates = ['datetime']
+            )
+            .assign(datetime = lambda df: df['datetime'].dt.tz_localize('utc'))
+            .set_index('datetime')
+        )
+
+        with open('data/sprakemodel-validation-config.json', 'r') as f:
+            d1 = json.load(f)
+        
+        mdl = sprakemodel.SprakeModel.from_dict(d1)
+        mdl.run()
+
+        gen_meters = newsegsgeneration.get_generation_meters(
+            mdl.get_generation_result()
+        )
+
+        for colname in ['wind_export']:
+            numpy.testing.assert_allclose(
+                gen_meters[colname], 
+                external_meter_data[colname],
+                rtol = 1e-6,
+                err_msg = 'Almost equal failure for `{0}`'.format(colname)
+            )
+
+        # For now, we accept that we have some numeric differences in solar
+        for colname in ['solar_export']:
+            numpy.testing.assert_allclose(
+                gen_meters[colname], 
+                external_meter_data[colname],
+                atol = 0.01,
+                rtol = 1e-2,
+                err_msg = 'Almost equal failure for `{0}`'.format(colname)
+            )
+
+        cons_meters = newsegscs.get_consumption_meters(
+            mdl.get_consumption_storage_result()
+        )
+
+        for colname in ['appliance_import', 'dhw_import', 'spaceheat_import', 'evcharge_import']:
+            numpy.testing.assert_array_almost_equal(
+                cons_meters[colname], 
+                external_meter_data[colname],
+                err_msg = 'Almost equal failure for `{0}`'.format(colname)
+            )

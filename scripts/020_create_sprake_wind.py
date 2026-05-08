@@ -9,6 +9,9 @@ is appropriate.
 import numpy as np
 import pandas as pd
 
+from common import setup_script_env
+setup_script_env()
+
 from config import settings
 
 from src.util import wind_resource_helpers
