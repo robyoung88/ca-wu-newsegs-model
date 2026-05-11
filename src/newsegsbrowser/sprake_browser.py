@@ -15,8 +15,8 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegsfinance import SprakeFinance
+from src.newsegsmodel import sprakemodel
+from src.newsegsfinance import sprakefinance
 
 from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
@@ -27,15 +27,13 @@ from src.newsegsbrowser.postprocess import post_sprake_consumption_results, post
 from src.newsegsbrowser.postprocess import post_sprake_finance_benefits_results, post_sprake_finance_costs_results
 from src.newsegsbrowser.postprocess import post_sprake_finance_value_results
 
-from src.newsegsbrowser import ROOTDIR
+from src.newsegsbrowser import ROOTDIR, STATICDATA
 #from config import settings
 
 _CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
 
 with open(_CONST_FILE, 'r') as f:
     MODEL_CONSTANTS = json.load(f)
-
-print(MODEL_CONSTANTS)
 
 def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
     """
@@ -1693,7 +1691,7 @@ def create_layout():
 
     return dbc.Container(mapview, fluid=False)
 
-def sprake_model_set_gen_input(gen_input:dict, mdl:SprakeModel):
+def sprake_model_set_gen_input(gen_input: dict, mdl: sprakemodel.SprakeModel):
     turbine_size = mdl.generation.generator.generators[0].turbine.nameplate_capacity
     n_turbines = gen_input.get('wind_capacity', 0.0) / turbine_size
     
@@ -1705,11 +1703,11 @@ def sprake_model_set_gen_input(gen_input:dict, mdl:SprakeModel):
     
     mdl.generation.dirty = True
 
-def sprake_model_set_stor_input(stor_input:dict, mdl:SprakeModel):
+def sprake_model_set_stor_input(stor_input: dict, mdl: sprakemodel.SprakeModel):
     mdl.consumption_storage.set_storage_params(stor_input.copy())
     # consumption storage will be dirtied by this method
 
-def sprake_model_set_bc_input(bc_input:dict, mdl:SprakeModel):
+def sprake_model_set_bc_input(bc_input: dict, mdl: sprakemodel.SprakeModel):
     cs = mdl.consumption_storage
     spaceheat_p = cs.spaceheat_params
     dhw_p = cs.dhw_params
@@ -1721,7 +1719,7 @@ def sprake_model_set_bc_input(bc_input:dict, mdl:SprakeModel):
     dhw_p['seasonal_variance'] = bc_input.get('seasonal_variance', 0.01)
     cs.dirty = True
 
-def sprake_model_set_dc_input(dc_input:dict, mdl:SprakeModel):
+def sprake_model_set_dc_input(dc_input: dict, mdl: sprakemodel.SprakeModel):
     cs = mdl.consumption_storage
     app_p = cs.appliance_params
     ev_p = cs.ev_params
@@ -1731,21 +1729,21 @@ def sprake_model_set_dc_input(dc_input:dict, mdl:SprakeModel):
     ev_p['n_evs'] = dc_input.get('n_evs_per_household', 0.0) * cs.n_units
     cs.dirty = True
 
-def sprake_model_set_mc_input(mc_input:dict, mdl:SprakeModel):
+def sprake_model_set_mc_input(mc_input: dict, mdl: sprakemodel.SprakeModel):
     ts = mdl.get_run_period()
     ts.end = ts.start + pd.Timedelta(mc_input.get('horizon',1)*365, unit='d') 
     while ts.end.day != ts.start.day:
         ts.end = ts.end + pd.Timedelta(1, unit='d')
     mdl.set_run_period(ts)
 
-def sprake_finance_set_finance_config(fcfg: dict, fnc: SprakeFinance):
+def sprake_finance_set_finance_config(fcfg: dict, fnc: sprakefinance.SprakeFinance):
     fnc.set_unit_costs_from_dict(fcfg.get('unit_costs'))
     fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0))
     fnc.cost_discount_rate = float(fcfg.get('cost_discount_rate', 0.0))
 
 def sprake_model_to_interface_configs(
-    mdl: SprakeModel, 
-    fnc: SprakeFinance
+    mdl: sprakemodel.SprakeModel, 
+    fnc: sprakefinance.SprakeFinance
 ) -> Tuple[dict, dict]:
     gen_input = {
         'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
@@ -2930,12 +2928,28 @@ def create_app(external_stylesheets=None, run_model=False):
     app.layout = serve_layout
 
     # Load model
-    app.mdl = SprakeModel.from_none()
-    # Temp - override default PV array size
-    app.mdl.generation.generator.generators[1].n_arrays=100
+    with open(
+        os.path.join(
+            STATICDATA, 
+            'sprakemodel-validation-config.json'
+        ), 
+    'r') as f:
+        mdl_conf = json.load(f)
+    app.mdl = sprakemodel.SprakeModel.from_dict(mdl_conf)
+
     if run_model:
         app.mdl.run()
-    app.finance = SprakeFinance()
+
+    # Load finance configuration
+    with open(
+        os.path.join(
+            STATICDATA,
+            'sprakemodel-validation-finance-config.json'
+        ),
+    'r') as f:
+        fnc_conf = json.load(f)
+    
+    app.finance = sprakefinance.SprakeFinance.from_none()
     app.finance.set_model(app.mdl)
 
     app = add_site_selector_callbacks(app)
