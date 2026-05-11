@@ -6,6 +6,7 @@ import unittest
 import json
 
 import pandas as pd
+import numpy as np
 import numpy.testing
 
 from unit_tests.common import setup_test_env
@@ -16,6 +17,7 @@ from config import settings
 from src.util import jsonfuncs
 from src.core import location
 from src.newsegsmodel import sprakemodel
+from src.newsegsfinance import sprakefinance
 from src.newsegsgeneration import sprakegeneration
 from src.newsegsgrid import sprakegrid
 from src.newsegscs import sprakecs
@@ -217,3 +219,70 @@ class TestSprakeModelRun(unittest.TestCase):
                 external_meter_data[colname],
                 err_msg = 'Almost equal failure for `{0}`'.format(colname)
             )
+
+class TestSprakeFinanceRun(unittest.TestCase):
+    """
+    Primarily for performing validation on the finance configuration.
+    """
+
+    def test_excel_validation(self):
+
+        # Acceptable relative tolerance for validation
+        RTOL = 1e-6
+
+        external_finance_data = (
+            pd.read_excel(
+                os.path.join(settings.get('SprakeExcelValidationLoc'), 'Sprake_model_validation.xlsx'),
+                sheet_name = 'Totals',
+                header = 0,
+                index_col = 'name'
+            )
+        )
+
+        with open('data/sprakemodel-validation-config.json', 'r') as f:
+            d1 = json.load(f)
+
+        with open('data/sprakemodel-validation-finance-config.json', 'r') as f:
+            fd1 = json.load(f)
+        
+        mdl = sprakemodel.SprakeModel.from_dict(d1)
+        mdl.run()
+
+        fnc = sprakefinance.SprakeFinance.from_dict(fd1)
+        fnc.model = mdl
+
+        numpy.testing.assert_allclose(
+            fnc.get_total_present_costs_undiscounted(),
+            external_finance_data.loc['total_cost_undiscounted', 'value'],
+            rtol = RTOL
+        )
+
+        numpy.testing.assert_allclose(
+            fnc.get_total_present_costs_discounted(),
+            external_finance_data.loc['total_cost_discounted', 'value'],
+            rtol = RTOL
+        )
+
+        numpy.testing.assert_allclose(
+            fnc.get_total_present_benefits_undiscounted(),
+            external_finance_data.loc['total_benefits_undiscounted', 'value'],
+            rtol = RTOL
+        )
+
+        numpy.testing.assert_allclose(
+            fnc.get_total_present_benefits_discounted(),
+            external_finance_data.loc['total_benefits_discounted', 'value'],
+            rtol = RTOL
+        )
+
+        numpy.testing.assert_allclose(
+            fnc.get_net_present_value_undiscounted(),
+            external_finance_data.loc['npv_undiscounted', 'value'],
+            rtol = 10*RTOL
+        )
+
+        numpy.testing.assert_allclose(
+            fnc.get_net_present_value_discounted(),
+            external_finance_data.loc['npv_discounted', 'value'],
+            rtol = 10*RTOL
+        )

@@ -1,20 +1,28 @@
 from __future__ import annotations
-import re
-from collections.abc import Mapping
+import copy
+from typing import override, Mapping
+from numbers import Number
+from functools import singledispatchmethod
 
 import numpy as np
 import pandas as pd
 
+from src.util import classfuncs
 from src.core.timespan import delta_days
 from src.core.newsegsmodule import filter_meter_indices
+from src.newsegsfinance import newsegsfinance
+from src.newsegsfinance import common as common_finance
+from src.newsegsmodel import newsegsmodel
+
 from src.newsegsfinance import NewsegsFinance, apply_discount_factor, sum_all_to_horizon
 from src.newsegsmodel import NewsegsModel
-from src.stats.core import assign_month_index
+from src.stats import core as stats_core
 
+# Not strictly true, but good enough for finance.
 HOURS_IN_YEAR = 8760.0
 
-class SprakeFinance(NewsegsFinance):
-    _default_name = 'Sprake Finance Module'
+class SprakeFinance(newsegsfinance.NewsegsFinance):
+    _name = 'Sprake Finance Module'
 
     _default_unit_costs = {
         'wind_capex_per_kw': 1500.0,
@@ -43,17 +51,60 @@ class SprakeFinance(NewsegsFinance):
         'grid_import': ('grid_import')
     }
 
-    def __init__(self):
-        self._name = self._default_name
+    @singledispatchmethod
+    def __init__(
+        self,
+        unit_costs: Mapping | Number | SprakeFinance,
+        benefit_discount_rate: Number | None = None,
+        cost_discount_rate: Number | None = None,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None
+    ) -> None:
+        raise ValueError('First argument must be a Mapping, a Number, or a SprakeFinance, is %s', type(unit_costs))
+    
+    # Copy constructor is registered underneath class definition for late-bind
 
-        self._unit_costs = self._default_unit_costs.copy()
-        
-        self._benefit_discount_rate = 0.0
-        self._cost_discount_rate = 0.0
-        
-        self._model = None
+    @__init__.register(Number)
+    def _from_number(
+        self,
+        benefit_discount_rate: Number,
+        cost_discount_rate: Number = 0.0,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None,
+    ) -> None:
+        self._unit_costs = type(self)._default_unit_costs.copy()
 
-    def set_unit_costs_from_dict(self, input_dict:Mapping) -> None:
+        self.benefit_discount_rate = benefit_discount_rate
+        self.cost_discount_rate = cost_discount_rate
+
+        if name is not None:
+            self.name = name
+        
+        if model is not None:
+            self.set_model(model)
+    
+    @__init__.register(dict)
+    def _from_dict(
+        self,
+        unit_costs: Mapping,
+        benefit_discount_rate: Number = 0.0,
+        cost_discount_rate: Number = 0.0,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None,
+    ) -> None:
+        a = locals()
+        del a['self']
+        del a['unit_costs']
+        del a['benefit_discount_rate']
+
+        self.__init__(benefit_discount_rate, **a)
+        self.set_unit_costs_from_dict(unit_costs)
+    
+    @classmethod
+    def from_none(cls):
+        return cls(0.0)
+
+    def set_unit_costs_from_dict(self, input_dict: Mapping) -> None:
         """
         Update all unit costs using a dictionary.
 
@@ -300,7 +351,10 @@ class SprakeFinance(NewsegsFinance):
     @property
     def om_costs_generation_undiscounted(self) -> pd.DataFrame:
         """
-        Accrue O&M costs monthly
+        Frame of timeseries of o&m costs of generators.
+
+        Broken down into `wind_costs`, `pv_costs` and `costs` (i.e. total).
+        O&M costs are accrued in single monthly payments.
         """
         odf = self._get_empty_df()
         if len(odf) == 0:
@@ -316,7 +370,7 @@ class SprakeFinance(NewsegsFinance):
         # picked up in the meter summary statistics
         odf = (
             odf
-            .pipe(assign_month_index, shift=0)
+            .pipe(stats_core.assign_month_index, shift=0)
             .assign(
                 deltamonth = lambda df: (df['month_index'] - df['month_index'].shift(1, fill_value = df['month_index'].iloc[0]-1)),
                 wind_costs = lambda df: (df['deltamonth'] * wind_om_per_month).shift(1, fill_value = 0.0),
@@ -330,12 +384,21 @@ class SprakeFinance(NewsegsFinance):
 
     @property
     def om_costs_generation_discounted(self) -> pd.DataFrame:
+        """
+        Frame of timeseries of o&m costs of generators (cost discount applied).
+
+        Broken down into `wind_costs`, `pv_costs` and `costs` (i.e. total).
+        O&M costs are accrued in single monthly payments.
+        """
         return apply_discount_factor(self.om_costs_generation_undiscounted, self._cost_discount_rate, shift=1)
 
     @property
     def om_costs_storage_undiscounted(self) -> pd.DataFrame:
         """
-        Accrue O&M costs monthly.
+        Frame of timeseries of o&m costs of storage technologies.
+
+        Broken down into `bess_costs` and `costs` (i.e. total).
+        O&M costs are accrued in single monthly payments.
         """
         odf = self._get_empty_df()
         if len(odf) == 0:
@@ -349,7 +412,7 @@ class SprakeFinance(NewsegsFinance):
         # picked up in the meter summary statistics
         odf = (
             odf
-            .pipe(assign_month_index, shift=0)
+            .pipe(stats_core.assign_month_index, shift=0)
             .assign(
                 deltamonth = lambda df: (df['month_index'] - df['month_index'].shift(1, fill_value = df['month_index'].iloc[0]-1)),
                 bess_costs = lambda df: (df['deltamonth'] * bess_om_per_month).shift(1, fill_value = 0.0),
@@ -363,6 +426,12 @@ class SprakeFinance(NewsegsFinance):
 
     @property
     def om_costs_storage_discounted(self) -> pd.DataFrame:
+        """
+        Frame of timeseries of o&m costs of storage technologies (cost discount applied).
+
+        Broken down into `bess_costs` and `costs` (i.e. total).
+        O&M costs are accrued in single monthly payments.
+        """
         return apply_discount_factor(self.om_costs_storage_undiscounted, self._cost_discount_rate, shift=1)
 
     @property
@@ -690,14 +759,68 @@ class SprakeFinance(NewsegsFinance):
             .assign(costs = lambda df: -df['costs']) \
             .pipe(sum_all_to_horizon, horizon=horizon)
     
+    @override
     def to_dict(self):
         return {
-            'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
+            'class': classfuncs.get_class(self),
             'name': self._name,
             'unit_costs': self._unit_costs,
             'benefit_discount_rate': self._benefit_discount_rate,
             'cost_discount_rate': self._cost_discount_rate
         }
+    
+    def sync_with_dict(self, config: Mapping) -> None:
+        """
+        Synchronise configuration with a config dictionary.
+        """
+        
+        config = copy.copy(config)
+
+        unit_costs = config.get('unit_costs', None)
+        if unit_costs:
+            self.set_unit_costs_from_dict(unit_costs)
+        
+        # This looks risky, but practically may only result in
+        # some redundant attributes if the config is bad.
+        conf_keys = config.keys()
+        for k in conf_keys:
+            if hasattr(self, k):
+                v = config.get(k)
+
+                # If the attribute is a read-write property, its class attribute 
+                # will have an fset
+                try:
+                    prop = getattr(type(self), k)
+                    if hasattr(prop, 'fset'):
+                        if getattr(prop, 'fset') is not None:
+                            getattr(prop, 'fset')(self, v)
+                        else:
+                            # Property is read-only; do nothing
+                            ...
+                    else:
+                        # Otherwise, we assume it is a simple attribute that may be overwritten
+                        setattr(self, k, v)
+                except AttributeError:
+                    setattr(self, k, v)
+    
+    @classmethod
+    def from_dict(cls, config: Mapping) -> SprakeFinance:
+        o = cls.from_none()
+        o.sync_with_dict(config)
+
+        return o
+
+# SprakeFinance copy constructor
+@SprakeFinance.__init__.register(SprakeFinance)
+def _SprakeFinance_from_other(
+    self,
+    other: SprakeFinance
+) -> None:
+    self._unit_costs = copy.copy(other.unit_costs)
+    self.benefit_discount_rate = other.benefit_discount_rate
+    self.cost_discount_rate = other.cost_discount_rate
+    self.name = other.name
+    self.model = other.model
 
 def _make_unit_cost_property(key: str):
     def getter(self) -> float:

@@ -18,4 +18,4 @@ mdl.consumption_storage.ev_per_unit = 0.2
 
 d1 = mdl.to_dict()
 with open('data/sprakemodel-validation-config.json', 'w') as f:
-    json.dump(d1, f, cls = jsonfuncs.NumpyEncoder, sort_keys=True, indent=4)
+    json.dump(d1, f, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4)
