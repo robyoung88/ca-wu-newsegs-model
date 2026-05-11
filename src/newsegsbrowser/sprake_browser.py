@@ -21,6 +21,7 @@ from src.newsegsfinance import sprakefinance
 from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
+from src.newsegsbrowser import results_table
 from src.newsegsbrowser.stats import *
 from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results
 from src.newsegsbrowser.postprocess import post_sprake_consumption_results, post_sprake_net_results
@@ -1743,7 +1744,7 @@ def sprake_finance_set_finance_config(fcfg: dict, fnc: sprakefinance.SprakeFinan
 
 def sprake_model_to_interface_configs(
     mdl: sprakemodel.SprakeModel, 
-    fnc: sprakefinance.SprakeFinance
+    fnc: sprakefinance.SprakeFinance,
 ) -> Tuple[dict, dict]:
     gen_input = {
         'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
@@ -1822,8 +1823,9 @@ def add_initial_callback(app):
         Input('onload-div', 'children')
     )
     def sync_mdl_run_init(_):
-        app.mdl.run()
-        print('run complete')
+        print('Starting first run')
+        app.models[app.selected_config].run()
+        print('First run complete')
         return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
@@ -1834,7 +1836,7 @@ def add_initial_callback(app):
     def trigger_mdl_run(_):
         """Config change - run the model now"""
         print('Starting normally triggered run')
-        app.mdl.run()
+        app.models[app.selected_config].run()
         print('Normal run complete')
         return json.dumps(str(datetime.datetime.now()))
 
@@ -1845,7 +1847,7 @@ def add_initial_callback(app):
         prevent_initial_call = True
     )
     def trigger_financial_results_post_run(_, _2):
-        app.finance.dirty = False
+        app.finances[app.selected_config].dirty = False
         return json.dumps(str(datetime.datetime.now()))
     
     @app.callback(
@@ -1855,8 +1857,8 @@ def add_initial_callback(app):
         prevent_initial_call=True
     )
     def sync_config(_):
-        mdl = app.mdl
-        fnc = app.finance
+        mdl = app.models[app.selected_config]
+        fnc = app.finances[app.selected_config]
 
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
@@ -2206,7 +2208,7 @@ def add_result_callbacks(app):
         """
         Create the generation results data after a completed model run
         """
-        mdl = app.mdl
+        mdl = app.models[app.selected_config]
 
         print ("making gen results")
         gen_results = post_sprake_gen_results.gen_results_to_interface_sprake(mdl)
@@ -2222,7 +2224,7 @@ def add_result_callbacks(app):
         """
         Create the storage results data after a completed model run
         """
-        mdl = app.mdl
+        mdl = app.models[app.selected_config]
 
         print ("making stor results")
         stor_results = post_sprake_storage_results.stor_results_to_interface_sprake(mdl)
@@ -2238,7 +2240,7 @@ def add_result_callbacks(app):
         """
         Create the consumption results data after a completed model run.
         """
-        mdl = app.mdl
+        mdl = app.models[app.selected_config]
 
         print ("making consumption results")
         cons_results = post_sprake_consumption_results.consumption_results_to_interface_sprake(mdl)
@@ -2254,7 +2256,7 @@ def add_result_callbacks(app):
         """
         Create the net energy results data after a completed model run.
         """
-        mdl = app.mdl
+        mdl = app.models[app.selected_config]
 
         print ("making net energy results")
         net_results = post_sprake_net_results.net_results_to_interface_sprake(mdl)
@@ -2269,8 +2271,8 @@ def add_result_callbacks(app):
         """
         Create the system owner financial benefits results after a completed model run.
         """
-        mdl = app.mdl
-        fnc = app.finance
+        mdl = app.models[app.selected_config]
+        fnc = app.finances[app.selected_config]
 
         print ("making so financial benefits results")
         fnc_benefits_results = (
@@ -2288,8 +2290,8 @@ def add_result_callbacks(app):
         """
         Create the system owner financial costs results after a completed model run.
         """
-        mdl = app.mdl
-        fnc = app.finance
+        mdl = app.models[app.selected_config]
+        fnc = app.finances[app.selected_config]
 
         print ("making so financial costs results")
         fnc_costs_results = (
@@ -2307,8 +2309,8 @@ def add_result_callbacks(app):
         """
         Create the system owner financial value results after a completed model run.
         """
-        mdl = app.mdl
-        fnc = app.finance
+        mdl = app.models[app.selected_config]
+        fnc = app.finances[app.selected_config]
 
         print ("making so financial value results")
         fnc_value_results = (
@@ -2834,8 +2836,8 @@ def add_input_callbacks(app):
         """
         Pass the configuration dictionaries into the Sprake model
         """
-        mdl = app.mdl
-        fnc = app.finance
+        mdl = app.models[app.selected_config]
+        fnc = app.finances[app.selected_config]
 
         # Get the existing configs to check against
         w_mcfg, w_fcfg = sprake_model_to_interface_configs(mdl, fnc)
@@ -2892,6 +2894,7 @@ def add_model_callbacks(app):
     app = add_result_callbacks(app)
     app = add_result_header_callbacks(app)
     app = add_input_callbacks(app)
+    app = results_table.add_configuration_selection_callbacks(app)
 
     return app
 
@@ -2927,6 +2930,9 @@ def create_app(external_stylesheets=None, run_model=False):
     )
     app.layout = serve_layout
 
+    app.selected_config = 0
+    app.config_names = ['Configuration Name']
+
     # Load model
     with open(
         os.path.join(
@@ -2935,10 +2941,10 @@ def create_app(external_stylesheets=None, run_model=False):
         ), 
     'r') as f:
         mdl_conf = json.load(f)
-    app.mdl = sprakemodel.SprakeModel.from_dict(mdl_conf)
+    app.models = [sprakemodel.SprakeModel.from_dict(mdl_conf)]
 
     if run_model:
-        app.mdl.run()
+        app.models[app.selected_config].run()
 
     # Load finance configuration
     with open(
@@ -2949,8 +2955,8 @@ def create_app(external_stylesheets=None, run_model=False):
     'r') as f:
         fnc_conf = json.load(f)
     
-    app.finance = sprakefinance.SprakeFinance.from_none()
-    app.finance.set_model(app.mdl)
+    app.finances = [sprakefinance.SprakeFinance.from_none()]
+    app.finances[0].set_model(app.models[0])
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)

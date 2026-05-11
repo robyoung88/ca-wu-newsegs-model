@@ -73,7 +73,9 @@ DEFAULT_ICONS = {
     'config-1': 'bi bi-1-circle-fill',
     'config-2': 'bi bi-2-circle-fill',
     'config-3': 'bi bi-3-circle-fill',
-    'config-4': 'bi bi-4-circle-fill'
+    'config-4': 'bi bi-4-circle-fill',
+    'config-duplicate': 'bi bi-copy',
+    'config-remove': 'bi bi-dash-circle',
 }
 def get_icon(icon_name:None|Sequence|str=None,
              icon_class:None|Sequence|str=None,
