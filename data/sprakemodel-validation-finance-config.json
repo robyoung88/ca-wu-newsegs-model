@@ -1,0 +1,19 @@
+{
+    "class": "SprakeFinance",
+    "name": "Sprake Finance Module",
+    "unit_costs": {
+        "wind_capex_per_kw": 1500.0,
+        "wind_om_per_kw_year": 46.0,
+        "pv_capex_per_kw": 1000.0,
+        "pv_om_per_kw_year": 10.5,
+        "bess_capex_per_kwh": 191.772,
+        "bess_om_per_kwh_year": 16.719,
+        "resident_sc_per_unit_day": 0.0,
+        "resident_var_per_unit": 0.2975,
+        "grid_export_var_per_unit": 0.1,
+        "grid_import_sc_per_day": 0.0,
+        "grid_import_var_per_unit": 0.35
+    },
+    "benefit_discount_rate": 0.035,
+    "cost_discount_rate": 0.035
+}

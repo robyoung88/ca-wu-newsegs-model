@@ -2,6 +2,7 @@
 Core functions used by multiple statistical procedures.
 """
 from collections.abc import Collection
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -9,6 +10,7 @@ import pandas as pd
 
 from src.core import SECONDS_TO_HOURS
 from src.core.timespan import year_index, season_index, day_index, peaktime_index, PEAK_PERIODS
+from src.core.timespan import month_index
 
 def assign_delta_hours(
     data: pd.DataFrame|pd.Series
@@ -83,6 +85,33 @@ def assign_season_index(
         ann_data = ann_data.assign(season_index = lambda df: df['season_index'].shift(shift, fill_value=df['season_index'].iloc[-1]))
     
     return ann_data
+
+def assign_month_index(
+    data: pd.DataFrame|pd.Series,
+    shift: int = -1,
+) -> pd.DataFrame:
+    """
+    Augment a datetime-indexed meter dataframe with the month index.
+
+    The month index will be shifted by default, assuming that meters
+    are retrospective (i.e. sum over previous timestep).
+    """
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+    
+    if "month_index" in data.columns:
+        warnings.warn('month_index is already present in data and will be overwritten')
+    mon_data = data.assign(month_index = lambda df: month_index(pd.Series(df.index)))
+
+    if shift > 0:
+        mon_data = mon_data.assign(
+            month_index = lambda df: df['month_index'].shift(shift, fill_value=df['month_index'].iloc[0])
+        )
+    elif shift <0:
+        mon_data = mon_data.assign(
+            month_index = lambda df: df['month_index'].shift(shift, fill_value=df['month_index'].iloc[-1]))
+    
+    return mon_data
 
 def assign_peaktime_index(
     data: pd.DataFrame|pd.Series,

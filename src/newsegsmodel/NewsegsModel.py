@@ -3,13 +3,16 @@ Abstract base class for NewSEGS model
 """
 
 from abc import ABCMeta, abstractmethod
+from typing import Mapping
+import re
 
 from src.core import TimeSpan, TimedeltaScalar
 from src.core import NewsegsLocalEnvironment,NewsegsWiderEnvironment
 from src.core import ABCNewsegsModuleResult
-from src.newsegsgeneration import NewsegsGeneration
+from src.newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from src.newsegsgrid import NewsegsGrid
 from src.newsegscs import NewsegsCS
+from src.util import classfuncs
 
 class NewsegsModel(metaclass=ABCMeta):
     """
@@ -38,6 +41,7 @@ class NewsegsModel(metaclass=ABCMeta):
     """
 
     _dirty_flag = False
+    _name = 'NewSEGS Model'
 
     @abstractmethod
     def run(self):
@@ -172,3 +176,15 @@ class NewsegsModel(metaclass=ABCMeta):
             self.consumption_storage.dirty or
             self._dirty_flag
         )
+
+    def to_dict(self) -> Mapping:
+        """
+        A dictionary representation of the model configuration (not results).
+        """
+        odict = {
+            'class': classfuncs.get_class(self),
+            #'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
+            'name': self._name
+        }
+
+        return odict

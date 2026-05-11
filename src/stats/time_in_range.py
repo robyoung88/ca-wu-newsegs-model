@@ -138,6 +138,14 @@ def max_continuous_time_in_range(
     kwargs = locals()
     intervals = in_range_intervals_unclosed(**kwargs)
     
+    # If no intervals exist, return zero-length
+    if len(intervals) == 0:
+        return {
+            'datetime_start': str(timeseries.index[0]),
+            'datetime_end': str(timeseries.index[0]),
+            'hours': 0.0
+        }
+
     # Deal with case that all intervals are one timestep long
     if np.all(np.logical_and(
         intervals['starting_sequence'],
@@ -161,6 +169,14 @@ def max_continuous_time_in_range(
         .sort_values('interval_length', ascending=False)
     )
 
+    # If no intervals exist, return zero-length
+    if len(intervals) == 0:
+        return {
+            'datetime_start': str(timeseries.index[0]),
+            'datetime_end': str(timeseries.index[0]),
+            'hours': 0.0
+        }
+    
     # Although there may be multiple maxima, just choose the first
     x = intervals.iloc[0, :]
     return {

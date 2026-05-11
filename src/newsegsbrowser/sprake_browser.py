@@ -1234,6 +1234,44 @@ def create_model_settings_input_card():
                         create_numeric_card_input('model-settings-time-horizon',
                                                   'Time horizon (years)',
                                                   'mdl-timehorizon-input')
+                    ),
+                ])
+            ])
+        ]),
+    ])
+
+def create_finance_settings_input_card():
+    """
+    HTML inputs for general finance settings (e.g. discount rates)
+    """
+    return dbc.Card([
+        dbc.CardBody([
+            html.H2([get_icon('finance-settings'), 'Finance Settings'],
+            className='card-title'),
+
+            html.H4([
+                get_icon('finance-settings-benefit-discount'),
+                " = ",
+                html.Span("0%", id="fnc-smry-benefit-dr"),
+                "; ",
+                get_icon('finance-settings-cost-discount'),
+                " = ",
+                html.Span("0%", id="fnc-smry-cost-dr"),
+            ],
+            className='card-subtitle'),
+
+            html.Details([
+                html.Summary(""),
+                html.Div([
+                    dbc.Row(
+                        create_numeric_card_input('finance-settings-benefit-discount',
+                                                  'Benefit discount rate (%)',
+                                                  'fnc-benefit-dr-input')
+                    ),
+                    dbc.Row(
+                        create_numeric_card_input('finance-settings-cost-discount',
+                                                  'Cost discount rate (%)',
+                                                  'fnc-cost-dr-input')
                     )
                 ])
             ])
@@ -1296,6 +1334,10 @@ def create_generation_results_card():
 
             html.H4([
                 'Annual generation: ',
+                get_icon('generation'),
+                " = ",
+                html.Span("0.0"),
+                " kWh; ",
                 get_icon('gen-wind'),
                 " = ",
                 html.Span("0.0"),
@@ -1564,6 +1606,15 @@ def create_layout():
             width=12)
         ]),
 
+        # Finance settings
+
+        dbc.Row([
+            dbc.Col([
+                create_finance_settings_input_card()
+            ],
+            width=12)
+        ]),
+
         html.Hr(),
 
         # Results
@@ -1643,8 +1694,15 @@ def create_layout():
     return dbc.Container(mapview, fluid=False)
 
 def sprake_model_set_gen_input(gen_input:dict, mdl:SprakeModel):
-    mdl.generation.generator.generators[0].nameplate_capacity = gen_input.get('wind_capacity', 0.0)
-    mdl.generation.generator.generators[1].nameplate_capacity = gen_input.get('pv_capacity', 0.0)
+    turbine_size = mdl.generation.generator.generators[0].turbine.nameplate_capacity
+    n_turbines = gen_input.get('wind_capacity', 0.0) / turbine_size
+    
+    pv_size = mdl.generation.generator.generators[1].pv_array.nameplate_capacity
+    n_arrays = gen_input.get('pv_capacity', 0.0) / pv_size
+
+    mdl.generation.generator.generators[0].n_turbines = n_turbines
+    mdl.generation.generator.generators[1].n_arrays = n_arrays
+    
     mdl.generation.dirty = True
 
 def sprake_model_set_stor_input(stor_input:dict, mdl:SprakeModel):
@@ -2008,6 +2066,25 @@ def add_initial_callback(app):
         )
 
     @app.callback(
+        Output('fnc-smry-benefit-dr', 'children'),
+        Output('fnc-smry-cost-dr', 'children'),
+        Output('fnc-benefit-dr-input', 'value'),
+        Output('fnc-cost-dr-input', 'value'),
+        Input('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_inputs_to_store(fcfg):
+        if fcfg is None:
+            return no_update, no_update, no_update, no_update
+        fcfg = json.loads(fcfg)
+        return (
+            f"{fcfg.get('benefit_discount_rate', 0.0):,.1%}",
+            f"{fcfg.get('cost_discount_rate', 0.0):,.1%}",
+            100.*fcfg.get('benefit_discount_rate', 0.0),
+            100.*fcfg.get('cost_discount_rate', 0.0)
+        )
+
+    @app.callback(
         Output('res-gen-wind-tbl', 'children'),
         Output('res-gen-pv-tbl', 'children'),
         Output('res-gen-combined-tbl', 'children'),
@@ -2261,12 +2338,18 @@ def add_result_header_callbacks(app):
             str_1 = 'Total generation: '
             wind_ann = gm.get('wind_export').get('sum')
             pv_ann = gm.get('solar_export').get('sum')
+            total_ann = wind_ann + pv_ann
         else:
             str_1 = 'Annual generation: '
             wind_ann = gm.get('wind_export').get('mean')
             pv_ann = gm.get('solar_export').get('mean')
+            total_ann = wind_ann + pv_ann
         return [
             str_1,
+            get_icon('generation'),
+            " = ",
+            html.Span(f'{total_ann:,.1f}'),
+            " kWh; ",
             get_icon('gen-wind'),
             " = ",
             html.Span(f'{wind_ann:,.1f}'),
@@ -2725,6 +2808,30 @@ def add_input_callbacks(app):
         mcfg['mc_input'] = mc_input
         return json.dumps(mcfg)
 
+    @app.callback(
+        Output('finance-config', 'data', allow_duplicate=True),
+        Input('fnc-benefit-dr-input', 'value'),
+        Input('fnc-cost-dr-input', 'value'),
+        State('finance-config', 'data'),
+        prevent_initial_call=True
+    )
+    def update_finance_settings(
+        benefit_dr,
+        cost_dr,
+        fcfg
+    ):
+        if fcfg is None:
+            fcfg = {}
+        else:
+            fcfg = json.loads(fcfg)
+
+        if not benefit_dr is None:
+            fcfg['benefit_discount_rate'] = float(benefit_dr) / 100.
+        if not cost_dr is None:
+            fcfg['cost_discount_rate'] = float(cost_dr) / 100.
+
+        return json.dumps(fcfg)
+
     def sync_configs_to_model(mcfg: dict, fcfg: dict) -> Tuple[bool, bool]:
         """
         Pass the configuration dictionaries into the Sprake model
@@ -2797,11 +2904,9 @@ def serve_layout():
     session_id = str(uuid.uuid4())
 
     return html.Div([
-        html.H1('OI!', id='oi'),
         create_layout(),
         dcc.Store(data=session_id, id='session-id')
     ])
-    
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
@@ -2815,14 +2920,6 @@ def create_app(external_stylesheets=None, run_model=False):
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
-    assets_path = os.path.join(
-        ROOTDIR,
-        'newsegsbrowser',
-        'assets'
-    )
-    print (assets_path)
-    print (os.getcwd())
-    #assets_path = '/newsegsbrowser/assets'
     assets_path = '/assets'
     app = Dash(
         __name__,
@@ -2833,7 +2930,7 @@ def create_app(external_stylesheets=None, run_model=False):
     app.layout = serve_layout
 
     # Load model
-    app.mdl = SprakeModel()
+    app.mdl = SprakeModel.from_none()
     # Temp - override default PV array size
     app.mdl.generation.generator.generators[1].n_arrays=100
     if run_model:

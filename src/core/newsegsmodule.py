@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import pandas as pd
 from src.core.timespan import TimeSpan, RegTimeSpan
-from collections.abc import Iterable
+from collections.abc import Iterable, Collection, Mapping
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
     @property
@@ -58,15 +58,65 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
                             index=datetime,
                             columns=self.get_dsm_names())
 
-def filter_meters(results: ABCNewsegsModuleResult,
-                  meter_type: str
-) -> Iterable:
+def filter_meters(
+    results: ABCNewsegsModuleResult,
+    meter_type: Collection|str|None = None,
+    meter_name: Collection|str|None = None,                
+) -> Collection[str]:
     """
-    The meters which match a particular type.
+    The meter names which match a particular type and/or name collection
     """
+    if meter_type is None and meter_name is None:
+        raise ValueError('Need at least one of `meter_type` and `meter_name`')
+    
     nms = results.get_meter_names()
-    typs = results.get_meter_types()
-    return [mtr for mtr, typ in zip(nms, typs) if typ == meter_type]
+    if meter_type is not None:
+        typs = results.get_meter_types()
+
+        if isinstance(meter_type, str):
+            nms = [mtr for mtr, typ in zip(nms, typs) if typ == meter_type]
+        else:
+            nms = [mtr for mtr, typ in zip(nms, typs) if typ in meter_type]
+    
+    if meter_name is not None:
+        if isinstance(meter_type, str):
+            nms = [mtr for mtr in nms if mtr == meter_name]
+        else:
+            nms = [mtr for mtr in nms if mtr in meter_name]
+
+    return nms
+
+def filter_meter_indices(
+    results: ABCNewsegsModuleResult,
+    meter_type: Collection|str|None = None,
+    meter_name: Collection|str|None = None,
+) -> Collection[int]:
+    """
+    The meter indexes which match a particular type and/or name collection
+    """
+    if meter_type is None and meter_name is None:
+        raise ValueError('Need at least one of `meter_type` and `meter_name`')
+    
+    nms = results.get_meter_names()
+    indxs = range(len(nms))
+    
+    if meter_type is not None:
+        typs = results.get_meter_types()
+
+        if isinstance(meter_type, str):
+            indxs = [indxs[i] for i, typ in enumerate(typs) if typ == meter_type]
+            nms = [nms[i] for i in indxs]
+        else:
+            indxs = [indxs[i] for i, typ in enumerate(typs) if typ in meter_type]
+            nms = [nms[i] for i in indxs]
+    
+    if meter_name is not None:
+        if isinstance(meter_type, str):
+            indxs = [indxs[i] for i, nm in enumerate(nms) if nm == meter_name]
+        else:
+            indxs = [indxs[i] for i, nm in enumerate(nms) if nm in meter_name]
+
+    return indxs
 
 class NewsegsModule(metaclass=ABCMeta):
     """
@@ -74,6 +124,7 @@ class NewsegsModule(metaclass=ABCMeta):
     """
 
     _dirty_flag = True
+    _model = None
 
     @abstractmethod
     def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
@@ -85,11 +136,10 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         The callback model associated with the module
         """
-        ...
 
     @model.setter
     @abstractmethod
-    def model(self, callback_model:NewsegsModel):
+    def model(self, model: NewsegsModel):
         ...
 
     @abstractmethod
@@ -99,12 +149,18 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         ...
     
-    #@abstractmethod
-    #def load_dict(self):
-    #    """
-    #    Update configuration using a dictionary
-    #    """
-    #    ...
+    @abstractmethod
+    def sync_with_dict(self, config: Mapping) -> None:
+        """
+        Update configuration using a dictionary.
+        """
+
+    @classmethod
+    @abstractmethod
+    def from_dict(cls, config: Mapping) -> NewsegsModule:
+        """
+        An instance of the module configured per a dictionary.
+        """
 
     @property
     def dirty(self) -> bool:
