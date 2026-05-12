@@ -29,6 +29,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
             header.addEventListener('click', (e) => {
                 if (isResizing) return;
                 if (toggle && e.target.closest && e.target.closest('#annual-horizon-toggle')) return;
+                if (toggle && e.target.closest && e.target.closest('button')) return;
 
                 if (!(drawer.style.height == '') && drawer.style.height != '80px') {
                     restore_height = drawer.style.height || restore_height;

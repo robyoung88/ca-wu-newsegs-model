@@ -21,6 +21,24 @@ def create_tbl_head(n_configs):
         )
     ]
 
+def create_config_selector_headerbutton(config_index, app = None):
+    if app is not None and app.selected_config == (config_index - 1):
+        do_outline = False
+    else:
+        do_outline = True
+
+    contents = dbc.Button(
+        html.I(
+            className = get_icon('config-{}'.format(config_index), style_name = 'raw'),
+            style={'display': 'inline'}
+        ),
+        color='primary',
+        id = {'type': 'config-hdrfocus-btn', 'index': config_index},
+        outline = do_outline
+    )
+
+    return contents
+
 def create_single_configuration_selector_row(config_index, app = None):
     if config_index < 2:
         primary_container = html.H1
@@ -173,6 +191,7 @@ def add_configuration_selection_callbacks(app):
 
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
+        Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
         Output('n_active_conf', 'data', allow_duplicate = True),
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
         State('n_active_conf', 'data'),
@@ -180,9 +199,11 @@ def add_configuration_selection_callbacks(app):
     )
     def add_duplicate_config(n_clicks,n_active):
         # Add the selector as the penultimate row
+        NUP = (no_update, no_update, no_update)
+        
         trig = ctx.triggered_id
         if trig is None or n_clicks is None:
-            return no_update, no_update
+            return NUP
 
         n_conf = json.loads(n_active).get('n', 1) + 1
 
@@ -190,7 +211,7 @@ def add_configuration_selection_callbacks(app):
             trigger_index = trig['index']
 
             if n_clicks[trigger_index-1] is None:
-                return no_update, no_update
+                return NUP
             
             app.config_names.append(app.config_names[trigger_index-1] + " Copy")
             mdl_ref = app.models[trigger_index - 1]
@@ -206,7 +227,7 @@ def add_configuration_selection_callbacks(app):
             fnc._dirty = False
             app.finances.append(fnc)
         else:
-            return no_update, no_update
+            return NUP
         
         # TODO: Instruct app to update results tables
 
@@ -215,13 +236,20 @@ def add_configuration_selection_callbacks(app):
             create_single_configuration_selector_row(n_conf, app)
         )
 
+        patched_header_comparator_selector = Patch()
+        patched_header_comparator_selector.append(
+            create_config_selector_headerbutton(n_conf, app)
+        )
+
         return (
             patched_comparator_selector,
+            patched_header_comparator_selector,
             json.dumps({'n': n_conf})
         )  
     
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
+        Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
         Output('n_active_conf', 'data', allow_duplicate = True),
         Input({'type': 'config-remove-btn', 'index': ALL}, 'n_clicks'),
         State('n_active_conf', 'data'),
@@ -229,16 +257,18 @@ def add_configuration_selection_callbacks(app):
         prevent_initial_call=True
     )
     def remove_config(n_clicks, n_active, ids):
+        NUP = (no_update, no_update, no_update)
+
         trig = ctx.triggered_id
         if trig is None:
-            return no_update, no_update
+            return NUP
         
         if trig['type'] == 'config-remove-btn':
             trigger_index = trig['index']
             if trigger_index == 1:
-                return no_update, no_update
+                return NUP
         else:
-            return no_update, no_update
+            return NUP
 
         # There are not necessarily as many "config-remove-btn" items
         # as there are trigger indices (or at least they may not go as
@@ -250,7 +280,7 @@ def add_configuration_selection_callbacks(app):
                 nclick_i = i
                 break
         if n_clicks[nclick_i] is None:
-            return no_update, no_update
+            return NUP
         
         # Pop the name, decrement the index, and update the children
         dropped = app.config_names.pop(trigger_index-1)
@@ -269,34 +299,49 @@ def add_configuration_selection_callbacks(app):
             contents = [create_single_configuration_selector_row(i, app) for i in range(2, n_conf+1)]
         else:
             contents = []
+
+        hdr_contents = [create_config_selector_headerbutton(i, app = None) for i in range(1, n_conf + 1)]
+
         return (
             contents,
+            hdr_contents,
             json.dumps({'n': n_conf})
         )
 
     @app.callback(
         Output({'type': 'config-focus-btn', 'index': ALL}, 'outline'),
+        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline'),
+        Output('live-config-watcher', 'data', allow_duplicate = True),
         Output('model-run-watcher', 'data', allow_duplicate = True),
         Input({'type': 'config-focus-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'config-hdrfocus-btn', 'index': ALL}, 'n_clicks'),
         prevent_initial_call = True
     )
-    def set_focussed_config(n_clicks):
-        trig = ctx.triggered_id
+    def set_focussed_config(n_clicks, n_clicks_hdr):
         n_conf = len(app.config_names)
+        NUP = ([no_update] * n_conf, [no_update] * n_conf, no_update, no_update)
+        
+        trig = ctx.triggered_id
         if trig is None:
-            return ([no_update] * n_conf, no_update)
+            return NUP
         
         trigger_index = trig['index']
         # Should always be as many buttons as configurations, so can
         # use the index directly
-        if n_clicks[trigger_index-1] is None:
-            return ([no_update] * n_conf, no_update)
+        if trig['type'] == 'config-focus-btn':
+            if n_clicks[trigger_index-1] is None:
+                return NUP
+        elif trig['type'] == 'config-hdrfocus-btn':
+            if n_clicks_hdr[trigger_index-1] is None:
+                return NUP
 
         # TODO: set the app focussed configuration here. Also trigger watchers
         app.selected_config = trigger_index - 1
         
         return (
             [False if i == (trigger_index-1) else True for i in range(n_conf)],
+            [False if i == (trigger_index-1) else True for i in range(n_conf)],
+            json.dumps(str(datetime.datetime.now())),
             json.dumps(str(datetime.datetime.now()))
         )
 

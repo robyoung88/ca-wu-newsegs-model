@@ -1292,9 +1292,31 @@ def create_results_header():
                         html.H1([get_icon('results'), 'Results'],
                         style={
                             'display': 'inline-block',
-                            'width':'50%',
+                            'width':'33%',
                             'float': 'left'
                         }),
+
+                        html.Span([
+                            dbc.Button(
+                                html.I(
+                                    className = get_icon('config-1', style_name = 'raw'),
+                                    style={'display': 'inline'}
+                                ),
+                                color='primary',
+                                id = {'type': 'config-hdrfocus-btn', 'index': 1},
+                                outline = False
+                            )
+                        ],
+                        id = 'config-selector-hdrcontainer',
+                        style = {
+                            'display': 'inline-block',
+                            'width': '33%',
+                            'float': 'left',
+                            'vertical-align': 'bottom',
+                            'padding-top': '10px',
+                            #'alignItems': 'center',
+                        }
+                        ),
 
                         html.Span([
                             html.H5("Per year",style={'display': 'inline-block', 'verticalAlign': 'middle'}),
@@ -1306,7 +1328,7 @@ def create_results_header():
                         ],
                         style={
                             'display': 'inline-block',
-                            'width':'50%',
+                            'width':'33%',
                             'float': 'right',
                             "justifyContent": "flex-end",
                             "alignItems": "center",
@@ -1662,6 +1684,7 @@ def create_layout():
         html.Div(id='onload-div'), # To trigger first callback
 
         # To trigger resync of input fields from model, e.g. after a load
+        dcc.Store(id='firstload-config-watcher'),
         dcc.Store(id='live-config-watcher'),
 
         # Updated when the model configuration is updated.
@@ -1803,7 +1826,7 @@ def add_initial_callback(app):
     Functions to synchronise app interface with the served model
     """
     @app.callback(
-        Output('live-config-watcher', 'data'),
+        Output('firstload-config-watcher', 'data'),
         Input('onload-div', 'children')
     )
     def sync_config_init(_):
@@ -1853,10 +1876,11 @@ def add_initial_callback(app):
     @app.callback(
         Output('model-config', 'data', allow_duplicate=True),
         Output('finance-config', 'data', allow_duplicate=True),
+        Input('firstload-config-watcher', 'data'),
         Input('live-config-watcher', 'data'),
         prevent_initial_call=True
     )
-    def sync_config(_):
+    def sync_config(_, _2):
         mdl = app.models[app.selected_config]
         fnc = app.finances[app.selected_config]
 
