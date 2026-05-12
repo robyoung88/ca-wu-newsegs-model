@@ -1829,7 +1829,7 @@ def add_initial_callback(app):
         return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
-        Output('model-run-watcher', 'data'),
+        Output('model-run-watcher', 'data', allow_duplicate = True),
         Input('model-config-watcher', 'data'),
         prevent_initial_call = True
     )
@@ -2158,8 +2158,8 @@ def add_initial_callback(app):
         bnfts = create_so_benefits_results(fnc, not(ann_hori_toggle))
         return (
             bnfts,
-            '{:,.0f}'.format(fnc.get('smry_residential_peryear')),
-            '{:,.0f}'.format(fnc.get('smry_exports_peryear')),
+            '{:,.0f}'.format(fnc[app.selected_config].get('smry_residential_peryear')),
+            '{:,.0f}'.format(fnc[app.selected_config].get('smry_exports_peryear')),
         )
     
     @app.callback(
@@ -2176,8 +2176,8 @@ def add_initial_callback(app):
         fnc = json.loads(fnc)
         return (
             create_so_costs_results(fnc, not(ann_hori_toggle)),
-            '{:,.0f}'.format(fnc.get('smry_import_fixed_cost_peryear')),
-            '{:,.0f}'.format(fnc.get('smry_import_variable_cost_peryear'))
+            '{:,.0f}'.format(fnc[app.selected_config].get('smry_import_fixed_cost_peryear')),
+            '{:,.0f}'.format(fnc[app.selected_config].get('smry_import_variable_cost_peryear'))
         )
 
     @app.callback(
@@ -2202,9 +2202,10 @@ def add_result_callbacks(app):
         Output('res-gen', 'data'),
         Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
+        State('res-gen', 'data'),
         prevent_initial_call=True
     )
-    def set_res_gen(_,_2):
+    def set_res_gen(_,_2,res_gen):
         """
         Create the generation results data after a completed model run
         """
@@ -2212,15 +2213,26 @@ def add_result_callbacks(app):
 
         print ("making gen results")
         gen_results = post_sprake_gen_results.gen_results_to_interface_sprake(mdl)
-        return json.dumps(gen_results)
+        if res_gen is None:
+            res_gen = [None] * len(app.config_names)
+        else:
+            res_gen = json.loads(res_gen)
+        
+        if len(res_gen) == app.selected_config:
+            res_gen.append(gen_results)
+        else:
+            res_gen[app.selected_config] = gen_results
+        
+        return json.dumps(res_gen)
 
     @app.callback(
         Output('res-stor', 'data'),
         Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
+        State('res-stor', 'data'),
         prevent_initial_call=True
     )
-    def set_res_stor(_,_2):
+    def set_res_stor(_,_2, res_stor):
         """
         Create the storage results data after a completed model run
         """
@@ -2228,15 +2240,27 @@ def add_result_callbacks(app):
 
         print ("making stor results")
         stor_results = post_sprake_storage_results.stor_results_to_interface_sprake(mdl)
-        return json.dumps(stor_results)
+
+        if res_stor is None:
+            res_stor = [None] * len(app.config_names)
+        else:
+            res_stor = json.loads(res_stor)
+        
+        if len(res_stor) == app.selected_config:
+            res_stor.append(stor_results)
+        else:
+            res_stor[app.selected_config] = stor_results
+
+        return json.dumps(res_stor)
 
     @app.callback(
         Output('res-cons', 'data'),
         Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
+        State('res-cons', 'data'),
         prevent_initial_call=True
     )
-    def set_res_cons(_,_2):
+    def set_res_cons(_,_2, res_cons):
         """
         Create the consumption results data after a completed model run.
         """
@@ -2244,15 +2268,27 @@ def add_result_callbacks(app):
 
         print ("making consumption results")
         cons_results = post_sprake_consumption_results.consumption_results_to_interface_sprake(mdl)
-        return json.dumps(cons_results)
+
+        if res_cons is None:
+            res_cons = [None] * len(app.config_names)
+        else:
+            res_cons = json.loads(res_cons)
+        
+        if len(res_cons) == app.selected_config:
+            res_cons.append(cons_results)
+        else:
+            res_cons[app.selected_config] = cons_results
+
+        return json.dumps(res_cons)
 
     @app.callback(
         Output('res-net', 'data'),
         Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
+        State('res-net', 'data'),
         prevent_initial_call=True
     )
-    def set_res_net(_,_2):
+    def set_res_net(_,_2, res_net):
         """
         Create the net energy results data after a completed model run.
         """
@@ -2260,14 +2296,26 @@ def add_result_callbacks(app):
 
         print ("making net energy results")
         net_results = post_sprake_net_results.net_results_to_interface_sprake(mdl)
-        return json.dumps(net_results)
+
+        if res_net is None:
+            res_net = [None] * len(app.config_names)
+        else:
+            res_net = json.loads(res_net)
+        
+        if len(res_net) == app.selected_config:
+            res_net.append(net_results)
+        else:
+            res_net[app.selected_config] = net_results
+
+        return json.dumps(res_net)
     
     @app.callback(
         Output('res-finance-so-benefits', 'data'),
         Input('finance-config-watcher', 'data'),
+        State('res-finance-so-benefits', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_benefits_so(_):
+    def set_res_finance_benefits_so(_, res_ben):
         """
         Create the system owner financial benefits results after a completed model run.
         """
@@ -2279,14 +2327,26 @@ def add_result_callbacks(app):
             post_sprake_finance_benefits_results
             .finance_benefits_results_to_interface_sprake(mdl,fnc)
         )
-        return json.dumps(fnc_benefits_results)
+
+        if res_ben is None:
+            res_ben = [None] * len(app.config_names)
+        else:
+            res_ben = json.loads(res_ben)
+        
+        if len(res_ben) == app.selected_config:
+            res_ben.append(fnc_benefits_results)
+        else:
+            res_ben[app.selected_config] = fnc_benefits_results
+
+        return json.dumps(res_ben)
     
     @app.callback(
         Output('res-finance-so-costs', 'data'),
         Input('finance-config-watcher', 'data'),
+        State('res-finance-so-costs', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_costs_so(_):
+    def set_res_finance_costs_so(_, res_cost):
         """
         Create the system owner financial costs results after a completed model run.
         """
@@ -2298,14 +2358,26 @@ def add_result_callbacks(app):
             post_sprake_finance_costs_results
             .finance_costs_results_to_interface_sprake(mdl,fnc)
         )
-        return json.dumps(fnc_costs_results)
+
+        if res_cost is None:
+            res_cost = [None] * len(app.config_names)
+        else:
+            res_cost = json.loads(res_cost)
+        
+        if len(res_cost) == app.selected_config:
+            res_cost.append(fnc_costs_results)
+        else:
+            res_cost[app.selected_config] = fnc_costs_results
+
+        return json.dumps(res_cost)
 
     @app.callback(
         Output('res-finance-so-value', 'data'),
         Input('finance-config-watcher', 'data'),
+        State('res-finance-so-value', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_value_so(_):
+    def set_res_finance_value_so(_, res_value):
         """
         Create the system owner financial value results after a completed model run.
         """
@@ -2317,7 +2389,18 @@ def add_result_callbacks(app):
             post_sprake_finance_value_results
             .finance_value_results_to_interface_sprake(mdl,fnc)
         )
-        return json.dumps(fnc_value_results)
+        
+        if res_value is None:
+            res_value = [None] * len(app.config_names)
+        else:
+            res_value = json.loads(res_value)
+        
+        if len(res_value) == app.selected_config:
+            res_value.append(fnc_value_results)
+        else:
+            res_value[app.selected_config] = fnc_value_results
+
+        return json.dumps(res_value)
 
     return app
 
@@ -2333,6 +2416,8 @@ def add_result_header_callbacks(app):
         if res is None:
             return no_update
         res = json.loads(res)
+        if isinstance(res, list):
+            res = res[app.selected_config]
         gm = res.get('generator_meter_summary')
         if ann_hori_toggle:
             str_1 = 'Total generation: '
@@ -2370,6 +2455,9 @@ def add_result_header_callbacks(app):
         if res is None:
             return no_update
         res = json.loads(res)
+        if isinstance(res, list):
+            res = res[app.selected_config]
+        
         hrs_full = res.get('stor_hours_at_max').get('hrs_at_max_soc')
         hrs_empty = res.get('stor_hours_at_min').get('hrs_at_min_soc')
         cc = res.get('no_charge_cycles').get('charge_cycles')
@@ -2402,6 +2490,9 @@ def add_result_header_callbacks(app):
         if res is None:
             return no_update
         res = json.loads(res)
+        if isinstance(res, list):
+            res = res[app.selected_config]
+        
         if ann_hori_toggle:
             str_1 = 'Total consumption: '
             stat='sum'
@@ -2433,6 +2524,10 @@ def add_result_header_callbacks(app):
         if res is None:
             return no_update
         res = json.loads(res)
+
+        if isinstance(res, list):
+            res = res[app.selected_config]
+
         if ann_hori_toggle:
             str_1 = 'Total export = '
             str_2 = 'Total import = '
@@ -2475,6 +2570,13 @@ def add_result_header_callbacks(app):
         res_benefits = json.loads(res_benefits)
         res_costs = json.loads(res_costs)
         res_value = json.loads(res_value)
+
+        if isinstance(res_benefits, list):
+            res_benefits = res_benefits[app.selected_config]
+        if isinstance(res_costs, list):
+            res_costs = res_costs[app.selected_config]
+        if isinstance(res_value, list):
+            res_value = res_value[app.selected_config]
 
         dr_benefits = res_benefits.get('benefits_discount_rate')
         prval_benefits = res_benefits.get('present_benefits_discounted')

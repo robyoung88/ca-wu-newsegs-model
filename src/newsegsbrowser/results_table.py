@@ -1,9 +1,13 @@
 import json
+import datetime
+import copy
 
 from dash import html, Patch, Input, Output, dcc, ALL, State, ctx, no_update
 import dash_bootstrap_components as dbc
 
 from src.newsegsbrowser.common import get_icon
+from src.newsegsmodel import sprakemodel
+from src.newsegsfinance import sprakefinance
 
 def create_tbl_head(n_configs):
     return [
@@ -189,9 +193,22 @@ def add_configuration_selection_callbacks(app):
                 return no_update, no_update
             
             app.config_names.append(app.config_names[trigger_index-1] + " Copy")
-        
+            mdl_ref = app.models[trigger_index - 1]
+            mdl = sprakemodel.SprakeModel(mdl_ref)
+            # Do a manual copy of results
+            mdl._generation_result = copy.copy(mdl_ref._generation_result)
+            mdl._grid_result = copy.copy(mdl_ref._grid_result)
+            mdl._cs_result = copy.copy(mdl_ref._cs_result)
+            mdl._dirty = False
+            app.models.append(mdl)
+            fnc = sprakefinance.SprakeFinance(app.finances[trigger_index - 1])
+            fnc.set_model(app.models[-1])
+            fnc._dirty = False
+            app.finances.append(fnc)
         else:
             return no_update, no_update
+        
+        # TODO: Instruct app to update results tables
 
         patched_comparator_selector = Patch()
         patched_comparator_selector.append(
@@ -237,7 +254,15 @@ def add_configuration_selection_callbacks(app):
         
         # Pop the name, decrement the index, and update the children
         dropped = app.config_names.pop(trigger_index-1)
-        # TODO: Drop the model and finance as appropriate
+        if app.selected_config == trigger_index - 1:
+            if app.selected_config > 0:
+                app.selected_config -= 1
+        app.finances.pop(trigger_index - 1)
+        app.models.pop(trigger_index - 1)
+
+        # TODO: Set the outline characteristics of the focus button if we go back to 0
+        # TODO: Instruct app to update results tables
+
         n_conf = len(app.config_names)
 
         if n_conf > 1:
@@ -251,6 +276,7 @@ def add_configuration_selection_callbacks(app):
 
     @app.callback(
         Output({'type': 'config-focus-btn', 'index': ALL}, 'outline'),
+        Output('model-run-watcher', 'data', allow_duplicate = True),
         Input({'type': 'config-focus-btn', 'index': ALL}, 'n_clicks'),
         prevent_initial_call = True
     )
@@ -258,18 +284,20 @@ def add_configuration_selection_callbacks(app):
         trig = ctx.triggered_id
         n_conf = len(app.config_names)
         if trig is None:
-            return [no_update] * n_conf
+            return ([no_update] * n_conf, no_update)
         
         trigger_index = trig['index']
         # Should always be as many buttons as configurations, so can
         # use the index directly
         if n_clicks[trigger_index-1] is None:
-            return [no_update] * n_conf
+            return ([no_update] * n_conf, no_update)
 
         # TODO: set the app focussed configuration here. Also trigger watchers
+        app.selected_config = trigger_index - 1
         
         return (
-            [False if i == (trigger_index-1) else True for i in range(n_conf)]
+            [False if i == (trigger_index-1) else True for i in range(n_conf)],
+            json.dumps(str(datetime.datetime.now()))
         )
 
     return app
