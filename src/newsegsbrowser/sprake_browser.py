@@ -1639,44 +1639,67 @@ def create_layout():
         html.Hr(),
 
         # Results
+      
 
         html.Div(
             [
-                create_results_header(),
-                html.Div(
-                    [
-                        create_configuration_selector(),
-
-                        dbc.Row([
-                            dbc.Col([
-                                create_generation_results_card()
-                            ],
-                                width=12),
-                            dbc.Col([
-                                create_storage_results_card()
-                            ],
-                                width=12),
-                            dbc.Col([
-                                create_consumption_results_card()
-                            ],
-                                width=12),
-                            dbc.Col([
-                                create_net_results_card()
-                            ],
-                                width=12),
-                            dbc.Col([
-                                create_economic_results_so_card()
-                            ],
-                                width=12)
-                        ]),
-
+                dcc.Loading(
+                    html.Div([
+                        create_results_header(),
                         html.Div(
-                            id='post-drawer-attach',
-                            style={'display':'none'}
-                        )
-                    ],
-                    id = 'drawer-content',
-                )
+                            [
+                                create_configuration_selector(),
+
+                                dbc.Row([
+                                    dbc.Col([
+                                        create_generation_results_card()
+                                    ],
+                                        width=12),
+                                    dbc.Col([
+                                        create_storage_results_card()
+                                    ],
+                                        width=12),
+                                    dbc.Col([
+                                        create_consumption_results_card()
+                                    ],
+                                        width=12),
+                                    dbc.Col([
+                                        create_net_results_card()
+                                    ],
+                                        width=12),
+                                    dbc.Col([
+                                        create_economic_results_so_card()
+                                    ],
+                                        width=12)
+                                ]),
+
+                                html.Div(
+                                    id='post-drawer-attach',
+                                    style={'display':'none'}
+                                )
+                            ],
+                            id = 'drawer-content',
+                        ),
+                        dcc.Store(id='res-gen'),
+                        dcc.Store(id='res-stor'),
+                        dcc.Store(id='res-cons'),
+                        dcc.Store(id='res-net'),
+                        dcc.Store(id='res-finance-so-benefits'),
+                        dcc.Store(id='res-finance-so-costs'),
+                        dcc.Store(id='res-finance-so-value'),
+                    ]),
+                    overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+                    target_components = {
+                        'model-config-watcher': 'data',
+                        'res-gen': 'data',
+                        'res-stor': 'data',
+                        'res-net': 'data',
+                        'res-finance-so-benefits': 'data',
+                        'res-finance-so-costs': 'data',
+                        'res-finance-so-value': 'data',
+                        'res-finance-so-value-tbl': 'children',
+                    }
+                ),
             ],
             id='drawer-container',
         ),
@@ -1703,13 +1726,7 @@ def create_layout():
 
         dcc.Store(id='model-config'),
         dcc.Store(id='finance-config'),
-        dcc.Store(id='res-gen'),
-        dcc.Store(id='res-stor'),
-        dcc.Store(id='res-cons'),
-        dcc.Store(id='res-net'),
-        dcc.Store(id='res-finance-so-benefits'),
-        dcc.Store(id='res-finance-so-costs'),
-        dcc.Store(id='res-finance-so-value'),
+        
     ])
     ]
 
