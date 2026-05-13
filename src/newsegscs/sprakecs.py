@@ -1,19 +1,27 @@
 from __future__ import annotations
-from collections.abc import Mapping
 import os
+import copy
+from collections.abc import Mapping
+from typing_extensions import override
+from numbers import Number
+from functools import singledispatchmethod
+
 import numpy as np
 import pandas as pd
 import numpy.typing as npt
 
-#from src.newsegsmodel import NewsegsModel
-from src.newsegscs import NewsegsCS
-from src.core import ABCNewsegsModuleResult
+from src.newsegscs.newsegscs import NewsegsCS
+from src.util import classfuncs
+from src.core import newsegsmodule
+from src.core import timespan as modtimespan
+from src.core import location as modlocation
+from src.newsegsmodel import newsegsmodel
 
-from src.core.timespan import OffsetRegTimeSpan, RegTimeSpan
 from src.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 
-class SprakeCSResult(ABCNewsegsModuleResult):
+class SprakeCSResult(newsegsmodule.ABCNewsegsModuleResult):
     def __init__(self,
+                 timespan: modtimespan.RegTimeSpan,
                  domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]],
                  storage_import:np.ndarray[tuple[int], np.dtype[np.number]],
                  storage_export:np.ndarray[tuple[int], np.dtype[np.number]],
@@ -24,6 +32,7 @@ class SprakeCSResult(ABCNewsegsModuleResult):
                  ) -> None:
         
         # Meter values - i.e. import/export
+        self._timespan = copy.copy(timespan)
         self.set_domestic_consumption(domestic_consumption)
         self.set_storage_import(storage_import)
         self.set_storage_export(storage_export)
@@ -33,6 +42,9 @@ class SprakeCSResult(ABCNewsegsModuleResult):
 
         # DSM values - i.e. system state values
         self.set_storage_soc(storage_soc)
+
+    def get_timespan(self) -> modtimespan.RegTimeSpan:
+        return self._timespan
 
     @property
     def meters(self) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
@@ -94,7 +106,7 @@ class SprakeCSResult(ABCNewsegsModuleResult):
         minlength = len(self._storage_soc)
 
         o_arr = np.empty((1, minlength), dtype = np.float64)
-        o_arr[1, :] = self._storage_soc
+        o_arr[0, :] = self._storage_soc
 
         return o_arr
 
@@ -109,10 +121,10 @@ class SprakeCSResult(ABCNewsegsModuleResult):
                 'import', 'export')
 
     def get_dsm_names(self):
-        return ('storage_soc')
+        return ('storage_soc',)
 
     def get_dsm_types(self):
-        return ('system_state')
+        return ('system_state',)
 
     def set_domestic_consumption(self, domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]]):
         self._domestic_consumption = domestic_consumption
@@ -159,142 +171,235 @@ def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_ho
                                             hlp,gfa)
     return cons['consumption'] * n_households                        
 
+
 class SprakeCS(NewsegsCS):
 
-    _default_name = "Sprake Consumption and Storage Module"
+    _name = "Sprake Consumption and Storage Module"
+    _n_units = 100
+    _ev_per_unit = 0
 
-    def __init__(self):
-        self._name = self._default_name
-        self._n_units = 1000.0
-        self._ev_per_unit = 1.2
-        self._model = None
-        self._appliance_params = {
+    @singledispatchmethod
+    def __init__(
+        self,
+        n_units: Number | SprakeCS,
+        ev_per_unit: Number | None = None,
+        appliance_params: Mapping | None = None,
+        ev_params: Mapping | None = None,
+        dhw_params: Mapping | None = None,
+        spaceheat_params: Mapping | None = None,
+        storage_params: Mapping | None = None,
+        loc: modlocation.Location | None = None,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None,
+    ) -> None:
+        raise ValueError('First argument must be a number or a SprakeCS, is %s', type(n_units))
+    
+    # Copy constructor is registered underneath class definition for late-bind.
+
+    @__init__.register(Number)
+    def _from_Number(
+        self,
+        n_units: Number,
+        ev_per_unit: Number = 1.2,
+        appliance_params: Mapping = {
             'efficiency_reduction': 0.1,
-            'n_households': self._n_units
-        }
-        self._ev_params = {
-            'annual_residential_consumption_per_ev': 1313.65683,
-            'n_evs': self._ev_per_unit * self._n_units
-        }
-        self._dhw_params = {
+            'n_households': 100
+        },
+        ev_params: Mapping = {
+            'annual_residential_consumption_per_ev': 1760.0*0.747,
+            'n_evs': 1.2 * 100
+        },
+        dhw_params: Mapping = {
             'ref_daily_consumption': 4.5,
             'seasonal_variance': 0.2,
-            'n_households': self._n_units
-        }
+            'n_households': 100
+        },
+        spaceheat_params: Mapping = {
+            'hlp': 1.1,
+            'gfa': 105.0,
+            'timeseries_hdd_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+            'timeseries_model_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+            'n_households': 100
+        },
+        storage_params: Mapping = {
+            'storage_capacity': 1000.0,
+            'storage_rte': 0.88
+        },
+        loc: modlocation.Location | None = None,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None
+    ) -> None:
+
+        self._appliance_params = copy.copy(appliance_params)
+        self._ev_params = copy.copy(ev_params)
+        self._dhw_params = copy.copy(dhw_params)
+        self._spaceheat_params = copy.copy(spaceheat_params)
+        self._storage_params = copy.copy(storage_params)
+
+        self.n_units = float(n_units)
+        self.ev_per_unit = ev_per_unit
+
+        if loc:
+            self.location = loc
+        else:
+            self.location = modlocation.Location.from_none()
+
+        if name is not None:
+            self.name = name
+        
+        if model is not None:
+            self.model = model
+    
+    @classmethod
+    def from_none(cls):
         if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
-            self._spaceheat_params = {
+            spaceheat_params = {
                 'hlp': 0.3,
                 'gfa': 105.0,
                 'timeseries_hdd_start': pd.Timestamp('2018-01-01T00:00:00', tz='utc'),
                 'timeseries_model_start': pd.Timestamp('2002-01-01T00:00:00', tz='utc'),
-                'n_households': self._n_units
+                'n_households': 100
             }
         else:
-            self._spaceheat_params = {
+            spaceheat_params = {
                 'hlp': 1.1,
                 'gfa': 105.0,
                 'timeseries_hdd_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
                 'timeseries_model_start': TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
-                'n_households': self._n_units
+                'n_households': 100
             }
-        self._storage_params = {
-            'storage_capacity': 4000.0,
-            'storage_rte': 0.88
-        }
+        
+        return cls(100, spaceheat_params = spaceheat_params)
         
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self) -> newsegsmodel.NewsegsModel | None:
         return self._model
     
     @model.setter
-    def model(self, model:NewsegsModel) -> None:
+    def model(self, model: newsegsmodel.NewsegsModel) -> None:
         self._model = model
+        self.dirty = True
 
     @property
     def name(self) -> str:
         return self._name
     
     @name.setter
-    def name(self, name:str) -> None:
+    def name(self, name: str) -> None:
         self._name = name
+
+    @property
+    @override
+    def location(self) -> modlocation.Location:
+        return self._location
+    
+    @location.setter
+    @override
+    def location(self, loc: modlocation.Location) -> None:
+        """
+        Set the consumption-storage location.
+
+        This has no impact on results in the Sprake model, so it is simply
+        held for external inspection.
+        """
+        self._location = loc
 
     @property
     def n_units(self) -> float:
         return self._n_units
 
     @n_units.setter
-    def n_units(self, n_units:float) -> None:
+    def n_units(self, n_units: Number) -> None:
         self._n_units = n_units
         self._appliance_params['n_households'] = n_units
-        self._ev_params['n_evs'] = n_unit * self._ev_per_unit
+        self._ev_params['n_evs'] = n_units * self._ev_per_unit
         self._dhw_params['n_households'] = n_units
         self._spaceheat_params['n_households'] = n_units
+        self.dirty = True
+    
+    @property
+    def ev_per_unit(self) -> float:
+        return self._ev_per_unit
+    
+    @ev_per_unit.setter
+    def ev_per_unit(self, ev_per_unit: Number) -> None:
+        self._ev_per_unit = ev_per_unit
+        self._ev_params['n_evs'] = self.n_units * self._ev_per_unit
+        self.dirty = True
     
     @property
     def appliance_params(self) -> dict:
         return self._appliance_params
     
     # Keep property as read-only, use explicit setter as dict is mutable anyway
-    def set_appliance_params(self, params:dict) -> None:
+    def set_appliance_params(self, params: dict) -> None:
         self._appliance_params = params
+        self.dirty = True
 
     @property
     def ev_params(self) -> dict:
         return self._ev_params
 
-    def set_ev_params(self, params:dict) -> None:
+    def set_ev_params(self, params: dict) -> None:
         self._ev_params = params
+        self.dirty = True
 
     @property
     def dhw_params(self) -> dict:
         return self._dhw_params
 
-    def set_dhw_params(self, params:dict) -> None:
+    def set_dhw_params(self, params: dict) -> None:
         self._dhw_params = params
+        self.dirty = True
 
     @property
     def spaceheat_params(self) -> dict:
         return self._spaceheat_params
 
-    def set_spaceheat_params(self, params:dict) -> None:
+    def set_spaceheat_params(self, params: dict) -> None:
         self._spaceheat_params = params
+        self.dirty = True
 
     @property
     def storage_params(self) -> dict:
         return self._storage_params
     
-    def set_storage_params(self, params:dict) -> None:
+    def set_storage_params(self, params: dict) -> None:
         self._storage_params = params
+        self.dirty = True
 
-    def run(self, timespan:TimeSpan) -> SprakeCSResult:
-        if not isinstance(timespan, RegTimeSpan):
+    def run(self, timespan: modtimespan.TimeSpan) -> SprakeCSResult:
+        if not isinstance(timespan, modtimespan.RegTimeSpan):
             if self.model is None:
                 raise ValueError("CS module requires a model to serve timestep")
-            timespan = RegTimeSpan(timespan)
+            timespan = modtimespan.RegTimeSpan(timespan)
             timespan.timestep = self.model.get_default_timestep()
         
         datetimes = timespan.to_pandas()
 
         cons_arr = np.empty((4, len(datetimes)), dtype=np.float64)
         cons_arr[0,:] = sprake_appliance_consumption(datetimes, **self._appliance_params)
-        cons_arr[1,:] = sprake_ev_consumption(datetimes, **self._ev_params)
-        cons_arr[2,:] = sprake_dhw_consumption(datetimes, **self._dhw_params)
+        cons_arr[3,:] = sprake_ev_consumption(datetimes, **self._ev_params)
+        cons_arr[1,:] = sprake_dhw_consumption(datetimes, **self._dhw_params)
 
         # The space heating requires a little more finess, simply because the time series may require repetition
         shp = self._spaceheat_params.copy()
         
-        spaceheat_timespan = OffsetRegTimeSpan()
-        spaceheat_timespan.start = TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0]
-        spaceheat_timespan.end = TIMESERIES_DEGREE_DAYS['timestamp'].iloc[-1]
-        spaceheat_timespan.timestep = timespan.timestep
+        spaceheat_timespan = modtimespan.OffsetRegTimeSpan(
+            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[-1],
+            timestep = timespan.timestep
+        )
 
         # In this context, 'local' is the heating degree day ts, and remote is the model ts
-        spaceheat_timespan.set_offset(local_start=shp.pop('timeseries_hdd_start'),
-                                      remote_start=shp.pop('timeseries_model_start'))
+        spaceheat_timespan.set_offset(
+            local_start = shp.pop('timeseries_hdd_start'),
+            remote_start = shp.pop('timeseries_model_start')
+        )
 
         spaceheat_datetimes = spaceheat_timespan.to_pandas()[spaceheat_timespan.get_local_index(timespan)]
         
-        cons_arr[3,:] = sprake_spaceheat_consumption(spaceheat_datetimes, **shp)
+        cons_arr[2,:] = sprake_spaceheat_consumption(spaceheat_datetimes, **shp)
 
         storage_cap = self._storage_params.get('storage_capacity', 0.0)
         if storage_cap > 0.0:
@@ -356,6 +461,7 @@ class SprakeCS(NewsegsCS):
             grid_exp = np.zeros_like(stor_arr)
         
         res = SprakeCSResult(
+            timespan = timespan,
             domestic_consumption = cons_arr,
             storage_import=stor_imp,
             storage_export=stor_exp,
@@ -365,43 +471,121 @@ class SprakeCS(NewsegsCS):
             storage_soc = stor_arr
         )
 
+        self.dirty = False
+
         return res
 
     @classmethod
-    def from_characteristics(cls,
-                             name:str,
-                             n_units:float,
-                             appliance_params:dict,
-                             ev_params:dict,
-                             dhw_params:dict,
-                             spaceheat_params:dict,
-                             storage_params:dict
-                             ) -> SprakeCS:
-        o = cls()
-        o.name = name
-        o.n_units = n_units
-        o.set_appliance_params(appliance_params)
-        o.set_ev_params(ev_params)
-        o.set_dhw_params(dhw_params)
-        o.set_spaceheat_params(spaceheat_params)
-        o.set_storage_params(storage_params)
+    def from_characteristics(
+        cls,
+        n_units: Number,
+        ev_per_unit: Number,
+        appliance_params: Mapping,
+        ev_params: Mapping,
+        dhw_params: Mapping,
+        spaceheat_params: Mapping,
+        storage_params: Mapping,
+        loc: modlocation.Location | None = None,
+        name: str | None = None,
+        model: newsegsmodel.NewsegsModel | None = None
+    ) -> SprakeCS:
 
-        return o
+        a = locals()
+        del a['cls']
+        del a['n_units']
 
+        return cls(n_units, **a)
+
+    @override
     def to_dict(self) -> Mapping:
         odict = {
-            'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
+            'class': classfuncs.get_class(self),
             'name': self._name,
             'n_units': self._n_units,
+            'ev_per_unit': self._ev_per_unit,
             'appliance_params': self._appliance_params,
             'ev_params': self._ev_params,
-            'dhw_params': self._ev_params,
+            'dhw_params': self._dhw_params,
             'spaceheat_params': self._spaceheat_params,
-            'storage_params': self._storage_params
+            'storage_params': self._storage_params,
+            'loc': self.location.to_dict()
         }
 
         return odict
+
+    @override
+    def sync_with_dict(self, config: Mapping) -> None:
+        config = copy.copy(config)
+
+        # For all the params, we have no fset so must set explicitly
+        appliance_params = config.pop('appliance_params', None)
+        if appliance_params:
+            self.set_appliance_params(appliance_params)
+        
+        ev_params = config.pop('ev_params', None)
+        if ev_params:
+            self.set_ev_params(ev_params)
+        
+        dhw_params = config.pop('dhw_params', None)
+        if dhw_params:
+            self.set_dhw_params(dhw_params)
+        
+        spaceheat_params = config.pop('spaceheat_params', None)
+        if spaceheat_params:
+            self.set_spaceheat_params(spaceheat_params)
+        
+        storage_params = config.pop('storage_params', None)
+        if storage_params:
+            self.set_storage_params(storage_params)
+        
+        loc = config.pop('loc', None)
+        if loc:
+            if isinstance(loc, Mapping):
+                loc = modlocation.location_from_dict(loc)
+            self.location = loc
+        
+        conf_keys = config.keys()
+        for k in conf_keys:
+            if hasattr(self, k):
+                v = config.get(k)
+
+                # If the attribute is a read-write property, its class attribute 
+                # will have an fset
+                try:
+                    prop = getattr(type(self), k)
+                    if hasattr(prop, 'fset'):
+                        getattr(prop, 'fset')(self, v)
+                    else:
+                        # Otherwise, we assume it is a simple attribute that may be overwritten
+                        setattr(self, k, v)
+                except AttributeError:
+                    setattr(self, k, v)
     
+    @override
     @classmethod
-    def from_dict(cls, input:Mapping) -> SprakeCS:
-        return cls.from_characteristics(**input)
+    def from_dict(cls, config: Mapping) -> SprakeCS:
+        config = copy.copy(config)
+        config.pop('class', None)
+        loc = config.get('loc', None)
+        if loc:
+            if isinstance(loc, Mapping):
+                config['loc'] = modlocation.location_from_dict(loc)
+        return cls.from_characteristics(**config)
+
+#SprakeCS copy constructor
+@SprakeCS.__init__.register(SprakeCS)
+def _SprakeCS_from_other(
+    self,
+    other: SprakeCS
+) -> None:
+    self.set_appliance_params(other.appliance_params)
+    self.set_ev_params(other.ev_params)
+    self.set_dhw_params(other.dhw_params)
+    self.set_spaceheat_params(other.spaceheat_params)
+    self.set_storage_params(other.storage_params)
+    
+    self.n_units = other.n_units
+    self.ev_per_unit = other.ev_per_unit
+
+    self.name = other.name
+    self.model = other.model

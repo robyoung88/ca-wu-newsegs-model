@@ -3,12 +3,26 @@ from __future__ import annotations
 
 from src.core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
 from src.core.location import Location,RaisedLocation,AspectLocation
-from src.core.timespan import RegTimeSpan,OffsetRegTimeSpan
+from src.core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 from collections.abc import Iterable
 
+def _get_true_datetimes_srs(
+    srs: dict,
+    timespan: TimeSpan
+) -> pd.DatetimeIndex:
+    if srs is None:
+        return None
+    idx = srs['timespan'].get_local_index(timespan)
+
+    return srs['timespan'].to_pandas()[idx]
+
 class InMemoryLocalEnv(NewsegsLocalEnvironment):
+    _version = '0.0.1'
+    _name = 'Local environment'
+
     def __init__(self):
         self._wind_series = {}
         self._horizontal_solar_flux_series = {}
@@ -49,9 +63,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
     def get_wind_speeds(self, 
                         location:RaisedLocation|tuple[RaisedLocation, ...]|list[RaisedLocation], 
-                        timespan:TimeSpan):
+                        timespan: TimeSpan):
         if (isinstance(location, Iterable)):
-            olist = [self.get_wind_speeds(x) for x in location]
+            olist = [self.get_wind_speeds(x, timespan=timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
 
@@ -60,6 +74,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
+
+    def get_wind_timestep(self) -> pd.TimeDelta|None:
+        return next(iter(self._wind_series.values())).get('timespan').timestep
 
     def set_horizontal_solar_flux(self,
                        horizontal_solar_flux:npt.ArrayLike,
@@ -88,6 +105,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
+    def get_horizontal_solar_flux_timestep(self) -> pd.TimeDelta|None:
+        return next(iter(self._horizontal_solar_flux_series.values())).get('timespan').timestep
+
     def set_external_temperature(self,
                        external_temperature:npt.ArrayLike,
                        location:RaisedLocation,
@@ -114,6 +134,9 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
+
+    def get_external_temperature_timestep(self) -> pd.TimeDelta|None:
+        return None
 
     def set_solar_flux_on_plane(self,
                                 solar_flux:npt.ArrayLike,
@@ -151,12 +174,55 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
+    def get_solar_flux_on_plane_timestep(self) -> pd.TimeDelta|None:
+        return self._horizontal_solar_flux_series.values()[0].get('timespan').timestep
+
     def get_air_density(self,
                         location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
                         timespan:TimeSpan):
         return 1.225
+    
+    def get_air_density_timestep(self) -> pd.TimeDelta|None:
+        return None
+    
+    def get_true_datetimes(
+        self,
+        measure: Literal[
+            'wind_speeds',
+            'air_density',
+            'horizontal_solar_flux',
+            'external_temperature',
+            'solar_flux_on_plane'
+        ],
+        location: Location|tuple[Location, ...]|list[Location],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex|list[pd.DatetimeIndex]:
+        if (isinstance(location, Iterable)):
+            olist = [self.get_true_datetimes(measure, x, timespan = timespan) for x in location]
+            return olist
+        
+        match measure:
+            case 'wind_speeds':
+                return _get_true_datetimes_srs(self.access_wind_series(location), timespan)
+            case 'horizontal_solar_flux':
+                return _get_true_datetimes_srs(self.access_horizontal_solar_flux_series(location), timespan)
+            case 'external_temperature':
+                return _get_true_datetimes_srs(self.access_external_temperature_series(location), timespan)
+            case 'solar_flux_on_plane':
+                return _get_true_datetimes_srs(self.access_solar_flux_on_plane_series(location), timespan)
+            case _:
+                timestep = self.get_wind_timestep()
+                ts2 = RegTimeSpan(timespan)
+                ts2.timestep = timestep
+                return ts2.to_pandas()
+    
+    def __str__(self) -> str:
+        return super().__str__() + "; name: " + self._name
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
+    _version = '0.0.1'
+    _name = 'Wider environment'
+
     def __init__(self):
         self._temperature_series = None
         self._horizontal_solar_flux_series = None
@@ -190,4 +256,23 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
-    
+
+    def get_true_datetimes(
+        self,
+        measure: Literal[
+            'temperature',
+            'horizontal_solar_flux'
+        ],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex:
+        
+        match measure:
+            case 'temperature':
+                return _get_true_datetimes_srs(self._temperature_series, timespan)
+            case 'horizontal_solar_flux':
+                return _get_true_datetimes_srs(self._horizontal_solar_flux_series, timespan)
+            case _:
+                return None
+
+    def __str__(self) -> str:
+        return super().__str__() + "; name: " + self._name

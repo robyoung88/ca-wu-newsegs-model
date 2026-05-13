@@ -28,7 +28,7 @@ PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
 def characterise_dates_evprofile(datetimes,
                                  hols:holidays.HolidayBase = holidays.country_holidays('GB', subdiv='WLS')):
     """
-    Assign variables to characterise a datetime series or DataFrame be ev charging averaging periods
+    Assign variables to characterise a datetime series or DataFrame by ev charging averaging periods
     """
     if isinstance(datetimes, pd.DataFrame):
         if not 'datetime' in datetimes.columns:
