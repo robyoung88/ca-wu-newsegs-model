@@ -1640,92 +1640,86 @@ def create_layout():
 
         # Results
       
+        html.Div([
+            dcc.Loading([
+                create_results_header(),
+                html.Div(
+                    [
+                        create_configuration_selector(),
 
-        html.Div(
-            [
-                dcc.Loading(
-                    html.Div([
-                        create_results_header(),
-                        html.Div(
-                            [
-                                create_configuration_selector(),
-
-                                dbc.Row([
-                                    dbc.Col([
-                                        create_generation_results_card()
-                                    ],
-                                        width=12),
-                                    dbc.Col([
-                                        create_storage_results_card()
-                                    ],
-                                        width=12),
-                                    dbc.Col([
-                                        create_consumption_results_card()
-                                    ],
-                                        width=12),
-                                    dbc.Col([
-                                        create_net_results_card()
-                                    ],
-                                        width=12),
-                                    dbc.Col([
-                                        create_economic_results_so_card()
-                                    ],
-                                        width=12)
-                                ]),
-
-                                html.Div(
-                                    id='post-drawer-attach',
-                                    style={'display':'none'}
-                                )
+                        dbc.Row([
+                            dbc.Col([
+                                create_generation_results_card()
                             ],
-                            id = 'drawer-content',
-                        ),
-                        dcc.Store(id='res-gen'),
-                        dcc.Store(id='res-stor'),
-                        dcc.Store(id='res-cons'),
-                        dcc.Store(id='res-net'),
-                        dcc.Store(id='res-finance-so-benefits'),
-                        dcc.Store(id='res-finance-so-costs'),
-                        dcc.Store(id='res-finance-so-value'),
-                    ]),
-                    overlay_style={"visibility":"visible", "filter": "blur(2px)"},
-                    target_components = {
-                        'model-config-watcher': 'data',
-                        'res-gen': 'data',
-                        'res-stor': 'data',
-                        'res-net': 'data',
-                        'res-finance-so-benefits': 'data',
-                        'res-finance-so-costs': 'data',
-                        'res-finance-so-value': 'data',
-                        'res-finance-so-value-tbl': 'children',
-                    }
+                                width=12),
+                            dbc.Col([
+                                create_storage_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_consumption_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_net_results_card()
+                            ],
+                                width=12),
+                            dbc.Col([
+                                create_economic_results_so_card()
+                            ],
+                                width=12)
+                        ]),
+                    ],
+                    id = 'drawer-content',
                 ),
+                # To trigger resync of input fields from model, e.g. after a load
+                dcc.Store(id='firstload-config-watcher'),
+                dcc.Store(id='live-config-watcher'),
+
+                # Updated when the model configuration is updated.
+                # Used to indicate that a new run is necessary to update results.
+                dcc.Store(id='model-config-watcher'),
+
+                # Updated when either:
+                # 1) The finance module has been set to a new configuration or
+                # 2) The model has finished running
+                # In either case, a refresh of the financial results is required.
+                dcc.Store(id='finance-config-watcher'),
+
+                # To trigger resync of output fields after a model run
+                dcc.Store(id='model-run-watcher'),
+                dcc.Store(id='model-firstrun-watcher'),
+
+                dcc.Store(id='model-config'),
+                dcc.Store(id='finance-config'),
+                dcc.Store(id='res-gen'),
+                dcc.Store(id='res-stor'),
+                dcc.Store(id='res-cons'),
+                dcc.Store(id='res-net'),
+                dcc.Store(id='res-finance-so-benefits'),
+                dcc.Store(id='res-finance-so-costs'),
+                dcc.Store(id='res-finance-so-value'),
+                ],
+                overlay_style={
+                    'visibility': 'visible',
+                    'filter': 'blur(2px)',
+                    'display': 'block',
+                },
+                id = 'loading-results',
+                parent_className = 'drawer-loading-container',
+            ),
             ],
             id='drawer-container',
+        ),
+                    
+        html.Div(
+            id='post-drawer-attach',
+            style={'display':'none'}
         ),
 
         html.Div(id='onload-div'), # To trigger first callback
 
-        # To trigger resync of input fields from model, e.g. after a load
-        dcc.Store(id='firstload-config-watcher'),
-        dcc.Store(id='live-config-watcher'),
-
-        # Updated when the model configuration is updated.
-        # Used to indicate that a new run is necessary to update results.
-        dcc.Store(id='model-config-watcher'),
-
-        # Updated when either:
-        # 1) The finance module has been set to a new configuration or
-        # 2) The model has finished running
-        # In either case, a refresh of the financial results is required.
-        dcc.Store(id='finance-config-watcher'),
-
-        # To trigger resync of output fields after a model run
-        dcc.Store(id='model-run-watcher'),
-        dcc.Store(id='model-firstrun-watcher'),
-
-        dcc.Store(id='model-config'),
-        dcc.Store(id='finance-config'),
+        
         
     ])
     ]
