@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Mapping
 import re
 
+from src.core import location as modlocation
 from src.core import TimeSpan, TimedeltaScalar
 from src.core import NewsegsLocalEnvironment,NewsegsWiderEnvironment
 from src.core import ABCNewsegsModuleResult
@@ -95,7 +96,7 @@ class NewsegsModel(metaclass=ABCMeta):
 
     @grid.setter
     @abstractmethod
-    def grid(self, grid_module:NewsegsGrid):
+    def grid(self, grid_module: NewsegsGrid):
         """
         Replace the grid module
         """
@@ -164,6 +165,22 @@ class NewsegsModel(metaclass=ABCMeta):
         market closure times). This method is provided for convenience when sychronising
         such modules
         """
+    
+    @property
+    @abstractmethod
+    def location(self) -> modlocation.Location:
+        """
+        A generalised location for the model.
+
+        May or may not relate to the local environment of any of the
+        generators, storage units or consumers, but should give an
+        indication of the site location.
+        """
+    
+    @location.setter
+    @abstractmethod
+    def location(self, loc: modlocation.Location) -> None:
+        ...
 
     @property
     def dirty(self) -> bool:

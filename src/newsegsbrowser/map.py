@@ -4,6 +4,7 @@ from dash import html, dcc, Input, Output, State, ALL, no_update
 import dash_leaflet as dl
 import dash_bootstrap_components as dbc
 
+from src.core import location as modlocation
 from src.newsegsbrowser.common import get_icon
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
@@ -60,11 +61,24 @@ def create_site_selector_map(map_id='sitemap',
             ]),
             dbc.Row([
                 dbc.Col(
-                    html.H1("Site Name", 
-                            contentEditable="true", 
-                            id='site-name-input',
+                    html.H1(
+                        dcc.Input(
+                            placeholder = 'Site Name',
+                            debounce = True,
+                            type = 'text',
+                            id = 'site-name-input',
+                            style = {
+                                'border': 'none',
+                                'outline': 'none',
+                                'width': '25',
+                                'height': 'auto',
+                                'lineHeight': '1.5',
+                                'padding': '5px 0',
+                                'background': 'transparent',
+                            },
                             className='p-2 m-1'
-                            ),
+                        )
+                    ),  
                     width=12,
                     lg=6
                 ),
@@ -107,11 +121,12 @@ def add_latlon_sync_callbacks(app):
         Output('site-location', 'data', allow_duplicate=True),
         Input('site-lat-input', 'value'),
         Input('site-lon-input', 'value'),
+        Input('site-name-input', 'value'),
         State('site-location', 'data'),
         prevent_initial_call=True
     )
-    def sync_inputs_to_store(lat_val, lon_val, current_site):
-        if lat_val is None or lon_val is None:
+    def sync_inputs_to_store(lat_val, lon_val, site_name, current_site):
+        if lat_val is None or lon_val is None or site_name is None:
             return no_update
         try:
             lat = float(lat_val)
@@ -121,7 +136,7 @@ def add_latlon_sync_callbacks(app):
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
             return no_update
         easting,northing = _trans_togb.transform(lat, lon)
-        new_site = json.dumps({'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing})
+        new_site = json.dumps({'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing, 'name': site_name})
         if new_site == current_site:
             return no_update
         return new_site
@@ -129,6 +144,7 @@ def add_latlon_sync_callbacks(app):
     @app.callback(
         Output('site-lat-input', 'value'),
         Output('site-lon-input', 'value'),
+        Output('site-name-input', 'value'),
         Input('site-location', 'data'),
         prevent_initial_call=True
     )
@@ -141,7 +157,15 @@ def add_latlon_sync_callbacks(app):
             lon = float(coords.get('lon', ''))
         except (TypeError, ValueError, json.JSONDecodeError, AttributeError):
             return no_update, no_update
-        return f"{lat:.6f}", f"{lon:.6f}"
+        name = coords.get('name', no_update)
+
+        newloc = modlocation.Location(lat, lon, name = name)
+        if not(newloc == app.models[app.selected_config].location):
+            app.models[app.selected_config].location = newloc
+        if not app.models[app.selected_config].location.name != name:
+            app.models[app.selected_config].location.name = name
+
+        return f"{lat:.6f}", f"{lon:.6f}", name
 
     return app
 
@@ -150,9 +174,10 @@ def add_map_click_callback(app):
         Output('potential-site-location', 'data'),
         Input('sitemap', 'dblclickData'),
         State('potential-site-location', 'data'),
+        State('site-name-input', 'value'),
         prevent_initial_call=True
     )
-    def change_site_loc(click_data, current_val):
+    def change_site_loc(click_data, current_val, current_name):
         if not current_val is None:
             coords = json.loads(current_val)
             pos = [float(coords['lat']), float(coords['lon'])]
@@ -162,9 +187,9 @@ def add_map_click_callback(app):
             coordinates = click_data['latlng']
             lat, lon = coordinates.values()
             easting,northing = _trans_togb.transform(lat, lon)
-            return json.dumps({'lat':lat,'lon':lon, 'easting': easting, 'northing': northing})
+            return json.dumps({'lat':lat,'lon':lon, 'easting': easting, 'northing': northing, 'name': current_name})
         else:
-            return json.dumps({'lat':0,'lon':0})
+            return json.dumps({'lat':0,'lon':0, 'name': current_name})
     return app
 
 def add_potential_site_change_callback(app):
@@ -235,11 +260,15 @@ def add_site_change_callback(app):
     def add_site_marker(json_latlon):
         coords = json.loads(json_latlon)
         pos = [float(coords['lat']), float(coords['lon'])]
+        easting = coords.get('easting', None)
+        northing = coords.get('northing', None)
+        if not easting:
+            easting, northing = _trans_togb.transform(pos[0], pos[1])
         return ([dl.Marker(id='site-marker',
                           position=pos,
                           children=[dl.Tooltip("Site Location")])], 
-                          f"{float(coords['easting']):,.0f}",
-                          f"{float(coords['northing']):,.0f}")
+                          f"{float(easting):,.0f}",
+                          f"{float(northing):,.0f}")
     return app
 
 def add_site_selector_callbacks(app):

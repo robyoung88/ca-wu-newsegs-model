@@ -20,6 +20,7 @@
     cursor: pointer;
     position: relative;
     width: 100%;
+    flex-shrink: 0;
 }
 #resize-handle {
     position: absolute;
@@ -29,11 +30,25 @@
     cursor: ns-resize;
     background: transparent;
 }
+
+/* Make dcc.Loading parent transparent to flexbox */
+.drawer-loading-container {
+    display: contents;
+    flex: 1 1 auto;
+}
+
+/* Make dcc.Loading wrapper transparent to flexbox */
+#drawer-container > div[style*="position: relative"] {
+    flex: 1 1 auto;
+    display: contents;
+}
+
 #drawer-content {
-    flex-grow: 1;
+    flex: 1 1 auto;
     overflow-y: auto;
-    padding: 20px;
+    padding: 12px;
     display: none;
+    min-height: 0;
 }
 #drawer-title {
     width: 100%;

@@ -43,7 +43,8 @@ class Location:
     def __init__(
         self,
         lat: Number | Location,
-        lon: Number | None
+        lon: Number | None,
+        name: str| None = None,
     ) -> None:
         """
         Default assumes we have None
@@ -56,17 +57,21 @@ class Location:
     def _from_numbers(
         self,
         lat: Number,
-        lon: Number
+        lon: Number,
+        name: str| None = None,
     ) -> None:
         self._lat = float(lat)
         self._lon = float(lon)
+
+        if name:
+            self.name = name
 
     @classmethod
     def from_none(cls) -> Location:
         """
         Replaces a no-argument constructor.
         """
-        return cls(53.46, -3.80)
+        return cls(53.255, -3.477, name = 'St Asaph V72')
 
     @property
     def lat(self) -> float:
@@ -184,15 +189,17 @@ class Location:
         lat: Number,
         lon: Number,
         crs: str,
-        name: str
+        name: str | None = None,
     ) -> Location:
 
         o = cls.from_none()
         
         o._crs = crs
-        o.name = name
         o.lat = lat
         o.lon = lon
+
+        if name:
+            o.name = name
 
         return o
 
@@ -211,13 +218,6 @@ class Location:
         input.pop('class', None)
         return cls.from_characteristics(**input)
 
-    # If we are using single dispatch, then we are unable
-    # to use a "None" first argument for a default constructor
-    # To get around this, we will use a class method
-    @classmethod
-    def from_none(cls):
-        return cls(52., -3.5)
-
 # Location copy constructor
 @Location.__init__.register(Location)
 def Location_from_other(self, other: Location):
@@ -228,6 +228,7 @@ def Location_from_other(self, other: Location):
     self._lat = latlon[0]
     self._lon = latlon[1]
     self._name = other.name
+    self._crs = other._crs
 
 class RaisedLocation(Location):
     _height = 0.
@@ -237,7 +238,8 @@ class RaisedLocation(Location):
         self,
         lat: Number | Location,
         lon: Number | None = None,
-        height_agl: Number | None = None
+        height_agl: Number | None = None,
+        name: str | None = None
     ) -> None:
         """
         Default assumes we have None
@@ -250,10 +252,10 @@ class RaisedLocation(Location):
         self,
         lat: Number,
         lon: Number,
-        height_agl: Number = 0.
+        height_agl: Number = 0.,
+        name: str | None = None
     ) -> None:
-        self._lat = float(lat)
-        self._lon = float(lon)
+        super().__init__(lat, lon, name = name)
         self._height = float(height_agl)
     
     @property
@@ -316,7 +318,7 @@ class RaisedLocation(Location):
         lon: Number,
         crs: str,
         height_agl: Number,
-        name: str
+        name: str | None = None,
     ) -> RaisedLocation:
 
         a = locals()
@@ -360,7 +362,8 @@ class AspectLocation(RaisedLocation):
         lon: Number | None = None,
         height_agl: Number | None = None,
         azimuth: Number | None = None,
-        pitch: Number | None = None
+        pitch: Number | None = None,
+        name: str | None = None,
     ) -> None:
         """
         Default assumes we have None
@@ -375,11 +378,10 @@ class AspectLocation(RaisedLocation):
         lon: Number,
         height_agl: Number = 0.,
         azimuth: Number = 180.,
-        pitch: Number = 90.
+        pitch: Number = 90.,
+        name: str | None = None,
     ) -> None:
-        self._lat = float(lat)
-        self._lon = float(lon)
-        self._height = float(height_agl)
+        super().__init__(lat, lon, height_agl = height_agl, name = name)
         self.azimuth = float(azimuth)
         self.pitch = float(pitch)
     
@@ -441,17 +443,18 @@ class AspectLocation(RaisedLocation):
 
     def __str__(self):
         return "(" + str(self.lat) + ", " + str(self.lon) + "), height: " + str(self.height_agl) + " m AGL, azimuth: " + str(self.azimuth) + "°, pitch: " + str(self.pitch) + "°"
-    
 
     @classmethod
-    def from_characteristics(cls,
-                             name:str,
-                             lat:float,
-                             lon:float,
-                             crs:str,
-                             height_agl:float,
-                             azimuth:float,
-                             pitch:float) -> Location:
+    def from_characteristics(
+        cls,
+        lat: float,
+        lon: float,
+        crs: str,
+        height_agl: float,
+        azimuth: float,
+        pitch: float,
+        name:str | None = None
+    ) -> AspectLocation:
         a = locals()
         del a['azimuth']
         del a['pitch']
