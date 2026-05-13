@@ -3,6 +3,8 @@ import datetime
 import copy
 import base64
 
+import pathvalidate
+
 from dash import html, Patch, Input, Output, dcc, ALL, State, ctx, no_update
 import dash_bootstrap_components as dbc
 
@@ -19,6 +21,7 @@ def config_to_dict(app, config_index: int | None = None):
         config_index = app.selected_config
     
     odict = {
+        'config_name': app.config_names[config_index],
         'model_config': app.models[config_index].to_dict(),
         'finance_config': app.finances[config_index].to_dict(),
     }
@@ -35,8 +38,21 @@ def config_from_dict(app, cfg, config_index: int | None = None):
     if config_index >= len(app.models) or config_index >= len(app.finances):
         return None
     
-    app.models[config_index].sync_with_dict(cfg.get('model_config'))
-    app.finances[config_index].sync_with_dict(cfg.get('finance_config'))
+    nm = app.config_names[config_index] 
+    app.config_names[config_index] = cfg.get('config_name', nm)
+
+    try:
+        app.models[config_index].sync_with_dict(cfg.get('model_config'))
+    except ValueError as e:
+        print(e)
+        return False
+
+    try:
+        app.finances[config_index].sync_with_dict(cfg.get('finance_config'))
+    except ValueError as e:
+        print(e)
+        return False
+    
     app.finances[config_index].set_model(app.models[config_index])
     app.models[config_index].run()
 
@@ -240,8 +256,9 @@ def create_single_configuration_selector_row(config_index, app = None):
 
 def create_configuration_selector():
     return html.Div([
-        create_single_configuration_selector_row(1),
+        
         html.Div([        
+            create_single_configuration_selector_row(1),
         ],
         id='comparator-selector-container',
         ),
@@ -268,15 +285,19 @@ def add_configuration_selection_callbacks(app):
         prevent_initial_call=True
     )
     def rename_config(config_name):
+        NUP = no_update
         trig = ctx.triggered_id
         if trig is None:
-            return no_update
+            return NUP
+        if len(ctx.triggered) > 1:
+            return NUP
+        
         trigger_index = trig['index']
         if config_name[trigger_index-1] is None:
-            return no_update
+            return NUP
 
         app.config_names[trigger_index-1] = config_name[trigger_index-1]
-        return no_update
+        return NUP
 
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
@@ -289,7 +310,7 @@ def add_configuration_selection_callbacks(app):
         State('n_active_conf', 'data'),
         prevent_initial_call=True
     )
-    def add_duplicate_config(n_clicks,n_active):
+    def add_duplicate_config(n_clicks, n_active):
         # Add the selector as the penultimate row
         n_conf = len(app.config_names)
         NUP = (no_update, no_update, no_update, no_update, [no_update] * n_conf, [no_update] * n_conf)
@@ -299,6 +320,12 @@ def add_configuration_selection_callbacks(app):
         trig = ctx.triggered_id
         if trig is None or n_clicks is None:
             return NUP
+        # After construction of a new button, ctx.triggered will contain
+        # the full list, not just the triggering button, though the triggering id is arbitrary
+        # Therefore reject if the list is longer than 1; if rejecting on first construction,
+        # the above should catch
+        if len(ctx.triggered) > 1:
+            return NUP
 
         n_conf = json.loads(n_active).get('n', 1) + 1
 
@@ -307,7 +334,7 @@ def add_configuration_selection_callbacks(app):
 
             if n_clicks[trigger_index-1] is None:
                 return NUP
-            
+
             app.config_names.append(app.config_names[trigger_index-1] + " Copy")
             mdl_ref = app.models[trigger_index - 1]
             mdl = sprakemodel.SprakeModel(mdl_ref)
@@ -359,6 +386,12 @@ def add_configuration_selection_callbacks(app):
         trig = ctx.triggered_id
         if trig is None:
             return NUP
+        # After construction of a new button, ctx.triggered will contain
+        # the full list, not just the triggering button, though the triggering id is arbitrary
+        # Therefore reject if the list is longer than 1; if rejecting on first construction,
+        # the above should catch
+        if len(ctx.triggered) > 1:
+            return NUP
         
         if trig['type'] == 'config-remove-btn':
             trigger_index = trig['index']
@@ -376,6 +409,7 @@ def add_configuration_selection_callbacks(app):
             if ids[i].get('index') == trigger_index:
                 nclick_i = i
                 break
+
         if n_clicks[nclick_i] is None:
             return NUP
         
@@ -392,8 +426,8 @@ def add_configuration_selection_callbacks(app):
 
         n_conf = len(app.config_names)
 
-        if n_conf > 1:
-            contents = [create_single_configuration_selector_row(i, app) for i in range(2, n_conf+1)]
+        if n_conf > 0:
+            contents = [create_single_configuration_selector_row(i, app) for i in range(1, n_conf+1)]
         else:
             contents = []
 
@@ -421,7 +455,13 @@ def add_configuration_selection_callbacks(app):
         trig = ctx.triggered_id
         if trig is None:
             return NUP
-        
+        # After construction of a new button, ctx.triggered will contain
+        # the full list, not just the triggering button, though the triggering id is arbitrary
+        # Therefore reject if the list is longer than 1; if rejecting on first construction,
+        # the above should catch
+        if len(ctx.triggered) > 1:
+            return NUP
+
         trigger_index = trig['index']
         # Should always be as many buttons as configurations, so can
         # use the index directly
@@ -432,7 +472,6 @@ def add_configuration_selection_callbacks(app):
             if n_clicks_hdr[trigger_index-1] is None:
                 return NUP
 
-        # TODO: set the app focussed configuration here. Also trigger watchers
         app.selected_config = trigger_index - 1
         
         return (
@@ -453,19 +492,28 @@ def add_configuration_selection_callbacks(app):
         trig = ctx.triggered_id
         if trig is None:
             return NUP
-        
+        # After construction of a new button, ctx.triggered will contain
+        # the full list, not just the triggering button, though the triggering id is arbitrary
+        # Therefore reject if the list is longer than 1; if rejecting on first construction,
+        # the above should catch
+        if len(ctx.triggered) > 1:
+            return NUP
+
         trigger_index = trig['index']
+        
         if n_clicks[trigger_index-1] is None:
             return NUP
         
         odict = config_to_dict(app, trigger_index - 1)
+        fn = odict.get('config_name') + ".json"
+        fn = pathvalidate.sanitize_filename(fn)
         return dict(
             content = json.dumps(odict, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4), 
-            filename = 'sprake_model_conf.json'
+            filename = fn
         )
 
     @app.callback(
-        Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
+        Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Output('live-config-watcher', 'data', allow_duplicate = True),
         Output('model-run-watcher', 'data', allow_duplicate = True),
@@ -474,10 +522,16 @@ def add_configuration_selection_callbacks(app):
     )
     def upload_config_json(config_jsons):
         n_conf = len(app.config_names)
-        NUP = ([no_update] * n_conf, [no_update] * n_conf, no_update, no_update)
+        NUP = (no_update, [no_update] * n_conf, no_update, no_update)
 
         trig = ctx.triggered_id
         if trig is None:
+            return NUP
+        # After construction of a new button, ctx.triggered will contain
+        # the full list, not just the triggering button, though the triggering id is arbitrary
+        # Therefore reject if the list is longer than 1; if rejecting on first construction,
+        # the above should catch
+        if len(ctx.triggered) > 1:
             return NUP
         
         trigger_index = trig['index']
@@ -488,10 +542,15 @@ def add_configuration_selection_callbacks(app):
         ctype, cstr = cfg.split(',')
         cfg = json.loads(base64.b64decode(cstr))
 
-        config_from_dict(app, cfg, trigger_index-1)
+        ok = config_from_dict(app, cfg, trigger_index-1)
+
+        if not ok:
+            return NUP
+        
+        contents = [create_single_configuration_selector_row(i, app) for i in range(1, n_conf+1)]
 
         return (
-            [False if i == (trigger_index-1) else True for i in range(n_conf)],
+            contents,
             [False if i == (trigger_index-1) else True for i in range(n_conf)],
             json.dumps(str(datetime.datetime.now())),
             json.dumps(str(datetime.datetime.now()))

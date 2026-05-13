@@ -18,6 +18,7 @@ dependencies:
   - numpy=2.4.3
   - openpyxl
   - pandas=2.3.3
+  - pathvalidate
   - pip=26.0.1
   - pvlib
   - pyproj

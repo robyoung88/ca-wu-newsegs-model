@@ -9,7 +9,7 @@ import pandas as pd
 
 from src.util import classfuncs
 from src.core import timespan as modtimespan
-from src.core import location
+from src.core import location as modlocation
 from src.core.generation import generators
 from src.core.environment import environment_servers
 from src.core.environment import inmem_env_servers
@@ -50,7 +50,7 @@ def get_sprake_environment_server():
         .loc[:,['timestamp','wind_speed']]
     )
    
-    windloc = location.RaisedLocation.from_none()
+    windloc = modlocation.RaisedLocation.from_none()
     windloc.height_agl = _NOMINAL_WT_HEIGHT
     wind_ts = modtimespan.OffsetRegTimeSpan(
         pd.Timestamp(wind_data['timestamp'].iloc[0], tz='utc'),
@@ -78,7 +78,7 @@ def get_sprake_environment_server():
         )
     )
 
-    pvloc = location.RaisedLocation(
+    pvloc = modlocation.RaisedLocation(
         settings.get('SprakeValidationLat'),
         settings.get('SprakeValidationLon'), 
         height_agl = 2
@@ -130,7 +130,7 @@ def get_sprake_gamesa_126():
         )
     )
     
-    tloc = location.RaisedLocation.from_none()
+    tloc = modlocation.RaisedLocation.from_none()
     tloc.height_agl = _NOMINAL_WT_HEIGHT
     
     turbine = generators.WindTurbineElecGenerator.from_characteristics(
@@ -158,7 +158,7 @@ def get_sprake_ned100():
         )
         .loc[:,['wind_speed','coeff_power']]
     )
-    tloc = location.RaisedLocation.from_none()
+    tloc = modlocation.RaisedLocation.from_none()
     tloc.height_agl = _NOMINAL_WT_HEIGHT
     turbine = generators.WindTurbineElecGenerator.from_characteristics(
         cut_in=3.0,
@@ -206,6 +206,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         wider_environment_server: environment_servers.NewsegsWiderEnvironment | str | None = None,
         timestep: modtimespan.TimedeltaScalar | None = None,
         run_period: modtimespan.TimeSpan | None = None,
+        loc: modlocation.Location | None = None,
         name: str | None = None,
     ) -> None:
 
@@ -257,6 +258,9 @@ class SprakeModel(newsegsmodel.NewsegsModel):
             )
         self._run_period.timestep = self._default_timestep
 
+        if loc:
+            self._mod_cs.location = loc
+
         if name is not None:
             self.name = name
 
@@ -270,7 +274,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
         mod_gen = sprakegeneration.SprakeGeneration(get_sprake_ned100())
         mod_gen.set_location(
-            location.Location(
+            modlocation.Location(
                 settings.get('SprakeValidationLat'),
                 settings.get('SprakeValidationLon')
             )
@@ -344,6 +348,20 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     def get_default_timestep(self) -> pd.Timedelta:
         return self._default_timestep
+
+    @property
+    @override
+    def location(self) -> modlocation.Location:
+        return self._mod_cs.location
+    
+    @location.setter
+    @override
+    def location(self, loc: modlocation.Location):
+        """
+        The location has no impact on the Sprake model; store with the 
+        consumption-storage module.
+        """
+        self._mod_cs.location = loc
 
     def get_generation_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
         return self._generation_result

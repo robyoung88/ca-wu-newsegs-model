@@ -1809,12 +1809,21 @@ def sprake_model_to_interface_configs(
         'horizon': ts.end.year - ts.start.year
     }
 
+    # Location config
+    loc = mdl.location
+    loc_input = {
+        'lat': loc.lat,
+        'lon': loc.lon,
+        'name': loc.name
+    }
+
     mcfg = {
         'gen_input': gen_input,
         'stor_input': stor_input,
         'bc_input': bc_input,
         'dc_input': dc_input,
-        'mc_input': mc_input
+        'mc_input': mc_input,
+        'loc_input': loc_input,
     }
 
     fcfg = fnc.to_dict()
@@ -1887,6 +1896,18 @@ def add_initial_callback(app):
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
         return json.dumps(mcfg), json.dumps(fcfg)
+    
+    @app.callback(
+        Output('site-location', 'data', allow_duplicate = True),
+        Input('model-config', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_loc_inputs_to_store(mcfg):
+        if mcfg is None:
+            return no_update
+        mcfg = json.loads(mcfg)
+        loc_input = mcfg.get('loc_input', None)
+        return json.dumps(loc_input)
 
     @app.callback(
         Output('gen-smry-wind-cap', 'children'),

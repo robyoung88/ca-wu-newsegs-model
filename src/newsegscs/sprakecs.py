@@ -14,6 +14,7 @@ from src.newsegscs.newsegscs import NewsegsCS
 from src.util import classfuncs
 from src.core import newsegsmodule
 from src.core import timespan as modtimespan
+from src.core import location as modlocation
 from src.newsegsmodel import newsegsmodel
 
 from src.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
@@ -187,6 +188,7 @@ class SprakeCS(NewsegsCS):
         dhw_params: Mapping | None = None,
         spaceheat_params: Mapping | None = None,
         storage_params: Mapping | None = None,
+        loc: modlocation.Location | None = None,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None,
     ) -> None:
@@ -223,6 +225,7 @@ class SprakeCS(NewsegsCS):
             'storage_capacity': 1000.0,
             'storage_rte': 0.88
         },
+        loc: modlocation.Location | None = None,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None
     ) -> None:
@@ -235,6 +238,11 @@ class SprakeCS(NewsegsCS):
 
         self.n_units = float(n_units)
         self.ev_per_unit = ev_per_unit
+
+        if loc:
+            self.location = loc
+        else:
+            self.location = modlocation.Location.from_none()
 
         if name is not None:
             self.name = name
@@ -279,6 +287,22 @@ class SprakeCS(NewsegsCS):
     @name.setter
     def name(self, name: str) -> None:
         self._name = name
+
+    @property
+    @override
+    def location(self) -> modlocation.Location:
+        return self._location
+    
+    @location.setter
+    @override
+    def location(self, loc: modlocation.Location) -> None:
+        """
+        Set the consumption-storage location.
+
+        This has no impact on results in the Sprake model, so it is simply
+        held for external inspection.
+        """
+        self._location = loc
 
     @property
     def n_units(self) -> float:
@@ -461,6 +485,7 @@ class SprakeCS(NewsegsCS):
         dhw_params: Mapping,
         spaceheat_params: Mapping,
         storage_params: Mapping,
+        loc: modlocation.Location | None = None,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None
     ) -> SprakeCS:
@@ -482,7 +507,8 @@ class SprakeCS(NewsegsCS):
             'ev_params': self._ev_params,
             'dhw_params': self._dhw_params,
             'spaceheat_params': self._spaceheat_params,
-            'storage_params': self._storage_params
+            'storage_params': self._storage_params,
+            'loc': self.location.to_dict()
         }
 
         return odict
@@ -512,6 +538,12 @@ class SprakeCS(NewsegsCS):
         if storage_params:
             self.set_storage_params(storage_params)
         
+        loc = config.pop('loc', None)
+        if loc:
+            if isinstance(loc, Mapping):
+                loc = modlocation.location_from_dict(loc)
+            self.location = loc
+        
         conf_keys = config.keys()
         for k in conf_keys:
             if hasattr(self, k):
@@ -534,6 +566,10 @@ class SprakeCS(NewsegsCS):
     def from_dict(cls, config: Mapping) -> SprakeCS:
         config = copy.copy(config)
         config.pop('class', None)
+        loc = config.get('loc', None)
+        if loc:
+            if isinstance(loc, Mapping):
+                config['loc'] = modlocation.location_from_dict(loc)
         return cls.from_characteristics(**config)
 
 #SprakeCS copy constructor
