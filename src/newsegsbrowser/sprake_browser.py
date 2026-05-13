@@ -9,7 +9,7 @@ from functools import partial
 from typing import Tuple
 #from typing import Literal
 
-from dash import Dash, html, Input, Output, dcc, State, ALL, no_update
+from dash import Dash, html, Input, Output, dcc, State, ALL, no_update, ctx
 from dash import clientside_callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 import dash_daq as daq
@@ -1765,6 +1765,13 @@ def sprake_finance_set_finance_config(fcfg: dict, fnc: sprakefinance.SprakeFinan
     fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0))
     fnc.cost_discount_rate = float(fcfg.get('cost_discount_rate', 0.0))
 
+def sprake_finance_to_interface_config(
+    fnc: sprakefinance.SprakeFinance,
+) -> dict:
+    fcfg = fnc.to_dict()
+
+    return fcfg
+
 def sprake_model_to_interface_configs(
     mdl: sprakemodel.SprakeModel, 
     fnc: sprakefinance.SprakeFinance,
@@ -1826,7 +1833,7 @@ def sprake_model_to_interface_configs(
         'loc_input': loc_input,
     }
 
-    fcfg = fnc.to_dict()
+    fcfg = sprake_finance_to_interface_config(fnc)
 
     return mcfg, fcfg
 
@@ -1850,15 +1857,15 @@ def add_initial_callback(app):
         Input('onload-div', 'children')
     )
 
-    @app.callback(
-        Output('model-firstrun-watcher', 'data'),
-        Input('onload-div', 'children')
-    )
-    def sync_mdl_run_init(_):
-        print('Starting first run')
-        app.models[app.selected_config].run()
-        print('First run complete')
-        return json.dumps(str(datetime.datetime.now()))
+    #@app.callback(
+    #    Output('model-firstrun-watcher', 'data'),
+    #    Input('onload-div', 'children')
+    #)
+    #def sync_mdl_run_init(_):
+    #    print('Starting first run')
+    #    app.models[app.selected_config].run()
+    #    print('First run complete')
+    #    return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
         Output('model-run-watcher', 'data', allow_duplicate = True),
@@ -1868,6 +1875,7 @@ def add_initial_callback(app):
     def trigger_mdl_run(_):
         """Config change - run the model now"""
         print('Starting normally triggered run')
+        # print (ctx.triggered)
         app.models[app.selected_config].run()
         print('Normal run complete')
         return json.dumps(str(datetime.datetime.now()))
@@ -1890,6 +1898,8 @@ def add_initial_callback(app):
         prevent_initial_call=True
     )
     def sync_config(_, _2):
+        # print ('Active configuration has been changed')
+        # print (ctx.triggered)
         mdl = app.models[app.selected_config]
         fnc = app.finances[app.selected_config]
 
@@ -2661,6 +2671,8 @@ def add_input_callbacks(app):
         prevent_initial_call=True
     )
     def update_gen_config(wind_cap, pv_cap, mcfg):
+        # print ('A model config input field has changed')
+        # print (ctx.triggered)
         if mcfg is None:
             mcfg = {
                 'gen_input': {}
@@ -2689,6 +2701,8 @@ def add_input_callbacks(app):
         prevent_initial_call=True
     )
     def update_stor_config(stor_cap, mcfg):
+        # print ('A storage config input field has changed')
+        # print (ctx.triggered)
         if mcfg is None:
             mcfg = {
                 'stor_input': {}
@@ -2725,6 +2739,9 @@ def add_input_callbacks(app):
         bc_dhw_seasonal_variance,
         mcfg
     ):
+        # print ('A building consumption input field has changed')
+        # print (ctx.triggered)
+
         if mcfg is None:
             mcfg = {
                 'bc_input': {}
@@ -2765,6 +2782,9 @@ def add_input_callbacks(app):
         ev_per_unit,
         mcfg
     ):
+        # print ('A direct consumption input field has changed')
+        # print (ctx.triggered)
+
         if mcfg is None:
             mcfg = {
                 'bc_input': {}
@@ -2978,6 +2998,20 @@ def add_input_callbacks(app):
             fcfg['cost_discount_rate'] = float(cost_dr) / 100.
 
         return json.dumps(fcfg)
+    
+    def sync_fcfg_to_model(fcfg: dict) -> bool:
+        """
+        Pass the finance conf dictionary into the Sprake model
+        """
+        fnc = app.finances[app.selected_config]
+        w_fcfg = sprake_finance_to_interface_config(fnc)
+
+        dirty = False
+        if not w_fcfg == fcfg:
+            sprake_finance_set_finance_config(fcfg, fnc)
+            dirty = True
+        
+        return dirty
 
     def sync_configs_to_model(mcfg: dict, fcfg: dict) -> Tuple[bool, bool]:
         """
@@ -3010,19 +3044,43 @@ def add_input_callbacks(app):
         return mdl.dirty, fnc.dirty
 
     @app.callback(
-        Output('model-config-watcher', 'data'),
         Output('finance-config-watcher', 'data', allow_duplicate=True),
-        Input('model-config', 'data'),
         Input('finance-config', 'data'),
         prevent_initial_call = True
     )
+    def update_finance_config(fcfg):
+        """
+        Set the currently selected finance with the data held in the fcfg dict
+        """
+        NUP = no_update
+        if fcfg is None:
+            return NUP
+        
+        fcfg = json.loads(fcfg)
+        finance_dirty = sync_fcfg_to_model(fcfg)
+        if finance_dirty:
+            return json.dumps(str(datetime.datetime.now()))
+        return NUP
+
+    @app.callback(
+        Output('model-config-watcher', 'data'),
+        Output('finance-config-watcher', 'data', allow_duplicate=True),
+        Input('model-config', 'data'),
+        State('finance-config', 'data'),
+        prevent_initial_call = True
+    )
     def update_model_configs(mcfg, fcfg):
+        # print('Configuration is being updated')
+        # print(ctx.triggered)
         if mcfg is None or fcfg is None:
             return no_update, no_update
         mcfg = json.loads(mcfg)
         fcfg = json.loads(fcfg)
 
+        # I don't trust these dirty flags on first load; 
         mdl_dirty, finance_dirty = sync_configs_to_model(mcfg, fcfg)
+
+
 
         if mdl_dirty:
             return json.dumps(str(datetime.datetime.now())), no_update
