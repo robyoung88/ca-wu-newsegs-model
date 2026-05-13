@@ -1,16 +1,30 @@
+/* ===== Mobile/Narrow Layout (Default) ===== */
+#app-layout-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+}
+
 #drawer-container {
     position: sticky;
     bottom: 0;
+    top: auto;
+    right: auto;
     width: 100%;
-    background: #ffffff;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    height: 80px;
     border-top: 1px solid #ccc;
+    border-left: none;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
     z-index: 1000;
     display: flex;
     flex-direction: column;
     transition: height 0.3s ease-out;
-    height: 80px;
+    flex-shrink: 0;
+    background: #ffffff;
 }
+
 #drawer-header {
     height: 80px;
     background: #f8f9fa;
@@ -22,6 +36,7 @@
     width: 100%;
     flex-shrink: 0;
 }
+
 #resize-handle {
     position: absolute;
     top: 0;
@@ -46,10 +61,93 @@
 #drawer-content {
     flex: 1 1 auto;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px;
     display: none;
     min-height: 0;
 }
+
 #drawer-title {
     width: 100%;
+    padding: 0 12px;
+}
+
+#main-content-pane {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ===== Wide Screen Layout (Side-by-side) ===== */
+@media (min-width: 992px) and (orientation: landscape) {
+    /* Main layout wrapper becomes a side-by-side container */
+    #app-layout-wrapper {
+        flex-direction: row;
+        width: 50%;
+        overflow: hidden;
+        float: left;
+    }
+
+    /* Main content takes full height on left side */
+    #app-layout-wrapper > div:first-child {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-left: 20px;
+        padding-right: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        max-width: calc(100% - 40px);
+    }
+
+    /* Ensure the bootstrap container doesn't overflow */
+    #app-layout-wrapper > div:first-child .container,
+    #app-layout-wrapper > div:first-child .container-lg {
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    /* Limit map container width */
+    #app-layout-wrapper > div:first-child [id*="map"] {
+        max-width: 100%;
+    }
+
+    #drawer-container {
+        position: fixed;
+        bottom: auto;
+        top: 0;
+        right: 0;
+        width: 50%;
+        height: 100vh !important;
+        border-top: none;
+        border-left: 1px solid #ccc;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        transition: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    #drawer-header {
+        height: auto;
+        min-height: 60px;
+        cursor: default;
+    }
+
+    #resize-handle {
+        display: none;
+    }
+
+    #drawer-content {
+        display: block !important;
+    }
+
+    /* Adjust main content pane for side-by-side layout */
+    #main-content-pane {
+        margin-right: 0;
+        width: 50%;
+    }
 }

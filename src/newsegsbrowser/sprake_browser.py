@@ -1560,10 +1560,9 @@ def create_layout():
     """
     Create Sprake Energy Model Interface Layout in HTML
     """
-    mapview = [create_site_selector_map()] \
-        + [
-            html.Div([
-
+    mapview = html.Div([
+        dbc.Row(dbc.Col(create_site_selector_map(),width=12)),
+        
         html.Hr(),
 
         # Site details
@@ -1578,6 +1577,7 @@ def create_layout():
             ],
             lg = 6),
         ]),
+
         dbc.Row([
             dbc.Col([
                 create_building_consumption_input_card()
@@ -1605,6 +1605,7 @@ def create_layout():
             ],
             lg=6),
         ]),
+
         dbc.Row([
             dbc.Col([
                 create_sales_input_card()
@@ -1719,12 +1720,14 @@ def create_layout():
 
         html.Div(id='onload-div'), # To trigger first callback
 
-        
-        
-    ])
-    ]
 
-    return dbc.Container(mapview, fluid=False)
+
+    ],
+    id='main-content-pane',
+    )
+    
+
+    return dbc.Container(mapview, fluid=False, id='app-layout-wrapper',)
 
 def sprake_model_set_gen_input(gen_input: dict, mdl: sprakemodel.SprakeModel):
     turbine_size = mdl.generation.generator.generators[0].turbine.nameplate_capacity
