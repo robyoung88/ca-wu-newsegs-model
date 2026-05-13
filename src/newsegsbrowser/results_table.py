@@ -1,13 +1,46 @@
 import json
 import datetime
 import copy
+import base64
 
 from dash import html, Patch, Input, Output, dcc, ALL, State, ctx, no_update
 import dash_bootstrap_components as dbc
 
+from src.util import jsonfuncs
 from src.newsegsbrowser.common import get_icon
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
+
+def config_to_dict(app, config_index: int | None = None):
+    """
+    Encapsulate a model and finance configuration in a dictionary.
+    """
+    if config_index is None:
+        config_index = app.selected_config
+    
+    odict = {
+        'model_config': app.models[config_index].to_dict(),
+        'finance_config': app.finances[config_index].to_dict(),
+    }
+
+    return odict
+
+def config_from_dict(app, cfg, config_index: int | None = None):
+    """
+    Given a model and finance configuration, update the live config
+    """
+    if config_index is None:
+        config_index = app.selected_config
+    
+    if config_index >= len(app.models) or config_index >= len(app.finances):
+        return None
+    
+    app.models[config_index].sync_with_dict(cfg.get('model_config'))
+    app.finances[config_index].sync_with_dict(cfg.get('finance_config'))
+    app.finances[config_index].set_model(app.models[config_index])
+    app.models[config_index].run()
+
+    return True       
 
 def create_tbl_head(n_configs):
     return [
@@ -53,8 +86,10 @@ def create_single_configuration_selector_row(config_index, app = None):
     
     if app is None:
         config_name = 'Configuration Name'
+        is_selected = True
     else:
         config_name = app.config_names[config_index - 1]
+        is_selected = app.selected_config == (config_index-1)
     
     if config_index < 2 and config_name == 'Configuration Name':
         contents.append(
@@ -103,17 +138,20 @@ def create_single_configuration_selector_row(config_index, app = None):
             ),
             color = 'primary',
             id = {'type': 'config-focus-btn', 'index': config_index},
-            outline = True if config_index > 1 else False,
+            outline = not(is_selected),
+            title = 'Focus configuration',
         ),
-        dbc.Button(
-            html.I(
-                className="bi bi-floppy",
-                style={'display': 'inline'}
-            ),
-            color="primary",
-            id = {'type': 'config-save-btn', 'index': config_index},
-            outline=True,
-        ),
+        # temporarily disabling save until we get the database back-end
+        #dbc.Button(
+        #    html.I(
+        #        className="bi bi-floppy",
+        #        style={'display': 'inline'}
+        #    ),
+        #    color="primary",
+        #    id = {'type': 'config-save-btn', 'index': config_index},
+        #    outline=True,
+        #    title = 'Save configuration',
+        #),
         dbc.Button(
             html.I(
                 className=get_icon('config-duplicate', style_name = 'raw'),
@@ -122,7 +160,57 @@ def create_single_configuration_selector_row(config_index, app = None):
             color="primary",
             id = {'type': 'config-dup-btn', 'index': config_index},
             outline=True,
-        )
+            title = 'Duplicate configuration'
+        ),
+        dbc.Button(
+            html.I(
+                className = get_icon('config-download', style_name = 'raw'),
+                style = {'display': 'inline'}
+            ),
+            color='secondary',
+            id = {'type': 'config-download-btn', 'index': config_index},
+            outline = True,
+            title = 'Download configuration as json'
+        ),
+        html.Span(
+            html.Span(
+                dcc.Upload(
+                    dbc.Button(
+                        html.I(
+                            className = get_icon('config-upload', style_name = 'raw'),
+                            style = {'display': 'inline'}
+                        ),
+                        color='secondary',
+                        id = {'type': 'config-upload-btn', 'index': config_index},
+                        outline = True,
+                        title = 'Overwrite configuration with uploaded json',
+                        #style = {
+                        #    'margin-top': '10px'
+                        #}
+                    ),
+                    id = {'type': 'config-upload', 'index': config_index},
+                    multiple = False,
+                    enable_folder_selection = False,
+                    accept = '.json',
+                ),
+                style = {
+                    'display': 'inline',
+                    'float': 'left'
+                },
+            ),
+            style = {'display': 'inline-block', 'vertical-align': 'top',},
+        ),
+        
+        dbc.Button(
+            html.I(
+                className = get_icon('results-download', style_name = 'raw'),
+                style = {'display': 'inline'}
+            ),
+            color='secondary',
+            id = {'type': 'results-download-btn', 'index': config_index},
+            outline = True,
+            title = 'Download results as spreadsheet'
+        ),
     ]
 
     if show_remove:
@@ -166,6 +254,7 @@ def create_configuration_selector():
         #        ])
         #    ])
         #),
+        dcc.Download(id='download-config-json'),
         dcc.Store(id='n_active_conf', data = '{"n": 1}')
     ])
 
@@ -193,14 +282,20 @@ def add_configuration_selection_callbacks(app):
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
         Output('n_active_conf', 'data', allow_duplicate = True),
+        Output('model-run-watcher', 'data', allow_duplicate = True),
+        Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
+        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
         State('n_active_conf', 'data'),
         prevent_initial_call=True
     )
     def add_duplicate_config(n_clicks,n_active):
         # Add the selector as the penultimate row
-        NUP = (no_update, no_update, no_update)
+        n_conf = len(app.config_names)
+        NUP = (no_update, no_update, no_update, no_update, [no_update] * n_conf, [no_update] * n_conf)
         
+        update_outlines = [True] * n_conf
+
         trig = ctx.triggered_id
         if trig is None or n_clicks is None:
             return NUP
@@ -226,11 +321,10 @@ def add_configuration_selection_callbacks(app):
             fnc.set_model(app.models[-1])
             fnc._dirty = False
             app.finances.append(fnc)
+            app.selected_config = n_conf-1
         else:
             return NUP
         
-        # TODO: Instruct app to update results tables
-
         patched_comparator_selector = Patch()
         patched_comparator_selector.append(
             create_single_configuration_selector_row(n_conf, app)
@@ -244,7 +338,10 @@ def add_configuration_selection_callbacks(app):
         return (
             patched_comparator_selector,
             patched_header_comparator_selector,
-            json.dumps({'n': n_conf})
+            json.dumps({'n': n_conf}),
+            json.dumps(str(datetime.datetime.now())),
+            update_outlines,
+            update_outlines
         )  
     
     @app.callback(
@@ -300,7 +397,7 @@ def add_configuration_selection_callbacks(app):
         else:
             contents = []
 
-        hdr_contents = [create_config_selector_headerbutton(i, app = None) for i in range(1, n_conf + 1)]
+        hdr_contents = [create_config_selector_headerbutton(i, app) for i in range(1, n_conf + 1)]
 
         return (
             contents,
@@ -309,8 +406,8 @@ def add_configuration_selection_callbacks(app):
         )
 
     @app.callback(
-        Output({'type': 'config-focus-btn', 'index': ALL}, 'outline'),
-        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline'),
+        Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
+        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Output('live-config-watcher', 'data', allow_duplicate = True),
         Output('model-run-watcher', 'data', allow_duplicate = True),
         Input({'type': 'config-focus-btn', 'index': ALL}, 'n_clicks'),
@@ -338,6 +435,61 @@ def add_configuration_selection_callbacks(app):
         # TODO: set the app focussed configuration here. Also trigger watchers
         app.selected_config = trigger_index - 1
         
+        return (
+            [False if i == (trigger_index-1) else True for i in range(n_conf)],
+            [False if i == (trigger_index-1) else True for i in range(n_conf)],
+            json.dumps(str(datetime.datetime.now())),
+            json.dumps(str(datetime.datetime.now()))
+        )
+
+    @app.callback(
+        Output('download-config-json', 'data'),
+        Input({'type': 'config-download-btn', 'index': ALL}, 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def download_config_json(n_clicks):
+        NUP = no_update
+
+        trig = ctx.triggered_id
+        if trig is None:
+            return NUP
+        
+        trigger_index = trig['index']
+        if n_clicks[trigger_index-1] is None:
+            return NUP
+        
+        odict = config_to_dict(app, trigger_index - 1)
+        return dict(
+            content = json.dumps(odict, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4), 
+            filename = 'sprake_model_conf.json'
+        )
+
+    @app.callback(
+        Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
+        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
+        Output('live-config-watcher', 'data', allow_duplicate = True),
+        Output('model-run-watcher', 'data', allow_duplicate = True),
+        Input({'type': 'config-upload', 'index': ALL}, 'contents'),
+        prevent_initial_call = True
+    )
+    def upload_config_json(config_jsons):
+        n_conf = len(app.config_names)
+        NUP = ([no_update] * n_conf, [no_update] * n_conf, no_update, no_update)
+
+        trig = ctx.triggered_id
+        if trig is None:
+            return NUP
+        
+        trigger_index = trig['index']
+        if config_jsons[trigger_index-1] is None:
+            return NUP
+        
+        cfg = config_jsons[trigger_index - 1]
+        ctype, cstr = cfg.split(',')
+        cfg = json.loads(base64.b64decode(cstr))
+
+        config_from_dict(app, cfg, trigger_index-1)
+
         return (
             [False if i == (trigger_index-1) else True for i in range(n_conf)],
             [False if i == (trigger_index-1) else True for i in range(n_conf)],

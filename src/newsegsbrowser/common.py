@@ -77,6 +77,9 @@ DEFAULT_ICONS = {
     'config-duplicate': 'bi bi-copy',
     'config-remove': 'bi bi-dash-circle',
     'config-focus': 'bi bi-crosshair',
+    'config-download': 'bi bi-box-arrow-down',
+    'config-upload': 'bi bi-box-arrow-in-up',
+    'results-download': 'bi bi-table',
 }
 def get_icon(icon_name:None|Sequence|str=None,
              icon_class:None|Sequence|str=None,
