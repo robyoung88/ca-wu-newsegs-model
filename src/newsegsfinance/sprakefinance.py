@@ -3,6 +3,7 @@ import copy
 from typing import override, Mapping
 from numbers import Number
 from functools import singledispatchmethod
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -82,6 +83,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         
         if model is not None:
             self.set_model(model)
+
+        self.dirty = True
     
     @__init__.register(dict)
     def _from_dict(
@@ -128,6 +131,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
     def set_model(self, mdl:NewsegsModel) -> None:
         self._model = mdl
+        self.dirty = True
     
     @property
     def benefit_discount_rate(self) -> float:
@@ -176,15 +180,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         self.dirty = True
 
     def _get_empty_df(self) -> pd.DataFrame:
-        if self._model is None:
-            return pd.DataFrame()
-        
-        csr = self._model.get_consumption_storage_result()
-        if csr is None:
-            return pd.DataFrame()
-        return pd.DataFrame({
-            'datetime': csr.get_timespan().to_pandas(),
-        }).set_index('datetime')
+        return _deferred_get_empty_df(self).copy()
 
     def _get_consumption(self, meter_names) -> pd.DataFrame:
         """
@@ -662,25 +658,25 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     # Summary vectors
     def get_benefits_series_undiscounted(self) -> pd.Series:
         benefits = self.all_receipts_undiscounted.loc[:,(slice(None), 'receipts')]
-        srs = benefits.apply(sum, axis=1)
+        srs = benefits.sum(axis=1)
         srs.name = 'benefits'
         return srs
 
     def get_benefits_series_discounted(self) -> pd.Series:
         benefits = self.all_receipts_discounted.loc[:,(slice(None), 'receipts')]
-        srs = benefits.apply(sum, axis=1)
+        srs = benefits.sum(axis=1)
         srs.name = 'benefits'
         return srs
     
     def get_costs_series_undiscounted(self) -> pd.Series:
         costs = self.all_costs_undiscounted.loc[:,(slice(None), 'costs')]
-        srs = costs.apply(sum, axis=1)
+        srs = costs.sum(axis=1)
         srs.name = 'costs'
         return srs
 
     def get_costs_series_discounted(self) -> pd.Series:
         costs = self.all_costs_discounted.loc[:,(slice(None), 'costs')]
-        srs = costs.apply(sum, axis=1)
+        srs = costs.sum(axis=1)
         srs.name = 'costs'
         return srs
 
@@ -718,8 +714,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         return total_benefits / total_costs
 
     def get_simple_payback_time_days(self) -> float:
-        capex = self.all_capex_costs_undiscounted.apply(sum, axis=1)
-        net_revenue = self.all_receipts_undiscounted.apply(sum, axis=1) - self.all_recurrent_costs_undiscounted.apply(sum, axis=1)
+        capex = self.all_capex_costs_undiscounted.sum(axis=1)
+        net_revenue = self.all_receipts_undiscounted.sum(axis=1) - self.all_recurrent_costs_undiscounted.sum(axis=1)
 
         simple_debt = (net_revenue - capex).cumsum().values.flatten()
 
@@ -827,9 +823,23 @@ def _make_unit_cost_property(key: str):
         return self._unit_costs.get(key)
 
     def setter(self, value: float) -> None:
+        self.dirty = True
         self._unit_costs[key] = value
 
     return property(getter, setter, doc=f"Unit cost for {key}")
 
 for _key in SprakeFinance._default_unit_costs.keys():
     setattr(SprakeFinance, _key, _make_unit_cost_property(_key))
+
+@lru_cache
+def _deferred_get_empty_df(fnc: SprakeFinance):
+    if fnc._model is None:
+        return pd.DataFrame()
+    
+    csr = fnc._model.get_consumption_storage_result()
+    if csr is None:
+        return pd.DataFrame()
+    
+    return pd.DataFrame({
+        'datetime': csr.get_timespan().to_pandas(),
+    }).set_index('datetime')

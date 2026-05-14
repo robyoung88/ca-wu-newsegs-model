@@ -1,8 +1,10 @@
 from __future__ import annotations
 import os
 import copy
+import datetime
 from typing import override, Mapping
 from functools import singledispatchmethod
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -172,6 +174,10 @@ def get_sprake_ned100():
     )
 
     return turbine
+
+# Deferred results 
+#@lru_cache
+#def d
 
 class SprakeModel(newsegsmodel.NewsegsModel):
     _name = 'Sprake Model'
@@ -381,6 +387,10 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)
         self._dirty_flag = False
+        
+        self._last_run = datetime.datetime.now()
+        self._last_hash = hash((str(self.to_dict()), str(self._last_run)))
+        return self._last_hash
 
     @override
     def to_dict(self) -> Mapping:

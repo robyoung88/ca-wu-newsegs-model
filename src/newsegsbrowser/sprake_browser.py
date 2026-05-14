@@ -1689,7 +1689,6 @@ def create_layout():
 
                 # To trigger resync of output fields after a model run
                 dcc.Store(id='model-run-watcher'),
-                dcc.Store(id='model-firstrun-watcher'),
 
                 dcc.Store(id='model-config'),
                 dcc.Store(id='finance-config'),
@@ -1719,13 +1718,9 @@ def create_layout():
         ),
 
         html.Div(id='onload-div'), # To trigger first callback
-
-
-
     ],
     id='main-content-pane',
     )
-    
 
     return dbc.Container(mapview, fluid=False, id='app-layout-wrapper',)
 
@@ -1871,36 +1866,37 @@ def add_initial_callback(app):
         Input('onload-div', 'children')
     )
 
-    #@app.callback(
-    #    Output('model-firstrun-watcher', 'data'),
-    #    Input('onload-div', 'children')
-    #)
-    #def sync_mdl_run_init(_):
-    #    print('Starting first run')
-    #    app.models[app.selected_config].run()
-    #    print('First run complete')
-    #    return json.dumps(str(datetime.datetime.now()))
-
     @app.callback(
         Output('model-run-watcher', 'data', allow_duplicate = True),
         Input('model-config-watcher', 'data'),
+        State('model-run-watcher', 'data'),
         prevent_initial_call = True
     )
-    def trigger_mdl_run(_):
+    def trigger_mdl_run(_, mdl_run_hashes):
         """Config change - run the model now"""
         print('Starting normally triggered run')
         # print (ctx.triggered)
-        app.models[app.selected_config].run()
+        mdl_hash = app.models[app.selected_config].run()
         print('Normal run complete')
-        return json.dumps(str(datetime.datetime.now()))
+
+        if mdl_run_hashes is None:
+            mdl_run_hashes = [None] * len(app.config_names)
+        else:
+            mdl_run_hashes = json.loads(mdl_run_hashes)
+        
+        if len(mdl_run_hashes) == app.selected_config:
+            mdl_run_hashes.append(mdl_hash)
+        else:
+            mdl_run_hashes[app.selected_config] = mdl_hash
+
+        return json.dumps(mdl_run_hashes)
 
     @app.callback(
         Output('finance-config-watcher', 'data', allow_duplicate=True),
-        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         prevent_initial_call = True
     )
-    def trigger_financial_results_post_run(_, _2):
+    def trigger_financial_results_post_run(_):
         app.finances[app.selected_config].dirty = False
         return json.dumps(str(datetime.datetime.now()))
     
@@ -2269,15 +2265,18 @@ def add_result_callbacks(app):
     """
     @app.callback(
         Output('res-gen', 'data'),
-        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         State('res-gen', 'data'),
         prevent_initial_call=True
     )
-    def set_res_gen(_,_2,res_gen):
+    def set_res_gen(mdl_run_hashes,res_gen):
         """
         Create the generation results data after a completed model run
         """
+        if mdl_run_hashes is None:
+            return no_update
+        #mdl_run_hashes = json.loads(mdl_run_hashes)
+        #mdl_hash = mdl_run_hashes[app.selected_config]
         mdl = app.models[app.selected_config]
 
         print ("making gen results")
@@ -2296,12 +2295,11 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-stor', 'data'),
-        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         State('res-stor', 'data'),
         prevent_initial_call=True
     )
-    def set_res_stor(_,_2, res_stor):
+    def set_res_stor(_, res_stor):
         """
         Create the storage results data after a completed model run
         """
@@ -2324,12 +2322,11 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-cons', 'data'),
-        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         State('res-cons', 'data'),
         prevent_initial_call=True
     )
-    def set_res_cons(_,_2, res_cons):
+    def set_res_cons(_, res_cons):
         """
         Create the consumption results data after a completed model run.
         """
@@ -2352,12 +2349,11 @@ def add_result_callbacks(app):
 
     @app.callback(
         Output('res-net', 'data'),
-        Input('model-firstrun-watcher', 'data'),
         Input('model-run-watcher', 'data'),
         State('res-net', 'data'),
         prevent_initial_call=True
     )
-    def set_res_net(_,_2, res_net):
+    def set_res_net(_, res_net):
         """
         Create the net energy results data after a completed model run.
         """
@@ -3130,7 +3126,16 @@ def serve_layout():
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
-def create_app(external_stylesheets=None, run_model=False):
+def add_model_from_hash_method(app):
+    def model_from_hash(h):
+        for mdl in app.models:
+            if hash(mdl) == h:
+                return mdl
+        return None
+    app.model_from_hash = model_from_hash
+    return app
+
+def create_app(external_stylesheets=None):
     """
     Create the Sprake Energy Model Interface Dash App
     """
@@ -3162,9 +3167,6 @@ def create_app(external_stylesheets=None, run_model=False):
         mdl_conf = json.load(f)
     app.models = [sprakemodel.SprakeModel.from_dict(mdl_conf)]
 
-    if run_model:
-        app.models[app.selected_config].run()
-
     # Load finance configuration
     with open(
         os.path.join(
@@ -3180,6 +3182,7 @@ def create_app(external_stylesheets=None, run_model=False):
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)
 
+    app = add_model_from_hash_method(app)
     return app
 
 # Commented out to prevent PyLint complaining about use of the name "app" in argument lists

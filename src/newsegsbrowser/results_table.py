@@ -343,6 +343,9 @@ def add_configuration_selection_callbacks(app):
             mdl._grid_result = copy.copy(mdl_ref._grid_result)
             mdl._cs_result = copy.copy(mdl_ref._cs_result)
             mdl._dirty = False
+            # We also want the cached functions to respond, so, at risk:
+            mdl._last_run = mdl_ref._last_run
+            mdl._last_hash = mdl_ref._last_hash
             app.models.append(mdl)
             fnc = sprakefinance.SprakeFinance(app.finances[trigger_index - 1])
             fnc.set_model(app.models[-1])

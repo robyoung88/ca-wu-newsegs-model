@@ -1,11 +1,22 @@
 from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
+import datetime
+import uuid
+from functools import lru_cache
+
+
 import numpy as np
 import pandas as pd
 from src.core.timespan import TimeSpan, RegTimeSpan
 from collections.abc import Iterable, Collection, Mapping
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
+    
+    def __init__(self):
+        self._first_created = datetime.datetime.now()
+        self._last_hash = hash(uuid.uuid4())
+
     @property
     @abstractmethod
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
@@ -42,21 +53,35 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
 
         Caution - this implementation could become unweildy for large results
         """
-        datetime = self.get_timespan().to_pandas()
-        return pd.DataFrame(data=self.meters.T,
-                            index=datetime,
-                            columns=self.get_meter_names())
-
+        return defer_meters_to_pandas(self)
+        
     def dsm_to_pandas(self) -> pd.DataFrame:
         """
         Return the dsm data as a pandas dataframe
 
         Caution - this implementation could become unweildy for large results
         """
-        datetime = self.get_timespan().to_pandas()
-        return pd.DataFrame(data=self.dsm.T,
-                            index=datetime,
-                            columns=self.get_dsm_names())
+        return defer_dsm_to_pandas(self)
+
+    def __hash__(self):
+        """Caution - this treats the results object as immutable!"""
+        if not (hasattr(self, '_last_hash')):
+            self._last_hash = hash(uuid.uuid4())
+        return self._last_hash
+
+@lru_cache
+def defer_meters_to_pandas(res: ABCNewsegsModuleResult):
+    datetime = res.get_timespan().to_pandas()
+    return pd.DataFrame(data = res.meters.T,
+                        index = datetime,
+                        columns = res.get_meter_names())
+
+@lru_cache
+def defer_dsm_to_pandas(res: ABCNewsegsModuleResult):
+    datetime = res.get_timespan().to_pandas()
+    return pd.DataFrame(data = res.dsm.T,
+                        index = datetime,
+                        columns = res.get_dsm_names())
 
 def filter_meters(
     results: ABCNewsegsModuleResult,

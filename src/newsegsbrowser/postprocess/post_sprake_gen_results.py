@@ -1,6 +1,8 @@
 """
 Convert Sprake model generation results to interface-readable dictionary
 """
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
@@ -25,6 +27,7 @@ SEASON_NAMES_MAP = (
     .set_index('season_index')
 )
 
+@lru_cache
 def gen_results_to_interface_sprake(
     mdl: SprakeModel
 ) -> dict:
@@ -206,3 +209,20 @@ def gen_results_to_interface_sprake(
     results_to_interface['self-consumption']['horizon'] = selfcons_horizon_combined.to_dict(orient='tight')
 
     return results_to_interface
+
+def gen_results_to_interface_sprake_factory(app):
+    """
+    Wrap gen_results_to_interface_sprake in a function taking the model hash.
+
+    Allows for caching of the result.
+    """
+    _app_ref = app
+
+    @lru_cache
+    def wrapped_func(mdl_hash):
+        mdl = _app_ref.model_from_hash(mdl_hash)
+        if mdl is None:
+            return None
+        return gen_results_to_interface_sprake(mdl)
+    
+    return wrapped_func

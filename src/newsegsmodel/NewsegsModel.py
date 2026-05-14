@@ -5,6 +5,7 @@ Abstract base class for NewSEGS model
 from abc import ABCMeta, abstractmethod
 from typing import Mapping
 import re
+import datetime
 
 from src.core import location as modlocation
 from src.core import TimeSpan, TimedeltaScalar
@@ -43,13 +44,17 @@ class NewsegsModel(metaclass=ABCMeta):
 
     _dirty_flag = False
     _name = 'NewSEGS Model'
+    _last_run = datetime.datetime.now()
+    _last_hash = 1
 
     @abstractmethod
-    def run(self):
+    def run(self) -> int:
         """
         Compute all submodules given current configuration
 
-        Results are accessed via the model properties
+        Results are accessed via the model properties.
+
+        Returns a hash representing the model and datetime of run completion.
         """
 
     @abstractmethod
@@ -205,3 +210,7 @@ class NewsegsModel(metaclass=ABCMeta):
         }
 
         return odict
+
+    def __hash__(self) -> int:
+        return self._last_hash
+
