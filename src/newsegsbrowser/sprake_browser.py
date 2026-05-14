@@ -2219,7 +2219,9 @@ def add_initial_callback(app):
     def sync_fnc_so_benefits_to_store(fnc, ann_hori_toggle):
         if fnc is None:
             return no_update, no_update, no_update
-        fnc = json.loads(fnc)
+        fnc = app.results.get('res-finance-so-benefits', None)
+        if fnc is None:
+            return no_update, no_update, no_update
         bnfts = create_so_benefits_results(fnc, not(ann_hori_toggle))
         return (
             bnfts,
@@ -2238,7 +2240,9 @@ def add_initial_callback(app):
     def sync_fnc_so_costs_to_store(fnc, ann_hori_toggle):
         if fnc is None:
             return no_update, no_update, no_update
-        fnc = json.loads(fnc)
+        fnc = app.results.get('res-finance-so-costs', None)
+        if fnc is None:
+            return no_update, no_update, no_update
         return (
             create_so_costs_results(fnc, not(ann_hori_toggle)),
             '{:,.0f}'.format(fnc[app.selected_config].get('smry_import_fixed_cost_peryear')),
@@ -2254,7 +2258,9 @@ def add_initial_callback(app):
     def sync_fnc_so_value_to_store(fnc, ann_hori_toggle):
         if fnc is None:
             return no_update
-        fnc = json.loads(fnc)
+        fnc = app.results.get('res-finance-so-value', None)
+        if fnc is None:
+            return no_update
         return create_so_value_results(fnc, not(ann_hori_toggle))
 
     return app
@@ -2377,10 +2383,9 @@ def add_result_callbacks(app):
     @app.callback(
         Output('res-finance-so-benefits', 'data'),
         Input('finance-config-watcher', 'data'),
-        State('res-finance-so-benefits', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_benefits_so(_, res_ben):
+    def set_res_finance_benefits_so(_):
         """
         Create the system owner financial benefits results after a completed model run.
         """
@@ -2393,25 +2398,28 @@ def add_result_callbacks(app):
             .finance_benefits_results_to_interface_sprake(mdl,fnc)
         )
 
+        res_ben = app.results.get('res-finance-so-benefits', None)
+
         if res_ben is None:
             res_ben = [None] * len(app.config_names)
-        else:
-            res_ben = json.loads(res_ben)
+            app.results['res-finance-so-benefits'] = res_ben
+
+        #else:
+        #    res_ben = json.loads(res_ben)
         
         if len(res_ben) == app.selected_config:
             res_ben.append(fnc_benefits_results)
         else:
             res_ben[app.selected_config] = fnc_benefits_results
 
-        return json.dumps(res_ben)
+        return json.dumps(str(datetime.datetime.now()))
     
     @app.callback(
         Output('res-finance-so-costs', 'data'),
         Input('finance-config-watcher', 'data'),
-        State('res-finance-so-costs', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_costs_so(_, res_cost):
+    def set_res_finance_costs_so(_):
         """
         Create the system owner financial costs results after a completed model run.
         """
@@ -2424,25 +2432,27 @@ def add_result_callbacks(app):
             .finance_costs_results_to_interface_sprake(mdl,fnc)
         )
 
+        res_cost = app.results.get('res-finance-so-costs', None)
+
         if res_cost is None:
             res_cost = [None] * len(app.config_names)
-        else:
-            res_cost = json.loads(res_cost)
+            app.results['res-finance-so-costs'] = res_cost
+        #else:
+        #    res_cost = json.loads(res_cost)
         
         if len(res_cost) == app.selected_config:
             res_cost.append(fnc_costs_results)
         else:
             res_cost[app.selected_config] = fnc_costs_results
 
-        return json.dumps(res_cost)
+        return json.dumps(str(datetime.datetime.now()))
 
     @app.callback(
         Output('res-finance-so-value', 'data'),
         Input('finance-config-watcher', 'data'),
-        State('res-finance-so-value', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_value_so(_, res_value):
+    def set_res_finance_value_so(_):
         """
         Create the system owner financial value results after a completed model run.
         """
@@ -2454,18 +2464,21 @@ def add_result_callbacks(app):
             post_sprake_finance_value_results
             .finance_value_results_to_interface_sprake(mdl,fnc)
         )
+
+        res_value = app.results.get('res-finance-so-value', None)
         
         if res_value is None:
             res_value = [None] * len(app.config_names)
-        else:
-            res_value = json.loads(res_value)
+            app.results['res-finance-so-value'] = res_value
+        #else:
+        #    res_value = json.loads(res_value)
         
         if len(res_value) == app.selected_config:
             res_value.append(fnc_value_results)
         else:
             res_value[app.selected_config] = fnc_value_results
 
-        return json.dumps(res_value)
+        return json.dumps(str(datetime.datetime.now()))
 
     return app
 
@@ -2629,12 +2642,19 @@ def add_result_header_callbacks(app):
         Input('res-finance-so-value', 'data'),
         prevent_initial_call=True
     )
-    def update_finance_results_header(res_benefits, res_costs, res_value):
-        if (res_benefits is None) or (res_costs is None) or (res_value is None):
+    def update_finance_results_header(res_benefits_updated, res_costs_updated, res_value_updated):
+        if (res_benefits_updated is None) or (res_costs_updated is None) or (res_value_updated is None):
             return no_update
-        res_benefits = json.loads(res_benefits)
-        res_costs = json.loads(res_costs)
-        res_value = json.loads(res_value)
+        
+        res_benefits = app.results.get('res-finance-so-benefits', None)
+        if res_benefits is None:
+            return no_update
+        res_costs = app.results.get('res-finance-so-costs', None)
+        if res_costs is None:
+            return no_update
+        res_value = app.results.get('res-finance-so-value', None)
+        if res_value is None:
+            return no_update
 
         if isinstance(res_benefits, list):
             res_benefits = res_benefits[app.selected_config]
@@ -3181,6 +3201,8 @@ def create_app(external_stylesheets=None):
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)
+
+    app.results = {}
 
     app = add_model_from_hash_method(app)
     return app

@@ -18,25 +18,25 @@ def finance_value_results_to_interface_sprake(
     # This holds our final returned data structure
     results_to_interface = {}
 
-    start_1 = timer()
+    #start_1 = timer()
     v1 = fnc.get_benefit_cost_ratio_undiscounted()
-    dash.callback_context.record_timing('bcr', timer() - start_1, 'Undiscounted benefit:cost')
+    #dash.callback_context.record_timing('bcr', timer() - start_1, 'Undiscounted benefit:cost')
 
-    start_1 = timer()
+    #start_1 = timer()
     v2 = fnc.get_benefit_cost_ratio_discounted()
-    dash.callback_context.record_timing('bcr_disc', timer() - start_1, 'discounted benefit:cost')
+    #dash.callback_context.record_timing('bcr_disc', timer() - start_1, 'discounted benefit:cost')
 
-    start_1 = timer()
+    #start_1 = timer()
     v3 = fnc.get_simple_payback_time_days() / 365
-    dash.callback_context.record_timing('spb', timer() - start_1, 'simple payback')
+    #dash.callback_context.record_timing('spb', timer() - start_1, 'simple payback')
 
-    start_1 = timer()
+    #start_1 = timer()
     v4 = fnc.get_net_present_value_undiscounted()
-    dash.callback_context.record_timing('npv', timer() - start_1, 'undiscounted NPV')
+    #dash.callback_context.record_timing('npv', timer() - start_1, 'undiscounted NPV')
 
-    start_1 = timer()
+    #start_1 = timer()
     v5 = fnc.get_net_present_value_discounted()
-    dash.callback_context.record_timing('npv_disc', timer() - start_1, 'discounted NPV')
+    #dash.callback_context.record_timing('npv_disc', timer() - start_1, 'discounted NPV')
 
     value_summaries = pd.DataFrame.from_dict(
         {

@@ -303,14 +303,16 @@ def add_configuration_selection_callbacks(app):
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
         Output('n_active_conf', 'data', allow_duplicate = True),
+        Output('live-config-watcher', 'data', allow_duplicate = True),
         Output('model-run-watcher', 'data', allow_duplicate = True),
         Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
         State('n_active_conf', 'data'),
+        State('model-run-watcher', 'data'),
         prevent_initial_call=True
     )
-    def add_duplicate_config(n_clicks, n_active):
+    def add_duplicate_config(n_clicks, n_active, mdl_run_hashes):
         # Add the selector as the penultimate row
         n_conf = len(app.config_names)
         NUP = (no_update, no_update, no_update, no_update, [no_update] * n_conf, [no_update] * n_conf)
@@ -352,6 +354,14 @@ def add_configuration_selection_callbacks(app):
             fnc._dirty = False
             app.finances.append(fnc)
             app.selected_config = n_conf-1
+
+            if mdl_run_hashes is None:
+                mdl_run_hashes = [None] * len(app.config_names)
+            else:
+                mdl_run_hashes = json.loads(mdl_run_hashes)
+            
+            mdl_run_hashes.append(hash(mdl))
+            mdl_run_hashes = json.dumps(mdl_run_hashes)
         else:
             return NUP
         
@@ -370,6 +380,7 @@ def add_configuration_selection_callbacks(app):
             patched_header_comparator_selector,
             json.dumps({'n': n_conf}),
             json.dumps(str(datetime.datetime.now())),
+            mdl_run_hashes,
             update_outlines,
             update_outlines
         )  

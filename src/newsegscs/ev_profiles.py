@@ -1,10 +1,12 @@
 # Helper functions for aligning timeseries with EV charging profile data
 
 import os
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
-import holidays
+from src.util.holiday_helpers import get_holiday_df
 
 from config import settings
 lookup_dir = settings.get('SprakeDataLoc')
@@ -15,18 +17,18 @@ lookup_dir = settings.get('SprakeDataLoc')
 # Notably, 2017 is not a leap year.
 # Regardless, to make these data representative of weekly as well as yearly trend, they need characterisation
 # Timestamp is at half hour within hour of observation
-PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
-                                          r'NG EV Charging Behaviour Study - Demand Profiles - V3 - External (11-04-2019 00-00-00).xlsx'),
-                                          sheet_name='GB Level Profile',
-                                          header = 22,
-                                          usecols=[0,2])\
-                            .rename(columns={'Timestamp':'datetime'})  \
-                            .assign(start_day_seconds = lambda df:  (df['datetime'] - df['datetime'].dt.floor('D')).dt.total_seconds() - 1800, 
-                                    end_day_seconds = lambda df:  (df['datetime'] - df['datetime'].dt.floor('D')).dt.total_seconds() + 1800)
-                            
+#PROFILE_DATA = pd.read_parquet(
+#    os.path.join(
+#        lookup_dir,
+#        r'NG EV Charging Behaviour Study - Demand Profiles - V3 - External (11-04-2019 00-00-00).gzip'
+#    )
+#)                            
 
-def characterise_dates_evprofile(datetimes,
-                                 hols:holidays.HolidayBase = holidays.country_holidays('GB', subdiv='WLS')):
+def characterise_dates_evprofile(
+    datetimes,
+    holiday_country = 'GB', 
+    holiday_subdiv = 'WLS'
+):
     """
     Assign variables to characterise a datetime series or DataFrame by ev charging averaging periods
     """
@@ -37,14 +39,24 @@ def characterise_dates_evprofile(datetimes,
     else:
         oframe = pd.DataFrame({'datetime': pd.to_datetime(datetimes)})
     
+    start_year = oframe['datetime'].iloc[0].year
+    end_year = oframe['datetime'].iloc[-1].year
+    hol_df = get_holiday_df(start_year, end_year, holiday_country, holiday_subdiv)
+
+
     # As we are going month by month, we will not use bank holidays as their own category
     # as the data are too sparse - will just roll them into the Sunday profile.
     oframe = (
         oframe
         .assign(
+            datetime_day = lambda df: df['datetime'].dt.floor('D')
+        )
+        .set_index('datetime_day')
+        .join(hol_df, how = 'left')
+        .reset_index()
+        .assign(
             month_n = lambda df: df['datetime'].dt.month,
             day_n = lambda df: df['datetime'].dt.day_of_week,
-            is_holiday = lambda df: df.apply(lambda rw: rw['datetime'] in hols, axis=1),
             is_sat = lambda df: df['day_n'] == 5,
             is_sun = lambda df: df['day_n'] == 6,
             is_bh = lambda df: np.logical_and(df['is_holiday'], np.logical_not(np.logical_or(df['is_sat'], df['is_sun']))),
@@ -65,17 +77,26 @@ def characterise_dates_evprofile(datetimes,
 
 # As England is by far the largest by EV ownership, use English holidays to 
 # characterise profiles
-def characterise_profile_data(profile_data:pd.DataFrame,
-                              hols:holidays.HolidayBase = holidays.country_holidays('GB', subdiv='ENG')):
+def characterise_profile_data(
+    profile_data:pd.DataFrame,
+    holiday_country = 'GB',
+    holiday_subdiv = 'ENG'
+):
     
     return (
-        profile_data.pipe(characterise_dates_evprofile, hols)
+        profile_data.pipe(characterise_dates_evprofile, holiday_country, holiday_subdiv)
         .groupby(['start_day_seconds','end_day_seconds','month_n','prof_day'])
         ['Residential']
         .mean()
     )
 
-PROFILE_DATA_CHARACTERISED = characterise_profile_data(PROFILE_DATA).to_frame().reset_index()
+#PROFILE_DATA_CHARACTERISED = characterise_profile_data(PROFILE_DATA).to_frame().reset_index()
+PROFILE_DATA_CHARACTERISED = pd.read_parquet(
+    os.path.join(
+        lookup_dir,
+        r'CHARACTERISED NG EV Charging Behaviour Study - Demand Profiles - V3 - External (11-04-2019 00-00-00).gzip'
+    )
+)  
 
 # TODO: This function takes too long
 def ev_profiles_for_time_spans(time_spans,
@@ -114,10 +135,13 @@ def ev_profiles_for_time_spans(time_spans,
         return df
 
 # TODO: this is too slow
-def get_ev_consumption(datetimes,
-                       annual_consumption:float = 2000.0,
-                       profile_data=PROFILE_DATA_CHARACTERISED,
-                       hols:holidays.HolidayBase = holidays.country_holidays('GB', subdiv='WLS')):
+def get_ev_consumption(
+    datetimes,
+    annual_consumption:float = 2000.0,
+    profile_data = PROFILE_DATA_CHARACTERISED,
+    holiday_country = 'GB',
+    holiday_subdiv = 'WLS'
+):
     """
     Given a regular timeseries, get the profiled EV consumption between adjacent entries
 
@@ -133,7 +157,7 @@ def get_ev_consumption(datetimes,
     # of the interval
     start_datetimes = pd.Series(datetimes).shift(1, fill_value=datetimes[0])
     oframe = (
-        characterise_dates_evprofile(start_datetimes, hols)
+        characterise_dates_evprofile(start_datetimes, holiday_country, holiday_subdiv)
         .rename(columns={'datetime':'start_datetime'})
         .assign(
             datetime = datetimes,

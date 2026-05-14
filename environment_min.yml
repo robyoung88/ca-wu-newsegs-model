@@ -21,6 +21,7 @@ dependencies:
   - pathvalidate
   - pip=26.0.1
   - pvlib
+  - pyarrow
   - pyproj
   - python=3.13.12
   - quarto
