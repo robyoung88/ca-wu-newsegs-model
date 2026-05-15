@@ -653,8 +653,8 @@ class OffsetRegTimeSpan(RegTimeSpan):
         if self._offset_initialised:
             return (
                 root_str
-                + ", local_start = " + self._local_start 
-                + ", remote_start = " + self._remote_start 
+                + ", local_start = " + repr(self._local_start) 
+                + ", remote_start = " + repr(self._remote_start)
                 + ")"
             )
         return root_str + ")"
