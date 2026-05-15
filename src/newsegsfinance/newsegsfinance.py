@@ -14,8 +14,6 @@ class NewsegsFinance(metaclass=ABCMeta):
     _model = None
     _dirty_flag = True
     
-    model_last_run = datetime.datetime.now()
-    model_uuid = 1
     last_update = datetime.datetime.now()
     uuid = 1
 
@@ -457,7 +455,7 @@ class NewsegsFinance(metaclass=ABCMeta):
             (
                 self.uuid,
                 self.last_update,
-                self.model_uuid,
-                self.model_last_run
+                self.model.uuid,
+                self.model.last_run
             )
         )
