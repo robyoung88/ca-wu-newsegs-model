@@ -219,6 +219,18 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     def __str__(self) -> str:
         return super().__str__() + "; name: " + self._name
 
+    #def __getstate__(self):
+    #    """
+    #    Return the state for pickling.
+    #    """
+    #    odict = super().__getstate__()
+
+
+    #def __setstate__(self, state):
+
+
+
+
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
     _version = '0.0.1'
     _name = 'Wider environment'

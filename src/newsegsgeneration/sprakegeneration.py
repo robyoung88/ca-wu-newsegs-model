@@ -14,11 +14,15 @@ from src.core import generation
 from src.core import timespan as modtimespan
 
 class SprakeGenerationResult(newsegsmodule.ABCNewsegsModuleResult):
-    def __init__(self,
-                 timespan: modtimespan.RegTimeSpan,
-                 wind_energy:np.ndarray[tuple[int], np.dtype[np.number]], 
-                 solar_energy:np.ndarray[tuple[int], np.dtype[np.number]]
-                 ) -> None:
+    def __init__(
+        self,
+        *args,
+        timespan: modtimespan.RegTimeSpan,
+        wind_energy: np.ndarray[tuple[int], np.dtype[np.number]],
+        solar_energy: np.ndarray[tuple[int], np.dtype[np.number]],
+        **kwargs
+    ) -> None:
+        super().__init__(*args, **kwargs)
         self._timespan = copy.copy(timespan)
         self.set_wind(wind_energy)
         self.set_solar(solar_energy)
@@ -87,6 +91,7 @@ class SprakeGeneration(NewsegsGeneration):
         model: newsegsmodel.NewsegsModel | None = None,
         loc: location.Location | None = None,
     ) -> None:
+        super().__init__()
         self._generator = generation.PowerPlantHeterogeneousGenerators([
             generation.PowerPlantHomogeneousWind(turbine),
             generation.PowerPlantHomogeneousPV(
@@ -110,6 +115,7 @@ class SprakeGeneration(NewsegsGeneration):
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None
     ) -> None:
+        super().__init__()
         self._generator = copy.deepcopy(generator)
         
         if name is not None:
@@ -139,10 +145,20 @@ class SprakeGeneration(NewsegsGeneration):
     def generator(self) -> generation.PowerPlantHeterogeneousGenerators:
         return self._generator
 
-    def run(self, timespan: modtimespan.TimeSpan) -> SprakeGenerationResult:
+    def run(
+        self,
+        timespan: modtimespan.TimeSpan,
+        run_start: datetime.datetime | None = None
+    ) -> SprakeGenerationResult:
+        super().run(timespan, run_start)
         energy = self._generator.run(timespan)
         self.dirty = False
-        return SprakeGenerationResult(timespan, energy[0,:], energy[1,:])
+        return SprakeGenerationResult(
+            self,
+            timespan = timespan,
+            wind_energy = energy[0,:],
+            solar_energy = energy[1,:]
+        )
 
     def set_location(self, loc: location.Location) -> None:
         # Ensure location is only a location, i.e. not an elevated or aspect location
@@ -216,6 +232,7 @@ def _SprakeGeneration_from_other(
     self,
     other: SprakeGeneration
 ) -> None:
+    super(SprakeGeneration, self).__init__()
     self._generator = copy.deepcopy(other.generator)
     self.name = other.name
     self.model = other.model

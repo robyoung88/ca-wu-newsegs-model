@@ -20,16 +20,20 @@ from src.newsegsmodel import newsegsmodel
 from src.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 
 class SprakeCSResult(newsegsmodule.ABCNewsegsModuleResult):
-    def __init__(self,
-                 timespan: modtimespan.RegTimeSpan,
-                 domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]],
-                 storage_import:np.ndarray[tuple[int], np.dtype[np.number]],
-                 storage_export:np.ndarray[tuple[int], np.dtype[np.number]],
-                 storage_loss:np.ndarray[tuple[int], np.dtype[np.number]],
-                 grid_import:np.ndarray[tuple[int], np.dtype[np.number]],
-                 grid_export:np.ndarray[tuple[int], np.dtype[np.number]],
-                 storage_soc:np.ndarray[tuple[int], np.dtype[np.number]]
-                 ) -> None:
+    def __init__(
+        self,
+        *args,
+        timespan: modtimespan.RegTimeSpan,
+        domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]],
+        storage_import:np.ndarray[tuple[int], np.dtype[np.number]],
+        storage_export:np.ndarray[tuple[int], np.dtype[np.number]],
+        storage_loss:np.ndarray[tuple[int], np.dtype[np.number]],
+        grid_import:np.ndarray[tuple[int], np.dtype[np.number]],
+        grid_export:np.ndarray[tuple[int], np.dtype[np.number]],
+        storage_soc:np.ndarray[tuple[int], np.dtype[np.number]],
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
         
         # Meter values - i.e. import/export
         self._timespan = copy.copy(timespan)
@@ -147,6 +151,10 @@ class SprakeCSResult(newsegsmodule.ABCNewsegsModuleResult):
     def set_storage_soc(self, storage_soc:np.ndarray[tuple[int], np.dtype[np.number]]):
         self._storage_soc = storage_soc
 
+# Function wrappers for consumption models
+# Todo: Consider how to re-wrap these, as DatetimeIndex[es] and Series are unhashable
+# so we can't get a cache working.
+
 def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
     from src.newsegscs.elexon_profiles import get_elexon_consumption
     cons = get_elexon_consumption(datetimes)
@@ -229,6 +237,7 @@ class SprakeCS(NewsegsCS):
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None
     ) -> None:
+        super().__init__()
 
         self._appliance_params = copy.copy(appliance_params)
         self._ev_params = copy.copy(ev_params)
@@ -368,7 +377,12 @@ class SprakeCS(NewsegsCS):
         self._storage_params = params
         self.dirty = True
 
-    def run(self, timespan: modtimespan.TimeSpan) -> SprakeCSResult:
+    def run(
+        self, 
+        timespan: modtimespan.TimeSpan,
+        run_start: datetime.datetime | None = None
+    ) -> SprakeCSResult:
+        super().run(timespan, run_start)
         if not isinstance(timespan, modtimespan.RegTimeSpan):
             if self.model is None:
                 raise ValueError("CS module requires a model to serve timestep")
@@ -460,7 +474,10 @@ class SprakeCS(NewsegsCS):
             grid_imp = np.zeros_like(stor_arr)
             grid_exp = np.zeros_like(stor_arr)
         
+        self.dirty = False
+
         res = SprakeCSResult(
+            self,
             timespan = timespan,
             domestic_consumption = cons_arr,
             storage_import=stor_imp,
@@ -470,8 +487,6 @@ class SprakeCS(NewsegsCS):
             grid_export = grid_exp,
             storage_soc = stor_arr
         )
-
-        self.dirty = False
 
         return res
 
@@ -578,6 +593,7 @@ def _SprakeCS_from_other(
     self,
     other: SprakeCS
 ) -> None:
+    super(SprakeCS, self).__init__()
     self.set_appliance_params(other.appliance_params)
     self.set_ev_params(other.ev_params)
     self.set_dhw_params(other.dhw_params)

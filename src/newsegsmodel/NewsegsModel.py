@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Mapping
 import re
 import datetime
+import uuid
 
 from src.core import location as modlocation
 from src.core import TimeSpan, TimedeltaScalar
@@ -44,8 +45,12 @@ class NewsegsModel(metaclass=ABCMeta):
 
     _dirty_flag = False
     _name = 'NewSEGS Model'
-    _last_run = datetime.datetime.now()
     _last_hash = 1
+    last_run = datetime.datetime.now()
+    uuid = 1
+
+    def __init__(self, *args, **kwargs):
+        self.uuid = uuid.uuid4()
 
     @abstractmethod
     def run(self) -> int:

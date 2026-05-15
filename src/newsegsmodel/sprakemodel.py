@@ -215,6 +215,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         loc: modlocation.Location | None = None,
         name: str | None = None,
     ) -> None:
+        super().__init__()
 
         if local_environment_server:
             if isinstance(local_environment_server, str):
@@ -383,13 +384,13 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @override
     def run(self):
+        self.last_run = datetime.datetime.now()
         self._generation_result = self._mod_gen.run(self._run_period)
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)
         self._dirty_flag = False
         
-        self._last_run = datetime.datetime.now()
-        self._last_hash = hash((str(self.to_dict()), str(self._last_run)))
+        self._last_hash = hash((self.uuid, str(self.last_run)))
         return self._last_hash
 
     @override
@@ -461,6 +462,7 @@ def _SprakeModel_from_other(
     self,
     other: SprakeModel
 ) -> None:
+    super(SprakeModel, self).__init__()
     self.local_env = other.local_env
     self.wider_env = other.wider_env
 

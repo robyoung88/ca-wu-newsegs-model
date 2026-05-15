@@ -12,10 +12,22 @@ from src.core.timespan import TimeSpan, RegTimeSpan
 from collections.abc import Iterable, Collection, Mapping
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
+    run_module_uuid = 1
+    last_run = datetime.datetime.now()
     
-    def __init__(self):
-        self._first_created = datetime.datetime.now()
-        self._last_hash = hash(uuid.uuid4())
+    def __init__(
+        self,
+        run_module: NewsegsModule | int,
+        last_run: datetime.datetime | None = None,
+    ):
+        if isinstance(run_module, NewsegsModule):
+            if last_run is None:
+                last_run = run_module.last_run
+            run_module = run_module.uuid
+        self.run_module_uuid = run_module
+        if last_run is None:
+            raise ValueError('`last_run` cannot be None if run_module is not a NewsegsModule, is {}'.format(type(run_module)))
+        self.last_run = last_run
 
     @property
     @abstractmethod
@@ -64,10 +76,14 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
         return defer_dsm_to_pandas(self)
 
     def __hash__(self):
-        """Caution - this treats the results object as immutable!"""
-        if not (hasattr(self, '_last_hash')):
-            self._last_hash = hash(uuid.uuid4())
-        return self._last_hash
+        """The hash is dependent on the module uuid and run time."""
+        return hash(
+            (
+                self.run_module_uuid, 
+                self.last_run,
+            )
+        )
+
 
 @lru_cache
 def defer_meters_to_pandas(res: ABCNewsegsModuleResult):
@@ -151,9 +167,19 @@ class NewsegsModule(metaclass=ABCMeta):
     _dirty_flag = True
     _model = None
 
+    def __init__(self, *args, **kwargs):
+        self.uuid = uuid.uuid4()
+
     @abstractmethod
-    def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
-        ...
+    def run(
+        self,
+        timespan:TimeSpan,
+        run_start: datetime.datetime | None = None
+    ) -> ABCNewsegsModuleResult:
+        if run_start is None:
+            run_start = datetime.datetime.now()
+        self.last_run = run_start
+        # Returns none as this is still abstract
    
     @property
     @abstractmethod

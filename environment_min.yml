@@ -29,4 +29,6 @@ dependencies:
   - seaborn
   - sf-hamilton
   - xarray
+  - pip:
+    - diskcache
 prefix: C:\Users\YoungR2\AppData\Local\anaconda3\envs\ca-wu-newsegs-mod

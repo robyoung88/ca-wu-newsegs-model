@@ -73,6 +73,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None,
     ) -> None:
+        super().__init__()
         self._unit_costs = type(self)._default_unit_costs.copy()
 
         self.benefit_discount_rate = benefit_discount_rate
@@ -812,6 +813,8 @@ def _SprakeFinance_from_other(
     self,
     other: SprakeFinance
 ) -> None:
+    super(SprakeFinance, self).__init__()
+
     self._unit_costs = copy.copy(other.unit_costs)
     self.benefit_discount_rate = other.benefit_discount_rate
     self.cost_discount_rate = other.cost_discount_rate

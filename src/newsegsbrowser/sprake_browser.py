@@ -15,6 +15,26 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
 
+# Manager for background callbacks
+if 'REDIS_URL' in os.environ:
+    # Use Redis & Celery if REDIS_URL is set
+    from dash import CeleryManager
+    from celery import Celery
+    celery_app = Celery(
+        __name__,
+        broker = os.environ['REDIS_URL'],
+        backend = os.environ['REDIS_URL']
+    )
+    background_callback_manager = CeleryManager(celery_app)
+else:
+    # Diskcache otherwise, for non-production and local dev.
+    from dash import DiskcacheManager
+    import diskcache
+    from config import settings
+
+    cache = diskcache.Cache(settings.get('DiskcacheCache', './cache'))
+    background_callback_manager = DiskcacheManager(cache)
+
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
 
@@ -1870,7 +1890,9 @@ def add_initial_callback(app):
         Output('model-run-watcher', 'data', allow_duplicate = True),
         Input('model-config-watcher', 'data'),
         State('model-run-watcher', 'data'),
-        prevent_initial_call = True
+        prevent_initial_call = True,
+        #background = True,
+        #manager = background_callback_manager,
     )
     def trigger_mdl_run(_, mdl_run_hashes):
         """Config change - run the model now"""

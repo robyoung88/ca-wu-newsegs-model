@@ -1,6 +1,8 @@
 # Abstract base class for NewSEGS financial calculations
 
 from abc import ABCMeta, abstractmethod
+import datetime
+import uuid
 
 from src.newsegsmodel import NewsegsModel
 import pandas as pd
@@ -11,7 +13,14 @@ class NewsegsFinance(metaclass=ABCMeta):
     _name = 'NewSEGS Finance'
     _model = None
     _dirty_flag = True
-    _last_hash = 1
+    
+    model_last_run = datetime.datetime.now()
+    model_uuid = 1
+    last_update = datetime.datetime.now()
+    uuid = 1
+
+    def __init__(self, *args, **kwargs):
+        self.uuid = uuid.uuid4()
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
@@ -439,10 +448,16 @@ class NewsegsFinance(metaclass=ABCMeta):
 
     @dirty.setter
     def dirty(self, val:bool) -> None:
+        if val:
+            self.last_update = datetime.datetime.now()
         self._dirty_flag = val
 
     def __hash__(self):
-        if self.dirty:
-            self._last_hash = hash(str(self.to_dict()) + 'model:' + str(hash(self.model)))
-            self.dirty = False
-        return self._last_hash
+        return hash(
+            (
+                self.uuid,
+                self.last_update,
+                self.model_uuid,
+                self.model_last_run
+            )
+        )

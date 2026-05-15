@@ -9,6 +9,7 @@ SprakeExcelValidationLoc = "@format {env[OneDrive]}\\Model\\Validation"
 NEWAEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/microscale-atlas/v1/"
 NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1/"
 NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/"
+DiskcacheCache = 'C:\\scratch\\appdiskcache'
 
 [spraketest]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"
