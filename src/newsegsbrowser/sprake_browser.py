@@ -35,6 +35,8 @@ else:
     cache = diskcache.Cache(settings.get('DiskcacheCache', './cache'))
     background_callback_manager = DiskcacheManager(cache)
 
+from src.newsegsmodel import newsegsmodel
+from src.newsegsfinance import newsegsfinance
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
 
@@ -55,6 +57,55 @@ _CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
 
 with open(_CONST_FILE, 'r') as f:
     MODEL_CONSTANTS = json.load(f)
+
+# Globally accessible dictionaries of models and finances
+# These should be keyed by their uuids.
+models = {}
+finances = {}
+
+def compose_configuration(
+    name: str,
+    mdl: newsegsmodel.NewsegsModel | str,
+    fnc: newsegsfinance.NewsegsFinance | str
+) -> dict:
+    if isinstance(mdl, newsegsmodel.NewsegsModel):
+        mdl_uuid = mdl.uuid
+    else:
+        mdl_uuid = mdl
+    if isinstance(fnc, newsegsfinance.NewsegsFinance):
+        fnc_uuid = fnc.uuid
+    else:
+        fnc_uuid = fnc
+    
+    return {
+        'uuid': str(uuid.uuid4()),
+        'name': name,
+        'model_uuid': mdl_uuid,
+        'finance_uuid': fnc_uuid
+    }
+
+def create_default_model() -> newsegsmodel.NewsegsModel:
+    # Load model
+    with open(
+        os.path.join(
+            STATICDATA, 
+            'sprakemodel-validation-config.json'
+        ), 
+    'r') as f:
+        mdl_conf = json.load(f)
+    return sprakemodel.SprakeModel.from_dict(mdl_conf)
+
+def create_default_finance() -> newsegsfinance.NewsegsFinance:
+    # Load finance configuration
+    with open(
+        os.path.join(
+            STATICDATA,
+            'sprakemodel-validation-finance-config.json'
+        ),
+    'r') as f:
+        fnc_conf = json.load(f)
+    
+    return sprakefinance.SprakeFinance.from_dict(fnc_conf)
 
 def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
     """
@@ -1323,7 +1374,7 @@ def create_results_header():
                                     style={'display': 'inline'}
                                 ),
                                 color='primary',
-                                id = {'type': 'config-hdrfocus-btn', 'index': 1},
+                                id = {'type': 'config-hdrfocus-btn', 'index': 0},
                                 outline = False
                             )
                         ],
@@ -1701,6 +1752,18 @@ def create_layout():
                 # Used to indicate that a new run is necessary to update results.
                 dcc.Store(id='model-config-watcher'),
 
+                # A store of the available and active configurations
+                # As a JSON list of the results of `compose_configuration`
+                dcc.Store(id = 'store-selected-configuration'),
+                dcc.Store(id = 'store-configurations'),
+
+                # Stores for the -to-interface configurations of the models
+                # and finances that are in the current session.
+                # These should only really be necessary to draw from when
+                # recreating a model after a migration
+                dcc.Store(id = 'store-model-interface-configurations'),
+                dcc.Store(id = 'store-finance-interface-configurations'),
+
                 # Updated when either:
                 # 1) The finance module has been set to a new configuration or
                 # 2) The model has finished running
@@ -1708,7 +1771,8 @@ def create_layout():
                 dcc.Store(id='finance-config-watcher'),
 
                 # To trigger resync of output fields after a model run
-                dcc.Store(id='model-run-watcher'),
+                # Holds the uuid of the model (not the configuration)
+                dcc.Store(id='store-model-completed-run'),
 
                 dcc.Store(id='model-config'),
                 dcc.Store(id='finance-config'),
@@ -1798,6 +1862,7 @@ def sprake_finance_to_interface_config(
     fnc: sprakefinance.SprakeFinance,
 ) -> dict:
     fcfg = fnc.to_dict()
+    fcfg['finance_uuid'] = fnc.uuid
 
     return fcfg
 
@@ -1854,6 +1919,7 @@ def sprake_model_to_interface_configs(
     }
 
     mcfg = {
+        'model_uuid': mdl.uuid,
         'gen_input': gen_input,
         'stor_input': stor_input,
         'bc_input': bc_input,
@@ -1887,57 +1953,119 @@ def add_initial_callback(app):
     )
 
     @app.callback(
-        Output('model-run-watcher', 'data', allow_duplicate = True),
+        Output('store-model-completed-run', 'data', allow_duplicate = True),
         Input('model-config-watcher', 'data'),
-        State('model-run-watcher', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call = True,
         #background = True,
         #manager = background_callback_manager,
     )
-    def trigger_mdl_run(_, mdl_run_hashes):
+    def trigger_mdl_run(_, selected_config):
         """Config change - run the model now"""
-        print('Starting normally triggered run')
         # print (ctx.triggered)
-        mdl_hash = app.models[app.selected_config].run()
+
+        NUP = no_update
+        if selected_config is None:
+            return NUP
+        selected_config = json.loads(selected_config)
+        mdl = models.get(selected_config['model_uuid'], None)
+        if mdl is None:
+            return NUP
+
+        print('Starting normally triggered run')
+        mdl_hash = mdl.run()
         print('Normal run complete')
 
-        if mdl_run_hashes is None:
-            mdl_run_hashes = [None] * len(app.config_names)
-        else:
-            mdl_run_hashes = json.loads(mdl_run_hashes)
-        
-        if len(mdl_run_hashes) == app.selected_config:
-            mdl_run_hashes.append(mdl_hash)
-        else:
-            mdl_run_hashes[app.selected_config] = mdl_hash
-
-        return json.dumps(mdl_run_hashes)
+        return json.dumps(
+            {
+                'model_uuid': mdl.uuid,
+                'model_last_run': str(mdl.last_run),
+                'model_hash': mdl_hash
+            }
+        )
 
     @app.callback(
         Output('finance-config-watcher', 'data', allow_duplicate=True),
-        Input('model-run-watcher', 'data'),
+        Input('store-model-completed-run', 'data'),
+        State('store-configurations', 'data'),
         prevent_initial_call = True
     )
-    def trigger_financial_results_post_run(_):
-        app.finances[app.selected_config].dirty = False
-        return json.dumps(str(datetime.datetime.now()))
+    def trigger_financial_results_post_run(model_run, configurations):
+        NUP = no_update
+        if model_run is None or configurations is None:
+            return NUP
+        model_run = json.loads(model_run)
+        configurations = json.loads(configurations)
+        model_uuid = model_run['model_uuid']
+        olist = []
+        print(configurations)
+        print(type(configurations))
+        for i, conf in enumerate(configurations):
+            print(i)
+            print(conf)
+            if conf['model_uuid'] == model_uuid:
+                olist.append({
+                    'config_index': i,
+                    'finance_uuid': conf['finance_uuid'],
+                    'model_uuid': model_uuid
+                })
+        return json.dumps(olist)
     
     @app.callback(
+        Output('store-selected-configuration', 'data', allow_duplicate = True),
+        Output('store-configurations', 'data', allow_duplicate = True),
         Output('model-config', 'data', allow_duplicate=True),
         Output('finance-config', 'data', allow_duplicate=True),
         Input('firstload-config-watcher', 'data'),
-        Input('live-config-watcher', 'data'),
+        #Input('live-config-watcher', 'data'),
+        Input('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
         prevent_initial_call=True
     )
-    def sync_config(_, _2):
+    def sync_config(_, selected_config, all_configs):
         # print ('Active configuration has been changed')
         # print (ctx.triggered)
-        mdl = app.models[app.selected_config]
-        fnc = app.finances[app.selected_config]
-
+        if selected_config is None:
+            if all_configs is None:
+                # On first load, we can generate a random configuration
+                all_configs = [compose_configuration(
+                    'Configuration Name',
+                    str(uuid.uuid4()),
+                    str(uuid.uuid4())
+                )]
+            else:
+                all_configs = json.loads(all_configs)
+            selected_config = all_configs[0].copy()
+            selected_config['config_index'] = 0
+        else:
+            selected_config = json.loads(selected_config)
+            all_configs = json.loads(all_configs)
+        
+        mdl = models.get(selected_config['model_uuid'], None)
+        if mdl is None:
+            # TODO: Deal with if the model should exist.
+            # Need to recreate it from the local store.
+            mdl = create_default_model()
+            mdl.uuid = selected_config['model_uuid']
+            models[mdl.uuid] = mdl
+        
+        fnc = finances.get(selected_config['finance_uuid'], None)
+        if fnc is None:
+            # TODO: Deal with if the finance should exist.
+            # Need to recreate it from the local store.
+            fnc = create_default_finance()
+            fnc.uuid = selected_config['finance_uuid']
+            fnc.set_model(mdl)
+            finances[fnc.uuid] = fnc
+        
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
-        return json.dumps(mcfg), json.dumps(fcfg)
+        return (
+            json.dumps(selected_config),
+            json.dumps(all_configs),
+            json.dumps(mcfg),
+            json.dumps(fcfg)
+        )
     
     @app.callback(
         Output('site-location', 'data', allow_duplicate = True),
@@ -2236,19 +2364,22 @@ def add_initial_callback(app):
         Output('cost-sales-smry-export', 'children'),
         Input('res-finance-so-benefits', 'data'),
         Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def sync_fnc_so_benefits_to_store(fnc, ann_hori_toggle):
+    def sync_fnc_so_benefits_to_store(fnc, ann_hori_toggle, selected_config):
         if fnc is None:
             return no_update, no_update, no_update
-        fnc = app.results.get('res-finance-so-benefits', None)
+        fnc = json.loads(fnc)
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
         if fnc is None:
             return no_update, no_update, no_update
         bnfts = create_so_benefits_results(fnc, not(ann_hori_toggle))
         return (
             bnfts,
-            '{:,.0f}'.format(fnc[app.selected_config].get('smry_residential_peryear')),
-            '{:,.0f}'.format(fnc[app.selected_config].get('smry_exports_peryear')),
+            '{:,.0f}'.format(fnc[config_index].get('smry_residential_peryear')),
+            '{:,.0f}'.format(fnc[config_index].get('smry_exports_peryear')),
         )
     
     @app.callback(
@@ -2257,18 +2388,21 @@ def add_initial_callback(app):
         Output('cost-import-smry-ongoing', 'children'),
         Input('res-finance-so-costs', 'data'),
         Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def sync_fnc_so_costs_to_store(fnc, ann_hori_toggle):
+    def sync_fnc_so_costs_to_store(fnc, ann_hori_toggle, selected_config):
         if fnc is None:
             return no_update, no_update, no_update
-        fnc = app.results.get('res-finance-so-costs', None)
+        fnc = json.loads(fnc)
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
         if fnc is None:
             return no_update, no_update, no_update
         return (
             create_so_costs_results(fnc, not(ann_hori_toggle)),
-            '{:,.0f}'.format(fnc[app.selected_config].get('smry_import_fixed_cost_peryear')),
-            '{:,.0f}'.format(fnc[app.selected_config].get('smry_import_variable_cost_peryear'))
+            '{:,.0f}'.format(fnc[config_index].get('smry_import_fixed_cost_peryear')),
+            '{:,.0f}'.format(fnc[config_index].get('smry_import_variable_cost_peryear'))
         )
 
     @app.callback(
@@ -2280,7 +2414,7 @@ def add_initial_callback(app):
     def sync_fnc_so_value_to_store(fnc, ann_hori_toggle):
         if fnc is None:
             return no_update
-        fnc = app.results.get('res-finance-so-value', None)
+        fnc = json.loads(fnc)
         if fnc is None:
             return no_update
         return create_so_value_results(fnc, not(ann_hori_toggle))
@@ -2293,214 +2427,273 @@ def add_result_callbacks(app):
     """
     @app.callback(
         Output('res-gen', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('store-model-completed-run', 'data'),
+        State('store-configurations', 'data'),
         State('res-gen', 'data'),
         prevent_initial_call=True
     )
-    def set_res_gen(mdl_run_hashes,res_gen):
+    def set_res_gen(model_run, configurations, res_gen):
         """
         Create the generation results data after a completed model run
         """
-        if mdl_run_hashes is None:
-            return no_update
-        #mdl_run_hashes = json.loads(mdl_run_hashes)
-        #mdl_hash = mdl_run_hashes[app.selected_config]
-        mdl = app.models[app.selected_config]
+        NUP = no_update
+        if model_run is None or configurations is None:
+            return NUP
+        model_run = json.loads(model_run)
+        configurations = json.loads(configurations)
+        model_uuid = model_run['model_uuid']
+
+        mdl = models.get(model_uuid)
+        if mdl is None:
+            # TODO: Work out how to handle this
+            return NUP
 
         print ("making gen results")
         gen_results = post_sprake_gen_results.gen_results_to_interface_sprake(mdl)
+
         if res_gen is None:
-            res_gen = [None] * len(app.config_names)
+            res_gen = [None] * len(configurations)
         else:
             res_gen = json.loads(res_gen)
+            if len(res_gen) < len(configurations):
+                res_gen += [None] * (len(configurations) - len(res_gen))
         
-        if len(res_gen) == app.selected_config:
-            res_gen.append(gen_results)
-        else:
-            res_gen[app.selected_config] = gen_results
+        for i in range(len(configurations)):
+            if configurations[i]['model_uuid'] == model_uuid:
+                res_gen[i] = gen_results
         
         return json.dumps(res_gen)
 
     @app.callback(
         Output('res-stor', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('store-model-completed-run', 'data'),
+        State('store-configurations', 'data'),
         State('res-stor', 'data'),
         prevent_initial_call=True
     )
-    def set_res_stor(_, res_stor):
+    def set_res_stor(model_run, configurations, res_stor):
         """
         Create the storage results data after a completed model run
         """
-        mdl = app.models[app.selected_config]
+        NUP = no_update
+        if model_run is None or configurations is None:
+            return NUP
+        model_run = json.loads(model_run)
+        configurations = json.loads(configurations)
+        model_uuid = model_run['model_uuid']
 
+        mdl = models.get(model_uuid)
+        if mdl is None:
+            # TODO: Work out how to handle this
+            return NUP
+        
         print ("making stor results")
         stor_results = post_sprake_storage_results.stor_results_to_interface_sprake(mdl)
 
         if res_stor is None:
-            res_stor = [None] * len(app.config_names)
+            res_stor = [None] * len(configurations)
         else:
             res_stor = json.loads(res_stor)
+            if len(res_stor) < len(configurations):
+                res_stor += [None] * (len(configurations) - len(res_stor))
         
-        if len(res_stor) == app.selected_config:
-            res_stor.append(stor_results)
-        else:
-            res_stor[app.selected_config] = stor_results
-
+        for i in range(len(configurations)):
+            if configurations[i]['model_uuid'] == model_uuid:
+                res_stor[i] = stor_results
+        
         return json.dumps(res_stor)
 
     @app.callback(
         Output('res-cons', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('store-model-completed-run', 'data'),
+        State('store-configurations', 'data'),
         State('res-cons', 'data'),
         prevent_initial_call=True
     )
-    def set_res_cons(_, res_cons):
+    def set_res_cons(model_run, configurations, res_cons):
         """
         Create the consumption results data after a completed model run.
         """
-        mdl = app.models[app.selected_config]
+        NUP = no_update
+        if model_run is None or configurations is None:
+            return NUP
+        model_run = json.loads(model_run)
+        configurations = json.loads(configurations)
+        model_uuid = model_run['model_uuid']
+
+        mdl = models.get(model_uuid)
+        if mdl is None:
+            # TODO: Work out how to handle this
+            return NUP
 
         print ("making consumption results")
         cons_results = post_sprake_consumption_results.consumption_results_to_interface_sprake(mdl)
 
         if res_cons is None:
-            res_cons = [None] * len(app.config_names)
+            res_cons = [None] * len(configurations)
         else:
             res_cons = json.loads(res_cons)
+            if len(res_cons) < len(configurations):
+                res_cons += [None] * (len(configurations) - len(res_cons))
         
-        if len(res_cons) == app.selected_config:
-            res_cons.append(cons_results)
-        else:
-            res_cons[app.selected_config] = cons_results
-
+        for i in range(len(configurations)):
+            if configurations[i]['model_uuid'] == model_uuid:
+                res_cons[i] = cons_results
+        
         return json.dumps(res_cons)
 
     @app.callback(
         Output('res-net', 'data'),
-        Input('model-run-watcher', 'data'),
+        Input('store-model-completed-run', 'data'),
+        State('store-configurations', 'data'),
         State('res-net', 'data'),
         prevent_initial_call=True
     )
-    def set_res_net(_, res_net):
+    def set_res_net(model_run, configurations, res_net):
         """
         Create the net energy results data after a completed model run.
         """
-        mdl = app.models[app.selected_config]
+        NUP = no_update
+        if model_run is None or configurations is None:
+            return NUP
+        model_run = json.loads(model_run)
+        configurations = json.loads(configurations)
+        model_uuid = model_run['model_uuid']
+
+        mdl = models.get(model_uuid)
+        if mdl is None:
+            # TODO: Work out how to handle this
+            return NUP
 
         print ("making net energy results")
         net_results = post_sprake_net_results.net_results_to_interface_sprake(mdl)
 
         if res_net is None:
-            res_net = [None] * len(app.config_names)
+            res_net = [None] * len(configurations)
         else:
             res_net = json.loads(res_net)
+            if len(res_net) < len(configurations):
+                res_net += [None] * (len(configurations) - len(res_net))
         
-        if len(res_net) == app.selected_config:
-            res_net.append(net_results)
-        else:
-            res_net[app.selected_config] = net_results
-
+        for i in range(len(configurations)):
+            if configurations[i]['model_uuid'] == model_uuid:
+                res_net[i] = net_results
+        
         return json.dumps(res_net)
-    
+
     @app.callback(
         Output('res-finance-so-benefits', 'data'),
         Input('finance-config-watcher', 'data'),
+        State('store-configurations', 'data'),
+        State('res-finance-so-benefits', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_benefits_so(_):
+    def set_res_finance_benefits_so(finance_to_refresh, configurations, res_ben):
         """
         Create the system owner financial benefits results after a completed model run.
         """
-        mdl = app.models[app.selected_config]
-        fnc = app.finances[app.selected_config]
-
-        print ("making so financial benefits results")
-        fnc_benefits_results = (
-            post_sprake_finance_benefits_results
-            .finance_benefits_results_to_interface_sprake(mdl,fnc)
-        )
-
-        res_ben = app.results.get('res-finance-so-benefits', None)
+        NUP = no_update
+        if finance_to_refresh is None or configurations is None:
+            return NUP
+        finance_to_refresh = json.loads(finance_to_refresh)
+        configurations = json.loads(configurations)
 
         if res_ben is None:
-            res_ben = [None] * len(app.config_names)
-            app.results['res-finance-so-benefits'] = res_ben
-
-        #else:
-        #    res_ben = json.loads(res_ben)
-        
-        if len(res_ben) == app.selected_config:
-            res_ben.append(fnc_benefits_results)
+            res_ben = [None] * len(configurations)
         else:
-            res_ben[app.selected_config] = fnc_benefits_results
+            res_ben = json.loads(res_ben)
+            if len(res_ben) < len(configurations):
+                res_ben += [None] * (len(configurations) - len(res_ben))
 
-        return json.dumps(str(datetime.datetime.now()))
+        for ftr in finance_to_refresh:
+            mdl = models.get(ftr['model_uuid'])
+            fnc = finances.get(ftr['finance_uuid'])
+            if mdl is None or fnc is None:
+                next
+            print ("making so financial benefits results")
+            fnc_benefits_results = (
+                post_sprake_finance_benefits_results
+                .finance_benefits_results_to_interface_sprake(mdl,fnc)
+            )
+            res_ben[ftr['config_index']] = fnc_benefits_results
+        
+        return json.dumps(res_ben)
     
     @app.callback(
         Output('res-finance-so-costs', 'data'),
         Input('finance-config-watcher', 'data'),
+        State('store-configurations', 'data'),
+        State('res-finance-so-costs', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_costs_so(_):
+    def set_res_finance_costs_so(finance_to_refresh, configurations, res_cost):
         """
         Create the system owner financial costs results after a completed model run.
         """
-        mdl = app.models[app.selected_config]
-        fnc = app.finances[app.selected_config]
-
-        print ("making so financial costs results")
-        fnc_costs_results = (
-            post_sprake_finance_costs_results
-            .finance_costs_results_to_interface_sprake(mdl,fnc)
-        )
-
-        res_cost = app.results.get('res-finance-so-costs', None)
+        NUP = no_update
+        if finance_to_refresh is None or configurations is None:
+            return NUP
+        finance_to_refresh = json.loads(finance_to_refresh)
+        configurations = json.loads(configurations)
 
         if res_cost is None:
-            res_cost = [None] * len(app.config_names)
-            app.results['res-finance-so-costs'] = res_cost
-        #else:
-        #    res_cost = json.loads(res_cost)
-        
-        if len(res_cost) == app.selected_config:
-            res_cost.append(fnc_costs_results)
+            res_cost = [None] * len(configurations)
         else:
-            res_cost[app.selected_config] = fnc_costs_results
-
-        return json.dumps(str(datetime.datetime.now()))
+            res_cost = json.loads(res_cost)
+            if len(res_cost) < len(configurations):
+                res_cost += [None] * (len(configurations) - len(res_cost))
+        
+        for ftr in finance_to_refresh:
+            mdl = models.get(ftr['model_uuid'])
+            fnc = finances.get(ftr['finance_uuid'])
+            if mdl is None or fnc is None:
+                next
+            print ("making so financial costs results")
+            fnc_costs_results = (
+                post_sprake_finance_costs_results
+                .finance_costs_results_to_interface_sprake(mdl,fnc)
+            )
+            res_cost[ftr['config_index']] = fnc_costs_results
+        
+        return json.dumps(res_cost)
 
     @app.callback(
         Output('res-finance-so-value', 'data'),
         Input('finance-config-watcher', 'data'),
+        State('store-configurations', 'data'),
+        State('res-finance-so-value', 'data'),
         prevent_initial_call=True
     )
-    def set_res_finance_value_so(_):
+    def set_res_finance_value_so(finance_to_refresh, configurations, res_value):
         """
         Create the system owner financial value results after a completed model run.
         """
-        mdl = app.models[app.selected_config]
-        fnc = app.finances[app.selected_config]
+        NUP = no_update
+        if finance_to_refresh is None or configurations is None:
+            return NUP
+        finance_to_refresh = json.loads(finance_to_refresh)
+        configurations = json.loads(configurations)
 
-        print ("making so financial value results")
-        fnc_value_results = (
-            post_sprake_finance_value_results
-            .finance_value_results_to_interface_sprake(mdl,fnc)
-        )
-
-        res_value = app.results.get('res-finance-so-value', None)
-        
         if res_value is None:
-            res_value = [None] * len(app.config_names)
-            app.results['res-finance-so-value'] = res_value
-        #else:
-        #    res_value = json.loads(res_value)
-        
-        if len(res_value) == app.selected_config:
-            res_value.append(fnc_value_results)
+            res_value = [None] * len(configurations)
         else:
-            res_value[app.selected_config] = fnc_value_results
+            res_value = json.loads(res_value)
+            if len(res_value) < len(configurations):
+                res_value += [None] * (len(configurations) - len(res_value))
 
-        return json.dumps(str(datetime.datetime.now()))
+        for ftr in finance_to_refresh:
+            mdl = models.get(ftr['model_uuid'])
+            fnc = finances.get(ftr['finance_uuid'])
+            if mdl is None or fnc is None:
+                next
+            print ("making so financial value results")
+            fnc_value_results = (
+                post_sprake_finance_value_results
+                .finance_value_results_to_interface_sprake(mdl,fnc)
+            )
+            res_value[ftr['config_index']] = fnc_value_results
+        
+        return json.dumps(res_value)
 
     return app
 
@@ -2510,14 +2703,17 @@ def add_result_header_callbacks(app):
         Output('gen-ressmry-container', 'children'),
         Input('res-gen', 'data'),
         Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_generation_results_header(res, ann_hori_toggle):
+    def update_generation_results_header(res, ann_hori_toggle, selected_config):
         if res is None:
             return no_update
         res = json.loads(res)
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
         if isinstance(res, list):
-            res = res[app.selected_config]
+            res = res[config_index]
         gm = res.get('generator_meter_summary')
         if ann_hori_toggle:
             str_1 = 'Total generation: '
@@ -2549,14 +2745,17 @@ def add_result_header_callbacks(app):
         Output('stor-ressmry-container', 'children'),
         Input('res-stor', 'data'),
         Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_storage_results_header(res, ann_hori_toggle):
+    def update_storage_results_header(res, ann_hori_toggle, selected_config):
         if res is None:
             return no_update
         res = json.loads(res)
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
         if isinstance(res, list):
-            res = res[app.selected_config]
+            res = res[config_index]
         
         hrs_full = res.get('stor_hours_at_max').get('hrs_at_max_soc')
         hrs_empty = res.get('stor_hours_at_min').get('hrs_at_min_soc')
@@ -2584,14 +2783,17 @@ def add_result_header_callbacks(app):
         Output('cons-ressmry-container', 'children'),
         Input('res-cons', 'data'),
         Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_consumption_results_header(res, ann_hori_toggle):
+    def update_consumption_results_header(res, ann_hori_toggle, selected_config):
         if res is None:
             return no_update
         res = json.loads(res)
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
         if isinstance(res, list):
-            res = res[app.selected_config]
+            res = res[config_index]
         
         if ann_hori_toggle:
             str_1 = 'Total consumption: '
@@ -2618,15 +2820,17 @@ def add_result_header_callbacks(app):
         Output('net-ressmry-container', 'children'),
         Input('res-net', 'data'),
         Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_net_results_header(res, ann_hori_toggle):
+    def update_net_results_header(res, ann_hori_toggle, selected_config):
         if res is None:
             return no_update
         res = json.loads(res)
-
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
         if isinstance(res, list):
-            res = res[app.selected_config]
+            res = res[config_index]
 
         if ann_hori_toggle:
             str_1 = 'Total export = '
@@ -2662,28 +2866,26 @@ def add_result_header_callbacks(app):
         Input('res-finance-so-benefits', 'data'),
         Input('res-finance-so-costs', 'data'),
         Input('res-finance-so-value', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_finance_results_header(res_benefits_updated, res_costs_updated, res_value_updated):
-        if (res_benefits_updated is None) or (res_costs_updated is None) or (res_value_updated is None):
+    def update_finance_results_header(res_benefits, res_costs, res_value, selected_config):
+        if (res_benefits is None) or (res_costs is None) or (res_value is None):
             return no_update
         
-        res_benefits = app.results.get('res-finance-so-benefits', None)
-        if res_benefits is None:
-            return no_update
-        res_costs = app.results.get('res-finance-so-costs', None)
-        if res_costs is None:
-            return no_update
-        res_value = app.results.get('res-finance-so-value', None)
-        if res_value is None:
-            return no_update
+        res_benefits = json.loads(res_benefits)
+        res_costs = json.loads(res_costs)
+        res_value = json.loads(res_value)
+
+        selected_config = json.loads(selected_config)
+        config_index = selected_config['config_index']
 
         if isinstance(res_benefits, list):
-            res_benefits = res_benefits[app.selected_config]
+            res_benefits = res_benefits[config_index]
         if isinstance(res_costs, list):
-            res_costs = res_costs[app.selected_config]
+            res_costs = res_costs[config_index]
         if isinstance(res_value, list):
-            res_value = res_value[app.selected_config]
+            res_value = res_value[config_index]
 
         dr_benefits = res_benefits.get('benefits_discount_rate')
         prval_benefits = res_benefits.get('present_benefits_discounted')
@@ -3051,11 +3253,10 @@ def add_input_callbacks(app):
 
         return json.dumps(fcfg)
     
-    def sync_fcfg_to_model(fcfg: dict) -> bool:
+    def sync_fcfg_to_model(fcfg: dict, fnc: sprakefinance.SprakeFinance) -> bool:
         """
         Pass the finance conf dictionary into the Sprake model
         """
-        fnc = app.finances[app.selected_config]
         w_fcfg = sprake_finance_to_interface_config(fnc)
 
         dirty = False
@@ -3065,13 +3266,15 @@ def add_input_callbacks(app):
         
         return dirty
 
-    def sync_configs_to_model(mcfg: dict, fcfg: dict) -> Tuple[bool, bool]:
+    def sync_configs_to_model(
+        mcfg: dict,
+        fcfg: dict,
+        mdl: sprakemodel.SprakeModel,
+        fnc: sprakefinance.SprakeFinance
+    ) -> Tuple[bool, bool]:
         """
         Pass the configuration dictionaries into the Sprake model
         """
-        mdl = app.models[app.selected_config]
-        fnc = app.finances[app.selected_config]
-
         # Get the existing configs to check against
         w_mcfg, w_fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
@@ -3098,20 +3301,34 @@ def add_input_callbacks(app):
     @app.callback(
         Output('finance-config-watcher', 'data', allow_duplicate=True),
         Input('finance-config', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call = True
     )
-    def update_finance_config(fcfg):
+    def update_finance_config(fcfg, selected_conf):
         """
         Set the currently selected finance with the data held in the fcfg dict
         """
         NUP = no_update
-        if fcfg is None:
+        if fcfg is None or selected_conf is None:
             return NUP
         
         fcfg = json.loads(fcfg)
-        finance_dirty = sync_fcfg_to_model(fcfg)
+        selected_conf = json.loads(selected_conf)
+        fnc = finances.get(selected_conf['finance_uuid'], None)
+        if fnc is None:
+            # TODO: Deal with this
+            return NUP
+
+        finance_dirty = sync_fcfg_to_model(fcfg, fnc)
+
         if finance_dirty:
-            return json.dumps(str(datetime.datetime.now()))
+            return json.dumps(
+                [{
+                    'config_index': selected_conf.get('config_index', 0),
+                    'finance_uuid': selected_conf.get('finance_uuid'),
+                    'model_uuid': selected_conf.get('model_uuid')
+                }]
+            )
         return NUP
 
     @app.callback(
@@ -3119,27 +3336,43 @@ def add_input_callbacks(app):
         Output('finance-config-watcher', 'data', allow_duplicate=True),
         Input('model-config', 'data'),
         State('finance-config', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call = True
     )
-    def update_model_configs(mcfg, fcfg):
+    def update_model_configs(mcfg, fcfg, selected_conf):
+        NUP = no_update, no_update
         # print('Configuration is being updated')
         # print(ctx.triggered)
-        if mcfg is None or fcfg is None:
+        if mcfg is None or fcfg is None or selected_conf is None:
             return no_update, no_update
         mcfg = json.loads(mcfg)
         fcfg = json.loads(fcfg)
+        selected_conf = json.loads(selected_conf)
+
+        mdl = models.get(selected_conf['model_uuid'], None)
+        fnc = finances.get(selected_conf['finance_uuid'], None)
+        if mdl is None or fnc is None:
+            # TODO: Deal with this
+            return NUP
 
         # I don't trust these dirty flags on first load; 
-        mdl_dirty, finance_dirty = sync_configs_to_model(mcfg, fcfg)
-
-
+        mdl_dirty, finance_dirty = sync_configs_to_model(mcfg, fcfg, mdl, fnc)
 
         if mdl_dirty:
             return json.dumps(str(datetime.datetime.now())), no_update
         if finance_dirty:
-            return no_update, json.dumps(str(datetime.datetime.now()))
+            return (
+                no_update, 
+                json.dumps(
+                    [{
+                        'config_index': selected_conf.get('config_index', 0),
+                        'finance_uuid': selected_conf.get('finance_uuid'),
+                        'model_uuid': selected_conf.get('model_uuid')
+                    }]
+                )
+            )
         
-        return no_update, no_update
+        return NUP
 
     return app
 
@@ -3159,7 +3392,7 @@ def serve_layout():
     """
     Layout server function for Sprake Energy Model Interface Dash App
     """
-    session_id = str(uuid.uuid4())
+    session_id = str(str(uuid.uuid4()))
 
     return html.Div([
         create_layout(),
@@ -3196,35 +3429,59 @@ def create_app(external_stylesheets=None):
     )
     app.layout = serve_layout
 
-    app.selected_config = 0
-    app.config_names = ['Configuration Name']
-
-    # Load model
-    with open(
-        os.path.join(
-            STATICDATA, 
-            'sprakemodel-validation-config.json'
-        ), 
-    'r') as f:
-        mdl_conf = json.load(f)
-    app.models = [sprakemodel.SprakeModel.from_dict(mdl_conf)]
-
-    # Load finance configuration
-    with open(
-        os.path.join(
-            STATICDATA,
-            'sprakemodel-validation-finance-config.json'
-        ),
-    'r') as f:
-        fnc_conf = json.load(f)
+    def add_new_model(ref: newsegsmodel.NewsegsModel | None = None):
+        if ref is None:
+            mdl = create_default_model()
+        else:
+            mdl = sprakemodel.SprakeModel(ref)
+        models[mdl.uuid] = mdl
+        return mdl
     
-    app.finances = [sprakefinance.SprakeFinance.from_none()]
-    app.finances[0].set_model(app.models[0])
+    def duplicate_model(model_uuid: str):
+        ref = models.get(model_uuid, None)
+        if ref is None:
+            return None
+        return add_new_model(ref)
+    
+    def get_model(model_uuid: str):
+        return models.get(model_uuid, None)
+    
+    def remove_model(model_uuid: str):
+        return models.pop(model_uuid, None())
+
+    app.add_new_model = add_new_model
+    app.duplicate_model = duplicate_model
+    app.get_model = get_model
+
+    def add_new_finance(ref: newsegsfinance.NewsegsFinance | None = None):
+        if ref is None:
+            fnc = create_default_finance()
+        else:
+            fnc = sprakefinance.SprakeFinance(ref)
+        finances[fnc.uuid] = fnc
+        return fnc
+    
+    def duplicate_finance(finance_uuid: str):
+        ref = finances.get(finance_uuid, None)
+        if ref is None:
+            return None
+        model_uuid = ref.model.uuid
+        fnc = add_new_finance(ref)
+        fnc.model = models.get(model_uuid, None)
+        return fnc
+    
+    def get_finance(finance_uuid: str):
+        return finances.get(finance_uuid, None)
+    
+    def remove_finance(finance_uuid: str):
+        return finances.pop(finance_uuid, None)
+
+    app.add_new_finance = add_new_finance
+    app.duplicate_finance = duplicate_finance
+    app.get_finance = get_finance
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)
-
-    app.results = {}
 
     app = add_model_from_hash_method(app)
     return app

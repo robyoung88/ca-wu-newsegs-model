@@ -18,7 +18,7 @@ class NewsegsFinance(metaclass=ABCMeta):
     uuid = 1
 
     def __init__(self, *args, **kwargs):
-        self.uuid = uuid.uuid4()
+        self.uuid = str(uuid.uuid4())
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod

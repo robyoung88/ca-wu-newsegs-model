@@ -146,24 +146,30 @@ def add_latlon_sync_callbacks(app):
         Output('site-lon-input', 'value'),
         Output('site-name-input', 'value'),
         Input('site-location', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def sync_store_to_inputs(site_loc):
+    def sync_store_to_inputs(site_loc, selected_config):
+        NUP = no_update, no_update
         if site_loc is None:
-            return no_update, no_update
+            return NUP
         try:
             coords = json.loads(site_loc)
             lat = float(coords.get('lat', ''))
             lon = float(coords.get('lon', ''))
+            name = coords.get('name', no_update)
         except (TypeError, ValueError, json.JSONDecodeError, AttributeError):
-            return no_update, no_update
-        name = coords.get('name', no_update)
-
+            return NUP
+        
         newloc = modlocation.Location(lat, lon, name = name)
-        if not(newloc == app.models[app.selected_config].location):
-            app.models[app.selected_config].location = newloc
-        if not app.models[app.selected_config].location.name != name:
-            app.models[app.selected_config].location.name = name
+
+        selected_config = json.loads(selected_config)
+        mdl = app.get_model(selected_config['model_uuid'])
+
+        if not(newloc == mdl.location):
+            mdl.location = newloc
+        if not mdl.location.name != name:
+            mdl.location.name = name
 
         return f"{lat:.6f}", f"{lon:.6f}", name
 

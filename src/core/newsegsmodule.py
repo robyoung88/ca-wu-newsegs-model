@@ -168,7 +168,7 @@ class NewsegsModule(metaclass=ABCMeta):
     _model = None
 
     def __init__(self, *args, **kwargs):
-        self.uuid = uuid.uuid4()
+        self.uuid = str(uuid.uuid4())
 
     @abstractmethod
     def run(

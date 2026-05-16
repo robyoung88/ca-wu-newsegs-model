@@ -2,10 +2,12 @@ import json
 import datetime
 import copy
 import base64
+import uuid
 
 import pathvalidate
 
 from dash import html, Patch, Input, Output, dcc, ALL, State, ctx, no_update
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 from src.util import jsonfuncs
@@ -13,50 +15,18 @@ from src.newsegsbrowser.common import get_icon
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
 
-def config_to_dict(app, config_index: int | None = None):
+def config_to_dict(name, mdl: sprakemodel.SprakeModel, fnc: sprakefinance.SprakeFinance):
     """
     Encapsulate a model and finance configuration in a dictionary.
     """
-    if config_index is None:
-        config_index = app.selected_config
     
     odict = {
-        'config_name': app.config_names[config_index],
-        'model_config': app.models[config_index].to_dict(),
-        'finance_config': app.finances[config_index].to_dict(),
+        'config_name': name,
+        'model_config': mdl.to_dict(),
+        'finance_config': fnc.to_dict(),
     }
 
-    return odict
-
-def config_from_dict(app, cfg, config_index: int | None = None):
-    """
-    Given a model and finance configuration, update the live config
-    """
-    if config_index is None:
-        config_index = app.selected_config
-    
-    if config_index >= len(app.models) or config_index >= len(app.finances):
-        return None
-    
-    nm = app.config_names[config_index] 
-    app.config_names[config_index] = cfg.get('config_name', nm)
-
-    try:
-        app.models[config_index].sync_with_dict(cfg.get('model_config'))
-    except ValueError as e:
-        print(e)
-        return False
-
-    try:
-        app.finances[config_index].sync_with_dict(cfg.get('finance_config'))
-    except ValueError as e:
-        print(e)
-        return False
-    
-    app.finances[config_index].set_model(app.models[config_index])
-    app.models[config_index].run()
-
-    return True       
+    return odict      
 
 def create_tbl_head(n_configs):
     return [
@@ -70,15 +40,18 @@ def create_tbl_head(n_configs):
         )
     ]
 
-def create_config_selector_headerbutton(config_index, app = None):
-    if app is not None and app.selected_config == (config_index - 1):
+def create_config_selector_headerbutton(
+    config_index,
+    selected_config = None
+):
+    if selected_config is not None and selected_config['config_index'] == config_index:
         do_outline = False
     else:
         do_outline = True
 
     contents = dbc.Button(
         html.I(
-            className = get_icon('config-{}'.format(config_index), style_name = 'raw'),
+            className = get_icon('config-{}'.format(config_index+1), style_name = 'raw'),
             style={'display': 'inline'}
         ),
         color='primary',
@@ -88,8 +61,11 @@ def create_config_selector_headerbutton(config_index, app = None):
 
     return contents
 
-def create_single_configuration_selector_row(config_index, app = None):
-    if config_index < 2:
+def create_single_configuration_selector_row(
+    config_index, 
+    configurations = None,
+    selected_config = None):
+    if config_index < 1:
         primary_container = html.H1
         show_remove = False
     else:
@@ -97,17 +73,19 @@ def create_single_configuration_selector_row(config_index, app = None):
         show_remove = True
     
     contents = [
-        get_icon('config-'+str(config_index)),
+        get_icon('config-'+str(config_index+1)),
     ]
     
-    if app is None:
+    if configurations is None:
         config_name = 'Configuration Name'
+    else:
+        config_name = configurations[config_index]['name']
+    if selected_config is None:
         is_selected = True
     else:
-        config_name = app.config_names[config_index - 1]
-        is_selected = app.selected_config == (config_index-1)
+        is_selected = selected_config['config_index'] == config_index
     
-    if config_index < 2 and config_name == 'Configuration Name':
+    if config_name == 'Configuration Name':
         contents.append(
             dcc.Input(
                 placeholder = config_name,
@@ -258,7 +236,7 @@ def create_configuration_selector():
     return html.Div([
         
         html.Div([        
-            create_single_configuration_selector_row(1),
+            create_single_configuration_selector_row(0),
         ],
         id='comparator-selector-container',
         ),
@@ -280,11 +258,14 @@ def add_configuration_selection_callbacks(app):
     Make the buttons on the configuration selector live.
     """
     @app.callback(
-        Output('n_active_conf', 'data', allow_duplicate = True),
+        Output('store-configurations', 'data'),
+        Output('store-selected-configuration', 'data'),
         Input({'type': 'config-name-input', 'index': ALL}, 'value'),
+        State('store-configurations', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def rename_config(config_name):
+    def rename_config(config_name, configurations, selected_config):
         NUP = no_update
         trig = ctx.triggered_id
         if trig is None:
@@ -292,36 +273,66 @@ def add_configuration_selection_callbacks(app):
         if len(ctx.triggered) > 1:
             return NUP
         
+        configurations = json.loads(configurations)
+        selected_config = json.loads(selected_config)
+        
         trigger_index = trig['index']
-        if config_name[trigger_index-1] is None:
+        if config_name[trigger_index] is None:
             return NUP
-
-        app.config_names[trigger_index-1] = config_name[trigger_index-1]
-        return NUP
+        
+        configurations[trigger_index]['name'] = config_name[trigger_index]
+        if selected_config['config_index'] == trigger_index:
+            selected_config['name'] = config_name[trigger_index]
+            rval = (json.dumps(configurations), json.dumps(selected_config))
+        else:
+            rval = (json.dumps(configurations), no_update)
+        
+        return rval
 
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
-        Output('n_active_conf', 'data', allow_duplicate = True),
-        Output('live-config-watcher', 'data', allow_duplicate = True),
-        Output('model-run-watcher', 'data', allow_duplicate = True),
+        
         Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
+
+        #Output('live-config-watcher', 'data', allow_duplicate = True),
+        Output('store-model-completed-run', 'data', allow_duplicate=True),
+
+        Output('store-configurations', 'data', allow_duplicate = True),
+        Output('store-selected-configuration', 'data', allow_duplicate = True),
+        
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
-        State('n_active_conf', 'data'),
-        State('model-run-watcher', 'data'),
+        State('store-configurations', 'data'),
+        State('store-selected-configuration', 'data'),
+
         prevent_initial_call=True
     )
-    def add_duplicate_config(n_clicks, n_active, mdl_run_hashes):
+    def add_duplicate_config(n_clicks, configurations, selected_config):
         # Add the selector as the penultimate row
-        n_conf = len(app.config_names)
-        NUP = (no_update, no_update, no_update, no_update, [no_update] * n_conf, [no_update] * n_conf)
+        if configurations is None:
+            raise PreventUpdate()
+        
+        configurations = json.loads(configurations)
+        n_conf = len(configurations)
+
+        NUP = (
+            no_update, 
+            no_update, 
+            [no_update] * n_conf, 
+            [no_update] * n_conf, 
+            #no_update, 
+            no_update,
+            no_update,
+            no_update
+        )
         
         update_outlines = [True] * n_conf
 
         trig = ctx.triggered_id
         if trig is None or n_clicks is None:
             return NUP
+        
         # After construction of a new button, ctx.triggered will contain
         # the full list, not just the triggering button, though the triggering id is arbitrary
         # Therefore reject if the list is longer than 1; if rejecting on first construction,
@@ -329,77 +340,110 @@ def add_configuration_selection_callbacks(app):
         if len(ctx.triggered) > 1:
             return NUP
 
-        n_conf = json.loads(n_active).get('n', 1) + 1
+        n_conf += 1
 
         if trig['type'] == 'config-dup-btn':
             trigger_index = trig['index']
 
-            if n_clicks[trigger_index-1] is None:
+            if n_clicks[trigger_index] is None:
                 return NUP
 
-            app.config_names.append(app.config_names[trigger_index-1] + " Copy")
-            mdl_ref = app.models[trigger_index - 1]
-            mdl = sprakemodel.SprakeModel(mdl_ref)
-            # Do a manual copy of results
+            # Make the copy
+            ref_config = configurations[trigger_index]
+            mdl = app.duplicate_model(ref_config['model_uuid'])
+            fnc = app.duplicate_finance(ref_config['finance_uuid'])
+
+            # TODO: move compose_configuration to a utility module so it can be shared
+            new_config = {
+                'uuid': str(uuid.uuid4()),
+                'name': ref_config['name'] + " Copy",
+                'model_uuid': mdl.uuid,
+                'finance_uuid': fnc.uuid
+            }
+
+            configurations.append(new_config)
+            print('after append')
+            print(configurations)
+            selected_config = new_config.copy()
+            selected_config['config_index'] = len(configurations) - 1
+
+            # Let's copy over the results
+            mdl_ref = app.get_model(ref_config['model_uuid'])
             mdl._generation_result = copy.copy(mdl_ref._generation_result)
             mdl._grid_result = copy.copy(mdl_ref._grid_result)
             mdl._cs_result = copy.copy(mdl_ref._cs_result)
             mdl._dirty = False
-            # We also want the cached functions to respond, so, at risk:
-            mdl.last_run = mdl_ref.last_run
-            #mdl._last_hash = mdl_ref._last_hash
-            app.models.append(mdl)
-            fnc = sprakefinance.SprakeFinance(app.finances[trigger_index - 1])
-            fnc.set_model(app.models[-1])
-            fnc._dirty = False
-            app.finances.append(fnc)
-            app.selected_config = n_conf-1
-
-            if mdl_run_hashes is None:
-                mdl_run_hashes = [None] * len(app.config_names)
-            else:
-                mdl_run_hashes = json.loads(mdl_run_hashes)
             
-            mdl_run_hashes.append(hash(mdl))
-            mdl_run_hashes = json.dumps(mdl_run_hashes)
+            # Because of the different uuid, the caches will not recognise this model,
+            # or its finance, but just for info:
+            mdl.last_run = mdl_ref.last_run
+            
         else:
             return NUP
         
+        # Now for all the UI stuff
+
         patched_comparator_selector = Patch()
         patched_comparator_selector.append(
-            create_single_configuration_selector_row(n_conf, app)
+            create_single_configuration_selector_row(
+                n_conf-1, 
+                configurations, 
+                selected_config
+            )
         )
 
         patched_header_comparator_selector = Patch()
         patched_header_comparator_selector.append(
-            create_config_selector_headerbutton(n_conf, app)
+            create_config_selector_headerbutton(
+                n_conf-1, 
+                selected_config
+            )
+        )
+
+        mdl_completed_run = json.dumps(
+            {
+                'model_uuid': mdl.uuid,
+                'model_last_run': str(mdl.last_run),
+                'model_hash': hash(mdl)
+            }
         )
 
         return (
             patched_comparator_selector,
             patched_header_comparator_selector,
-            json.dumps({'n': n_conf}),
-            json.dumps(str(datetime.datetime.now())),
-            mdl_run_hashes,
+
             update_outlines,
-            update_outlines
+            update_outlines,
+
+            #json.dumps(str(datetime.datetime.now())),
+            mdl_completed_run,
+
+            json.dumps(configurations),
+            json.dumps(selected_config)
         )  
     
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
-        Output('n_active_conf', 'data', allow_duplicate = True),
+        
+        Output('store-configurations', 'data', allow_duplicate = True),
+        Output('store-selected-configuration', 'data', allow_duplicate = True),
+
+        #Output('n_active_conf', 'data', allow_duplicate = True),
         Input({'type': 'config-remove-btn', 'index': ALL}, 'n_clicks'),
-        State('n_active_conf', 'data'),
+        State('store-configurations', 'data'),
+        State('store-selected-configuration', 'data'),
+        #State('n_active_conf', 'data'),
         State({'type': 'config-remove-btn', 'index': ALL}, 'id'),
         prevent_initial_call=True
     )
-    def remove_config(n_clicks, n_active, ids):
-        NUP = (no_update, no_update, no_update)
+    def remove_config(n_clicks, configurations, selected_config, ids):
+        NUP = (no_update, no_update, no_update, no_update)
 
         trig = ctx.triggered_id
         if trig is None:
             return NUP
+        
         # After construction of a new button, ctx.triggered will contain
         # the full list, not just the triggering button, though the triggering id is arbitrary
         # Therefore reject if the list is longer than 1; if rejecting on first construction,
@@ -409,7 +453,7 @@ def add_configuration_selection_callbacks(app):
         
         if trig['type'] == 'config-remove-btn':
             trigger_index = trig['index']
-            if trigger_index == 1:
+            if trigger_index == 0:
                 return NUP
         else:
             return NUP
@@ -426,49 +470,71 @@ def add_configuration_selection_callbacks(app):
 
         if n_clicks[nclick_i] is None:
             return NUP
+
+        configurations = json.loads(configurations)
+        selected_config = json.loads(selected_config)
+        dropped = configurations.pop(trigger_index)
+        if selected_config['config_index'] == trigger_index:
+            selected_config = configurations[trigger_index-1].copy()
+            selected_config['config_index'] = trigger_index - 1
         
-        # Pop the name, decrement the index, and update the children
-        dropped = app.config_names.pop(trigger_index-1)
-        if app.selected_config == trigger_index - 1:
-            if app.selected_config > 0:
-                app.selected_config -= 1
-        app.finances.pop(trigger_index - 1)
-        app.models.pop(trigger_index - 1)
+        safe_drop = True
+        for conf in configurations:
+            if conf['model_uuid'] == dropped['model_uuid']:
+                safe_drop = False
+        
+        if safe_drop:
+            app.remove_model(dropped['model_uuid'])
+        
+        safe_drop = True
+        for conf in configurations:
+            if conf['finance_uuid'] == dropped['finance_uuid']:
+                safe_drop = False
+        
+        if safe_drop:
+            app.remove_finance(dropped['finance_uuid'])
 
-        # TODO: Set the outline characteristics of the focus button if we go back to 0
-        # TODO: Instruct app to update results tables
+        n_conf = len(configurations)
 
-        n_conf = len(app.config_names)
-
-        if n_conf > 0:
-            contents = [create_single_configuration_selector_row(i, app) for i in range(1, n_conf+1)]
-        else:
-            contents = []
-
-        hdr_contents = [create_config_selector_headerbutton(i, app) for i in range(1, n_conf + 1)]
+        
+        contents = [create_single_configuration_selector_row(i, contents, selected_config) for i in range(n_conf)]
+        hdr_contents = [create_config_selector_headerbutton(i, selected_config) for i in range(n_conf)]
 
         return (
             contents,
             hdr_contents,
-            json.dumps({'n': n_conf})
+
+            json.dumps(configurations),
+            json.dumps(selected_config)
         )
 
     @app.callback(
         Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
-        Output('live-config-watcher', 'data', allow_duplicate = True),
-        Output('model-run-watcher', 'data', allow_duplicate = True),
+        
+        Output('store-model-completed-run', 'data', allow_duplicate = True),
+
+        Output('store-selected-configuration', 'data', allow_duplicate = True),
+
         Input({'type': 'config-focus-btn', 'index': ALL}, 'n_clicks'),
         Input({'type': 'config-hdrfocus-btn', 'index': ALL}, 'n_clicks'),
+        
+        State('store-configurations', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call = True
     )
-    def set_focussed_config(n_clicks, n_clicks_hdr):
-        n_conf = len(app.config_names)
+    def set_focussed_config(n_clicks, n_clicks_hdr, configurations, selected_config):
+        if configurations is None:
+            raise PreventUpdate()
+        
+        configurations = json.loads(configurations)
+        n_conf = len(configurations)
         NUP = ([no_update] * n_conf, [no_update] * n_conf, no_update, no_update)
         
         trig = ctx.triggered_id
         if trig is None:
             return NUP
+
         # After construction of a new button, ctx.triggered will contain
         # the full list, not just the triggering button, though the triggering id is arbitrary
         # Therefore reject if the list is longer than 1; if rejecting on first construction,
@@ -480,27 +546,43 @@ def add_configuration_selection_callbacks(app):
         # Should always be as many buttons as configurations, so can
         # use the index directly
         if trig['type'] == 'config-focus-btn':
-            if n_clicks[trigger_index-1] is None:
+            if n_clicks[trigger_index] is None:
                 return NUP
         elif trig['type'] == 'config-hdrfocus-btn':
-            if n_clicks_hdr[trigger_index-1] is None:
+            if n_clicks_hdr[trigger_index] is None:
                 return NUP
+        
+        selected_config = json.loads(selected_config)
+        if selected_config['config_index'] == trigger_index:
+            return NUP
+        
+        selected_config = configurations[trigger_index].copy()
+        selected_config['config_index'] = trigger_index
 
-        app.selected_config = trigger_index - 1
+        mdl = app.get_model(selected_config['model_uuid'])
+
+        mdl_completed_run = json.dumps(
+            {
+                'model_uuid': mdl.uuid,
+                'model_last_run': str(mdl.last_run),
+                'model_hash': hash(mdl)
+            }
+        )
         
         return (
-            [False if i == (trigger_index-1) else True for i in range(n_conf)],
-            [False if i == (trigger_index-1) else True for i in range(n_conf)],
-            json.dumps(str(datetime.datetime.now())),
-            json.dumps(str(datetime.datetime.now()))
+            [False if i == (trigger_index) else True for i in range(n_conf)],
+            [False if i == (trigger_index) else True for i in range(n_conf)],
+            mdl_completed_run,
+            json.dumps(selected_config)
         )
 
     @app.callback(
         Output('download-config-json', 'data'),
         Input({'type': 'config-download-btn', 'index': ALL}, 'n_clicks'),
+        State('store-configurations', 'data'),
         prevent_initial_call = True
     )
-    def download_config_json(n_clicks):
+    def download_config_json(n_clicks, configurations):
         NUP = no_update
 
         trig = ctx.triggered_id
@@ -515,10 +597,16 @@ def add_configuration_selection_callbacks(app):
 
         trigger_index = trig['index']
         
-        if n_clicks[trigger_index-1] is None:
+        if n_clicks[trigger_index] is None:
             return NUP
+
+        config = json.loads(configurations)[trigger_index]
+
+
+        mdl = app.get_model(config['model_uuid'])
+        fnc = app.get_finance(config['finance_uuid'])
         
-        odict = config_to_dict(app, trigger_index - 1)
+        odict = config_to_dict(config['name'], mdl, fnc)
         fn = odict.get('config_name') + ".json"
         fn = pathvalidate.sanitize_filename(fn)
         return dict(
@@ -529,18 +617,25 @@ def add_configuration_selection_callbacks(app):
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
-        Output('live-config-watcher', 'data', allow_duplicate = True),
-        Output('model-run-watcher', 'data', allow_duplicate = True),
+
+        Output('store-configurations', 'data', allow_duplicate = True),
+        Output('store-selected-configuration', 'data', allow_duplicate = True),
+        
         Input({'type': 'config-upload', 'index': ALL}, 'contents'),
+        State('store-configurations', 'data'),
         prevent_initial_call = True
     )
-    def upload_config_json(config_jsons):
-        n_conf = len(app.config_names)
+    def upload_config_json(config_jsons, configurations):
+        if configurations is None:
+            raise PreventUpdate()
+        configurations = json.loads(configurations)
+        n_conf = len(configurations)
         NUP = (no_update, [no_update] * n_conf, no_update, no_update)
 
         trig = ctx.triggered_id
         if trig is None:
             return NUP
+        
         # After construction of a new button, ctx.triggered will contain
         # the full list, not just the triggering button, though the triggering id is arbitrary
         # Therefore reject if the list is longer than 1; if rejecting on first construction,
@@ -549,25 +644,32 @@ def add_configuration_selection_callbacks(app):
             return NUP
         
         trigger_index = trig['index']
-        if config_jsons[trigger_index-1] is None:
+        if config_jsons[trigger_index] is None:
             return NUP
         
-        cfg = config_jsons[trigger_index - 1]
+        working_conf = configurations[trigger_index]
+        mdl = app.get_model(working_conf['model_uuid'])
+        fnc = app.get_finance(working_conf['finance_uuid'])
+
+        cfg = config_jsons[trigger_index]
         ctype, cstr = cfg.split(',')
         cfg = json.loads(base64.b64decode(cstr))
 
-        ok = config_from_dict(app, cfg, trigger_index-1)
+        mdl.sync_with_dict(cfg['model_config'])
+        fnc.sync_with_dict(cfg['finance_config'])
+        working_conf['name'] = cfg['config_name']
 
-        if not ok:
-            return NUP
+        selected_config = working_conf.copy()
+        selected_config['config_index'] = trigger_index
+        configurations[trigger_index]  = selected_config
         
-        contents = [create_single_configuration_selector_row(i, app) for i in range(1, n_conf+1)]
+        contents = [create_single_configuration_selector_row(i, configurations, selected_config) for i in range(n_conf)]
 
         return (
             contents,
-            [False if i == (trigger_index-1) else True for i in range(n_conf)],
-            json.dumps(str(datetime.datetime.now())),
-            json.dumps(str(datetime.datetime.now()))
+            [False if i == (trigger_index) else True for i in range(n_conf)],
+            json.dumps(configurations),
+            json.dumps(selected_config)
         )
 
     return app
