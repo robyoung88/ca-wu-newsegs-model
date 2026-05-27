@@ -70,6 +70,7 @@ launch_uid = uuid.uuid4()
 # of models and finances. These should be keyed by their uuids.
 models = {}
 finances = {}
+results = {}
 
 def spawn_model():
     return sprakemodel.SprakeModel.from_none()
@@ -88,6 +89,24 @@ def model_to_cache(model_id):
 def model_from_cache(model_id):
     mdl = cache.get(model_id)
     return mdl
+
+def spawn_finance():
+    return sprakefinance.SprakeFinance.from_none()
+
+def get_finance(finance_id):
+    fnc = finances.get(finance_id, None)
+    if fnc is None:
+        fnc = spawn_finance()
+        finances[finance_id] = fnc
+    return fnc
+
+def finance_to_cache(finance_id):
+    fnc = get_finance(finance_id)
+    cache[finance_id] = fnc
+
+def finance_from_cache(finance_id):
+    fnc = cache.get(finance_id)
+    return fnc
 
 def compose_configuration(
     name: str,
@@ -1256,24 +1275,60 @@ def create_gen_cost_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('gen-wind',
-                                                  'Wind Capex (£/kW)',
-                                                  'cost-gen-wind-capex-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'gen-wind',
+                            'Wind Capex (£/kW)',
+                            'input-finance-config',
+                            'wind_capex_per_kw',
+                            section = 'unit_costs',
+                            max = 10000,
+                            step = 50
+                        )
+                        #create_numeric_card_input('gen-wind',
+                        #                          'Wind Capex (£/kW)',
+                        #                          'cost-gen-wind-capex-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input(['gen-wind','cost-recurrent'],
-                                                  'Wind Ongoing (£/kW/yr)',
-                                                  'cost-gen-wind-recurrent-input')
+                        browser.create_numeric_card_input_compound_key(
+                            ['gen-wind','cost-recurrent'],
+                            'Wind Ongoing (£/kW/yr)',
+                            'input-finance-config',
+                            'wind_om_per_kw_year',
+                            section = 'unit_costs',
+                            max = 5000,
+                            step = 10
+                        )
+                        #create_numeric_card_input(['gen-wind','cost-recurrent'],
+                        #                          'Wind Ongoing (£/kW/yr)',
+                        #                          'cost-gen-wind-recurrent-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('gen-pv',
-                                                  'Solar PV Capex (£/kWp)',
-                                                  'cost-gen-pv-capex-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'gen-pv',
+                            'Solar PV Capex (£/kWp)',
+                            'input-finance-config',
+                            'pv_capex_per_kw',
+                            section = 'unit_costs',
+                            max = 10000,
+                            step = 50
+                        )
+                        #create_numeric_card_input('gen-pv',
+                        #                          'Solar PV Capex (£/kWp)',
+                        #                          'cost-gen-pv-capex-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input(['gen-pv','cost-recurrent'],
-                                                  'Solar PV Ongoing (£/kWp/yr)',
-                                                  'cost-gen-pv-recurrent-input')
+                        browser.create_numeric_card_input_compound_key(
+                            ['gen-pv','cost-recurrent'],
+                            'Solar PV Ongoing (£/kWp/yr)',
+                            'input-finance-config',
+                            'pv_om_per_kw_year',
+                            section = 'unit_costs',
+                            max = 5000,
+                            step = 10
+                        )
+                        #create_numeric_card_input(['gen-pv','cost-recurrent'],
+                        #                          'Solar PV Ongoing (£/kWp/yr)',
+                        #                          'cost-gen-pv-recurrent-input')
                     ),
                 ])
             ])
@@ -1302,14 +1357,32 @@ def create_storage_cost_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('storage',
-                                                  'BESS Capex (£/kWh)',
-                                                  'cost-stor-bess-capex-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'storage',
+                            'BESS Capex (£/kWh)',
+                            'input-finance-config',
+                            'bess_capex_per_kwh',
+                            section = 'unit_costs',
+                            max = 10000,
+                            step = 50
+                        )
+                        #create_numeric_card_input('storage',
+                        #                          'BESS Capex (£/kWh)',
+                        #                          'cost-stor-bess-capex-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input(['storage', 'cost-recurrent'],
-                                                   'BESS Ongoing (£/kWh/yr)',
-                                                   'cost-stor-bess-recurrent-input')
+                        browser.create_numeric_card_input_compound_key(
+                            ['storage', 'cost-recurrent'],
+                            'BESS Ongoing (£/kWh/yr)',
+                            'input-finance-config',
+                            'bess_om_per_kwh_year',
+                            section = 'unit_costs',
+                            max = 5000,
+                            step = 10
+                        )
+                        #create_numeric_card_input(['storage', 'cost-recurrent'],
+                        #                           'BESS Ongoing (£/kWh/yr)',
+                        #                           'cost-stor-bess-recurrent-input')
                     ),
                 ])
             ])
@@ -1341,19 +1414,46 @@ def create_sales_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('cost-residents-standing',
-                                                  'Standing charge (£/household/day)',
-                                                  'cost-resident-sc-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'cost-residents-standing',
+                            'Standing charge (£/household/day)',
+                            'input-finance-config',
+                            'resident_sc_per_unit_day',
+                            section = 'unit_costs',
+                            max = 10,
+                            step = 0.01
+                        )
+                        #create_numeric_card_input('cost-residents-standing',
+                        #                          'Standing charge (£/household/day)',
+                        #                          'cost-resident-sc-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('cost-residents-perunit',
-                                                  'Per unit charge (£/kWh)',
-                                                  'cost-resident-var-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'cost-residents-perunit',
+                            'Per unit charge (£/kWh)',
+                            'input-finance-config',
+                            'resident_var_per_unit',
+                            section = 'unit_costs',
+                            max = 10,
+                            step = 0.01
+                        )
+                        #create_numeric_card_input('cost-residents-perunit',
+                        #                          'Per unit charge (£/kWh)',
+                        #                          'cost-resident-var-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('cost-export',
-                                                  'Grid export - mean per unit charge (£/kWh)',
-                                                  'cost-export-var-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'cost-export',
+                            'Grid export - mean per unit (£/kWh)',
+                            'input-finance-config',
+                            'grid_export_var_per_unit',
+                            section = 'unit_costs',
+                            max = 10,
+                            step = 0.01
+                        )
+                        #create_numeric_card_input('cost-export',
+                        #                          'Grid export - mean per unit charge (£/kWh)',
+                        #                          'cost-export-var-input')
                     ),
                 ])
             ])
@@ -1382,14 +1482,32 @@ def create_import_cost_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('cost-import-fixed',
-                                                  'Fixed costs for backup (£/site/day)',
-                                                  'cost-import-sc-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'cost-import-fixed',
+                            'Fixed costs for backup (£/site/day)',
+                            'input-finance-config',
+                            'grid_import_sc_per_day',
+                            section = 'unit_costs',
+                            max = 10000,
+                            step = 10
+                        )
+                        #create_numeric_card_input('cost-import-fixed',
+                        #                          'Fixed costs for backup (£/site/day)',
+                        #                          'cost-import-sc-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('cost-import-perunit',
-                                                  'Per-unit costs for backup (£/kWh)', 
-                                                  'cost-import-var-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'cost-import-perunit',
+                            'Per-unit costs for backup (£/kWh)',
+                            'input-finance-config',
+                            'grid_import_var_per_unit',
+                            section = 'unit_costs',
+                            max = 10,
+                            step = 0.01
+                        )
+                        #create_numeric_card_input('cost-import-perunit',
+                        #                          'Per-unit costs for backup (£/kWh)', 
+                        #                          'cost-import-var-input')
                     ),
                 ])
             ])
@@ -1456,14 +1574,34 @@ def create_finance_settings_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('finance-settings-benefit-discount',
-                                                  'Benefit discount rate (%)',
-                                                  'fnc-benefit-dr-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'finance-settings-benefit-discount',
+                            'Benefit discount rate (%)',
+                            'input-finance-config',
+                            'benefit_discount_rate',
+                            section = None,
+                            max = 100,
+                            step = 1
+                        )
+
+                        #create_numeric_card_input('finance-settings-benefit-discount',
+                        #                          'Benefit discount rate (%)',
+                        #                          'fnc-benefit-dr-input')
                     ),
                     dbc.Row(
-                        create_numeric_card_input('finance-settings-cost-discount',
-                                                  'Cost discount rate (%)',
-                                                  'fnc-cost-dr-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'finance-settings-cost-discount',
+                            'Benefit discount rate (%)',
+                            'input-finance-config',
+                            'cost_discount_rate',
+                            section = None,
+                            max = 100,
+                            step = 1
+                        )
+
+                        #create_numeric_card_input('finance-settings-cost-discount',
+                        #                          'Cost discount rate (%)',
+                        #                          'fnc-cost-dr-input')
                     )
                 ])
             ])
@@ -1893,23 +2031,44 @@ def create_layout():
                 # A pre-queue to transfer model run requests to the queue
                 # manager
                 dcc.Store(id = 'prequeue-model-run'),
+                # An Interval element to trigger the queue until it is cleared
+                dcc.Interval(id = 'interval-model-run', interval = 1000, disabled = True),
                 # A dispatch object holding id of a model permitted to run
                 dcc.Store(id = 'dispatchitem-model-run'),
                 # Trigger object for the model run
                 dcc.Store(id = 'trigger-model-run'),
                 # Trigger object for relocalising model after run
                 dcc.Store(id = 'trigger-post-model-run'),
-                # An Interval element to trigger the queue until it is cleared
-                dcc.Interval(id = 'interval-model-run', interval = 1000, disabled = True),
                 # A store to trigger handling of model run completion
                 dcc.Store(id = 'trigger-postprocess-model-run'),
+
+                # A queue of finance run requests
+                # A pre-queue to transfer finance run requests to the queue
+                # manager
+                dcc.Store(id = 'prequeue-finance-run'),
+                # The queue to hold scheduled finance runs
+                dcc.Store(id = 'queue-finance-run'),
+                # An Interval to trigger the queue manager until queue is cleared
+                dcc.Interval(id = 'interval-finance-run', interval = 1000, disabled = True),
+                # A dispatch object holding id of a finance permitted to run
+                dcc.Store(id = 'dispatchitem-finance-run'),
+                # Trigger object for the finance run
+                dcc.Store(id = 'trigger-finance-run'),
+                # Trigger object for relocalising finance after run
+                dcc.Store(id = 'trigger-post-finance-run'),
+                # Trigger handling of finance run completion
+                dcc.Store(id = 'trigger-postprocess-finance-run'),
 
                 ##### Latches
 
                 # A global switch to disable model runs
                 dcc.Store(id = 'latch-model-run-global'),
+                # A global switch to disable finance runs
+                dcc.Store(id = 'latch-finance-run-global'),
                 # A list of checked-out models whose configuration cannot be updated
                 dcc.Store(id = 'latch-models-checkedout'),
+                # A list of checked-out finances whose configuratoin cannot be updated
+                dcc.Store(id = 'latch-finances-checkedout'),
 
                 # Updated when the model configuration is updated.
                 # Used to indicate that a new run is necessary to update results.
@@ -2027,13 +2186,15 @@ def sprake_model_set_loc_input(loc_input: dict, mdl: sprakemodel.SprakeModel):
 
 def sprake_finance_set_finance_config(fcfg: dict, fnc: sprakefinance.SprakeFinance):
     fnc.set_unit_costs_from_dict(fcfg.get('unit_costs'))
-    fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0))
-    fnc.cost_discount_rate = float(fcfg.get('cost_discount_rate', 0.0))
+    fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0) / 100)
+    fnc.cost_discount_rate = float(fcfg.get('cost_discount_rate', 0.0) / 100)
 
 def sprake_finance_to_interface_config(
     fnc: sprakefinance.SprakeFinance,
 ) -> dict:
     fcfg = fnc.to_dict()
+    fcfg['benefit_discount_rate'] *= 100.
+    fcfg['cost_discount_rate'] *= 100.
     fcfg['finance_uuid'] = fnc.uuid
 
     return fcfg
@@ -2399,10 +2560,10 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('cost-gen-wind-capex-input', 'value'),
-        Output('cost-gen-wind-recurrent-input', 'value'),
-        Output('cost-gen-pv-capex-input', 'value'),
-        Output('cost-gen-pv-recurrent-input', 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'wind_capex_per_kw'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'wind_om_per_kw_year'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'pv_capex_per_kw'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'pv_om_per_kw_year'}, 'value'),
         Output('cost-gen-smry-capex', 'children'),
         Output('cost-gen-smry-ongoing', 'children'),
         Input('model-config', 'data'),
@@ -2436,8 +2597,8 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('cost-stor-bess-capex-input', 'value'),
-        Output('cost-stor-bess-recurrent-input', 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'bess_capex_per_kwh'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'bess_om_per_kwh_year'}, 'value'),
         Output('cost-stor-smry-capex', 'children'),
         Output('cost-stor-smry-ongoing', 'children'),
         Input('model-config', 'data'),
@@ -2462,9 +2623,9 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('cost-resident-sc-input', 'value'),
-        Output('cost-resident-var-input', 'value'),
-        Output('cost-export-var-input', 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'resident_sc_per_unit_day'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'resident_var_per_unit'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'grid_export_var_per_unit'}, 'value'),
         Input('finance-config', 'data'),
         prevent_initial_call=True
     )
@@ -2480,8 +2641,8 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('cost-import-sc-input', 'value'),
-        Output('cost-import-var-input', 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'grid_import_sc_per_day'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': 'grid_import_var_per_unit'}, 'value'),
         Input('finance-config', 'data'),
         prevent_initial_call=True
     )
@@ -2514,8 +2675,8 @@ def add_initial_callback(app):
     @app.callback(
         Output('fnc-smry-benefit-dr', 'children'),
         Output('fnc-smry-cost-dr', 'children'),
-        Output('fnc-benefit-dr-input', 'value'),
-        Output('fnc-cost-dr-input', 'value'),
+        Output({'type': 'input-finance-config', 'section': 'None', 'key': 'benefit_discount_rate'}, 'value'),
+        Output({'type': 'input-finance-config', 'section': 'None', 'key': 'cost_discount_rate'}, 'value'),
         Input('finance-config', 'data'),
         prevent_initial_call=True
     )
@@ -2652,165 +2813,108 @@ def add_initial_callback(app):
 
     return app
 
+RESULT_CACHE_PREFIXES = {
+    'generation': 'res_gen_',
+    'storage': 'res_stor_',
+    'consumption': 'res_cons_',
+    'net_energy': 'res_net_'
+}
+
+def generic_model_postprocess(
+    model_run_json,
+    postprocess_function,
+    result_id_prefix
+):
+    """
+    Run a postprocess function on a model and store in the results cache.
+    """
+    NUP = no_update
+    if model_run_json is None:
+        return NUP
+    
+    model_run = json.loads(model_run_json)
+    model_id = model_run['model_id']
+    mdl = get_model(model_id)
+    
+    # Avoid recalculation if nothing has actually run
+    run_hash = hash(mdl)
+    result_id = result_id_prefix + str(model_id)
+    prev_result = results.get(result_id, None)
+    if not prev_result is None and prev_result['run_hash'] == run_hash:
+        return NUP
+    
+    print (f"making {result_id_prefix}")
+    gen_results = postprocess_function(mdl)
+    gen_results['run_hash'] = run_hash
+    results[result_id] = gen_results
+
+    return model_run_json
+
+
 def add_result_callbacks(app):
     """
     Callbacks to synchronise app interface with results of the model after run
     """
+
     @app.callback(
         Output('res-gen', 'data'),
-        Input('store-model-completed-run', 'data'),
-        State('store-configurations', 'data'),
-        State('res-gen', 'data'),
-        prevent_initial_call=True
+        Input('trigger-postprocess-model-run', 'data'),
+        prevent_initial_call = True
     )
-    def set_res_gen(model_run, configurations, res_gen):
+    def postproc_model_gen(model_run_json):
         """
-        Create the generation results data after a completed model run
+        Create the generation results for a completed model run.
         """
-        NUP = no_update
-        if model_run is None or configurations is None:
-            return NUP
-        model_run = json.loads(model_run)
-        configurations = json.loads(configurations)
-        model_uuid = model_run['model_uuid']
-
-        mdl = models.get(model_uuid)
-        if mdl is None:
-            # TODO: Work out how to handle this
-            return NUP
-
-        print ("making gen results")
-        gen_results = post_sprake_gen_results.gen_results_to_interface_sprake(mdl)
-
-        if res_gen is None:
-            res_gen = [None] * len(configurations)
-        else:
-            res_gen = json.loads(res_gen)
-            if len(res_gen) < len(configurations):
-                res_gen += [None] * (len(configurations) - len(res_gen))
-        
-        for i in range(len(configurations)):
-            if configurations[i]['model_uuid'] == model_uuid:
-                res_gen[i] = gen_results
-        
-        return json.dumps(res_gen)
-
+        return generic_model_postprocess(
+            model_run_json,
+            post_sprake_gen_results.gen_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['generation']
+        )
+    
     @app.callback(
         Output('res-stor', 'data'),
-        Input('store-model-completed-run', 'data'),
-        State('store-configurations', 'data'),
-        State('res-stor', 'data'),
-        prevent_initial_call=True
+        Input('trigger-postprocess-model-run', 'data'),
+        prevent_initial_call = True
     )
-    def set_res_stor(model_run, configurations, res_stor):
+    def postproc_model_stor(model_run_json):
         """
-        Create the storage results data after a completed model run
+        Create the storage results for a completed model run.
         """
-        NUP = no_update
-        if model_run is None or configurations is None:
-            return NUP
-        model_run = json.loads(model_run)
-        configurations = json.loads(configurations)
-        model_uuid = model_run['model_uuid']
-
-        mdl = models.get(model_uuid)
-        if mdl is None:
-            # TODO: Work out how to handle this
-            return NUP
-        
-        print ("making stor results")
-        stor_results = post_sprake_storage_results.stor_results_to_interface_sprake(mdl)
-
-        if res_stor is None:
-            res_stor = [None] * len(configurations)
-        else:
-            res_stor = json.loads(res_stor)
-            if len(res_stor) < len(configurations):
-                res_stor += [None] * (len(configurations) - len(res_stor))
-        
-        for i in range(len(configurations)):
-            if configurations[i]['model_uuid'] == model_uuid:
-                res_stor[i] = stor_results
-        
-        return json.dumps(res_stor)
+        return generic_model_postprocess(
+            model_run_json,
+            post_sprake_storage_results.stor_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['storage']
+        )
+    
+    @app.callback(
+        Output('res-cons', 'data'),
+        Input('trigger-postprocess-model-run', 'data'),
+        prevent_initial_call = True
+    )
+    def postproc_model_cons(model_run_json):
+        """
+        Create the consumption results for a completed model run.
+        """
+        return generic_model_postprocess(
+            model_run_json,
+            post_sprake_consumption_results.consumption_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['consumption']
+        )
 
     @app.callback(
         Output('res-cons', 'data'),
-        Input('store-model-completed-run', 'data'),
-        State('store-configurations', 'data'),
-        State('res-cons', 'data'),
-        prevent_initial_call=True
+        Input('trigger-postprocess-model-run', 'data'),
+        prevent_initial_call = True
     )
-    def set_res_cons(model_run, configurations, res_cons):
+    def postproc_model_cons(model_run_json):
         """
-        Create the consumption results data after a completed model run.
+        Create the net energy results for a completed model run.
         """
-        NUP = no_update
-        if model_run is None or configurations is None:
-            return NUP
-        model_run = json.loads(model_run)
-        configurations = json.loads(configurations)
-        model_uuid = model_run['model_uuid']
-
-        mdl = models.get(model_uuid)
-        if mdl is None:
-            # TODO: Work out how to handle this
-            return NUP
-
-        print ("making consumption results")
-        cons_results = post_sprake_consumption_results.consumption_results_to_interface_sprake(mdl)
-
-        if res_cons is None:
-            res_cons = [None] * len(configurations)
-        else:
-            res_cons = json.loads(res_cons)
-            if len(res_cons) < len(configurations):
-                res_cons += [None] * (len(configurations) - len(res_cons))
-        
-        for i in range(len(configurations)):
-            if configurations[i]['model_uuid'] == model_uuid:
-                res_cons[i] = cons_results
-        
-        return json.dumps(res_cons)
-
-    @app.callback(
-        Output('res-net', 'data'),
-        Input('store-model-completed-run', 'data'),
-        State('store-configurations', 'data'),
-        State('res-net', 'data'),
-        prevent_initial_call=True
-    )
-    def set_res_net(model_run, configurations, res_net):
-        """
-        Create the net energy results data after a completed model run.
-        """
-        NUP = no_update
-        if model_run is None or configurations is None:
-            return NUP
-        model_run = json.loads(model_run)
-        configurations = json.loads(configurations)
-        model_uuid = model_run['model_uuid']
-
-        mdl = models.get(model_uuid)
-        if mdl is None:
-            # TODO: Work out how to handle this
-            return NUP
-
-        print ("making net energy results")
-        net_results = post_sprake_net_results.net_results_to_interface_sprake(mdl)
-
-        if res_net is None:
-            res_net = [None] * len(configurations)
-        else:
-            res_net = json.loads(res_net)
-            if len(res_net) < len(configurations):
-                res_net += [None] * (len(configurations) - len(res_net))
-        
-        for i in range(len(configurations)):
-            if configurations[i]['model_uuid'] == model_uuid:
-                res_net[i] = net_results
-        
-        return json.dumps(res_net)
+        return generic_model_postprocess(
+            model_run_json,
+            post_sprake_net_results.net_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['net_energy']
+        )
 
     @app.callback(
         Output('res-finance-so-benefits', 'data'),
@@ -2937,15 +3041,22 @@ def add_result_header_callbacks(app):
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_generation_results_header(res, ann_hori_toggle, selected_config):
-        if res is None:
-            return no_update
-        res = json.loads(res)
+    def update_generation_results_header(
+        res_trigger, 
+        ann_hori_toggle, 
+        selected_config
+    ):
+        NUP = no_update
+        
         selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
-        if isinstance(res, list):
-            res = res[config_index]
+        model_id = selected_config['model_uuid']
+        res_id = RESULT_CACHE_PREFIXES['generation'] + str(model_id)
+        res = results.get(res_id)
+        if res is None:
+            return NUP
+
         gm = res.get('generator_meter_summary')
+        
         if ann_hori_toggle:
             str_1 = 'Total generation: '
             wind_ann = gm.get('wind_export').get('sum')
@@ -2956,6 +3067,7 @@ def add_result_header_callbacks(app):
             wind_ann = gm.get('wind_export').get('mean')
             pv_ann = gm.get('solar_export').get('mean')
             total_ann = wind_ann + pv_ann
+        
         return [
             str_1,
             get_icon('generation'),
@@ -2979,15 +3091,20 @@ def add_result_header_callbacks(app):
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_storage_results_header(res, ann_hori_toggle, selected_config):
-        if res is None:
-            return no_update
-        res = json.loads(res)
+    def update_storage_results_header(
+        res_trigger, 
+        ann_hori_toggle,
+        selected_config
+    ):
+        NUP = no_update
+
         selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
-        if isinstance(res, list):
-            res = res[config_index]
-        
+        model_id = selected_config['model_uuid']
+        res_id = RESULT_CACHE_PREFIXES['storage'] + str(model_id)
+        res = results.get(res_id)
+        if res is None:
+            return NUP
+
         hrs_full = res.get('stor_hours_at_max').get('hrs_at_max_soc')
         hrs_empty = res.get('stor_hours_at_min').get('hrs_at_min_soc')
         cc = res.get('no_charge_cycles').get('charge_cycles')
@@ -3017,14 +3134,19 @@ def add_result_header_callbacks(app):
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_consumption_results_header(res, ann_hori_toggle, selected_config):
-        if res is None:
-            return no_update
-        res = json.loads(res)
+    def update_consumption_results_header(
+        res_trigger, 
+        ann_hori_toggle, 
+        selected_config
+    ):
+        NUP = no_update
+        
         selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
-        if isinstance(res, list):
-            res = res[config_index]
+        model_id = selected_config['model_uuid']
+        res_id = RESULT_CACHE_PREFIXES['consumption'] + str(model_id)
+        res = results.get(res_id)
+        if res is None:
+            return NUP
         
         if ann_hori_toggle:
             str_1 = 'Total consumption: '
@@ -3054,14 +3176,19 @@ def add_result_header_callbacks(app):
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_net_results_header(res, ann_hori_toggle, selected_config):
-        if res is None:
-            return no_update
-        res = json.loads(res)
+    def update_net_results_header(
+        res_trigger,
+        ann_hori_toggle,
+        selected_config
+    ):
+        NUP = no_update
+        
         selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
-        if isinstance(res, list):
-            res = res[config_index]
+        model_id = selected_config['model_uuid']
+        res_id = RESULT_CACHE_PREFIXES['net_energy'] + str(model_id)
+        res = results.get(res_id)
+        if res is None:
+            return NUP
 
         if ann_hori_toggle:
             str_1 = 'Total export = '
@@ -3150,6 +3277,210 @@ def add_input_callbacks(app):
     """
 
     @app.callback(
+        Input('trigger-post-model-run', 'data'),
+        prevent_initial_call = True
+    )
+    def model_run_postprocess(model_run):
+        """
+        Postprocess and trigger updates from a completed model run.
+
+        A completed model run should result in the following actions:
+        1. For any configuration where the finance is associated with this 
+           model, queue up a finance run.
+        2. If the model is the model of the selected configuration, update the
+           main results.
+        3. Update the model results in the View.
+        """
+        return 
+
+    @app.callback(
+        Output('trigger-postprocess-finance-run', 'data'),
+        Output('latch-finances-checkedout', 'data', allow_duplicate = True),
+        Output('latch-finance-run-global', 'data', allow_duplicate = True),
+        Input('trigger-post-finance-run', 'data'),
+        State('latch-finances-checkedout', 'data'),
+        prevent_initial_call = True
+    )
+    def receiver_finance_run(
+        trigger_post_finance_run,
+        latch_finances_checkedout
+    ):
+        """
+        After a (background) finance run completes, resync the local finance.
+        """
+        finance_run = json.loads(trigger_post_finance_run)
+        finance_id = finance_run['finance_id']
+
+        # Sync with background cache
+        finances[finance_id] = finance_from_cache(finance_id)
+        # Ensure model is correct
+        finances[finance_id].model = get_model(finance_run['model_id'])
+
+        # Clear finance for editing
+        latch_finances_checkedout = set(json.loads(latch_finances_checkedout))
+        latch_finances_checkedout.remove(finance_id)
+
+        print('finance run did complete')
+        print(finance_run)
+
+        return (
+            trigger_post_finance_run,
+            json.dumps(list(latch_finances_checkedout)),
+            True,
+        )
+
+    @app.callback(
+        Output('trigger-post-finance-run', 'data'),
+        Input('trigger-finance-run', 'data'),
+        prevent_initial_call = True,
+        background = True,
+        manager = noncaching_background_callback_manager
+    )
+    def run_finance(finance_run_request):
+        finance_run = json.loads(finance_run_request)
+        model_id = finance_run['model_id']
+        finance_id = finance_run['finance_id']
+        mdl = model_from_cache(model_id)
+
+        fnc = finance_from_cache(finance_id)
+        # Suspect that if we don't do this, things will rapidly break
+        # unless the pickle serialises the model for the finance
+        # in which case, we may need to re-write the reduce function
+        fnc.model = mdl
+
+        # CREATE THE FINANCE RESULTS
+
+        # SYNCRONISE THE FINANCE
+        finances[finance_id] = fnc
+        finance_to_cache(finance_id)
+        
+        return finance_run_request
+
+    @app.callback(
+        Output('latch-finances-checkedout', 'data', allow_duplicate = True),
+        Output('latch-finance-run-global', 'data', allow_duplicate = True),
+        Output('trigger-finance-run', 'data'),
+        Input('dispatchitem-finance-run', 'data'),
+        State('latch-finances-checkedout', 'data'),
+        prevent_initial_call = True,
+    )
+    def dispatcher_finance_run(
+        dispatchitem_finance_run,
+        latch_finances_checkedout
+    ):
+        """
+        Handle a finance run request.
+
+        When a finance run request gets this far, it has been cleared for
+        running (i.e. it has passed any latches). It can therefore be
+        synchronised to the cache, soft-locked for configuration updates
+        by adding it to the checked-out list, and the trigger of the background
+        finance run can be fired.
+        """
+        if dispatchitem_finance_run is None:
+            return no_update, no_update, no_update
+        
+        finance_run = json.loads(dispatchitem_finance_run)
+
+        if isinstance(finance_run, list):
+            raise TypeError('Cannot handle a list of finance run requests')
+        
+        if latch_finances_checkedout is None:
+            latch_finances_checkedout = set()
+        else:
+            latch_finances_checkedout = set(json.loads(latch_finances_checkedout))
+        
+        # Model is synced to cache, but no need to lock
+        model_to_cache(finance_run['model_id'])
+
+        finance_to_cache(finance_run['finance_id'])
+        latch_finances_checkedout.add(finance_run['finance_id'])
+
+        return(
+            json.dumps(list(latch_finances_checkedout)),
+            False,
+            dispatchitem_finance_run
+        )
+
+    @app.callback(
+        Output('queue-finance-run', 'data'),
+        Output('dispatchitem-finance-run', 'data'),
+        Output('interval-finance-run', 'disabled'),
+        Input('prequeue-finance-run', 'data'),
+        Input('interval-finance-run', 'n_intervals'),
+        State('latch-models-checkedout', 'data'),
+        State('queue-finance-run', 'data'),
+        prevent_initial_call = True,
+    )
+    def queueman_finance_run(
+        prequeue_finance_run,
+        interval_finance_run,
+        latch_models_checkedout,
+        queue_finance_run
+    ):
+        """
+        Receives and dispatches finance runs.
+
+        On receiving (a) finance run request(s) through the prequeue, adds
+        it/them to the end of the finance run queue, after popping out any
+        existing requests for that finance to run.
+        The queue is then iterated through. If the finance is permitted to
+        be run (no latches apply) then it shall be removed from the queue
+        and dispatched.
+        The interval-finance-fun is enabled if the queue is not empty, forcing
+        a re-fire of this callback every second until the queue is cleared.
+        """
+        if not queue_finance_run:
+            queue_finance_run = []
+        else:
+            queue_finance_run = json.loads(queue_finance_run)
+        
+        if ctx.triggered_id == 'prequeue-finance-run':
+            requests = json.loads(prequeue_finance_run)
+            if isinstance(requests, list):
+                for finance_id in [x['finance_id'] for x in requests]:
+                    remove_indexes = (
+                        [i if x['finance_id']  == finance_id else None for i, x in enumerate(queue_finance_run)]
+                        .sort(reverse = True)
+                    )
+                    if remove_indexes:
+                        for i in remove_indexes:
+                            queue_finance_run.pop(i)
+                queue_finance_run += requests
+            else:
+                finance_id = requests['finance_id']
+                remove_indexes = (
+                    [i if x['finance_id']  == finance_id else None for i, x in enumerate(queue_finance_run)]
+                    .sort(reverse = True)
+                )
+                if remove_indexes:
+                    for i in remove_indexes:
+                        queue_finance_run.pop(i)
+                queue_finance_run.append(requests)
+
+            if latch_models_checkedout is None:
+                latch_models_checkedout = set()
+            else:
+                latch_models_checkedout = set(json.loads(latch_models_checkedout))
+            
+            for i, request in enumerate(queue_finance_run):
+                # Cannot run if model is checked out
+                if not request['model_id'] in latch_models_checkedout:
+                    dispatch_request = queue_finance_run.pop(i)
+
+                    return (
+                        json.dumps(queue_finance_run),
+                        json.dumps(dispatch_request),
+                        len(queue_finance_run) == 0,
+                    )
+            
+            return (
+                json.dumps(queue_finance_run),
+                no_update,
+                len(queue_finance_run) == 0
+            )
+
+    @app.callback(
         Output('trigger-postprocess-model-run', 'data'),
         Output('latch-models-checkedout', 'data', allow_duplicate = True),
         Output('latch-model-run-global', 'data', allow_duplicate = True),
@@ -3172,7 +3503,7 @@ def add_input_callbacks(app):
         
         # Clear model for editing
         latch_models_checkedout = set(json.loads(latch_models_checkedout))
-        latch_models_checkedout.remove(model_run['model_id'])
+        latch_models_checkedout.remove(model_id)
 
         print('model run did complete')
         print(model_run)
@@ -3285,14 +3616,20 @@ def add_input_callbacks(app):
             requests = json.loads(prequeue_model_run)
             if isinstance(requests, list):
                 for model_id in [x['model_id'] for x in requests]:
-                    remove_indexes = [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)].sort(reverse=True)
+                    remove_indexes = (
+                        [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)]
+                        .sort(reverse=True)
+                    )
                     if remove_indexes:
                         for i in remove_indexes:
                             queue_model_run.pop(i)
                 queue_model_run += requests
             else:
                 model_id = requests['model_id']
-                remove_indexes = [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)].sort(reverse=True)
+                remove_indexes = (
+                    [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)]
+                    .sort(reverse=True)
+                )
                 if remove_indexes:
                     for i in remove_indexes:
                         queue_model_run.pop(i)
@@ -3326,14 +3663,18 @@ def add_input_callbacks(app):
     
     @app.callback(
         Output('store-model-interface-configurations', 'data'),
+        Output('store-finance-interface-configurations', 'data'),
         Output('prequeue-model-run', 'data'),
+        Output('prequeue-finance-run', 'data'),
         Input('dispatchitem-action-user', 'data'),
         State('store-model-interface-configurations', 'data'),
+        State('store-finance-interface-configurations', 'data'),
         prevent_initial_call = True
     )
     def dispatcher_action_user(
         dispatchitem_action_user,
         store_model_interface_configurations,
+        store_finance_interface_configurations,
     ):
         """
         Handle a user action.
@@ -3363,15 +3704,24 @@ def add_input_callbacks(app):
                 store_model_interface_configurations
             )
 
+        if store_finance_interface_configurations is None:
+            store_finance_interface_configurations = {}
+        else:
+            store_finance_interface_configurations = json.loads(
+                store_finance_interface_configurations
+            )
+
         mdl_change_list = []
+        fnc_change_list = []
         
         lastmodel = None
+        lastfinance = None
         for action in dispatchitem_action_user:
             match action['type']:
                 case 'model_config_interface_update':
                     model_id = action['model_id']
                     
-                    # Avoid doing the get if mdl is already correctly assigned
+                    # Avoid doing the get if mdl_conf is already correctly assigned
                     if not lastmodel or lastmodel != model_id:
                         if model_id not in mdl_change_list:
                             mdl_change_list.append(model_id)
@@ -3388,11 +3738,33 @@ def add_input_callbacks(app):
                     if action['key_section'] is None:
                         mdl_conf.update(update_val)
                     else:
-                        if mdl_conf.get(action['key_section']) is None:
+                        if mdl_conf.get(action['key_section']) is None or action['key_section'] == 'None':
                             mdl_conf[action['key_section']] = {}
                         mdl_conf[action['key_section']].update(update_val)
                     
                     # We'll synchronise models once we've done all the updates
+                case 'finance_config_interface_update':
+                    finance_id = action['finance_id']
+
+                    # Avoid doing the get if fnc_conf is already correctly assigned
+                    if not lastfinance or lastfinance != finance_id:
+                        if finance_id not in fnc_change_list:
+                            fnc_change_list.append(finance_id)
+                        lastfinance = finance_id
+                        fnc_conf = store_finance_interface_configurations.get(finance_id, {})
+                        if not fnc_conf:
+                            # Empty dictionary returned - ensure key-val pair set
+                            store_finance_interface_configurations[finance_id] = fnc_conf
+                    
+                    update_val = {action['key']: action['val']}
+
+                    if action['key_section'] is None or action['key_section'] == 'None':
+                        fnc_conf.update(update_val)
+                    else:
+                        if fnc_conf.get(action['key_section']) is None:
+                            fnc_conf[action['key_section']] = {}
+                        fnc_conf[action['key_section']].update(update_val)
+                    # We'll synchronise finances once we've done all the updates
         
         mdl_run_list = []
         for model_id in mdl_change_list:
@@ -3406,12 +3778,34 @@ def add_input_callbacks(app):
             r_local_model_config = no_update
         else:
             r_local_model_config = json.dumps(store_model_interface_configurations)
+
+        fnc_run_list = []
+        for finance_id in fnc_change_list:
+            fnc_conf = store_finance_interface_configurations.get(finance_id)
+            fnc = get_finance(finance_id)
+            dirty = sync_local_finance_config_to_finance(fnc_conf, fnc)
+            if dirty:
+                # Need to store both the finance id and its associated model id,
+                # in case the model is locked
+                fnc_run_list.append((finance_id, fnc.model.uuid))
+
+        if len(fnc_change_list) == 0:
+            r_local_finance_config = no_update
+        else:
+            r_local_finance_config = json.dumps(store_finance_interface_configurations)
         
         if len(mdl_run_list) == 0:
             r_model_run_requests = no_update
         else:
             r_model_run_requests = json.dumps(
                 [browser.model_run_request(model_id) for model_id in mdl_run_list]
+            )
+
+        if len(fnc_run_list) == 0:
+            r_finance_run_requests = no_update
+        else:
+            r_finance_run_requests = json.dumps(
+                [browser.finance_run_request(finance_id, model_id) for finance_id, model_id in fnc_run_list]
             )
 
         print('models with local config change')
@@ -3421,10 +3815,13 @@ def add_input_callbacks(app):
 
         return (
             r_local_model_config,
+            r_local_finance_config,
             r_model_run_requests,
+            r_finance_run_requests
         )
 
     @app.callback(
+        Output('prequeue-action-user', 'data'),
         Output('queue-action-user', 'data'),
         Output('dispatchitem-action-user', 'data'),
         Output('interval-action-user', 'disabled'),
@@ -3496,47 +3893,91 @@ def add_input_callbacks(app):
                         action_indexes.reverse()
                         dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
                         dispatch_actions.reverse()
+                        
                         print('dispatching')
                         print(dispatch_actions)
+                        
                         return (
+                            None, # The prequeue is consumed
                             json.dumps(queue_action_user),
                             json.dumps(dispatch_actions),
                             len(queue_action_user) == 0 # Disable Interval
                         )
+                case 'finance_config_interface_update':
+                    # Currently, have no latches in place for finance.
+                    # Will go here when defined.
+
+                    # Collate actions relating to this finance
+                    action_indexes = [i]
+                    j = i + 1
+                    if j < len(queue_action_user):
+                        for j in range(i + 1, len(queue_action_user)):
+                            act_j = queue_action_user[j]
+                            if (
+                                act_j['type'] == 'finance_config_interface_update'
+                                and act_j['finance_id'] == action['finance_id']
+                            ):
+                                action_indexes.append(j)
+                    action_indexes.reverse()
+                    dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
+                    dispatch_actions.reverse()
+
+                    print('dispatching')
+                    print(dispatch_actions)
+
+                    return (
+                        None, # The prequeue is consumed
+                        json.dumps(queue_action_user),
+                        json.dumps(dispatch_actions),
+                        len(queue_action_user) == 0 # Disable Interval
+                    )
                 case _:
                     raise ValueError('action type not recognised: %s'.format(action['type']))
         
         # Fall-through - do not update dispatchitem-action-user
         return (
+            None, # The prequeue is consumed
             json.dumps(queue_action_user),
             no_update,
-            False
+            len(queue_action_user) == 0 # Disable Interval
         )
 
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
         Input({'type': 'input-model-config', 'section': ALL, 'key': ALL}, 'value'),
+        State('prequeue-action-user', 'data'),
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_model_config(inputs, selected_config):
-        # print ('A model config input field has changed')
-        # print (ctx.triggered)
+    def update_model_config(inputs, prequeue, selected_config):
+        """
+        Add model configuration update events to the user action prequeue.
+
+        May be fired before the queuemanager absorbs the prequeue, so needs
+        to ensure that the prequeue is appended, not overwritten.
+        In future, we may see if we can do this with a Patch - not sure how the
+        data are held, and it may be that we can just append a list rather than
+        full json deserialise/serialise.
+        """
         NUP = no_update
 
         selected_model = json.loads(selected_config).get('model_uuid', None)
         if selected_model is None:
             return NUP
+
+        if prequeue is None:
+            prequeue = []
+        else:
+            prequeue = json.loads(prequeue)
         
-        print('generation configuration input field changed')
+        print('model configuration input field changed')
         print(ctx.triggered)
 
         trig = ctx.triggered
-        rval = []
         for prop in trig:
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
-            rval.append(
+            prequeue.append(
                 browser.model_interface_action(
                     model_id = selected_model,
                     input_key = pid['key'],
@@ -3545,173 +3986,59 @@ def add_input_callbacks(app):
                 )
             )
         
-        if len(rval) == 0:
+        if len(prequeue) == 0:
             return NUP
-        return json.dumps(rval)
-
+        
+        return json.dumps(prequeue)
+    
     @app.callback(
-        Output('finance-config', 'data', allow_duplicate=True),
-        Input('cost-gen-wind-capex-input', 'value'),
-        Input('cost-gen-wind-recurrent-input', 'value'),
-        Input('cost-gen-pv-capex-input', 'value'),
-        Input('cost-gen-pv-recurrent-input', 'value'),
-        State('finance-config', 'data'),
+        Output('prequeue-action-user', 'data', allow_duplicate = True),
+        Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL}, 'value'),
+        State('prequeue-action-user', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_gen_costs(
-        gen_wind_capex,
-        gen_wind_recurrent,
-        gen_pv_capex,
-        gen_pv_recurrent,
-        fcfg
-    ):
-        if fcfg is None:
-            fcfg = {
-                'unit_costs': {}
-            }
+    def update_finance_config(inputs, prequeue, selected_config):
+        """
+        Add finance configuration update events to the user action prequeue.
+
+        May be fired before the queuemanager absorbs the prequeue, so needs
+        to ensure that the prequeue is appended, not overwritten.
+        In future, we may see if we can do this with a Patch - not sure how the
+        data are held, and it may be that we can just append a list rather than
+        full json deserialise/serialise.
+        """
+        NUP = no_update
+
+        selected_finance = json.loads(selected_config).get('finance_uuid', None)
+        if selected_finance is None:
+            return NUP
+        
+        if prequeue is None:
+            prequeue = []
         else:
-            fcfg = json.loads(fcfg)
+            prequeue = json.loads(prequeue)
+
+        print('finance configuration input field changed')
+        print(ctx.triggered)
+
+        trig = ctx.triggered
+        for prop in trig:
+            pid = json.loads(prop['prop_id'].rstrip('.value'))
+            val = prop['value']
+            prequeue.append(
+                browser.finance_interface_action(
+                    finance_id = selected_finance,
+                    input_key = pid['key'],
+                    input_value = val,
+                    key_section = pid['section']
+                )
+            )
         
-        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
-
-        if not gen_wind_capex is None:
-            unit_costs['wind_capex_per_kw'] = float(gen_wind_capex)
-        if not gen_wind_recurrent is None:
-            unit_costs['wind_om_per_kw_year'] = float(gen_wind_recurrent)
-        if not gen_pv_capex is None:
-            unit_costs['pv_capex_per_kw'] = float(gen_pv_capex)
-        if not gen_pv_recurrent is None:
-            unit_costs['pv_om_per_kw_year'] = float(gen_pv_recurrent)
+        if len(prequeue) == 0:
+            return NUP
         
-        if unit_costs == fcfg.get('unit_costs', {}):
-            return no_update
-        
-        fcfg['unit_costs'] = unit_costs
-        return json.dumps(fcfg)
-
-    @app.callback(
-        Output('finance-config', 'data', allow_duplicate=True),
-        Input('cost-stor-bess-capex-input', 'value'),
-        Input('cost-stor-bess-recurrent-input', 'value'),
-        State('finance-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_stor_costs(
-        stor_capex,
-        stor_recurrent,
-        fcfg
-    ):
-        if fcfg is None:
-            fcfg = {
-                'unit_costs': {}
-            }
-        else:
-            fcfg = json.loads(fcfg)
-
-        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
-
-        if not stor_capex is None:
-            unit_costs['bess_capex_per_kwh'] = float(stor_capex)
-        if not stor_recurrent is None:
-            unit_costs['bess_om_per_kwh_year'] = float(stor_recurrent)
-        
-        if unit_costs == fcfg.get('unit_costs', {}):
-            return no_update
-        
-        fcfg['unit_costs'] = unit_costs
-        return json.dumps(fcfg)
-
-    @app.callback(
-        Output('finance-config', 'data', allow_duplicate=True),
-        Input('cost-resident-sc-input', 'value'),
-        Input('cost-resident-var-input', 'value'),
-        Input('cost-export-var-input', 'value'),
-        State('finance-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_sales_costs(
-        resident_sc,
-        resident_var,
-        export_var,
-        fcfg
-    ):
-        if fcfg is None:
-            fcfg = {
-                'unit_costs': {}
-            }
-        else:
-            fcfg = json.loads(fcfg)
-
-        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
-
-        if not resident_sc is None:
-            unit_costs['resident_sc_per_unit_day'] = float(resident_sc)
-        if not resident_var is None:
-            unit_costs['resident_var_per_unit'] = float(resident_var)
-        if not export_var is None:
-            unit_costs['grid_export_var_per_unit'] = float(export_var)
-        
-        if unit_costs == fcfg.get('unit_costs', {}):
-            return no_update
-        
-        fcfg['unit_costs'] = unit_costs
-        return json.dumps(fcfg)
-
-    @app.callback(
-        Output('finance-config', 'data', allow_duplicate=True),
-        Input('cost-import-sc-input', 'value'),
-        Input('cost-import-var-input', 'value'),
-        State('finance-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_import_costs(
-        import_sc,
-        import_var,
-        fcfg
-    ):
-        if fcfg is None:
-            fcfg = {
-                'unit_costs': {}
-            }
-        else:
-            fcfg = json.loads(fcfg)
-
-        unit_costs = copy.copy(fcfg.get('unit_costs', {}))
-
-        if not import_sc is None:
-            unit_costs['grid_import_sc_per_day'] = float(import_sc)
-        if not import_var is None:
-            unit_costs['grid_import_var_per_unit'] = float(import_var)
-        
-        if unit_costs == fcfg.get('unit_costs', {}):
-            return no_update
-        
-        fcfg['unit_costs'] = unit_costs
-        return json.dumps(fcfg)
-
-    @app.callback(
-        Output('finance-config', 'data', allow_duplicate=True),
-        Input('fnc-benefit-dr-input', 'value'),
-        Input('fnc-cost-dr-input', 'value'),
-        State('finance-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_finance_settings(
-        benefit_dr,
-        cost_dr,
-        fcfg
-    ):
-        if fcfg is None:
-            fcfg = {}
-        else:
-            fcfg = json.loads(fcfg)
-
-        if not benefit_dr is None:
-            fcfg['benefit_discount_rate'] = float(benefit_dr) / 100.
-        if not cost_dr is None:
-            fcfg['cost_discount_rate'] = float(cost_dr) / 100.
-
-        return json.dumps(fcfg)
+        return json.dumps(prequeue)
     
     def sync_fcfg_to_model(fcfg: dict, fnc: sprakefinance.SprakeFinance) -> bool:
         """

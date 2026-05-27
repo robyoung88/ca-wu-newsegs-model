@@ -219,6 +219,8 @@ def create_numeric_card_input_compound_key(
     max = None,
     step = 1
 ):
+    if section is None:
+        section = 'None'
     
     input_id = {
         'type': type_id,
@@ -284,6 +286,24 @@ def model_interface_action(
         'time': input_time.timestamp(),
     }
 
+def finance_interface_action(
+    finance_id,
+    input_key,
+    input_value,
+    key_section = None,
+    input_time = None
+):
+    if input_time is None:
+        input_time = datetime.datetime.now()
+    return {
+        'type': 'finance_config_interface_update',
+        'finance_id': finance_id,
+        'key': input_key,
+        'val': input_value,
+        'key_section': key_section,
+        'time': input_time.timestamp(),
+    }
+
 def model_run_request(
     model_id,
     request_time = None
@@ -292,6 +312,20 @@ def model_run_request(
         request_time = datetime.datetime.now()
     return {
         'type': 'model_run_request',
+        'model_id': model_id,
+        'time': request_time.timestamp()
+    }
+
+def finance_run_request(
+    finance_id,
+    model_id,
+    request_time = None
+):
+    if request_time is None:
+        request_time = datetime.datetime.now()
+    return {
+        'type': 'finance_run_request',
+        'finance_id': finance_id,
         'model_id': model_id,
         'time': request_time.timestamp()
     }
