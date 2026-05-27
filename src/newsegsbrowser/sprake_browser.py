@@ -15,6 +15,12 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
 
+# At the moment, use a diskcache cache for transferring models 
+# regardless of background callback manager
+import diskcache
+from config import settings
+cache = diskcache.Cache(settings.get('DiskcacheCache', './cache'))
+
 # Manager for background callbacks
 if 'REDIS_URL' in os.environ:
     # Use Redis & Celery if REDIS_URL is set
@@ -29,17 +35,17 @@ if 'REDIS_URL' in os.environ:
 else:
     # Diskcache otherwise, for non-production and local dev.
     from dash import DiskcacheManager
-    import diskcache
-    from config import settings
 
-    cache = diskcache.Cache(settings.get('DiskcacheCache', './cache'))
-    background_callback_manager = DiskcacheManager(cache)
+    #cache = diskcache.Cache(settings.get('DiskcacheCache', './cache'))
+    background_callback_manager = DiskcacheManager(cache, cache_by = [lambda: launch_uid])
+    noncaching_background_callback_manager = DiskcacheManager(cache)
 
 from src.newsegsmodel import newsegsmodel
 from src.newsegsfinance import newsegsfinance
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
 
+from src.newsegsbrowser import common as browser
 from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
 from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
 from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
@@ -58,10 +64,30 @@ _CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
 with open(_CONST_FILE, 'r') as f:
     MODEL_CONSTANTS = json.load(f)
 
-# Globally accessible dictionaries of models and finances
-# These should be keyed by their uuids.
+launch_uid = uuid.uuid4()
+
+# Locally (to app, not background callback managed) accessible dictionaries
+# of models and finances. These should be keyed by their uuids.
 models = {}
 finances = {}
+
+def spawn_model():
+    return sprakemodel.SprakeModel.from_none()
+
+def get_model(model_id):
+    mdl = models.get(model_id, None)
+    if mdl is None:
+        mdl = spawn_model()
+        models[model_id] = mdl
+    return mdl
+
+def model_to_cache(model_id):
+    mdl = get_model(model_id)
+    cache[model_id] = mdl
+
+def model_from_cache(model_id):
+    mdl = cache.get(model_id)
+    return mdl
 
 def compose_configuration(
     name: str,
@@ -1002,10 +1028,26 @@ def create_generation_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('gen-wind', 'Wind Capacity (kW rated)', 'wind-capacity-input')    
+                        browser.create_numeric_card_input_compound_key(
+                            'gen-wind',
+                            'Wind Capacity (kW rated)',
+                            'input-model-config',
+                            'wind_capacity',
+                            section = 'gen_input',
+                            max = 10000,
+                            step = 5.0
+                        )    
                     ),
                     dbc.Row(
-                        create_numeric_card_input('gen-pv', 'Solar PV Capacity (kWp)', 'pv-capacity-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'gen-pv',
+                            'Solar PV Capacity (kWp)',
+                            'input-model-config',
+                            'pv_capacity',
+                            section = 'gen_input',
+                            max = 10000,
+                            step = 5.0
+                        )
                     )
                 ])
             ])
@@ -1748,6 +1790,47 @@ def create_layout():
                 dcc.Store(id='firstload-config-watcher'),
                 dcc.Store(id='live-config-watcher'),
 
+                ##### Queues
+                
+                # A queue of actions performed by the user
+                # Generally will hold changes to model and finance configurations
+                # to enact.
+                dcc.Store(id = 'queue-action-user'),
+                # A pre-queue holds individual actions on the way to the queue
+                # manager
+                dcc.Store(id = 'prequeue-action-user'),
+                # A dispatch object holds actions that may be handled by the
+                # dispatcher.
+                dcc.Store(id = 'dispatchitem-action-user'),
+                # An Interval element is necessary to trigger the queue until
+                # it is cleared
+                dcc.Interval(id = 'interval-action-user', interval = 1000, disabled = True),
+
+                # A queue of model run requests
+                # Will generally get added to when a configuration changes
+                # but the running of the model is latched off
+                dcc.Store(id = 'queue-model-run'),
+                # A pre-queue to transfer model run requests to the queue
+                # manager
+                dcc.Store(id = 'prequeue-model-run'),
+                # A dispatch object holding id of a model permitted to run
+                dcc.Store(id = 'dispatchitem-model-run'),
+                # Trigger object for the model run
+                dcc.Store(id = 'trigger-model-run'),
+                # Trigger object for relocalising model after run
+                dcc.Store(id = 'trigger-post-model-run'),
+                # An Interval element to trigger the queue until it is cleared
+                dcc.Interval(id = 'interval-model-run', interval = 1000, disabled = True),
+                # A store to trigger handling of model run completion
+                dcc.Store(id = 'trigger-postprocess-model-run'),
+
+                ##### Latches
+
+                # A global switch to disable model runs
+                dcc.Store(id = 'latch-model-run-global'),
+                # A list of checked-out models whose configuration cannot be updated
+                dcc.Store(id = 'latch-models-checkedout'),
+
                 # Updated when the model configuration is updated.
                 # Used to indicate that a new run is necessary to update results.
                 dcc.Store(id='model-config-watcher'),
@@ -1853,6 +1936,15 @@ def sprake_model_set_mc_input(mc_input: dict, mdl: sprakemodel.SprakeModel):
         ts.end = ts.end + pd.Timedelta(1, unit='d')
     mdl.set_run_period(ts)
 
+def sprake_model_set_loc_input(loc_input: dict, mdl: sprakemodel.SprakeModel):
+    loc_0 = mdl.location
+    loc = location.Location(
+        loc_input.get('lat', loc_0.lat),
+        loc_input.get('lon', loc_0.lon),
+        name = loc_input.get('name', loc_0.name)
+    )
+    mdl.location = loc
+
 def sprake_finance_set_finance_config(fcfg: dict, fnc: sprakefinance.SprakeFinance):
     fnc.set_unit_costs_from_dict(fcfg.get('unit_costs'))
     fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0))
@@ -1865,6 +1957,69 @@ def sprake_finance_to_interface_config(
     fcfg['finance_uuid'] = fnc.uuid
 
     return fcfg
+
+def sprake_model_to_local_model_config(
+    mdl: sprakemodel.SprakeModel
+) -> dict:
+    gen_input = {
+        'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
+        'pv_capacity': mdl.generation.generator.generators[1].nameplate_capacity
+    }
+
+    cs = mdl.consumption_storage
+
+    stor_input = cs.storage_params
+
+    spaceheat_p = cs.spaceheat_params
+    dhw_p = cs.dhw_params
+    app_p = cs.appliance_params
+    ev_p = cs.ev_params
+
+    bc_input = {
+        'n_units': cs.n_units,
+        'hlp': spaceheat_p.get('hlp'),
+        'gfa': spaceheat_p.get('gfa'),
+        'ref_daily_consumption': dhw_p.get('ref_daily_consumption'),
+        'seasonal_variance': dhw_p.get('seasonal_variance')
+    }
+
+    dc_input = {
+        'efficiency_reduction': app_p.get('efficiency_reduction'),
+        'annual_residential_consumption_per_ev': \
+            ev_p.get('annual_residential_consumption_per_ev'),
+        'n_evs_per_household': ev_p.get('n_evs') / cs.n_units
+    }
+
+    # Model config
+
+    # Note that we are only going to allow horizons in multiples
+    # of one year. I may allow the start date to vary later.
+    # As such, we are just going to take the horizon to be the
+    # difference in year between the start and end of the timespan
+    ts = mdl.get_run_period()
+    mc_input = {
+        'horizon': ts.end.year - ts.start.year
+    }
+
+    # Location config
+    loc = mdl.location
+    loc_input = {
+        'lat': loc.lat,
+        'lon': loc.lon,
+        'name': loc.name
+    }
+
+    mcfg = {
+        'model_uuid': mdl.uuid,
+        'gen_input': gen_input,
+        'stor_input': stor_input,
+        'bc_input': bc_input,
+        'dc_input': dc_input,
+        'mc_input': mc_input,
+        'loc_input': loc_input,
+    }
+
+    return mcfg
 
 def sprake_model_to_interface_configs(
     mdl: sprakemodel.SprakeModel, 
@@ -1998,11 +2153,7 @@ def add_initial_callback(app):
         configurations = json.loads(configurations)
         model_uuid = model_run['model_uuid']
         olist = []
-        print(configurations)
-        print(type(configurations))
         for i, conf in enumerate(configurations):
-            print(i)
-            print(conf)
             if conf['model_uuid'] == model_uuid:
                 olist.append({
                     'config_index': i,
@@ -2082,8 +2233,8 @@ def add_initial_callback(app):
     @app.callback(
         Output('gen-smry-wind-cap', 'children'),
         Output('gen-smry-pv-cap', 'children'),
-        Output('wind-capacity-input', 'value'),
-        Output('pv-capacity-input', 'value'),
+        Output({'type': 'input-model-config', 'section': 'gen_input', 'key': 'wind_capacity'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'gen_input', 'key': 'pv_capacity'}, 'value'),
         Input('model-config', 'data'),
         prevent_initial_call=True
     )
@@ -2917,36 +3068,406 @@ def add_input_callbacks(app):
     """
     Functions to synchronise configurations with inputs.
     """
+
     @app.callback(
-        Output('model-config', 'data', allow_duplicate=True),
-        Input('wind-capacity-input', 'value'),
-        Input('pv-capacity-input', 'value'),
-        State('model-config', 'data'),
+        Output('trigger-postprocess-model-run', 'data'),
+        Output('latch-models-checkedout', 'data', allow_duplicate = True),
+        Output('latch-model-run-global', 'data', allow_duplicate = True),
+        Input('trigger-post-model-run', 'data'),
+        State('latch-models-checkedout', 'data'),
+        prevent_initial_call = True
+    )
+    def receiver_model_run(
+        trigger_post_model_run,
+        latch_models_checkedout
+    ):
+        """
+        After a (background) model run completes, resync the local model.
+        """
+        model_run = json.loads(trigger_post_model_run)
+        model_id = model_run['model_id']
+        
+        # Sync with background cache
+        models[model_id] = model_from_cache(model_id)
+        
+        # Clear model for editing
+        latch_models_checkedout = set(json.loads(latch_models_checkedout))
+        latch_models_checkedout.remove(model_run['model_id'])
+
+        print('model run did complete')
+        print(model_run)
+
+        return (
+            trigger_post_model_run,
+            json.dumps(list(latch_models_checkedout)),
+            True,
+        )
+
+    @app.callback(
+        Output('trigger-post-model-run', 'data'),
+        Input('trigger-model-run', 'data'),
+        prevent_initial_call = True,
+        background = True,
+        manager = noncaching_background_callback_manager
+    )
+    def run_model(model_run_request):
+        model_run = json.loads(model_run_request)
+        model_id = model_run['model_id']
+        mdl = model_from_cache(model_id)
+        run_hash = mdl.run()
+        # Simply because of how to_cache is written, need to place model in
+        # local dict
+        models[model_id] = mdl
+        model_to_cache(model_id)
+        return model_run_request
+
+    @app.callback(
+        Output('latch-models-checkedout', 'data', allow_duplicate = True),
+        Output('latch-model-run-global', 'data', allow_duplicate = True),
+        Output('trigger-model-run', 'data'),
+        Input('dispatchitem-model-run', 'data'),
+        State('latch-models-checkedout', 'data'),
+        prevent_initial_call = True,
+    )
+    def dispatcher_model_run(
+        dispatchitem_model_run,
+        latch_models_checkedout,
+    ):
+        """
+        Handle a model run request.
+
+        When a model run request gets this far, it has been cleared for running
+        (i.e. it has passed any latches). It can therefore be synchronised to 
+        the cache, soft-locked for configuration updates by adding it to the
+        checked-out list, and the trigger for the background model run can be 
+        fired.
+        """
+        if dispatchitem_model_run is None:
+            return no_update, no_update, no_update
+        
+        model_run = json.loads(dispatchitem_model_run)
+
+        # No plan to handle a list of requests here
+        if isinstance(model_run, list):
+            raise TypeError('Cannot handle a list of model run requests.')
+        
+        if latch_models_checkedout is None:
+            latch_models_checkedout = set() # Empty set, not dict
+        else:
+            latch_models_checkedout = set(json.loads(latch_models_checkedout))
+
+        model_to_cache(model_run['model_id'])
+        latch_models_checkedout.add(model_run['model_id'])
+
+        print ('model dispatched to run')
+        print (model_run)
+
+        return (
+            json.dumps(list(latch_models_checkedout)),
+            False,
+            dispatchitem_model_run,
+        )
+
+    @app.callback(
+        Output('queue-model-run', 'data'),
+        Output('dispatchitem-model-run', 'data'),
+        Output('interval-model-run', 'disabled'),
+        Input('prequeue-model-run', 'data'),
+        Input('interval-model-run', 'n_intervals'),
+        State('latch-model-run-global', 'data'),
+        State('queue-model-run', 'data'),
+        prevent_initial_call = True
+    )
+    def queueman_model_run(
+        prequeue_model_run,
+        interval_model_run,
+        latch_model_run_global,
+        queue_model_run
+    ):
+        """
+        Receives and dispatches model runs.
+
+        On receiving (a) model run request(s) through the prequeue, will add 
+        it/them to the end of the model run queue, after popping out any 
+        existing requests for those models to run.
+        The queue is then iterated through. If the model is permitted to be
+        run (no latches apply) then it shall be removed from the queue and
+        dispatched.
+        The interval-model-run is enabled if the queue is not empty, forcing a
+        re-fire of this callback every second until the queue is cleared.
+        """
+        if not queue_model_run:
+            queue_model_run = []
+        else:
+            queue_model_run = json.loads(queue_model_run)
+        
+        if ctx.triggered_id == 'prequeue-model-run':
+            requests = json.loads(prequeue_model_run)
+            if isinstance(requests, list):
+                for model_id in [x['model_id'] for x in requests]:
+                    remove_indexes = [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)].sort(reverse=True)
+                    if remove_indexes:
+                        for i in remove_indexes:
+                            queue_model_run.pop(i)
+                queue_model_run += requests
+            else:
+                model_id = requests['model_id']
+                remove_indexes = [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)].sort(reverse=True)
+                if remove_indexes:
+                    for i in remove_indexes:
+                        queue_model_run.pop(i)
+                queue_model_run.append(requests)
+        
+        print ('checking run latches')
+
+        # Hope that this can be interpreted as a bool
+        if latch_model_run_global is None:
+            latch_model_run_global = True
+
+        print(latch_model_run_global)
+
+        if latch_model_run_global:
+            for i, request in enumerate(queue_model_run):
+                # There are no conditions, so we automatically run the first model
+                dispatch_request = queue_model_run.pop(i)
+                print('model run')
+                print(dispatch_request)
+                return (
+                    json.dumps(queue_model_run),
+                    json.dumps(dispatch_request),
+                    len(queue_model_run) == 0
+                )
+        
+        return (
+            json.dumps(queue_model_run),
+            no_update,
+            len(queue_model_run) == 0
+        )
+    
+    @app.callback(
+        Output('store-model-interface-configurations', 'data'),
+        Output('prequeue-model-run', 'data'),
+        Input('dispatchitem-action-user', 'data'),
+        State('store-model-interface-configurations', 'data'),
+        prevent_initial_call = True
+    )
+    def dispatcher_action_user(
+        dispatchitem_action_user,
+        store_model_interface_configurations,
+    ):
+        """
+        Handle a user action.
+
+        When a user action gets this far, it has been cleared for actioning
+        (i.e. it has passed any latches). This means that if it is a local 
+        model configuration change, that may now be applied into the local
+        configuration dictionary and the local copy of the model updated.
+        If we have a change to a model, then it will be necessary to queue
+        the model for running.
+        To allow processing of the queue efficiently, the dispatchitem-action-user
+        may be a list of actions for a single model, finance, or configuration.
+        All updates should be applied prior to the model run request being
+        sent.
+        """
+        if dispatchitem_action_user is None:
+            return no_update, no_update
+        
+        dispatchitem_action_user = json.loads(dispatchitem_action_user)
+        if not isinstance(dispatchitem_action_user, list):
+            dispatchitem_action_user = [dispatchitem_action_user]
+
+        if store_model_interface_configurations is None:
+            store_model_interface_configurations = {}
+        else:
+            store_model_interface_configurations = json.loads(
+                store_model_interface_configurations
+            )
+
+        mdl_change_list = []
+        
+        lastmodel = None
+        for action in dispatchitem_action_user:
+            match action['type']:
+                case 'model_config_interface_update':
+                    model_id = action['model_id']
+                    
+                    # Avoid doing the get if mdl is already correctly assigned
+                    if not lastmodel or lastmodel != model_id:
+                        if model_id not in mdl_change_list:
+                            mdl_change_list.append(model_id)
+                        lastmodel = model_id
+                        mdl_conf = store_model_interface_configurations.get(model_id, {})
+                        if not mdl_conf:
+                            # Empty dictionary returned - ensure key-val pair set
+                            store_model_interface_configurations[model_id] = mdl_conf
+
+                    # First update the interface conf
+                    update_val = {action['key']: action['val']}
+                    print('updating model')
+                    print(update_val)
+                    if action['key_section'] is None:
+                        mdl_conf.update(update_val)
+                    else:
+                        if mdl_conf.get(action['key_section']) is None:
+                            mdl_conf[action['key_section']] = {}
+                        mdl_conf[action['key_section']].update(update_val)
+                    
+                    # We'll synchronise models once we've done all the updates
+        
+        mdl_run_list = []
+        for model_id in mdl_change_list:
+            mdl_conf = store_model_interface_configurations.get(model_id)
+            mdl = get_model(model_id)
+            dirty = sync_local_model_config_to_model(mdl_conf, mdl)
+            if dirty:
+                mdl_run_list.append(model_id)
+        
+        if len(mdl_change_list) == 0:
+            r_local_model_config = no_update
+        else:
+            r_local_model_config = json.dumps(store_model_interface_configurations)
+        
+        if len(mdl_run_list) == 0:
+            r_model_run_requests = no_update
+        else:
+            r_model_run_requests = json.dumps(
+                [browser.model_run_request(model_id) for model_id in mdl_run_list]
+            )
+
+        print('models with local config change')
+        print(r_local_model_config)
+        print('models to request run')
+        print(r_model_run_requests)
+
+        return (
+            r_local_model_config,
+            r_model_run_requests,
+        )
+
+    @app.callback(
+        Output('queue-action-user', 'data'),
+        Output('dispatchitem-action-user', 'data'),
+        Output('interval-action-user', 'disabled'),
+        Input('prequeue-action-user', 'data'),
+        Input('interval-action-user', 'n_intervals'),
+        State('latch-models-checkedout', 'data'),
+        State('queue-action-user', 'data'),
+        prevent_initial_call = True
+    )
+    def queueman_action_user(
+        prequeue_action_user, 
+        interval_action_user,
+        latch_models_checkedout,
+        queue_action_user,
+    ):
+        """
+        Receives and dispatches user actions.
+
+        On receiving an action through the prequeue, will add it to the end
+        of the action queue.
+        If the action overrides any queued action, the queued action will
+        be removed.
+        The queue is then iterated through. If the action is permitted to
+        be dispatched, it shall be removed from the queue and dispatched.
+        A change to the latch conditions or a trigger through the postdispatch-trigger
+        will result in the queue being run through again.
+        """
+        if not queue_action_user:
+            queue_action_user = []
+        else:
+            queue_action_user = json.loads(queue_action_user)
+
+        print('action queue manager triggered by:')
+        print(ctx.triggered_id)
+        
+        if ctx.triggered_id == 'prequeue-action-user':
+            print('handling user action')
+            action = json.loads(prequeue_action_user)
+            print(action)
+            if isinstance(action, list):
+                queue_action_user += action
+            else:
+                queue_action_user.append(action)
+            
+            # TODO: Rationalise queue
+        
+        if latch_models_checkedout is None:
+            latch_models_checkedout = []
+        else:
+            latch_models_checkedout = set(json.loads(latch_models_checkedout))
+
+        # Loop through action queue
+        for i, action in enumerate(queue_action_user):
+            match action['type']:
+                case 'model_config_interface_update':
+                    if action['model_id'] not in latch_models_checkedout:
+                        # Have a positive dispatch
+                        # Find other appropriate actions
+                        action_indexes = [i]
+                        j = i + 1
+                        if j < len(queue_action_user):
+                            for j in range(i + 1, len(queue_action_user)):
+                                act_j = queue_action_user[j]
+                                if (
+                                    act_j['type'] == 'model_config_interface_update'
+                                    and act_j['model_id'] == action['model_id']
+                                ):
+                                    action_indexes.append(j)
+                        action_indexes.reverse()
+                        dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
+                        dispatch_actions.reverse()
+                        print('dispatching')
+                        print(dispatch_actions)
+                        return (
+                            json.dumps(queue_action_user),
+                            json.dumps(dispatch_actions),
+                            len(queue_action_user) == 0 # Disable Interval
+                        )
+                case _:
+                    raise ValueError('action type not recognised: %s'.format(action['type']))
+        
+        # Fall-through - do not update dispatchitem-action-user
+        return (
+            json.dumps(queue_action_user),
+            no_update,
+            False
+        )
+
+    @app.callback(
+        Output('prequeue-action-user', 'data', allow_duplicate = True),
+        Input({'type': 'input-model-config', 'section': ALL, 'key': ALL}, 'value'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_gen_config(wind_cap, pv_cap, mcfg):
+    def update_gen_config(inputs, selected_config):
         # print ('A model config input field has changed')
         # print (ctx.triggered)
-        if mcfg is None:
-            mcfg = {
-                'gen_input': {}
-            }
-        else:
-            mcfg = json.loads(mcfg)
+        NUP = no_update
 
-        gen_input = copy.copy(mcfg.get('gen_input', {}))
-
-        if not wind_cap is None:
-            gen_input['wind_capacity'] = float(wind_cap)
-        if not pv_cap is None:
-            gen_input['pv_capacity'] = float(pv_cap)
-
-        if (gen_input == mcfg['gen_input']):
-            return no_update
+        selected_model = json.loads(selected_config).get('model_uuid', None)
+        if selected_model is None:
+            return NUP
         
-        mcfg['gen_input'] = gen_input
+        print('generation configuration input field changed')
+        print(ctx.triggered)
 
-        return json.dumps(mcfg)
+        trig = ctx.triggered
+        rval = []
+        for prop in trig:
+            pid = json.loads(prop['prop_id'].rstrip('.value'))
+            val = prop['value']
+            rval.append(
+                browser.model_interface_action(
+                    model_id = selected_model,
+                    input_key = pid['key'],
+                    input_value = val,
+                    key_section = pid['section']
+                )
+            )
+        
+        if len(rval) == 0:
+            return NUP
+        return json.dumps(rval)
     
     @app.callback(
         Output('model-config', 'data', allow_duplicate=True),
@@ -3265,6 +3786,72 @@ def add_input_callbacks(app):
             dirty = True
         
         return dirty
+    
+    def sync_local_model_config_to_model(
+        local_model_config: dict,
+        mdl: sprakemodel.SprakeModel,
+    ) -> bool:
+        """
+        Pass a local model configuration dictionary into a Sprake model.
+
+        Returns a bool indicating whether a configuration has changed.
+        """
+        # Get the existing model configuration so we only update if we have
+        # changes
+        mcfg = local_model_config
+        w_mcfg = sprake_model_to_local_model_config(mdl)
+
+        if (
+            mcfg.get('gen_input') is not None
+            and w_mcfg.get('gen_input') != mcfg.get('gen_input')
+        ):
+            sprake_model_set_gen_input(mcfg.get('gen_input', {}), mdl)
+        
+        if (
+            mcfg.get('stor_input') is not None
+            and w_mcfg.get('stor_input') != mcfg.get('stor_input')
+        ):
+            sprake_model_set_stor_input(mcfg.get('stor_input', {}), mdl)
+
+        if (
+            mcfg.get('bc_input') is not None
+            and w_mcfg.get('bc_input') != mcfg.get('bc_input')
+        ):
+            sprake_model_set_bc_input(mcfg.get('bc_input', {}), mdl)
+        
+        if (
+            mcfg.get('dc_input') is not None
+            and w_mcfg.get('dc_input') != mcfg.get('dc_input')
+        ):
+            sprake_model_set_dc_input(mcfg.get('dc_input', {}), mdl)
+        
+        if (
+            mcfg.get('mc_input') is not None
+            and w_mcfg.get('mc_input') != mcfg.get('mc_input')
+        ):
+            sprake_model_set_mc_input(mcfg.get('mc_input', {}), mdl)
+        
+        if (
+            mcfg.get('loc_input') is not None
+            and w_mcfg.get('loc_input') != mcfg.get('loc_input')
+        ):
+            sprake_model_set_loc_input(mcfg.get('loc_input', {}), mdl)
+        
+        return mdl.dirty
+    
+    def sync_local_finance_config_to_finance(
+        local_finance_config: dict,
+        fnc: sprakefinance.SprakeFinance,
+    ) -> bool:
+        fcfg = local_finance_config
+        w_fcfg = sprake_finance_to_interface_config(fnc)
+
+        if (
+            fcfg is not None
+            and w_fcfg != fcfg
+        ):
+            sprake_finance_set_finance_config(fcfg, fnc)
+        return fnc.dirty
 
     def sync_configs_to_model(
         mcfg: dict,
@@ -3275,28 +3862,11 @@ def add_input_callbacks(app):
         """
         Pass the configuration dictionaries into the Sprake model
         """
-        # Get the existing configs to check against
-        w_mcfg, w_fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
-        if not w_mcfg.get('gen_input') == mcfg.get('gen_input'):
-            sprake_model_set_gen_input(mcfg.get('gen_input', {}), mdl)
+        mdl_dirty = sync_local_model_config_to_model(mcfg, mdl)
+        fnc_dirty = sync_local_finance_config_to_finance(fcfg, fnc)
         
-        if not w_mcfg.get('stor_input') == mcfg.get('stor_input'):
-            sprake_model_set_stor_input(mcfg.get('stor_input', {}), mdl)
-
-        if not w_mcfg.get('bc_input') == mcfg.get('bc_input'):
-            sprake_model_set_bc_input(mcfg.get('bc_input', {}), mdl)
-        
-        if not w_mcfg.get('dc_input') == mcfg.get('dc_input'):
-            sprake_model_set_dc_input(mcfg.get('dc_input', {}), mdl)
-        
-        if not w_mcfg.get('mc_input') == mcfg.get('mc_input'):
-            sprake_model_set_mc_input(mcfg.get('mc_input', {}), mdl)
-
-        if not w_fcfg == fcfg:
-            sprake_finance_set_finance_config(fcfg, fnc)
-        
-        return mdl.dirty, fnc.dirty
+        return mdl_dirty, fnc_dirty
 
     @app.callback(
         Output('finance-config-watcher', 'data', allow_duplicate=True),
@@ -3447,7 +4017,7 @@ def create_app(external_stylesheets=None):
         return models.get(model_uuid, None)
     
     def remove_model(model_uuid: str):
-        return models.pop(model_uuid, None())
+        return models.pop(model_uuid, None)
 
     app.add_new_model = add_new_model
     app.duplicate_model = duplicate_model
@@ -3483,7 +4053,7 @@ def create_app(external_stylesheets=None):
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)
 
-    app = add_model_from_hash_method(app)
+    #app = add_model_from_hash_method(app)
     return app
 
 # Commented out to prevent PyLint complaining about use of the name "app" in argument lists
