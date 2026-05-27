@@ -1074,7 +1074,15 @@ def create_storage_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row([
-                        create_numeric_card_input('storage', 'Storage Capacity (kWh)', 'stor-capacity-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'storage',
+                            'Storage Capacity (kWh)',
+                            'input-model-config',
+                            'storage_capacity',
+                            section = 'stor_input',
+                            max = 10000,
+                            step = 5.0
+                        ),
                     ])
                 ])
             ])
@@ -1101,20 +1109,60 @@ def create_building_consumption_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row([
-                        create_numeric_card_input('consumption-building-nunits', 'No. of households', 'bc-n-unit-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-building-nunits',
+                            'No. of households',
+                            'input-model-config',
+                            'n_units',
+                            section = 'bc_input',
+                            max = 1000,
+                            step = 1
+                        ),
                     ]),
                     dbc.Row([
-                        create_numeric_card_input('consumption-building-hlp', 'HLP (W/m²/K)', 'bc-hlp-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-building-hlp',
+                            'HLP (W/m²/K)',
+                            'input-model-config',
+                            'hlp',
+                            section = 'bc_input',
+                            max = 3.0,
+                            step = 0.1
+                        ),
                     ]),
                     dbc.Row([
-                        create_numeric_card_input('consumption-building-gfa', 'Mean GFA (m²/household)', 'bc-gfa-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-building-gfa',
+                            'Mean GFA (m²/household)',
+                            'input-model-config',
+                            'gfa',
+                            section = 'bc_input',
+                            max = 300,
+                            step = 1
+                        ),
                     ]),
                     # TODO: Output Fabric Energy Efficiency here
                     dbc.Row([
-                        create_numeric_card_input('consumption-building-dhw-ref', 'Reference hot water demand (kWh/day)', 'bc-dhw-ref-daily-cons-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-building-dhw-ref',
+                            'Reference hot water demand (kWh/day)',
+                            'input-model-config',
+                            'ref_daily_consumption',
+                            section = 'bc_input',
+                            max = 10.0,
+                            step = 0.1
+                        ),
                     ]),
                     dbc.Row([
-                        create_numeric_card_input('consumption-building-dhw-var', 'Seasonal variation (%)', 'bc-dhw-seasonal-variance-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-building-dhw-var',
+                            'Seasonal variation (%)',
+                            'input-model-config',
+                            'seasonal_variance',
+                            section = 'bc_input',
+                            max = 100.0,
+                            step = 1
+                        ),
                     ])
                     # TODO: Output annual DHW demand
                 ])
@@ -1147,13 +1195,39 @@ def create_direct_consumption_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('consumption-direct-appliance-reduction', 'High-efficiency appliances consumption reduction (fraction)', 'dc-app-efficiency-reduction-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-direct-appliance-reduction',
+                            'High-efficiency appliances consumption reduction (fraction)',
+                            'input-model-config',
+                            'efficiency_reduction',
+                            section = 'dc_input',
+                            max = 1,
+                            step = 0.05
+                        )
                     ),
                     dbc.Row(
-                        create_numeric_card_input('consumption-direct-ev-anncharge', 'Residential charging per EV (kWh/yr)', 'ev-ann-charge-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-direct-ev-anncharge',
+                            'Residential charging per EV (kWh/yr)',
+                            'input-model-config',
+                            'annual_residential_consumption_per_ev',
+                            section = 'dc_input',
+                            max = 4000,
+                            step = 0.05,
+                            placeholder = 2000
+                        )
                     ),
                     dbc.Row(
-                        create_numeric_card_input('consumption-direct-ev-nperunit', 'EVs per household (n)', 'ev-per-unit-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'consumption-direct-ev-nperunit',
+                            'EVs per household (n)',
+                            'input-model-config',
+                            'n_evs_per_household',
+                            section = 'dc_input',
+                            max = 3,
+                            step = 0.05,
+                            placeholder = 0.2
+                        )
                     ),
                 ])
             ])
@@ -1343,9 +1417,15 @@ def create_model_settings_input_card():
                 html.Summary(""),
                 html.Div([
                     dbc.Row(
-                        create_numeric_card_input('model-settings-time-horizon',
-                                                  'Time horizon (years)',
-                                                  'mdl-timehorizon-input')
+                        browser.create_numeric_card_input_compound_key(
+                            'model-settings-time-horizon',
+                            'Time horizon (years)',
+                            'input-model-config',
+                            'horizon',
+                            section = 'mc_input',
+                            max = 10,
+                            step = 1
+                        )
                     ),
                 ])
             ])
@@ -2252,7 +2332,7 @@ def add_initial_callback(app):
 
     @app.callback(
         Output('stor-smry-cap', 'children'),
-        Output('stor-capacity-input', 'value'),
+        Output({'type': 'input-model-config', 'section': 'stor_input', 'key': 'storage_capacity'}, 'value'),
         Input('model-config','data'),
         prevent_initial_call=True
     )
@@ -2268,11 +2348,11 @@ def add_initial_callback(app):
 
     @app.callback(
         Output('bc-smry-n-units', 'children'),
-        Output('bc-n-unit-input', 'value'),
-        Output('bc-hlp-input', 'value'),
-        Output('bc-gfa-input', 'value'),
-        Output('bc-dhw-ref-daily-cons-input', 'value'),
-        Output('bc-dhw-seasonal-variance-input', 'value'),
+        Output({'type': 'input-model-config', 'section': 'bc_input', 'key': 'n_units'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'bc_input', 'key': 'hlp'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'bc_input', 'key': 'gfa'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'bc_input', 'key': 'ref_daily_consumption'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'bc_input', 'key': 'seasonal_variance'}, 'value'),
         Input('model-config', 'data'),
         prevent_initial_call=True
     )
@@ -2291,9 +2371,9 @@ def add_initial_callback(app):
         )
 
     @app.callback(
-        Output('dc-app-efficiency-reduction-input', 'value'),
-        Output('ev-ann-charge-input', 'value'),
-        Output('ev-per-unit-input', 'value'),
+        Output({'type': 'input-model-config', 'section': 'dc_input', 'key': 'efficiency_reduction'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'dc_input', 'key': 'annual_residential_consumption_per_ev'}, 'value'),
+        Output({'type': 'input-model-config', 'section': 'dc_input', 'key': 'n_evs_per_household'}, 'value'),
         Output('cons-smry-app','children'),
         Output('cons-smry-ev','children'),
         Input('model-config', 'data'),
@@ -2417,7 +2497,7 @@ def add_initial_callback(app):
 
     @app.callback(
         Output('mdl-smry-horizon', 'children'),
-        Output('mdl-timehorizon-input', 'value'),
+        Output({'type': 'input-model-config', 'section': 'mc_input', 'key': 'horizon'}, 'value'),
         Input('model-config', 'data'),
         prevent_initial_call=True
     )
@@ -3439,7 +3519,7 @@ def add_input_callbacks(app):
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_gen_config(inputs, selected_config):
+    def update_model_config(inputs, selected_config):
         # print ('A model config input field has changed')
         # print (ctx.triggered)
         NUP = no_update
@@ -3468,119 +3548,6 @@ def add_input_callbacks(app):
         if len(rval) == 0:
             return NUP
         return json.dumps(rval)
-    
-    @app.callback(
-        Output('model-config', 'data', allow_duplicate=True),
-        Input('stor-capacity-input', 'value'),
-        State('model-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_stor_config(stor_cap, mcfg):
-        # print ('A storage config input field has changed')
-        # print (ctx.triggered)
-        if mcfg is None:
-            mcfg = {
-                'stor_input': {}
-            }
-        else:
-            mcfg = json.loads(mcfg)
-
-        stor_input = copy.copy(mcfg.get('stor_input', {}))
-
-        if not stor_cap is None:
-            stor_input['storage_capacity'] = float(stor_cap)
-        
-        if stor_input == mcfg.get('stor_input', {}):
-            return no_update
-        
-        mcfg['stor_input'] = stor_input
-        return json.dumps(mcfg)
-
-    @app.callback(
-        Output('model-config', 'data', allow_duplicate=True),
-        Input('bc-n-unit-input', 'value'),
-        Input('bc-hlp-input', 'value'),
-        Input('bc-gfa-input', 'value'),
-        Input('bc-dhw-ref-daily-cons-input', 'value'),
-        Input('bc-dhw-seasonal-variance-input', 'value'),
-        State('model-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_bc_config(
-        bc_n_unit,
-        bc_hlp,
-        bc_gfa,
-        bc_dhw_ref_daily_cons,
-        bc_dhw_seasonal_variance,
-        mcfg
-    ):
-        # print ('A building consumption input field has changed')
-        # print (ctx.triggered)
-
-        if mcfg is None:
-            mcfg = {
-                'bc_input': {}
-            }
-        else:
-            mcfg = json.loads(mcfg)
-        
-        bc_input = copy.copy(mcfg.get('bc_input', {}))
-
-        if not bc_n_unit is None:
-            bc_input['n_units'] = float(bc_n_unit)
-        if not bc_hlp is None:
-            bc_input['hlp'] = float(bc_hlp)
-        if not bc_gfa is None:
-            bc_input['gfa'] = float(bc_gfa)
-        if not bc_dhw_ref_daily_cons is None:
-            bc_input['ref_daily_consumption'] = bc_dhw_ref_daily_cons
-        if not bc_dhw_seasonal_variance is None:
-            bc_input['seasonal_variance'] = bc_dhw_seasonal_variance
-        
-        if bc_input == mcfg.get('bc_input', {}):
-            return no_update
-        
-        mcfg['bc_input'] = bc_input
-        return json.dumps(mcfg)
-
-    @app.callback(
-        Output('model-config', 'data', allow_duplicate=True),
-        Input('dc-app-efficiency-reduction-input', 'value'),
-        Input('ev-ann-charge-input', 'value'),
-        Input('ev-per-unit-input', 'value'),
-        State('model-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_dc_config(
-        dc_app_efficiency_reduction,
-        ev_ann_charge,
-        ev_per_unit,
-        mcfg
-    ):
-        # print ('A direct consumption input field has changed')
-        # print (ctx.triggered)
-
-        if mcfg is None:
-            mcfg = {
-                'bc_input': {}
-            }
-        else:
-            mcfg = json.loads(mcfg)
-        
-        dc_input = copy.copy(mcfg.get('dc_input', {}))
-
-        if not dc_app_efficiency_reduction is None:
-            dc_input['efficiency_reduction'] = float(dc_app_efficiency_reduction)
-        if not ev_ann_charge is None:
-            dc_input['annual_residential_consumption_per_ev'] = float(ev_ann_charge)
-        if not ev_per_unit is None:
-            dc_input['n_evs_per_household'] = float(ev_per_unit)
-        
-        if dc_input == mcfg.get('dc_input', {}):
-            return no_update
-        
-        mcfg['dc_input'] = dc_input
-        return json.dumps(mcfg)
 
     @app.callback(
         Output('finance-config', 'data', allow_duplicate=True),
@@ -3721,34 +3688,6 @@ def add_input_callbacks(app):
         
         fcfg['unit_costs'] = unit_costs
         return json.dumps(fcfg)
-
-    @app.callback(
-        Output('model-config', 'data', allow_duplicate=True),
-        Input('mdl-timehorizon-input', 'value'),
-        State('model-config', 'data'),
-        prevent_initial_call=True
-    )
-    def update_model_settings(
-        timehorizon,
-        mcfg
-    ):
-        if mcfg is None:
-            mcfg = {
-                'mc_input': {}
-            }
-        else:
-            mcfg = json.loads(mcfg)
-        
-        mc_input = copy.copy(mcfg.get('mc_input', {}))
-
-        if not timehorizon is None:
-            mc_input['horizon'] = int(timehorizon)
-        
-        if mc_input == mcfg.get('mc_input', {}):
-            return no_update
-        
-        mcfg['mc_input'] = mc_input
-        return json.dumps(mcfg)
 
     @app.callback(
         Output('finance-config', 'data', allow_duplicate=True),
