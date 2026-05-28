@@ -2356,7 +2356,7 @@ def add_initial_callback(app):
         Input('firstload-config-watcher', 'data'),
         #Input('live-config-watcher', 'data'),
         Input('store-selected-configuration', 'data'),
-        State('store-configurations', 'data'),
+        Input('store-configurations', 'data'),
         prevent_initial_call=True
     )
     def sync_config(_, selected_config, all_configs):
@@ -2401,7 +2401,7 @@ def add_initial_callback(app):
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
         print('at end of switch we have:')
-        print(f'benefit discount rate is {fcfg['benefit_discount_rate']}')
+        print(mdl.dirty)
 
         return (
             json.dumps(selected_config),
@@ -2666,10 +2666,14 @@ def get_model_result_list(prefix, configs):
     return [results.get(get_model_result_id(prefix, x['model_uuid'])) for x in configs]
 
 def get_finance_result_list(prefix, configs):
-   return [results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])) for x in configs]
+    print(f'getting {prefix}')
+    for x in configs:
+        print(f'searching {get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])}')
+        print(f'returning {type(results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])))}')
+    return [results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])) for x in configs]
 
 def generic_model_postprocess(
-    model_run_json,
+    model_run,
     postprocess_function,
     result_id_prefix
 ):
@@ -2677,10 +2681,17 @@ def generic_model_postprocess(
     Run a postprocess function on a model and store in the results cache.
     """
     NUP = no_update
-    if model_run_json is None:
+    if model_run is None:
         return NUP
     
-    model_run = json.loads(model_run_json)
+    model_run_0 = copy.copy(model_run)
+
+    if isinstance(model_run, str):
+        model_run = json.loads(model_run)
+    
+    if isinstance(model_run, list):
+        return [generic_model_postprocess(x, postprocess_function, result_id_prefix) for x in model_run]
+
     model_id = model_run['model_id']
     mdl = get_model(model_id)
     
@@ -2696,18 +2707,25 @@ def generic_model_postprocess(
     postproc_results['run_hash'] = run_hash
     results[result_id] = postproc_results
 
-    return model_run_json
+    return model_run_0
 
 def generic_finance_postprocess(
-    finance_run_json,
+    finance_run,
     postprocess_function,
     result_id_prefix
 ):
     NUP = no_update
-    if finance_run_json is None:
+    if finance_run is None:
         return NUP
     
-    finance_run = json.loads(finance_run_json)
+    finance_run_0 = copy.copy(finance_run)
+
+    if isinstance(finance_run, str):
+        finance_run = json.loads(finance_run)
+    
+    if isinstance(finance_run, list):
+        return [generic_finance_postprocess(x, postprocess_function, result_id_prefix) for x in finance_run]
+    
     model_id = finance_run['model_id']
     finance_id = finance_run['finance_id']
     mdl = get_model(model_id)
@@ -2726,7 +2744,7 @@ def generic_finance_postprocess(
     #print(postproc_results)
     results[result_id] = postproc_results
 
-    return finance_run_json
+    return finance_run_0
 
 def add_result_callbacks(app):
     """
@@ -3414,6 +3432,7 @@ def add_input_callbacks(app):
         fnc.model = mdl
 
         # CREATE THE FINANCE RESULTS
+        fnc.dirty = False
 
         # SYNCRONISE THE FINANCE
         finances[finance_id] = fnc
@@ -3731,6 +3750,8 @@ def add_input_callbacks(app):
         Output('store-finance-interface-configurations', 'data'),
         Output('prequeue-model-run', 'data'),
         Output('prequeue-finance-run', 'data'),
+        Output('trigger-postprocess-model-run', 'data'),
+        Output('trigger-postprocess-finance-run', 'data'),
         Input('dispatchitem-action-user', 'data'),
         State('store-model-interface-configurations', 'data'),
         State('store-finance-interface-configurations', 'data'),
@@ -3755,8 +3776,9 @@ def add_input_callbacks(app):
         All updates should be applied prior to the model run request being
         sent.
         """
+        NUP = no_update, no_update, no_update, no_update, no_update, no_update
         if dispatchitem_action_user is None:
-            return no_update, no_update
+            return NUP
         
         dispatchitem_action_user = json.loads(dispatchitem_action_user)
         if not isinstance(dispatchitem_action_user, list):
@@ -3838,11 +3860,16 @@ def add_input_callbacks(app):
             if dirty:
                 mdl_run_list.append(model_id)
         
+        # Need to perform a manual trigger of the postprocess (for header updates)
+        # even if no model runs have occurred
+        r_trigger_postprocess_model_run = no_update
         if len(mdl_change_list) == 0:
             r_local_model_config = no_update
         else:
             r_local_model_config = json.dumps(store_model_interface_configurations)
-
+            if len(mdl_run_list) == 0:
+                r_trigger_postprocess_model_run = json.dumps([browser.model_run_request(model_id) for model_id in mdl_change_list])
+        
         fnc_run_list = []
         for finance_id in fnc_change_list:
             fnc_conf = store_finance_interface_configurations.get(finance_id)
@@ -3853,10 +3880,16 @@ def add_input_callbacks(app):
                 # in case the model is locked
                 fnc_run_list.append((finance_id, fnc.model.uuid))
 
+        # Need to perform a manual trigger of the postprocess (for header updates)
+        # even if no finance runs have occurred
+        r_trigger_postprocess_finance_run = no_update
         if len(fnc_change_list) == 0:
             r_local_finance_config = no_update
         else:
             r_local_finance_config = json.dumps(store_finance_interface_configurations)
+            if len(fnc_run_list) == 0:
+                r_trigger_postprocess_finance_run = json.dumps([browser.finance_run_request(finance_id, get_finance(finance_id).model.uuid) for finance_id in fnc_change_list])
+
         
         if len(mdl_run_list) == 0:
             r_model_run_requests = no_update
@@ -3885,7 +3918,9 @@ def add_input_callbacks(app):
             r_local_model_config,
             r_local_finance_config,
             r_model_run_requests,
-            r_finance_run_requests
+            r_finance_run_requests,
+            r_trigger_postprocess_model_run,
+            r_trigger_postprocess_finance_run
         )
 
     @app.callback(
@@ -4255,17 +4290,27 @@ def create_app(external_stylesheets=None):
         ref = models.get(model_uuid, None)
         if ref is None:
             return None
-        return add_new_model(ref)
+        mdl = add_new_model(ref)
+        new_model_id = mdl.uuid
+        # Copy over any results
+        for res_class in ['generation', 'storage', 'consumption', 'net_energy']:
+            ref_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], model_uuid)
+            new_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], new_model_id)
+            results[new_id] = results.get(ref_id)
+
+        return mdl
     
     def get_model(model_uuid: str):
         return models.get(model_uuid, None)
     
     def remove_model(model_uuid: str):
+        cache.delete(model_uuid)
         return models.pop(model_uuid, None)
 
     app.add_new_model = add_new_model
     app.duplicate_model = duplicate_model
     app.get_model = get_model
+    app.remove_model = remove_model
 
     def add_new_finance(ref: newsegsfinance.NewsegsFinance | None = None):
         if ref is None:
@@ -4275,24 +4320,36 @@ def create_app(external_stylesheets=None):
         finances[fnc.uuid] = fnc
         return fnc
     
-    def duplicate_finance(finance_uuid: str):
+    def duplicate_finance(finance_uuid: str, model_uuid: str|None = None):
         ref = finances.get(finance_uuid, None)
         if ref is None:
             return None
-        model_uuid = ref.model.uuid
+        
+        ref_model_uuid = ref.model.uuid
+        if not model_uuid:
+            model_uuid = ref_model_uuid
         fnc = add_new_finance(ref)
         fnc.model = models.get(model_uuid, None)
+
+        # Copy over any results
+        for res_class in ['finance_benefits_so', 'finance_costs_so', 'finance_value_so']:
+            ref_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], ref.uuid, ref_model_uuid)
+            new_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], fnc.uuid, model_uuid)
+            results[new_id] = results.get(ref_id)
+
         return fnc
     
     def get_finance(finance_uuid: str):
         return finances.get(finance_uuid, None)
     
     def remove_finance(finance_uuid: str):
+        cache.delete(finance_uuid)
         return finances.pop(finance_uuid, None)
 
     app.add_new_finance = add_new_finance
     app.duplicate_finance = duplicate_finance
     app.get_finance = get_finance
+    app.remove_finance = remove_finance
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)

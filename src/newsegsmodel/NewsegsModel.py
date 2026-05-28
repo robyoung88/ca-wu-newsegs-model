@@ -43,7 +43,7 @@ class NewsegsModel(metaclass=ABCMeta):
     passed down
     """
 
-    _dirty_flag = False
+    _dirty = False
     _name = 'NewSEGS Model'
     _last_hash = 1
     last_run = datetime.datetime.now()
@@ -201,7 +201,7 @@ class NewsegsModel(metaclass=ABCMeta):
             self.generation.dirty or
             self.grid.dirty or
             self.consumption_storage.dirty or
-            self._dirty_flag
+            self._dirty
         )
 
     def to_dict(self) -> Mapping:

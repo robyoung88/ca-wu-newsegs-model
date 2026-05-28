@@ -271,7 +271,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         if name is not None:
             self.name = name
 
-        self._dirty_flag = True
+        self._dirty = True
 
     @__init__.register(str)
     def _from_str(
@@ -299,7 +299,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
         self._run_period = modtimespan.RegTimeSpan(timespan)
         self._run_period.timestep = self._default_timestep
-        self._dirty_flag = True
+        self._dirty = True
 
     def get_run_period(self) -> modtimespan.TimeSpan:
         return self._run_period
@@ -388,7 +388,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._generation_result = self._mod_gen.run(self._run_period)
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)
-        self._dirty_flag = False
+        self._dirty = False
         
         self._last_hash = hash((self.uuid, str(self.last_run)))
         return self._last_hash
@@ -472,4 +472,4 @@ def _SprakeModel_from_other(
 
     self._default_timestep = other.get_default_timestep()
     self.set_run_period(other.get_run_period())
-    self._dirty_flag = True
+    self._dirty = True

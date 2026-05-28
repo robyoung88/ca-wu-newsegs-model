@@ -297,18 +297,30 @@ def add_configuration_selection_callbacks(app):
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
 
         #Output('live-config-watcher', 'data', allow_duplicate = True),
-        Output('store-model-completed-run', 'data', allow_duplicate=True),
+        #Output('store-model-completed-run', 'data', allow_duplicate=True),
 
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data', allow_duplicate = True),
+
+        Output('store-model-interface-configurations', 'data'),
+        Output('store-finance-interface-configurations', 'data'),
         
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
         State('store-configurations', 'data'),
         State('store-selected-configuration', 'data'),
 
+        State('store-model-interface-configurations', 'data'),
+        State('store-finance-interface-configurations', 'data'),
+
         prevent_initial_call=True
     )
-    def add_duplicate_config(n_clicks, configurations, selected_config):
+    def add_duplicate_config(
+        n_clicks, 
+        configurations, 
+        selected_config,
+        store_model_interface_configurations,
+        store_finance_interface_configurations
+    ):
         # Add the selector as the penultimate row
         if configurations is None:
             raise PreventUpdate()
@@ -322,6 +334,8 @@ def add_configuration_selection_callbacks(app):
             [no_update] * n_conf, 
             [no_update] * n_conf, 
             #no_update, 
+            #no_update,
+            no_update,
             no_update,
             no_update,
             no_update
@@ -342,6 +356,20 @@ def add_configuration_selection_callbacks(app):
 
         n_conf += 1
 
+        if store_model_interface_configurations is None:
+            store_model_interface_configurations = {}
+        else:
+            store_model_interface_configurations = json.loads(
+                store_model_interface_configurations
+            )
+
+        if store_finance_interface_configurations is None:
+            store_finance_interface_configurations = {}
+        else:
+            store_finance_interface_configurations = json.loads(
+                store_finance_interface_configurations
+            )
+
         if trig['type'] == 'config-dup-btn':
             trigger_index = trig['index']
 
@@ -352,6 +380,12 @@ def add_configuration_selection_callbacks(app):
             ref_config = configurations[trigger_index]
             mdl = app.duplicate_model(ref_config['model_uuid'])
             fnc = app.duplicate_finance(ref_config['finance_uuid'])
+
+            store_model_interface_configurations[mdl.uuid] = copy.copy(store_model_interface_configurations.get(ref_config['model_uuid']))
+            store_model_interface_configurations[mdl.uuid]['model_uuid'] = mdl.uuid
+
+            store_finance_interface_configurations[fnc.uuid] = copy.copy(store_finance_interface_configurations.get(ref_config['finance_uuid']))
+            store_finance_interface_configurations[fnc.uuid]['finance_uuid'] = fnc.uuid
 
             # TODO: move compose_configuration to a utility module so it can be shared
             new_config = {
@@ -370,14 +404,21 @@ def add_configuration_selection_callbacks(app):
             # Let's copy over the results
             mdl_ref = app.get_model(ref_config['model_uuid'])
             mdl._generation_result = copy.copy(mdl_ref._generation_result)
+            mdl.generation._dirty = False
             mdl._grid_result = copy.copy(mdl_ref._grid_result)
+            mdl.grid._dirty = False
             mdl._cs_result = copy.copy(mdl_ref._cs_result)
+            mdl.consumption_storage._dirty = False
             mdl._dirty = False
             
             # Because of the different uuid, the caches will not recognise this model,
             # or its finance, but just for info:
             mdl.last_run = mdl_ref.last_run
-            
+            print(f'model is duplicated from {mdl_ref.uuid} to {mdl.uuid} and dirty is {mdl.dirty}')
+
+            fnc.model = mdl
+            fnc._dirty = False
+
         else:
             return NUP
         
@@ -400,13 +441,13 @@ def add_configuration_selection_callbacks(app):
             )
         )
 
-        mdl_completed_run = json.dumps(
-            {
-                'model_uuid': mdl.uuid,
-                'model_last_run': str(mdl.last_run),
-                'model_hash': hash(mdl)
-            }
-        )
+        #mdl_completed_run = json.dumps(
+        #    {
+        #        'model_uuid': mdl.uuid,
+        #        'model_last_run': str(mdl.last_run),
+        #        'model_hash': hash(mdl)
+        #    }
+        #)
 
         return (
             patched_comparator_selector,
@@ -416,10 +457,13 @@ def add_configuration_selection_callbacks(app):
             update_outlines,
 
             #json.dumps(str(datetime.datetime.now())),
-            mdl_completed_run,
+            #mdl_completed_run,
 
             json.dumps(configurations),
-            json.dumps(selected_config)
+            json.dumps(selected_config),
+
+            json.dumps(store_model_interface_configurations),
+            json.dumps(store_finance_interface_configurations)
         )  
     
     @app.callback(
@@ -497,7 +541,7 @@ def add_configuration_selection_callbacks(app):
         n_conf = len(configurations)
 
         
-        contents = [create_single_configuration_selector_row(i, contents, selected_config) for i in range(n_conf)]
+        contents = [create_single_configuration_selector_row(i, configurations, selected_config) for i in range(n_conf)]
         hdr_contents = [create_config_selector_headerbutton(i, selected_config) for i in range(n_conf)]
 
         return (

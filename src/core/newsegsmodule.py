@@ -164,7 +164,7 @@ class NewsegsModule(metaclass=ABCMeta):
     Basic abstract class serving module results
     """
 
-    _dirty_flag = True
+    _dirty = True
     _model = None
 
     def __init__(self, *args, **kwargs):
@@ -218,8 +218,8 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         Has the model configuration changed since last run?
         """
-        return self._dirty_flag
+        return self._dirty
 
     @dirty.setter
     def dirty(self, val:bool) -> None:
-        self._dirty_flag = val
+        self._dirty = val

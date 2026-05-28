@@ -12,7 +12,7 @@ class NewsegsFinance(metaclass=ABCMeta):
 
     _name = 'NewSEGS Finance'
     _model = None
-    _dirty_flag = True
+    _dirty = True
     
     last_update = datetime.datetime.now()
     uuid = 1
@@ -442,13 +442,13 @@ class NewsegsFinance(metaclass=ABCMeta):
         """
         Has the model configuration changed since last run?
         """
-        return self._dirty_flag
+        return self._dirty
 
     @dirty.setter
     def dirty(self, val:bool) -> None:
         if val:
             self.last_update = datetime.datetime.now()
-        self._dirty_flag = val
+        self._dirty = val
 
     def __hash__(self):
         return hash(
