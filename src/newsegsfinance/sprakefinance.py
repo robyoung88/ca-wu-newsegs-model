@@ -392,10 +392,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         return _deferred_get_all_costs_discounted(self).copy()
         
     def get_total_present_costs_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_total_present_costs_undiscounted(self).copy()
+        return _deferred_get_total_present_costs_undiscounted(self)
         
     def get_total_present_costs_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_total_present_costs_discounted(self).copy()
+        return _deferred_get_total_present_costs_discounted(self)
         
     # Summary vectors
     def get_benefits_series_undiscounted(self) -> pd.Series:
@@ -418,19 +418,19 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
     # Derived values
     def get_benefit_cost_ratio_undiscounted(self,  horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_benefit_cost_ratio_undiscounted(self).copy()
+        return _deferred_get_benefit_cost_ratio_undiscounted(self)
         
     def get_benefit_cost_ratio_discounted(self,  horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_benefit_cost_ratio_discounted(self).copy()
+        return _deferred_get_benefit_cost_ratio_discounted(self)
 
     def get_simple_payback_time_days(self) -> float:
-        return _deferred_get_simple_payback_time_days(self).copy()
+        return _deferred_get_simple_payback_time_days(self)
         
     def get_net_present_value_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_net_present_value_undiscounted(self, horizon).copy()
+        return _deferred_get_net_present_value_undiscounted(self, horizon)
 
     def get_net_present_value_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_net_present_value_discounted(self, horizon).copy()
+        return _deferred_get_net_present_value_discounted(self, horizon)
     
     @override
     def to_dict(self):

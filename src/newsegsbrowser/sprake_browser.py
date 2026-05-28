@@ -2266,63 +2266,8 @@ def sprake_model_to_interface_configs(
     mdl: sprakemodel.SprakeModel, 
     fnc: sprakefinance.SprakeFinance,
 ) -> Tuple[dict, dict]:
-    gen_input = {
-        'wind_capacity': mdl.generation.generator.generators[0].nameplate_capacity,
-        'pv_capacity': mdl.generation.generator.generators[1].nameplate_capacity
-    }
 
-    cs = mdl.consumption_storage
-
-    stor_input = cs.storage_params
-
-    spaceheat_p = cs.spaceheat_params
-    dhw_p = cs.dhw_params
-    app_p = cs.appliance_params
-    ev_p = cs.ev_params
-
-    bc_input = {
-        'n_units': cs.n_units,
-        'hlp': spaceheat_p.get('hlp'),
-        'gfa': spaceheat_p.get('gfa'),
-        'ref_daily_consumption': dhw_p.get('ref_daily_consumption'),
-        'seasonal_variance': dhw_p.get('seasonal_variance')
-    }
-
-    dc_input = {
-        'efficiency_reduction': app_p.get('efficiency_reduction'),
-        'annual_residential_consumption_per_ev': \
-            ev_p.get('annual_residential_consumption_per_ev'),
-        'n_evs_per_household': ev_p.get('n_evs') / cs.n_units
-    }
-
-    # Model config
-
-    # Note that we are only going to allow horizons in multiples
-    # of one year. I may allow the start date to vary later.
-    # As such, we are just going to take the horizon to be the
-    # difference in year between the start and end of the timespan
-    ts = mdl.get_run_period()
-    mc_input = {
-        'horizon': ts.end.year - ts.start.year
-    }
-
-    # Location config
-    loc = mdl.location
-    loc_input = {
-        'lat': loc.lat,
-        'lon': loc.lon,
-        'name': loc.name
-    }
-
-    mcfg = {
-        'model_uuid': mdl.uuid,
-        'gen_input': gen_input,
-        'stor_input': stor_input,
-        'bc_input': bc_input,
-        'dc_input': dc_input,
-        'mc_input': mc_input,
-        'loc_input': loc_input,
-    }
+    mcfg = sprake_model_to_local_model_config(mdl)
 
     fcfg = sprake_finance_to_interface_config(fnc)
 
@@ -2348,60 +2293,60 @@ def add_initial_callback(app):
         Input('onload-div', 'children')
     )
 
-    @app.callback(
-        Output('store-model-completed-run', 'data', allow_duplicate = True),
-        Input('model-config-watcher', 'data'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call = True,
-        #background = True,
-        #manager = background_callback_manager,
-    )
-    def trigger_mdl_run(_, selected_config):
-        """Config change - run the model now"""
-        # print (ctx.triggered)
+    #@app.callback(
+    #    Output('store-model-completed-run', 'data', allow_duplicate = True),
+    #    Input('model-config-watcher', 'data'),
+    #    State('store-selected-configuration', 'data'),
+    #    prevent_initial_call = True,
+    #    #background = True,
+    #    #manager = background_callback_manager,
+    #)
+    #def trigger_mdl_run(_, selected_config):
+    #    """Config change - run the model now"""
+    #    # print (ctx.triggered)
+#
+    #    NUP = no_update
+    #    if selected_config is None:
+    #        return NUP
+    #    selected_config = json.loads(selected_config)
+    #    mdl = models.get(selected_config['model_uuid'], None)
+    #    if mdl is None:
+    #        return NUP
 
-        NUP = no_update
-        if selected_config is None:
-            return NUP
-        selected_config = json.loads(selected_config)
-        mdl = models.get(selected_config['model_uuid'], None)
-        if mdl is None:
-            return NUP
+    #    print('Starting normally triggered run')
+    #    mdl_hash = mdl.run()
+    #    print('Normal run complete')
 
-        print('Starting normally triggered run')
-        mdl_hash = mdl.run()
-        print('Normal run complete')
+    #    return json.dumps(
+    #        {
+    #            'model_uuid': mdl.uuid,
+    #            'model_last_run': str(mdl.last_run),
+    #            'model_hash': mdl_hash
+    #        }
+    #    )
 
-        return json.dumps(
-            {
-                'model_uuid': mdl.uuid,
-                'model_last_run': str(mdl.last_run),
-                'model_hash': mdl_hash
-            }
-        )
-
-    @app.callback(
-        Output('finance-config-watcher', 'data', allow_duplicate=True),
-        Input('store-model-completed-run', 'data'),
-        State('store-configurations', 'data'),
-        prevent_initial_call = True
-    )
-    def trigger_financial_results_post_run(model_run, configurations):
-        NUP = no_update
-        if model_run is None or configurations is None:
-            return NUP
-        model_run = json.loads(model_run)
-        configurations = json.loads(configurations)
-        model_uuid = model_run['model_uuid']
-        olist = []
-        for i, conf in enumerate(configurations):
-            if conf['model_uuid'] == model_uuid:
-                olist.append({
-                    'config_index': i,
-                    'finance_uuid': conf['finance_uuid'],
-                    'model_uuid': model_uuid
-                })
-        return json.dumps(olist)
+    #@app.callback(
+    #    Output('finance-config-watcher', 'data', allow_duplicate=True),
+    #    Input('store-model-completed-run', 'data'),
+    #    State('store-configurations', 'data'),
+    #    prevent_initial_call = True
+    #)
+    #def trigger_financial_results_post_run(model_run, configurations):
+    #    NUP = no_update
+    #    if model_run is None or configurations is None:
+    #        return NUP
+    #    model_run = json.loads(model_run)
+    #    configurations = json.loads(configurations)
+    #    model_uuid = model_run['model_uuid']
+    #    olist = []
+    #    for i, conf in enumerate(configurations):
+    #        if conf['model_uuid'] == model_uuid:
+    #            olist.append({
+    #                'config_index': i,
+    #                'finance_uuid': conf['finance_uuid'],
+    #                'model_uuid': model_uuid
+    #            })
+    #    return json.dumps(olist)
     
     @app.callback(
         Output('store-selected-configuration', 'data', allow_duplicate = True),
@@ -2415,7 +2360,7 @@ def add_initial_callback(app):
         prevent_initial_call=True
     )
     def sync_config(_, selected_config, all_configs):
-        # print ('Active configuration has been changed')
+        print ('Active configuration has been changed')
         # print (ctx.triggered)
         if selected_config is None:
             if all_configs is None:
@@ -2432,6 +2377,9 @@ def add_initial_callback(app):
         else:
             selected_config = json.loads(selected_config)
             all_configs = json.loads(all_configs)
+        
+        print ('selected config is:')
+        print (selected_config)
         
         mdl = models.get(selected_config['model_uuid'], None)
         if mdl is None:
@@ -2451,6 +2399,9 @@ def add_initial_callback(app):
             finances[fnc.uuid] = fnc
         
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
+
+        print('at end of switch we have:')
+        print(f'benefit discount rate is {fcfg['benefit_discount_rate']}')
 
         return (
             json.dumps(selected_config),
@@ -2685,140 +2636,37 @@ def add_initial_callback(app):
             return no_update, no_update, no_update, no_update
         fcfg = json.loads(fcfg)
         return (
-            f"{fcfg.get('benefit_discount_rate', 0.0):,.1%}",
-            f"{fcfg.get('cost_discount_rate', 0.0):,.1%}",
-            100.*fcfg.get('benefit_discount_rate', 0.0),
-            100.*fcfg.get('cost_discount_rate', 0.0)
+            f"{fcfg.get('benefit_discount_rate', 0.0)/100:,.1%}",
+            f"{fcfg.get('cost_discount_rate', 0.0)/100:,.1%}",
+            fcfg.get('benefit_discount_rate', 0.0),
+            fcfg.get('cost_discount_rate', 0.0)
         )
-
-    @app.callback(
-        Output('res-gen-wind-tbl', 'children'),
-        Output('res-gen-pv-tbl', 'children'),
-        Output('res-gen-combined-tbl', 'children'),
-        Input('res-gen', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        prevent_initial_call=True
-    )
-    def sync_gen_results_to_store(res, ann_hori_toggle):
-        if res is None:
-            return no_update, no_update, no_update
-        res = json.loads(res)
-        return (
-            create_wind_results(res, not(ann_hori_toggle)),
-            create_pv_results(res, not(ann_hori_toggle)),
-            create_combined_generation_results(res, not(ann_hori_toggle))
-        )
-
-    @app.callback(
-        Output('res-stor-tbl', 'children'),
-        Input('res-stor', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        prevent_initial_call=True
-    )
-    def sync_stor_results_to_store(res, ann_hori_toggle):
-        if res is None:
-            return no_update
-        res = json.loads(res)
-        return create_stor_results(res, not(ann_hori_toggle))        
-
-    @app.callback(
-        Output('res-cons-tbl', 'children'),
-        Output('res-cons-seasonal-tbl', 'children'),
-        Input('res-cons', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        prevent_initial_call=True
-    )
-    def sync_cons_results_to_store(res, ann_hori_toggle):
-        if res is None:
-            return no_update, no_update
-        res = json.loads(res)
-        return create_cons_results(res, not(ann_hori_toggle)), create_seasonal_cons_results(res, not(ann_hori_toggle))
-
-    @app.callback(
-        Output('res-net-tbl', 'children'),
-        Output('res-net-seasonal-tbl', 'children'),
-        Input('res-net', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        prevent_initial_call=True
-    )
-    def sync_net_results_to_store(net, ann_hori_toggle):
-        if net is None:
-            return no_update, no_update
-        net = json.loads(net)
-        return (
-            create_net_results(net, not(ann_hori_toggle)), 
-            create_seasonal_net_results(net, not(ann_hori_toggle))
-        )
-
-    @app.callback(
-        Output('res-finance-so-benefits-tbl', 'children'),
-        Output('cost-sales-smry-residents', 'children'),
-        Output('cost-sales-smry-export', 'children'),
-        Input('res-finance-so-benefits', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call=True
-    )
-    def sync_fnc_so_benefits_to_store(fnc, ann_hori_toggle, selected_config):
-        if fnc is None:
-            return no_update, no_update, no_update
-        fnc = json.loads(fnc)
-        selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
-        if fnc is None:
-            return no_update, no_update, no_update
-        bnfts = create_so_benefits_results(fnc, not(ann_hori_toggle))
-        return (
-            bnfts,
-            '{:,.0f}'.format(fnc[config_index].get('smry_residential_peryear')),
-            '{:,.0f}'.format(fnc[config_index].get('smry_exports_peryear')),
-        )
-    
-    @app.callback(
-        Output('res-finance-so-costs-tbl', 'children'),
-        Output('cost-import-smry-fixed', 'children'),
-        Output('cost-import-smry-ongoing', 'children'),
-        Input('res-finance-so-costs', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call=True
-    )
-    def sync_fnc_so_costs_to_store(fnc, ann_hori_toggle, selected_config):
-        if fnc is None:
-            return no_update, no_update, no_update
-        fnc = json.loads(fnc)
-        selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
-        if fnc is None:
-            return no_update, no_update, no_update
-        return (
-            create_so_costs_results(fnc, not(ann_hori_toggle)),
-            '{:,.0f}'.format(fnc[config_index].get('smry_import_fixed_cost_peryear')),
-            '{:,.0f}'.format(fnc[config_index].get('smry_import_variable_cost_peryear'))
-        )
-
-    @app.callback(
-        Output('res-finance-so-value-tbl', 'children'),
-        Input('res-finance-so-value', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        prevent_initial_call=True
-    )
-    def sync_fnc_so_value_to_store(fnc, ann_hori_toggle):
-        if fnc is None:
-            return no_update
-        fnc = json.loads(fnc)
-        if fnc is None:
-            return no_update
-        return create_so_value_results(fnc, not(ann_hori_toggle))
 
     return app
+
+#### Post-run processing ####
 
 RESULT_CACHE_PREFIXES = {
     'generation': 'res_gen_',
     'storage': 'res_stor_',
     'consumption': 'res_cons_',
-    'net_energy': 'res_net_'
+    'net_energy': 'res_net_',
+    'finance_benefits_so': 'res_fnc_ben_so_',
+    'finance_costs_so': 'res_fnc_cost_so_',
+    'finance_value_so': 'res_fnc_val_so_'
 }
+
+def get_model_result_id(prefix, model_id):
+    return prefix + str(model_id)
+
+def get_finance_result_id(prefix, finance_id, model_id):
+    return prefix + "fnc_" + str(finance_id) + "_mdl_" + str(model_id)
+
+def get_model_result_list(prefix, configs):
+    return [results.get(get_model_result_id(prefix, x['model_uuid'])) for x in configs]
+
+def get_finance_result_list(prefix, configs):
+   return [results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])) for x in configs]
 
 def generic_model_postprocess(
     model_run_json,
@@ -2838,18 +2686,47 @@ def generic_model_postprocess(
     
     # Avoid recalculation if nothing has actually run
     run_hash = hash(mdl)
-    result_id = result_id_prefix + str(model_id)
+    result_id = get_model_result_id(result_id_prefix, model_id)
     prev_result = results.get(result_id, None)
     if not prev_result is None and prev_result['run_hash'] == run_hash:
         return NUP
     
     print (f"making {result_id_prefix}")
-    gen_results = postprocess_function(mdl)
-    gen_results['run_hash'] = run_hash
-    results[result_id] = gen_results
+    postproc_results = postprocess_function(mdl)
+    postproc_results['run_hash'] = run_hash
+    results[result_id] = postproc_results
 
     return model_run_json
 
+def generic_finance_postprocess(
+    finance_run_json,
+    postprocess_function,
+    result_id_prefix
+):
+    NUP = no_update
+    if finance_run_json is None:
+        return NUP
+    
+    finance_run = json.loads(finance_run_json)
+    model_id = finance_run['model_id']
+    finance_id = finance_run['finance_id']
+    mdl = get_model(model_id)
+    fnc = get_finance(finance_id)
+
+    run_hash = hash(mdl) + hash(fnc)
+    result_id = get_finance_result_id(result_id_prefix, finance_id, model_id)
+    prev_result = results.get(result_id, None)
+    if not prev_result is None and prev_result['run_hash'] == run_hash:
+        return NUP
+    
+    print (f"making {result_id_prefix}")
+    print(f"assigning to {result_id}")
+    postproc_results = postprocess_function(mdl, fnc)
+    postproc_results['run_hash'] = run_hash
+    #print(postproc_results)
+    results[result_id] = postproc_results
+
+    return finance_run_json
 
 def add_result_callbacks(app):
     """
@@ -2902,11 +2779,11 @@ def add_result_callbacks(app):
         )
 
     @app.callback(
-        Output('res-cons', 'data'),
+        Output('res-net', 'data'),
         Input('trigger-postprocess-model-run', 'data'),
         prevent_initial_call = True
     )
-    def postproc_model_cons(model_run_json):
+    def postproc_model_net(model_run_json):
         """
         Create the net energy results for a completed model run.
         """
@@ -2915,122 +2792,55 @@ def add_result_callbacks(app):
             post_sprake_net_results.net_results_to_interface_sprake,
             RESULT_CACHE_PREFIXES['net_energy']
         )
-
+    
     @app.callback(
         Output('res-finance-so-benefits', 'data'),
-        Input('finance-config-watcher', 'data'),
-        State('store-configurations', 'data'),
-        State('res-finance-so-benefits', 'data'),
-        prevent_initial_call=True
+        Input('trigger-postprocess-finance-run', 'data'),
+        prevent_initial_call = True
     )
-    def set_res_finance_benefits_so(finance_to_refresh, configurations, res_ben):
+    def postproc_finance_benefits_so(finance_run_json):
         """
-        Create the system owner financial benefits results after a completed model run.
+        Create the system owner financial benefits results.
         """
-        NUP = no_update
-        if finance_to_refresh is None or configurations is None:
-            return NUP
-        finance_to_refresh = json.loads(finance_to_refresh)
-        configurations = json.loads(configurations)
-
-        if res_ben is None:
-            res_ben = [None] * len(configurations)
-        else:
-            res_ben = json.loads(res_ben)
-            if len(res_ben) < len(configurations):
-                res_ben += [None] * (len(configurations) - len(res_ben))
-
-        for ftr in finance_to_refresh:
-            mdl = models.get(ftr['model_uuid'])
-            fnc = finances.get(ftr['finance_uuid'])
-            if mdl is None or fnc is None:
-                next
-            print ("making so financial benefits results")
-            fnc_benefits_results = (
-                post_sprake_finance_benefits_results
-                .finance_benefits_results_to_interface_sprake(mdl,fnc)
-            )
-            res_ben[ftr['config_index']] = fnc_benefits_results
-        
-        return json.dumps(res_ben)
+        return generic_finance_postprocess(
+            finance_run_json,
+            post_sprake_finance_benefits_results.finance_benefits_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['finance_benefits_so']
+        )
     
     @app.callback(
         Output('res-finance-so-costs', 'data'),
-        Input('finance-config-watcher', 'data'),
-        State('store-configurations', 'data'),
-        State('res-finance-so-costs', 'data'),
-        prevent_initial_call=True
+        Input('trigger-postprocess-finance-run', 'data'),
+        prevent_initial_call = True
     )
-    def set_res_finance_costs_so(finance_to_refresh, configurations, res_cost):
+    def postproc_finance_costs_so(finance_run_json):
         """
-        Create the system owner financial costs results after a completed model run.
+        Create the system owner financial costs results.
         """
-        NUP = no_update
-        if finance_to_refresh is None or configurations is None:
-            return NUP
-        finance_to_refresh = json.loads(finance_to_refresh)
-        configurations = json.loads(configurations)
-
-        if res_cost is None:
-            res_cost = [None] * len(configurations)
-        else:
-            res_cost = json.loads(res_cost)
-            if len(res_cost) < len(configurations):
-                res_cost += [None] * (len(configurations) - len(res_cost))
-        
-        for ftr in finance_to_refresh:
-            mdl = models.get(ftr['model_uuid'])
-            fnc = finances.get(ftr['finance_uuid'])
-            if mdl is None or fnc is None:
-                next
-            print ("making so financial costs results")
-            fnc_costs_results = (
-                post_sprake_finance_costs_results
-                .finance_costs_results_to_interface_sprake(mdl,fnc)
-            )
-            res_cost[ftr['config_index']] = fnc_costs_results
-        
-        return json.dumps(res_cost)
-
+        return generic_finance_postprocess(
+            finance_run_json,
+            post_sprake_finance_costs_results.finance_costs_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['finance_costs_so']
+        )
+    
     @app.callback(
         Output('res-finance-so-value', 'data'),
-        Input('finance-config-watcher', 'data'),
-        State('store-configurations', 'data'),
-        State('res-finance-so-value', 'data'),
-        prevent_initial_call=True
+        Input('trigger-postprocess-finance-run', 'data'),
+        prevent_initial_call = True
     )
-    def set_res_finance_value_so(finance_to_refresh, configurations, res_value):
+    def postproc_finance_value_so(finance_run_json):
         """
-        Create the system owner financial value results after a completed model run.
+        Create the system owner financial value results.
         """
-        NUP = no_update
-        if finance_to_refresh is None or configurations is None:
-            return NUP
-        finance_to_refresh = json.loads(finance_to_refresh)
-        configurations = json.loads(configurations)
-
-        if res_value is None:
-            res_value = [None] * len(configurations)
-        else:
-            res_value = json.loads(res_value)
-            if len(res_value) < len(configurations):
-                res_value += [None] * (len(configurations) - len(res_value))
-
-        for ftr in finance_to_refresh:
-            mdl = models.get(ftr['model_uuid'])
-            fnc = finances.get(ftr['finance_uuid'])
-            if mdl is None or fnc is None:
-                next
-            print ("making so financial value results")
-            fnc_value_results = (
-                post_sprake_finance_value_results
-                .finance_value_results_to_interface_sprake(mdl,fnc)
-            )
-            res_value[ftr['config_index']] = fnc_value_results
-        
-        return json.dumps(res_value)
+        return generic_finance_postprocess(
+            finance_run_json,
+            post_sprake_finance_value_results.finance_value_results_to_interface_sprake,
+            RESULT_CACHE_PREFIXES['finance_value_so']
+        )
 
     return app
+
+##### After postprocess, header updates #####
 
 def add_result_header_callbacks(app):
     
@@ -3227,23 +3037,42 @@ def add_result_header_callbacks(app):
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_finance_results_header(res_benefits, res_costs, res_value, selected_config):
-        if (res_benefits is None) or (res_costs is None) or (res_value is None):
-            return no_update
-        
-        res_benefits = json.loads(res_benefits)
-        res_costs = json.loads(res_costs)
-        res_value = json.loads(res_value)
+    def update_finance_results_header(
+        res_benefits_trigger,
+        res_costs_trigger,
+        res_value_trigger,
+        selected_config
+    ):
+        NUP = no_update
 
         selected_config = json.loads(selected_config)
-        config_index = selected_config['config_index']
+        model_id = selected_config['model_uuid']
+        finance_id = selected_config['finance_uuid']
 
-        if isinstance(res_benefits, list):
-            res_benefits = res_benefits[config_index]
-        if isinstance(res_costs, list):
-            res_costs = res_costs[config_index]
-        if isinstance(res_value, list):
-            res_value = res_value[config_index]
+        res_benefits = results.get(
+            get_finance_result_id(
+                RESULT_CACHE_PREFIXES['finance_benefits_so'], 
+                finance_id, 
+                model_id
+            )
+        )
+        res_costs = results.get(
+            get_finance_result_id(
+                RESULT_CACHE_PREFIXES['finance_costs_so'],
+                finance_id,
+                model_id
+            )
+        )
+        res_value = results.get(
+            get_finance_result_id(
+                RESULT_CACHE_PREFIXES['finance_value_so'],
+                finance_id,
+                model_id
+            )
+        )
+
+        if (res_benefits is None) or (res_costs is None) or (res_value is None):
+            return NUP
 
         dr_benefits = res_benefits.get('benefits_discount_rate')
         prval_benefits = res_benefits.get('present_benefits_discounted')
@@ -3271,16 +3100,225 @@ def add_result_header_callbacks(app):
 
     return app
 
+def add_result_table_callbacks(app):
+    """
+    Functions to synchronise the results table with model/finance results.
+    """
+
+    @app.callback(
+        Output('res-gen-wind-tbl', 'children'),
+        Output('res-gen-pv-tbl', 'children'),
+        Output('res-gen-combined-tbl', 'children'),
+        Input('res-gen', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_gen_results_table_to_store(
+        res_trigger,
+        ann_hori_toggle,
+        store_configurations
+    ):
+        NUP = no_update, no_update, no_update
+
+        if store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_model_result_list(RESULT_CACHE_PREFIXES['generation'], configurations)
+
+        return (
+            create_wind_results(res, not(ann_hori_toggle)),
+            create_pv_results(res, not(ann_hori_toggle)),
+            create_combined_generation_results(res, not(ann_hori_toggle))
+        )
+    
+    @app.callback(
+        Output('res-stor-tbl', 'children'),
+        Input('res-stor', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_stor_results_table_to_stor(
+        res_trigger,
+        ann_hori_toggle,
+        store_configurations
+    ):
+        NUP = no_update
+
+        if store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_model_result_list(RESULT_CACHE_PREFIXES['storage'], configurations)
+
+        return create_stor_results(res, not(ann_hori_toggle))
+    
+    @app.callback(
+        Output('res-cons-tbl', 'children'),
+        Output('res-cons-seasonal-tbl', 'children'),
+        Input('res-cons', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_cons_results_table_to_store(
+        res_trigger,
+        ann_hori_toggle,
+        store_configurations
+    ):
+        NUP = no_update, no_update
+
+        if store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_model_result_list(RESULT_CACHE_PREFIXES['consumption'], configurations)
+
+        return (
+            create_cons_results(res, not(ann_hori_toggle)),
+            create_seasonal_cons_results(res, not(ann_hori_toggle))
+        )
+
+    @app.callback(
+        Output('res-net-tbl', 'children'),
+        Output('res-net-seasonal-tbl', 'children'),
+        Input('res-net', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_net_results_table_to_store(
+        res_trigger,
+        ann_hori_toggle,
+        store_configurations
+    ):
+        NUP = no_update, no_update
+
+        if store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_model_result_list(RESULT_CACHE_PREFIXES['net_energy'], configurations)
+
+        return (
+            create_net_results(res, not(ann_hori_toggle)), 
+            create_seasonal_net_results(res, not(ann_hori_toggle))
+        )
+    
+    @app.callback(
+        Output('res-finance-so-benefits-tbl', 'children'),
+        Output('cost-sales-smry-residents', 'children'),
+        Output('cost-sales-smry-export', 'children'),
+        Input('res-finance-so-benefits', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_so_benefits_table_to_store(
+        res_trigger,
+        ann_hori_toggle,
+        store_selected_configuration,
+        store_configurations
+    ):
+        NUP = no_update, no_update, no_update
+
+        if store_selected_configuration is None or store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_finance_result_list(RESULT_CACHE_PREFIXES['finance_benefits_so'], configurations)
+
+        selected_config = json.loads(store_selected_configuration)
+        config_index = selected_config['config_index']
+
+        if not res or res[0] is None:
+            return NUP
+        
+        return (
+            create_so_benefits_results(res, not(ann_hori_toggle)),
+            '{:,.0f}'.format(res[config_index].get('smry_residential_peryear')),
+            '{:,.0f}'.format(res[config_index].get('smry_exports_peryear')),
+        )
+    
+    @app.callback(
+        Output('res-finance-so-costs-tbl', 'children'),
+        Output('cost-import-smry-fixed', 'children'),
+        Output('cost-import-smry-ongoing', 'children'),
+        Input('res-finance-so-costs', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_so_costs_table_to_store(
+        res_trigger,
+        ann_hori_toggle,
+        store_selected_configuration,
+        store_configurations
+    ):
+        NUP = no_update, no_update, no_update
+
+        if store_selected_configuration is None or store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_finance_result_list(RESULT_CACHE_PREFIXES['finance_costs_so'], configurations)
+
+        selected_config = json.loads(store_selected_configuration)
+        config_index = selected_config['config_index']
+
+        if not res or res[0] is None:
+            return NUP
+        
+        return (
+            create_so_costs_results(res, not(ann_hori_toggle)),
+            '{:,.0f}'.format(res[config_index].get('smry_import_fixed_cost_peryear')),
+            '{:,.0f}'.format(res[config_index].get('smry_import_variable_cost_peryear'))
+        )
+    
+    @app.callback(
+        Output('res-finance-so-value-tbl', 'children'),
+        Input('res-finance-so-value', 'data'),
+        Input('annual-horizon-toggle', 'value'),
+        State('store-configurations', 'data'),
+        prevent_initial_call=True
+    )
+    def sync_fnc_so_value_table_to_store(
+        res_trigger,
+        ann_hori_toggle,
+        store_configurations
+    ):
+        NUP = no_update
+
+        if store_configurations is None:
+            return NUP
+        
+        configurations = json.loads(store_configurations)
+        res = get_finance_result_list(RESULT_CACHE_PREFIXES['finance_value_so'], configurations)
+        
+        if not res or res[0] is None:
+            return NUP
+
+        return create_so_value_results(res, not(ann_hori_toggle))
+
+    return app
+
 def add_input_callbacks(app):
     """
     Functions to synchronise configurations with inputs.
     """
 
     @app.callback(
+        Output('prequeue-finance-run', 'data'),
         Input('trigger-post-model-run', 'data'),
+        State('prequeue-finance-run', 'data'),
+        State('store-configurations', 'data'),
         prevent_initial_call = True
     )
-    def model_run_postprocess(model_run):
+    def model_run_postprocess(model_run, prequeue_finance_run, store_configurations):
         """
         Postprocess and trigger updates from a completed model run.
 
@@ -3290,8 +3328,35 @@ def add_input_callbacks(app):
         2. If the model is the model of the selected configuration, update the
            main results.
         3. Update the model results in the View.
+
+        The latter two processes are handled by separate postprocess callbacks.
+        Therefore, this callback only dispatches to the finance run queue.
         """
-        return 
+        if model_run is None or store_configurations is None:
+            return no_update
+        
+        model_run = json.loads(model_run)
+        configurations = json.loads(store_configurations)
+
+        if prequeue_finance_run is None:
+            prequeue_finance_run = []
+        else:
+            prequeue_finance_run = json.loads(prequeue_finance_run)
+        
+        model_id = model_run['model_id']
+
+        do_update = False
+        for config in configurations:
+            if config['model_uuid'] == model_id:
+                prequeue_finance_run.append(
+                    browser.finance_run_request(config['finance_uuid'], model_id)
+                )
+                do_update = True
+        
+        if not do_update:
+            return NUP
+
+        return json.dumps(prequeue_finance_run)
 
     @app.callback(
         Output('trigger-postprocess-finance-run', 'data'),
@@ -3458,27 +3523,27 @@ def add_input_callbacks(app):
                         queue_finance_run.pop(i)
                 queue_finance_run.append(requests)
 
-            if latch_models_checkedout is None:
-                latch_models_checkedout = set()
-            else:
-                latch_models_checkedout = set(json.loads(latch_models_checkedout))
-            
-            for i, request in enumerate(queue_finance_run):
-                # Cannot run if model is checked out
-                if not request['model_id'] in latch_models_checkedout:
-                    dispatch_request = queue_finance_run.pop(i)
+        if latch_models_checkedout is None:
+            latch_models_checkedout = set()
+        else:
+            latch_models_checkedout = set(json.loads(latch_models_checkedout))
+        
+        for i, request in enumerate(queue_finance_run):
+            # Cannot run if model is checked out
+            if not request['model_id'] in latch_models_checkedout:
+                dispatch_request = queue_finance_run.pop(i)
 
-                    return (
-                        json.dumps(queue_finance_run),
-                        json.dumps(dispatch_request),
-                        len(queue_finance_run) == 0,
-                    )
-            
-            return (
-                json.dumps(queue_finance_run),
-                no_update,
-                len(queue_finance_run) == 0
-            )
+                return (
+                    json.dumps(queue_finance_run),
+                    json.dumps(dispatch_request),
+                    len(queue_finance_run) == 0
+                )
+        
+        return (
+            json.dumps(queue_finance_run),
+            no_update,
+            len(queue_finance_run) == 0
+        )
 
     @app.callback(
         Output('trigger-postprocess-model-run', 'data'),
@@ -3733,8 +3798,6 @@ def add_input_callbacks(app):
 
                     # First update the interface conf
                     update_val = {action['key']: action['val']}
-                    print('updating model')
-                    print(update_val)
                     if action['key_section'] is None:
                         mdl_conf.update(update_val)
                     else:
@@ -3769,6 +3832,7 @@ def add_input_callbacks(app):
         mdl_run_list = []
         for model_id in mdl_change_list:
             mdl_conf = store_model_interface_configurations.get(model_id)
+            print(f'syncronising model {model_id}')
             mdl = get_model(model_id)
             dirty = sync_local_model_config_to_model(mdl_conf, mdl)
             if dirty:
@@ -3812,6 +3876,10 @@ def add_input_callbacks(app):
         print(r_local_model_config)
         print('models to request run')
         print(r_model_run_requests)
+        print('finances with local config change')
+        print(r_local_finance_config)
+        print('finances to request run')
+        print(r_finance_run_requests)
 
         return (
             r_local_model_config,
@@ -3858,12 +3926,14 @@ def add_input_callbacks(app):
         print(ctx.triggered_id)
         
         if ctx.triggered_id == 'prequeue-action-user':
-            print('handling user action')
             action = json.loads(prequeue_action_user)
-            print(action)
+            
+            #print(action)
             if isinstance(action, list):
+                print(f'handling {len(action)} user actions')
                 queue_action_user += action
             else:
+                print('handling single user actions')
                 queue_action_user.append(action)
             
             # TODO: Rationalise queue
@@ -3894,8 +3964,8 @@ def add_input_callbacks(app):
                         dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
                         dispatch_actions.reverse()
                         
-                        print('dispatching')
-                        print(dispatch_actions)
+                        print(f'dispatching {len(dispatch_actions)} actions')
+                        #print(dispatch_actions)
                         
                         return (
                             None, # The prequeue is consumed
@@ -3922,8 +3992,8 @@ def add_input_callbacks(app):
                     dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
                     dispatch_actions.reverse()
 
-                    print('dispatching')
-                    print(dispatch_actions)
+                    print(f'dispatching {len(dispatch_actions)} actions')
+                    #print(dispatch_actions)
 
                     return (
                         None, # The prequeue is consumed
@@ -3943,13 +4013,14 @@ def add_input_callbacks(app):
         )
 
     @app.callback(
-        Output('prequeue-action-user', 'data', allow_duplicate = True),
+        Output('prequeue-action-user', 'data'),
         Input({'type': 'input-model-config', 'section': ALL, 'key': ALL}, 'value'),
+        Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL}, 'value'),
         State('prequeue-action-user', 'data'),
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
     )
-    def update_model_config(inputs, prequeue, selected_config):
+    def interface_update_config(inputs_model, inputs_finance, prequeue, selected_config):
         """
         Add model configuration update events to the user action prequeue.
 
@@ -3964,78 +4035,60 @@ def add_input_callbacks(app):
         selected_model = json.loads(selected_config).get('model_uuid', None)
         if selected_model is None:
             return NUP
-
-        if prequeue is None:
-            prequeue = []
-        else:
-            prequeue = json.loads(prequeue)
-        
-        print('model configuration input field changed')
-        print(ctx.triggered)
-
-        trig = ctx.triggered
-        for prop in trig:
-            pid = json.loads(prop['prop_id'].rstrip('.value'))
-            val = prop['value']
-            prequeue.append(
-                browser.model_interface_action(
-                    model_id = selected_model,
-                    input_key = pid['key'],
-                    input_value = val,
-                    key_section = pid['section']
-                )
-            )
-        
-        if len(prequeue) == 0:
-            return NUP
-        
-        return json.dumps(prequeue)
-    
-    @app.callback(
-        Output('prequeue-action-user', 'data', allow_duplicate = True),
-        Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL}, 'value'),
-        State('prequeue-action-user', 'data'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call=True
-    )
-    def update_finance_config(inputs, prequeue, selected_config):
-        """
-        Add finance configuration update events to the user action prequeue.
-
-        May be fired before the queuemanager absorbs the prequeue, so needs
-        to ensure that the prequeue is appended, not overwritten.
-        In future, we may see if we can do this with a Patch - not sure how the
-        data are held, and it may be that we can just append a list rather than
-        full json deserialise/serialise.
-        """
-        NUP = no_update
-
         selected_finance = json.loads(selected_config).get('finance_uuid', None)
-        if selected_finance is None:
-            return NUP
-        
+
         if prequeue is None:
             prequeue = []
         else:
             prequeue = json.loads(prequeue)
 
-        print('finance configuration input field changed')
-        print(ctx.triggered)
+        l1 = len(prequeue)
+        
+        print('configuration input field changed')
+        #print(ctx.triggered)
+
+        model_changed = False
+        finance_changed = False
 
         trig = ctx.triggered
         for prop in trig:
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
-            prequeue.append(
-                browser.finance_interface_action(
-                    finance_id = selected_finance,
-                    input_key = pid['key'],
-                    input_value = val,
-                    key_section = pid['section']
-                )
-            )
+            match pid['type']:
+                case 'input-model-config':
+                    model_changed = True
+                    prequeue.append(
+                        browser.model_interface_action(
+                            model_id = selected_model,
+                            input_key = pid['key'],
+                            input_value = val,
+                            key_section = pid['section']
+                        )
+                    )
+                case 'input-finance-config':
+                    finance_changed = True
+                    prequeue.append(
+                        browser.finance_interface_action(
+                            finance_id = selected_finance,
+                            input_key = pid['key'],
+                            input_value = val,
+                            key_section = pid['section']
+                        )
+                    )
+                case _:
+                    raise ValueError('Triggered by an unknown input type %s', pid['type'])
+        l2 = len(prequeue)
+
+        if model_changed and finance_changed:
+            print(f'model and finance configuration changes have added {l2-l1} items to prequeue, which is now {l2} items long')
+        elif model_changed:
+            print(f'model configuration changes have added {l2-l1} items to prequeue, which is now {l2} items long')
+        elif finance_changed:
+            print(f'finance configuration changes have added {l2-l1} items to prequeue, which is now {l2} items long')
+        else:
+            print(f'no changes to prequeue, which i {l2} items long')        
         
-        if len(prequeue) == 0:
+        if l2 == l1:
             return NUP
         
         return json.dumps(prequeue)
@@ -4134,82 +4187,6 @@ def add_input_callbacks(app):
         
         return mdl_dirty, fnc_dirty
 
-    @app.callback(
-        Output('finance-config-watcher', 'data', allow_duplicate=True),
-        Input('finance-config', 'data'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call = True
-    )
-    def update_finance_config(fcfg, selected_conf):
-        """
-        Set the currently selected finance with the data held in the fcfg dict
-        """
-        NUP = no_update
-        if fcfg is None or selected_conf is None:
-            return NUP
-        
-        fcfg = json.loads(fcfg)
-        selected_conf = json.loads(selected_conf)
-        fnc = finances.get(selected_conf['finance_uuid'], None)
-        if fnc is None:
-            # TODO: Deal with this
-            return NUP
-
-        finance_dirty = sync_fcfg_to_model(fcfg, fnc)
-
-        if finance_dirty:
-            return json.dumps(
-                [{
-                    'config_index': selected_conf.get('config_index', 0),
-                    'finance_uuid': selected_conf.get('finance_uuid'),
-                    'model_uuid': selected_conf.get('model_uuid')
-                }]
-            )
-        return NUP
-
-    @app.callback(
-        Output('model-config-watcher', 'data'),
-        Output('finance-config-watcher', 'data', allow_duplicate=True),
-        Input('model-config', 'data'),
-        State('finance-config', 'data'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call = True
-    )
-    def update_model_configs(mcfg, fcfg, selected_conf):
-        NUP = no_update, no_update
-        # print('Configuration is being updated')
-        # print(ctx.triggered)
-        if mcfg is None or fcfg is None or selected_conf is None:
-            return no_update, no_update
-        mcfg = json.loads(mcfg)
-        fcfg = json.loads(fcfg)
-        selected_conf = json.loads(selected_conf)
-
-        mdl = models.get(selected_conf['model_uuid'], None)
-        fnc = finances.get(selected_conf['finance_uuid'], None)
-        if mdl is None or fnc is None:
-            # TODO: Deal with this
-            return NUP
-
-        # I don't trust these dirty flags on first load; 
-        mdl_dirty, finance_dirty = sync_configs_to_model(mcfg, fcfg, mdl, fnc)
-
-        if mdl_dirty:
-            return json.dumps(str(datetime.datetime.now())), no_update
-        if finance_dirty:
-            return (
-                no_update, 
-                json.dumps(
-                    [{
-                        'config_index': selected_conf.get('config_index', 0),
-                        'finance_uuid': selected_conf.get('finance_uuid'),
-                        'model_uuid': selected_conf.get('model_uuid')
-                    }]
-                )
-            )
-        
-        return NUP
-
     return app
 
 def add_model_callbacks(app):
@@ -4219,6 +4196,7 @@ def add_model_callbacks(app):
     app = add_initial_callback(app)
     app = add_result_callbacks(app)
     app = add_result_header_callbacks(app)
+    app = add_result_table_callbacks(app)
     app = add_input_callbacks(app)
     app = results_table.add_configuration_selection_callbacks(app)
 
