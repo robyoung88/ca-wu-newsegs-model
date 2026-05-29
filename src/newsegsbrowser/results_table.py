@@ -379,7 +379,7 @@ def add_configuration_selection_callbacks(app):
             # Make the copy
             ref_config = configurations[trigger_index]
             mdl = app.duplicate_model(ref_config['model_uuid'])
-            fnc = app.duplicate_finance(ref_config['finance_uuid'])
+            fnc = app.duplicate_finance(ref_config['finance_uuid'], mdl.uuid)
 
             store_model_interface_configurations[mdl.uuid] = copy.copy(store_model_interface_configurations.get(ref_config['model_uuid']))
             store_model_interface_configurations[mdl.uuid]['model_uuid'] = mdl.uuid
@@ -396,8 +396,10 @@ def add_configuration_selection_callbacks(app):
             }
 
             configurations.append(new_config)
-            print('after append')
-            print(configurations)
+            
+            #print('after append')
+            #print(configurations)
+            
             selected_config = new_config.copy()
             selected_config['config_index'] = len(configurations) - 1
 
@@ -413,10 +415,8 @@ def add_configuration_selection_callbacks(app):
             
             # Because of the different uuid, the caches will not recognise this model,
             # or its finance, but just for info:
-            mdl.last_run = mdl_ref.last_run
             print(f'model is duplicated from {mdl_ref.uuid} to {mdl.uuid} and dirty is {mdl.dirty}')
 
-            fnc.model = mdl
             fnc._dirty = False
 
         else:

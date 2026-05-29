@@ -17,12 +17,15 @@ class NewsegsFinance(metaclass=ABCMeta):
     last_update = datetime.datetime.now()
     uuid = 1
 
+    _benefit_discount_rate = 0.
+    _cost_discount_rate = 0.
+
     def __init__(self, *args, **kwargs):
         self.uuid = str(uuid.uuid4())
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
-    def set_model(self, mdl: NewsegsModel) -> None:
+    def set_model(self, mdl: NewsegsModel, dirty: bool = True) -> None:
         ...
     
     @property
@@ -445,8 +448,11 @@ class NewsegsFinance(metaclass=ABCMeta):
         return self._dirty
 
     @dirty.setter
-    def dirty(self, val:bool) -> None:
+    def dirty(self, val: bool) -> None:
+        #import traceback
         if val:
+            #print('finance last_update set')
+            #print(traceback.print_stack())
             self.last_update = datetime.datetime.now()
         self._dirty = val
 

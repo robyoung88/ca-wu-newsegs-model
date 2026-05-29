@@ -114,7 +114,9 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
         Check `SprakeFinance.get_default_unit_costs()` for expected values
         """
+        v0 = copy.copy(self._unit_costs)
         self._unit_costs.update(input_dict)
+        self.dirty = self.dirty or (v0 != self._unit_costs)
     
     @classmethod
     def get_default_unit_costs(cls) -> dict:
@@ -130,18 +132,18 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return self._unit_costs.copy()
 
-    def set_model(self, mdl:NewsegsModel) -> None:
+    def set_model(self, mdl:NewsegsModel, dirty: bool = True) -> None:
         self._model = mdl
-        self.dirty = True
+        self.dirty = self.dirty or dirty 
     
     @property
     def benefit_discount_rate(self) -> float:
         return self._benefit_discount_rate
 
     @benefit_discount_rate.setter
-    def benefit_discount_rate(self, v:float) -> None:
+    def benefit_discount_rate(self, v: float) -> None:
+        self.dirty = self.dirty or not(self._benefit_discount_rate == v)
         self._benefit_discount_rate = v
-        self.dirty = True
 
     @property
     def cost_discount_rate(self) -> float:
@@ -149,8 +151,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     
     @cost_discount_rate.setter
     def cost_discount_rate(self, v:float) -> None:
+        self.dirty = self.dirty or not(self._cost_discount_rate == v)
         self._cost_discount_rate = v
-        self.dirty = True
     
     def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
         """
@@ -170,15 +172,14 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         if len(drs) == 1 and len(kwdrs) == 0:
             # Assume that user wants to set both discount rates to nominated value
             dr = drs[0]
-            self._benefit_discount_rate = dr
-            self._cost_discount_rate = dr
+            self.benefit_discount_rate = dr
+            self.cost_discount_rate = dr
         else:
             argnames = ['benefit_discount_rate', 'cost_discount_rate']
             argdict = dict(zip(argnames, drs))
             argdict.update(kwdrs)
-            self._benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
-            self._cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
-        self.dirty = True
+            self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
+            self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
 
     def _get_empty_df(self) -> pd.DataFrame:
         return _deferred_get_empty_df(self).copy()
@@ -502,7 +503,7 @@ def _make_unit_cost_property(key: str):
         return self._unit_costs.get(key)
 
     def setter(self, value: float) -> None:
-        self.dirty = True
+        self.dirty = self.dirty or self._unit_costs[key] != value
         self._unit_costs[key] = value
 
     return property(getter, setter, doc=f"Unit cost for {key}")

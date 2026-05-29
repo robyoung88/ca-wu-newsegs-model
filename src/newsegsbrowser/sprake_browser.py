@@ -2292,61 +2292,6 @@ def add_initial_callback(app):
         Output('post-drawer-attach', 'children'),
         Input('onload-div', 'children')
     )
-
-    #@app.callback(
-    #    Output('store-model-completed-run', 'data', allow_duplicate = True),
-    #    Input('model-config-watcher', 'data'),
-    #    State('store-selected-configuration', 'data'),
-    #    prevent_initial_call = True,
-    #    #background = True,
-    #    #manager = background_callback_manager,
-    #)
-    #def trigger_mdl_run(_, selected_config):
-    #    """Config change - run the model now"""
-    #    # print (ctx.triggered)
-#
-    #    NUP = no_update
-    #    if selected_config is None:
-    #        return NUP
-    #    selected_config = json.loads(selected_config)
-    #    mdl = models.get(selected_config['model_uuid'], None)
-    #    if mdl is None:
-    #        return NUP
-
-    #    print('Starting normally triggered run')
-    #    mdl_hash = mdl.run()
-    #    print('Normal run complete')
-
-    #    return json.dumps(
-    #        {
-    #            'model_uuid': mdl.uuid,
-    #            'model_last_run': str(mdl.last_run),
-    #            'model_hash': mdl_hash
-    #        }
-    #    )
-
-    #@app.callback(
-    #    Output('finance-config-watcher', 'data', allow_duplicate=True),
-    #    Input('store-model-completed-run', 'data'),
-    #    State('store-configurations', 'data'),
-    #    prevent_initial_call = True
-    #)
-    #def trigger_financial_results_post_run(model_run, configurations):
-    #    NUP = no_update
-    #    if model_run is None or configurations is None:
-    #        return NUP
-    #    model_run = json.loads(model_run)
-    #    configurations = json.loads(configurations)
-    #    model_uuid = model_run['model_uuid']
-    #    olist = []
-    #    for i, conf in enumerate(configurations):
-    #        if conf['model_uuid'] == model_uuid:
-    #            olist.append({
-    #                'config_index': i,
-    #                'finance_uuid': conf['finance_uuid'],
-    #                'model_uuid': model_uuid
-    #            })
-    #    return json.dumps(olist)
     
     @app.callback(
         Output('store-selected-configuration', 'data', allow_duplicate = True),
@@ -2354,13 +2299,12 @@ def add_initial_callback(app):
         Output('model-config', 'data', allow_duplicate=True),
         Output('finance-config', 'data', allow_duplicate=True),
         Input('firstload-config-watcher', 'data'),
-        #Input('live-config-watcher', 'data'),
         Input('store-selected-configuration', 'data'),
         Input('store-configurations', 'data'),
         prevent_initial_call=True
     )
     def sync_config(_, selected_config, all_configs):
-        print ('Active configuration has been changed')
+        print ('A configuration has been changed')
         # print (ctx.triggered)
         if selected_config is None:
             if all_configs is None:
@@ -2378,8 +2322,8 @@ def add_initial_callback(app):
             selected_config = json.loads(selected_config)
             all_configs = json.loads(all_configs)
         
-        print ('selected config is:')
-        print (selected_config)
+        #print ('selected config is:')
+        #print (selected_config)
         
         mdl = models.get(selected_config['model_uuid'], None)
         if mdl is None:
@@ -2400,8 +2344,8 @@ def add_initial_callback(app):
         
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
-        print('at end of switch we have:')
-        print(mdl.dirty)
+        #print('at end of switch we have:')
+        #print(mdl.dirty)
 
         return (
             json.dumps(selected_config),
@@ -2666,10 +2610,6 @@ def get_model_result_list(prefix, configs):
     return [results.get(get_model_result_id(prefix, x['model_uuid'])) for x in configs]
 
 def get_finance_result_list(prefix, configs):
-    print(f'getting {prefix}')
-    for x in configs:
-        print(f'searching {get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])}')
-        print(f'returning {type(results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])))}')
     return [results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])) for x in configs]
 
 def generic_model_postprocess(
@@ -2698,11 +2638,12 @@ def generic_model_postprocess(
     # Avoid recalculation if nothing has actually run
     run_hash = hash(mdl)
     result_id = get_model_result_id(result_id_prefix, model_id)
+    print (f'getting {result_id}')
     prev_result = results.get(result_id, None)
     if not prev_result is None and prev_result['run_hash'] == run_hash:
         return NUP
     
-    print (f"making {result_id_prefix}")
+    print (f"cache miss - making {result_id}")
     postproc_results = postprocess_function(mdl)
     postproc_results['run_hash'] = run_hash
     results[result_id] = postproc_results
@@ -2733,15 +2674,21 @@ def generic_finance_postprocess(
 
     run_hash = hash(mdl) + hash(fnc)
     result_id = get_finance_result_id(result_id_prefix, finance_id, model_id)
+    print (f'getting {result_id}')
     prev_result = results.get(result_id, None)
     if not prev_result is None and prev_result['run_hash'] == run_hash:
         return NUP
     
-    print (f"making {result_id_prefix}")
-    print(f"assigning to {result_id}")
-    postproc_results = postprocess_function(mdl, fnc)
+    print (f"cache miss - making {result_id}")
+
+    try:
+        postproc_results = postprocess_function(mdl, fnc)
+    except KeyError:
+        # Model has not been run yet
+        print (f'KeyError likely due to model results not available')
+        return NUP
+
     postproc_results['run_hash'] = run_hash
-    #print(postproc_results)
     results[result_id] = postproc_results
 
     return finance_run_0
@@ -3397,13 +3344,15 @@ def add_input_callbacks(app):
         # Sync with background cache
         finances[finance_id] = finance_from_cache(finance_id)
         # Ensure model is correct
-        finances[finance_id].model = get_model(finance_run['model_id'])
+        # However, do not go through the standard accessor
+        # to avoid dirtying the finance
+        finances[finance_id].set_model(get_model(finance_run['model_id']), False)
 
         # Clear finance for editing
         latch_finances_checkedout = set(json.loads(latch_finances_checkedout))
         latch_finances_checkedout.remove(finance_id)
 
-        print('finance run did complete')
+        print('finance run completed')
         print(finance_run)
 
         return (
@@ -3429,7 +3378,7 @@ def add_input_callbacks(app):
         # Suspect that if we don't do this, things will rapidly break
         # unless the pickle serialises the model for the finance
         # in which case, we may need to re-write the reduce function
-        fnc.model = mdl
+        fnc.set_model(mdl, False)
 
         # CREATE THE FINANCE RESULTS
         fnc.dirty = False
@@ -3589,7 +3538,7 @@ def add_input_callbacks(app):
         latch_models_checkedout = set(json.loads(latch_models_checkedout))
         latch_models_checkedout.remove(model_id)
 
-        print('model run did complete')
+        print('model run completed')
         print(model_run)
 
         return (
@@ -3719,13 +3668,9 @@ def add_input_callbacks(app):
                         queue_model_run.pop(i)
                 queue_model_run.append(requests)
         
-        print ('checking run latches')
-
         # Hope that this can be interpreted as a bool
         if latch_model_run_global is None:
             latch_model_run_global = True
-
-        print(latch_model_run_global)
 
         if latch_model_run_global:
             for i, request in enumerate(queue_model_run):
@@ -3748,6 +3693,8 @@ def add_input_callbacks(app):
     @app.callback(
         Output('store-model-interface-configurations', 'data'),
         Output('store-finance-interface-configurations', 'data'),
+        Output('model-config', 'data'),
+        Output('finance-config', 'data'),
         Output('prequeue-model-run', 'data'),
         Output('prequeue-finance-run', 'data'),
         Output('trigger-postprocess-model-run', 'data'),
@@ -3755,12 +3702,14 @@ def add_input_callbacks(app):
         Input('dispatchitem-action-user', 'data'),
         State('store-model-interface-configurations', 'data'),
         State('store-finance-interface-configurations', 'data'),
+        State('store-selected-configuration', 'data'),
         prevent_initial_call = True
     )
     def dispatcher_action_user(
         dispatchitem_action_user,
         store_model_interface_configurations,
         store_finance_interface_configurations,
+        store_selected_configuration
     ):
         """
         Handle a user action.
@@ -3776,7 +3725,16 @@ def add_input_callbacks(app):
         All updates should be applied prior to the model run request being
         sent.
         """
-        NUP = no_update, no_update, no_update, no_update, no_update, no_update
+        NUP = (
+            no_update, # store-model-interface-configurations
+            no_update, # store-finance-interface-configurations
+            no_update, # model-config
+            no_update, # finance-config
+            no_update, # prequeue-model-run
+            no_update, # prequeue-finance-run
+            no_update, # trigger-postprocess-model-run
+            no_update, # trigger-postprocess-finance-fun
+        )
         if dispatchitem_action_user is None:
             return NUP
         
@@ -3850,15 +3808,27 @@ def add_input_callbacks(app):
                             fnc_conf[action['key_section']] = {}
                         fnc_conf[action['key_section']].update(update_val)
                     # We'll synchronise finances once we've done all the updates
+
+        if store_selected_configuration is None:
+            selected_model_id = ""
+            selected_finance_id = ""
+        else:
+            selected_config = json.loads(store_selected_configuration)
+            selected_model_id = selected_config['model_uuid']
+            selected_finance_id = selected_config['finance_uuid']
+
+        r_model_config = no_update
+        r_finance_config = no_update
         
         mdl_run_list = []
         for model_id in mdl_change_list:
             mdl_conf = store_model_interface_configurations.get(model_id)
-            print(f'syncronising model {model_id}')
             mdl = get_model(model_id)
             dirty = sync_local_model_config_to_model(mdl_conf, mdl)
             if dirty:
                 mdl_run_list.append(model_id)
+                if model_id == selected_model_id:
+                    r_model_config = json.dumps(sprake_model_to_local_model_config(mdl))
         
         # Need to perform a manual trigger of the postprocess (for header updates)
         # even if no model runs have occurred
@@ -3866,6 +3836,7 @@ def add_input_callbacks(app):
         if len(mdl_change_list) == 0:
             r_local_model_config = no_update
         else:
+            print(f'{len(mdl_change_list)} local model configs changed')
             r_local_model_config = json.dumps(store_model_interface_configurations)
             if len(mdl_run_list) == 0:
                 r_trigger_postprocess_model_run = json.dumps([browser.model_run_request(model_id) for model_id in mdl_change_list])
@@ -3879,6 +3850,10 @@ def add_input_callbacks(app):
                 # Need to store both the finance id and its associated model id,
                 # in case the model is locked
                 fnc_run_list.append((finance_id, fnc.model.uuid))
+                if finance_id == selected_finance_id:
+                    r_finance_config = json.dumps(
+                        sprake_finance_to_interface_config(fnc)
+                    )
 
         # Need to perform a manual trigger of the postprocess (for header updates)
         # even if no finance runs have occurred
@@ -3886,6 +3861,7 @@ def add_input_callbacks(app):
         if len(fnc_change_list) == 0:
             r_local_finance_config = no_update
         else:
+            print(f'{len(fnc_change_list)} local finance configs changed')
             r_local_finance_config = json.dumps(store_finance_interface_configurations)
             if len(fnc_run_list) == 0:
                 r_trigger_postprocess_finance_run = json.dumps([browser.finance_run_request(finance_id, get_finance(finance_id).model.uuid) for finance_id in fnc_change_list])
@@ -3894,6 +3870,7 @@ def add_input_callbacks(app):
         if len(mdl_run_list) == 0:
             r_model_run_requests = no_update
         else:
+            print(f'{len(mdl_run_list)} models dirtied by updates')
             r_model_run_requests = json.dumps(
                 [browser.model_run_request(model_id) for model_id in mdl_run_list]
             )
@@ -3901,22 +3878,25 @@ def add_input_callbacks(app):
         if len(fnc_run_list) == 0:
             r_finance_run_requests = no_update
         else:
+            print(f'{len(fnc_run_list)} finances dirtied by updates')
             r_finance_run_requests = json.dumps(
                 [browser.finance_run_request(finance_id, model_id) for finance_id, model_id in fnc_run_list]
             )
 
-        print('models with local config change')
-        print(r_local_model_config)
-        print('models to request run')
-        print(r_model_run_requests)
-        print('finances with local config change')
-        print(r_local_finance_config)
-        print('finances to request run')
-        print(r_finance_run_requests)
+        #print('models with local config change')
+        #print(r_local_model_config)
+        #print('models to request run')
+        #print(r_model_run_requests)
+        #print('finances with local config change')
+        #print(r_local_finance_config)
+        #print('finances to request run')
+        #print(r_finance_run_requests)
 
         return (
             r_local_model_config,
             r_local_finance_config,
+            r_model_config,
+            r_finance_config,
             r_model_run_requests,
             r_finance_run_requests,
             r_trigger_postprocess_model_run,
@@ -3963,12 +3943,11 @@ def add_input_callbacks(app):
         if ctx.triggered_id == 'prequeue-action-user':
             action = json.loads(prequeue_action_user)
             
-            #print(action)
             if isinstance(action, list):
                 print(f'handling {len(action)} user actions')
                 queue_action_user += action
             else:
-                print('handling single user actions')
+                print('handling single user action')
                 queue_action_user.append(action)
             
             # TODO: Rationalise queue
@@ -3999,7 +3978,7 @@ def add_input_callbacks(app):
                         dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
                         dispatch_actions.reverse()
                         
-                        print(f'dispatching {len(dispatch_actions)} actions')
+                        print(f'dispatching {len(dispatch_actions)} model config interface actions')
                         #print(dispatch_actions)
                         
                         return (
@@ -4027,7 +4006,7 @@ def add_input_callbacks(app):
                     dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
                     dispatch_actions.reverse()
 
-                    print(f'dispatching {len(dispatch_actions)} actions')
+                    print(f'dispatching {len(dispatch_actions)} finance configuration actions')
                     #print(dispatch_actions)
 
                     return (
@@ -4127,19 +4106,6 @@ def add_input_callbacks(app):
             return NUP
         
         return json.dumps(prequeue)
-    
-    def sync_fcfg_to_model(fcfg: dict, fnc: sprakefinance.SprakeFinance) -> bool:
-        """
-        Pass the finance conf dictionary into the Sprake model
-        """
-        w_fcfg = sprake_finance_to_interface_config(fnc)
-
-        dirty = False
-        if not w_fcfg == fcfg:
-            sprake_finance_set_finance_config(fcfg, fnc)
-            dirty = True
-        
-        return dirty
     
     def sync_local_model_config_to_model(
         local_model_config: dict,
@@ -4292,11 +4258,14 @@ def create_app(external_stylesheets=None):
             return None
         mdl = add_new_model(ref)
         new_model_id = mdl.uuid
+        mdl.last_run = ref.last_run
+        mdl._last_hash = hash((mdl.uuid, str(mdl.last_run)))
         # Copy over any results
         for res_class in ['generation', 'storage', 'consumption', 'net_energy']:
             ref_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], model_uuid)
             new_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], new_model_id)
-            results[new_id] = results.get(ref_id)
+            results[new_id] = copy.copy(results.get(ref_id))
+            results[new_id]['run_hash'] = hash(mdl)
 
         return mdl
     
@@ -4335,8 +4304,9 @@ def create_app(external_stylesheets=None):
         for res_class in ['finance_benefits_so', 'finance_costs_so', 'finance_value_so']:
             ref_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], ref.uuid, ref_model_uuid)
             new_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], fnc.uuid, model_uuid)
-            results[new_id] = results.get(ref_id)
-
+            results[new_id] = copy.copy(results.get(ref_id))
+            results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
+            
         return fnc
     
     def get_finance(finance_uuid: str):
