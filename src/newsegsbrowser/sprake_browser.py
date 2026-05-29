@@ -2191,6 +2191,8 @@ def sprake_model_to_local_model_config(
     cs = mdl.consumption_storage
 
     stor_input = cs.storage_params
+    print('#'*20)
+    print (stor_input)
 
     spaceheat_p = cs.spaceheat_params
     dhw_p = cs.dhw_params
