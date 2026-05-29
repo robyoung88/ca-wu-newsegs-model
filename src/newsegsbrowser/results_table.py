@@ -395,7 +395,6 @@ def add_configuration_selection_callbacks(app):
             )
             store_finance_interface_configurations[fnc.id]['finance_id'] = fnc.id
 
-            # TODO: move compose_configuration to a utility module so it can be shared
             new_config = browser.compose_configuration(
                 ref_config['name'] + " Copy",
                 mdl,
