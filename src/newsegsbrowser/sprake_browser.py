@@ -14,6 +14,7 @@ from dash import clientside_callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
+import plotly.express as px
 
 # At the moment, use a diskcache cache for transferring models 
 # regardless of background callback manager
@@ -55,6 +56,7 @@ from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_
 from src.newsegsbrowser.postprocess import post_sprake_consumption_results, post_sprake_net_results
 from src.newsegsbrowser.postprocess import post_sprake_finance_benefits_results, post_sprake_finance_costs_results
 from src.newsegsbrowser.postprocess import post_sprake_finance_value_results
+from src.newsegsbrowser import energy_balance_estimation
 
 from src.newsegsbrowser import ROOTDIR, STATICDATA
 #from config import settings
@@ -73,6 +75,25 @@ finances = {}
 # Results (i.e. stats run on run models and finances) should be keyed by their generating ids,
 # but also store a relevant hash.
 results = {}
+
+energy_balance = energy_balance_estimation.EstimatedEnergyBalance()
+def sync_energy_balance(mcfg):
+    energy_balance.set_wind_generation(mcfg['gen_input']['wind_capacity'])
+    energy_balance.set_pv_generation(mcfg['gen_input']['pv_capacity'])
+    energy_balance.set_spaceheat_consumption(mcfg['bc_input']['n_units'], mcfg['bc_input']['hlp'], mcfg['bc_input']['gfa'])
+    energy_balance.set_dhw_consumption(mcfg['bc_input']['n_units'], mcfg['bc_input']['ref_daily_consumption'])
+    energy_balance.set_direct_consumption(
+        mcfg['bc_input']['n_units'], 
+        (
+            (1. - mcfg['dc_input'].get('efficiency_reduction', 0))
+            * MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
+        )
+    )
+    energy_balance.set_ev_consumption(
+        mcfg['bc_input']['n_units'],
+        mcfg['dc_input']['annual_residential_consumption_per_ev'],
+        mcfg['dc_input']['n_evs_per_household'],
+    )
 
 def spawn_model():
     return sprakemodel.SprakeModel.from_none()
@@ -1005,6 +1026,24 @@ def create_so_value_results(econ_data=None, annual=True):
 
     return Purify(html = unescape_html_icons(out_table.to_html(classes='table', border=False)))
 
+def create_indicative_net_energy_card():
+    """
+    A Bootstrap card holding plots to help with generation and consumption sizing.
+    """
+    return dbc.Card([
+        dbc.CardBody([
+            html.H4(['Indicative net energy'], className = 'card-title'),
+            html.Details([
+                html.Summary(''),
+                dbc.Row(
+                    dbc.Col(
+                        dcc.Graph(id = 'graph-estimated-annual-energy-balance')
+                    )
+                )
+            ])
+        ])
+    ])
+
 def create_generation_input_card():
     """
     A Bootstrap card holding inputs for generation config
@@ -1881,6 +1920,14 @@ def create_layout():
 
         dbc.Row([
             dbc.Col([
+                create_indicative_net_energy_card()
+            ],
+            width = 12
+            )
+        ]),
+
+        dbc.Row([
+            dbc.Col([
                 create_generation_input_card()
             ],
             lg = 6),
@@ -2566,6 +2613,30 @@ def add_initial_callback(app):
             fcfg.get('benefit_discount_rate', 0.0),
             fcfg.get('cost_discount_rate', 0.0)
         )
+    
+    @app.callback(
+        Output('graph-estimated-annual-energy-balance', 'figure'),
+        Input('model-config', 'data'),
+        prevent_initial_call = True
+    )
+    def update_estimated_annual_energy_balance(mcfg):
+        # TODO: sync with cfg
+        if mcfg is None:
+            return no_update
+        mcfg = json.loads(mcfg)
+        sync_energy_balance(mcfg)
+
+        df = energy_balance.estimated_annual_energy_balance
+        fig = px.bar(
+            df, 
+            x = 'value', 
+            y = 'type', 
+            color = 'label', 
+            orientation = 'h',
+            labels = {'value': 'kWh/yr',
+                      'label': 'Category',
+                      'type': 'Direction'})
+        return fig
 
     return app
 
