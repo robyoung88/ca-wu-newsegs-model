@@ -15,13 +15,24 @@ class NewsegsFinance(metaclass=ABCMeta):
     _dirty = True
     
     last_update = datetime.datetime.now()
-    uuid = 1
+    uuid = "1"
 
     _benefit_discount_rate = 0.
     _cost_discount_rate = 0.
 
     def __init__(self, *args, **kwargs):
         self.uuid = str(uuid.uuid4())
+    
+    @property
+    def id(self) -> str:
+        return 'f-' + self.uuid
+    
+    @id.setter
+    def id(self, id: str) -> None:
+        uid = id.lstrip('f-')
+        if len(id) != 38 or len(uid) != 36:
+            raise ValueError(f'id: {id} is not a valid NewsegsFinance identifier')
+        self.uuid = uid
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
@@ -459,9 +470,9 @@ class NewsegsFinance(metaclass=ABCMeta):
     def __hash__(self):
         return hash(
             (
-                self.uuid,
+                self.id,
                 self.last_update,
-                self.model.uuid,
+                self.model.id,
                 self.model.last_run
             )
         )

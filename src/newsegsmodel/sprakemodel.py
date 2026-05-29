@@ -390,7 +390,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._cs_result = self._mod_cs.run(self._run_period)
         self._dirty = False
         
-        self._last_hash = hash((self.uuid, str(self.last_run)))
+        self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
 
     @override

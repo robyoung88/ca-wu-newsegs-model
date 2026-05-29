@@ -164,7 +164,7 @@ def add_latlon_sync_callbacks(app):
         newloc = modlocation.Location(lat, lon, name = name)
 
         selected_config = json.loads(selected_config)
-        mdl = app.get_model(selected_config['model_uuid'])
+        mdl = app.get_model(selected_config['model_id'])
 
         if not(newloc == mdl.location):
             mdl.location = newloc

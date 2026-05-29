@@ -47,10 +47,21 @@ class NewsegsModel(metaclass=ABCMeta):
     _name = 'NewSEGS Model'
     _last_hash = 1
     last_run = datetime.datetime.now()
-    uuid = 1
+    uuid = "1"
 
     def __init__(self, *args, **kwargs):
         self.uuid = str(uuid.uuid4())
+
+    @property
+    def id(self) -> str:
+        return 'm-' + self.uuid
+    
+    @id.setter
+    def id(self, id: str) -> None:
+        uid = id.lstrip('m-')
+        if len(id) != 38 or len(uid) != 36:
+            raise ValueError(f'id: {id} is not a valid NewsegsModel identifier')
+        self.uuid = uid
 
     @abstractmethod
     def run(self) -> int:
