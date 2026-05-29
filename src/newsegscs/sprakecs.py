@@ -319,6 +319,8 @@ class SprakeCS(NewsegsCS):
 
     @n_units.setter
     def n_units(self, n_units: Number) -> None:
+        if self._n_units == n_units:
+            return
         self._n_units = n_units
         self._appliance_params['n_households'] = n_units
         self._ev_params['n_evs'] = n_units * self._ev_per_unit
@@ -333,8 +335,9 @@ class SprakeCS(NewsegsCS):
     @ev_per_unit.setter
     def ev_per_unit(self, ev_per_unit: Number) -> None:
         self._ev_per_unit = ev_per_unit
+        v0 = self._ev_params['n_evs']
         self._ev_params['n_evs'] = self.n_units * self._ev_per_unit
-        self.dirty = True
+        self.dirty = self.dirty or (v0 != self._ev_params['n_evs'])
     
     @property
     def appliance_params(self) -> dict:
@@ -342,40 +345,45 @@ class SprakeCS(NewsegsCS):
     
     # Keep property as read-only, use explicit setter as dict is mutable anyway
     def set_appliance_params(self, params: dict) -> None:
-        self._appliance_params = params
-        self.dirty = True
+        v0 = self._appliance_params.copy()
+        self._appliance_params.update(params)
+        self.dirty = self.dirty or (v0 != self._appliance_params)
 
     @property
     def ev_params(self) -> dict:
         return self._ev_params
 
     def set_ev_params(self, params: dict) -> None:
-        self._ev_params = params
-        self.dirty = True
+        v0 = self._ev_params.copy()
+        self._ev_params.update(params)
+        self.dirty = self.dirty or (v0 != self._ev_params)
 
     @property
     def dhw_params(self) -> dict:
         return self._dhw_params
 
     def set_dhw_params(self, params: dict) -> None:
-        self._dhw_params = params
-        self.dirty = True
+        v0 = self._dhw_params.copy()
+        self._dhw_params.update(params)
+        self.dirty = self.dirty or (v0 != self._dhw_params)
 
     @property
     def spaceheat_params(self) -> dict:
         return self._spaceheat_params
 
     def set_spaceheat_params(self, params: dict) -> None:
-        self._spaceheat_params = params
-        self.dirty = True
+        v0 = self._spaceheat_params.copy()
+        self._spaceheat_params.update(params)
+        self.dirty = self.dirty or (v0 != self._spaceheat_params)
 
     @property
     def storage_params(self) -> dict:
         return self._storage_params
     
     def set_storage_params(self, params: dict) -> None:
-        self._storage_params = params
-        self.dirty = True
+        v0 = self._storage_params.copy()
+        self._storage_params.update(params)
+        self.dirty = self.dirty or (v0 != self._storage_params)
 
     def run(
         self, 
