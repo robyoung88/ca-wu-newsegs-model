@@ -2,39 +2,24 @@
 
 import os
 import datetime
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
-import holidays
+from src.util.holiday_helpers import get_holiday_df
 
 from config import settings
 # Where to find elexon profile data
 lookup_dir = settings.get('SprakeDataLoc')
 
 # These data are retrospective, i.e. timestamp marks end of half-hour of demand
-PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir, 
-                                          r"Average_Profiling_data_201314_evaluated@10yearNET_v1.0.xlsx"),
-                            sheet_name="Average Profile Class data",
-                            header=2, nrows=48, # For Profile 1
-                            dtype={'Settlement period':str}
-                            ) \
-                .assign(
-                    **{'Settlement period': lambda df: pd.to_timedelta(df['Settlement period']),
-                       'end_day_seconds': lambda df: df['Settlement period'].dt.total_seconds()}
-                ) \
-                .assign(
-                    # Because these periods are retrospective, we end at midnight and a 0. Convert it to a 24
-                    end_day_seconds = lambda df: np.where(df['end_day_seconds']==0.0, 24.0*3600.0, df['end_day_seconds']),
-                    start_day_seconds = lambda df: df['end_day_seconds'].shift(1, fill_value = 0.0)
-                ) \
-                .melt(id_vars=['Settlement period','start_day_seconds','end_day_seconds'],
-                      var_name="profile",value_name="consumption_rate") \
-                .assign(
-                    split_prof = lambda df: df['profile'].str.split(" "),
-                    elexon_season = lambda df: df.apply(lambda rw: rw['split_prof'][0].lower(), axis=1),
-                    elexon_day = lambda df: df.apply(lambda rw: rw['split_prof'][1].lower(), axis=1),
-                ) \
-                .loc[:, ['start_day_seconds', 'end_day_seconds', 'elexon_season', 'elexon_day', 'consumption_rate']]
+PROFILE_DATA = pd.read_parquet(
+    os.path.join(
+        lookup_dir, 
+        r"Average_Profiling_data_201314_evaluated@10yearNET_v1.0.gzip"
+    )
+)
 
 # First elexon season change in year is spring - first day of year of BST
 # This is last Sunday in March
@@ -111,8 +96,11 @@ def get_start_elexon_wtr(year:int) -> pd.Timestamp:
     """
     return get_first_day_gmt(year)
 
-def characterise_dates_elexon(datetimes,
-                              hols = holidays.country_holidays('GB', subdiv='WLS')):
+def characterise_dates_elexon(
+    datetimes,
+    holiday_country = 'GB',
+    holiday_subdiv = 'WLS'
+):
     """
     Categorise datetimes by season and day of week per elexon profiling schedule
 
@@ -139,13 +127,22 @@ def characterise_dates_elexon(datetimes,
         )
     )
 
+    start_year = min(years)
+    end_year = max(years)
+    hol_df = get_holiday_df(start_year, end_year, holiday_country, holiday_subdiv)
+
     oframe = (
         oframe
         .set_index('year')
         .join(index_dates.set_index('year'))
         .reset_index()
         .assign(
-            is_holiday = lambda df: df.apply(lambda rw: rw['datetime'] in hols, axis=1),
+            datetime_day = lambda df: df['datetime'].dt.floor('D')
+        )
+        .set_index('datetime_day')
+        .join(hol_df, how = 'left')
+        .reset_index()
+        .assign(
             is_weekday = lambda df: df['day_no'] < 5,
             is_sat = lambda df: df['day_no'] == 5,
             is_sun = lambda df: df['day_no'] == 6,

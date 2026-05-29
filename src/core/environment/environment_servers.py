@@ -94,6 +94,18 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
         timespan: TimeSpan
     ) -> pd.DatetimeIndex:
         ...
+    
+    #def __getstate__(self):
+    #    """
+    #    Return the state for pickling.
+    #    
+    #    May be overwritten to provide state as other than a dict; for now, it
+    #    makes sense to.
+    #    """
+    #    odict = {
+    #        'name': self._name
+    #    }
+    #    return odict
 
     def __str__(self) -> str:
         return classfuncs.get_class(self) + ' v' + str(self._version)

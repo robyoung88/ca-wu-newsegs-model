@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from typing import Literal
+import datetime
 
 from dash import html
 import dash_bootstrap_components as dbc
@@ -207,6 +208,57 @@ def create_numeric_card_input(icon_name,
                   })
     ])
 
+def create_numeric_card_input_compound_key(
+    icon_name,
+    label,
+    type_id,
+    key,
+    section = None,
+    placeholder = 0.0,
+    min = 0.0,
+    max = None,
+    step = 1
+):
+    if section is None:
+        section = 'None'
+    
+    input_id = {
+        'type': type_id,
+        'key': key,
+        'section': section
+    }
+    if float(int(step)) == float(step):
+        step = int(step)
+        cn = f'dynamic-step-field step-val-{step:d}'
+    else:
+        cn = f'dynamic-step-field step-val-{step:f}'
+
+    
+    return html.Div([
+        html.H5(
+            [
+                get_icon(icon_name),
+                html.Span(label+":", className='mr-3')
+            ],
+            style={'display':'inline'}
+        ),
+        dbc.Input(
+            id = input_id,
+            type = 'number',
+            placeholder = placeholder,
+            debounce = True,
+            min = min,
+            max = max,
+            step = 'any',
+            style = {
+                'display':'inline-block',
+                'float':'right',
+                'width':'30%'
+            },
+            className = cn
+        )
+    ])
+
 def unescape_html_icons(html_text):
     return (
         html_text
@@ -214,3 +266,66 @@ def unescape_html_icons(html_text):
         .replace('"&gt;&lt;','"><')
         .replace('i&gt;', 'i>')
     )
+
+##### Functions for app control - Actions, Queue items etc #####
+def model_interface_action(
+    model_id,
+    input_key,
+    input_value,
+    key_section = None,
+    input_time = None
+):
+    if input_time is None:
+        input_time = datetime.datetime.now()
+    return {
+        'type': 'model_config_interface_update',
+        'model_id': model_id,
+        'key': input_key,
+        'val': input_value,
+        'key_section': key_section,
+        'time': input_time.timestamp(),
+    }
+
+def finance_interface_action(
+    finance_id,
+    input_key,
+    input_value,
+    key_section = None,
+    input_time = None
+):
+    if input_time is None:
+        input_time = datetime.datetime.now()
+    return {
+        'type': 'finance_config_interface_update',
+        'finance_id': finance_id,
+        'key': input_key,
+        'val': input_value,
+        'key_section': key_section,
+        'time': input_time.timestamp(),
+    }
+
+def model_run_request(
+    model_id,
+    request_time = None
+):
+    if request_time is None:
+        request_time = datetime.datetime.now()
+    return {
+        'type': 'model_run_request',
+        'model_id': model_id,
+        'time': request_time.timestamp()
+    }
+
+def finance_run_request(
+    finance_id,
+    model_id,
+    request_time = None
+):
+    if request_time is None:
+        request_time = datetime.datetime.now()
+    return {
+        'type': 'finance_run_request',
+        'finance_id': finance_id,
+        'model_id': model_id,
+        'time': request_time.timestamp()
+    }

@@ -614,6 +614,28 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         if ip.get('loc', None) is not None:
             ip['loc'] = location.location_from_dict(ip['loc'])
         return cls.from_characteristics(**ip)
+    
+    def __getstate__(self):
+        """
+        State for pickling.
+
+        Essentially just provides the __dict__ contents, but after
+        stripping out the _cp_func so that it may be re-built after
+        unpickling.
+        """
+        odict = self.__dict__.copy()
+        odict.pop('_cp_func', None)
+        return odict
+    
+    def __setstate__(self, state):
+        """
+        Set the state of a new instance - for unpickling.
+
+        Essentially copies over the state to the __dict__ then
+        forces creation of the _cp_func.
+        """
+        self.__dict__.update(state)
+        self.set_cp_curve(self._cp_curve)
 
 # WindTurbineElecGenerator copy constructor
 @WindTurbineElecGenerator.__init__.register(WindTurbineElecGenerator)

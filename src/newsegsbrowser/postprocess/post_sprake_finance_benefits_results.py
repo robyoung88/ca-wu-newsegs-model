@@ -36,7 +36,7 @@ def finance_benefits_results_to_interface_sprake(
             .rename(columns = {'receipts': 'receipts_exports'})
         )
         .assign(
-            receipts_total = lambda df: df.apply(sum, axis=1)
+            receipts_total = lambda df: df.sum(axis=1)
         )
     )
 

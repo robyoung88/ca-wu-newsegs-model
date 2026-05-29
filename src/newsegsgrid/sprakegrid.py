@@ -15,11 +15,15 @@ from src.core import timespan as modtimespan
 from src.newsegsmodel import newsegsmodel
 
 class SprakeGridResult(newsegsmodule.ABCNewsegsModuleResult):
-    def __init__(self,
-                 timespan: modtimespan.RegTimeSpan,
-                 import_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]],
-                 export_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]]
-                 ) -> None:
+    def __init__(
+        self,
+        *args,
+        timespan: modtimespan.RegTimeSpan,
+        import_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]],
+        export_unit_cost:np.ndarray[tuple[int], np.dtype[np.number]],
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
         self._timespan = copy.copy(timespan)
         self.set_import_cost(import_unit_cost)
         self.set_export_cost(export_unit_cost)
@@ -86,6 +90,7 @@ class SprakeGrid(NewsegsGrid):
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None
     ) -> None:
+        super().__init__()
         self.import_rate = import_per_unit
         self.export_rate = export_per_unit
 
@@ -134,7 +139,12 @@ class SprakeGrid(NewsegsGrid):
         self._export_rate = rate
         self.dirty = True
 
-    def run(self, timespan: modtimespan.TimeSpan):
+    def run(
+        self, 
+        timespan: modtimespan.TimeSpan,
+        run_start: datetime.datetime | None = None
+    ) -> SprakeGridResult:
+        super().run(timespan, run_start)
         if not isinstance(timespan, modtimespan.RegTimeSpan):
             if self.model is None:
                 raise ValueError("Grid module requires a model to serve timestep")
@@ -145,9 +155,10 @@ class SprakeGrid(NewsegsGrid):
 
         self.dirty = False
         return SprakeGridResult(
-            timespan,
-            self.import_rate * np.ones(model_length),
-            self.export_rate * np.ones(model_length)
+            self,
+            timespan = timespan,
+            import_unit_cost = self.import_rate * np.ones(model_length),
+            export_unit_cost = self.export_rate * np.ones(model_length)
         )
 
     @classmethod
@@ -211,6 +222,7 @@ def _SprakeGrid_from_other(
     self,
     other: SprakeGrid
 ) -> None:
+    super(SprakeGrid, self).__init__()
     self.import_rate = other.import_rate
     self.export_rate = other.export_rate
     self.name = other.name

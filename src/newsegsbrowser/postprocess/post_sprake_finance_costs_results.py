@@ -36,7 +36,7 @@ def finance_costs_results_to_interface_sprake(
             .rename(columns = {'costs': 'om_costs_stor'})
         )
         .assign(
-            variable_costs = lambda df: df.apply(sum, axis=1)
+            variable_costs = lambda df: df.sum(axis=1)
         )
     )
 

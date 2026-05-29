@@ -1,8 +1,10 @@
 from __future__ import annotations
 import os
 import copy
+import datetime
 from typing import override, Mapping
 from functools import singledispatchmethod
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -173,6 +175,10 @@ def get_sprake_ned100():
 
     return turbine
 
+# Deferred results 
+#@lru_cache
+#def d
+
 class SprakeModel(newsegsmodel.NewsegsModel):
     _name = 'Sprake Model'
     _model_version = '0.0.1'
@@ -209,6 +215,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         loc: modlocation.Location | None = None,
         name: str | None = None,
     ) -> None:
+        super().__init__()
 
         if local_environment_server:
             if isinstance(local_environment_server, str):
@@ -264,7 +271,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         if name is not None:
             self.name = name
 
-        self._dirty_flag = True
+        self._dirty = True
 
     @__init__.register(str)
     def _from_str(
@@ -292,7 +299,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
         self._run_period = modtimespan.RegTimeSpan(timespan)
         self._run_period.timestep = self._default_timestep
-        self._dirty_flag = True
+        self._dirty = True
 
     def get_run_period(self) -> modtimespan.TimeSpan:
         return self._run_period
@@ -377,10 +384,14 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @override
     def run(self):
+        self.last_run = datetime.datetime.now()
         self._generation_result = self._mod_gen.run(self._run_period)
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)
-        self._dirty_flag = False
+        self._dirty = False
+        
+        self._last_hash = hash((self.uuid, str(self.last_run)))
+        return self._last_hash
 
     @override
     def to_dict(self) -> Mapping:
@@ -451,6 +462,7 @@ def _SprakeModel_from_other(
     self,
     other: SprakeModel
 ) -> None:
+    super(SprakeModel, self).__init__()
     self.local_env = other.local_env
     self.wider_env = other.wider_env
 
@@ -460,4 +472,4 @@ def _SprakeModel_from_other(
 
     self._default_timestep = other.get_default_timestep()
     self.set_run_period(other.get_run_period())
-    self._dirty_flag = True
+    self._dirty = True

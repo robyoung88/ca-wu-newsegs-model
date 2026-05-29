@@ -1,11 +1,34 @@
 from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
+import datetime
+import uuid
+from functools import lru_cache
+
+
 import numpy as np
 import pandas as pd
 from src.core.timespan import TimeSpan, RegTimeSpan
 from collections.abc import Iterable, Collection, Mapping
 
 class ABCNewsegsModuleResult(metaclass=ABCMeta):
+    run_module_uuid = 1
+    last_run = datetime.datetime.now()
+    
+    def __init__(
+        self,
+        run_module: NewsegsModule | int,
+        last_run: datetime.datetime | None = None,
+    ):
+        if isinstance(run_module, NewsegsModule):
+            if last_run is None:
+                last_run = run_module.last_run
+            run_module = run_module.uuid
+        self.run_module_uuid = run_module
+        if last_run is None:
+            raise ValueError('`last_run` cannot be None if run_module is not a NewsegsModule, is {}'.format(type(run_module)))
+        self.last_run = last_run
+
     @property
     @abstractmethod
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
@@ -42,21 +65,39 @@ class ABCNewsegsModuleResult(metaclass=ABCMeta):
 
         Caution - this implementation could become unweildy for large results
         """
-        datetime = self.get_timespan().to_pandas()
-        return pd.DataFrame(data=self.meters.T,
-                            index=datetime,
-                            columns=self.get_meter_names())
-
+        return defer_meters_to_pandas(self)
+        
     def dsm_to_pandas(self) -> pd.DataFrame:
         """
         Return the dsm data as a pandas dataframe
 
         Caution - this implementation could become unweildy for large results
         """
-        datetime = self.get_timespan().to_pandas()
-        return pd.DataFrame(data=self.dsm.T,
-                            index=datetime,
-                            columns=self.get_dsm_names())
+        return defer_dsm_to_pandas(self)
+
+    def __hash__(self):
+        """The hash is dependent on the module uuid and run time."""
+        return hash(
+            (
+                self.run_module_uuid, 
+                self.last_run,
+            )
+        )
+
+
+@lru_cache
+def defer_meters_to_pandas(res: ABCNewsegsModuleResult):
+    datetime = res.get_timespan().to_pandas()
+    return pd.DataFrame(data = res.meters.T,
+                        index = datetime,
+                        columns = res.get_meter_names())
+
+@lru_cache
+def defer_dsm_to_pandas(res: ABCNewsegsModuleResult):
+    datetime = res.get_timespan().to_pandas()
+    return pd.DataFrame(data = res.dsm.T,
+                        index = datetime,
+                        columns = res.get_dsm_names())
 
 def filter_meters(
     results: ABCNewsegsModuleResult,
@@ -123,12 +164,22 @@ class NewsegsModule(metaclass=ABCMeta):
     Basic abstract class serving module results
     """
 
-    _dirty_flag = True
+    _dirty = True
     _model = None
 
+    def __init__(self, *args, **kwargs):
+        self.uuid = str(uuid.uuid4())
+
     @abstractmethod
-    def run(self, timespan:TimeSpan) -> ABCNewsegsModuleResult:
-        ...
+    def run(
+        self,
+        timespan:TimeSpan,
+        run_start: datetime.datetime | None = None
+    ) -> ABCNewsegsModuleResult:
+        if run_start is None:
+            run_start = datetime.datetime.now()
+        self.last_run = run_start
+        # Returns none as this is still abstract
    
     @property
     @abstractmethod
@@ -167,8 +218,8 @@ class NewsegsModule(metaclass=ABCMeta):
         """
         Has the model configuration changed since last run?
         """
-        return self._dirty_flag
+        return self._dirty
 
     @dirty.setter
     def dirty(self, val:bool) -> None:
-        self._dirty_flag = val
+        self._dirty = val
