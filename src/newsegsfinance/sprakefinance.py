@@ -55,9 +55,9 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     @singledispatchmethod
     def __init__(
         self,
-        unit_costs: Mapping | Number | SprakeFinance,
-        benefit_discount_rate: Number | None = None,
-        cost_discount_rate: Number | None = None,
+        unit_costs: Mapping | float|int | SprakeFinance,
+        benefit_discount_rate: float|int | None = None,
+        cost_discount_rate: float|int | None = None,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None
     ) -> None:
@@ -65,11 +65,11 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     
     # Copy constructor is registered underneath class definition for late-bind
 
-    @__init__.register(Number)
+    @__init__.register(float|int)
     def _from_number(
         self,
-        benefit_discount_rate: Number,
-        cost_discount_rate: Number = 0.0,
+        benefit_discount_rate: float|int,
+        cost_discount_rate: float|int = 0.0,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None,
     ) -> None:
@@ -91,8 +91,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     def _from_dict(
         self,
         unit_costs: Mapping,
-        benefit_discount_rate: Number = 0.0,
-        cost_discount_rate: Number = 0.0,
+        benefit_discount_rate: float|int = 0.0,
+        cost_discount_rate: float|int = 0.0,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None,
     ) -> None:
@@ -132,7 +132,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return self._unit_costs.copy()
 
-    def set_model(self, mdl:NewsegsModel, dirty: bool = True) -> None:
+    def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:
         self._model = mdl
         self.dirty = self.dirty or dirty 
     
@@ -239,10 +239,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         return _deferred_get_total_present_benefits_undiscounted(
             self,
             horizon
-        ).copy()
+        )
     
     def get_total_present_benefits_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        return _deferred_get_total_present_benefits_discounted(self, horizon).copy()
+        return _deferred_get_total_present_benefits_discounted(self, horizon)
         
     # Costs
     
@@ -434,7 +434,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         return _deferred_get_net_present_value_discounted(self, horizon)
     
     @override
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             'class': classfuncs.get_class(self),
             'name': self._name,
@@ -485,7 +485,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         return o
 
 # SprakeFinance copy constructor
-@SprakeFinance.__init__.register(SprakeFinance)
+@SprakeFinance.__init__.register(SprakeFinance) # pyright: ignore[reportFunctionMemberAccess]
 def _SprakeFinance_from_other(
     self,
     other: SprakeFinance
@@ -548,6 +548,9 @@ def _deferred_get_resident_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataF
     consumption = fnc._get_resident_consumption()
     if len(consumption) == 0:
         return consumption
+
+    if fnc.model is None:
+        raise TypeError('NewsegsFinance instance does not have an attached NewsegsModel')
     
     odf = (
         consumption

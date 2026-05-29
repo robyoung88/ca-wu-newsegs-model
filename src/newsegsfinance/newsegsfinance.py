@@ -3,6 +3,7 @@
 from abc import ABCMeta, abstractmethod
 import datetime
 import uuid
+import re
 
 from src.newsegsmodel import NewsegsModel
 import pandas as pd
@@ -29,22 +30,22 @@ class NewsegsFinance(metaclass=ABCMeta):
     
     @id.setter
     def id(self, id: str) -> None:
-        uid = id.lstrip('f-')
+        uid = re.sub('^f-', '', id)
         if len(id) != 38 or len(uid) != 36:
             raise ValueError(f'id: {id} is not a valid NewsegsFinance identifier')
         self.uuid = uid
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
-    def set_model(self, mdl: NewsegsModel, dirty: bool = True) -> None:
+    def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:
         ...
     
     @property
-    def model(self) -> NewsegsModel:
+    def model(self) -> NewsegsModel | None:
         return self._model
     
     @model.setter
-    def model(self, mdl: NewsegsModel) -> None:
+    def model(self, mdl: NewsegsModel | None) -> None:
         self.set_model(mdl)
 
     @property
@@ -103,7 +104,7 @@ class NewsegsFinance(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def ev_receipts_undiscounted(self) -> pd.DataFrame:
+    def ev_receipts_discounted(self) -> pd.DataFrame:
         """
         Frame of timeseries of EV receipts (benefits discount applied).
 
@@ -441,11 +442,11 @@ class NewsegsFinance(metaclass=ABCMeta):
         ...
     
     @abstractmethod
-    def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None):
+    def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
         ...
 
     @abstractmethod
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """
         Configuration as a dictionary
         """
@@ -468,11 +469,19 @@ class NewsegsFinance(metaclass=ABCMeta):
         self._dirty = val
 
     def __hash__(self):
+        mdl = self.model
+        if mdl is None:
+            return hash(
+                (
+                    self.id,
+                    self.last_update,
+                )
+            )
         return hash(
             (
                 self.id,
                 self.last_update,
-                self.model.id,
-                self.model.last_run
+                mdl.id,
+                mdl.last_run
             )
         )

@@ -194,21 +194,21 @@ class NewsegsModule(metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """
         Configuration as a dictionary
         """
         ...
     
     @abstractmethod
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict) -> None:
         """
         Update configuration using a dictionary.
         """
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, config: Mapping) -> NewsegsModule:
+    def from_dict(cls, config: dict) -> NewsegsModule:
         """
         An instance of the module configured per a dictionary.
         """

@@ -58,7 +58,7 @@ class NewsegsModel(metaclass=ABCMeta):
     
     @id.setter
     def id(self, id: str) -> None:
-        uid = id.lstrip('m-')
+        uid = re.sub('^m-', '', id)
         if len(id) != 38 or len(uid) != 36:
             raise ValueError(f'id: {id} is not a valid NewsegsModel identifier')
         self.uuid = uid
@@ -79,6 +79,7 @@ class NewsegsModel(metaclass=ABCMeta):
         Define the timespan of simulation
         """
 
+    @abstractmethod
     def get_run_period(self) -> TimeSpan:
         """
         Get the current timespan of the simulation

@@ -1,15 +1,20 @@
 from collections.abc import Sequence
 from typing import Literal
+from typing import TypeVar
+from typing import overload
+from typing import Optional
+from typing import List
 import datetime
 import uuid
 
 from dash import html
 import dash_bootstrap_components as dbc
+from useful_types import SequenceNotStr
 
 from src.newsegsmodel import newsegsmodel
 from src.newsegsfinance import newsegsfinance
 
-def flatten_mixed_list(mixed_list):
+def flatten_mixed_list(mixed_list: Sequence[List[str] | str]) -> List[str]:
     flat_list=[]
     for item in mixed_list:
         if isinstance(item, str):
@@ -18,7 +23,7 @@ def flatten_mixed_list(mixed_list):
             flat_list += item
     return flat_list
 
-def len_mixed_list(mixed_list):
+def len_mixed_list(mixed_list: Sequence[List[str] | str]) -> List[int]:
     lens=[]
     for item in mixed_list:
         if isinstance(item, str):
@@ -27,7 +32,12 @@ def len_mixed_list(mixed_list):
             lens += [len(item)]
     return lens
 
-def repeat_list_by_index(l, repeats):
+T = TypeVar('T')
+
+def repeat_list_by_index(
+    l: Sequence[T], 
+    repeats: int | Sequence[int]
+) -> List[T]:
     if not isinstance(repeats, Sequence):
         repeats = [repeats] * len(l)
     assert len(l) == len(repeats), '`repeats` must be a scalar or same length as the list'
@@ -85,10 +95,140 @@ DEFAULT_ICONS = {
     'config-download': 'bi bi-box-arrow-down',
     'config-upload': 'bi bi-box-arrow-in-up',
     'results-download': 'bi bi-table',
+    'show-graph': 'bi bi-graph-up',
 }
-def get_icon(icon_name:None|Sequence|str=None,
-             icon_class:None|Sequence|str=None,
-             style_name:Literal['default','raw','unpadded']='default'):
+
+@overload
+def get_icon(
+    icon_name: str,
+    icon_class: Optional[SequenceNotStr[str] | str]=...,
+    style_name: Literal['default', 'unpadded']=...,
+) -> html.I:
+    ...
+
+@overload
+def get_icon(
+    icon_name: str,
+    *,
+    style_name: Literal['default', 'unpadded']=...,
+) -> html.I:
+    ...
+
+@overload
+def get_icon(
+    icon_name: str,
+    icon_class: Optional[SequenceNotStr[str] | str],
+    style_name: Literal['raw'],
+) -> str:
+    ...
+
+@overload
+def get_icon(
+    icon_name: str,
+    *,
+    style_name: Literal['raw'],
+) -> str:
+    ...
+
+@overload
+def get_icon(
+    icon_name: SequenceNotStr[str],
+    icon_class: Optional[SequenceNotStr[str]],
+    style_name: Literal['default', 'unpadded']=...,
+) -> html.Span:
+    ...
+
+@overload
+def get_icon(
+    icon_name: SequenceNotStr[str],
+    *,
+    style_name: Literal['default', 'unpadded']=...,
+) -> html.Span:
+    ...
+
+@overload
+def get_icon(
+    icon_name: SequenceNotStr[str],
+    icon_class: Optional[SequenceNotStr[str]],
+    style_name: Literal['raw'],
+) -> List[str]:
+    ...
+
+@overload
+def get_icon(
+    icon_name: SequenceNotStr[str],
+    *,
+    style_name: Literal['raw'],
+) -> List[str]:
+    ...
+
+@overload
+def get_icon(
+    icon_name: None,
+    icon_class: str,
+    style_name: Literal['default', 'unpadded']=...
+) -> html.I:
+    ...
+
+@overload
+def get_icon(
+    *,
+    icon_class: str,
+    style_name: Literal['default', 'unpadded']=...
+) -> html.I:
+    ...
+
+@overload
+def get_icon(
+    icon_name: None,
+    icon_class: str,
+    style_name: Literal['raw'],
+) -> str:
+    ...
+
+@overload
+def get_icon(
+    *,
+    icon_class: str,
+    style_name: Literal['raw'],
+) -> str:
+    ...
+
+@overload
+def get_icon(
+    icon_name: None,
+    icon_class: SequenceNotStr[str],
+    style_name: Literal['default', 'unpadded']=...
+) -> html.Span:
+    ...
+
+@overload
+def get_icon(
+    *,
+    icon_class: SequenceNotStr[str],
+    style_name: Literal['default', 'unpadded']=...
+) -> html.Span:
+    ...
+
+@overload
+def get_icon(
+    icon_name: None,
+    icon_class: SequenceNotStr[str],
+    style_name: Literal['raw'],
+) -> List[str]:
+    ...
+
+@overload
+def get_icon(
+    *,
+    icon_class: SequenceNotStr[str],
+    style_name: Literal['raw'],
+) -> List[str]:
+    ...
+
+def get_icon(icon_name: None | SequenceNotStr[str] | str = None,
+             icon_class: None | SequenceNotStr[str] | str = None,
+             style_name: Literal['default', 'raw', 'unpadded'] = 'default'):
     
     # Icon for missing names:
     mi = "bi bi-exclamation-circle"
@@ -100,13 +240,13 @@ def get_icon(icon_name:None|Sequence|str=None,
 
     if not icon_name is None:
         if isinstance(icon_name, str):
-            if not icon_class is None:
-                if not (isinstance(icon_class, str) or len(icon_class) == 1):
-                    raise ValueError('icon_class must match length of icon_name')
-                if not isinstance(icon_class, str):
-                    icon_class = icon_class[0]
-            else:
-                icon_class = ""
+            if icon_class is None:
+                icon_class = ''
+            elif not isinstance(icon_class, str):
+                if len(icon_class) > 1:
+                    raise ValueError(f'icon_class must match length of icon_name; icon_name is single string, icon_class is length {len(icon_class)}')
+                icon_class = icon_class[0]
+            
             fetched_icon = DEFAULT_ICONS.get(icon_name, mi)
             if style_name == 'raw':
                 return fetched_icon
@@ -119,7 +259,9 @@ def get_icon(icon_name:None|Sequence|str=None,
                         return html.I(className=' '.join([fetched_icon, icon_class]).strip())
             else:
                 ic = [' '.join([x, icon_class]).strip() for x in fetched_icon]
-                return get_icon(icon_class=ic, style_name=style_name)
+                return get_icon(icon_class = ic, style_name = style_name)
+            
+            return ""
         else:
             # Assume is sequence
             if len(icon_name) == 1:
@@ -131,14 +273,14 @@ def get_icon(icon_name:None|Sequence|str=None,
                 if isinstance(icon_class, str):
                     icon_class = [icon_class]
                 if len(icon_class) == 1:
-                    icon_class = icon_class * len(icon_name)
+                    icon_class = list(icon_class) * len(icon_name)
             else:
                 icon_class = [""] * len(icon_name)
             
-            ilistraw = [get_icon(x, style_name='raw') for x in icon_name]
+            ilistraw = [get_icon(x, None, style_name = 'raw') for x in icon_name]
             # Some icons may be lists themselves. Run a quick expansion
             class_reps = len_mixed_list(ilistraw)
-            icon_class = repeat_list_by_index(icon_class, class_reps)
+            icon_class = repeat_list_by_index(list(icon_class), class_reps)
             ilistraw = flatten_mixed_list(ilistraw)
 
             match style_name:
@@ -146,7 +288,7 @@ def get_icon(icon_name:None|Sequence|str=None,
                     return ilistraw
                 case 'unpadded':
                     return html.Span([
-                        html.I(className=' '.join([ilistraw[i],icon_class[i]]).strip()) for i in range(len(ilistraw))
+                        html.I(className=' '.join([ilistraw[i], icon_class[i]]).strip()) for i in range(len(ilistraw))
                     ])
                 case 'default':
                     ilist = []
@@ -158,6 +300,8 @@ def get_icon(icon_name:None|Sequence|str=None,
                         else:
                             ilist.append(html.I(className=' '.join([ilistraw[i], mid_sequence_pad_class ,icon_class[i]]).strip()))
                     return html.Span(ilist)
+            
+            return []
     else:
         if icon_class is None:
             raise ValueError('One of `icon_name` or `icon_class` must be provided')
@@ -169,6 +313,7 @@ def get_icon(icon_name:None|Sequence|str=None,
                     return html.I(className=icon_class)
                 case 'default':
                     return html.I(className=' '.join([icon_class, default_pad_class]))
+            return ""
         else:
             if len(icon_class) == 1:
                 return get_icon(icon_class = icon_class[0], style_name=style_name)
@@ -190,14 +335,17 @@ def get_icon(icon_name:None|Sequence|str=None,
                         else:
                             ilist.append(html.I(className=' '.join([mid_sequence_pad_class, icon_class[i]]).strip()))
                     return html.Span(ilist)
+    
     return []
 
-def create_numeric_card_input(icon_name,
-                              label,
-                              input_id):
+def create_numeric_card_input(
+    icon_name: str | SequenceNotStr[str],
+    label: str,
+    input_id: str
+):
     return html.Div([
         html.H5([
-            get_icon(icon_name),
+            get_icon(icon_name, None, 'default'),
             html.Span(label+":", className='mr-3')
         ],
         style={'display':'inline'}),
@@ -213,15 +361,15 @@ def create_numeric_card_input(icon_name,
     ])
 
 def create_numeric_card_input_compound_key(
-    icon_name,
-    label,
-    type_id,
-    key,
-    section = None,
-    placeholder = 0.0,
-    min = 0.0,
-    max = None,
-    step = 1
+     icon_name: str | SequenceNotStr[str],
+    label: str,
+    type_id: str,
+    key: str,
+    section: str | None = None,
+    placeholder: int | float = 0.0,
+    min: int | float | None = 0.0,
+    max: int | float | None = None,
+    step: int | float  = 1
 ):
     if section is None:
         section = 'None'
@@ -241,7 +389,7 @@ def create_numeric_card_input_compound_key(
     return html.Div([
         html.H5(
             [
-                get_icon(icon_name),
+                get_icon(icon_name, None, 'default'),
                 html.Span(label+":", className='mr-3')
             ],
             style={'display':'inline'}
