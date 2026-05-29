@@ -67,9 +67,11 @@ with open(_CONST_FILE, 'r') as f:
 launch_uid = uuid.uuid4()
 
 # Locally (to app, not background callback managed) accessible dictionaries
-# of models and finances. These should be keyed by their uuids.
+# of models and finances. These should be keyed by their ids.
 models = {}
 finances = {}
+# Results (i.e. stats run on run models and finances) should be keyed by their generating ids,
+# but also store a relevant hash.
 results = {}
 
 def spawn_model():
@@ -107,27 +109,6 @@ def finance_to_cache(finance_id):
 def finance_from_cache(finance_id):
     fnc = cache.get(finance_id)
     return fnc
-
-def compose_configuration(
-    name: str,
-    mdl: newsegsmodel.NewsegsModel | str,
-    fnc: newsegsfinance.NewsegsFinance | str
-) -> dict:
-    if isinstance(mdl, newsegsmodel.NewsegsModel):
-        mdl_uuid = mdl.uuid
-    else:
-        mdl_uuid = mdl
-    if isinstance(fnc, newsegsfinance.NewsegsFinance):
-        fnc_uuid = fnc.uuid
-    else:
-        fnc_uuid = fnc
-    
-    return {
-        'uuid': str(uuid.uuid4()),
-        'name': name,
-        'model_uuid': mdl_uuid,
-        'finance_uuid': fnc_uuid
-    }
 
 def create_default_model() -> newsegsmodel.NewsegsModel:
     # Load model
@@ -2093,7 +2074,7 @@ def create_layout():
                 dcc.Store(id='finance-config-watcher'),
 
                 # To trigger resync of output fields after a model run
-                # Holds the uuid of the model (not the configuration)
+                # Holds the id of the model (not the configuration)
                 dcc.Store(id='store-model-completed-run'),
 
                 dcc.Store(id='model-config'),
@@ -2309,10 +2290,10 @@ def add_initial_callback(app):
         if selected_config is None:
             if all_configs is None:
                 # On first load, we can generate a random configuration
-                all_configs = [compose_configuration(
+                all_configs = [browser.compose_configuration(
                     'Configuration Name',
-                    str(uuid.uuid4()),
-                    str(uuid.uuid4())
+                    'm-' + str(uuid.uuid4()),
+                    'f-' + str(uuid.uuid4())
                 )]
             else:
                 all_configs = json.loads(all_configs)
@@ -2325,22 +2306,22 @@ def add_initial_callback(app):
         #print ('selected config is:')
         #print (selected_config)
         
-        mdl = models.get(selected_config['model_uuid'], None)
+        mdl = models.get(selected_config['model_id'], None)
         if mdl is None:
             # TODO: Deal with if the model should exist.
             # Need to recreate it from the local store.
             mdl = create_default_model()
-            mdl.uuid = selected_config['model_uuid']
-            models[mdl.uuid] = mdl
+            mdl.id = selected_config['model_id']
+            models[mdl.id] = mdl
         
-        fnc = finances.get(selected_config['finance_uuid'], None)
+        fnc = finances.get(selected_config['finance_id'], None)
         if fnc is None:
             # TODO: Deal with if the finance should exist.
             # Need to recreate it from the local store.
             fnc = create_default_finance()
-            fnc.uuid = selected_config['finance_uuid']
-            fnc.set_model(mdl)
-            finances[fnc.uuid] = fnc
+            fnc.id = selected_config['finance_id']
+            fnc.set_model(mdl, False)
+            finances[fnc.id] = fnc
         
         mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
 
@@ -2607,10 +2588,10 @@ def get_finance_result_id(prefix, finance_id, model_id):
     return prefix + "fnc_" + str(finance_id) + "_mdl_" + str(model_id)
 
 def get_model_result_list(prefix, configs):
-    return [results.get(get_model_result_id(prefix, x['model_uuid'])) for x in configs]
+    return [results.get(get_model_result_id(prefix, x['model_id'])) for x in configs]
 
 def get_finance_result_list(prefix, configs):
-    return [results.get(get_finance_result_id(prefix, x['finance_uuid'], x['model_uuid'])) for x in configs]
+    return [results.get(get_finance_result_id(prefix, x['finance_id'], x['model_id'])) for x in configs]
 
 def generic_model_postprocess(
     model_run,
@@ -2824,7 +2805,7 @@ def add_result_header_callbacks(app):
         NUP = no_update
         
         selected_config = json.loads(selected_config)
-        model_id = selected_config['model_uuid']
+        model_id = selected_config['model_id']
         res_id = RESULT_CACHE_PREFIXES['generation'] + str(model_id)
         res = results.get(res_id)
         if res is None:
@@ -2874,7 +2855,7 @@ def add_result_header_callbacks(app):
         NUP = no_update
 
         selected_config = json.loads(selected_config)
-        model_id = selected_config['model_uuid']
+        model_id = selected_config['model_id']
         res_id = RESULT_CACHE_PREFIXES['storage'] + str(model_id)
         res = results.get(res_id)
         if res is None:
@@ -2917,7 +2898,7 @@ def add_result_header_callbacks(app):
         NUP = no_update
         
         selected_config = json.loads(selected_config)
-        model_id = selected_config['model_uuid']
+        model_id = selected_config['model_id']
         res_id = RESULT_CACHE_PREFIXES['consumption'] + str(model_id)
         res = results.get(res_id)
         if res is None:
@@ -2959,7 +2940,7 @@ def add_result_header_callbacks(app):
         NUP = no_update
         
         selected_config = json.loads(selected_config)
-        model_id = selected_config['model_uuid']
+        model_id = selected_config['model_id']
         res_id = RESULT_CACHE_PREFIXES['net_energy'] + str(model_id)
         res = results.get(res_id)
         if res is None:
@@ -3011,8 +2992,8 @@ def add_result_header_callbacks(app):
         NUP = no_update
 
         selected_config = json.loads(selected_config)
-        model_id = selected_config['model_uuid']
-        finance_id = selected_config['finance_uuid']
+        model_id = selected_config['model_id']
+        finance_id = selected_config['finance_id']
 
         res_benefits = results.get(
             get_finance_result_id(
@@ -3312,9 +3293,9 @@ def add_input_callbacks(app):
 
         do_update = False
         for config in configurations:
-            if config['model_uuid'] == model_id:
+            if config['model_id'] == model_id:
                 prequeue_finance_run.append(
-                    browser.finance_run_request(config['finance_uuid'], model_id)
+                    browser.finance_run_request(config['finance_id'], model_id)
                 )
                 do_update = True
         
@@ -3814,8 +3795,8 @@ def add_input_callbacks(app):
             selected_finance_id = ""
         else:
             selected_config = json.loads(store_selected_configuration)
-            selected_model_id = selected_config['model_uuid']
-            selected_finance_id = selected_config['finance_uuid']
+            selected_model_id = selected_config['model_id']
+            selected_finance_id = selected_config['finance_id']
 
         r_model_config = no_update
         r_finance_config = no_update
@@ -3849,7 +3830,7 @@ def add_input_callbacks(app):
             if dirty:
                 # Need to store both the finance id and its associated model id,
                 # in case the model is locked
-                fnc_run_list.append((finance_id, fnc.model.uuid))
+                fnc_run_list.append((finance_id, fnc.model.id))
                 if finance_id == selected_finance_id:
                     r_finance_config = json.dumps(
                         sprake_finance_to_interface_config(fnc)
@@ -3864,7 +3845,7 @@ def add_input_callbacks(app):
             print(f'{len(fnc_change_list)} local finance configs changed')
             r_local_finance_config = json.dumps(store_finance_interface_configurations)
             if len(fnc_run_list) == 0:
-                r_trigger_postprocess_finance_run = json.dumps([browser.finance_run_request(finance_id, get_finance(finance_id).model.uuid) for finance_id in fnc_change_list])
+                r_trigger_postprocess_finance_run = json.dumps([browser.finance_run_request(finance_id, get_finance(finance_id).model.id) for finance_id in fnc_change_list])
 
         
         if len(mdl_run_list) == 0:
@@ -4046,10 +4027,10 @@ def add_input_callbacks(app):
         """
         NUP = no_update
 
-        selected_model = json.loads(selected_config).get('model_uuid', None)
+        selected_model = json.loads(selected_config).get('model_id', None)
         if selected_model is None:
             return NUP
-        selected_finance = json.loads(selected_config).get('finance_uuid', None)
+        selected_finance = json.loads(selected_config).get('finance_id', None)
 
         if prequeue is None:
             prequeue = []
@@ -4249,32 +4230,32 @@ def create_app(external_stylesheets=None):
             mdl = create_default_model()
         else:
             mdl = sprakemodel.SprakeModel(ref)
-        models[mdl.uuid] = mdl
+        models[mdl.id] = mdl
         return mdl
     
-    def duplicate_model(model_uuid: str):
-        ref = models.get(model_uuid, None)
+    def duplicate_model(model_id: str):
+        ref = models.get(model_id, None)
         if ref is None:
             return None
         mdl = add_new_model(ref)
-        new_model_id = mdl.uuid
+        new_model_id = mdl.id
         mdl.last_run = ref.last_run
-        mdl._last_hash = hash((mdl.uuid, str(mdl.last_run)))
+        mdl._last_hash = hash((mdl.id, str(mdl.last_run)))
         # Copy over any results
         for res_class in ['generation', 'storage', 'consumption', 'net_energy']:
-            ref_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], model_uuid)
+            ref_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], model_id)
             new_id = get_model_result_id(RESULT_CACHE_PREFIXES[res_class], new_model_id)
             results[new_id] = copy.copy(results.get(ref_id))
             results[new_id]['run_hash'] = hash(mdl)
 
         return mdl
     
-    def get_model(model_uuid: str):
-        return models.get(model_uuid, None)
+    def get_model(model_id: str):
+        return models.get(model_id, None)
     
-    def remove_model(model_uuid: str):
-        cache.delete(model_uuid)
-        return models.pop(model_uuid, None)
+    def remove_model(model_id: str):
+        cache.delete(model_id)
+        return models.pop(model_id, None)
 
     app.add_new_model = add_new_model
     app.duplicate_model = duplicate_model
@@ -4286,35 +4267,35 @@ def create_app(external_stylesheets=None):
             fnc = create_default_finance()
         else:
             fnc = sprakefinance.SprakeFinance(ref)
-        finances[fnc.uuid] = fnc
+        finances[fnc.id] = fnc
         return fnc
     
-    def duplicate_finance(finance_uuid: str, model_uuid: str|None = None):
-        ref = finances.get(finance_uuid, None)
+    def duplicate_finance(finance_id: str, model_id: str|None = None):
+        ref = finances.get(finance_id, None)
         if ref is None:
             return None
         
-        ref_model_uuid = ref.model.uuid
-        if not model_uuid:
-            model_uuid = ref_model_uuid
+        ref_model_id = ref.model.id
+        if not model_id:
+            model_id = ref_model_id
         fnc = add_new_finance(ref)
-        fnc.model = models.get(model_uuid, None)
+        fnc.model = models.get(model_id, None)
 
         # Copy over any results
         for res_class in ['finance_benefits_so', 'finance_costs_so', 'finance_value_so']:
-            ref_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], ref.uuid, ref_model_uuid)
-            new_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], fnc.uuid, model_uuid)
+            ref_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], ref.id, ref_model_id)
+            new_id = get_finance_result_id(RESULT_CACHE_PREFIXES[res_class], fnc.id, model_id)
             results[new_id] = copy.copy(results.get(ref_id))
             results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
             
         return fnc
     
-    def get_finance(finance_uuid: str):
-        return finances.get(finance_uuid, None)
+    def get_finance(finance_id: str):
+        return finances.get(finance_id, None)
     
-    def remove_finance(finance_uuid: str):
-        cache.delete(finance_uuid)
-        return finances.pop(finance_uuid, None)
+    def remove_finance(finance_id: str):
+        cache.delete(finance_id)
+        return finances.pop(finance_id, None)
 
     app.add_new_finance = add_new_finance
     app.duplicate_finance = duplicate_finance

@@ -1,9 +1,13 @@
 from collections.abc import Sequence
 from typing import Literal
 import datetime
+import uuid
 
 from dash import html
 import dash_bootstrap_components as dbc
+
+from src.newsegsmodel import newsegsmodel
+from src.newsegsfinance import newsegsfinance
 
 def flatten_mixed_list(mixed_list):
     flat_list=[]
@@ -268,6 +272,46 @@ def unescape_html_icons(html_text):
     )
 
 ##### Functions for app control - Actions, Queue items etc #####
+
+def compose_configuration(
+    name: str,
+    mdl: newsegsmodel.NewsegsModel | str,
+    fnc: newsegsfinance.NewsegsFinance | str,
+    model_class: str = 'SprakeModel',
+    finance_class: str = 'SprakeFinance',
+) -> dict:
+    """
+    A 'Composed Configuration' - a named combination of a model and a finance.
+
+    Args:
+        name: A compulsory name for the configuration.
+        mdl: A NewsegsModel or a model id.
+        fnc: A NewsegsFinance or a finance id.
+        model_class (Optional): A string giving the class of the model.
+        finance_class (Optional): A string giving the class of the finance.
+    """
+    if isinstance(mdl, newsegsmodel.NewsegsModel):
+        mdl_id = mdl.id
+    else:
+        mdl_id = mdl
+    
+    if isinstance(fnc, newsegsfinance.NewsegsFinance):
+        fnc_id = fnc.id
+    else:
+        fnc_id = fnc
+    
+    rval = {
+        'uuid': str(uuid.uuid4()),
+        'name': name,
+        'model_id': mdl_id,
+        'finance_id': fnc_id,
+        'model_class': model_class,
+        'finance_class': finance_class,
+    }
+    rval['id'] = 'c-' + rval['uuid']
+    
+    return rval
+
 def model_interface_action(
     model_id,
     input_key,

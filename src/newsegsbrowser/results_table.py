@@ -2,7 +2,6 @@ import json
 import datetime
 import copy
 import base64
-import uuid
 
 import pathvalidate
 
@@ -11,6 +10,7 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 from src.util import jsonfuncs
+from src.newsegsbrowser import common as browser
 from src.newsegsbrowser.common import get_icon
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
@@ -378,22 +378,29 @@ def add_configuration_selection_callbacks(app):
 
             # Make the copy
             ref_config = configurations[trigger_index]
-            mdl = app.duplicate_model(ref_config['model_uuid'])
-            fnc = app.duplicate_finance(ref_config['finance_uuid'], mdl.uuid)
+            mdl = app.duplicate_model(ref_config['model_id'])
+            fnc = app.duplicate_finance(ref_config['finance_id'], mdl.id)
 
-            store_model_interface_configurations[mdl.uuid] = copy.copy(store_model_interface_configurations.get(ref_config['model_uuid']))
-            store_model_interface_configurations[mdl.uuid]['model_uuid'] = mdl.uuid
+            store_model_interface_configurations[mdl.id] = copy.copy(
+                store_model_interface_configurations.get(
+                    ref_config['model_id']
+                )
+            )
+            store_model_interface_configurations[mdl.id]['model_id'] = mdl.id
 
-            store_finance_interface_configurations[fnc.uuid] = copy.copy(store_finance_interface_configurations.get(ref_config['finance_uuid']))
-            store_finance_interface_configurations[fnc.uuid]['finance_uuid'] = fnc.uuid
+            store_finance_interface_configurations[fnc.id] = copy.copy(
+                store_finance_interface_configurations.get(
+                    ref_config['finance_id']
+                )
+            )
+            store_finance_interface_configurations[fnc.id]['finance_id'] = fnc.id
 
             # TODO: move compose_configuration to a utility module so it can be shared
-            new_config = {
-                'uuid': str(uuid.uuid4()),
-                'name': ref_config['name'] + " Copy",
-                'model_uuid': mdl.uuid,
-                'finance_uuid': fnc.uuid
-            }
+            new_config = browser.compose_configuration(
+                ref_config['name'] + " Copy",
+                mdl,
+                fnc,
+            )
 
             configurations.append(new_config)
             
@@ -404,7 +411,7 @@ def add_configuration_selection_callbacks(app):
             selected_config['config_index'] = len(configurations) - 1
 
             # Let's copy over the results
-            mdl_ref = app.get_model(ref_config['model_uuid'])
+            mdl_ref = app.get_model(ref_config['model_id'])
             mdl._generation_result = copy.copy(mdl_ref._generation_result)
             mdl.generation._dirty = False
             mdl._grid_result = copy.copy(mdl_ref._grid_result)
@@ -415,7 +422,7 @@ def add_configuration_selection_callbacks(app):
             
             # Because of the different uuid, the caches will not recognise this model,
             # or its finance, but just for info:
-            print(f'model is duplicated from {mdl_ref.uuid} to {mdl.uuid} and dirty is {mdl.dirty}')
+            print(f'model is duplicated from {mdl_ref.id} to {mdl.id} and dirty is {mdl.dirty}')
 
             fnc._dirty = False
 
@@ -524,19 +531,19 @@ def add_configuration_selection_callbacks(app):
         
         safe_drop = True
         for conf in configurations:
-            if conf['model_uuid'] == dropped['model_uuid']:
+            if conf['model_id'] == dropped['model_id']:
                 safe_drop = False
         
         if safe_drop:
-            app.remove_model(dropped['model_uuid'])
+            app.remove_model(dropped['model_id'])
         
         safe_drop = True
         for conf in configurations:
-            if conf['finance_uuid'] == dropped['finance_uuid']:
+            if conf['finance_id'] == dropped['finance_id']:
                 safe_drop = False
         
         if safe_drop:
-            app.remove_finance(dropped['finance_uuid'])
+            app.remove_finance(dropped['finance_id'])
 
         n_conf = len(configurations)
 
@@ -603,11 +610,11 @@ def add_configuration_selection_callbacks(app):
         selected_config = configurations[trigger_index].copy()
         selected_config['config_index'] = trigger_index
 
-        mdl = app.get_model(selected_config['model_uuid'])
+        mdl = app.get_model(selected_config['model_id'])
 
         mdl_completed_run = json.dumps(
             {
-                'model_uuid': mdl.uuid,
+                'model_id': mdl.id,
                 'model_last_run': str(mdl.last_run),
                 'model_hash': hash(mdl)
             }
@@ -647,8 +654,8 @@ def add_configuration_selection_callbacks(app):
         config = json.loads(configurations)[trigger_index]
 
 
-        mdl = app.get_model(config['model_uuid'])
-        fnc = app.get_finance(config['finance_uuid'])
+        mdl = app.get_model(config['model_id'])
+        fnc = app.get_finance(config['finance_id'])
         
         odict = config_to_dict(config['name'], mdl, fnc)
         fn = odict.get('config_name') + ".json"
@@ -692,8 +699,8 @@ def add_configuration_selection_callbacks(app):
             return NUP
         
         working_conf = configurations[trigger_index]
-        mdl = app.get_model(working_conf['model_uuid'])
-        fnc = app.get_finance(working_conf['finance_uuid'])
+        mdl = app.get_model(working_conf['model_id'])
+        fnc = app.get_finance(working_conf['finance_id'])
 
         cfg = config_jsons[trigger_index]
         ctype, cstr = cfg.split(',')
