@@ -94,6 +94,9 @@ def sync_energy_balance(mcfg):
         mcfg['dc_input']['annual_residential_consumption_per_ev'],
         mcfg['dc_input']['n_evs_per_household'],
     )
+    energy_balance.set_storage_capacity(
+        mcfg['stor_input']['storage_capacity']
+    )
 
 def spawn_model():
     return sprakemodel.SprakeModel.from_none()
@@ -1032,14 +1035,38 @@ def create_indicative_net_energy_card():
     """
     return dbc.Card([
         dbc.CardBody([
-            html.H4(['Indicative net energy'], className = 'card-title'),
             html.Details([
-                html.Summary(''),
-                dbc.Row(
+                html.Summary(
+                    html.H5(
+                        ['Indicative net energy']
+                        ),
+                ),
+                dbc.Row([
                     dbc.Col(
-                        dcc.Graph(id = 'graph-estimated-annual-energy-balance')
+                        dcc.Graph(
+                            id='graph-estimated-annual-energy-balance',
+                            config={'displayModeBar': False},
+                            style={
+                                'height': '120px',
+                                'border': '1px solid #dee2e6',
+                                'borderRadius': '0.5rem',
+                                'backgroundColor': 'transparent'
+                            }
+                        )
+                    ),
+                    dbc.Col(
+                        dcc.Graph(
+                            id='graph-estimated-maximum-daily-energy-balance',
+                            config={'displayModeBar': False},
+                            style={
+                                'height': '120px',
+                                'border': '1px solid #dee2e6',
+                                'borderRadius': '0.5rem',
+                                'backgroundColor': 'transparent'
+                            }
+                        )
                     )
-                )
+                ])
             ])
         ])
     ])
@@ -2616,27 +2643,71 @@ def add_initial_callback(app):
     
     @app.callback(
         Output('graph-estimated-annual-energy-balance', 'figure'),
+        Output('graph-estimated-maximum-daily-energy-balance', 'figure'),
         Input('model-config', 'data'),
         prevent_initial_call = True
     )
     def update_estimated_annual_energy_balance(mcfg):
         # TODO: sync with cfg
         if mcfg is None:
-            return no_update
+            return no_update, no_update
         mcfg = json.loads(mcfg)
         sync_energy_balance(mcfg)
 
         df = energy_balance.estimated_annual_energy_balance
         fig = px.bar(
-            df, 
-            x = 'value', 
-            y = 'type', 
-            color = 'label', 
-            orientation = 'h',
-            labels = {'value': 'kWh/yr',
-                      'label': 'Category',
-                      'type': 'Direction'})
-        return fig
+            df,
+            x='value',
+            y='type',
+            color='label',
+            orientation='h'
+        )
+        fig.update_layout(
+            height=120,
+            margin={'l': 0, 'r': 0, 't': 28, 'b': 0},
+            title={
+                'text': 'Annual',
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'size': 12, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
+            },
+            showlegend=False,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            bargap=0.75
+        )
+        fig.update_traces(width=0.35, marker_line_width=0)
+        fig.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
+        fig.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
+
+        df = energy_balance.estimated_maximum_daily_balance
+        fig2 = px.bar(
+            df,
+            x='value',
+            y='label',
+            color='label',
+            orientation='h'
+        )
+        fig2.update_layout(
+            height=120,
+            margin={'l': 0, 'r': 0, 't': 28, 'b': 0},
+            title={
+                'text': '(Max) Daily',
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'size': 12, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
+            },
+            showlegend=False,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            bargap=0.75
+        )
+        fig2.update_traces(width=0.35, marker_line_width=0)
+        fig2.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
+        fig2.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
+        return fig, fig2
 
     return app
 
