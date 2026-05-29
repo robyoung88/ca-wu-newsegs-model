@@ -13,6 +13,12 @@ from src.stats import locate_timeseries_extrema
 MIN_SOC_THRESHOLD_PROP = 0.01
 MAX_SOC_THRESHOLD_PROP = 0.99
 
+def _hours_to_year_fraction(df, variable_name):
+    n_year_sum = df.loc['count', variable_name]
+    n_years = np.where(df.index == 'sum', n_year_sum, 1)
+    n_hours = np.floor(n_years * 365.25) * 24.
+    return df.loc[:, variable_name] / n_hours
+
 def stor_results_to_interface_sprake(
     mdl: SprakeModel
 ) -> dict:
@@ -66,9 +72,9 @@ def stor_results_to_interface_sprake(
         .loc[:, 'hrs_at_min_soc']
         .pipe(assign_year_index)
         .query('year_index >= 0')
-        .pipe(basic_summary_stats.meter_annual_summary)
+        .pipe(basic_summary_stats.meter_annual_summary, ['sum','mean','min','max','count'])
         .assign(
-            prop_hrs_at_min_soc = lambda df: df['hrs_at_min_soc'] / 8760.0 # NB - may result in > 1.0 for leap years
+            prop_hrs_at_min_soc = lambda df: _hours_to_year_fraction(df, 'hrs_at_min_soc') # NB - may result in > 1.0 for leap years
         )
         .pipe(basic_summary_stats.meter_annual_summary_to_interface)
     )
@@ -91,9 +97,9 @@ def stor_results_to_interface_sprake(
         .loc[:, 'hrs_at_max_soc']
         .pipe(assign_year_index)
         .query('year_index >= 0')
-        .pipe(basic_summary_stats.meter_annual_summary)
+        .pipe(basic_summary_stats.meter_annual_summary, ['sum','mean','min','max','count'])
         .assign(
-            prop_hrs_at_max_soc = lambda df: df['hrs_at_max_soc'] / 8760.0 # NB - may result in > 1.0 for leap years
+            prop_hrs_at_max_soc = lambda df: _hours_to_year_fraction(df, 'hrs_at_max_soc') # NB - may result in > 1.0 for leap years
         )
         .pipe(basic_summary_stats.meter_annual_summary_to_interface)
     )

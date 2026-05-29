@@ -11,7 +11,10 @@ import pandas as pd
 
 from src.stats.core import assign_year_index, assign_day_index
 
-def meter_annual_summary(data: pd.DataFrame|pd.Series) -> pd.DataFrame:
+def meter_annual_summary(
+    data: pd.DataFrame | pd.Series,
+    agg_operations: list = ['sum','mean','min','max'],
+) -> pd.DataFrame:
     """
     Summary stats for generation or consumption meters.
 
@@ -34,9 +37,7 @@ def meter_annual_summary(data: pd.DataFrame|pd.Series) -> pd.DataFrame:
         data
         .groupby('year_index')
         .agg('sum')
-        .agg(
-            ['sum', 'mean', 'min', 'max']
-        ) 
+        .agg(agg_operations) 
     )
 
     return ann_smry
