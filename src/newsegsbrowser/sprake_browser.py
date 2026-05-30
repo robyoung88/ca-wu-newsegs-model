@@ -16,6 +16,9 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
 import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
 
 # At the moment, use a diskcache cache for transferring models 
 # regardless of background callback manager
@@ -1712,6 +1715,7 @@ def create_results_header():
                                 color = 'primary',
                                 id = 'btn-show-timeseries',
                                 outline = True,
+                                style = {'margin-right': '10px'}
                             ),
                             html.H5("Per year",style={'display': 'inline-block', 'verticalAlign': 'middle'}),
                             daq.ToggleSwitch(style={'display': 'inline-block',
@@ -1741,7 +1745,10 @@ def create_results_header():
                             )
                         ],
                         id = 'timeseries-graph-container',
-                        style = {'display': 'none', 'height': '0px'},
+                        style = {
+                            'display': 'none', 
+                            #'height': '0px'
+                            },
                     )
                 ]),
             id = 'drawer-title',
@@ -4356,27 +4363,156 @@ def add_result_timeseries_callbacks(app):
 
     @app.callback(
         Output('timeseries-graph-container', 'style'),
+        Output('btn-show-timeseries', 'outline'),
         Input('btn-show-timeseries', 'n_clicks'),
         State('timeseries-graph-container', 'style'),
         prevent_initial_call = True
     )
     def toggle_timeseries_visibility(n_clicks, current_style):
-        NUP = no_update
+        NUP = no_update, no_update
         if n_clicks is None:
             return NUP
 
         if current_style.get('display') == 'none':
             r_containerstyle = {
                 'display': 'block',
-                'height': '400px'
+                #'height': '400px'
             }
+            r_btnoutline = False
         else:
             r_containerstyle = {
                 'display': 'none',
-                'height': '0px'
+                #'height': '0px'
             }
-        return r_containerstyle
+            r_btnoutline = True
+        return r_containerstyle, r_btnoutline
+    
+    @app.callback(
+        Output('graph-timeseries', 'figure'),
+        Input('trigger-postprocess-model-run', 'data'),
+        Input('store-selected-configuration', 'data'),
+        prevent_initial_call = True
+    )
+    def show_model_timeseries(
+        model_run_json,
+        store_selected_configuration
+    ):
+        NUP = no_update
+        if store_selected_configuration is None:
+            return NUP
+        
+        if ctx.triggered_id == 'store-selected-configuration':
+            model_id = json.loads(store_selected_configuration).get('model_id')
+            if model_id is None:
+                return NUP
+            mdl = get_model(model_id)
+        elif ctx.triggered_id == 'trigger-postprocess-model-run':
+            active_model_id = json.loads(store_selected_configuration).get('model_id')
+            model_run = json.loads(model_run_json)
+            do_continue = False
+            if isinstance(model_run, list):
+                for mr in model_run:
+                    model_id = mr.get('model_id')
+                    if model_id == active_model_id:
+                        do_continue = True
+                        break
+            else:
+                model_id = model_run.get('model_id')
+                if model_id == active_model_id:
+                    do_continue = True
+            
+            if not do_continue:
+                return NUP
+            mdl = get_model(active_model_id)
 
+        genr = mdl.get_generation_result()
+        cs = mdl.get_consumption_storage_result()
+        if genr is None or cs is None:
+            return NUP
+
+        df = (
+            genr.meters_to_pandas()
+            .join(cs.meters_to_pandas())
+            .assign(
+                gen_total = lambda df: df['wind_export'] + df['solar_export'],
+                cons_total = lambda df: df['appliance_import'] + df['dhw_import'] + df['spaceheat_import'] + df['evcharge_import']
+            )
+            .loc[:, [
+                'wind_export',
+                'solar_export',
+                'gen_total',
+                'cons_total',
+                'storage_import',
+                'storage_export',
+                'grid_import',
+                'grid_export']]
+            .rename(
+                columns = {
+                    'wind_export': 'Gen - Wind',
+                    'solar_export': 'Gen - PV',
+                    'gen_total': 'Gen - Total',
+                    'cons_total': 'Cons - Total',
+                    'storage_import': 'BESS - Imp.',
+                    'storage_export': 'BESS - Exp.',
+                    'grid_import': 'Grid - Imp',
+                    'grid_export': 'Grid - Exp'
+                }
+            )
+        )
+        df2 = (
+            cs.dsm_to_pandas()
+            .rename(
+                columns = {
+                    'storage_soc': 'BESS - SoC'
+                }
+            )
+        )
+
+        #fig = px.line(df)
+
+        fig = make_subplots(specs=[[{'secondary_y': True}]])
+        df1_varnames = [
+            'Gen - Wind',
+            'Gen - PV',
+            'Gen - Total',
+            'Cons - Total',
+            'BESS - Imp.',
+            'BESS - Exp.',
+            'Grid - Imp',
+            'Grid - Exp'
+        ]
+
+        for vn in df1_varnames:
+            fig.add_trace(
+                go.Scatter(
+                    x = df.index,
+                    y = df.loc[:,vn],
+                    name = vn
+                ),
+                secondary_y = False
+            )
+        
+        df2_varnames = [
+            'BESS - SoC'
+        ]
+        for vn in df2_varnames:
+            fig.add_trace(
+                go.Scatter(
+                    x = df2.index,
+                    y = df2.loc[:,vn],
+                    name = vn
+                ),
+                secondary_y = True
+            )
+        
+        fig.update_layout(
+            height = 250,
+            margin = {'l': 5, 'r': 5, 't': 5, 'b': 0},
+            legend_y = 0,
+            legend_yanchor = 'bottom'
+        )
+        return fig
+    
     return app
 
 def add_model_callbacks(app):
