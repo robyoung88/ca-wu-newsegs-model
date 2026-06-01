@@ -7,14 +7,18 @@ import datetime
 from collections.abc import Mapping
 from functools import partial
 from typing import Tuple
+from typing import cast
 #from typing import Literal
 
-from dash import Dash, html, Input, Output, dcc, State, ALL, no_update, ctx
+from dash import Dash, html, Input, Output, dcc, State, Patch, ALL, no_update, ctx
 from dash import clientside_callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 from dash_extensions import Purify
 import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
 
 # At the moment, use a diskcache cache for transferring models 
 # regardless of background callback manager
@@ -45,6 +49,7 @@ from src.newsegsmodel import newsegsmodel
 from src.newsegsfinance import newsegsfinance
 from src.newsegsmodel import sprakemodel
 from src.newsegsfinance import sprakefinance
+from src.core import location
 
 from src.newsegsbrowser import common as browser
 from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
@@ -112,8 +117,10 @@ def model_to_cache(model_id):
     mdl = get_model(model_id)
     cache[model_id] = mdl
 
-def model_from_cache(model_id):
+def model_from_cache(model_id) -> newsegsmodel.NewsegsModel:
     mdl = cache.get(model_id)
+    if not isinstance(mdl, newsegsmodel.NewsegsModel):
+        raise TypeError(f'{model_id} retrieved from cache is of type {type(mdl)}')
     return mdl
 
 def spawn_finance():
@@ -130,8 +137,10 @@ def finance_to_cache(finance_id):
     fnc = get_finance(finance_id)
     cache[finance_id] = fnc
 
-def finance_from_cache(finance_id):
+def finance_from_cache(finance_id) -> newsegsfinance.NewsegsFinance:
     fnc = cache.get(finance_id)
+    if not isinstance(fnc, newsegsfinance.NewsegsFinance):
+        raise TypeError(f'{finance_id} retrieved form cache is of type {type(fnc)}')
     return fnc
 
 def create_default_model() -> newsegsmodel.NewsegsModel:
@@ -1665,15 +1674,16 @@ def create_results_header():
             html.Div(id='resize-handle'),
 
             html.Div(
-                dbc.Container(
+                dbc.Container([
                     dbc.Row([
-                        html.H1([get_icon('results'), 'Results'],
-                        style={
-                            'display': 'inline-block',
-                            'width':'33%',
-                            'float': 'left'
-                        }),
-
+                        html.H1(
+                            [get_icon('results'), 'Results'],
+                            style={
+                                'display': 'inline-block',
+                                'width':'33%',
+                                'float': 'left'
+                            }
+                        ),
                         html.Span([
                             dbc.Button(
                                 html.I(
@@ -1697,6 +1707,16 @@ def create_results_header():
                         ),
 
                         html.Span([
+                            dbc.Button(
+                                html.I(
+                                    className = get_icon('show-graph', style_name = 'raw'),
+                                    style = {'display': 'inline'}
+                                ),
+                                color = 'primary',
+                                id = 'btn-show-timeseries',
+                                outline = True,
+                                style = {'margin-right': '10px'}
+                            ),
                             html.H5("Per year",style={'display': 'inline-block', 'verticalAlign': 'middle'}),
                             daq.ToggleSwitch(style={'display': 'inline-block',
                                                     'verticalAlign': 'middle',
@@ -1715,9 +1735,24 @@ def create_results_header():
                         id='annual-horizon-toggle-container'
                         ),
                     ]),
-                ),
+                    dbc.Row(
+                        [
+                            dcc.Graph(
+                                id = 'graph-timeseries',
+                                style = {
+                                    'height': '300px',
+                                }
+                            )
+                        ],
+                        id = 'timeseries-graph-container',
+                        style = {
+                            'display': 'none', 
+                            #'height': '0px'
+                            },
+                    )
+                ]),
             id = 'drawer-title',
-        )
+            ),
         ],
     id='drawer-header'
     )
@@ -2240,7 +2275,7 @@ def sprake_model_set_loc_input(loc_input: dict, mdl: sprakemodel.SprakeModel):
     mdl.location = loc
 
 def sprake_finance_set_finance_config(fcfg: dict, fnc: sprakefinance.SprakeFinance):
-    fnc.set_unit_costs_from_dict(fcfg.get('unit_costs'))
+    fnc.set_unit_costs_from_dict(fcfg.get('unit_costs', {}))
     fnc.benefit_discount_rate = float(fcfg.get('benefit_discount_rate', 0.0) / 100)
     fnc.cost_discount_rate = float(fcfg.get('cost_discount_rate', 0.0) / 100)
 
@@ -2283,7 +2318,7 @@ def sprake_model_to_local_model_config(
         'efficiency_reduction': app_p.get('efficiency_reduction'),
         'annual_residential_consumption_per_ev': \
             ev_p.get('annual_residential_consumption_per_ev'),
-        'n_evs_per_household': ev_p.get('n_evs') / cs.n_units
+        'n_evs_per_household': ev_p.get('n_evs', 0) / cs.n_units
     }
 
     # Model config
@@ -2397,7 +2432,10 @@ def add_initial_callback(app):
             fnc.set_model(mdl, False)
             finances[fnc.id] = fnc
         
-        mcfg, fcfg = sprake_model_to_interface_configs(mdl, fnc)
+        mcfg, fcfg = sprake_model_to_interface_configs(
+            cast(sprakemodel.SprakeModel, mdl),
+            cast(sprakefinance.SprakeFinance, fnc)
+        )
 
         #print('at end of switch we have:')
         #print(mdl.dirty)
@@ -3420,8 +3458,9 @@ def add_input_callbacks(app):
         The latter two processes are handled by separate postprocess callbacks.
         Therefore, this callback only dispatches to the finance run queue.
         """
+        NUP = no_update
         if model_run is None or store_configurations is None:
-            return no_update
+            return NUP
         
         model_run = json.loads(model_run)
         configurations = json.loads(store_configurations)
@@ -3598,7 +3637,7 @@ def add_input_callbacks(app):
                     remove_indexes = (
                         [i if x['finance_id']  == finance_id else None for i, x in enumerate(queue_finance_run)]
                         .sort(reverse = True)
-                    )
+                    ) # type: ignore
                     if remove_indexes:
                         for i in remove_indexes:
                             queue_finance_run.pop(i)
@@ -3608,7 +3647,7 @@ def add_input_callbacks(app):
                 remove_indexes = (
                     [i if x['finance_id']  == finance_id else None for i, x in enumerate(queue_finance_run)]
                     .sort(reverse = True)
-                )
+                ) # type: ignore
                 if remove_indexes:
                     for i in remove_indexes:
                         queue_finance_run.pop(i)
@@ -3775,7 +3814,7 @@ def add_input_callbacks(app):
                     remove_indexes = (
                         [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)]
                         .sort(reverse=True)
-                    )
+                    ) # type: ignore
                     if remove_indexes:
                         for i in remove_indexes:
                             queue_model_run.pop(i)
@@ -3785,7 +3824,7 @@ def add_input_callbacks(app):
                 remove_indexes = (
                     [i if x['model_id'] == model_id else None for i, x in enumerate(queue_model_run)]
                     .sort(reverse=True)
-                )
+                ) # type: ignore
                 if remove_indexes:
                     for i in remove_indexes:
                         queue_model_run.pop(i)
@@ -3902,11 +3941,11 @@ def add_input_callbacks(app):
                     # First update the interface conf
                     update_val = {action['key']: action['val']}
                     if action['key_section'] is None:
-                        mdl_conf.update(update_val)
+                        mdl_conf.update(update_val) # pyright: ignore[reportPossiblyUnboundVariable]
                     else:
-                        if mdl_conf.get(action['key_section']) is None or action['key_section'] == 'None':
-                            mdl_conf[action['key_section']] = {}
-                        mdl_conf[action['key_section']].update(update_val)
+                        if mdl_conf.get(action['key_section']) is None or action['key_section'] == 'None': # pyright: ignore[reportPossiblyUnboundVariable]
+                            mdl_conf[action['key_section']] = {} # pyright: ignore[reportPossiblyUnboundVariable]
+                        mdl_conf[action['key_section']].update(update_val) # pyright: ignore[reportPossiblyUnboundVariable]
                     
                     # We'll synchronise models once we've done all the updates
                 case 'finance_config_interface_update':
@@ -3925,11 +3964,11 @@ def add_input_callbacks(app):
                     update_val = {action['key']: action['val']}
 
                     if action['key_section'] is None or action['key_section'] == 'None':
-                        fnc_conf.update(update_val)
+                        fnc_conf.update(update_val) # pyright: ignore[reportPossiblyUnboundVariable]
                     else:
-                        if fnc_conf.get(action['key_section']) is None:
-                            fnc_conf[action['key_section']] = {}
-                        fnc_conf[action['key_section']].update(update_val)
+                        if fnc_conf.get(action['key_section']) is None: # pyright: ignore[reportPossiblyUnboundVariable]
+                            fnc_conf[action['key_section']] = {} # pyright: ignore[reportPossiblyUnboundVariable]
+                        fnc_conf[action['key_section']].update(update_val) # pyright: ignore[reportPossiblyUnboundVariable]
                     # We'll synchronise finances once we've done all the updates
 
         if store_selected_configuration is None:
@@ -3945,7 +3984,7 @@ def add_input_callbacks(app):
         
         mdl_run_list = []
         for model_id in mdl_change_list:
-            mdl_conf = store_model_interface_configurations.get(model_id)
+            mdl_conf = store_model_interface_configurations.get(model_id, {})
             mdl = get_model(model_id)
             dirty = sync_local_model_config_to_model(mdl_conf, mdl)
             if dirty:
@@ -3966,10 +4005,10 @@ def add_input_callbacks(app):
         
         fnc_run_list = []
         for finance_id in fnc_change_list:
-            fnc_conf = store_finance_interface_configurations.get(finance_id)
+            fnc_conf = store_finance_interface_configurations.get(finance_id, {})
             fnc = get_finance(finance_id)
             dirty = sync_local_finance_config_to_finance(fnc_conf, fnc)
-            if dirty:
+            if dirty and fnc.model is not None:
                 # Need to store both the finance id and its associated model id,
                 # in case the model is locked
                 fnc_run_list.append((finance_id, fnc.model.id))
@@ -3987,7 +4026,14 @@ def add_input_callbacks(app):
             print(f'{len(fnc_change_list)} local finance configs changed')
             r_local_finance_config = json.dumps(store_finance_interface_configurations)
             if len(fnc_run_list) == 0:
-                r_trigger_postprocess_finance_run = json.dumps([browser.finance_run_request(finance_id, get_finance(finance_id).model.id) for finance_id in fnc_change_list])
+                r_trigger_postprocess_finance_run = json.dumps(
+                    [
+                        browser.finance_run_request(
+                            finance_id, 
+                            get_finance(finance_id).model.id # pyright: ignore[reportOptionalMemberAccess]
+                        ) for finance_id in fnc_change_list
+                    ]
+                )
 
         
         if len(mdl_run_list) == 0:
@@ -4313,6 +4359,221 @@ def add_input_callbacks(app):
 
     return app
 
+def add_result_timeseries_callbacks(app):
+
+    @app.callback(
+        Output('timeseries-graph-container', 'style'),
+        Output('btn-show-timeseries', 'outline'),
+        Input('btn-show-timeseries', 'n_clicks'),
+        State('timeseries-graph-container', 'style'),
+        prevent_initial_call = True
+    )
+    def toggle_timeseries_visibility(n_clicks, current_style):
+        NUP = no_update, no_update
+        if n_clicks is None:
+            return NUP
+
+        if current_style.get('display') == 'none':
+            r_containerstyle = {
+                'display': 'block',
+                #'height': '400px'
+            }
+            r_btnoutline = False
+        else:
+            r_containerstyle = {
+                'display': 'none',
+                #'height': '0px'
+            }
+            r_btnoutline = True
+        return r_containerstyle, r_btnoutline
+    
+    @app.callback(
+        Output('graph-timeseries', 'figure', allow_duplicate = True),
+        Input('trigger-postprocess-model-run', 'data'),
+        Input('store-selected-configuration', 'data'),
+        prevent_initial_call = True
+    )
+    def show_model_timeseries(
+        model_run_json,
+        store_selected_configuration
+    ):
+        NUP = no_update
+        if store_selected_configuration is None:
+            return NUP
+        
+        if ctx.triggered_id == 'store-selected-configuration':
+            model_id = json.loads(store_selected_configuration).get('model_id')
+            if model_id is None:
+                return NUP
+            mdl = get_model(model_id)
+        elif ctx.triggered_id == 'trigger-postprocess-model-run':
+            active_model_id = json.loads(store_selected_configuration).get('model_id')
+            model_run = json.loads(model_run_json)
+            do_continue = False
+            if isinstance(model_run, list):
+                for mr in model_run:
+                    model_id = mr.get('model_id')
+                    if model_id == active_model_id:
+                        do_continue = True
+                        break
+            else:
+                model_id = model_run.get('model_id')
+                if model_id == active_model_id:
+                    do_continue = True
+            
+            if not do_continue:
+                return NUP
+            mdl = get_model(active_model_id)
+
+        genr = mdl.get_generation_result()
+        cs = mdl.get_consumption_storage_result()
+        if genr is None or cs is None:
+            return NUP
+
+        df = (
+            genr.meters_to_pandas()
+            .join(cs.meters_to_pandas())
+            .assign(
+                gen_total = lambda df: df['wind_export'] + df['solar_export'],
+                cons_total = lambda df: df['appliance_import'] + df['dhw_import'] + df['spaceheat_import'] + df['evcharge_import']
+            )
+            .loc[:, [
+                'wind_export',
+                'solar_export',
+                'gen_total',
+                'cons_total',
+                'storage_import',
+                'storage_export',
+                'grid_import',
+                'grid_export']]
+            .rename(
+                columns = {
+                    'wind_export': 'Gen - Wind',
+                    'solar_export': 'Gen - PV',
+                    'gen_total': 'Gen - Total',
+                    'cons_total': 'Cons - Total',
+                    'storage_import': 'BESS - Imp.',
+                    'storage_export': 'BESS - Exp.',
+                    'grid_import': 'Grid - Imp',
+                    'grid_export': 'Grid - Exp'
+                }
+            )
+        )
+        df2 = (
+            cs.dsm_to_pandas()
+            .rename(
+                columns = {
+                    'storage_soc': 'BESS - SoC'
+                }
+            )
+        )
+
+        #fig = px.line(df)
+
+        fig = make_subplots(specs=[[{'secondary_y': True}]])
+        df1_varnames = [
+            'Gen - Wind',
+            'Gen - PV',
+            'Gen - Total',
+            'Cons - Total',
+            'BESS - Imp.',
+            'BESS - Exp.',
+            'Grid - Imp',
+            'Grid - Exp'
+        ]
+
+        for vn in df1_varnames:
+            fig.add_trace(
+                go.Scattergl(
+                    x = df.index,
+                    y = df.loc[:,vn],
+                    name = vn
+                ),
+                secondary_y = False
+            )
+        
+        df2_varnames = [
+            'BESS - SoC'
+        ]
+        for vn in df2_varnames:
+            fig.add_trace(
+                go.Scattergl(
+                    x = df2.index,
+                    y = df2.loc[:,vn],
+                    name = vn
+                ),
+                secondary_y = True
+            )
+        
+        fig.update_layout(
+            height = 250,
+            margin = {'l': 5, 'r': 5, 't': 5, 'b': 0},
+            legend_y = 0,
+            legend_yanchor = 'bottom'
+        )
+        return fig
+    
+    @app.callback(
+        Output('graph-timeseries', 'figure', allow_duplicate=True),
+        Input({'type': 'link-event-date', 'date': ALL}, 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def zoom_to_event(event_datetime_click):
+        NUP = no_update
+        if event_datetime_click is None:
+            return NUP
+        id = ctx.triggered
+        if len(id) > 1:
+            return NUP
+        id = id[0]
+        if id['value'] is None:
+            return NUP
+        
+        try:
+            pid = json.loads(id['prop_id'].rstrip('.n_clicks'))
+        except json.JSONDecodeError:
+            return NUP
+        if pid['type'] != 'link-event-date':
+            return NUP
+        eventdate = pd.Timestamp(pid['date'], tz ='utc')
+        window_start = eventdate - pd.Timedelta(days=0.5)
+        window_end = eventdate + pd.Timedelta(days=1.5)
+        fig_patch = Patch()
+        fig_patch['layout']['xaxis'] = {'range': (window_start, window_end)}
+        
+        return fig_patch
+    
+    @app.callback(
+        Output('graph-timeseries', 'figure', allow_duplicate=True),
+        Input({'type': 'link-event-daterange', 'datetime_start': ALL, 'datetime_end': ALL}, 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def zoom_to_daterange(event_datetime_click):
+        NUP = no_update
+        if event_datetime_click is None:
+            return NUP
+        id = ctx.triggered
+        if len(id) > 1:
+            return NUP
+        id = id[0]
+        if id['value'] is None:
+            return NUP
+        
+        try:
+            pid = json.loads(id['prop_id'].rstrip('.n_clicks'))
+        except json.JSONDecodeError:
+            return NUP
+        if pid['type'] != 'link-event-daterange':
+            return NUP
+        window_start = pd.Timestamp(pid['datetime_start'], tz ='utc') - pd.Timedelta(days=0.5)
+        window_end = pd.Timestamp(pid['datetime_end'], tz ='utc') + pd.Timedelta(days=0.5)
+        fig_patch = Patch()
+        fig_patch['layout']['xaxis'] = {'range': (window_start, window_end)}
+        
+        return fig_patch
+
+    return app
+
 def add_model_callbacks(app):
     """
     Add callbacks to Dash App to allow for interfacing with a Sprake model
@@ -4322,6 +4583,7 @@ def add_model_callbacks(app):
     app = add_result_header_callbacks(app)
     app = add_result_table_callbacks(app)
     app = add_input_callbacks(app)
+    app = add_result_timeseries_callbacks(app)
     app = results_table.add_configuration_selection_callbacks(app)
 
     return app
@@ -4399,10 +4661,10 @@ def create_app(external_stylesheets=None):
         cache.delete(model_id)
         return models.pop(model_id, None)
 
-    app.add_new_model = add_new_model
-    app.duplicate_model = duplicate_model
-    app.get_model = get_model
-    app.remove_model = remove_model
+    app.add_new_model = add_new_model # pyright: ignore[reportAttributeAccessIssue]
+    app.duplicate_model = duplicate_model # pyright: ignore[reportAttributeAccessIssue]
+    app.get_model = get_model # pyright: ignore[reportAttributeAccessIssue]
+    app.remove_model = remove_model # pyright: ignore[reportAttributeAccessIssue]
 
     def add_new_finance(ref: newsegsfinance.NewsegsFinance | None = None):
         if ref is None:
@@ -4439,10 +4701,10 @@ def create_app(external_stylesheets=None):
         cache.delete(finance_id)
         return finances.pop(finance_id, None)
 
-    app.add_new_finance = add_new_finance
-    app.duplicate_finance = duplicate_finance
-    app.get_finance = get_finance
-    app.remove_finance = remove_finance
+    app.add_new_finance = add_new_finance # pyright: ignore[reportAttributeAccessIssue]
+    app.duplicate_finance = duplicate_finance # pyright: ignore[reportAttributeAccessIssue]
+    app.get_finance = get_finance # pyright: ignore[reportAttributeAccessIssue]
+    app.remove_finance = remove_finance # pyright: ignore[reportAttributeAccessIssue]
 
     app = add_site_selector_callbacks(app)
     app = add_model_callbacks(app)

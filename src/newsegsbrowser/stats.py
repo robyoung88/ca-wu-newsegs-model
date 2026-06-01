@@ -848,10 +848,24 @@ def present_event_and_date(data_list,
     val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] +
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
 
-    #date_row = html.Tr([html.Td(date_label, colSpan=2, style={'text-align':'end'})] 
-    #    + [html.Td(f'{x.get(event_date).strftime("%Y/%m/%d")}') if x is not None else html.Td(none_str) for x in comp_result])
-    date_row = html.Tr([html.Td(date_label, style={'text-align':'end'})] 
-        + [html.Td(f'{x.get(event_date)[:-trimdate]}') if x is not None else html.Td(none_str) for x in comp_result])
+    date_row = html.Tr(
+        [html.Td(date_label, style={'text-align':'end'})] 
+        + [
+            html.Td(
+                html.A(
+                    f'{x.get(event_date)[:-trimdate]}',
+                    disable_n_clicks = False,
+                    id = {
+                        'type': 'link-event-date',
+                        'date': x.get(event_date)[:-trimdate]
+                    },
+                    style = {
+                        'cursor': 'zoom-in'
+                    }
+                )
+            ) if x is not None else html.Td(none_str) for x in comp_result
+        ]
+    )
 
     return [val_row, date_row]    
 
@@ -864,7 +878,8 @@ def present_event_and_daterange(data_list,
                                 event_start='datetime_start',
                                 event_end='datetime_end',
                                 none_str='-',
-                                nonedate_str='#/#/# - #/#/#'):
+                                nonedate_str='#/#/# - #/#/#',
+                                trimdate = 9):
     #n_rows = 2
     n_configs = len(data_list)
 
@@ -876,7 +891,24 @@ def present_event_and_daterange(data_list,
     val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] + 
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
 
-    date_row = html.Tr([html.Td(range_label, style={'text-align':'end'})] 
-        + [html.Td(f'{x.get(event_start)[:-9]} - {x.get(event_end)[:-9]}') if x is not None else html.Td(none_str) for x in comp_result])
+    date_row = html.Tr(
+        [html.Td(range_label, style={'text-align':'end'})] 
+        + [
+            html.Td(
+                html.A(
+                    f'{x.get(event_start)[:-trimdate]} - {x.get(event_end)[:-trimdate]}',
+                    disable_n_clicks = False,
+                    id = {
+                        'type': 'link-event-daterange',
+                        'datetime_start': x.get(event_start)[:-trimdate],
+                        'datetime_end': x.get(event_end)[:-trimdate],
+                    },
+                    style = {
+                        'cursor': 'zoom-in'
+                    }
+                )
+            ) if x is not None else html.Td(nonedate_str) for x in comp_result
+        ]
+    )
 
     return [val_row, date_row]

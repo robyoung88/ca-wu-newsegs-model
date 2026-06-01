@@ -76,7 +76,7 @@ class SprakeGeneration(NewsegsGeneration):
         self,
         turbine: generation.WindTurbineElecGenerator | generation.PowerPlantHeterogeneousGenerators | SprakeGeneration,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        model: newsegsmodel.NewsegsModel | None = None, # pyright: ignore[reportUndefinedVariable]
         loc: location.Location | None = None,
     ) -> None:
         raise ValueError('First argument must be a WindTurbineElecGenerator or a PowerPlantHeterogeneousGenerators or a SprakeGeneration, is %s', type(turbine))
@@ -88,7 +88,7 @@ class SprakeGeneration(NewsegsGeneration):
         self,
         turbine: generation.WindTurbineElecGenerator,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        model: newsegsmodel.NewsegsModel | None = None, # pyright: ignore[reportUndefinedVariable]
         loc: location.Location | None = None,
     ) -> None:
         super().__init__()
@@ -113,7 +113,7 @@ class SprakeGeneration(NewsegsGeneration):
         self,
         generator: generation.PowerPlantHeterogeneousGenerators,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: newsegsmodel.NewsegsModel | None = None # pyright: ignore[reportUndefinedVariable]
     ) -> None:
         super().__init__()
         self._generator = copy.deepcopy(generator)
@@ -125,11 +125,11 @@ class SprakeGeneration(NewsegsGeneration):
             self.model = model
 
     @property
-    def model(self) -> newsegsmodel.NewsegsModel | None:
+    def model(self) -> newsegsmodel.NewsegsModel | None: # pyright: ignore[reportUndefinedVariable]
         return self._generator.model
 
     @model.setter
-    def model(self, model: newsegsmodel.NewsegsModel) -> None:
+    def model(self, model: newsegsmodel.NewsegsModel) -> None: # pyright: ignore[reportUndefinedVariable]
         self._generator.model = model
         self.dirty = True
     
@@ -169,7 +169,7 @@ class SprakeGeneration(NewsegsGeneration):
     def from_characteristics(cls,
                              generator: generation.PowerPlantHeterogeneousGenerators,
                              name: str|None = None,
-                             model: newsegsmodel.NewsegsModel | None = None,
+                             model: newsegsmodel.NewsegsModel | None = None, # pyright: ignore[reportUndefinedVariable]
                              ) -> SprakeGeneration:
         o = cls(generator)
 
@@ -182,7 +182,7 @@ class SprakeGeneration(NewsegsGeneration):
         return o
 
     @override
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict:
         odict = {
             'class': classfuncs.get_class(self),
             'name': self._name,
@@ -191,7 +191,7 @@ class SprakeGeneration(NewsegsGeneration):
         return odict
     
     @override
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict) -> None:
         config = copy.copy(config)
 
         generator = config.pop('generator', None)
@@ -219,15 +219,15 @@ class SprakeGeneration(NewsegsGeneration):
 
     @override
     @classmethod
-    def from_dict(cls, input: Mapping) -> SprakeGeneration:
-        input = copy.copy(input)
+    def from_dict(cls, config: dict) -> SprakeGeneration:
+        input = copy.copy(config)
         input.pop('class', None)
         if input.get('generator', None) is not None:
             input['generator'] = generation.generator_from_dict(input['generator'])
         return cls.from_characteristics(**input)
 
 # SprakeGeneration copy constructor
-@SprakeGeneration.__init__.register(SprakeGeneration)
+@SprakeGeneration.__init__.register(SprakeGeneration) # pyright: ignore[reportFunctionMemberAccess]
 def _SprakeGeneration_from_other(
     self,
     other: SprakeGeneration
