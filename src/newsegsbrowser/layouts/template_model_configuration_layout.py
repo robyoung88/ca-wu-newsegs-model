@@ -10,6 +10,7 @@ import dash_bootstrap_components as dbc
 from src.newsegsbrowser.layouts import navigation
 from src.newsegsbrowser.layouts.inputs import maps
 from src.newsegsbrowser.layouts.feedback import indicative_net_energy
+from src.newsegsbrowser.layouts.common import NULL_LAYOUT
 
 from src.newsegsbrowser.layouts.inputs import generation_input_sprake
 from src.newsegsbrowser.layouts.inputs import storage_input_sprake
@@ -31,9 +32,6 @@ from src.newsegsbrowser.layouts.results import consumption_results_sprake
 from src.newsegsbrowser.layouts.results import net_energy_results_sprake
 from src.newsegsbrowser.layouts.results import economic_results_so_sprake
 
-def _NULL_LAYOUT(*args, **kwargs):
-    return html.Span()
-
 DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_navigation': navigation.create_navigator_buttons_default,
     'width_navigation': 1,
@@ -49,7 +47,7 @@ DEFAULT_LAYOUT_CONFIGURATION = {
     'width_building_consumption_input': 6,
     'layout_direct_consumption_input': direct_consumption_input_sprake.create_direct_consumption_input_card,
     'width_direct_consumption_input': 6,
-    'layout_grid_input': _NULL_LAYOUT,
+    'layout_grid_input': NULL_LAYOUT,
     'width_grid_input': 12,
     'layout_model_settings_input': model_settings_input_sprake.create_model_settings_input_card,
     'width_model_settings_input': 12,
@@ -69,7 +67,7 @@ DEFAULT_LAYOUT_CONFIGURATION = {
     'results_table_functions': results_tables_map.SPRAKE_RESULT_TABLES,
     'layout_generation_results': generation_results_sprake.create_generation_results_card,
     'width_generation_results': 12,
-    'layout_grid_results': _NULL_LAYOUT,
+    'layout_grid_results': NULL_LAYOUT,
     'width_grid_results': 12,
     'layout_storage_results': storage_results_sprake.create_storage_results_card,
     'width_storage_results': 12,
@@ -244,8 +242,8 @@ def create_model_configuration_layout(*args, **kwargs):
 
                 # A store of the available and active configurations
                 # As a JSON list of the results of `compose_configuration`
-                dcc.Store(id = 'store-selected-configuration'),
-                dcc.Store(id = 'store-configurations'),
+                #dcc.Store(id = 'store-selected-configuration'),
+                #dcc.Store(id = 'store-configurations'),
 
                 # Stores for the -to-interface configurations of the models
                 # and finances that are in the current session.

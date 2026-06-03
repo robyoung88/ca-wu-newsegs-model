@@ -45,14 +45,18 @@ def add_configuration_selection_callbacks(app: Dash):
         if len(ctx.triggered) > 1:
             return NUP
         
-        configurations = json.loads(configurations)
+        if configurations is None or selected_config is None:
+            return NUP
+
         selected_config = json.loads(selected_config)
         
         trigger_index = trig['index']
         if config_name[trigger_index] is None:
             return NUP
         
-        configurations[trigger_index]['name'] = config_name[trigger_index]
+        w_conf = json.loads(configurations[trigger_index])
+        w_conf['name'] = config_name[trigger_index]
+        configurations[trigger_index] = json.dumps(w_conf)
         if selected_config['config_index'] == trigger_index:
             selected_config['name'] = config_name[trigger_index]
             rval = (json.dumps(configurations), json.dumps(selected_config))
@@ -81,6 +85,9 @@ def add_configuration_selection_callbacks(app: Dash):
         State('store-model-interface-configurations', 'data'),
         State('store-finance-interface-configurations', 'data'),
 
+        State({'type': 'config-focus-btn', 'index': ALL}, 'id'),
+        State({'type': 'config-hdrfocus-btn', 'index': ALL}, 'id'),
+
         prevent_initial_call=True
     )
     def add_duplicate_config(
@@ -88,7 +95,9 @@ def add_configuration_selection_callbacks(app: Dash):
         configurations, 
         selected_config,
         store_model_interface_configurations,
-        store_finance_interface_configurations
+        store_finance_interface_configurations,
+        focus_btn_ids,
+        header_focus_btn_ids
     ):
         # Add the selector as the penultimate row
         if configurations is None:
@@ -99,8 +108,8 @@ def add_configuration_selection_callbacks(app: Dash):
         NUP = (
             no_update, 
             no_update, 
-            [no_update] * n_conf, 
-            [no_update] * n_conf, 
+            [no_update] * len(focus_btn_ids), 
+            [no_update] * len(header_focus_btn_ids), 
             no_update,
             no_update,
             no_update,
@@ -318,14 +327,25 @@ def add_configuration_selection_callbacks(app: Dash):
         
         State('store-configurations', 'data'),
         State('store-selected-configuration', 'data'),
+
+        State({'type': 'config-focus-btn', 'index': ALL}, 'id'),
+        State({'type': 'config-hdrfocus-btn', 'index': ALL}, 'id'),
+
         prevent_initial_call = True
     )
-    def set_focussed_config(n_clicks, n_clicks_hdr, configurations, selected_config):
+    def set_focussed_config(
+        n_clicks, 
+        n_clicks_hdr, 
+        configurations, 
+        selected_config,
+        focus_btn_ids,
+        header_focus_btn_ids
+        ):
         if configurations is None:
             raise PreventUpdate()
         
         n_conf = len(configurations)
-        NUP = ([no_update] * n_conf, [no_update] * n_conf, no_update)
+        NUP = ([no_update] * len(focus_btn_ids), [no_update] * len(header_focus_btn_ids), no_update)
         
         trig = ctx.triggered_id
         if trig is None:

@@ -17,7 +17,7 @@ def add_result_timeseries_callbacks(app: Dash):
         prevent_initial_call = True
     )
     def toggle_timeseries_visibility(n_clicks, current_style, store_selected_configuration):
-        NUP = no_update, no_update
+        NUP = no_update, no_update, no_update
         if n_clicks is None:
             return NUP
 

@@ -46,7 +46,8 @@ def create_landing_layout(*args, **kwargs):
         dbc.Col([
             dcc.Markdown(config_dict['assumptions_text']),
             
-            f'The model type is {config_dict["model_type"]}'
+            f'The model type is {config_dict["model_type"]}',
+            #dcc.Store(id = 'store-selected-configuration'),
         ])
     ])
 

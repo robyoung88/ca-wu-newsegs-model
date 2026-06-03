@@ -20,6 +20,7 @@ from src.newsegsfinance import newsegsfinance
 from src.newsegsbrowser.layouts import model_selection_layout
 from src.newsegsbrowser.layouts import template_landing_layout
 from src.newsegsbrowser.layouts import template_model_configuration_layout
+from src.newsegsbrowser.layouts import template_dsa_configuration_layout
 from src.newsegsbrowser.layouts import layout_registry
 
 from src.newsegsbrowser.callbacks import model_selection_callbacks
@@ -73,6 +74,8 @@ def serve_layout():
         dcc.Location(id = 'url', refresh = 'callback-nav'),
         html.Div(id = 'page-content'),
         dcc.Store(id = 'selected-model', data = 'sprake'),
+        dcc.Store(id = 'store-selected-configuration'),
+        dcc.Store(id = 'store-configurations')
     ])
 
 def add_display_callbacks(app: Dash) -> Dash:
@@ -85,8 +88,10 @@ def add_display_callbacks(app: Dash) -> Dash:
         Output('page-content', 'children'),
         Input('url', 'pathname'),
         State('selected-model', 'data'),
+        State('store-selected-configuration', 'data')
     )
-    def display_page(pathname, selected_model):
+    def display_page(pathname, selected_model, selected_conf):
+        print(selected_conf)
         if pathname == '/' or pathname == '/model_selection':
             return model_selection_layout.model_selection_layout
         elif pathname == '/landing':
@@ -98,6 +103,12 @@ def add_display_callbacks(app: Dash) -> Dash:
         elif pathname == '/site-config':
             return template_model_configuration_layout.create_model_configuration_layout(
                 **layout_registry.get_model_configuration_layout_config(
+                    selected_model
+                )
+            )
+        elif pathname == '/dsa':
+            return template_dsa_configuration_layout.create_dsa_layout(
+                **layout_registry.get_dsa_layout_config(
                     selected_model
                 )
             )
@@ -179,7 +190,9 @@ def create_app(external_stylesheets = None) -> Dash:
         external_stylesheets = external_stylesheets,
         assets_url_path = assets_path,
         routing_callback_inputs = {
-            'model-type': Input('selected-model', 'data'),
+            'selected-model': Input('selected-model', 'data'),
+            'store-selected-configuration': Input('store-selected-configuration', 'data'),
+            'store-configurations': Input('store-configurations', 'data'),
         }
     )
     app.config.suppress_callback_exceptions = True
@@ -197,6 +210,11 @@ def create_app(external_stylesheets = None) -> Dash:
                 'sprake'
             )
         ),
+        template_dsa_configuration_layout.create_dsa_layout(
+                **layout_registry.get_dsa_layout_config(
+                    'sprake'
+                )
+            )
 
     ])
 
