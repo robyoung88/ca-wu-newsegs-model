@@ -35,6 +35,13 @@ class NewsegsFinance(metaclass=ABCMeta):
             raise ValueError(f'id: {id} is not a valid NewsegsFinance identifier')
         self.uuid = uid
 
+    def run(self):
+        """
+        Perform any expensive computation required to "un-dirty" the finance
+        """
+        self._dirty = False
+        return hash(self)
+
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
     def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:

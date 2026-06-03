@@ -620,12 +620,14 @@ def present_single_stat_per_row_plus_paired_scalars(
     
     return otbl
     
-def present_stat_description(data_list,
-                             stat_name,
-                             stat_label,
-                             stat_list=ANNUAL_DEFAULT_STATS,
-                             fmt='{:,.2f}',
-                             none_str='-'):
+def present_stat_description(
+        data_list,
+        stat_name,
+        stat_label,
+        stat_list=ANNUAL_DEFAULT_STATS,
+        fmt='{:,.2f}',
+        none_str='-'
+    ):
     n_rows = len(stat_list)
     n_configs = len(data_list)
 

@@ -9,16 +9,6 @@ from src.stats.core import assign_year_index, assign_peaktime_index, assign_seas
 from src.stats import basic_summary_stats
 from src.stats import seasonal_statistics
 
-#SEASON_NAMES_MAP = (
-#    pd.DataFrame(
-#        {
-#            'season_index': np.arange(len(SEASON_NAMES)),
-#            'season': SEASON_NAMES
-#        }
-#    )
-#    .set_index('season_index')
-#)
-
 def net_results_to_interface_sprake(
     mdl: SprakeModel
 ) -> dict:
