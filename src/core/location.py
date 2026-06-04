@@ -14,13 +14,17 @@ Exports:
 """
 from __future__ import annotations
 
-from numbers import Number
-from typing import override
+from typing import override, Type, TypeVar, Union, SupportsFloat
 import copy
 from functools import singledispatchmethod
 from pyproj import Transformer
 
+import numpy as np
+
 from src.util import classfuncs
+
+T = TypeVar('T')
+Real = SupportsFloat
 
 class Location:
     """
@@ -42,8 +46,8 @@ class Location:
     @singledispatchmethod
     def __init__(
         self,
-        lat: Number | Location,
-        lon: Number | None,
+        lat: Real | Location,
+        lon: Real | None,
         name: str| None = None,
     ) -> None:
         """
@@ -53,12 +57,12 @@ class Location:
     
     # Copy constructor is registered underneath class definition for late-bind.
 
-    @__init__.register(Number)
-    def _from_numbers(
+    @__init__.register(Real)
+    def _from_Reals(
         self,
-        lat: Number,
-        lon: Number,
-        name: str| None = None,
+        lat: Real,
+        lon: Real,
+        name: str | None = None,
     ) -> None:
         self._lat = float(lat)
         self._lon = float(lon)
@@ -67,18 +71,18 @@ class Location:
             self.name = name
 
     @classmethod
-    def from_none(cls) -> Location:
+    def from_none(cls: Type[T]) -> T:
         """
         Replaces a no-argument constructor.
         """
-        return cls(53.255, -3.477, name = 'St Asaph V72')
+        return cls(53.255, -3.477, name = 'St Asaph V72') # pyright: ignore[reportCallIssue]
 
     @property
     def lat(self) -> float:
         return self._lat
     
     @lat.setter
-    def lat(self, lat):
+    def lat(self, lat: Real):
         self._lat = float(lat)
 
     @property
@@ -86,26 +90,32 @@ class Location:
         return self._lon
     
     @lon.setter
-    def lon(self, lon: Number):
+    def lon(self, lon: Real):
         self._lon = float(lon)
 
     @property
     def latlon(self) :
         return (self._lat, self._lon)
     
-    def get_latlon(self) -> tuple[Number, Number]:
+    def get_latlon(self) -> tuple[float, float]:
         return (self._lat, self._lon)
 
     @latlon.setter
-    def latlon(self, latlon: tuple[Number, Number]):
-        self._lat = latlon[0]
-        self._lon = latlon[1]
+    def latlon(self, latlon: tuple[Real, Real]):
+        self._lat = float(latlon[0])
+        self._lon = float(latlon[1])
     
-    def set_latlon(self, lat: Number|tuple[Number, Number], lon: Number|None = None):
+    def set_latlon(
+            self, 
+            lat: Real | tuple[Real, Real], 
+            lon: Real | None = None
+        ):
         if isinstance(lat, tuple):
             self._lat = float(lat[0])
             self._lon = float(lat[1])
         else:
+            if lon is None:
+                raise ValueError('If not setting latlon via a tuple, `lon` must be provided')
             self._lat = float(lat)
             self._lon = float(lon)
 
@@ -126,25 +136,29 @@ class Location:
         return trans_togb.transform(self.lat, self.lon)
 
     @classmethod
-    def from_lat_lon(cls, lat: Number, lon: Number) -> Location:
+    def from_lat_lon(cls, lat: Real, lon: Real) -> Location:
         o = cls.from_none()
         o.lat = lat
         o.lon = lon
         return o
     
     @classmethod
-    def from_tuple(cls, inputs:tuple[Number, Number]) -> Location:
+    def from_tuple(cls, inputs: tuple[Real, Real]) -> Location:
         o = cls.from_none()
         o.lat, o.lon = inputs
         return o
 
     @classmethod
-    def from_osgb(cls, easting:int|float, northing:int|float) -> Location:
+    def from_osgb(
+        cls, 
+        easting: Real, 
+        northing: Real
+    ) -> Location:
         trans_tolatlon = Transformer.from_crs("EPSG:27700", cls._crs)
         coord = trans_tolatlon.transform(easting, northing)
         return cls.from_lat_lon(coord[0], coord[1])
     
-    def __add__(self, other:tuple[int|float, int|float]):
+    def __add__(self, other: tuple[int|float, int|float]):
         """
         Add an offset (in m) to the current coordinate, as a 2-tuple
         """
@@ -159,7 +173,8 @@ class Location:
         o2 = (-other[0], -other[1])
         return self + o2
 
-    def __eq__(self, other: Location) -> bool:
+    @override
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Location):
             raise ValueError('`other` must be a Location instance, is %s', type(other))
 
@@ -185,14 +200,14 @@ class Location:
 
     @classmethod
     def from_characteristics(
-        cls,
-        lat: Number,
-        lon: Number,
-        crs: str,
+        cls: Type[T],
+        lat: Real,
+        lon: Real,
+        crs: str = 'EPSG:4326',
         name: str | None = None,
-    ) -> Location:
+    ) -> T:
 
-        o = cls.from_none()
+        o = cls.from_none() # pyright: ignore[reportAttributeAccessIssue]
         
         o._crs = crs
         o.lat = lat
@@ -219,7 +234,7 @@ class Location:
         return cls.from_characteristics(**input)
 
 # Location copy constructor
-@Location.__init__.register(Location)
+@Location.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
 def Location_from_other(self, other: Location):
     """
     Initialise a Location using another Location
@@ -236,9 +251,9 @@ class RaisedLocation(Location):
     @singledispatchmethod
     def __init__(
         self,
-        lat: Number | Location,
-        lon: Number | None = None,
-        height_agl: Number | None = None,
+        lat: Real | Location,
+        lon: Real | None = None,
+        height_agl: Real | None = None,
         name: str | None = None
     ) -> None:
         """
@@ -247,12 +262,12 @@ class RaisedLocation(Location):
         raise ValueError('First value must be a latitude or location, is %s', lat)
     
     @override
-    @__init__.register(Number)
-    def _from_numbers(
+    @__init__.register(Real)
+    def _from_Reals(
         self,
-        lat: Number,
-        lon: Number,
-        height_agl: Number = 0.,
+        lat: Real,
+        lon: Real,
+        height_agl: Real = 0.,
         name: str | None = None
     ) -> None:
         super().__init__(lat, lon, name = name)
@@ -263,15 +278,15 @@ class RaisedLocation(Location):
         return self._height
     
     @height_agl.setter
-    def height_agl(self, height: Number):
+    def height_agl(self, height: Real):
         self._height = float(height)
 
     @classmethod
     def from_lat_lon_height(
         cls,
-        lat: Number, 
-        lon: Number,
-        height_agl: Number
+        lat: Real, 
+        lon: Real,
+        height_agl: Real
     ):
         o = cls(lat, lon, height_agl)
         return o
@@ -279,11 +294,12 @@ class RaisedLocation(Location):
     @classmethod
     def from_tuple(
         cls, 
-        inputs: tuple[Number, Number, Number]):
+        inputs: tuple[Real, Real] | tuple[Real, Real, Real]
+    ):
         o = cls(*inputs)
         return o
     
-    def __eq__(self, other: Location) -> bool:
+    def __eq__(self, other: object) -> bool:
         ok = super().__eq__(other)
 
         if isinstance(other, RaisedLocation):
@@ -313,20 +329,13 @@ class RaisedLocation(Location):
 
     @classmethod
     def from_characteristics(
-        cls,
-        lat: Number,
-        lon: Number,
-        crs: str,
-        height_agl: Number,
-        name: str | None = None,
-    ) -> RaisedLocation:
+        cls: Type[T],
+        *args, 
+        height_agl: Real,
+        **kwargs
+    ) -> T:
 
-        a = locals()
-        del a['height_agl']
-        del a['cls']
-        del a['__class__']
-
-        o = super(RaisedLocation, cls).from_characteristics(**a)
+        o = super().from_characteristics(*args, **kwargs)
         o.height_agl = height_agl
         
         return o
@@ -337,7 +346,7 @@ class RaisedLocation(Location):
         return odict
 
 # RaisedLocation copy constructor
-@RaisedLocation.__init__.register(Location)
+@RaisedLocation.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
 def RaiseLocation_from_other(
     self,
     other: Location
@@ -358,11 +367,11 @@ class AspectLocation(RaisedLocation):
     @singledispatchmethod
     def __init__(
         self,
-        lat: Number | Location,
-        lon: Number | None = None,
-        height_agl: Number | None = None,
-        azimuth: Number | None = None,
-        pitch: Number | None = None,
+        lat: Real | Location,
+        lon: Real | None = None,
+        height_agl: Real | None = None,
+        azimuth: Real | None = None,
+        pitch: Real | None = None,
         name: str | None = None,
     ) -> None:
         """
@@ -371,14 +380,14 @@ class AspectLocation(RaisedLocation):
         raise ValueError('First value must be a latitude or location, is %s', lat)
     
     @override
-    @__init__.register(Number)
-    def _from_numbers(
+    @__init__.register(Real)
+    def _from_Reals(
         self,
-        lat: Number,
-        lon: Number,
-        height_agl: Number = 0.,
-        azimuth: Number = 180.,
-        pitch: Number = 90.,
+        lat: Real,
+        lon: Real,
+        height_agl: Real = 0.,
+        azimuth: Real = 180.,
+        pitch: Real = 90.,
         name: str | None = None,
     ) -> None:
         super().__init__(lat, lon, height_agl = height_agl, name = name)
@@ -390,25 +399,25 @@ class AspectLocation(RaisedLocation):
         return self._azimuth
     
     @azimuth.setter
-    def azimuth(self, azimuth: Number):
-        self._azimuth = azimuth % 360.0
+    def azimuth(self, azimuth: Real):
+        self._azimuth = float(azimuth) % 360.0
     
     @property
     def pitch(self) -> float:
         return self._pitch
     
     @pitch.setter
-    def pitch(self, pitch: Number):
-        self._pitch = pitch
+    def pitch(self, pitch: Real):
+        self._pitch = float(pitch)
 
     @classmethod
     def from_llhap(
         cls, 
-        lat: Number,
-        lon: Number,
-        height_agl: Number,
-        azimuth: Number,
-        pitch: Number
+        lat: Real,
+        lon: Real,
+        height_agl: Real,
+        azimuth: Real,
+        pitch: Real
     ) -> AspectLocation:
         o = cls(lat, lon, height_agl, azimuth, pitch)
         return o
@@ -416,7 +425,7 @@ class AspectLocation(RaisedLocation):
     @classmethod
     def from_tuple(
         cls, 
-        inputs: tuple[Number, Number, Number, Number, Number]):
+        inputs: tuple[Real, Real] | tuple[Real, Real, Real] | tuple[Real, Real, Real, Real, Real]):
         """
             Tuple should consist of
 
@@ -429,7 +438,7 @@ class AspectLocation(RaisedLocation):
         o = cls(*inputs)
         return o
     
-    def __eq__(self, other:Location) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, AspectLocation):
             return super().__eq__(other) and (self.azimuth == other.azimuth) and (self.pitch == other.pitch)
         else:
@@ -446,21 +455,14 @@ class AspectLocation(RaisedLocation):
 
     @classmethod
     def from_characteristics(
-        cls,
-        lat: float,
-        lon: float,
-        crs: str,
-        height_agl: float,
-        azimuth: float,
-        pitch: float,
-        name:str | None = None
-    ) -> AspectLocation:
-        a = locals()
-        del a['azimuth']
-        del a['pitch']
-        del a['cls']
-        del a['__class__']
-        o = super(AspectLocation, cls).from_characteristics(**a)
+        cls: Type[T],
+        *args,
+        azimuth: Real,
+        pitch: Real,
+        **kwargs,
+    ) -> T:
+        
+        o = super().from_characteristics(*args, **kwargs)
         o.azimuth = azimuth
         o.pitch = pitch
 
@@ -473,7 +475,7 @@ class AspectLocation(RaisedLocation):
         return odict
 
 # AspectLocation copy constructor
-@AspectLocation.__init__.register(Location)
+@AspectLocation.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
 def AspectLocation_from_other(
     self,
     other: Location
