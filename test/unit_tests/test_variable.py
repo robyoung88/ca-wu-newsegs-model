@@ -2,9 +2,12 @@
 Unit tests for newsegsbrowser/variable.
 """
 import unittest
+from functools import partial
+from typing import Literal
 
 import numpy as np
 import numpy.testing as nptest
+from scipy.stats import lognorm
 
 from unit_tests.common import setup_test_env
 setup_test_env()
@@ -110,6 +113,445 @@ def activate_psa(var: variable.Variable):
     var.psa_selected = True
     var.psa_active = True
 
+class TestVariableDeterministic(unittest.TestCase):
+    """
+    Ensure sensible behaviour of variables for serving deterministic values
+    """
+
+    def test_constant_deterministic(self):
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'constant'
+        )
+
+        # From construction - string
+        var = create_var(parameters = 'A String')
+        self.assertEqual(
+            var.deterministic_value,
+            'A String'
+        )
+
+        # From construction - int
+        var = create_var(parameters = 1)
+        self.assertEqual(
+            var.deterministic_value,
+            1
+        )
+
+        # From construction - float
+        var = create_var(parameters = 123.456)
+        self.assertEqual(
+            var.deterministic_value,
+            123.456
+        )
+
+        # From construction - sequence (single)
+        var = create_var(parameters = [123.456,])
+        self.assertEqual(
+            var.deterministic_value,
+            123.456
+        )
+
+        # From construction - sequence (multiple)
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = [123.456, 999.9])
+
+        # From construction - string with log transform
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = 'A String', transform = 'ln')
+        
+        # From construction - float with log
+        var = create_var(parameters = 123.456, transform = 'ln')
+        self.assertEqual(
+            var.deterministic_value,
+            np.exp(123.456)
+        )
+
+        # Change after construction - string
+        var = create_var(parameters = 'A String')
+        var.set_parameters('Another string')
+        self.assertEqual(
+            var.deterministic_value,
+            'Another string'
+        )
+
+        # Change type after construction
+        var = create_var(parameters = 'A String')
+        var.set_parameters(123.4)
+        self.assertEqual(
+            var.deterministic_value,
+            123.4
+        )
+
+        # Change transform after construction
+        var = create_var(parameters = 'A String')
+        var.set_transform('ln')
+        with self.assertRaises(TypeError):
+            x = var.deterministic_value
+        
+        var.set_parameters(123.4)
+        self.assertEqual(
+            var.deterministic_value,
+            np.exp(123.4)
+        )
+
+        # Change type in opposite direction
+        var = create_var(parameters = 123.4, transform = 'ln')
+        
+        with self.assertRaises(TypeError):
+            var.set_parameters('A String')
+
+        var.set_transform('identity')
+        var.set_parameters('A String')
+        self.assertEqual(
+            var.deterministic_value,
+            'A String'
+        )
+
+    def test_binom_deterministic_param1(self):
+        """
+        Parameterisation 1 - prob, trials
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'binomial'
+        )
+
+        # From construction
+        var = create_var()
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        var = create_var(parameters = (0.25, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            1
+        )
+
+        var = create_var(parameters = (1, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            4
+        )
+
+        var = create_var(parameters = (0, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (-0.2, 4))
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (1.2, 4))
+
+        var = create_var(parameters = (0.25, 0))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+        
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (0.25, 4.5))
+        
+        # After construction
+        var = create_var(parameters = (0.25, 4))
+        var.set_parameters(0.5, 4)
+        self.assertEqual(
+            var.deterministic_value,
+            2
+        )
+
+    def test_binom_deterministic_param2(self):
+        """
+        Parameterisation 1 - mean, trials
+        """
+
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'binomial',
+            parameterisation_index = 1
+        )
+
+        # From construction
+        var = create_var()
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        var = create_var(parameters = (1, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            1
+        )
+
+        var = create_var(parameters = (2, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            2
+        )
+
+        var = create_var(parameters = (0, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        var = create_var(parameters = (4, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            4
+        )
+
+        var = create_var(parameters = (0, 0))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (5, 4))
+        
+        # Ok to have a non-integer expected number of successes
+        var = create_var(parameters = (2.5, 4))
+        self.assertEqual(
+            var.deterministic_value,
+            int(round(4* (2.5/4)))
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (-1, 4))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = ('foo', 4))
+
+        # After construction
+        var = create_var(parameters = (1, 4))
+        var.set_parameters(2, 4)
+        self.assertEqual(
+            var.deterministic_value,
+            2
+        )
+
+        # Revert parameterisation
+        var.parameterisation_index = 0
+        self.assertEqual(
+            var.deterministic_value,
+            2
+        )
+        var.set_parameters(0.75, 4)
+        self.assertEqual(
+            var.deterministic_value,
+            3
+        )
+
+    def test_normal_deterministic_param1(self):
+        """
+        Parameterisation 1 - mean, sd
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'normal'
+        )
+
+        var = create_var()
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        var = create_var(parameters = (20.20, 1))
+        self.assertEqual(
+            var.deterministic_value,
+            20.20
+        )
+
+        var = create_var(parameters = (-100, 100))
+        self.assertEqual(
+            var.deterministic_value,
+            -100
+        )
+
+        var = create_var(parameters = (10, 0))
+        self.assertEqual(
+            var.deterministic_value,
+            10
+        )
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = ('foo', 1))
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (10, -1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = 10)
+        
+        # After construction
+        var = create_var(parameters = (10, 1))
+        var.set_parameters(5,2)
+        self.assertEqual(
+            var.deterministic_value,
+            5
+        )
+
+        # Change transform after construction
+        var.set_transform('ln')
+        self.assertEqual(
+            var.deterministic_value,
+            lognorm.mean(2, scale = np.exp(5))
+        )
+        self.assertAlmostEqual(
+            var.deterministic_value,
+            1096.633, # From R's flexsurv::mean_lnorm, the parameterisation of which I know and trust # type: ignore
+            places = 2
+        ) # type: ignore
+
+    def test_normal_deterministic_param2(self):
+        """
+        Parameterisation 2 - lognormal with mu, sigma
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'normal',
+            transform = 'ln'
+        )
+
+        var = create_var()
+        self.assertEqual(
+            var.parameterisation_index,
+            1
+        )
+        self.assertEqual(
+            var.deterministic_value,
+            lognorm.mean(1, scale = np.exp(0))
+        )
+
+        var = create_var(parameters = (2, 3))
+        self.assertEqual(
+            var.deterministic_value,
+            lognorm.mean(3, scale = np.exp(2))
+        )
+
+        var = create_var(parameters = (-1, 2.5))
+        self.assertEqual(
+            var.deterministic_value,
+            lognorm.mean(2.5, scale = np.exp(-1))
+        )
+
+        var = create_var(parameters = (-1, 0))
+        self.assertEqual(
+            var.deterministic_value,
+            np.exp(-1)
+            #lognorm.mean(0, scale = np.exp(-1)) # Stats does not know how to handle the degenerate case
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (1, -1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = ('foo', 1))
+        
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = 55)
+
+        # After construction
+        var = create_var(parameters = (2, 3))
+        var.set_parameters(4, 1.5)
+        self.assertEqual(
+            var.deterministic_value,
+            lognorm.mean(1.5, scale = np.exp(4))
+        )
+
+        # Change transform after construction
+        var.set_transform('identity')
+        self.assertEqual(
+            var.deterministic_value,
+            4
+        )
+
+    def test_normal_deterministic_param3(self):
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'normal',
+            transform = 'ln',
+            parameterisation_index = 2
+        )
+         
+        var = create_var()
+        self.assertEqual(
+            var.deterministic_value,
+            1
+        )
+
+        var = create_var(parameters = (4, 2.5))
+        self.assertAlmostEqual(
+            var.deterministic_value,
+            4.0 # type: ignore
+        ) # type: ignore
+
+        var = create_var(parameters = (4, 0))
+        self.assertAlmostEqual(
+            var.deterministic_value,
+            4.0 # type: ignore
+        ) # type: ignore
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (0, 1))
+        
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (-1, 1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = ('foo', 1))
+        
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = 55)
+
+        # After construction
+        var = create_var(parameters = (2, 3))
+        var.set_parameters(4, 1.5)
+        self.assertEqual(
+            var.deterministic_value,
+            4
+        )
+
+        # Change transform after construction
+        var.set_transform('identity')
+        # Immediately after this, the deterministic value will be nonsense
+        var.parameterisation_index = 1
+        var.set_parameters(9, 6)
+        self.assertEqual(
+            var.deterministic_value,
+            9
+        )
+
+    def test_beta_deterministic_param1(self):
+        """
+        Parameterisation 1 - a, b
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'beta'
+        )
+
+
+
+    
+
+
+
 class TestVariableValidation(unittest.TestCase):
     """
     Ensure that Variables handle creation and sampling correctly
@@ -117,7 +559,6 @@ class TestVariableValidation(unittest.TestCase):
     def make_constant_variable(self):
         return variable.Variable(
             'const1',
-            variable_type = 'scalar',
             distribution = 'constant',
             transform = 'identity',
             parameters = 'String Constant',
@@ -128,7 +569,6 @@ class TestVariableValidation(unittest.TestCase):
     def make_constant_variable_numeric(self):
         return variable.Variable(
             'const2',
-            variable_type = 'scalar',
             distribution = 'constant',
             transform = 'identity',
             parameters = 12.34,
@@ -327,7 +767,6 @@ class TestVariableValidation(unittest.TestCase):
     def test_constant_validation(self):
         var1 = variable.Variable(
             'const1',
-            variable_type = 'scalar',
             distribution = 'constant',
             transform = 'identity',
             parameters = 'String Constant'
@@ -361,7 +800,6 @@ class TestVariableValidation(unittest.TestCase):
             """
             var1 = variable.Variable(
                 'const1',
-                variable_type = 'vector',
                 distribution = 'constant',
                 transform = 'identity',
                 parameters = 'String Constant'
@@ -373,7 +811,6 @@ class TestVariableValidation(unittest.TestCase):
             """
             var1 = variable.Variable(
                 'const1',
-                variable_type = 'scalar',
                 distribution = 'constant',
                 transform = 'ln',
                 parameters = 'String Constant'
@@ -382,7 +819,6 @@ class TestVariableValidation(unittest.TestCase):
     def make_binomial_variable(self):
         return variable.Variable(
             'const1',
-            variable_type = 'scalar',
             distribution = 'binomial',
             transform = 'identity',
             parameters = [0.2, 5],
@@ -481,7 +917,6 @@ class TestVariableValidation(unittest.TestCase):
     def make_normal_variable(self):
         return variable.Variable(
             'const1',
-            variable_type = 'scalar',
             distribution = 'normal',
             transform = 'identity',
             parameters = [10, 2],
@@ -492,7 +927,6 @@ class TestVariableValidation(unittest.TestCase):
     def test_normal_constructors(self):
         var = variable.Variable(
             'norm1',
-            variable_type = 'scalar',
             distribution = 'normal'
         )
     
@@ -624,7 +1058,6 @@ class TestVariableValidation(unittest.TestCase):
     def make_beta_variable(self):
         return variable.Variable(
             'const1',
-            variable_type = 'scalar',
             distribution = 'beta',
             transform = 'identity',
             parameters = [1, 3],
@@ -635,7 +1068,6 @@ class TestVariableValidation(unittest.TestCase):
     def test_beta_constructors(self):
         var = variable.Variable(
             'beta1',
-            variable_type = 'scalar',
             distribution = 'beta'
         )
 
@@ -728,7 +1160,6 @@ class TestVariableValidation(unittest.TestCase):
     def make_gamma_variable(self):
         return variable.Variable(
             'gamma1',
-            variable_type = 'scalar',
             distribution = 'gamma',
             transform = 'identity',
             parameters = [1, 1],
