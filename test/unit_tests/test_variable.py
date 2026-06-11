@@ -3,11 +3,16 @@ Unit tests for newsegsbrowser/variable.
 """
 import unittest
 from functools import partial
-from typing import Literal
+from typing import cast
 
 import numpy as np
 import numpy.testing as nptest
+from scipy.special import psi
 from scipy.stats import lognorm
+from scipy.stats import gamma as gamma_dist
+from scipy.stats import loggamma
+from scipy.stats import beta as betadist
+import scipy.integrate as integrate
 
 from unit_tests.common import setup_test_env
 setup_test_env()
@@ -77,7 +82,7 @@ class TestParameterisations(unittest.TestCase):
 
         dist = variable.BinomialDistribution()
 
-class test_polymorphic_factory(unittest.TestCase):
+class TestPolymorphicFactory(unittest.TestCase):
     """
     Test that the polymorphic variable system works as intended.
     """
@@ -546,10 +551,1074 @@ class TestVariableDeterministic(unittest.TestCase):
             distribution = 'beta'
         )
 
+        var = create_var()
+        self.assertEqual(var.deterministic_value, 0.5)
 
+        var = create_var(parameters = (2, 3))
+        self.assertEqual(var.deterministic_value, 0.4)
 
+        var = create_var(parameters = (2, 0))
+        self.assertEqual(var.deterministic_value, 1)
+
+        var = create_var(parameters = (0, 4))
+        self.assertEqual(var.deterministic_value, 0)
+
+        with self.assertRaises(ValueError):
+            create_var(parameters = (-1, 1))
+
+        with self.assertRaises(ValueError):
+            create_var(parameters = (1, -1))
+
+        with self.assertRaises(TypeError):
+            create_var(parameters = ('foo', 1))
+        
+        with self.assertRaises(TypeError):
+            create_var(parameters = 20)
+
+        # After construction
+        var = create_var(parameters = (2, 3))
+        var.set_parameters(3, 1)
+        self.assertEqual(var.deterministic_value, 0.75)
+
+    def test_beta_deterministic_param2(self):
+        """
+        Parameterisation 2 - mean, sd
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'beta',
+            parameterisation_index = 1
+        )
+
+        var = create_var()
+        self.assertEqual(var.parameterisation_index, 1)
+        self.assertEqual(var.deterministic_value, 0.5)
+
+        var = create_var(parameters = (1. / 3., 0.1))
+        self.assertAlmostEqual(var.deterministic_value, 1. / 3.) # type: ignore
+
+        var = create_var(parameters = (0, 0.1))
+        self.assertEqual(var.deterministic_value, 0)
+
+        var = create_var(parameters = (1, 0.1))
+        self.assertEqual(var.deterministic_value, 1)
+
+        with self.assertRaises(ValueError):
+            create_var(parameters = (1.5, 0.1))
+
+        with self.assertRaises(TypeError):
+            create_var(parameters = ('foo', 0.1))
+
+        # After construction
+        var = create_var(parameters = (1. / 3., 0.1))
+        var.set_parameters(0.6, 0.15)
+        self.assertAlmostEqual(var.deterministic_value, 0.6) # type: ignore
+
+        # Revert parameterisation
+        var.parameterisation_index = 0
+        self.assertAlmostEqual(var.deterministic_value, 0.6) # type: ignore
+        var.set_parameters(2, 1)
+        self.assertAlmostEqual(var.deterministic_value, 2. / 3.) # type: ignore
+
+    def test_beta_deterministic_param3(self):
+        """
+        Parameterisation 3 - a_log, b_log
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'beta',
+            transform = 'ln',
+            parameterisation_index = 2
+        )
+
+        var = create_var()
+        self.assertEqual(var.parameterisation_index, 2)
+        self.assertAlmostEqual(var.deterministic_value, betadist.expect(np.exp, (1,1)))
+
+        var = create_var(parameters = (2.5, 0.75))
+        self.assertAlmostEqual(var.deterministic_value, betadist.expect(np.exp, (2.5, 0.75)))
+
+        with self.assertRaises(TypeError):
+            create_var(parameters = ('foo', 1))
+
+        with self.assertRaises(TypeError):
+            create_var(parameters = 55)
+
+        var = create_var(parameters = (2.5, 0.75))
+        var.set_parameters(1.2, 0.8)
+        self.assertAlmostEqual(var.deterministic_value, betadist.expect(np.exp, (1.2, 0.8)))
+
+        var.set_transform('identity')
+        var.parameterisation_index = 1
+        var.set_parameters(0.3, 0.1)
+        self.assertAlmostEqual(var.deterministic_value, 0.3) # type: ignore
+
+    def test_gamma_deterministic_param1(self):
+        """
+        Parameterisation 1 - shape, scale
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'gamma'
+        )
+
+        var = create_var()
+        self.assertEqual(
+            var.deterministic_value,
+            1
+        )
+
+        var = create_var(parameters = (5, 2))
+        self.assertEqual(
+            var.deterministic_value,
+            10
+        )
+
+        var = create_var(parameters = (20.20, 0))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        var = create_var(parameters = (0, 2))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (-1, 2))
+        
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (2, -1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = ('foo', 1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = 10)
+
+        # After construction
+        var = create_var(parameters = (10, 2.5))
+        var.set_parameters(5,1.2)
+        self.assertEqual(
+            var.deterministic_value,
+            5*1.2
+        )
+
+    def test_gamma_deterministic_param2(self):
+        """
+        Parameterisation 2 - gamma with mean, sd
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'gamma',
+            parameterisation_index = 1
+        )
+
+        var = create_var()
+        self.assertEqual(
+            var.deterministic_value,
+            1
+        )
+
+        var = create_var(parameters = (5, 2))
+        self.assertEqual(
+            var.deterministic_value,
+            5
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (0, 2))
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (20.20, 0.0))
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (-1, 2))
+        
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = (2, -1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = ('foo', 1))
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = 10)
+
+        # After construction
+        var = create_var(parameters = (10, 2.5))
+        var.set_parameters(5,1.2)
+        self.assertEqual(
+            var.deterministic_value,
+            5
+        )
+
+        # Reversion of parameterisation
+        var.parameterisation_index = 0
+        self.assertEqual(
+            var.deterministic_value,
+            5
+        )
+        var.set_parameters(5,1.2)
+        self.assertEqual(
+            var.deterministic_value,
+            5 * 1.2
+        )
     
+    def test_gamma_deterministic_param3(self):
+        """
+        Parameterisation 3 - loggamma with shape, scale of underlying gamma
 
+        NB - this relies on quadrature and often results in numeric overflow.
+        """ 
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'gamma',
+            transform = 'ln'
+        )
+        var = create_var()
+        self.assertEqual(
+            var.parameterisation_index,
+            2
+        )
+        self.assertEqual(
+            var.deterministic_value,
+            integrate.quad(lambda x: 1 - gamma_dist.cdf(np.log(x), a = 1, scale = 1), 0, np.inf)[0]
+            #gamma_dist.expect(np.exp, (1,), scale = 1)
+        )
+        
+        var = create_var(parameters = (4, 2.5))
+        self.assertEqual(
+            var.deterministic_value,
+            integrate.quad(lambda x: 1 - gamma_dist.cdf(np.log(x), a = 4, scale = 2.5), 0, np.inf)[0]
+            #gamma_dist.expect(np.exp, (4,), scale = 2.5) # Absurd that scale is an int. # pyright: ignore[reportArgumentType]
+        )
+
+        # That will do - the loggamma has some numeric issues and is not a priority
+
+    def test_constant_vector_deterministic(self):
+        _create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'constant_vector'
+        )
+        create_var = lambda **kwargs: cast(variable.VectorVariable, _create_var(**kwargs))
+
+        var = create_var()
+        
+        self.assertListEqual(
+            list(var.deterministic_value),
+            [1]
+        )
+
+        var = create_var(parameters = 'A String')
+        self.assertListEqual(
+            list(var.deterministic_value),
+            ['A String']
+        )
+
+        var = create_var(parameters = ['A String', 'Another String'])
+        self.assertListEqual(
+            list(var.deterministic_value),
+            ['A String', 'Another String']
+        )
+
+        var = create_var(parameters = ['A String', 12])
+        self.assertListEqual(
+            list(var.deterministic_value),
+            ['A String', 12]
+        )
+
+        var = create_var(parameters = [['This is the preferred form', 19], ])
+        self.assertListEqual(
+            list(var.deterministic_value),
+            ['This is the preferred form', 19]
+        )
+
+
+        var = create_var(parameters = np.asarray([1,2,3]))
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([1,2,3])
+        )
+
+        var = create_var(parameters = np.asarray([1,2,3]), transform = 'ln')
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.exp(np.asarray([1,2,3]))
+        )
+
+        var = create_var(
+            parameters = np.asarray([1,2,3]),
+            transform = ('ln', 'identity', 'ln')
+        )
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([np.exp(1),2,np.exp(3)])
+        )
+
+        # Change after construction
+        var.set_transform('identity')
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([1,2,3])
+        )
+        var.set_parameters(['A sequence', 3])
+        self.assertListEqual(
+            list(var.deterministic_value),
+            ['A sequence', 3]
+        )
+        
+        var.set_parameters('Not', 'a', 'sequence')
+        self.assertListEqual(
+            list(var.deterministic_value),
+            ['Not', 'a', 'sequence']
+        )
+
+        var.set_parameters(['Item1List1', 'Item2List1'], ['Item1List2', 'Item2List2'])
+        self.assertListEqual(
+            list(var.deterministic_value),
+            [['Item1List1', 'Item2List1'], ['Item1List2', 'Item2List2']]
+        )
+
+    def test_mvn_deterministic_param1(self):
+        """
+        Parameterisation 1 - mean, vcv
+        """
+        _create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'mvn'
+        )
+        create_var = lambda **kwargs: cast(variable.NumericVectorVariable, _create_var(**kwargs))
+
+        var = create_var()
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0,0])
+        )
+
+        var = create_var(parameters = ([1,2], [[1,0],[0,1]]))
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([1,2])
+        )
+        means, vcv = var.parameters
+        nptest.assert_array_equal(
+            means,
+            np.asarray([1,2], dtype = np.float64),
+            strict=True
+        )
+        nptest.assert_array_equal(
+            vcv,
+            np.asarray([[1,0],[0,1]], dtype = np.float64),
+            strict=True
+        )
+
+        var.set_parameters([5,3], np.asarray([[0.5,0.2,0.2,0.3]]))
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([5,3])
+        )
+
+    def test_mvn_deterministic_param2(self):
+        """
+        Parameterisation 2 - all lognormal with mu, vcv
+        """
+        _create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'mvn',
+            transform = 'ln'
+        )
+        create_var = lambda **kwargs: cast(variable.NumericVectorVariable, _create_var(**kwargs))
+
+        var = create_var()
+        self.assertEqual(
+            var.parameterisation_index,
+            1
+        )
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([
+                lognorm.mean(1, scale = np.exp(0)),
+                lognorm.mean(1, scale = np.exp(0))
+            ])
+        )
+        
+        var = create_var(
+            parameters = (
+                [-1, 1],
+                np.asarray([[0.25,0.1],[0.1,0.3]])
+            )
+        )
+        nptest.assert_array_almost_equal(
+            var.deterministic_value,
+            np.asarray([
+                lognorm.mean(np.sqrt(0.25), scale = np.exp(-1)),
+                lognorm.mean(np.sqrt(0.3), scale = np.exp(1))
+            ])
+        )
+
+    def test_mvn_deterministic_param3(self):
+        """
+        Parameterisation 3 - mixed (log) normal with mu, vcv
+        """
+        _create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'mvn',
+            transform = 'ln',
+            parameterisation_index = 2
+        )
+        create_var = lambda **kwargs: cast(variable.NumericVectorVariable, _create_var(**kwargs))
+
+        var = create_var()
+        self.assertEqual(
+            var.parameterisation_index,
+            2
+        )
+        self.assertTupleEqual(
+            var.transform,
+            ('ln', 'ln')
+        )
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([
+                1,
+                1
+            ])
+        )
+        var.set_transform('identity')
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([
+                np.log(1)- 0.5*1**2,
+                np.log(1)- 0.5*1**2
+            ])
+        )
+        var.set_transform(('identity','ln'))
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([
+                np.log(1)- 0.5*1**2,
+                1
+            ])
+        )
+
+    def test_dirichlet_deterministic_param1(self):
+        """
+        Parameterisation 1 - alpha
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'dirichlet'
+        )
+
+        var = create_var()
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0.5,0.5])
+        )
+
+        var = create_var(parameters = [[5,3,2]])
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0.5, 0.3, 0.2])
+        )
+
+        var = create_var(parameters = [[5,3,0,2]])
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0.5, 0.3, 0.0, 0.2])
+        )
+
+        with self.assertRaises(TypeError):
+            var = create_var(parameters = [5,3,0,2])
+        
+        var = create_var(parameters = [[5,3,0,2]])
+        var.set_parameters([3,2])
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0.6,0.4])
+        )
+    
+    def test_dirichlet_deterministic_param2(self):
+        """
+        Parameterisation 2 - mean, vcv
+        """
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'dirichlet',
+            parameterisation_index = 1
+        )
+
+        var = create_var()
+        self.assertEqual(
+            var.parameterisation_index,
+            1
+        )
+        self.assertTupleEqual(
+            var.parameterisation.names,
+            ('mean', 'vcv')
+        )
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0.5,0.5])
+        )
+
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = [[0.125,0.75], np.matrix([[0.1,0.05,0.05,0.02]])])
+        
+        with self.assertRaises(ValueError):
+            var = create_var(parameters = [[0.125,0.75,0.125], np.matrix([[0.1,0.05,0.05,0.02]])])
+        
+        def dvar(x,s):
+            return ((x/s)*(1.-x/s))/(s+1)
+        def dcov(x,y,s):
+            return ((x/s) - (x/s)*(y/s))/(s+1)
+
+        var = create_var(parameters = [[0.125,0.75,0.125], 
+                                       np.matrix([[
+                                           dvar(1,8), dcov(1,6,8), dcov(1,1,8),
+                                           dcov(6,1,8), dvar(6,8), dcov(6,1,8),
+                                           dcov(1,1,8), dcov(1,6,8), dvar(1,8)]])])
+        nptest.assert_array_equal(
+            var.deterministic_value,
+            np.asarray([0.125,0.75,0.125])
+        )
+
+class TestVariablePSA(unittest.TestCase):
+
+    def test_binom_psa(self):
+        true_mean = 33.33
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'binomial',
+            parameterisation_index=1,
+            parameters = (true_mean, 100)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        self.assertGreater(
+            mn,
+            true_mean * 0.9
+        )
+        self.assertLess(
+            mn,
+            true_mean * 1.1
+        )
+
+        var.dsa_bounds_type = 'interval'
+        interval_width = 0.9
+        var.dsa_lower = interval_width
+        var.dsa_upper = interval_width
+
+        var = cast(variable.NumericScalarVariable, var)
+
+        lb = float(var.get_dsa_value('lower', True))
+        ub = float(var.get_dsa_value('upper', True))
+        in_bound = np.logical_and(
+            oarray >= lb,
+            oarray <= ub
+        )
+
+        p_in_bound = in_bound.sum() / n_sample
+        self.assertGreater(p_in_bound, interval_width - 0.02)
+        self.assertLess(p_in_bound, interval_width + 0.02)
+
+    def test_normal_psa(self):
+        true_mean = 3.33
+        true_sd = 0.7
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'normal',
+            parameterisation_index=0,
+            parameters = (true_mean, true_sd)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        se = std / np.sqrt(n_sample)
+        self.assertGreater(
+            mn,
+            true_mean - 1.96 * se
+        )
+        self.assertLess(
+            mn,
+            true_mean + 1.96 * se
+        )
+
+        self.assertGreater(
+            std,
+            true_sd * 0.9
+        )
+        self.assertLess(
+            std,
+            true_sd * 1.1
+        )
+
+        var.dsa_bounds_type = 'interval'
+        interval_width = 0.9
+        var.dsa_lower = interval_width
+        var.dsa_upper = interval_width
+
+        var = cast(variable.NumericScalarVariable, var)
+
+        lb = float(var.get_dsa_value('lower', True))
+        ub = float(var.get_dsa_value('upper', True))
+        in_bound = np.logical_and(
+            oarray >= lb,
+            oarray <= ub
+        )
+
+        p_in_bound = in_bound.sum() / n_sample
+        self.assertGreater(p_in_bound, interval_width - 0.02)
+        self.assertLess(p_in_bound, interval_width + 0.02)
+
+    def test_lognormal_psa(self):
+        true_mean = 3.33
+        true_sd = 0.7
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'normal',
+            transform = 'ln',
+            parameterisation_index=2,
+            parameters = (true_mean, true_sd)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        se = std / np.sqrt(n_sample)
+        self.assertGreater(
+            mn,
+            true_mean - 1.96 * se
+        )
+        self.assertLess(
+            mn,
+            true_mean + 1.96 * se
+        )
+
+        self.assertGreater(
+            std,
+            true_sd * 0.9
+        )
+        self.assertLess(
+            std,
+            true_sd * 1.1
+        )
+
+        var.dsa_bounds_type = 'interval'
+        interval_width = 0.9
+        var.dsa_lower = interval_width
+        var.dsa_upper = interval_width
+
+        var = cast(variable.NumericScalarVariable, var)
+
+        lb = float(var.get_dsa_value('lower', True))
+        ub = float(var.get_dsa_value('upper', True))
+        in_bound = np.logical_and(
+            oarray >= lb,
+            oarray <= ub
+        )
+
+        p_in_bound = in_bound.sum() / n_sample
+        self.assertGreater(p_in_bound, interval_width - 0.02)
+        self.assertLess(p_in_bound, interval_width + 0.02)
+
+    def test_beta_psa(self):
+        true_mean = 0.33
+        true_sd = 0.12
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'beta',
+            parameterisation_index=1,
+            parameters = (true_mean, true_sd)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        se = std / np.sqrt(n_sample)
+        # This normal approximation may not work
+        self.assertGreater(
+            mn,
+            true_mean - 1.96 * se
+        )
+        self.assertLess(
+            mn,
+            true_mean + 1.96 * se
+        )
+
+        self.assertGreater(
+            std,
+            true_sd * 0.9
+        )
+        self.assertLess(
+            std,
+            true_sd * 1.1
+        )
+
+        var.dsa_bounds_type = 'interval'
+        interval_width = 0.9
+        var.dsa_lower = interval_width
+        var.dsa_upper = interval_width
+
+        var = cast(variable.NumericScalarVariable, var)
+
+        lb = float(var.get_dsa_value('lower', True))
+        ub = float(var.get_dsa_value('upper', True))
+        in_bound = np.logical_and(
+            oarray >= lb,
+            oarray <= ub
+        )
+
+        p_in_bound = in_bound.sum() / n_sample
+        self.assertGreater(p_in_bound, interval_width - 0.02)
+        self.assertLess(p_in_bound, interval_width + 0.02)
+
+    def test_logbeta_psa(self):
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'beta',
+            transform = 'ln'
+        )
+
+        true_mean = var.deterministic_value
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 5000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        se = std / np.sqrt(n_sample)
+        # This normal approximation may not work - requires large number of samples
+        self.assertGreater(
+            mn,
+            true_mean - 1.96 * se
+        )
+        self.assertLess(
+            mn,
+            true_mean + 1.96 * se
+        )
+
+        #TODO: Get the Log-beta interval evaluation check.
+        # Probably worth changing the interval function signature to match the vector type
+        # so the transform check can happen within the interval function rather than the
+        # main Distribution class
+
+    def test_gamma_psa(self):
+        true_mean = 3.33
+        true_sd = 0.7
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'gamma',
+            parameterisation_index=1,
+            parameters = (true_mean, true_sd)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        se = std / np.sqrt(n_sample)
+        self.assertGreater(
+            mn,
+            true_mean - 1.96 * se
+        )
+        self.assertLess(
+            mn,
+            true_mean + 1.96 * se
+        )
+
+        self.assertGreater(
+            std,
+            true_sd * 0.9
+        )
+        self.assertLess(
+            std,
+            true_sd * 1.1
+        )
+
+        var.dsa_bounds_type = 'interval'
+        interval_width = 0.9
+        var.dsa_lower = interval_width
+        var.dsa_upper = interval_width
+
+        var = cast(variable.NumericScalarVariable, var)
+
+        lb = float(var.get_dsa_value('lower', True))
+        ub = float(var.get_dsa_value('upper', True))
+        in_bound = np.logical_and(
+            oarray >= lb,
+            oarray <= ub
+        )
+
+        p_in_bound = in_bound.sum() / n_sample
+        self.assertGreater(p_in_bound, interval_width - 0.02)
+        self.assertLess(p_in_bound, interval_width + 0.02)
+
+    def test_logamma_psa(self):
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'gamma',
+            transform = 'ln',
+            parameterisation_index=2,
+            parameters = (1.2, 0.2)
+        )
+
+        true_mean = var.deterministic_value
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000
+        oarray = np.empty(n_sample, dtype = np.float64)
+        for i in range(n_sample):
+            oarray[i] = var.draw_psa(rng)
+        oarray = oarray[np.logical_not(np.isinf(oarray))]
+        n_sample = len(oarray)
+
+        mn = oarray.mean()
+        std = oarray.std()
+        se = std / np.sqrt(n_sample)
+        self.assertGreater(
+            mn,
+            true_mean - 1.96 * se
+        )
+        self.assertLess(
+            mn,
+            true_mean + 1.96 * se
+        )
+        
+        var.dsa_bounds_type = 'interval'
+        interval_width = 0.9
+        var.dsa_lower = interval_width
+        var.dsa_upper = interval_width
+
+        var = cast(variable.NumericScalarVariable, var)
+
+        lb = float(var.get_dsa_value('lower', True))
+        ub = float(var.get_dsa_value('upper', True))
+        in_bound = np.logical_and(
+            oarray >= lb,
+            oarray <= ub
+        )
+
+        p_in_bound = in_bound.sum() / n_sample
+        self.assertGreater(p_in_bound, interval_width - 0.02)
+        self.assertLess(p_in_bound, interval_width + 0.02)
+
+    def test_mvn_psa(self):
+
+        true_means = np.asarray((3.33, 1.23), dtype = np.float64)
+        true_sds = np.asarray((0.7, 0.33))
+        true_vcv = np.asarray([[true_sds[0]**2, 0.25],[0.25, true_sds[1]**2]], dtype = np.float64)
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'mvn',
+            parameterisation_index=0,
+            parameters = (true_means, true_vcv)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 5000 # Bumping up the number of samples to ensure SD comes within arbitrary bounds
+        oarray = np.empty(n_sample*len(true_means), dtype = np.float64).reshape((n_sample, -1))
+        for i in range(n_sample):
+            oarray[i, :] = var.draw_psa(rng)
+
+        mn = oarray.mean(axis = 0)
+        std = oarray.std(axis = 0)
+        se = std / np.sqrt(n_sample)
+        nptest.assert_array_less(
+            true_means - 1.96 * se,
+            mn
+        )
+        nptest.assert_array_less(
+            mn,
+            true_means + 1.96 * se
+        )
+
+        nptest.assert_array_less(
+            true_sds * 0.9,
+            std
+        )
+        nptest.assert_array_less(
+            std,
+            true_sds * 1.1
+        )
+
+    def test_mvln_psa(self):
+
+        true_means = np.asarray((3.33, 1.23), dtype = np.float64)
+        true_sds = np.asarray((0.7, 0.33))
+        true_vcv = np.asarray([[true_sds[0]**2, 0.25],[0.25, true_sds[1]**2]], dtype = np.float64)
+
+        var = variable.Variable(
+            'Variable name',
+            distribution = 'mvn',
+            transform = 'ln',
+            parameterisation_index=2,
+            parameters = (true_means, true_vcv)
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000 
+        oarray = np.empty(n_sample*len(true_means), dtype = np.float64).reshape((n_sample, -1))
+        for i in range(n_sample):
+            oarray[i, :] = var.draw_psa(rng)
+
+        mn = oarray.mean(axis = 0)
+        std = oarray.std(axis = 0)
+        se = std / np.sqrt(n_sample)
+        nptest.assert_array_less(
+            true_means - 1.96 * se,
+            mn
+        )
+        nptest.assert_array_less(
+            mn,
+            true_means + 1.96 * se
+        )
+
+        # The VCV is on the log scale, so we can't compare the sds
+
+    def test_mixed_mvn_psa(self):
+
+        true_means = np.asarray((3.33, 1.23), dtype = np.float64)
+        true_sds = np.asarray((0.7, 0.33))
+        true_vcv = np.asarray([[true_sds[0]**2, 0.25],[0.25, true_sds[1]**2]], dtype = np.float64)
+
+        var = cast(
+            variable.VectorVariable,
+            variable.Variable(
+                'Variable name',
+                distribution = 'mvn',
+                transform = ('identity','ln'),
+                parameterisation_index=2,
+                parameters = (true_means, true_vcv)
+            )
+        )
+        
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000 
+        oarray = np.empty(n_sample*len(true_means), dtype = np.float64).reshape((n_sample, -1))
+        for i in range(n_sample):
+            oarray[i, :] = var.draw_psa(rng)
+
+        mn = oarray.mean(axis = 0)
+        std = oarray.std(axis = 0)
+        se = std / np.sqrt(n_sample)
+
+        nptest.assert_array_almost_equal(
+            true_means,
+            np.asarray(var.deterministic_value)
+        )
+        self.assertTrue(
+            any(mn1 != mn2 for mn1, mn2 in zip(var.deterministic_value, np.asarray(var.parameters[0])))
+        )
+        self.assertFalse(
+            all(mn1 != mn2 for mn1, mn2 in zip(var.deterministic_value, np.asarray(var.parameters[0])))
+        )
+
+        nptest.assert_array_less(
+            true_means - 1.96 * se,
+            mn
+        )
+        nptest.assert_array_less(
+            mn,
+            true_means + 1.96 * se
+        )
+
+        # The VCV is on the log scale for transformed parameters, so we can't compare the sds
+
+    def test_dirichlet_psa(self):
+
+        true_alphas = np.asarray((4,16,2))
+
+        var = cast(
+            variable.VectorVariable,
+            variable.Variable(
+                'Variable name',
+                distribution = 'dirichlet',
+                parameterisation_index=0,
+                parameters = (true_alphas,)
+            )
+        )
+        
+
+        true_means = var.deterministic_value
+        activate_psa(var)
+        rng = np.random.default_rng(123)
+        n_sample = 1000 
+        oarray = np.empty(n_sample*len(true_means), dtype = np.float64).reshape((n_sample, -1))
+        for i in range(n_sample):
+            oarray[i, :] = var.draw_psa(rng)
+
+        mn = oarray.mean(axis = 0)
+        std = oarray.std(axis = 0)
+        se = std / np.sqrt(n_sample)
+        nptest.assert_array_less(
+            true_means - 1.96 * se,
+            mn
+        )
+        nptest.assert_array_less(
+            mn,
+            true_means + 1.96 * se
+        )
 
 
 class TestVariableValidation(unittest.TestCase):
@@ -623,7 +1692,7 @@ class TestVariableValidation(unittest.TestCase):
             'A string'
         )
         
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             var = variable.Variable(
                 'aconst',
                 parameters = 'A string',
@@ -793,19 +1862,8 @@ class TestVariableValidation(unittest.TestCase):
             var1.deterministic_value,
             5.25
         )
-
-        with self.assertRaises(ValueError):
-            """
-            Needs to be a scalar, not a vector.
-            """
-            var1 = variable.Variable(
-                'const1',
-                distribution = 'constant',
-                transform = 'identity',
-                parameters = 'String Constant'
-            )
         
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             """
             Cannot use a log transform with a string constant
             """
@@ -950,8 +2008,9 @@ class TestVariableValidation(unittest.TestCase):
             np.exp(5 + 0.5 * 1 * 1)
         )
 
-        var1.parameterisation_index = var1.find_parameterisation(lambda x: 'mean' in x['names'])
+        var1.parameterisation_index = var1.find_parameterisation(lambda x: 'mean' in x.names)
         var1.set_parameters(5, 2)
+        var1 = cast(variable.NumericScalarVariable, var1)
         self.assertAlmostEqual(
             float(var1.deterministic_value),
             5.
@@ -992,6 +2051,8 @@ class TestVariableValidation(unittest.TestCase):
             var1.get_dsa_value('upper'),
             1.1 * 10
         )
+
+        var1 = cast(variable.NumericScalarVariable, var1)
 
         var1.dsa_bounds_type = 'offset'
         var1.dsa_lower = -(1.96 * float(var1.parameters[1]))
@@ -1079,7 +2140,8 @@ class TestVariableValidation(unittest.TestCase):
             0.25
         )
 
-        var1.parameterisation_index = var1.find_parameterisation(lambda x: 'mean' in x['names'])
+        var1.parameterisation_index = var1.find_parameterisation(lambda x: 'mean' in x.names)
+        var1 = cast(variable.NumericScalarVariable, var1)
         var1.set_parameters(1. / 3., 0.1)
         self.assertAlmostEqual(
             var1.deterministic_value,
@@ -1126,7 +2188,7 @@ class TestVariableValidation(unittest.TestCase):
         var1 = self.make_beta_variable()
         rng = np.random.default_rng(123)
 
-        var1.parameterisation_index = var1.find_parameterisation(lambda x: 'mean' in x['names'])
+        var1.parameterisation_index = var1.find_parameterisation(lambda x: 'mean' in x.names)
         var1.set_parameters(1. / 3., 0.1)
 
         n_draws = 1000

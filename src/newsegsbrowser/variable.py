@@ -18,12 +18,13 @@ from src.stats.dirichlet import fit_dirichlet
 ScalarParam = Union[str | int | float]
 ScalarNumParam = Union[int | float]
 VectorParam = Union[Sequence[ScalarParam], np.ndarray[tuple[int], Any]]
-VectorNumParam = Union[Sequence[ScalarNumParam], np.ndarray[tuple[int], np.dtype[np.float64]]]
+NumericVectorParam = Union[Sequence[ScalarNumParam], np.ndarray[tuple[int], np.dtype[np.float64]]]
 type MatrixParam[S: np.generic]  = np.ndarray[tuple[int,int], np.dtype[S]]
 type MatrixNumParam = MatrixParam[np.float64]
 
 Value = Union[ScalarParam, VectorParam]
 Param = Union[ScalarParam, VectorParam, MatrixNumParam]
+ParamList = Union[Param, Sequence[Param]]
 
 VARIABLE_TYPE = Literal[
     'scalar',
@@ -81,7 +82,7 @@ DSA_BOUNDS_TYPE = Literal[
     'absolute',
     'offset',
     'relative',
-    #'sd_relative' # TODO: Handle bounds which scale off the standard deviation
+    'interval'
 ]
 
 def _parameter_validation_default(var: Variable, val: Param):
@@ -145,6 +146,11 @@ class Distribution(metaclass = Singleton):
     parameterisations: Sequence[Parameterisation]
     dsa_possible: bool
     psa_possible: bool
+    permitted_dsa_bounds: tuple[DSA_BOUNDS_TYPE,...] = (
+        'absolute',
+        'relative',
+        'offset'
+    )
 
     @classmethod
     def n_values(cls, var: Variable) -> int:
@@ -308,6 +314,12 @@ class ScalarValuedDistribution(Distribution):
 
 class NumericScalarValuedDistribution(ScalarValuedDistribution):
     interval_function: Callable[[float, Sequence[ScalarNumParam]], tuple[float, float]]
+    permitted_dsa_bounds = (
+        'absolute',
+        'relative',
+        'offset',
+        'interval'
+    )
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
@@ -330,7 +342,7 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
         deterministic_value: ScalarParam,
         bound_type: DSA_BOUNDS_TYPE,
         bound_value: ScalarParam,
-        transform: tuple[VARIABLE_TRANSFORM]
+        transform: tuple[VARIABLE_TRANSFORM],
     ) -> ScalarNumParam:
         if isinstance(deterministic_value, str):
             raise ValueError(f'Numeric deterministic value expected, is {type(deterministic_value)}')
@@ -369,11 +381,28 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
                 return out_val
             case 'absolute':
                 return bound_value
+
             case _:
                 raise ValueError(f'Unknown bound_type: {bound_type}')
             
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        if var.dsa_bounds_type == 'interval':
+            if not isinstance(var, NumericScalarVariable):
+                raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
+            
+            match bound:
+                case 'central':
+                    return cast(float, super().dsa_value(var, bound))
+                case 'lower':
+                    lbound, ubound = cls.interval_function(float(var.dsa_lower), var.parameters)
+                    return lbound
+                case 'upper':
+                    lbound, ubound = cls.interval_function(float(var.dsa_upper), var.parameters)
+                    return ubound
+                case _:
+                    raise ValueError(f'Unknown DSA bounds: {bound}')
+            
         return cast(float, super().dsa_value(var, bound))
     
     @classmethod
@@ -523,14 +552,21 @@ class VectorValuedDistribution(Distribution):
     def dsa_auto_values(cls, var: Variable) -> tuple[VectorParam, VectorParam]:
         ...
 
-class VectorNumValuedDistribution(VectorValuedDistribution):
+class NumericVectorValuedDistribution(VectorValuedDistribution):
+
+    permitted_dsa_bounds = (
+        'absolute',
+        'relative',
+        'offset',
+        'interval'
+    )
 
     @classmethod
     def interval_function(
         cls, 
         interval: float,
-        var: VectorNumVariable
-    ) -> tuple[VectorNumParam, VectorNumParam]:
+        var: NumericVectorVariable
+    ) -> tuple[NumericVectorParam, NumericVectorParam]:
         """
         The bounds of a confidence interval around each parameter
         """
@@ -538,12 +574,27 @@ class VectorNumValuedDistribution(VectorValuedDistribution):
 
     @classmethod
     @abstractmethod
-    def deterministic_value(cls, var: Variable) -> VectorNumParam:
+    def deterministic_value(cls, var: Variable) -> NumericVectorParam:
         ...
     
     @classmethod
-    def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> VectorNumParam:
-        return cast(VectorNumParam, super().dsa_value(var, bound))
+    def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> NumericVectorParam:
+        if var.dsa_bounds_type == 'interval':
+            if not isinstance(var, NumericVectorVariable):
+                raise TypeError(f'Expected NumericVectorVariable, got {type(var)}')
+            
+            match bound:
+                case 'central':
+                    return cast(NumericVectorParam, super().dsa_value(var, bound))
+                case 'lower':
+                    lbound, ubound = cls.interval_function(var.dsa_lower[0], var)
+                    return lbound
+                case 'upper':
+                    lbound, ubound = cls.interval_function(var.dsa_upper[0], var)
+                    return ubound
+                case _:
+                    raise ValueError(f'Unknown DSA bounds: {bound}')
+        return cast(NumericVectorParam, super().dsa_value(var, bound))
     
     @classmethod
     @abstractmethod
@@ -551,7 +602,7 @@ class VectorNumValuedDistribution(VectorValuedDistribution):
         cls,
         var: Variable,
         rng: np.random.Generator
-    ) -> VectorNumParam:
+    ) -> NumericVectorParam:
         ...
     
     @classmethod
@@ -559,7 +610,7 @@ class VectorNumValuedDistribution(VectorValuedDistribution):
     def dsa_auto_values(
         cls, 
         var: Variable
-    ) -> tuple[VectorNumParam, VectorNumParam]:
+    ) -> tuple[NumericVectorParam, NumericVectorParam]:
         ...
 
 class _ConstantParameterisation(Parameterisation):
@@ -579,6 +630,8 @@ class ConstantParameterisationDefault(
     
     @classmethod
     def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarParam]:
+        if len(args):
+            raise TypeError('Constant variable can only accept single value - use constant_vector')
         if isinstance(value, str):
             return (value, )
         elif isinstance(value, Sequence):
@@ -683,18 +736,24 @@ class BinomialParameterisationDefault(
 class BinomialParameterisationExpected(
     _BinomialParameterisation
 ):
-    names = ('expected', 'trials')
+    names = ('mean', 'trials')
     types = ('scalar', 'scalar')
     defaults = (0.25, 1)
 
     @classmethod
     def generator(
         cls,
-        expected: ScalarNumParam,
+        mean: ScalarNumParam,
         trials: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        return (trials, expected / trials)
+        if trials == 0:
+            if mean == 0:
+                return (0, 0)
+            else:
+                raise ValueError('Number of trials cannot be zero with a non-zero mean')
+
+        return (trials, mean / trials)
     
 def _binomial_interval_function(
     interval: float,
@@ -724,6 +783,8 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
         
         if parameters[0] < 0:
             raise ValueError(f'Number of trials must be positive, is {parameters[0]}')
+        if int(parameters[0]) != parameters[0]:
+            raise ValueError(f'Number of trials must be an integer, is {parameters[0]}')
         
         if parameters[1] < 0 or parameters[1] > 1:
             raise ValueError(f'Binomial probability parameter must be in [0, 1], is {parameters[1]}')
@@ -835,6 +896,10 @@ class NormalParameterisationDefault(
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
         return (mean, sd)
     
+    @classmethod
+    def eligibility(cls, var: Variable) -> bool:
+        return var.transform[0] == 'identity'
+    
 class LogNormalParameterisationDefault(
     _NormalParameterisation
 ):
@@ -849,6 +914,8 @@ class LogNormalParameterisationDefault(
         sigma: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        if sigma < 0:
+            raise ValueError(f'Sigma parameter must be positive, is {sigma}')
         return (mu, sigma)
 
     @classmethod
@@ -869,6 +936,10 @@ class LogNormalParameterisationExpected(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        if sd == 0:
+            return (np.log(mean), 0)
+        if mean <= 0:
+            raise ValueError('Lognormal requires mean > 0')
         sigma_squared = np.log((sd*sd) / (mean*mean) + 1)
         mu = np.log(mean) - 0.5 * sigma_squared
         return (mu, np.sqrt(sigma_squared))
@@ -895,7 +966,7 @@ def _lognormal_interval(
     from scipy.stats import lognorm
     # NB - whilst stats.lognorm requires exponentiation of mu to get the scale,
     # random.lognorm does not. 
-    return lognorm.interval(interval, parameters[1], np.exp(parameters[0]))
+    return lognorm.interval(interval, parameters[1], scale=np.exp(parameters[0]))
     
 class NormalDistribution(TwoParamNumericScalarValuedDistribution):
     parameterisations: Sequence[_NormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -930,7 +1001,27 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
         else:
             return var.parameters[0]
     
-    # dsa_value can be inherited from NumericScalarValuedDistribution
+    @classmethod
+    def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        if var.transform[0] == 'ln' and var.dsa_bounds_type == 'interval':
+            if not isinstance(var, NumericScalarVariable):
+                raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
+
+            interval_function = _lognormal_interval
+            
+            match bound:
+                case 'central':
+                    return cast(float, super().dsa_value(var, bound))
+                case 'lower':
+                    lbound, ubound = interval_function(float(var.dsa_lower), var.parameters)
+                    return lbound
+                case 'upper':
+                    lbound, ubound = interval_function(float(var.dsa_upper), var.parameters)
+                    return ubound
+                case _:
+                    raise ValueError(f'Unknown DSA bounds: {bound}')
+
+        return super().dsa_value(var, bound)
 
     @classmethod
     def psa_value(
@@ -1087,7 +1178,7 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
         
         values = cast(tuple[ScalarNumParam], values)
         val = values[0]
-        if val < 0 or val > 1:
+        if var.transform[0] != 'ln' and (val < 0 or val > 1):
             raise ValueError(f'Value expected in range [0, 1], is {val}')
         
     @classmethod
@@ -1096,8 +1187,8 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
         a, b = var.parameters
         if var.transform[0] == 'ln':
-            from scipy.special import psi
-            return psi(a) - psi(a + b)
+            from scipy.stats import beta
+            return float(beta.expect(np.exp, (a,b)))
         else:
             return a / (a + b)
         
@@ -1122,24 +1213,6 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
             return np.exp(v)
         return v
 
-
-def _gamma_interval(
-    interval: float,
-    parameters: Sequence[ScalarNumParam]
-) -> tuple[float, float]:
-    if len(parameters) != 2:
-        raise TypeError(f'Gamma requires two parameters, {len(parameters)} provided')
-    from scipy.stats import gamma
-    return gamma.interval(interval, a = parameters[1], scale = parameters[0])
-
-def _loggamma_interval(
-    interval: float,
-    parameters: Sequence[ScalarNumParam]
-) -> tuple[float, float]:
-    if len(parameters) != 2:
-        raise TypeError(f'Log-Gamma requires two parameters, {len(parameters)} provided')
-    from scipy.stats import loggamma
-    return loggamma.interval(interval, c = parameters[1], scale = parameters[0])
 
 class _GammaParameterisation(TwoParamParameterisation):
     ...
@@ -1187,6 +1260,10 @@ class GammaParameterisationExpected(
         # scale = mean/shape
         # sd = sqrt(shape) * mean / shape = mean / sqrt(shape)
         # shape = (mean / sd) **2
+        if sd <= 0:
+            raise ValueError(f'sd must be positive, is: {sd}')
+        if mean <= 0:
+            raise ValueError(f'Mean must be positive, is: {mean}')
         shape = (mean / sd) ** 2
         scale = mean / shape
         return (shape, scale)
@@ -1214,6 +1291,28 @@ class LogGammaParameterisationDefault(
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'ln'
+
+def _gamma_interval(
+    interval: float,
+    parameters: Sequence[ScalarNumParam]
+) -> tuple[float, float]:
+    if len(parameters) != 2:
+        raise TypeError(f'Gamma requires two parameters, {len(parameters)} provided')
+    from scipy.stats import gamma
+    return gamma.interval(interval, a = parameters[0], scale = parameters[1])
+
+# CAUTION! Scipy incorrectly refers to the exponential gamma as the loggamma.
+def _loggamma_interval(
+    interval: float,
+    parameters: Sequence[ScalarNumParam]
+) -> tuple[float, float]:
+    if len(parameters) != 2:
+        raise TypeError(f'Log-Gamma requires two parameters, {len(parameters)} provided')
+    #from scipy.stats import loggamma
+    #return loggamma.interval(interval, c = parameters[0], scale = parameters[1])
+    from scipy.stats import gamma
+    interval_values = gamma.interval(interval, a = parameters[0], scale = parameters[1])
+    return (np.exp(interval_values[0]), np.exp(interval_values[1]))
 
 class GammaDistribution(TwoParamNumericScalarValuedDistribution):
     parameterisations: Sequence[_GammaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -1257,12 +1356,35 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
         shape, scale = var.parameters
         if var.transform[0] == 'ln':
-            from scipy.special import psi
-            return psi(shape) + np.log(scale)
+            # Do not trust scipy loggamma - is actually exponential gamma
+            import scipy.integrate as integrate
+            from scipy.stats import gamma as gamma_dist
+            
+            return integrate.quad(lambda x: 1 - gamma_dist.cdf(np.log(x), a = shape, scale = scale), 0, np.inf)[0]
         else:
             return shape * scale
         
-    # dsa_value can be inherited from NumericScalarValuedDistribution
+    @classmethod
+    def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        if var.transform[0] == 'ln' and var.dsa_bounds_type == 'interval':
+            if not isinstance(var, NumericScalarVariable):
+                raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
+
+            interval_function = _loggamma_interval
+            
+            match bound:
+                case 'central':
+                    return cast(float, super().dsa_value(var, bound))
+                case 'lower':
+                    lbound, ubound = interval_function(float(var.dsa_lower), var.parameters)
+                    return lbound
+                case 'upper':
+                    lbound, ubound = interval_function(float(var.dsa_upper), var.parameters)
+                    return ubound
+                case _:
+                    raise ValueError(f'Unknown DSA bounds: {bound}')
+
+        return super().dsa_value(var, bound)
 
     @classmethod
     def psa_value(
@@ -1323,6 +1445,15 @@ class ConstantVectorParameterisationDefault(
         values: VectorParam,
         *args, **kwargs
     ) -> tuple[VectorParam]:
+        if len(args) > 0:
+            # Assume that we need to concat
+            if not isinstance(values, Sized):
+                return ([values] + list(args),)
+            elif isinstance(values, str):
+                return ([values] + list(args),)
+            else:
+                # Was planning to unpack, but this feels more consistent if not type-safe
+                return ([values] + list(args), ) # pyright: ignore[reportReturnType]
         if isinstance(values, str):
             return ([values], )
         elif isinstance(values, np.ndarray):
@@ -1422,7 +1553,7 @@ class ConstantVectorDistribution(VectorValuedDistribution):
 class _MultivariateNormalParameterisation(VectorParameterisation):
     @classmethod
     @abstractmethod
-    def generator(cls, *args, **kwargs) -> tuple[VectorNumParam, MatrixNumParam]:
+    def generator(cls, *args, **kwargs) -> tuple[NumericVectorParam, MatrixNumParam]:
         ...
 
 class MultivariateNormalParameterisationDefault(
@@ -1435,10 +1566,10 @@ class MultivariateNormalParameterisationDefault(
     @classmethod
     def generator(
         cls,
-        mean: VectorNumParam,
+        mean: NumericVectorParam,
         vcv: MatrixNumParam, 
         *args, **kwargs
-    ) -> tuple[VectorNumParam, MatrixNumParam]:
+    ) -> tuple[NumericVectorParam, MatrixNumParam]:
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
@@ -1462,10 +1593,10 @@ class MultivariateLogNormalParameterisationDefault(
     @classmethod
     def generator(
         cls,
-        mu: VectorNumParam,
+        mu: NumericVectorParam,
         vcv: MatrixNumParam, 
         *args, **kwargs
-    ) -> tuple[VectorNumParam, MatrixNumParam]:
+    ) -> tuple[NumericVectorParam, MatrixNumParam]:
         if not isinstance(mu, np.ndarray):
             mu = np.asarray(mu, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
@@ -1482,38 +1613,38 @@ class MultivariateLogNormalParameterisationDefault(
 class MultivariateLogNormalParameterisationExpected(
     _MultivariateNormalParameterisation
 ):
-    names = ('mu', 'vcv', 'transform')
+    names = ('mean', 'vcv', 'transform')
     types = ('vector', 'matrix', 'vector')
-    defaults = (np.asarray([1.,1.,]), np.asarray([[1., 0.],[0.,1.]]), ['identity', 'identity'])
+    defaults = (np.asarray([1.,1.,]), np.asarray([[1., 0.],[0.,1.]])) # NB - do not provide transform, so that it is passed from the Variable at parameter set time
 
     @classmethod
     def generator(
         cls, 
-        mu: VectorNumParam,
+        mean: NumericVectorParam,
         vcv: MatrixNumParam,
         transform: VectorParam,
         *args, **kwargs
-    ) -> tuple[VectorNumParam, MatrixNumParam]:
-        if not isinstance(mu, np.ndarray):
-            mu = np.asarray(mu, dtype = np.float64)
+    ) -> tuple[NumericVectorParam, MatrixNumParam]:
+        if not isinstance(mean, np.ndarray):
+            mean = np.asarray(mean, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
             vcv = np.asarray(vcv, dtype = np.float64)
-        mu = mu.flatten()
-        n_means = len(mu)
+        mean = mean.flatten()
+        n_means = len(mean)
         vcv = vcv.reshape((n_means, n_means))
 
         for i, trans in enumerate(transform):
             if trans == 'ln':
                 sigma_squared = vcv[i,i]
-                mu[i] = np.log(mu[i]) - 0.5 * sigma_squared
+                mean[i] = np.log(mean[i]) - 0.5 * sigma_squared
         
-        return (mu, vcv)
+        return (mean, vcv)
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return any(trans == 'ln' for trans in var.transform)
 
-class MultivariateNormalDistribution(VectorNumValuedDistribution):
+class MultivariateNormalDistribution(NumericVectorValuedDistribution):
     parameterisations: Sequence[_MultivariateNormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         MultivariateNormalParameterisationDefault(),
         MultivariateLogNormalParameterisationDefault(),
@@ -1521,14 +1652,14 @@ class MultivariateNormalDistribution(VectorNumValuedDistribution):
     ]
 
     dsa_possible = True
-    psa_possible = False
+    psa_possible = True
 
     @classmethod
     def interval_function(
         cls, 
         interval: float, 
-        var: VectorNumVariable
-    ) -> tuple[VectorNumParam, VectorNumParam]:
+        var: NumericVectorVariable
+    ) -> tuple[NumericVectorParam, NumericVectorParam]:
         out_val = super().interval_function(interval, var)
         i = var.dsa_value_index
         if i >= len(out_val[0]):
@@ -1602,7 +1733,7 @@ class MultivariateNormalDistribution(VectorNumValuedDistribution):
                 raise TypeError(f'Vector of numeric values expected, item {i} is {type(item)}')
             
     @classmethod
-    def deterministic_value(cls, var: Variable) -> VectorNumParam:
+    def deterministic_value(cls, var: Variable) -> NumericVectorParam:
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         var = cast(MultivariateNormalVariable, var)
@@ -1623,7 +1754,7 @@ class MultivariateNormalDistribution(VectorNumValuedDistribution):
         cls, 
         var: Variable, 
         rng: Generator
-    ) -> VectorNumParam:
+    ) -> NumericVectorParam:
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         
@@ -1636,7 +1767,7 @@ class MultivariateNormalDistribution(VectorNumValuedDistribution):
         return oarray
 
     @classmethod
-    def dsa_auto_values(cls, var: Variable) -> tuple[VectorNumParam, VectorNumParam]:
+    def dsa_auto_values(cls, var: Variable) -> tuple[NumericVectorParam, NumericVectorParam]:
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -1660,7 +1791,7 @@ class _DirichletParameterisation(Parameterisation):
     
     @classmethod
     @abstractmethod
-    def generator(cls, *args, **kwargs) -> tuple[VectorNumParam]:
+    def generator(cls, *args, **kwargs) -> tuple[NumericVectorParam]:
         ...
 
 class DirichletParameterisationDefault(
@@ -1673,9 +1804,9 @@ class DirichletParameterisationDefault(
     @classmethod
     def generator(
         cls,
-        alpha: VectorNumParam,
+        alpha: NumericVectorParam,
         *args, **kwargs
-    ) -> tuple[VectorNumParam, ]:
+    ) -> tuple[NumericVectorParam, ]:
         alpha = np.asarray(alpha, dtype = np.float64).flatten()
         return (alpha, )
     
@@ -1688,31 +1819,42 @@ class DirichletParameterisationExpected(
 ):
     names = ('mean', 'vcv')
     types = ('vector', 'matrix')
-    defaults = (np.asarray([0.5, 0.5]), np.matrix([[0.25, 0.1], [0.1, 0.25]]))
+    # Note that the variance of values with equal concentration parameters must be the same
+    defaults = (np.asarray([0.5, 0.5]), np.matrix([[0.25/3, -1/3], [-1/3, 0.25/3]]))
 
     @classmethod
     def generator(
         cls,
-        mean: VectorNumParam,
+        mean: NumericVectorParam,
         vcv: MatrixNumParam,
         *args, **kwargs
-    ) -> tuple[VectorNumParam, ]:
+    ) -> tuple[NumericVectorParam, ]:
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
             vcv = np.asarray(vcv, dtype = np.float64)
         mean = mean.flatten()
+        meansum = np.sum(mean)
+        if np.abs(meansum-1) > 1e-2:
+            raise ValueError(f'Mean parameters do not sum to 1 (value = {meansum}). Dirichlet fitting will not be attempted.')
+        elif np.abs(meansum-1) > 1e-16:
+            warnings.warn(f'Mean parameters do not sum to 1 - sum is {meansum}. They will be standardised')
+            mean = mean / meansum
         n_means = len(mean)
         vcv = vcv.reshape((n_means, n_means))
 
         alpha = fit_dirichlet(mean, vcv)
+        checksum = np.sum(np.abs(mean - (alpha/np.sum(alpha))))
+        if checksum > 1e-6:
+            raise ArithmeticError(f'Dirichlet fitting unable to recover means - {alpha/np.sum(alpha)}.')
+
         return (alpha, )
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return all(trans == 'identity' for trans in var.transform)
 
-class DirichletDistribution(VectorNumValuedDistribution):
+class DirichletDistribution(NumericVectorValuedDistribution):
     parameterisations: Sequence[_DirichletParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         DirichletParameterisationDefault(),
         DirichletParameterisationExpected(),
@@ -1725,8 +1867,8 @@ class DirichletDistribution(VectorNumValuedDistribution):
     def interval_function(
         cls,
         interval: float,
-        var: VectorNumVariable
-    ) -> tuple[VectorNumParam, VectorNumParam]:
+        var: NumericVectorVariable
+    ) -> tuple[NumericVectorParam, NumericVectorParam]:
         out_val = super().interval_function(interval, var)
 
         i = var.dsa_value_index
@@ -1813,11 +1955,12 @@ class DirichletDistribution(VectorNumValuedDistribution):
             if a < 0 or a > 1:
                 raise ValueError(f'All values are expected within [0, 1], {i} is {a}')
         
-        if not np.sum(val) == 1:
+        checksum = np.abs(np.sum(val) - 1)
+        if checksum > 1e-12:
             raise ValueError(f'Dirichlet values should sum to 1, these sum to {np.sum(val)}')
         
     @classmethod
-    def deterministic_value(cls, var: Variable) -> VectorNumParam:
+    def deterministic_value(cls, var: Variable) -> NumericVectorParam:
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         var = cast(DirichletVariable, var)
@@ -1835,7 +1978,7 @@ class DirichletDistribution(VectorNumValuedDistribution):
         cls, 
         var: Variable, 
         rng: Generator
-    ) -> VectorNumParam:
+    ) -> NumericVectorParam:
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         if any(trans == 'ln' for trans in var.transform):
@@ -1852,7 +1995,7 @@ class DirichletDistribution(VectorNumValuedDistribution):
         return oarray
             
     @classmethod
-    def dsa_auto_values(cls, var: Variable) -> tuple[VectorNumParam, VectorNumParam]:
+    def dsa_auto_values(cls, var: Variable) -> tuple[NumericVectorParam, NumericVectorParam]:
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -1882,6 +2025,7 @@ class Variable:
     set of probabilities which form a simplex)
     """
     distribution: Distribution
+    parameterisation_index: int
 
     """
     Can variable participate in DSA?
@@ -1954,8 +2098,8 @@ class Variable:
         interface_key: str | Sequence[str] | None = None,
         distribution: VARIABLE_DISTRIBUTION = 'constant',
         transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM] = 'identity',
-        parameterisation_index: int = 0,
-        parameters: Param | None = None,
+        parameterisation_index: int | None = None,
+        parameters: ParamList | None = None,
         dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute',
         dsa_lower: Value | None = None,
         dsa_upper: Value | None = None,
@@ -1981,8 +2125,18 @@ class Variable:
             self.interface_key = self.name
 
         self.set_distribution()
-        self.set_transform(transform)
+        if isinstance(transform, str) or not isinstance(transform, Sequence):
+            self.set_transform(transform)
+        else:
+            self.set_transform(transform, autosize = False)
+        if parameterisation_index is None:
+            indexed_par = self.get_indexed_parameterisations()
+            if len(indexed_par) > 0:
+                parameterisation_index = int(indexed_par[0].get('index', 0))
+            else:
+                parameterisation_index = 0
         self.parameterisation_index = parameterisation_index
+        self.dsa_bounds_type = dsa_bounds_type
 
         if parameters is None:
             self.set_default_parameters()
@@ -1991,8 +2145,9 @@ class Variable:
                 self.set_parameters(parameters)
             else:
                 self.set_parameters(*parameters)
-        
-        self.dsa_bounds_type = dsa_bounds_type
+
+        # If we have vector transformation, now we need to set it (again) to obey the number of values
+        self.set_transform(transform)
 
         dsa_autovals = self.distribution.dsa_auto_values(self)
 
@@ -2011,7 +2166,12 @@ class Variable:
         self.dsa_active = dsa_active
         self.dsa_focussed = dsa_focussed
 
-    
+    @property
+    def parameterisation(self) -> Parameterisation:
+        if self.parameterisation_index is None:
+            raise AttributeError('No parameterisation index set')
+        return self.distribution.parameterisations[self.parameterisation_index]
+
     @property
     @abstractmethod
     def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
@@ -2031,16 +2191,17 @@ class Variable:
         ...
 
     @abstractmethod
-    def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM]) -> None:
+    def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
         ...
     
-    @property
-    @abstractmethod
-    def deterministic_value(self) -> Value:
-        ...
+    def get_deterministic_value(self) -> Value:
         v = self.distribution.deterministic_value(self)
         self.distribution.value_validation(self, v)
         return v
+
+    @property
+    def deterministic_value(self) -> Value:
+        return self.get_deterministic_value()
 
     def set_distribution(self) -> None:
         pass
@@ -2060,7 +2221,7 @@ class Variable:
             if x.eligibility(self)
         ]
     
-    def find_parameterisation(self, filter: Callable[[dict], bool]) -> int:
+    def find_parameterisation(self, filter: Callable[[Parameterisation], bool]) -> int:
         """
         Return the first available parameterisation to satisfy a filter.
 
@@ -2266,7 +2427,7 @@ class ScalarVariable(Variable):
     def transform(self) -> tuple[VARIABLE_TRANSFORM]:
         return self._transform
     
-    def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM]) -> None:
+    def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
         if isinstance(transform, str):
             if not transform in get_args(VARIABLE_TRANSFORM):
                 raise ValueError(f'Transform not recognised: {transform}')
@@ -2287,9 +2448,10 @@ class ScalarVariable(Variable):
     
     @property
     def deterministic_value(self) -> ScalarParam:
-        v = self.distribution.deterministic_value(self)
-        self.distribution.value_validation(self, v)
-        return v
+        return cast(ScalarParam, self.get_deterministic_value())
+    
+    def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> ScalarParam:
+        return cast(ScalarParam, super().get_dsa_value(bound, force))
 
 
 class NumericScalarVariable(ScalarVariable):
@@ -2301,9 +2463,11 @@ class NumericScalarVariable(ScalarVariable):
         return self._parameters
 
     @property
-    @abstractmethod
     def deterministic_value(self) -> ScalarNumParam:
-        ...
+        return cast(ScalarNumParam, self.get_deterministic_value())
+    
+    def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> ScalarNumParam:
+        return cast(ScalarNumParam, super().get_dsa_value(bound, force))
 
 
 class TwoParamNumericScalarVariable(NumericScalarVariable):
@@ -2325,7 +2489,7 @@ class VectorVariable(Variable):
 
     def set_parameters(
         self, 
-        *parameters: Param
+        *parameters: Param,
     ):
         super().set_parameters(*parameters)
         if len(self._parameters) == 0:
@@ -2387,45 +2551,53 @@ class VectorVariable(Variable):
     def transform(self) -> tuple[VARIABLE_TRANSFORM, ...]:
         return self._transform
     
-    def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM]) -> None:
+    def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
         if isinstance(transform, str):
             if not transform in get_args(VARIABLE_TRANSFORM):
                 raise ValueError(f'Transform not recognised: {transform}')
-            self._transform = (transform,) * self.n_values
+            if autosize:
+                self._transform = (transform,) * self.n_values
+            else:
+                self._transform = (transform,)
         elif isinstance(transform, Sequence):
             if len(transform) == 0:
                 raise ValueError('Cannot set transform with no value')
             elif len(transform) == 1:
                 if not transform[0] in get_args(VARIABLE_TRANSFORM):
                     raise ValueError(f'Transform not recognised: {transform[0]}')
-                self._transform = (transform[0],) * self.n_values
-            elif len(transform) != self.n_values:
+                if autosize:
+                    self._transform = (transform[0],) * self.n_values
+                else:
+                    self._transform = (transform[0],)
+            elif len(transform) != self.n_values and autosize:
                 raise TypeError(f'Incorrect number of transforms: {self.n_values} expected, {len(transform)} provided')
             else:
-                for i, trans in transform:
+                for i, trans in enumerate(transform):
                     if not trans in get_args(VARIABLE_TRANSFORM):
                         raise ValueError(f'Transform {i} not recognised: {trans}')
                 transform = cast(Sequence[VARIABLE_TRANSFORM], transform)
-                self._transform = cast(tuple[VARIABLE_TRANSFORM, ...], tuple(*transform))
+                self._transform = cast(tuple[VARIABLE_TRANSFORM, ...], tuple(transform))
         else:
             raise ValueError(f'Transform type not recognised: {transform} of type {type(transform)}')
     
     @property
     def deterministic_value(self) -> VectorParam:
-        v = self.distribution.deterministic_value(self)
-        self.distribution.value_validation(self, v)
-        return v
+        return cast(VectorParam, self.get_deterministic_value())
     
-class VectorNumVariable(VectorVariable):
-    distribution: VectorNumValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
-    _dsa_lower: VectorNumParam # pyright: ignore[reportIncompatibleVariableOverride]
-    _dsa_upper: VectorNumParam # pyright: ignore[reportIncompatibleVariableOverride]
+    def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> VectorParam:
+        return cast(VectorParam, super().get_dsa_value(bound, force))
+    
+    
+class NumericVectorVariable(VectorVariable):
+    distribution: NumericVectorValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
+    _dsa_lower: NumericVectorParam # pyright: ignore[reportIncompatibleVariableOverride]
+    _dsa_upper: NumericVectorParam # pyright: ignore[reportIncompatibleVariableOverride]
 
     dsa_value_index = 1
     """Which Value is of interest in DSA?"""
 
     @property
-    def dsa_lower(self) -> VectorNumParam:
+    def dsa_lower(self) -> NumericVectorParam:
         return self._dsa_lower
     
     @dsa_lower.setter
@@ -2438,10 +2610,10 @@ class VectorNumVariable(VectorVariable):
             or isinstance(value, np.ndarray)
         ):
             raise TypeError(f'Expected a vector or sequence, got: {type(value)}')
-        self._dsa_lower = cast(VectorNumParam, value) # pyright: ignore[reportIncompatibleVariableOverride]
+        self._dsa_lower = cast(NumericVectorParam, value) # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
-    def dsa_upper(self) -> VectorNumParam:
+    def dsa_upper(self) -> NumericVectorParam:
         return self._dsa_upper
     
     @dsa_upper.setter
@@ -2454,13 +2626,14 @@ class VectorNumVariable(VectorVariable):
             or isinstance(value, np.ndarray)
         ):
             raise TypeError(f'Expected a vector or sequence, got: {type(value)}')
-        self._dsa_upper = cast(VectorNumParam, value) # pyright: ignore[reportIncompatibleVariableOverride]
+        self._dsa_upper = cast(NumericVectorParam, value) # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
-    def deterministic_value(self) -> VectorNumParam:
-        v = self.distribution.deterministic_value(self)
-        self.distribution.value_validation(self, v)
-        return v
+    def deterministic_value(self) -> NumericVectorParam:
+        return cast(NumericVectorParam, self.get_deterministic_value())
+    
+    def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> NumericVectorParam:
+        return cast(NumericVectorParam, super().get_dsa_value(bound, force))
 
 
 class ConstantVariable(ScalarVariable):
@@ -2497,21 +2670,27 @@ class ConstantVectorVariable(VectorVariable):
         return self._parameters
 
 
-class MultivariateNormalVariable(VectorNumVariable):
+class MultivariateNormalVariable(NumericVectorVariable):
     distribution = MultivariateNormalDistribution()
-    _parameters: tuple[VectorNumParam, MatrixNumParam] = (np.asarray([0,0]), np.asarray([[1,0],[0,1]]))
+    _parameters: tuple[NumericVectorParam, MatrixNumParam] = (np.asarray([0,0]), np.asarray([[1,0],[0,1]]))
 
     @property
-    def parameters(self) -> tuple[VectorNumParam, MatrixNumParam]:
+    def parameters(self) -> tuple[NumericVectorParam, MatrixNumParam]:
         return self._parameters
+    
+    def set_parameters(self, *parameters: Param):
+        if 'transform' in self.parameterisation.names and len(parameters) < 3:
+            super().set_parameters(*parameters, self.transform)
+        else:
+            super().set_parameters(*parameters)
 
 
-class DirichletVariable(VectorNumVariable):
+class DirichletVariable(NumericVectorVariable):
     distribution = DirichletDistribution()
-    _parameters: tuple[VectorNumParam] = (np.asarray([1,1]),)
+    _parameters: tuple[NumericVectorParam] = (np.asarray([1,1]),)
 
     @property
-    def parameters(self) -> tuple[VectorNumParam]:
+    def parameters(self) -> tuple[NumericVectorParam]:
         return self._parameters
 
 
