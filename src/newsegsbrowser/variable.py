@@ -26,6 +26,8 @@ Value = Union[ScalarParam, VectorParam]
 Param = Union[ScalarParam, VectorParam, MatrixNumParam]
 ParamList = Union[Param, Sequence[Param]]
 
+ModelType = Union[newsegsmodel.NewsegsModel, newsegsfinance.NewsegsFinance]
+
 VARIABLE_TYPE = Literal[
     'scalar',
     'vector'
@@ -427,6 +429,8 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
             case 'absolute':
                 lbound, ubound = cls.interval_function(interval, var.parameters)
                 return (lbound, ubound)
+            case 'interval':
+                return (0.95, 0.95)
             case _:
                 raise ValueError(f'Unknown dsa_bounds_type {var.dsa_bounds_type}')
 
@@ -2091,6 +2095,7 @@ class Variable:
     def __init__(
         self,
         name: str,
+        unit: str = "",
         configuration_type: CONFIGURATION_TYPE = 'model',
         model_section: str | Sequence[str] | None = None,
         model_parameter: str | Sequence[str] | None = None,
@@ -2100,13 +2105,21 @@ class Variable:
         transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM] = 'identity',
         parameterisation_index: int | None = None,
         parameters: ParamList | None = None,
+        value_name: Sequence[str]| None = None,
         dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute',
         dsa_lower: Value | None = None,
         dsa_upper: Value | None = None,
         dsa_selectable: bool = False,
         dsa_selected: bool = False,
         dsa_active: bool = False,
-        dsa_focussed: bool = False
+        dsa_focussed: bool = False,
+        psa_selectable: bool = False,
+        psa_selected: bool = False,
+        psa_active: bool = False,
+        configuration_show: bool = True,
+        interface_min: float | None = None,
+        interface_max: float | None = None,
+        interface_step: float | None = None,
     ):
         self.name = name
 
@@ -2165,6 +2178,21 @@ class Variable:
         self.dsa_selected = dsa_selected
         self.dsa_active = dsa_active
         self.dsa_focussed = dsa_focussed
+
+        if value_name is None:
+            self.value_name = [f'Value {i+1}' for i in range(self.n_values)]
+        else:
+            self.value_name = value_name
+
+        self.psa_selectable = psa_selectable
+        self.psa_selected = psa_selected
+        self.psa_active = psa_active
+
+        self.unit = unit
+        self.configuration_show = configuration_show
+        self.interface_min = interface_min
+        self.interface_max = interface_max
+        self.interface_step = interface_step
 
     @property
     def parameterisation(self) -> Parameterisation:
@@ -2358,6 +2386,30 @@ class Variable:
         Update model with central (deterministic) value(s).
 
         If config_type is not 'finance', does nothing.
+        """
+    
+    def is_model_type(self, model: ModelType) -> bool:
+        match self.configuration_type:
+            case 'model':
+                return isinstance(model, newsegsmodel.NewsegsModel)
+            case 'finance':
+                return isinstance(model, newsegsfinance.NewsegsFinance)
+        return False
+
+    @abstractmethod
+    def synchronise_from_model(self, model: ModelType) -> None:
+        """
+        Draw the appropriate value from the model and use it to set parameters.
+        
+        This is not a guaranteed operation; it may be that there is no 
+        implementation of a parameterisation to go between the model value
+        and the input parameters of the distribution, dependent upon the 
+        transform. It is also likely that the variance parameters will be
+        incorrect after synchronisation.
+
+        It is therefore recommended that this operation be performed only in
+        exceptional circumstances - it is better to store the raw parameters
+        in the metamodel and update from that direction.
         """
 
     def update_model_dsa_low(self, model: newsegsmodel.NewsegsModel) -> None:
@@ -2633,6 +2685,55 @@ class NumericVectorVariable(VectorVariable):
         return cast(NumericVectorParam, super().get_dsa_value(bound, force))
 
 
+def get_value_from_model(
+    model: ModelType, 
+    model_section: str | Sequence[str] | None, 
+    model_parameter: str | Sequence[str]
+):
+    if not isinstance(model_parameter, str) and isinstance(model_parameter, Sequence):
+        if not isinstance(model_section, str) and isinstance(model_section, Sequence):
+            if len(model_parameter) != len(model_section):
+                if len(model_section) == 1:
+                    return [
+                        get_value_from_model(model, model_section[0], x) for x in model_parameter
+                    ]
+                else:
+                    raise TypeError(f'model_section length does not match model_parameter: {len(model_section)} vs {len(model_parameter)}')
+            else:
+                return [
+                        get_value_from_model(model, x, y) for x, y in zip(model_section, model_parameter)
+                    ]
+        else:
+            return [
+                get_value_from_model(model, model_section, x) for x in model_parameter
+            ]
+
+    if model_section is not None and model_section != '':
+        model_sec_chain = str(model_section).split('.')
+        module = model
+        for attr in model_sec_chain:
+            try:
+                module = getattr(module, attr)
+            except AttributeError:
+                if isinstance(module, Mapping):
+                    try:
+                        module = module[attr]
+                    except AttributeError as e:
+                        raise ValueError(f'Model section cannot be accessed: section {model_section} with error {e}')
+    else:
+        module = model
+
+    model_param = str(model_parameter)
+
+    try:
+        model_val = getattr(module, model_param)
+    except AttributeError:
+        if isinstance(module, Mapping):
+            model_val = module[model_param]
+        else:
+            raise ValueError(f'Model parameter cannot be accessed: {model_param}')
+    return model_val
+
 class ConstantVariable(ScalarVariable):
     distribution = ConstantDistribution()
     _parameters : tuple[ScalarParam]
@@ -2640,22 +2741,191 @@ class ConstantVariable(ScalarVariable):
     @property
     def parameters(self) -> tuple[ScalarParam]:
         return self._parameters
+    
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        
+        if model_val == self.deterministic_value:
+            # No update
+            return
 
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'value' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+        
+        self.set_parameters(model_val)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # As the constant distribution has only a single parameterisation, we should never get here
+            raise NotImplementedError('Setting of raw parameters from alternative parameterisations not implemented for constant variables')
 
 class BinomialVariable(TwoParamNumericScalarVariable):
     distribution = BinomialDistribution()
+
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'mean' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+
+        n_trials = self.parameters[1]
+        
+        self.set_parameters(model_val, n_trials)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # If we are here, this means the variable is set to probability, trial form
+            # and so we should over-write the raw parameters so they can be read to the
+            # interface
+            self._raw_parameters = copy.copy(self.parameters)
 
 
 class NormalVariable(TwoParamNumericScalarVariable):
     distribution = NormalDistribution()
 
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'mean' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+
+        if self.transform[0] == 'identity':
+            sd = self.parameters[1]
+        else:
+            sigma_squared = self.parameters[1]**2
+            sd = np.sqrt((np.exp(sigma_squared) - 1) * (model_val * model_val))
+        
+        self.set_parameters(model_val, sd)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # If we are here, this means the variable is set to mu, sigma form
+            # and so we should over-write the raw parameters so they can be read to the
+            # interface
+            self._raw_parameters = copy.copy(self.parameters)
+
 
 class BetaVariable(TwoParamNumericScalarVariable):
     distribution = BetaDistribution()
 
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'mean' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+
+        if self.transform[0] == 'identity':
+            a, b = self.parameters
+            sd = np.sqrt(a*b / ((a+b)**2 * (a + b + 1.)))
+        else:
+            raise NotImplementedError('Derivation of log-beta parameters not supported')
+        
+        self.set_parameters(model_val, sd)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # If we are here, this means the variable is set to a,b form
+            # and so we should over-write the raw parameters so they can be read to the
+            # interface
+            self._raw_parameters = copy.copy(self.parameters)
+
 
 class GammaVariable(TwoParamNumericScalarVariable):
     distribution = GammaDistribution()
+
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'mean' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+
+        if self.transform[0] == 'identity':
+            shape, scale = self.parameters
+            sd = shape * scale**2
+        else:
+            raise NotImplementedError('Derivation of log-gamma parameters not supported')
+        
+        self.set_parameters(model_val, sd)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # If we are here, this means the variable is set to shape, scale form
+            # and so we should over-write the raw parameters so they can be read to the
+            # interface
+            self._raw_parameters = copy.copy(self.parameters)
 
 
 class ConstantVectorVariable(VectorVariable):
@@ -2665,6 +2935,32 @@ class ConstantVectorVariable(VectorVariable):
     @property
     def parameters(self) -> tuple[VectorParam]:
         return self._parameters
+    
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'mean' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+        
+        self.set_parameters(model_val)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
 
 
 class MultivariateNormalVariable(NumericVectorVariable):
@@ -2681,6 +2977,42 @@ class MultivariateNormalVariable(NumericVectorVariable):
         else:
             super().set_parameters(*parameters)
 
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'mean' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+
+        if self.transform[0] == 'identity':
+            sd = self.parameters[1]
+        else:
+            sigma_squared = self.parameters[1]**2
+            sd = np.sqrt((np.exp(sigma_squared) - 1) * (model_val * model_val))
+        
+        self.set_parameters(model_val, sd)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # If we are here, this means the variable is set to mu, vcv form
+            # and so we should over-write the raw parameters so they can be read to the
+            # interface
+            self._raw_parameters = copy.copy(self.parameters)
+
 
 class DirichletVariable(NumericVectorVariable):
     distribution = DirichletDistribution()
@@ -2689,6 +3021,42 @@ class DirichletVariable(NumericVectorVariable):
     @property
     def parameters(self) -> tuple[NumericVectorParam]:
         return self._parameters
+    
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        # NB - WE ARE NOT SETTING ON THE MEAN
+        # Just going to set on the alphas and let the variance fall as it may.
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'alpha' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+
+        if self.transform[0] == 'identity':
+            new_params = model_val
+        else:
+            raise NotImplementedError('Derivation of log-dirichlet parameters not supported')
+        
+        self.set_parameters(new_params)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            #TODO: Write back the means and VCV to the _raw_parameters
+            # It is fairly trivial to write the VCV matrix, but just needs to be done,
+            # especially considering we are messing with the matrix.
 
 
 # class Variable2():

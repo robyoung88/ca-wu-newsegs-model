@@ -1,9 +1,11 @@
 """
 Unit tests for newsegsbrowser/variable.
 """
-import unittest
+
 from functools import partial
+import json
 from typing import cast
+import unittest
 
 import numpy as np
 import numpy.testing as nptest
@@ -18,6 +20,8 @@ from unit_tests.common import setup_test_env
 setup_test_env()
 
 from src.newsegsbrowser import variable
+from src.newsegsmodel import sprakemodel
+from src.newsegsfinance import sprakefinance
 
 class TestParameterisations(unittest.TestCase):
 
@@ -1620,6 +1624,71 @@ class TestVariablePSA(unittest.TestCase):
             true_means + 1.96 * se
         )
 
+
+class TestVariableConstructionFromJSON(unittest.TestCase):
+    """
+    Ensure that variables handle being constructed from a json file correctly
+    """
+
+    def test_sprake_json_construction(self):
+        with open('data/sprake_variable_config.json') as f:
+            var_conf_list = json.load(f)
+        
+        self.assertIsInstance(var_conf_list, list)
+        variables = [variable.Variable(**x) for x in var_conf_list]
+        for var in variables:
+            self.assertIsInstance(var, variable.Variable)
+
+class TestVariableSynchronisation(unittest.TestCase):
+    """
+    Check synchronisation with model/finance instances
+    """
+
+    def load_sprake_variables(self):
+        with open('data/sprake_variable_config.json') as f:
+            var_conf_list = json.load(f)
+        return [variable.Variable(**x) for x in var_conf_list]
+    
+    def test_synchronisation_scalar_constant(self):
+        vars = self.load_sprake_variables()
+        mdl = sprakemodel.SprakeModel.from_none()
+
+        storcap = vars[0]
+        self.assertEqual(storcap.model_parameter, 'storage_capacity')
+        self.assertNotEqual(storcap.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        storcap.synchronise_from_model(mdl)
+        self.assertEqual(storcap.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+
+    def test_synchronisation_scalar_beta(self):
+        vars = self.load_sprake_variables()
+        mdl = sprakemodel.SprakeModel.from_none()
+
+        vbl = vars[1]
+        self.assertEqual(vbl.model_parameter, 'storage_rte')
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
+        vbl.synchronise_from_model(mdl)
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
+    
+    def test_synchronisation_normal(self):
+        vars = self.load_sprake_variables()
+        mdl = sprakemodel.SprakeModel.from_none()
+
+        vbl = vars[3]
+        self.assertEqual(vbl.model_parameter, 'hlp')
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
+        vbl.synchronise_from_model(mdl)
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
+
+    def test_synchronisation_gamma(self):
+        vars = self.load_sprake_variables()
+        fnc = sprakefinance.SprakeFinance.from_none()
+
+        vbl = [x for x in vars if x.model_parameter == 'resident_var_per_unit'][0]
+        self.assertEqual(vbl.model_parameter, 'resident_var_per_unit')
+        self.assertNotEqual(vbl.deterministic_value, fnc.unit_costs['resident_var_per_unit'])
+        vbl.synchronise_from_model(fnc)
+        self.assertAlmostEqual(vbl.deterministic_value, fnc.unit_costs['resident_var_per_unit'])
+        
 
 class TestVariableValidation(unittest.TestCase):
     """

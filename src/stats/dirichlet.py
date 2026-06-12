@@ -13,4 +13,7 @@ def fit_dirichlet(mean: npt.ArrayLike, vcv: npt.ArrayLike):
     wch = mean > 0
     ovector[wch] = mean[wch] * ((mean[wch] * (1. - mean[wch]))/ variances[wch] - 1.)
     
+    if np.all(ovector == 0):
+        raise ValueError('Dirichlet alpha parameters cannot be identified - check your variances')
+
     return ovector

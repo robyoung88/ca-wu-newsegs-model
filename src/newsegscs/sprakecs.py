@@ -345,6 +345,8 @@ class SprakeCS(NewsegsCS):
     
     # Keep property as read-only, use explicit setter as dict is mutable anyway
     def set_appliance_params(self, params: dict) -> None:
+        if not hasattr(self, '_appliance_params'):
+            self._appliance_params = {}
         v0 = self._appliance_params.copy()
         self._appliance_params.update(params)
         self.dirty = self.dirty or (v0 != self._appliance_params)
@@ -354,6 +356,8 @@ class SprakeCS(NewsegsCS):
         return self._ev_params
 
     def set_ev_params(self, params: dict) -> None:
+        if not hasattr(self, '_ev_params'):
+            self._ev_params = {}
         v0 = self._ev_params.copy()
         self._ev_params.update(params)
         self.dirty = self.dirty or (v0 != self._ev_params)
@@ -363,6 +367,8 @@ class SprakeCS(NewsegsCS):
         return self._dhw_params
 
     def set_dhw_params(self, params: dict) -> None:
+        if not hasattr(self, '_dhw_params'):
+            self._dhw_params = {}
         v0 = self._dhw_params.copy()
         self._dhw_params.update(params)
         self.dirty = self.dirty or (v0 != self._dhw_params)
@@ -372,6 +378,8 @@ class SprakeCS(NewsegsCS):
         return self._spaceheat_params
 
     def set_spaceheat_params(self, params: dict) -> None:
+        if not hasattr(self, '_spaceheat_params'):
+            self._spaceheat_params = {}
         v0 = self._spaceheat_params.copy()
         self._spaceheat_params.update(params)
         self.dirty = self.dirty or (v0 != self._spaceheat_params)
@@ -381,6 +389,8 @@ class SprakeCS(NewsegsCS):
         return self._storage_params
     
     def set_storage_params(self, params: dict) -> None:
+        if not hasattr(self, '_storage_params'):
+            self._storage_params = {}
         v0 = self._storage_params.copy()
         self._storage_params.update(params)
         self.dirty = self.dirty or (v0 != self._storage_params)

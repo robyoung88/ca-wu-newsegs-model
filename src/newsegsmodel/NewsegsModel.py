@@ -1,9 +1,11 @@
 """
 Abstract base class for NewSEGS model
 """
+from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Mapping
+import copy
+from typing import Any, Type
 import re
 import datetime
 import uuid
@@ -45,6 +47,8 @@ class NewsegsModel(metaclass=ABCMeta):
 
     _dirty = False
     _name = 'NewSEGS Model'
+    _model_version = '0.0.1'
+
     _last_hash = 1
     last_run = datetime.datetime.now()
     uuid = "1"
@@ -62,6 +66,10 @@ class NewsegsModel(metaclass=ABCMeta):
         if len(id) != 38 or len(uid) != 36:
             raise ValueError(f'id: {id} is not a valid NewsegsModel identifier')
         self.uuid = uid
+
+    @property
+    def version(self) -> str:
+        return self._model_version
 
     @abstractmethod
     def run(self) -> int:
@@ -98,16 +106,39 @@ class NewsegsModel(metaclass=ABCMeta):
 
     @generation.setter
     @abstractmethod
-    def generation(self, generation_module:NewsegsGeneration):
+    def generation(self, generation_module: NewsegsGeneration):
         """
         Replace the generation module
         """
+
+    @property
+    def mod_generation(self) -> NewsegsGeneration:
+        """
+        Alternative accessor for generation module
+        """
+        return self.generation
+    
+    @mod_generation.setter
+    def mod_generatin(self, generation_module: NewsegsGeneration):
+        self.generation = generation_module
 
     @abstractmethod
     def get_generation_result(self) -> ABCNewsegsModuleResult:
         """
         Access the result of a generation module run
         """
+
+    def update_generation(self, generation_config: dict[str, Any]) -> None:
+        """
+        Synchronise the generation module with a config dictionary.
+        """
+        try:
+            self.generation.update(generation_config)
+        except (AttributeError, TypeError):
+            from src.newsegsgeneration import constructors as genmodconstructors
+            gen = genmodconstructors.generation_module_from_dict(generation_config)
+            gen.model = self
+            self.generation = gen
 
     @property
     @abstractmethod
@@ -123,11 +154,34 @@ class NewsegsModel(metaclass=ABCMeta):
         Replace the grid module
         """
 
+    @property
+    def mod_grid(self) -> NewsegsGrid:
+        """
+        Alternative accessor for grid module
+        """
+        return self.grid
+    
+    @mod_grid.setter
+    def mod_grid(self, grid_module: NewsegsGrid):
+        self.grid = grid_module
+
     @abstractmethod
     def get_grid_result(self) -> ABCNewsegsModuleResult:
         """
         Access the result of a grid module run
         """
+    
+    def update_grid(self, grid_config: dict[str, Any]) -> None:
+        """
+        Synchronise the grid module with a config dictionary
+        """
+        try:
+            self.grid.update(grid_config)
+        except (AttributeError, TypeError):
+            from src.newsegsgrid import constructors as gridmodconstructors
+            grd = gridmodconstructors.grid_module_from_dict(grid_config)
+            grd.model = self
+            self.grid = grd
 
     @property
     @abstractmethod
@@ -143,11 +197,34 @@ class NewsegsModel(metaclass=ABCMeta):
         Replace the consumption/storage module
         """
 
+    @property
+    def mod_cs(self) -> NewsegsCS:
+        """
+        Alternative accessor for consumption/storage module
+        """
+        return self.consumption_storage
+    
+    @mod_cs.setter
+    def mod_cs(self, cs_module: NewsegsCS):
+        self.consumption_storage = cs_module
+
     @abstractmethod
     def get_consumption_storage_result(self) -> ABCNewsegsModuleResult:
         """
         Access the result of a consumption/storage module run
         """
+    
+    def update_consumption_storage(self, cs_config: dict[str, Any]) -> None:
+        """
+        Synchronise the consumption and storage module with a config dictionary
+        """
+        try:
+            self.consumption_storage.update(cs_config)
+        except (AttributeError, TypeError):
+            from src.newsegscs import constructors as csmodconstructors
+            cs = csmodconstructors.cs_module_from_dict(cs_config)
+            cs.model = self
+            self.consumption_storage = cs
 
     @property
     @abstractmethod
@@ -158,7 +235,7 @@ class NewsegsModel(metaclass=ABCMeta):
 
     @local_env.setter
     @abstractmethod
-    def local_env(self, local_environment_server:NewsegsLocalEnvironment):
+    def local_env(self, local_environment_server: NewsegsLocalEnvironment):
         """
         Replace the local environment server
         """
@@ -216,18 +293,101 @@ class NewsegsModel(metaclass=ABCMeta):
             self._dirty
         )
 
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict[str, Any]:
         """
         A dictionary representation of the model configuration (not results).
         """
         odict = {
             'class': classfuncs.get_class(self),
-            #'class': re.search(r"\.(\w+)\'>$", str(type(self))).group(1),
             'name': self._name
         }
 
         return odict
+    
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
+        """
+        Update configuration using a dictionary.
+
+        In the default implementation, will go through each key in the dict.
+        If there is an attribute with an fset attribute, then assume it is a
+        read-write property and update it via the fset. Otherwise, set the
+        attribute directly.
+        """
+        config_cls = config.get('class')
+        if config_cls is not None and config_cls != classfuncs.get_class(self):
+            raise ValueError(f'Config model class inconsistent: {config_cls}')
+        
+        config_version = config.get('model_version')
+        if config_version is not None and config_version != self.version:
+            raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
+        
+        config = copy.copy(config)
+        
+        generation = config.pop('mod_gen', None)
+        if generation:
+            self.update_generation(generation)
+
+        grid = config.pop('mod_grid', None)
+        if grid:
+            self.update_grid(grid)
+
+        cs = config.pop('mod_cs', None)
+        if cs:
+            self.update_consumption_storage(cs)
+        
+        for k in config.keys():
+            if hasattr(self, k):
+                v = config.get(k)
+
+                # If the attribute is a read-write property, its class attribute 
+                # will have an fset
+                try:
+                    prop = getattr(type(self), k)
+                    if hasattr(prop, 'fset'):
+                        getattr(prop, 'fset')(self, v)
+                    else:
+                        # Otherwise, we assume it is a simple attribute that may be overwritten
+                        setattr(self, k, v)
+                except AttributeError:
+                    setattr(self, k, v)
+    
+    def update(
+        self,
+        config: dict[str, Any] | NewsegsModel,
+        force: bool = False
+    ) -> None:
+        """
+        Update configuration using a dictionary or another instance.
+
+        Throws TypeError if the configuration is not compatible; e.g. if the
+        dict is for a different model or the other model instance is not of
+        the same kind.
+
+        If the dictionary has no 'class' key, it will be used anyway.
+        """
+        if isinstance(config, dict):
+            conf_class = config.get('class')
+            if conf_class and not force:
+                if classfuncs.get_class(self) != conf_class:
+                    raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
+            self.sync_with_dict(config)
+        else:
+            if not isinstance(config, type(self)):
+                if not force:
+                    raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
+            vars(self).update(copy.deepcopy(vars(config)))
+
 
     def __hash__(self) -> int:
         return self._last_hash
+    
+    @classmethod
+    @abstractmethod
+    def from_dict(
+        cls: Type[NewsegsModel],
+        config: dict[str, Any]
+    ) -> NewsegsModel:
+        """
+        An instance of the model configured per a dictionary
+        """
 
