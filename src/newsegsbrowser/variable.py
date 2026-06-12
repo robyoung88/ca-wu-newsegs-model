@@ -2372,9 +2372,6 @@ class Variable:
     def update_finance_dsa_high(self, finance: newsegsfinance.NewsegsFinance) -> None:
         ...
     
-    def random_draw(self, rng: np.random.Generator) -> str | float | Sequence[float]:
-        ...
-    
     def update_model_psa(self, model: newsegsmodel.NewsegsModel) -> None:
         ...
     
