@@ -21,7 +21,7 @@ from src.util import classfuncs
 
 class NewsegsModel(metaclass=ABCMeta):
     """
-    Abstract base class of Newbuild on-Site Energy Generation and Storage (NewSEGS) model
+    Abstract base class of NewSEGS energy model
 
     Holder for three submodules:
     - NewsegsGeneration
@@ -68,8 +68,20 @@ class NewsegsModel(metaclass=ABCMeta):
         self.uuid = uid
 
     @property
+    def name(self) -> str:
+        return self._name
+    
+    @name.setter
+    def name(self, name: str) -> None:
+        self._name = name
+
+    @property
     def version(self) -> str:
         return self._model_version
+    
+    @property
+    def model_version(self) -> str:
+        return self.version
 
     @abstractmethod
     def run(self) -> int:
@@ -299,7 +311,8 @@ class NewsegsModel(metaclass=ABCMeta):
         """
         odict = {
             'class': classfuncs.get_class(self),
-            'name': self._name
+            'name': self.name,
+            'model_version': self.model_version
         }
 
         return odict
@@ -376,7 +389,6 @@ class NewsegsModel(metaclass=ABCMeta):
                 if not force:
                     raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
             vars(self).update(copy.deepcopy(vars(config)))
-
 
     def __hash__(self) -> int:
         return self._last_hash

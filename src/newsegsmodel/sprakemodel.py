@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 import copy
 import datetime
-from typing import override, Mapping
+from typing import cast, override, Any, Mapping
 from functools import singledispatchmethod
 from functools import lru_cache
 
@@ -61,8 +61,9 @@ def get_sprake_environment_server():
     wind_ts.timestep = _DEFAULT_TS
     wind_ts.set_offset(wind_ts.start, wind_ts.start)
 
-    server.set_wind_speed(wind_data['wind_speed'].values,
-                          windloc,
+    server.set_wind_speed(
+        wind_data['wind_speed'].values, # pyright: ignore[reportArgumentType]
+        windloc,
                           wind_ts)
     
     ### Solar
@@ -406,34 +407,6 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         odict['mod_cs'] = self._mod_cs.to_dict()
 
         return odict
-
-    def sync_with_dict(self, config: Mapping) -> None:
-        """
-        Synchronise configuration with a config dictionary.
-        """
-        from src.newsegsgeneration import constructors as genmodconstructors
-        from src.newsegsgrid import constructors as gridmodconstructors
-        from src.newsegscs import constructors as csmodconstructors
-
-        if config.get('class') != classfuncs.get_class(self):
-            raise ValueError('Config model class inconsistent ', config.get('class'))
-        
-        if config.get('model_version') != self._model_version:
-            raise ValueError('Config has inconsistent model version ', config.get('model_version'), ' vs ', self._model_version )
-        
-        config = copy.copy(config)
-
-        generation = config.get('mod_gen', None)
-        if generation:
-            self.generation = genmodconstructors.generation_module_from_dict(generation)
-        
-        grid = config.get('mod_grid', None)
-        if grid:
-            self.grid = gridmodconstructors.grid_module_from_dict(grid)
-        
-        cs = config.get('mod_cs', None)
-        if cs:
-            self.consumption_storage = csmodconstructors.cs_module_from_dict(cs)
     
     @classmethod
     def from_dict(cls, config: dict) -> SprakeModel:

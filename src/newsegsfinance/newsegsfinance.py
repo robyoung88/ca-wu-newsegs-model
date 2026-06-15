@@ -1,25 +1,38 @@
 # Abstract base class for NewSEGS financial calculations
+from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+import copy
 import datetime
+from typing import Any
 import uuid
 import re
 
 from src.newsegsmodel import NewsegsModel
 import pandas as pd
-import numpy.typing as npt
+
+from src.util import classfuncs
 
 class NewsegsFinance(metaclass=ABCMeta):
+    """
+    Abstract base class of NewSEGS finance model
 
-    _name = 'NewSEGS Finance'
-    _model = None
+    Uses the results timeseries of a NewsegsModel instance in combination with
+    configuration variables to calculate costs and benefits associated with
+    energy generation, sales, and imports.
+    """
+
     _dirty = True
+    _name = 'NewSEGS Finance'
+    _finance_version = '0.0.1'
+    
+    _model = None
     
     last_update = datetime.datetime.now()
     uuid = "1"
 
-    _benefit_discount_rate = 0.
-    _cost_discount_rate = 0.
+    _benefit_discount_rate: float = 0.
+    _cost_discount_rate: float = 0.
 
     def __init__(self, *args, **kwargs):
         self.uuid = str(uuid.uuid4())
@@ -34,6 +47,22 @@ class NewsegsFinance(metaclass=ABCMeta):
         if len(id) != 38 or len(uid) != 36:
             raise ValueError(f'id: {id} is not a valid NewsegsFinance identifier')
         self.uuid = uid
+
+    @property
+    def name(self) -> str:
+        return self._name
+    
+    @name.setter
+    def name(self, name: str) -> None:
+        self._name = name
+
+    @property
+    def version(self) -> str:
+        return self._finance_version
+    
+    @property
+    def finance_version(self) -> str:
+        return self.version
 
     def run(self):
         """
@@ -54,14 +83,6 @@ class NewsegsFinance(metaclass=ABCMeta):
     @model.setter
     def model(self, mdl: NewsegsModel | None) -> None:
         self.set_model(mdl)
-
-    @property
-    def name(self) -> str:
-        return self._name
-    
-    @name.setter
-    def name(self, name: str) -> None:
-        self._name = name
 
     # Discount rates
     @property
@@ -452,13 +473,6 @@ class NewsegsFinance(metaclass=ABCMeta):
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
         ...
 
-    @abstractmethod
-    def to_dict(self) -> dict:
-        """
-        Configuration as a dictionary
-        """
-        ...
-
     @property
     def dirty(self) -> bool:
         """
@@ -474,6 +488,79 @@ class NewsegsFinance(metaclass=ABCMeta):
             #print(traceback.print_stack())
             self.last_update = datetime.datetime.now()
         self._dirty = val
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Configuration as a dictionary
+        """
+        odict = {
+            'class': classfuncs.get_class(self),
+            'name': self.name,
+            'finance_version': self.finance_version,
+        }
+        
+        return odict
+    
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
+        """
+        Update configuration using a dictionary.
+
+        In the default implementation, will go through each key in the dict.
+        If there is an attribute with an fset attribute, then assume it is a
+        read-write property and update it via the fset. Otherwise, set the
+        attribute directly.
+        """
+        config_cls = config.get('class')
+        if config_cls is not None and config_cls != classfuncs.get_class(self):
+            raise ValueError(f'Config model class inconsistent: {config_cls}')
+        
+        config_version = config.get('model_version')
+        if config_version is not None and config_version != self.version:
+            raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
+        
+        config = copy.copy(config)
+
+        for k in config.keys():
+            if hasattr(self, k):
+                v = config.get(k)
+
+                # If the attribute is a read-write property, its class attribute 
+                # will have an fset
+                try:
+                    prop = getattr(type(self), k)
+                    if hasattr(prop, 'fset'):
+                        getattr(prop, 'fset')(self, v)
+                    else:
+                        # Otherwise, we assume it is a simple attribute that may be overwritten
+                        setattr(self, k, v)
+                except AttributeError:
+                    setattr(self, k, v)
+
+    def update(
+        self,
+        config: dict[str, Any] | NewsegsFinance,
+        force: bool = False
+    ) -> None:
+        """
+        Update configuration using a dictionary or another instance.
+
+        Throws TypeError if the configuration is not compatible; e.g. if the
+        dict is for a different model or the other model instance is not of
+        the same kind.
+
+        If the dictionary has no 'class' key, it will be used anyway.
+        """
+        if isinstance(config, dict):
+            conf_class = config.get('class')
+            if conf_class and not force:
+                if classfuncs.get_class(self) != conf_class:
+                    raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
+            self.sync_with_dict(config)
+        else:
+            if not isinstance(config, type(self)):
+                if not force:
+                    raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
+            vars(self).update(copy.deepcopy(vars(config)))
 
     def __hash__(self):
         mdl = self.model

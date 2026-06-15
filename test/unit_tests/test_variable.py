@@ -1669,7 +1669,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         vbl.synchronise_from_model(mdl)
         self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
     
-    def test_synchronisation_normal(self):
+    def test_synchronisation_scalar_normal(self):
         vars = self.load_sprake_variables()
         mdl = sprakemodel.SprakeModel.from_none()
 
@@ -1679,7 +1679,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         vbl.synchronise_from_model(mdl)
         self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
 
-    def test_synchronisation_gamma(self):
+    def test_synchronisation_scalar_gamma(self):
         vars = self.load_sprake_variables()
         fnc = sprakefinance.SprakeFinance.from_none()
 
@@ -1688,7 +1688,117 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertNotEqual(vbl.deterministic_value, fnc.unit_costs['resident_var_per_unit'])
         vbl.synchronise_from_model(fnc)
         self.assertAlmostEqual(vbl.deterministic_value, fnc.unit_costs['resident_var_per_unit'])
+
+    def test_update_function(self):
+        """
+        Verify the behaviour of update_model_with_value
+        """
+        mdl = sprakemodel.SprakeModel.from_none()
+        self.assertNotEqual(
+            mdl.consumption_storage.storage_params['storage_capacity'],
+            100.0
+        )
+        variable.update_model_with_value(
+            100.0,
+            mdl,
+            'mod_cs.storage_params',
+            'storage_capacity'
+        )
+        self.assertEqual(
+            mdl.consumption_storage.storage_params['storage_capacity'],
+            100.0
+        )
+
+        fnc = sprakefinance.SprakeFinance.from_none()
+        self.assertNotEqual(
+            fnc.unit_costs['grid_import_sc_per_day'],
+            25
+        )
+        variable.update_model_with_value(
+            25,
+            fnc,
+            'unit_costs',
+            'grid_import_sc_per_day'
+        )
+        self.assertEqual(
+            fnc.unit_costs['grid_import_sc_per_day'],
+            25
+        )
+
+    def test_update_det_scalar_constant(self):
+        vars = self.load_sprake_variables()
+        mdl = sprakemodel.SprakeModel.from_none()
+
+        vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
+        self.assertEqual(vbl.model_parameter, 'storage_capacity')
+        vbl.synchronise_from_model(mdl)
+        self.assertNotEqual(
+            mdl.consumption_storage.storage_params['storage_capacity'], 
+            100
+        )
+        vbl.set_parameters(100)
+        vbl.update_model(mdl)
+        self.assertEqual(
+            mdl.consumption_storage.storage_params['storage_capacity'], 
+            100
+        )
         
+    def test_update_det_scalar_beta(self):
+        vars = self.load_sprake_variables()
+        mdl = sprakemodel.SprakeModel.from_none()
+
+        vbl = [x for x in vars if x.model_parameter == 'storage_rte'][0]
+        self.assertEqual(vbl.model_parameter, 'storage_rte')
+        vbl.synchronise_from_model(mdl)
+        self.assertNotEqual(
+            mdl.consumption_storage.storage_params['storage_rte'], 
+            0.8
+        )
+        self.assertEqual(vbl.parameterisation_index, 1)
+        vbl.set_parameters(0.8, 0.1)
+        vbl.update_model(mdl)
+        self.assertEqual(
+            mdl.consumption_storage.storage_params['storage_rte'], 
+            0.8
+        )
+    
+    def test_update_det_scalar_normal(self):
+        vars = self.load_sprake_variables()
+        mdl = sprakemodel.SprakeModel.from_none()
+
+        vbl = [x for x in vars if x.model_parameter == 'hlp'][0]
+        self.assertEqual(vbl.model_parameter, 'hlp')
+        vbl.synchronise_from_model(mdl)
+        self.assertNotEqual(
+            mdl.consumption_storage.spaceheat_params['hlp'], 
+            0.5
+        )
+        vbl.set_parameters(0.5, 0.02)
+        vbl.update_model(mdl)
+        self.assertEqual(
+            mdl.consumption_storage.spaceheat_params['hlp'],
+            0.5
+        )
+    
+    def test_update_det_scalar_gamma(self):
+        vars = self.load_sprake_variables()
+        fnc = fnc = sprakefinance.SprakeFinance.from_none()
+
+        vbl = [x for x in vars if x.model_parameter == 'resident_var_per_unit'][0]
+        self.assertEqual(vbl.model_parameter, 'resident_var_per_unit')
+        vbl.synchronise_from_model(fnc)
+        self.assertNotEqual(
+            fnc.unit_costs['resident_var_per_unit'], 
+            0.33
+        )
+        self.assertEqual(vbl.parameterisation_index, 1)
+        vbl.set_parameters(0.33, 0.05)
+        vbl.update_model(fnc)
+        self.assertEqual(
+            fnc.unit_costs['resident_var_per_unit'],
+            0.33
+        )
+    
 
 class TestVariableValidation(unittest.TestCase):
     """

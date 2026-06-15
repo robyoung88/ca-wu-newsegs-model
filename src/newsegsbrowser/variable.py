@@ -3,13 +3,14 @@ from __future__ import annotations
 from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Mapping
 import copy
-from typing import Any, cast, Callable, Literal, List, Sequence, Sized, get_args, Union
+from typing import Any, cast, Callable, Literal, List, Sequence, Sized, get_args, Union, overload, override
 from typing import TypeAlias
 import warnings
 
 from matplotlib.pylab import Generator
 import numpy as np
 import numpy.typing as npt
+from useful_types import SequenceNotStr
 
 from src.newsegsmodel import newsegsmodel
 from src.newsegsfinance import newsegsfinance
@@ -2020,6 +2021,89 @@ class DirichletDistribution(NumericVectorValuedDistribution):
                 raise ValueError(f'Unknown bounds_type: {var.dsa_bounds_type}')
 
 
+@overload
+def get_value_from_model(
+    model: ModelType, 
+    model_section: str | SequenceNotStr[str] | None, 
+    model_parameter: str
+) -> Value | Sequence[Value]:
+    ...
+
+@overload
+def get_value_from_model(
+    model: ModelType, 
+    model_section: str | SequenceNotStr[str] | None, 
+    model_parameter: SequenceNotStr[str]
+) -> Sequence[Value]:
+    ...
+
+def get_value_from_model(
+    model: ModelType, 
+    model_section: str | SequenceNotStr[str] | None, 
+    model_parameter: str | SequenceNotStr[str]
+) -> Value | Sequence[Value]:
+    if not isinstance(model_parameter, str) and isinstance(model_parameter, Sequence):
+        if not isinstance(model_section, str) and isinstance(model_section, Sequence):
+            if len(model_parameter) != len(model_section):
+                if len(model_section) == 1:
+                    return [
+                        get_value_from_model(model, model_section[0], x) for x in model_parameter if (isinstance(x, str) or not isinstance(x, Sequence))
+                    ] # pyright: ignore[reportReturnType]
+                else:
+                    raise TypeError(f'model_section length does not match model_parameter: {len(model_section)} vs {len(model_parameter)}')
+            else:
+                return [
+                        get_value_from_model(model, x, y) for x, y in zip(model_section, model_parameter) if (isinstance(x, str) or not isinstance(x, Sequence))
+                    ] # pyright: ignore[reportReturnType]
+        else:
+            return [
+                get_value_from_model(model, model_section, x) for x in model_parameter if (isinstance(x, str) or not isinstance(x, Sequence))
+            ] # pyright: ignore[reportReturnType]
+
+    if model_section is not None and model_section != '':
+        model_sec_chain = str(model_section).split('.')
+        module = model
+        for attr in model_sec_chain:
+            try:
+                module = getattr(module, attr)
+            except AttributeError:
+                if isinstance(module, Mapping):
+                    try:
+                        module = module[attr]
+                    except AttributeError as e:
+                        raise ValueError(f'Model section cannot be accessed: section {model_section} with error {e}')
+    else:
+        module = model
+
+    model_param = str(model_parameter)
+
+    try:
+        model_val = getattr(module, model_param)
+    except AttributeError:
+        if isinstance(module, Mapping):
+            model_val = module[model_param]
+        else:
+            raise ValueError(f'Model parameter cannot be accessed: {model_param}')
+    return model_val
+
+def update_model_with_value(
+    value: Value,
+    model: ModelType,
+    model_section: str | None,
+    model_parameter: str
+) -> None:
+    update_dict = {}
+    last_dict = update_dict
+    if model_section is not None and model_section != '':
+        model_sec_chain = str(model_section).split('.')
+        for key in model_sec_chain:
+            last_dict[key] = {}
+            last_dict = last_dict[key]
+    
+    last_dict[model_parameter] = value
+    model.update(update_dict)
+
+
 class Variable:
     """
     A single unit of variation in a model.
@@ -2097,10 +2181,10 @@ class Variable:
         name: str,
         unit: str = "",
         configuration_type: CONFIGURATION_TYPE = 'model',
-        model_section: str | Sequence[str] | None = None,
-        model_parameter: str | Sequence[str] | None = None,
-        interface_section: str | Sequence[str] | None = None,
-        interface_key: str | Sequence[str] | None = None,
+        model_section: str | SequenceNotStr[str] | None = None,
+        model_parameter: str | SequenceNotStr[str] | None = None,
+        interface_section: str | SequenceNotStr[str] | None = None,
+        interface_key: str | SequenceNotStr[str] | None = None,
         distribution: VARIABLE_DISTRIBUTION = 'constant',
         transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM] = 'identity',
         parameterisation_index: int | None = None,
@@ -2363,7 +2447,7 @@ class Variable:
         
         return self.deterministic_value
         
-    def get_psa_value(self) -> Param:
+    def get_psa_value(self) -> Value:
         if (
             self.distribution.psa_possible
             and self.psa_selectable
@@ -2373,21 +2457,6 @@ class Variable:
             return self._psa_draw
         return self.deterministic_value
     
-    def update_model(self, model: newsegsmodel.NewsegsModel) -> None:
-        """
-        Update model with central (deterministic) value(s).
-
-        If config_type is not 'model', does nothing.
-        """
-        ...
-    
-    def update_finance(self, finance: newsegsfinance.NewsegsFinance) -> None:
-        """
-        Update model with central (deterministic) value(s).
-
-        If config_type is not 'finance', does nothing.
-        """
-    
     def is_model_type(self, model: ModelType) -> bool:
         match self.configuration_type:
             case 'model':
@@ -2395,6 +2464,62 @@ class Variable:
             case 'finance':
                 return isinstance(model, newsegsfinance.NewsegsFinance)
         return False
+    
+    def _update_model(self, model: ModelType, value: Value) -> None:
+        if self.model_section is None or self.model_section == '':
+            if not(isinstance(self.model_parameter, str)) and isinstance(self.model_parameter, Sequence):
+                if isinstance(value, str) or not (isinstance(value, Sequence) or isinstance(value, np.ndarray)):
+                    raise TypeError('Value expected to be of sequence type')
+                for prm, val in zip(self.model_parameter, value):
+                    update_model_with_value(val, model, None, model_parameter = prm)
+            else:
+                if isinstance(self.model_parameter, str):
+                    update_model_with_value(value, model, None, self.model_parameter)
+                elif isinstance(self.model_parameter, Sequence):
+                    raise ValueError('Single model parameter expected')
+                else:
+                    update_model_with_value(value, model, None, self.model_parameter) # pyright: ignore[reportArgumentType]
+        elif isinstance(self.model_section, str):
+            if not(isinstance(self.model_parameter, str)) and isinstance(self.model_parameter, Sequence):
+                if isinstance(value, str) or not (isinstance(value, Sequence) or isinstance(value, np.ndarray)):
+                    raise TypeError('Value expected to be of sequence type')
+                for prm, val in zip(self.model_parameter, value):
+                    update_model_with_value(val, model, self.model_section, model_parameter = prm)
+            else:
+                if isinstance(self.model_parameter, str):
+                    update_model_with_value(value, model, self.model_section, self.model_parameter)
+                elif isinstance(self.model_parameter, Sequence):
+                    raise ValueError('Single model parameter expected')
+                else:
+                    update_model_with_value(value, model, self.model_section, self.model_parameter) # pyright: ignore[reportArgumentType]
+        elif isinstance(self.model_section, Sequence):
+            if isinstance(value, str) or not (isinstance(value, Sequence) or isinstance(value, np.ndarray)):
+                    raise TypeError('Value expected to be of sequence type')
+            if not(isinstance(self.model_parameter, str)) and isinstance(self.model_parameter, Sequence):
+                for val, prm, sec in zip(value, self.model_parameter, self.model_section):
+                    update_model_with_value(val, model, sec, model_parameter = prm)
+            else:
+                if isinstance(self.model_parameter, str):
+                    for val, sec in zip(value, self.model_section):
+                        update_model_with_value(val, model, sec, self.model_parameter)
+
+    
+    def update_model(self, model: ModelType) -> None:
+        if not self.is_model_type(model):
+            return
+        self._update_model(model, self.deterministic_value)
+
+    def update_model_dsa(self, model: ModelType, bound: DSA_BOUND) -> None:
+        if not self.is_model_type(model):
+            return
+        val = self.get_dsa_value(bound)
+        self._update_model(model, val)
+
+    def update_model_psa(self, model: ModelType) -> None:
+        if not self.is_model_type(model):
+            return
+        val = self.get_psa_value()
+        self._update_model(model, val)
 
     @abstractmethod
     def synchronise_from_model(self, model: ModelType) -> None:
@@ -2411,24 +2536,6 @@ class Variable:
         exceptional circumstances - it is better to store the raw parameters
         in the metamodel and update from that direction.
         """
-
-    def update_model_dsa_low(self, model: newsegsmodel.NewsegsModel) -> None:
-        ...
-    
-    def update_finance_dsa_low(self, finance: newsegsfinance.NewsegsFinance) -> None:
-        ...
-
-    def update_model_dsa_high(self, model: newsegsmodel.NewsegsModel) -> None:
-        ...
-    
-    def update_finance_dsa_high(self, finance: newsegsfinance.NewsegsFinance) -> None:
-        ...
-    
-    def update_model_psa(self, model: newsegsmodel.NewsegsModel) -> None:
-        ...
-    
-    def update_finance_psa(self, finance: newsegsfinance.NewsegsFinance) -> None:
-        ...
 
 class ScalarVariable(Variable):
 
@@ -2685,55 +2792,6 @@ class NumericVectorVariable(VectorVariable):
         return cast(NumericVectorParam, super().get_dsa_value(bound, force))
 
 
-def get_value_from_model(
-    model: ModelType, 
-    model_section: str | Sequence[str] | None, 
-    model_parameter: str | Sequence[str]
-):
-    if not isinstance(model_parameter, str) and isinstance(model_parameter, Sequence):
-        if not isinstance(model_section, str) and isinstance(model_section, Sequence):
-            if len(model_parameter) != len(model_section):
-                if len(model_section) == 1:
-                    return [
-                        get_value_from_model(model, model_section[0], x) for x in model_parameter
-                    ]
-                else:
-                    raise TypeError(f'model_section length does not match model_parameter: {len(model_section)} vs {len(model_parameter)}')
-            else:
-                return [
-                        get_value_from_model(model, x, y) for x, y in zip(model_section, model_parameter)
-                    ]
-        else:
-            return [
-                get_value_from_model(model, model_section, x) for x in model_parameter
-            ]
-
-    if model_section is not None and model_section != '':
-        model_sec_chain = str(model_section).split('.')
-        module = model
-        for attr in model_sec_chain:
-            try:
-                module = getattr(module, attr)
-            except AttributeError:
-                if isinstance(module, Mapping):
-                    try:
-                        module = module[attr]
-                    except AttributeError as e:
-                        raise ValueError(f'Model section cannot be accessed: section {model_section} with error {e}')
-    else:
-        module = model
-
-    model_param = str(model_parameter)
-
-    try:
-        model_val = getattr(module, model_param)
-    except AttributeError:
-        if isinstance(module, Mapping):
-            model_val = module[model_param]
-        else:
-            raise ValueError(f'Model parameter cannot be accessed: {model_param}')
-    return model_val
-
 class ConstantVariable(ScalarVariable):
     distribution = ConstantDistribution()
     _parameters : tuple[ScalarParam]
@@ -2763,6 +2821,9 @@ class ConstantVariable(ScalarVariable):
 
         if not (current_p_index == new_p_index):
             self.parameterisation_index = new_p_index
+        
+        if not isinstance(model_val, str) and isinstance(model_val, Sequence):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
         
         self.set_parameters(model_val)
 
@@ -2798,6 +2859,9 @@ class BinomialVariable(TwoParamNumericScalarVariable):
 
         n_trials = self.parameters[1]
         
+        if isinstance(model_val, str) or isinstance(model_val, Sequence):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
+        
         self.set_parameters(model_val, n_trials)
 
         if not (current_p_index == new_p_index):
@@ -2832,12 +2896,15 @@ class NormalVariable(TwoParamNumericScalarVariable):
         if not (current_p_index == new_p_index):
             self.parameterisation_index = new_p_index
 
+        if isinstance(model_val, str) or isinstance(model_val, Sequence):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
+
         if self.transform[0] == 'identity':
             sd = self.parameters[1]
         else:
             sigma_squared = self.parameters[1]**2
             sd = np.sqrt((np.exp(sigma_squared) - 1) * (model_val * model_val))
-        
+
         self.set_parameters(model_val, sd)
 
         if not (current_p_index == new_p_index):
@@ -2862,6 +2929,9 @@ class BetaVariable(TwoParamNumericScalarVariable):
         if model_val == self.deterministic_value:
             # No update
             return
+        
+        if isinstance(model_val, str) or isinstance(model_val, Sequence):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
 
         current_p_index = self.parameterisation_index
         try:
@@ -2902,6 +2972,9 @@ class GammaVariable(TwoParamNumericScalarVariable):
         if model_val == self.deterministic_value:
             # No update
             return
+        
+        if isinstance(model_val, str) or isinstance(model_val, Sequence):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
 
         current_p_index = self.parameterisation_index
         try:
@@ -2957,7 +3030,7 @@ class ConstantVectorVariable(VectorVariable):
         if not (current_p_index == new_p_index):
             self.parameterisation_index = new_p_index
         
-        self.set_parameters(model_val)
+        self.set_parameters((model_val,)) # pyright: ignore[reportArgumentType]
 
         if not (current_p_index == new_p_index):
             self.parameterisation_index = current_p_index
@@ -2988,6 +3061,9 @@ class MultivariateNormalVariable(NumericVectorVariable):
         if model_val == self.deterministic_value:
             # No update
             return
+        
+        if not isinstance(model_val, np.ndarray):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
 
         current_p_index = self.parameterisation_index
         try:
@@ -3033,6 +3109,9 @@ class DirichletVariable(NumericVectorVariable):
         if model_val == self.deterministic_value:
             # No update
             return
+        
+        if not isinstance(model_val, np.ndarray):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
 
         # NB - WE ARE NOT SETTING ON THE MEAN
         # Just going to set on the alphas and let the variance fall as it may.
