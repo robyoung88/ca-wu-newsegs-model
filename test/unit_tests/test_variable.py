@@ -19,9 +19,9 @@ import scipy.integrate as integrate
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.newsegsbrowser import variable
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import sprakefinance
+from newsegsvariable import variable
+from newsegsmodel import sprakemodel
+from newsegsfinance import sprakefinance
 
 class TestParameterisations(unittest.TestCase):
 
@@ -1631,7 +1631,7 @@ class TestVariableConstructionFromJSON(unittest.TestCase):
     """
 
     def test_sprake_json_construction(self):
-        with open('data/sprake_variable_config.json') as f:
+        with open('data/sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
         
         self.assertIsInstance(var_conf_list, list)
@@ -1645,7 +1645,7 @@ class TestVariableSynchronisation(unittest.TestCase):
     """
 
     def load_sprake_variables(self):
-        with open('data/sprake_variable_config.json') as f:
+        with open('data/sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
         return [variable.Variable(**x) for x in var_conf_list]
     
@@ -1798,6 +1798,27 @@ class TestVariableSynchronisation(unittest.TestCase):
             fnc.unit_costs['resident_var_per_unit'],
             0.33
         )
+
+class TestVariableSerialisation(unittest.TestCase):
+    """
+    Check serialisation of variables
+    """
+
+    # NB - using from_dict form here, not direct construction.
+    # This allows us to hold onto e.g. raw_parameters
+    def load_sprake_variables(self):
+        with open('data/sprake-variable-config.json') as f:
+            var_conf_list = json.load(f)
+        return [variable.variable_from_dict(x) for x in var_conf_list]
+    
+    def test_synchronisation_scalar_constant(self):
+        vars = self.load_sprake_variables()
+        
+        vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
+        self.assertEqual(vbl.distribution.distribution, 'constant')
+        self.assertEqual(vbl.name, 'Storage capacity')
+        #TODO: json isn't able to return a tuple; do we care?
+        self.assertListEqual(cast(list,vbl._raw_parameters), [4000])
     
 
 class TestVariableValidation(unittest.TestCase):

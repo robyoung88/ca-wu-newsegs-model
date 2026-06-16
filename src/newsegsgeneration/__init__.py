@@ -1,3 +1,3 @@
-#from src.newsegsgeneration.newsegsgeneration import NewsegsGeneration
-#from src.newsegsgeneration.sprakegeneration import SprakeGeneration
-#from src.newsegsgeneration.testnewsegsgeneration import TestNewsegsGeneration
+from newsegsgeneration.newsegsgeneration import NewsegsGeneration
+from newsegsgeneration.sprakegeneration import SprakeGeneration
+__all__ = ['NewsegsGeneration', 'SprakeGeneration']

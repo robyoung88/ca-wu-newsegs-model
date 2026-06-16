@@ -1,3 +1,4 @@
-from src.newsegsfinance.common import *
-from src.newsegsfinance.newsegsfinance import NewsegsFinance
-from src.newsegsfinance.sprakefinance import SprakeFinance
+from newsegsfinance.common import *
+from newsegsfinance.newsegsfinance import NewsegsFinance
+from newsegsfinance.sprakefinance import SprakeFinance
+__all__ = ['NewsegsFinance', 'SprakeFinance']

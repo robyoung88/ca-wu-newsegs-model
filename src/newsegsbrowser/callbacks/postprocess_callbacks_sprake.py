@@ -1,11 +1,11 @@
 from dash import Dash
 
-from src.newsegsbrowser.postprocess import postprocess_utils as pp_utils
-from src.newsegsbrowser.postprocess import post_sprake_gen_results
-from src.newsegsbrowser.postprocess import post_sprake_consumption_results
-from src.newsegsbrowser.postprocess import post_sprake_finance_benefits_results
-from src.newsegsbrowser.postprocess import post_sprake_finance_costs_results
-from src.newsegsbrowser.postprocess import post_sprake_finance_value_results
+from newsegsbrowser.postprocess import postprocess_utils as pp_utils
+from newsegsbrowser.postprocess import post_sprake_gen_results
+from newsegsbrowser.postprocess import post_sprake_consumption_results
+from newsegsbrowser.postprocess import post_sprake_finance_benefits_results
+from newsegsbrowser.postprocess import post_sprake_finance_costs_results
+from newsegsbrowser.postprocess import post_sprake_finance_value_results
 
 def postproc_model_gen(
     model_run_json: list | str,

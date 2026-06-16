@@ -3,7 +3,7 @@ import json
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
-from src.newsegsbrowser import icons
+from newsegsbrowser import icons
 
 def create_config_selector_headerbutton(
     config_index,

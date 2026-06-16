@@ -4,7 +4,7 @@ Categorise energy timeseries by fractions of nominal capacity
 import numpy as np
 import pandas as pd
 
-from src.core import SECONDS_TO_HOURS
+from core import SECONDS_TO_HOURS
 
 # Categorisation of wind production
 WIND_PRODUCTION_CATEGORIES = pd.DataFrame(

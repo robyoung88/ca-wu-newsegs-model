@@ -2,7 +2,7 @@ import json
 
 from dash import ALL, Dash, Input, Output, State, no_update
 
-from src.newsegsbrowser.callbacks import callbacks_map
+from newsegsbrowser.callbacks import callbacks_map
 
 def add_result_header_callbacks(app: Dash):
 

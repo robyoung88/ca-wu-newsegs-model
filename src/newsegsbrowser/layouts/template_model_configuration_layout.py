@@ -7,30 +7,30 @@ the bespoke layout creation.
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
-from src.newsegsbrowser.layouts import navigation
-from src.newsegsbrowser.layouts.inputs import maps
-from src.newsegsbrowser.layouts.feedback import indicative_net_energy
-from src.newsegsbrowser.layouts.common import NULL_LAYOUT
+from newsegsbrowser.layouts import navigation
+from newsegsbrowser.layouts.inputs import maps
+from newsegsbrowser.layouts.feedback import indicative_net_energy
+from newsegsbrowser.layouts.common import NULL_LAYOUT
 
-from src.newsegsbrowser.layouts.inputs import generation_input_sprake
-from src.newsegsbrowser.layouts.inputs import storage_input_sprake
-from src.newsegsbrowser.layouts.inputs import building_consumption_input_sprake
-from src.newsegsbrowser.layouts.inputs import direct_consumption_input_sprake
-from src.newsegsbrowser.layouts.inputs import model_settings_input_sprake
-from src.newsegsbrowser.layouts.inputs import gen_cost_input_sprake
-from src.newsegsbrowser.layouts.inputs import storage_cost_input_sprake
-from src.newsegsbrowser.layouts.inputs import sales_input_sprake
-from src.newsegsbrowser.layouts.inputs import import_cost_input_sprake
-from src.newsegsbrowser.layouts.inputs import finance_settings_input_sprake
+from newsegsbrowser.layouts.inputs import generation_input_sprake
+from newsegsbrowser.layouts.inputs import storage_input_sprake
+from newsegsbrowser.layouts.inputs import building_consumption_input_sprake
+from newsegsbrowser.layouts.inputs import direct_consumption_input_sprake
+from newsegsbrowser.layouts.inputs import model_settings_input_sprake
+from newsegsbrowser.layouts.inputs import gen_cost_input_sprake
+from newsegsbrowser.layouts.inputs import storage_cost_input_sprake
+from newsegsbrowser.layouts.inputs import sales_input_sprake
+from newsegsbrowser.layouts.inputs import import_cost_input_sprake
+from newsegsbrowser.layouts.inputs import finance_settings_input_sprake
 
-from src.newsegsbrowser.layouts.results import results_header
-from src.newsegsbrowser.layouts.results import configuration_selector
-from src.newsegsbrowser.postprocess.tables import results_tables_map
-from src.newsegsbrowser.layouts.results import generation_results_sprake
-from src.newsegsbrowser.layouts.results import storage_results_sprake
-from src.newsegsbrowser.layouts.results import consumption_results_sprake
-from src.newsegsbrowser.layouts.results import net_energy_results_sprake
-from src.newsegsbrowser.layouts.results import economic_results_so_sprake
+from newsegsbrowser.layouts.results import results_header
+from newsegsbrowser.layouts.results import configuration_selector
+from newsegsbrowser.postprocess.tables import results_tables_map
+from newsegsbrowser.layouts.results import generation_results_sprake
+from newsegsbrowser.layouts.results import storage_results_sprake
+from newsegsbrowser.layouts.results import consumption_results_sprake
+from newsegsbrowser.layouts.results import net_energy_results_sprake
+from newsegsbrowser.layouts.results import economic_results_so_sprake
 
 DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_navigation': navigation.create_navigator_buttons_default,

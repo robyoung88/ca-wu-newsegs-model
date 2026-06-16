@@ -14,8 +14,8 @@ import logging
 from dash import ALL, ctx, Dash, Input, Output, Patch, State, no_update
 from dash import clientside_callback, ClientsideFunction
 
-from src.newsegsbrowser import common as browser
-from src.newsegsbrowser.callbacks import callbacks_map
+from newsegsbrowser import common as browser
+from newsegsbrowser.callbacks import callbacks_map
 
 logger = logging.getLogger(__name__)
 

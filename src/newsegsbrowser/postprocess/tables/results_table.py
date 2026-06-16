@@ -1,6 +1,6 @@
 from dash import html
 
-from src.newsegsbrowser import icons
+from newsegsbrowser import icons
 
 def create_tbl_head(n_configs):
     """

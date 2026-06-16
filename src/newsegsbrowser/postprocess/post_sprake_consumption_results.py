@@ -1,21 +1,21 @@
 import numpy as np
 import pandas as pd
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegscs import newsegscs
-from src.core.timespan import SEASON_NAMES
-from src.stats.core import assign_year_index, assign_season_index, assign_day_index
-from src.stats.core import assign_delta_hours
-from src.stats import basic_summary_stats
-from src.stats import self_consumption
-from src.stats import locate_timeseries_extrema
-from src.stats import agg_meters_daily
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegscs import newsegscs
+from core.timespan import SEASON_NAMES
+from newsegsstats.core import assign_year_index, assign_season_index, assign_day_index
+from newsegsstats.core import assign_delta_hours
+from newsegsstats import basic_summary_stats
+from newsegsstats import self_consumption
+from newsegsstats import locate_timeseries_extrema
+from newsegsstats import agg_meters_daily
 
-from src.util.admd_helpers import get_admd_model_driver
-from src.admdspenmw import ASHP_count
-from src.admdspenmw.model_config import default_model_config, default_model_inputs, default_model_outputs
-from src.stats import locate_timeseries_extrema
-from src.newsegscs import elexon_profiles
+from util.admd_helpers import get_admd_model_driver
+from admdspenmw import ASHP_count
+from admdspenmw.model_config import default_model_config, default_model_inputs, default_model_outputs
+from newsegsstats import locate_timeseries_extrema
+from newsegscs import elexon_profiles
 
 SEASON_NAMES_MAP = (
     pd.DataFrame(

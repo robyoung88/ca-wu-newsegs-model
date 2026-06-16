@@ -22,10 +22,10 @@ import dash_bootstrap_components as dbc
 from dash_extensions import Purify
 import pandas as pd
 
-from src.newsegsbrowser import icons
-from src.newsegsbrowser import common as browser
-from src.newsegsbrowser.postprocess.tables import results_table
-from src.newsegsbrowser import stats as newsegsbrowser_stats
+from newsegsbrowser import icons
+from newsegsbrowser import common as browser
+from newsegsbrowser.postprocess.tables import results_table
+from newsegsbrowser import stats as newsegsbrowser_stats
 
 def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
     """

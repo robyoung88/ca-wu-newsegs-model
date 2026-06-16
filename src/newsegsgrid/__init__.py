@@ -1,3 +1,3 @@
-from src.newsegsgrid.newsegsgrid import NewsegsGrid
-from src.newsegsgrid.sprakegrid import SprakeGrid
-from src.newsegsgrid.testnewsegsgrid import TestNewsegsGrid
+from newsegsgrid.newsegsgrid import NewsegsGrid
+from newsegsgrid.sprakegrid import SprakeGrid
+__all__ = ['NewsegsGrid', 'SprakeGrid']

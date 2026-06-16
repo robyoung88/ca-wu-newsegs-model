@@ -2,6 +2,8 @@ import json
 
 from dash import Dash, Input, Output, ALL, ctx, no_update
 
+from newsegsbrowser import variable_dash_component as var_dc
+
 def assign_callbacks(app: Dash):
 
     @app.callback(
@@ -32,5 +34,16 @@ def assign_callbacks(app: Dash):
                 raise ValueError(f'Unknown prop has called update_model_type: {pid}')
         
         return '/landing', selected_model
+    
+    @app.callback(
+        Output('dsa_config_element_container', 'children'),
+        Input('selected-model', 'data'),
+        prevent_initial_call = True,
+    )
+    def update_dsa_configuration_options(selected_model):
+        print ('ping')
+        return [var_dc.create_dsa_input_scalar_constant('Wind Capacity (kW rated)', 'input-model-config', 'wind_capacity', section = 'gen_input')]
+    
+
     
     return app

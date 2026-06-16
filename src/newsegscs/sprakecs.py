@@ -10,14 +10,14 @@ import numpy as np
 import pandas as pd
 import numpy.typing as npt
 
-from src.newsegscs.newsegscs import NewsegsCS
-from src.util import classfuncs
-from src.core import newsegsmodule
-from src.core import timespan as modtimespan
-from src.core import location as modlocation
-from src.newsegsmodel import newsegsmodel
+from newsegscs.newsegscs import NewsegsCS
+from util import classfuncs
+from core import newsegsmodule
+from core import timespan as modtimespan
+from core import location as modlocation
+from newsegsmodel import newsegsmodel
 
-from src.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
+from newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 
 class SprakeCSResult(newsegsmodule.ABCNewsegsModuleResult):
     def __init__(
@@ -156,25 +156,25 @@ class SprakeCSResult(newsegsmodule.ABCNewsegsModuleResult):
 # so we can't get a cache working.
 
 def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
-    from src.newsegscs.elexon_profiles import get_elexon_consumption
+    from newsegscs.elexon_profiles import get_elexon_consumption
     cons = get_elexon_consumption(datetimes)
     return cons['consumption'].values * (1.0 - efficiency_reduction) * n_households
 
 def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
-    from src.newsegscs.ev_profiles import get_ev_consumption
+    from newsegscs.ev_profiles import get_ev_consumption
     cons = get_ev_consumption(datetimes,
                               annual_consumption=annual_residential_consumption_per_ev)
     return cons['consumption'] * n_evs
 
 def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
-    from src.newsegscs.dhw_profiles import get_dhw_energy_consumption
+    from newsegscs.dhw_profiles import get_dhw_energy_consumption
     cons = get_dhw_energy_consumption(datetimes,
                                       ref_daily_consumption,
                                       seasonal_variance)
     return cons['consumption'] * n_households
 
 def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_households=1000):
-    from src.newsegscs.sprake_thermal_model import get_spaceheat_energy_consumption
+    from newsegscs.sprake_thermal_model import get_spaceheat_energy_consumption
     cons = get_spaceheat_energy_consumption(datetimes,
                                             hlp,gfa)
     return cons['consumption'] * n_households                        

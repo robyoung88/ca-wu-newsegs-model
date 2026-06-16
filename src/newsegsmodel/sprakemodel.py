@@ -9,20 +9,20 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from src.util import classfuncs
-from src.core import timespan as modtimespan
-from src.core import location as modlocation
-from src.core.generation import generators
-from src.core.environment import environment_servers
-from src.core.environment import inmem_env_servers
-from src.core import newsegsmodule
-from src.newsegsmodel import newsegsmodel
-from src.newsegsgeneration import newsegsgeneration
-from src.newsegsgrid import newsegsgrid
-from src.newsegscs import newsegscs
-from src.newsegsgeneration import sprakegeneration
-from src.newsegsgrid import sprakegrid
-from src.newsegscs import sprakecs
+from util import classfuncs
+from core import timespan as modtimespan
+from core import location as modlocation
+from core.generation import generators
+from core.environment import environment_servers
+from core.environment import inmem_env_servers
+from core import newsegsmodule
+from newsegsmodel import newsegsmodel
+from newsegsgeneration import newsegsgeneration
+from newsegsgrid import newsegsgrid
+from newsegscs import newsegscs
+from newsegsgeneration import sprakegeneration
+from newsegsgrid import sprakegrid
+from newsegscs import sprakecs
 
 from config import settings
 lookup_dir = settings.get('SprakeDataLoc')
@@ -176,13 +176,9 @@ def get_sprake_ned100():
 
     return turbine
 
-# Deferred results 
-#@lru_cache
-#def d
-
 class SprakeModel(newsegsmodel.NewsegsModel):
     _name = 'Sprake Model'
-    _model_version = '0.0.1'
+    _version = '0.0.1'
 
     _generation_result = None
     _grid_result = None
@@ -240,14 +236,20 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         else:
             self._wider_environment_server = None
 
+        if not isinstance(mod_gen, sprakegeneration.SprakeGeneration):
+            raise TypeError(f'mod_gen must be of type SprakeGeneration, is {type(mod_gen)}')
         self.generation = mod_gen
 
         if mod_grid:
-            self.grid= mod_grid
+            if not isinstance(mod_grid, sprakegrid.SprakeGrid):
+                raise TypeError(f'mod_grid must be of type SprakeGrid, is {type(mod_grid)}')
+            self.grid = mod_grid
         else:
             self.grid = sprakegrid.SprakeGrid.from_none()
         
         if mod_cs:
+            if not isinstance(mod_cs, sprakecs.SprakeCS):
+                raise TypeError(f'mod_cs must be of type SprakeCS, is {type(mod_cs)}')
             self.consumption_storage = mod_cs
         else:
             self.consumption_storage = sprakecs.SprakeCS.from_none()
@@ -395,10 +397,9 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         return self._last_hash
 
     @override
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
-        odict['model_version'] = self._model_version
-
+        
         odict['local_environment_server'] = str(self._local_environment_server)
         odict['wider_environment_server'] = str(self._wider_environment_server)
 
@@ -408,26 +409,26 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
         return odict
     
-    @classmethod
-    def from_dict(cls, config: dict) -> SprakeModel:
-        from src.newsegsgeneration import constructors as genmodconstructors
-        from src.newsegsgrid import constructors as gridmodconstructors
-        from src.newsegscs import constructors as csmodconstructors
+    # @classmethod
+    # def from_dict(cls, config: dict) -> SprakeModel:
+    #     from newsegsgeneration import constructors as genmodconstructors
+    #     from newsegsgrid import constructors as gridmodconstructors
+    #     from newsegscs import constructors as csmodconstructors
 
-        config = copy.copy(config)
-        config.pop('class', None)
+    #     config = copy.copy(config)
+    #     config.pop('class', None)
 
-        model_version = config.pop('model_version', None)
-        if model_version != cls._model_version:
-            raise ValueError('Config has inconsistent model version: %s vs %s', model_version, cls._model_version)
+    #     model_version = config.pop('model_version', None)
+    #     if model_version != cls._model_version:
+    #         raise ValueError('Config has inconsistent model version: %s vs %s', model_version, cls._model_version)
         
-        config['mod_gen'] = genmodconstructors.generation_module_from_dict(config['mod_gen'])
-        config['mod_grid'] = gridmodconstructors.grid_module_from_dict(config['mod_grid'])
-        config['mod_cs'] = csmodconstructors.cs_module_from_dict(config['mod_cs'])
+    #     config['mod_gen'] = genmodconstructors.generation_module_from_dict(config['mod_gen'])
+    #     config['mod_grid'] = gridmodconstructors.grid_module_from_dict(config['mod_grid'])
+    #     config['mod_cs'] = csmodconstructors.cs_module_from_dict(config['mod_cs'])
 
-        mod_gen = config.pop('mod_gen')
+    #     mod_gen = config.pop('mod_gen')
 
-        return cls(mod_gen, **config)
+    #     return cls(mod_gen, **config)
 
 # SprakeModel copy constructor
 @SprakeModel.__init__.register(SprakeModel)

@@ -1,20 +1,37 @@
 from abc import ABCMeta, abstractmethod
-from typing import Literal
+from typing import Any, Literal, Union, SupportsFloat
 import re
 
+import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from src.core import Location,RaisedLocation,AspectLocation
-from src.core import TimeSpan
-from src.util import classfuncs
+from core import serialisation
+from core import Location,RaisedLocation,AspectLocation
+from core import TimeSpan
+from util import classfuncs
 
-class NewsegsLocalEnvironment(metaclass=ABCMeta):
+RealArrayLike = Union[
+    int, 
+    float, 
+    np.integer[Any], 
+    np.floating[Any], 
+    np.ndarray[tuple[Any, ...], np.dtype[np.integer[Any]]],
+    np.ndarray[tuple[Any, ...], np.dtype[np.floating[Any]]]
+]
+
+class NewsegsLocalEnvironment(
+    serialisation.SerialiseToDictMixin,
+    metaclass = ABCMeta
+):
     """
     Serves site-specific environmental data to a NewSEGS model.
     """
     _version = '0.0.1'
     _name = 'Local environment'
+
+    # Override of SerialiseToDictMixin _constructor_class
+    _constructor_class = 'Environment'
 
     @property
     def name(self) -> str:
@@ -28,52 +45,52 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
     def get_wind_speeds(self, 
                         location:RaisedLocation|tuple[RaisedLocation, ...]|list[RaisedLocation], 
                         timespan:TimeSpan
-                        ) -> npt.ArrayLike:
+                        ) -> RealArrayLike:
         ...
 
     @abstractmethod
 
-    def get_wind_timestep(self) -> pd.Timedelta|None:
+    def get_wind_timestep(self) -> pd.Timedelta:
         ...
 
     @abstractmethod
     def get_air_density(self,
                         location:RaisedLocation|tuple[RaisedLocation, ...]|list[RaisedLocation], 
                         timespan:TimeSpan
-                        ) -> npt.ArrayLike:
+                        ) -> RealArrayLike:
         ...
 
     @abstractmethod
-    def get_air_density_timestep(self) -> pd.Timedelta|None:
+    def get_air_density_timestep(self) -> pd.Timedelta:
         ...
 
     @abstractmethod
     def get_horizontal_solar_flux(self,
                                   location:Location|tuple[Location, ...]|list[Location],
                                   timespan:TimeSpan
-                                  ) -> npt.ArrayLike:
+                                  ) -> RealArrayLike:
         ...
 
     @abstractmethod
-    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta|None:
+    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta:
         ...
 
     @abstractmethod
     def get_external_temperature(self,
                                  location:Location|tuple[Location, ...]|list[Location],
                                  timespan:TimeSpan
-                                 ) -> npt.ArrayLike:
+                                 ) -> RealArrayLike:
         ...
 
     @abstractmethod
-    def get_external_temperature_timestep(self) -> pd.Timedelta|None:
+    def get_external_temperature_timestep(self) -> pd.Timedelta:
         ...
 
     @abstractmethod
     def get_solar_flux_on_plane(self,
                                 location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
                                 timespan:TimeSpan
-                                ) -> npt.ArrayLike:
+                                ) -> RealArrayLike:
         ...
 
     @abstractmethod
@@ -110,13 +127,19 @@ class NewsegsLocalEnvironment(metaclass=ABCMeta):
     def __str__(self) -> str:
         return classfuncs.get_class(self) + ' v' + str(self._version)
 
-class NewsegsWiderEnvironment(metaclass=ABCMeta):
+class NewsegsWiderEnvironment(
+    serialisation.SerialiseToDictMixin,
+    metaclass = ABCMeta
+):
     """
     Serves grid-wide environmental data to a NewSEGS model.
     """
     
     _version = '0.0.1'
     _name = 'Wider environment'
+
+    # Override of SerialiseToDictMixin _constructor_class
+    _constructor_class = 'Environment'
 
     @property
     def name(self) -> str:
@@ -152,4 +175,7 @@ class NewsegsWiderEnvironment(metaclass=ABCMeta):
         ...
 
     def __str__(self) -> str:
-        return re.search(r"\.(\w+)\'>$", str(type(self))).group(1) + ' v' + str(self._version)
+        srch = re.search(r"\.(\w+)\'>$", str(type(self)))
+        if srch is None:
+            raise ValueError(f'Class cannot be extracted from type {type(self)}')
+        return srch.group(1) + ' v' + str(self._version)

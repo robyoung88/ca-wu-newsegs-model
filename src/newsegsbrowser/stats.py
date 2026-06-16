@@ -7,7 +7,7 @@ from functools import reduce, partial
 
 import pandas as pd
 
-from src.core.timespan import SEASON_NAMES
+from core.timespan import SEASON_NAMES
 
 DEFAULT_SEASON_MAPPER = {k: v for k,v in enumerate(SEASON_NAMES)}
 

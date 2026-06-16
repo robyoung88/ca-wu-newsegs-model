@@ -1,9 +1,9 @@
 from __future__ import annotations
 # Very simple environment servers that provide in-memory stores for timeseries data which are returned on request
 
-from src.core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
-from src.core.location import Location,RaisedLocation,AspectLocation
-from src.core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
+from core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
+from core.location import Location,RaisedLocation,AspectLocation
+from core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -75,7 +75,7 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_wind_timestep(self) -> pd.TimeDelta|None:
+    def get_wind_timestep(self) -> pd.Timedelta | None:
         return next(iter(self._wind_series.values())).get('timespan').timestep
 
     def set_horizontal_solar_flux(self,
@@ -254,6 +254,12 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
+    def get_temperature_timestep(self) -> pd.Timedelta | None:
+        srs = self._temperature_series
+        if srs is None:
+            return None
+        return srs['timespan'].timestep
+
     def set_horizontal_solar_flux_series(self,
                                          horizontal_solar_flux:npt.ArrayLike,
                                          timespan=OffsetRegTimeSpan):
@@ -268,6 +274,12 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
             return srs
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
+
+    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta | None:
+        srs = self._horizontal_solar_flux_series
+        if srs is None:
+            return None
+        return srs['timespan'].timestep
 
     def get_true_datetimes(
         self,

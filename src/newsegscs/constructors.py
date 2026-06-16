@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 
-from src.newsegscs import newsegscs
-from src.newsegscs import sprakecs
+from newsegscs import newsegscs
+from newsegscs import sprakecs
 
 _CS_MODULE_CONSTRUCTORS = {
     'SprakeCS': sprakecs.SprakeCS,

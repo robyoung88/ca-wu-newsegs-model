@@ -3,8 +3,8 @@ import logging
 
 from dash import Dash, Input, no_update, Output, State
 
-from src.newsegsbrowser import common as browser
-from src.newsegsbrowser.callbacks import callbacks_map
+from newsegsbrowser import common as browser
+from newsegsbrowser.callbacks import callbacks_map
 
 logger = logging.getLogger(__name__)
 

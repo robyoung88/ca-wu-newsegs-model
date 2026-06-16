@@ -11,7 +11,7 @@ import numpy.testing
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan, timespan_from_dict
+from core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan, timespan_from_dict
 
 class TestBasicTimespan(unittest.TestCase):
     def test_null_construction(self):

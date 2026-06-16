@@ -10,9 +10,9 @@ import numpy.testing
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.core import location
-from src.core.generation import generators
-from src.util import jsonfuncs
+from core import location
+from core.generation import generators
+from util import jsonfuncs
 
 class TestWindTurbineElecGenerator(unittest.TestCase):
 
@@ -221,7 +221,8 @@ class TestPowerPlantHeterogeneousGenerators(unittest.TestCase):
         loc.azimuth = 270.        
         g2.location = loc
         g2.peak_power = 20.
-        pp.append(g2)
+        g4 = generators.PowerPlantHomogeneousPV(g2)
+        pp.append(g4)
 
         pp.location = location.Location(60,-5)
 
@@ -234,7 +235,9 @@ class TestPowerPlantHeterogeneousGenerators(unittest.TestCase):
         g3 = generators.WindTurbineElecGenerator.from_none()
         g3.rated_power = 20.
         g3.location = pp2.location
-        pp2.append(g2)
+        
+        g5 = generators.PowerPlantHomogeneousWind(g3)
+        pp2.append(g5)
         self.assertNotEqual(pp.nameplate_capacity, pp2.nameplate_capacity)
         self.assertNotEqual(pp.location, pp2.location)
 

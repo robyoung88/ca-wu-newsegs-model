@@ -2,9 +2,9 @@
 Generates and derives constants to be re-used in rapid calculations.
 """
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegscs.newsegscs import get_consumption_meters
-from src.stats.core import assign_year_index
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegscs.newsegscs import get_consumption_meters
+from newsegsstats.core import assign_year_index
 
 def get_sprakemodel_appliance_consumption(mdl: SprakeModel):
     if mdl.consumption_storage.appliance_params.get('efficiency_reduction') != 0.0:

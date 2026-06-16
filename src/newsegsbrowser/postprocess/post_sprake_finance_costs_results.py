@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegsfinance.sprakefinance import SprakeFinance
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegsfinance.sprakefinance import SprakeFinance
 
-from src.stats.core import assign_year_index
-from src.stats import basic_summary_stats
+from newsegsstats.core import assign_year_index
+from newsegsstats import basic_summary_stats
 
 def finance_costs_results_to_interface_sprake(
     mdl: SprakeModel, # Unused

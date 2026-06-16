@@ -1,8 +1,8 @@
 from dash import Dash
 
-from src.newsegsbrowser.postprocess import postprocess_utils as pp_utils
-from src.newsegsbrowser.postprocess import post_sprake_storage_results
-from src.newsegsbrowser.postprocess import post_sprake_net_results
+from newsegsbrowser.postprocess import postprocess_utils as pp_utils
+from newsegsbrowser.postprocess import post_sprake_storage_results
+from newsegsbrowser.postprocess import post_sprake_net_results
 
 def postproc_model_stor(
     model_run_json: list | str,

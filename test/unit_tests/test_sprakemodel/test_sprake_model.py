@@ -14,15 +14,15 @@ setup_test_env()
 
 from config import settings
 
-from src.util import jsonfuncs
-from src.core import location
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import sprakefinance
-from src.newsegsgeneration import sprakegeneration
-from src.newsegsgrid import sprakegrid
-from src.newsegscs import sprakecs
-from src.newsegsgeneration import newsegsgeneration
-from src.newsegscs import newsegscs
+from util import jsonfuncs
+from core import location
+from newsegsmodel import sprakemodel
+from newsegsfinance import sprakefinance
+from newsegsgeneration import sprakegeneration
+from newsegsgrid import sprakegrid
+from newsegscs import sprakecs
+from newsegsgeneration import newsegsgeneration
+from newsegscs import newsegscs
 
 class TestSprakeModelConfigEqualities(unittest.TestCase):
     """

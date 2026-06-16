@@ -7,9 +7,9 @@ import json
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.util import jsonfuncs
-from src.newsegscs import sprakecs
-from src.newsegscs import constructors as csconstructors
+from util import jsonfuncs
+from newsegscs import sprakecs
+from newsegscs import constructors as csconstructors
 
 class TestSprakeCSConfigEqualities(unittest.TestCase):
 

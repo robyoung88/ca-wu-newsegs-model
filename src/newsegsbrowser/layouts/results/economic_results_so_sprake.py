@@ -3,8 +3,8 @@ from collections.abc import Mapping, Callable
 from dash import html
 import dash_bootstrap_components as dbc
 
-from src.newsegsbrowser import icons
-from src.newsegsbrowser.layouts.results import results_details
+from newsegsbrowser import icons
+from newsegsbrowser.layouts.results import results_details
 
 def create_economic_results_so_card(results_table_functions: Mapping[str, Callable]):
     """

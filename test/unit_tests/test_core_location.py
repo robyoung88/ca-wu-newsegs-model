@@ -9,7 +9,7 @@ import json
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.core import location
+from core import location
 
 class TestLocationEqualities(unittest.TestCase):
 

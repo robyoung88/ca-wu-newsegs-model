@@ -11,10 +11,10 @@ from dash import html
 import dash_bootstrap_components as dbc
 from useful_types import SequenceNotStr
 
-from src.newsegsmodel import newsegsmodel
-from src.newsegsfinance import newsegsfinance
+from newsegsmodel import newsegsmodel
+from newsegsfinance import newsegsfinance
 
-from src.newsegsbrowser.icons import get_icon
+from newsegsbrowser.icons import get_icon
 
 def create_numeric_card_input(
     icon_name: str | SequenceNotStr[str],

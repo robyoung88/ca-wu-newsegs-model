@@ -1,13 +1,16 @@
 import json
 import os
+from typing import MutableSequence
 
-from src.newsegsbrowser import STATICDATA
-from src.newsegsmodel import newsegsmodel
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import newsegsfinance
-from src.newsegsfinance import sprakefinance
+from newsegsbrowser import STATICDATA
+from newsegsmodel import newsegsmodel
+from newsegsmodel import sprakemodel
+from newsegsfinance import newsegsfinance
+from newsegsfinance import sprakefinance
+from newsegsmetamodel import newsegsmetamodel
+from newsegsvariable import variable
 
-from src.newsegsbrowser import ROOTDIR
+from newsegsbrowser import ROOTDIR
 _CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
 with open(_CONST_FILE, 'r') as f:
     MODEL_CONSTANTS = json.load(f)
@@ -34,3 +37,19 @@ def create_default_finance() -> newsegsfinance.NewsegsFinance:
         fnc_conf = json.load(f)
     
     return sprakefinance.SprakeFinance.from_dict(fnc_conf)
+
+def create_default_variables() -> list[variable.Variable]:
+    with open(os.path.join(STATICDATA, 'sprake-variable-config.json')) as f:
+        var_conf_list = json.load(f)
+    return [variable.variable_from_dict(x) for x in var_conf_list]
+
+def create_default_metamodel(
+    mdl: newsegsmodel.NewsegsModel,
+    fnc: newsegsfinance.NewsegsFinance,
+    vars: MutableSequence[variable.Variable]
+) -> newsegsmetamodel.NewsegsMetaModel:
+    return newsegsmetamodel.NewsegsMetaModel(
+        mdl,
+        fnc,
+        vars
+    )

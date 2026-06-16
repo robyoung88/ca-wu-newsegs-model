@@ -6,11 +6,11 @@ from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
 from dash.exceptions import PreventUpdate
 import pathvalidate
 
-from src.util import jsonfuncs
-from src.newsegsbrowser import common as browser
-from src.newsegsbrowser.layouts.results import configuration_selector
-from src.newsegsmodel import newsegsmodel
-from src.newsegsfinance import newsegsfinance
+from util import jsonfuncs
+from newsegsbrowser import common as browser
+from newsegsbrowser.layouts.results import configuration_selector
+from newsegsmodel import newsegsmodel
+from newsegsfinance import newsegsfinance
 
 def config_to_dict(name, mdl: newsegsmodel.NewsegsModel, fnc: newsegsfinance.NewsegsFinance):
     """

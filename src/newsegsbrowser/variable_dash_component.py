@@ -8,7 +8,7 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 
-from src.newsegsbrowser import variable
+from newsegsvariable import variable
 
 def create_dsa_input_scalar_numeric_header(
     label: str,
@@ -324,6 +324,35 @@ def create_dsa_input_scalar_constant(
 # A form element for a normally distributed variable
 # e.g. a scaling factor for expected annual insolation
 def create_dsa_input_scalar_normal(
+    label: str,
+    type_id: str,
+    key: str,
+    section: str | None = None,
+):
+    return compose_dsa_input(
+        create_dsa_input_scalar_numeric_header(label, type_id, key, section),
+        [
+            dbc.InputGroup([
+                        dbc.InputGroupText('Mean:'),
+                        dbc.Input(type = 'number', debounce = True, placeholder = 'Value')
+                    ]
+                    ),
+                    dbc.InputGroup([
+                        dbc.InputGroupText('SD:'),
+                        dbc.Input(type = 'number', debounce = True, placeholder = 'SD')
+                    ]
+                    ),
+        ],
+        create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
+        create_dsa_bounds_inputs_scalar(
+            'interval',
+            type_id,
+            key,
+            section
+        )
+    )
+
+def create_dsa_input_scalar_beta(
     label: str,
     type_id: str,
     key: str,

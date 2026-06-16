@@ -1,17 +1,18 @@
 from __future__ import annotations
 import copy
-from typing import override, Mapping
+import datetime
+from typing import Any, override, Mapping, Sequence
 from functools import singledispatchmethod
 
 import numpy as np
 import numpy.typing as npt
 
-from src.newsegsgeneration.newsegsgeneration import NewsegsGeneration
-from src.util import classfuncs
-from src.core import newsegsmodule
-from src.core import location
-from src.core import generation
-from src.core import timespan as modtimespan
+from newsegsgeneration.newsegsgeneration import NewsegsGeneration
+from util import classfuncs
+from core import newsegsmodule
+from core import location
+from core import generation
+from core import timespan as modtimespan
 
 class SprakeGenerationResult(newsegsmodule.ABCNewsegsModuleResult):
     def __init__(
@@ -123,15 +124,6 @@ class SprakeGeneration(NewsegsGeneration):
         
         if model is not None:
             self.model = model
-
-    @property
-    def model(self) -> newsegsmodel.NewsegsModel | None: # pyright: ignore[reportUndefinedVariable]
-        return self._generator.model
-
-    @model.setter
-    def model(self, model: newsegsmodel.NewsegsModel) -> None: # pyright: ignore[reportUndefinedVariable]
-        self._generator.model = model
-        self.dirty = True
     
     @property
     def name(self) -> str:
@@ -143,6 +135,8 @@ class SprakeGeneration(NewsegsGeneration):
 
     @property
     def generator(self) -> generation.PowerPlantHeterogeneousGenerators:
+        if self._generator is None:
+            raise AttributeError('Generator not yet assigned to module')
         return self._generator
 
     def run(
@@ -151,11 +145,14 @@ class SprakeGeneration(NewsegsGeneration):
         run_start: datetime.datetime | None = None
     ) -> SprakeGenerationResult:
         super().run(timespan, run_start)
-        energy = self._generator.run(timespan)
+        energy = self.generator.run(timespan)
+        timestep = self.model.get_default_timestep()
+        r_timespan = modtimespan.RegTimeSpan(timespan)
+        r_timespan.timestep = timestep
         self.dirty = False
         return SprakeGenerationResult(
             self,
-            timespan = timespan,
+            timespan = r_timespan,
             wind_energy = energy[0,:],
             solar_energy = energy[1,:]
         )
@@ -163,7 +160,16 @@ class SprakeGeneration(NewsegsGeneration):
     def set_location(self, loc: location.Location) -> None:
         # Ensure location is only a location, i.e. not an elevated or aspect location
         loc = location.Location(loc)
-        self._generator.location = loc
+        self.generator.location = loc
+
+    @property
+    @override
+    def location(self) -> location.Location | Sequence[location.Location]:
+        return self.generator.location
+    
+    @location.setter
+    def location(self, loc: location.Location):
+        self.generator.location = loc
 
     @classmethod
     def from_characteristics(cls,
@@ -186,36 +192,23 @@ class SprakeGeneration(NewsegsGeneration):
         odict = {
             'class': classfuncs.get_class(self),
             'name': self._name,
-            'generator': self._generator.to_dict()
+            'generator': self.generator.to_dict()
         }
         return odict
     
     @override
-    def sync_with_dict(self, config: dict) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         config = copy.copy(config)
 
         generator = config.pop('generator', None)
         if generator is not None:
-            if isinstance(generator, Mapping):
+            if isinstance(generator, dict):
                 generator = generation.generator_from_dict(generator)
+            if not isinstance(generator, generation.PowerPlantHeterogeneousGenerators):
+                raise TypeError(f'generator is of type {type(generator)}')
             self._generator = generator
         
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
-
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+        super().sync_with_dict(config)
 
     @override
     @classmethod
@@ -235,4 +228,7 @@ def _SprakeGeneration_from_other(
     super(SprakeGeneration, self).__init__()
     self._generator = copy.deepcopy(other.generator)
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass

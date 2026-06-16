@@ -4,8 +4,8 @@ from abc import abstractmethod
 
 import pandas as pd
 
-from src.core import location as modlocation
-from src.core import newsegsmodule
+from core import location as modlocation
+from core import newsegsmodule
 
 class NewsegsCS(newsegsmodule.NewsegsModule):
     @property

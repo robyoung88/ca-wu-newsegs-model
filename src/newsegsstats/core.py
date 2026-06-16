@@ -8,9 +8,9 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from src.core import SECONDS_TO_HOURS
-from src.core.timespan import year_index, season_index, day_index, peaktime_index, PEAK_PERIODS
-from src.core.timespan import month_index
+from core import SECONDS_TO_HOURS
+from core.timespan import year_index, season_index, day_index, peaktime_index, PEAK_PERIODS
+from core.timespan import month_index
 
 def assign_delta_hours(
     data: pd.DataFrame|pd.Series

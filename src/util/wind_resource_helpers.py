@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import seaborn as sns
 
-from src.newa import get_newa_micro_point, get_newa_meso_ts_point
+from newa import get_newa_micro_point, get_newa_meso_ts_point
 from scipy.stats import weibull_min
 from config import settings
 

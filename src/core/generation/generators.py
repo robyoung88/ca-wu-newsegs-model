@@ -10,16 +10,16 @@ Exports:
     WindTurbineElecGenerator: Simple WTG using a Cp curve for transformation
                               of average wind speeds (e.g. 10 min).
     PowerPlantHomogeneousWind: Scaling of WindTurbineElecGenerator to represent
-                               a number of independent homogeneous wind
+                               a Real of independent homogeneous wind
                                turbines across a homogeneous site.
     ABCPVElecGenerator: Extension of ABCElecGenerator as an abstract base class
                         for solar photovoltaic generators.
     SprakePVElecGenerator: Extension of ABCPVElecGenerator using the simple PV
                            model of Sprake dependent only upon horizontal flux.
     PowerPlantHomogeneousPV: Scaling of an ABCPVElecGenerator to represent
-                             a number of independent modules across a 
+                             a Real of independent modules across a 
                              homogeneous site.
-    PowerPlantHeterogeneousGenerators: Composition of a number of 
+    PowerPlantHeterogeneousGenerators: Composition of a Real of 
                                        ABCElecGenerators.
     
     GENERATOR_CONSTRUCTORS: A dictionary of all the implementations of
@@ -32,11 +32,11 @@ from __future__ import annotations
 
 import re
 import copy
+from typing import Any
 import warnings
 from abc import ABCMeta, abstractmethod
-from numbers import Number
-from collections.abc import Callable, Mapping, Collection
-from typing_extensions import overload, override
+from collections.abc import Callable, Mapping, Collection, Iterable
+from typing import cast, override, SupportsFloat, Type, TypeVar
 from functools import singledispatchmethod
 
 import numpy as np
@@ -44,15 +44,18 @@ import numpy.typing as npt
 import pandas as pd
 import pvlib
 
-from src.util import classfuncs
-from src.core import timespan as modtimespan
-from src.core import location
-from src.core import Location,RaisedLocation,AspectLocation,location_from_dict
-from src.newsegsmodel import newsegsmodel
+from util import classfuncs
+from core import newsegscomponent
+from core import timespan as modtimespan
+from core import location
+from core import environmentserverinterface
+
+T = TypeVar('T')
+Real = SupportsFloat
 
 def _cp_interpolant_factory(
-    cp_curve: np.ndarray[tuple[int,int], np.dtype[np.number]],
-) -> Callable[npt.ArrayLike, npt.ArrayLike]:
+    cp_curve: np.ndarray[tuple[int,int], np.dtype[np.floating[Any]]],
+) -> Callable[[npt.ArrayLike], npt.ArrayLike]:
     """
     Returns a function taking axial mean wind speeds and returning Cp.
 
@@ -61,10 +64,16 @@ def _cp_interpolant_factory(
                   and row 1 is Cp value.
     """
     def interpolant(x):
-        return np.interp(x, cp_curve[0,:], cp_curve[1,:], left=0.0, right=0.0)
+        return np.interp(
+            x, 
+            cp_curve[0,:].astype(np.float64), 
+            cp_curve[1,:].astype(np.float64), 
+            left=0.0, 
+            right=0.0
+        )
     return interpolant
 
-class ABCElecGenerator(metaclass=ABCMeta):
+class ABCElecGenerator(newsegscomponent.NewsegsComponent):
     """
     Represents a converter of environmental conditions to electrical energy.
 
@@ -84,11 +93,11 @@ class ABCElecGenerator(metaclass=ABCMeta):
     @abstractmethod
     def run(
         self, timespan: modtimespan.TimeSpan
-    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
         """
         Returns an array of generation data over the provided TimeSpan.
 
-        By default, the returned data is the number of units produced in the
+        By default, the returned data is the Real of units produced in the
         preceding time interval in kWh. Deviations from this are indicated in
         the override / extension documentation.
         """
@@ -104,14 +113,14 @@ class ABCElecGenerator(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def model(self) -> 'NewsegsModel' | None:
+    def model(self) -> environmentserverinterface.EnvironmentServerIntrface: 
         """
         The callback NewsegsModel model associated with the generator.
         """
 
     @model.setter
     @abstractmethod
-    def model(self, callback_model: 'NewsegsModel'):
+    def model(self, model: environmentserverinterface.EnvironmentServerIntrface):
         ...
 
     @abstractmethod
@@ -120,15 +129,34 @@ class ABCElecGenerator(metaclass=ABCMeta):
         Returns Generator/Powerplant configuration as a dictionary.
         """
 
-    @abstractmethod
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         """
-        Update configuration using a dictionary
+        Update configuration using a dictionary.
+
+        In the default implementation, will go through each key in the dict.
+        If there is an attribute with an fset attribute, then assume it is a
+        read-write property and update it via the fset. Otherwise, set the
+        attribute directly.
         """
+        for k in config.keys():
+            if hasattr(self, k):
+                v = config.get(k)
+
+                # If the attribute is a read-write property, its class attribute 
+                # will have an fset
+                try:
+                    prop = getattr(type(self), k)
+                    if hasattr(prop, 'fset'):
+                        getattr(prop, 'fset')(self, v)
+                    else:
+                        # Otherwise, we assume it is a simple attribute that may be overwritten
+                        setattr(self, k, v)
+                except AttributeError:
+                    setattr(self, k, v)
     
     @classmethod
     @abstractmethod
-    def from_dict(cls, config: Mapping) -> ABCElecGenerator:
+    def from_dict(cls: Type['ABCElecGenerator'], config: dict[str, Any]) -> 'ABCElecGenerator':
         """
         An instance of the generator configured per a dictionary.
         """
@@ -162,7 +190,7 @@ class ABCScalingPowerPlant(ABCElecGenerator):
     @property
     def n(self) -> float:
         """
-        The number of generating units in the power plant
+        The Real of generating units in the power plant
         """
         return self._n
     
@@ -171,9 +199,9 @@ class ABCScalingPowerPlant(ABCElecGenerator):
         self._n = n
 
     @abstractmethod
-    def set_nameplate_capacity(self, capacity: Number) -> None:
+    def set_nameplate_capacity(self, nameplate_capacity: Real) -> None:
         """
-        Alter the number of generating units to match the desired nameplate capacity
+        Alter the Real of generating units to match the desired nameplate capacity
         """
 
 class WindTurbineElecGenerator(ABCElecGenerator):
@@ -209,15 +237,15 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     @singledispatchmethod
     def __init__(
         self,
-        cp_curve: np.ndarray[tuple[int,int], np.dtype[np.number]] | WindTurbineElecGenerator,
-        swept_area: Number | None = None,
-        hub_height: Number | None = None,
-        rated_power: Number | None = None,
-        cut_in: Number | None = None,
-        cut_out: Number | None = None,
+        cp_curve: np.ndarray[tuple[int,int], np.dtype[np.floating[Any]]] | WindTurbineElecGenerator,
+        swept_area: Real | None = None,
+        hub_height: Real | None = None,
+        rated_power: Real | None = None,
+        cut_in: Real | None = None,
+        cut_out: Real | None = None,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         """
         Default assumes None
@@ -228,23 +256,23 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     @__init__.register(np.ndarray)
     def _from_cp_curve(
         self,
-        cp_curve: np.ndarray[tuple[int,int], np.dtype[np.number]],
-        swept_area: Number | None = None,
-        hub_height: Number | None = None,
-        rated_power: Number | None = None,
-        cut_in: Number | None = None,
-        cut_out: Number | None = None,
+        cp_curve: np.ndarray[tuple[int,int], np.dtype[np.floating[Any]]],
+        swept_area: Real | None = None,
+        hub_height: Real | None = None,
+        rated_power: Real | None = None,
+        cut_in: Real | None = None,
+        cut_out: Real | None = None,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         
         self.set_cp_curve(cp_curve)
-        self._swept_area = swept_area if swept_area is not None else 1.
-        self._hub_height = hub_height if hub_height is not None else 10.
-        self._rated_power = rated_power if rated_power is not None else 0.245
-        self._cut_in = cut_in if cut_in is not None else 0.
-        self._cut_out = cut_out if cut_out is not None else 25.
+        self._swept_area = float(swept_area) if swept_area is not None else 1.
+        self._hub_height = float(hub_height) if hub_height is not None else 10.
+        self._rated_power = float(rated_power) if rated_power is not None else 0.245
+        self._cut_in = float(cut_in) if cut_in is not None else 0.
+        self._cut_out = float(cut_out) if cut_out is not None else 25.
 
         if loc is None:
             loc = location.RaisedLocation.from_none()
@@ -265,14 +293,15 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     def from_none(cls) -> WindTurbineElecGenerator:
         return cls(cls._default_cp_curve)
 
-    @override
     @property
-    def model(self) -> newsegsmodel.NewsegsModel | None:
+    @override
+    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
+        if self._model is None:
+            raise AttributeError('model has not been set')
         return self._model
 
-    @override
     @model.setter
-    def model(self, model: newsegsmodel.NewsegsModel) -> None:
+    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
         self._model = model
 
     @property
@@ -283,8 +312,8 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return self._cut_in
 
     @cut_in.setter
-    def cut_in(self, cut_in:float) -> None:
-        self._cut_in = cut_in
+    def cut_in(self, cut_in: Real) -> None:
+        self._cut_in = float(cut_in)
 
     @property
     def cut_out(self) -> float:
@@ -294,8 +323,8 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return self._cut_out
 
     @cut_out.setter
-    def cut_out(self, cut_out:float) -> None:
-        self._cut_out = cut_out
+    def cut_out(self, cut_out: Real) -> None:
+        self._cut_out = float(cut_out)
 
     @property
     def rated_power(self) -> float:
@@ -305,11 +334,11 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return self._rated_power
 
     @rated_power.setter
-    def rated_power(self, rated_power:float) -> None:
-        self._rated_power = rated_power
+    def rated_power(self, rated_power: Real) -> None:
+        self._rated_power = float(rated_power)
 
-    @override
     @property
+    @override
     def nameplate_capacity(self) -> float:
         """
         Power (kW) at rated wind speed.
@@ -328,8 +357,8 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return self._swept_area
 
     @swept_area.setter
-    def swept_area(self, swept_area:float) -> None:
-        self._swept_area = swept_area
+    def swept_area(self, swept_area: Real) -> None:
+        self._swept_area = float(swept_area)
 
     @property
     def rotor_diameter(self) -> float:
@@ -343,8 +372,8 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return 2.0 * np.sqrt(self._swept_area) / np.pi
 
     @rotor_diameter.setter
-    def rotor_diameter(self, diameter:float) -> None:
-        self._swept_area = np.pi * (0.5 * diameter) ** 2
+    def rotor_diameter(self, diameter: Real) -> None:
+        self._swept_area = np.pi * (0.5 * float(diameter)) ** 2
 
     @property
     def hub_height(self) -> float:
@@ -354,13 +383,15 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return self._hub_height
 
     @hub_height.setter
-    def hub_height(self, height:float) -> None:
-        self._hub_height = height
-        if hasattr(self, '_location'):
-            self._location.height_agl = height
+    def hub_height(self, height: Real) -> None:
+        self._hub_height = float(height)
+        try:
+            self.location.height_agl = height
+        except AttributeError:
+            pass
 
-    @override
     @property
+    @override
     def name(self) -> str:
         return self._name
 
@@ -368,12 +399,13 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     def name(self, name:str) -> None:
         self._name = name
 
-    @override
     @property
+    @override
     def location(self) -> location.RaisedLocation:
+        if self._location is None:
+            raise AttributeError('location has not been set')
         return self._location
 
-    @override
     @location.setter
     def location(self, loc: location.Location) -> None:
         if (
@@ -389,7 +421,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
 
     def set_cp_curve(
         self,
-        cp_curve: np.ndarray[tuple[int,int], np.dtype[np.number]]
+        cp_curve: np.ndarray[tuple[int,int], np.dtype[np.floating[Any]]]
     ) -> None:
         """
         Set the Cp function using an array of wind speed - Cp pairs.
@@ -418,7 +450,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
 
     def set_power_curve(self,
                         power_curve:
-                            np.ndarray[tuple[int,int], np.dtype[np.number]],
+                            np.ndarray[tuple[int,int], np.dtype[np.floating[Any]]],
                         air_density: float = 1.225
                         ) -> None:
         """
@@ -459,7 +491,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     @override
     def run(
         self, timespan: modtimespan.TimeSpan
-    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
         """
         Returns an array of generation data over the provided TimeSpan.
 
@@ -511,19 +543,19 @@ class WindTurbineElecGenerator(ABCElecGenerator):
 
     @classmethod
     def from_characteristics(
-        cls,
-        cut_in: Number,
-        cut_out: Number,
-        rated_power: Number,
-        swept_area: Number,
-        hub_height: Number,
+        cls: Type['WindTurbineElecGenerator'],
+        cut_in: Real,
+        cut_out: Real,
+        rated_power: Real,
+        swept_area: Real,
+        hub_height: Real,
         name: str | None = None,
         loc: location.Location | None = None,
         cp_curve:
-            np.ndarray[tuple[int,int], np.dtype[np.number]] | None = None,
+            np.ndarray[tuple[int,int], np.dtype[np.float64]] | None = None,
         power_curve:
-            np.ndarray[tuple[int,int], np.dtype[np.number]] | None = None,
-    ) -> WindTurbineElecGenerator:
+            np.ndarray[tuple[int,int], np.dtype[np.float64]] | None = None,
+    ) -> 'WindTurbineElecGenerator':
         """
         Return a new WindTurbineElecGenerator given its key characteristics.
         """
@@ -568,7 +600,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         return odict
     
     @override
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         config = copy.copy(config)
 
         cp_curve = config.pop('cp_curve', None)
@@ -582,38 +614,24 @@ class WindTurbineElecGenerator(ABCElecGenerator):
                 warnings.simplefilter('ignore')
                 if isinstance(loc, location.Location):
                     self.location = loc
-                elif isinstance(loc, Mapping):
+                elif isinstance(loc, dict):
                     self.location = location.location_from_dict(loc)
 
-        # This looks risky, but practically may only result in
-        # some redundant attributes if the config is bad.
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
-
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+        super().sync_with_dict(config)
 
     @classmethod
-    def from_dict(cls, ip: dict) -> WindTurbineElecGenerator:
+    def from_dict(
+        cls: Type[WindTurbineElecGenerator],
+        config: dict[str, Any]
+    ) -> WindTurbineElecGenerator:
         """
         Return a WindTurbineElecGenerator from a dictionary.
         """
-        ip = copy.copy(ip)
-        ip.pop('class', None)
-        if ip.get('loc', None) is not None:
-            ip['loc'] = location.location_from_dict(ip['loc'])
-        return cls.from_characteristics(**ip)
+        config = copy.copy(config)
+        config.pop('class', None)
+        if config.get('loc', None) is not None:
+            config['loc'] = location.location_from_dict(config['loc'])
+        return cls.from_characteristics(**config)
     
     def __getstate__(self):
         """
@@ -634,11 +652,11 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         Essentially copies over the state to the __dict__ then
         forces creation of the _cp_func.
         """
-        self.__dict__.update(state)
+        vars(self).update(state)
         self.set_cp_curve(self._cp_curve)
 
 # WindTurbineElecGenerator copy constructor
-@WindTurbineElecGenerator.__init__.register(WindTurbineElecGenerator)
+@WindTurbineElecGenerator.__init__.register(WindTurbineElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
 def WindTurbineElecGenerator_from_other(
     self,
     other: WindTurbineElecGenerator
@@ -651,13 +669,16 @@ def WindTurbineElecGenerator_from_other(
     self._cut_out = other.cut_out
     self.location = copy.copy(other.location)
     self._name = other.name
-    self._model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass
 
 class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
     """
-    A power plant consisting of a number of identical wind turbines.
+    A power plant consisting of a Real of identical wind turbines.
     
-    The number of turbines may be non-integer, and all are at a single nominal
+    The Real of turbines may be non-integer, and all are at a single nominal
     location.
     """
     _name = "Wind Farm"
@@ -667,9 +688,9 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         self,
         turbine: WindTurbineElecGenerator | PowerPlantHomogeneousWind,
         loc: location.Location | None = None,
-        n: Number | None = None,
+        n: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         raise ValueError('First argument must be a WindTurbineElecGenerator or PowerPlantHomogeneousWind, is %s', type(turbine))
     
@@ -679,9 +700,9 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         self,
         turbine: WindTurbineElecGenerator,
         loc: location.Location | None = None,
-        n: Number | None = None,
+        n: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         # Take a copy of the turbine, primarily to ensure that
         # changing its location does not break its parent
@@ -689,7 +710,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         if loc is not None:
             self._turbine.location = loc
         
-        self._n = n if n is not None else 1.
+        self._n = float(n) if n is not None else 1.
         
         if name is not None:
             self._name = name
@@ -703,18 +724,18 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         return cls(WindTurbineElecGenerator.from_none())
 
     @property
-    def model(self) -> 'NewsegsModel' | None:
+    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
         """
         The NewSEGS Model for environmental data.
 
         This is stored within the turbine instance to maintain sync and so
         cannot be accessed prior to a turbine being assigned.
         """
-        return self._turbine.model
+        return self.turbine.model
     
     @model.setter
-    def model(self, model) -> None:
-        self._turbine.model = model
+    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
+        self.turbine.model = model
 
     @property
     def name(self) -> str:
@@ -732,28 +753,38 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         This is stored within the turbine instance to maintain sync and so
         cannot be accessed prior to a turbine being assigned.
         """
-        return self._turbine.location
+        return self.turbine.location
 
     @location.setter
     def location(self, loc: location.Location) -> None:
-        self._turbine.location = loc
+        self.turbine.location = loc
 
     @property
     def turbine(self) -> WindTurbineElecGenerator:
+        if self._turbine is None:
+            raise AttributeError('turbine is not set')
         return self._turbine
 
     @turbine.setter
     def turbine(self, turbine: WindTurbineElecGenerator) -> None:
-        if hasattr(self, '_turbine'):
-            loc = self._turbine.location
-            mdl = self._turbine.model
+        if hasattr(self, '_turbine') and self._turbine is not None:
+            try:
+                loc = self._turbine.location
+            except AttributeError:
+                loc = None
+            try:
+                mdl = self._turbine.model
+            except AttributeError:
+                mdl = None
         else:
             loc = None
             mdl = None
+
         self._turbine = copy.deepcopy(turbine)
 
         if loc is not None:
             self._turbine.location = loc
+        if mdl is not None:
             self._turbine.model = mdl
 
     @property
@@ -761,39 +792,43 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         return self._n
 
     @n_turbines.setter
-    def n_turbines(self, n: Number) -> None:
+    def n_turbines(self, n: Real) -> None:
+        n = float(n)
         if n < 0:
-            raise ValueError("Number of turbines must be positive, is %s", n)
-        self._n = float(n)
+            raise ValueError("Real of turbines must be positive, is %s", n)
+        self._n = n
 
     @property
     def nameplate_capacity(self):
-        return self._turbine.rated_power * self._n
+        return self.turbine.rated_power * self._n
 
     @override
-    def set_nameplate_capacity(self, nameplate_capacity: float) -> None:
+    def set_nameplate_capacity(self, nameplate_capacity: Real) -> None:
         """
-        Alter the number of generators to match the required capacity.
+        Alter the Real of generators to match the required capacity.
         """
-        n_turb = nameplate_capacity / self._turbine.rated_power
+        n_turb = float(nameplate_capacity) / self.turbine.rated_power
         self.n = n_turb
 
     @property
     def swept_area(self):
-        return self._turbine.swept_area * self._n
+        return self.turbine.swept_area * self._n
     
-    def run(self, timespan: modtimespan.TimeSpan) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    def run(
+            self, 
+            timespan: modtimespan.TimeSpan
+        ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
         return self._n * self.turbine.run(timespan)
 
     @classmethod
     def from_characteristics(
-        cls,
+        cls: Type['PowerPlantHomogeneousWind'],
         turbine: WindTurbineElecGenerator,
-        n: Number,
+        n: Real,
         loc: location.RaisedLocation | None = None,
         name: str|None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
-    ) -> PowerPlantHomogeneousWind:
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+    ) -> 'PowerPlantHomogeneousWind':
         a = locals()
         del a['cls']
         del a['turbine']
@@ -805,18 +840,20 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         odict = {
             'class': classfuncs.get_class(self),
             'name': self._name,
-            'turbine': self._turbine.to_dict(),
+            'turbine': self.turbine.to_dict(),
             "n": self._n
         }
         return odict
     
     @override
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         config = copy.copy(config)
         turbine = config.pop('turbine', None)
         if turbine is not None:
-            if isinstance(turbine, Mapping):
+            if isinstance(turbine, dict):
                 turbine = generator_from_dict(turbine)
+                if not isinstance(turbine, WindTurbineElecGenerator):
+                    raise TypeError(f'generator is of incorrect type: {type(turbine)}')
             self._turbine = turbine
             # Expect the location to get overwritten in the setter;
             # as this is recovery, we do actually want the location
@@ -825,35 +862,25 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         
         # This looks risky, but practically may only result in
         # some redundant attributes if the config is bad.
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
-
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+        super().sync_with_dict(config)
     
     @classmethod
-    def from_dict(cls, ip: Mapping) -> PowerPlantHomogeneousWind:
-        ip = copy.copy(ip)
+    def from_dict(
+        cls: Type['PowerPlantHomogeneousWind'],
+        config: dict[str, Any]
+    ) -> 'PowerPlantHomogeneousWind':
+        ip = copy.copy(config)
         ip.pop('class', None)
 
         if ip.get('turbine', None) is not None:
             ip['turbine'] = generator_from_dict(ip['turbine'])
+            if not isinstance(ip['turbine'], WindTurbineElecGenerator):
+                    raise TypeError(f'generator is of incorrect type: {type(ip['turbine'])}')
 
         return cls.from_characteristics(**ip)
 
 # PowerPlantHomogeneousWind copy constructor
-@PowerPlantHomogeneousWind.__init__.register(PowerPlantHomogeneousWind)
+@PowerPlantHomogeneousWind.__init__.register(PowerPlantHomogeneousWind) # pyright: ignore[reportFunctionMemberAccess]
 def PowerPlantHomogeneousWind_from_other(
     self,
     other: PowerPlantHomogeneousWind
@@ -861,7 +888,10 @@ def PowerPlantHomogeneousWind_from_other(
     self._turbine = copy.deepcopy(other.turbine) # Bypass setter to avoid location and model synchronisation
     self.n = other.n
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass
 
 class ABCPVElecGenerator(ABCElecGenerator):
     """
@@ -872,13 +902,13 @@ class ABCPVElecGenerator(ABCElecGenerator):
     @singledispatchmethod
     def __init__(
         self,
-        peak_power: Number | ABCPVElecGenerator,
+        peak_power: Real | ABCPVElecGenerator,
         loc: location.AspectLocation | None = None,
-        total_area: Number | None = None,
-        collector_area: Number | None = None,
-        frame_factor: Number | None = None,
+        total_area: Real | None = None,
+        collector_area: Real | None = None,
+        frame_factor: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         """
         Default assumes None
@@ -887,25 +917,25 @@ class ABCPVElecGenerator(ABCElecGenerator):
 
     # Copy constructor is registered underneath class definition for late-bind
 
-    @__init__.register(Number)
-    def _from_number(
+    @__init__.register(Real)
+    def _from_Real(
         self,
-        peak_power: Number,
+        peak_power: Real,
         loc: location.AspectLocation | None = None,
-        total_area: Number | None = None,
-        collector_area: Number | None = None,
-        frame_factor: Number | None = None,
+        total_area: Real | None = None,
+        collector_area: Real | None = None,
+        frame_factor: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
-        self._peak_power = peak_power
-        self._total_area = total_area if total_area is not None else peak_power / 0.435
+        self._peak_power = float(peak_power)
+        self._total_area = float(total_area) if total_area is not None else self._peak_power / 0.435
         if collector_area is not None:
-            self._collector_area = collector_area
-            self._frame_factor = collector_area / self._total_area
+            self._collector_area = float(collector_area)
+            self._frame_factor = self._collector_area / self._total_area
         elif frame_factor is not None:
-            self._frame_factor = frame_factor
-            self._collector_area = frame_factor * self._total_area
+            self._frame_factor = float(frame_factor)
+            self._collector_area = self._frame_factor * self._total_area
         else:
             self._frame_factor = 1.0
             self._collector_area = self._frame_factor * self._total_area
@@ -931,11 +961,13 @@ class ABCPVElecGenerator(ABCElecGenerator):
         return cls(1.0)
 
     @property
-    def model(self) -> NewsegsModel|None:
+    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
+        if self._model is None:
+            raise AttributeError('model has not been set')
         return self._model
     
     @model.setter
-    def model(self, model) -> None:
+    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
         self._model = model
 
     @property
@@ -951,10 +983,11 @@ class ABCPVElecGenerator(ABCElecGenerator):
         return self._peak_power
     
     @peak_power.setter
-    def peak_power(self, power: Number) -> None:
+    def peak_power(self, power: Real) -> None:
+        power = float(power)
         if power < 0:
             raise ValueError("`peak_power` should be positive, is %s", power)
-        self._peak_power = float(power)
+        self._peak_power = power
 
     @property
     def nameplate_capacity(self) -> float:
@@ -970,10 +1003,11 @@ class ABCPVElecGenerator(ABCElecGenerator):
         return self._total_area
 
     @total_area.setter
-    def total_area(self, area: Number) -> None:
+    def total_area(self, area: Real) -> None:
+        area = float(area)
         if area < 0:
             raise ValueError("`area` should be positive, is %s", area)
-        self._total_area = float(area)
+        self._total_area = area
         if not self._frame_factor is None:
             self._collector_area = self._total_area * self._frame_factor
 
@@ -987,10 +1021,11 @@ class ABCPVElecGenerator(ABCElecGenerator):
         return self._collector_area
 
     @collector_area.setter
-    def collector_area(self, area: Number) -> None:
+    def collector_area(self, area: Real) -> None:
+        area = float(area)
         if area < 0:
             raise ValueError("`area` should be positive, is %s", area)
-        self._collector_area = float(area)
+        self._collector_area = area
         if not self._frame_factor is None:
             self._total_area = self._collector_area / self._frame_factor
     
@@ -1036,26 +1071,26 @@ class ABCPVElecGenerator(ABCElecGenerator):
 
     @classmethod
     def from_characteristics(
-        cls,
-        peak_power: Number,
+        cls: Type[T],
+        peak_power: Real,
         loc: location.AspectLocation | None = None,
-        total_area: Number | None = None,
-        collector_area: Number | None = None,
-        frame_factor: Number | None = None,
+        total_area: Real | None = None,
+        collector_area: Real | None = None,
+        frame_factor: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
-    ) -> ABCPVElecGenerator:
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+    ) -> T:
         
         a = locals()
         del a['cls']
         del a['peak_power']
         return cls(
-            peak_power,
+            peak_power, # pyright: ignore[reportCallIssue]
             **a
         )
     
     @override
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict[str, Any]:
         odict = {
             'class': classfuncs.get_class(self),
             'name': self._name,
@@ -1069,12 +1104,12 @@ class ABCPVElecGenerator(ABCElecGenerator):
         return odict
     
     @override
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         config = copy.copy(config)
 
         loc = config.pop('loc', None)
         if loc is not None:
-            if isinstance(loc, Mapping):
+            if isinstance(loc, dict):
                 loc = location.location_from_dict(loc)
             self.location = loc
         
@@ -1098,15 +1133,18 @@ class ABCPVElecGenerator(ABCElecGenerator):
                     setattr(self, k, v)
 
     @classmethod
-    def from_dict(cls, ip: Mapping) -> ABCPVElecGenerator:
-        ip = copy.copy(ip)
+    def from_dict(
+        cls: Type[ABCPVElecGenerator],
+        config: dict[str, Any]
+    ) -> ABCPVElecGenerator:
+        ip = copy.copy(config)
         ip.pop('class', None)
         if ip.get('loc', None) is not None:
             ip['loc'] = location.location_from_dict(ip['loc'])
         return cls.from_characteristics(**ip)
 
 # ABCPVElecGenerator copy constructor
-@ABCPVElecGenerator.__init__.register(ABCPVElecGenerator)
+@ABCPVElecGenerator.__init__.register(ABCPVElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
 def ABCPVElecGenerator_from_other(
     self,
     other: ABCPVElecGenerator
@@ -1117,104 +1155,103 @@ def ABCPVElecGenerator_from_other(
     self._collector_area = other.collector_area
     self._frame_factor = other.frame_factor
     self._name = other.name
-    self._model = other.model
+    try:
+        self._model = other.model
+    except AttributeError:
+        pass
 
-class SprakePVElecGenerator(ABCPVElecGenerator):
-    _name = "Simple PV Panel"
+##### Fully deprecated ####
+# class SprakePVElecGenerator(ABCPVElecGenerator):
+#     _name = "Simple PV Panel"
 
-    def __init__(self,
-                 other:SprakePVElecGenerator|None = None
-                 ) -> None:
-        super().__init__(other)
-        if other is None:
-            self._self_consumption = 0.04
-            self._aspect_factor = 0.7
-        elif isinstance(other, SprakePVElecGenerator):
-            self._self_consumption = other.self_consumption
-            self._aspect_factor = other.aspect_factor
-        else:
-            raise ValueError("'other' must be a SprakePVElecGenerator")
+#     @override
+#     def __init__( # pyright: ignore[reportIncompatibleVariableOverride]
+#         self,
+#         other:SprakePVElecGenerator|None = None
+#     ) -> None:
+#         super().__init__(other)
+#         if other is None:
+#             self._self_consumption = 0.04
+#             self._aspect_factor = 0.7
+#         elif isinstance(other, SprakePVElecGenerator):
+#             self._self_consumption = other.self_consumption
+#             self._aspect_factor = other.aspect_factor
+#         else:
+#             raise ValueError("'other' must be a SprakePVElecGenerator")
 
-    @property
-    def self_consumption(self) -> float:
-        """
-        The maximum self-consumption of the module or array in kW. 
+#     @property
+#     def self_consumption(self) -> float:
+#         """
+#         The maximum self-consumption of the module or array in kW. 
 
-        In the Sprake model, this is taken from mean production rate over the timestep. If the result is < 0, then it is clipped to 0
-        """
-        return self._self_consumption
+#         In the Sprake model, this is taken from mean production rate over the timestep. If the result is < 0, then it is clipped to 0
+#         """
+#         return self._self_consumption
 
-    @self_consumption.setter
-    def self_consumption(self, self_consumption_kw:int|float) -> None:
-        if self_consumption_kw < 0:
-            warnings.warn("Self consumption is defined positive - negative implies baseline generation without solar resource")
-        if self_consumption_kw > self._peak_power:
-            warnings.warn("Self-consumption greater than peak power under STC. Have you checked units?")
-        self._self_consumption = self_consumption_kw
+#     @self_consumption.setter
+#     def self_consumption(self, self_consumption_kw:int|float) -> None:
+#         if self_consumption_kw < 0:
+#             warnings.warn("Self consumption is defined positive - negative implies baseline generation without solar resource")
+#         if self_consumption_kw > self._peak_power:
+#             warnings.warn("Self-consumption greater than peak power under STC. Have you checked units?")
+#         self._self_consumption = self_consumption_kw
     
-    @property
-    def aspect_factor(self) -> float:
-        """
-        The Sprake model reduces production at all times by a factor reflecting the reduction from total horizontal radiation received by collectors due to pitch and azimuth of collectors.
+#     @property
+#     def aspect_factor(self) -> float:
+#         """
+#         The Sprake model reduces production at all times by a factor reflecting the reduction from total horizontal radiation received by collectors due to pitch and azimuth of collectors.
 
-        This simple model does not vary this loss by the actual solar position and the azimuth and pitch of the array
-        """
-        return self._aspect_factor
+#         This simple model does not vary this loss by the actual solar position and the azimuth and pitch of the array
+#         """
+#         return self._aspect_factor
 
-    @aspect_factor.setter
-    def aspect_factor(self, factor:float) -> None:
-        assert factor >= 0.0, "`factor` should be positive."
-        if factor > 1.0:
-            warnings.warn("Setting `factor` > 1 implies some form of concentrating technology is in use.")
-        self._aspect_factor = factor
+#     @aspect_factor.setter
+#     def aspect_factor(self, factor:float) -> None:
+#         assert factor >= 0.0, "`factor` should be positive."
+#         if factor > 1.0:
+#             warnings.warn("Setting `factor` > 1 implies some form of concentrating technology is in use.")
+#         self._aspect_factor = factor
 
-    def run(
-        self,
-        timespan: modtimespan.TimeSpan
-    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
-        if self.model is None:
-            raise ValueError("Electrical generator requires a model to serve environmental data")
-        global_horizontal_flux = self.model.local_env.get_horizontal_solar_flux(self.location, timespan)
-        # Scale flux to collector area
-        # NB - in Sprake model, the aspect factor does not get applied until after the removal of
-        # self-consumption. This is counter-intuitive, and we have reversed it here
-        collector_flux = global_horizontal_flux * self.collector_area * self.aspect_factor - self.self_consumption
+#     def run(
+#         self,
+#         timespan: modtimespan.TimeSpan
+#     ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
+#         if self.model is None:
+#             raise ValueError("Electrical generator requires a model to serve environmental data")
+#         global_horizontal_flux = self.model.local_env.get_horizontal_solar_flux(self.location, timespan)
+#         # Scale flux to collector area
+#         # NB - in Sprake model, the aspect factor does not get applied until after the removal of
+#         # self-consumption. This is counter-intuitive, and we have reversed it here
+#         collector_flux = global_horizontal_flux * self.collector_area * self.aspect_factor - self.self_consumption
+#         collector_flux = np.asarray(collector_flux)
         
-        # Apply assumption of no consumption when under low irradiation
-        collector_flux[collector_flux<0.0] = 0.0
+#         # Apply assumption of no consumption when under low irradiation
+#         collector_flux[collector_flux<0.0] = 0.0
 
-        return collector_flux.reshape((1,-1))
-
-    @classmethod
-    def from_characteristics(cls,
-                             name:str,
-                             peak_power:float,
-                             total_area:float,
-                             collector_area:float,
-                             frame_factor:float|None,
-                             loc: location.AspectLocation,
-                             self_consumption:float,
-                             aspect_factor:float
-                             ) -> ABCPVElecGenerator:
-
-        a = locals()
-        del a['self_consumption']
-        del a['aspect_factor']
-        del a['cls']
-        del a['__class__']
-        o = super(SprakePVElecGenerator, cls).from_characteristics(**a)
-
-        o.self_consumption = self_consumption
-        o.aspect_factor = aspect_factor
-
-        return o
-    
-    def to_dict(self) -> Mapping:
-        odict = super().to_dict()
-        odict['self_consumption'] = self._self_consumption
-        odict['aspect_factor'] = self._aspect_factor
-
-        return odict
+#         return collector_flux.reshape((1,-1))
+#
+#    @classmethod
+#    def from_characteristics(
+#        cls: Type[SprakePVElecGenerator],
+#        *args,
+#        self_consumption:float,
+#        aspect_factor:float,
+#        **kwargs
+#    ) -> SprakePVElecGenerator:
+#
+#        o = super(SprakePVElecGenerator, cls).from_characteristics(*args, **kwargs)
+#
+#        o.self_consumption = self_consumption
+#        o.aspect_factor = aspect_factor
+#
+#        return o
+#    
+#    def to_dict(self) -> dict[str, Any]:
+#        odict = super().to_dict()
+#        odict['self_consumption'] = self._self_consumption
+#        odict['aspect_factor'] = self._aspect_factor
+#
+#        return odict
 
 class SprakePVGISElecGenerator(ABCPVElecGenerator):
     """
@@ -1227,11 +1264,11 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
     @singledispatchmethod
     def __init__(
         self,
-        peak_power: Number | SprakePVGISElecGenerator,
-        dc_efficiency: Number = 0.98,
-        inverter_efficiency: Number = 0.96,
+        peak_power: Real | SprakePVGISElecGenerator,
+        dc_efficiency: Real = 0.98,
+        inverter_efficiency: Real = 0.96,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         """
         Default assumes None
@@ -1240,22 +1277,17 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
     # Copy constructor is registered underneath class definition for late-bind
 
-    @__init__.register(Number)
-    def _from_number(
+    @__init__.register(Real)
+    def _from_Real(
         self,
-        peak_power: Number,
-        dc_efficiency: Number = 0.98,
-        inverter_efficiency: Number = 0.96,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        peak_power: Real,
+        dc_efficiency: Real = 0.98,
+        inverter_efficiency: Real = 0.96,
+        **kwargs
     ) -> None:
         from config import settings
 
-        s_args = {
-            'name': name,
-            'model': model
-        }
-        super().__init__(peak_power, **s_args)
+        super().__init__(peak_power, **kwargs)
 
         # As the Sprake model insolation is pinned to a single location,
         # we set this to a constant
@@ -1266,8 +1298,8 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
                 pitch = 35.
             )
         
-        self._dc_efficiency = dc_efficiency
-        self._inverter_efficiency = inverter_efficiency
+        self._dc_efficiency = float(dc_efficiency)
+        self._inverter_efficiency = float(inverter_efficiency)
     
     @classmethod
     def from_none(cls) -> SprakePVGISElecGenerator:
@@ -1307,8 +1339,8 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
     def _create_system(self):
         self._system = pvlib.pvsystem.PVSystem(
-            surface_tilt = self.location.pitch,
-            surface_azimuth = self.location.azimuth,
+            surface_tilt = int(self.location.pitch),
+            surface_azimuth = int(self.location.azimuth),
             module_parameters = self._module_parameters,
             temperature_model_parameters = self._temperature_model_parameters,
             losses_parameters = self._losses_parameters,
@@ -1316,7 +1348,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         )
 
     def _create_modelchain(self):
-        import src.core.generation.generation_utils as generation_utils
+        import core.generation.generation_utils as generation_utils
 
         self._mc = pvlib.modelchain.ModelChain(
             self._system,
@@ -1326,7 +1358,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
             spectral_model = 'no_loss',
             temperature_model = 'faiman',
             dc_model = generation_utils.huld_dcmodel_wrapper,
-            losses_model = generation_utils.fixed_percent_dc_loss,
+            losses_model = generation_utils.fixed_percent_dc_loss, # pyright: ignore[reportArgumentType]
             ac_model = 'pvwatts'
         )
 
@@ -1349,7 +1381,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
     def run(
         self,
         timespan: modtimespan.TimeSpan
-    ) -> np.ndarray[tuple[int, int], np.dtype[np.number]]:
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]:
 
         if self.model is None:
             raise ValueError("Electrical generator requires a model to serve environmental data")
@@ -1385,13 +1417,19 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
         self._set_pvlib_location()
 
-        solarpos = self._pvlib_location.get_solarposition(rad_times_centered)
+        solarpos = cast(
+            pd.DataFrame,
+            self._pvlib_location.get_solarposition(rad_times_centered)
+        )
 
-        radiation_components = (
-            pvlib.irradiance.erbs(
-                global_horizontal_flux,
-                solarpos['zenith'].values,
-                rad_times_centered # for extraterrestrial radiation
+        radiation_components = cast(
+            pd.DataFrame,
+            (
+                pvlib.irradiance.erbs(
+                    global_horizontal_flux,
+                    solarpos['zenith'].values,
+                    rad_times_centered # for extraterrestrial radiation
+                )
             )
         )
 
@@ -1418,7 +1456,9 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
         self._mc.run_model(weather)
 
-        generation = self._mc.results.ac.values.reshape((1,-1))
+        if self._mc.results.ac is None:
+            raise ValueError('Model chain results have not been assigned')
+        generation = np.asarray(self._mc.results.ac.values).reshape((1,-1))
         
         # No energy in first pseudo-timestep
         generation[:,0] = 0.0
@@ -1428,19 +1468,19 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
     @classmethod
     def from_characteristics(
         cls,
-        peak_power: Number,
+        peak_power: Real,
         loc: location.AspectLocation | None = None,
-        total_area: Number | None = None,
-        collector_area: Number | None = None,
-        frame_factor: Number | None = None,
+        total_area: Real | None = None,
+        collector_area: Real | None = None,
+        frame_factor: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
-        dc_efficiency: Number | None = None,
-        inverter_efficiency: Number | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        dc_efficiency: Real | None = None,
+        inverter_efficiency: Real | None = None
     ) -> SprakePVGISElecGenerator:
 
         # Because the super .from_characteristics classmethod dispatches
-        # based on the actual class, the resultant ._from_number init
+        # based on the actual class, the resultant ._from_Real init
         # method will be the local one and so it will not recognise all
         # arguments; i.e. the below pattern will not work
         #
@@ -1461,7 +1501,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
         return o
 
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
         odict['dc_efficiency'] = self._dc_efficiency
         odict['inverter_efficiency'] = self._inverter_efficiency
@@ -1472,20 +1512,20 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
     # from_dict should inherit ok
 
 # SprakePVGISElecGenerator copy constructor
-@SprakePVGISElecGenerator.__init__.register(SprakePVGISElecGenerator)
+@SprakePVGISElecGenerator.__init__.register(SprakePVGISElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
 def SprakePVGISElecGenerator_from_other(
     self,
     other: SprakePVGISElecGenerator
 ) -> None:
-    super(SprakePVGISElecGenerator, self).__init__(other)
+    super(SprakePVGISElecGenerator, self).__init__(other) # pyright: ignore[reportCallIssue]
     self._dc_efficiency = other._dc_efficiency
     self._inverter_efficiency = other._inverter_efficiency
 
 class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
     """
-    A power plant consisting of a number of identical PV modules.
+    A power plant consisting of a Real of identical PV modules.
 
-    The number of modules may be non-integer, and all are at a single nominal
+    The Real of modules may be non-integer, and all are at a single nominal
     location and aspect and pitch, and do not self-shadow.
     """
     _name = "Solar PV Array"
@@ -1495,9 +1535,9 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         self,
         pv_array: ABCPVElecGenerator | PowerPlantHomogeneousPV,
         loc: location.Location | None = None,
-        n: Number | None = None,
+        n: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         raise ValueError('First argument must be an ABCPVElecGenerator or PowerPlantHomogeneousPV, is %s', type(pv_array))
 
@@ -1507,9 +1547,9 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         self,
         pv_array: ABCPVElecGenerator,
         loc: location.Location | None = None,
-        n: Number | None = None,
+        n: Real | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None
     ) -> None:
         # Take a copy of the pv array, primarily to ensure that
         # changing its location does not break its parent
@@ -1517,7 +1557,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         if loc is not None:
             self._pv_array.location = loc
         
-        self._n = n if n is not None else 1.
+        self._n = float(n) if n is not None else 1.
 
         if name is not None:
             self._name = name
@@ -1539,36 +1579,43 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         self._name = name
 
     @property
-    def model(self) -> newsegsmodel.NewsegsModel | None:
+    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
         """
         The NewSEGS Model for environmental data.
 
         This is stored within the pv array instance to maintain sync and so
         cannot be accessed prior to a pv array being assigned.
         """
-        return self._pv_array.model
+        return self.pv_array.model
     
     @model.setter
-    def model(self, model) -> None:
+    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
         self._pv_array.model = model
 
     @property
     def location(self) -> location.AspectLocation:
-        return self._pv_array.location
+        return self.pv_array.location
     
     @location.setter
     def location(self, loc: location.Location) -> None:
-        self._pv_array.location = loc
+        self.pv_array.location = loc
     
     @property
     def pv_array(self) -> ABCPVElecGenerator:
+        if self._pv_array is None:
+            raise AttributeError('pv_array has not been set')
         return self._pv_array
     
     @pv_array.setter
     def pv_array(self, pv_array: ABCPVElecGenerator) -> None:
-        if hasattr(self, '_pv_array'):
-            loc = self._pv_array.location
-            mdl = self._pv_array.model
+        try:
+            loc = self.pv_array.location
+        except AttributeError:
+            loc = None
+        try:
+            mdl = self.pv_array.model
+        except AttributeError:
+            mdl = None
         else:
             loc = None
             mdl = None
@@ -1577,6 +1624,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
 
         if loc is not None:
             self._pv_array.location = loc
+        if mdl is not None:
             self._pv_array.model = mdl
 
     @property
@@ -1584,45 +1632,46 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         return self._n
 
     @n_arrays.setter
-    def n_arrays(self, n: Number) -> None:
+    def n_arrays(self, n: Real) -> None:
+        n = float(n)
         if n < 0:
-            raise ValueError("Number of PV arrays must be positive, is %s", n)
-        self._n = float(n)
+            raise ValueError("Real of PV arrays must be positive, is %s", n)
+        self._n = n
 
     @property
     def nameplate_capacity(self):
-        return self._pv_array.nameplate_capacity * self._n
+        return self.pv_array.nameplate_capacity * self._n
 
     @override
-    def set_nameplate_capacity(self, nameplate_capacity: float) -> None:
+    def set_nameplate_capacity(self, nameplate_capacity: Real) -> None:
         """
         Alter the number of generators to match the required capacity.
         """
-        n_array = nameplate_capacity / self._pv_array.nameplate_capacity
+        n_array = float(nameplate_capacity) / self.pv_array.nameplate_capacity
         self.n = n_array
     
     @property
     def total_area(self):
-        return self._pv_array.total_area * self._n
+        return self.pv_array.total_area * self._n
     
     @property
     def collector_area(self):
-        return self._pv_array.collector_area * self._n
+        return self.pv_array.collector_area * self._n
 
     def run(
         self,
         timespan: modtimespan.TimeSpan
-    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
         return self.n * self.pv_array.run(timespan)
 
     @classmethod
     def from_characteristics(
         cls,
         pv_array: ABCPVElecGenerator,
-        n: Number,
+        n: Real,
         loc: location.AspectLocation | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
     ) -> PowerPlantHomogeneousPV:
 
         a = locals()
@@ -1646,12 +1695,14 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         return odict
 
     @override
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         config = copy.copy(config)
         pv_array = config.pop('pv_array', None)
         if pv_array is not None:
-            if isinstance(pv_array, Mapping):
+            if isinstance(pv_array, dict):
                 pv_array = generator_from_dict(pv_array)
+                if not isinstance(pv_array, ABCPVElecGenerator):
+                    raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(pv_array)}')
             self._pv_array = pv_array
             # Expect the location to get overwritten in the setter;
             # as this is recovery, we do actually want the location
@@ -1678,17 +1729,19 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
                     setattr(self, k, v)
 
     @classmethod
-    def from_dict(cls, ip: Mapping) -> PowerPlantHomogeneousPV:
-        ip = copy.copy(ip)
+    def from_dict(cls, config: dict[str, Any]) -> PowerPlantHomogeneousPV:
+        ip = copy.copy(config)
         ip.pop('class', None)
 
         if ip.get('pv_array', None) is not None:
             ip['pv_array'] = generator_from_dict(ip['pv_array'])
+            if not isinstance(ip['pv_array'], ABCPVElecGenerator):
+                raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(ip['pv_array'])}')
         
         return cls.from_characteristics(**ip)
 
 # PowerPlantHomogeneousPV copy constructor
-@PowerPlantHomogeneousPV.__init__.register(PowerPlantHomogeneousPV)
+@PowerPlantHomogeneousPV.__init__.register(PowerPlantHomogeneousPV) # pyright: ignore[reportFunctionMemberAccess]
 def PowerPlantHomogeneousPV_from_other(
     self,
     other: PowerPlantHomogeneousPV
@@ -1696,21 +1749,24 @@ def PowerPlantHomogeneousPV_from_other(
     self._pv_array = copy.deepcopy(other.pv_array)
     self.n = other.n
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass
 
 class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     """
-    A power plant consisting of a number of different generator types, locations, aspects etc
+    A power plant consisting of a Real of different generator types, locations, aspects etc
     """
     _name = "Site power plant"
     
     @singledispatchmethod
     def __init__(
         self,
-        generators: Collection[ABCElecGenerator] | PowerPlantHeterogeneousGenerators,
+        generators: Collection[ABCScalingPowerPlant] | PowerPlantHeterogeneousGenerators,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
         do_copy: bool = True
     ) -> None:
         raise ValueError('First argument must be a collection of `ABCElecGenerator`s or a PowerPlantHeterogeneousGenerators, is %s', type(generators))
@@ -1720,10 +1776,10 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     @__init__.register(Collection)
     def _from_collection(
         self,
-        generators: Collection[ABCElecGenerator],
+        generators: Collection[ABCScalingPowerPlant],
         loc: location.Location | None = None,
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
         do_copy: bool = True,
     ) -> None:
         if do_copy:
@@ -1749,11 +1805,11 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         ])
         
     @property
-    def model(self) -> newsegsmodel.NewsegsModel | None:
+    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
         return self._generators[0].model
 
     @model.setter
-    def model(self, model) -> None:
+    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
         for generator in self.generators:
             generator.model = model
 
@@ -1766,18 +1822,29 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         self._name = name
 
     @property
-    def generators(self) -> list[ABCElecGenerator]:
+    def generators(self) -> list[ABCScalingPowerPlant]:
         return self._generators
     
-    def append(self, generator: ABCElecGenerator) -> None:
-        if generator.model is None and self.generators:
-            generator.model = self.generators[0].model
+    def append(self, generator: ABCScalingPowerPlant) -> None:
+        try:
+            gen_model = generator.model
+        except AttributeError:
+            gen_model = None
+
+        if gen_model is None and self.generators:
+            try:
+                generator.model = self.generators[0].model
+            except AttributeError:
+                pass
         self._generators.append(generator)
     
     def clear(self) -> None:
         self._generators.clear()
 
-    def extend(self, other: PowerPlantHeterogeneousGenerators|Iterable) -> None:
+    def extend(
+            self, 
+            other: PowerPlantHeterogeneousGenerators | Iterable[ABCScalingPowerPlant]
+        ) -> None:
         if isinstance(other, PowerPlantHeterogeneousGenerators):
             for gen in other.generators:
                 self.append(gen)
@@ -1785,7 +1852,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
             for gen in other:
                 self.append(gen)
     
-    def insert(self, index:int, generator:ABCElecGenerator) -> None:
+    def insert(self, index: int, generator: ABCScalingPowerPlant) -> None:
         if generator.model is None and self.generators:
             generator.model = self.generators[0].model
         self._generators.insert(index, generator)
@@ -1806,7 +1873,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     def run(
         self,
         timespan: modtimespan.TimeSpan
-    ) -> np.ndarray[tuple[int,int], np.dtype[np.number]]:
+    ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
         # Verify that all are using the same model
         self.model = self._generators[0].model
 
@@ -1816,9 +1883,9 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     @classmethod
     def from_characteristics(
         cls,
-        generators: list[ABCElecGenerator],
+        generators: list[ABCScalingPowerPlant],
         name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
     ) -> PowerPlantHeterogeneousGenerators:
         a = locals()
         del a['cls']
@@ -1830,7 +1897,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         )
 
     @override
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict[str, Any]:
         odict = {
             'class': classfuncs.get_class(self),
             'name': self._name,
@@ -1839,19 +1906,29 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         return odict
     
     @override
-    def sync_with_dict(self, config: Mapping) -> None:
+    def sync_with_dict(self, config: dict[str, Any]) -> None:
         config = copy.copy(config)
         generators = config.pop('generators', None)
         if generators is not None:
-            mdl = self.model
+            try:
+                mdl = self.model
+            except AttributeError:
+                mdl = None
 
             generators = [
-                x if isinstance(x, ABCElecGenerator) else generator_from_dict(x) for x in generators
+                x if isinstance(x, ABCScalingPowerPlant) else generator_from_dict(x) for x in generators
+            ]
+            for x in generators:
+                if not isinstance(x, ABCScalingPowerPlant):
+                    raise TypeError(f'configuration contains generators of incorrect type: {type(x)}')
+            generators = [
+                cast(ABCScalingPowerPlant, x) for x in generators
             ]
             self.clear()
             self.extend(generators)
             # Sync up the model
-            self.model = mdl
+            if mdl is not None:
+                self.model = mdl
             # Note that the location is not synchronised for this type of generator
         
         # This looks risky, but practically may only result in
@@ -1874,8 +1951,8 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
                     setattr(self, k, v)
     
     @classmethod
-    def from_dict(cls, ip: Mapping) -> PowerPlantHeterogeneousGenerators:
-        ip = copy.copy(ip)
+    def from_dict(cls, config: dict[str, Any]) -> PowerPlantHeterogeneousGenerators:
+        ip = copy.copy(config)
         ip.pop('class', None)
 
         if ip.get('generators', None) is not None:
@@ -1884,10 +1961,11 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         return cls.from_characteristics(**ip)
 
     @property
-    def location(self) -> location.Location | None:
-        if self._generators:
-            return location.Location(self._generators[0].location)
-        return None
+    def location(self) -> location.Location:
+        if self._generators is None:
+            raise AttributeError('No generators have been added')
+        
+        return location.Location(self._generators[0].location)
     
     @location.setter
     def location(self, loc: location.Location):
@@ -1903,28 +1981,32 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         return cap
 
 # PowerPlantHeterogeneousGenerators copy constructor
-@PowerPlantHeterogeneousGenerators.__init__.register(PowerPlantHeterogeneousGenerators)
+@PowerPlantHeterogeneousGenerators.__init__.register(PowerPlantHeterogeneousGenerators) # pyright: ignore[reportFunctionMemberAccess]
 def PowerPlantHeterogeneousGenerators_from_other(
     self,
     other: PowerPlantHeterogeneousGenerators
 ) -> None:
     self._generators = copy.deepcopy(other.generators)
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass
 
 GENERATOR_CONSTRUCTORS = {
     'WindTurbineElecGenerator': WindTurbineElecGenerator,
     'PowerPlantHomogeneousWind': PowerPlantHomogeneousWind,
-    'SprakePVElecGenerator': SprakePVElecGenerator,
     'SprakePVGISElecGenerator': SprakePVGISElecGenerator,
     'PowerPlantHomogeneousPV': PowerPlantHomogeneousPV,
     'PowerPlantHeterogeneousGenerators': PowerPlantHeterogeneousGenerators,
 }
 
-def generator_from_dict(ip: Mapping):
+def generator_from_dict(ip: dict[str, Any]) -> ABCElecGenerator:
     ip = copy.copy(ip)
     classname = ip.pop('class')
+    if classname is None:
+        raise ValueError(f'`class` not found in configuration dictionary with keys: {ip.keys()}')
     constructor = GENERATOR_CONSTRUCTORS.get(classname, None)
     if constructor is None:
-        return constructor
+        raise ValueError(f'Constructor not found for {classname}')
     return constructor.from_dict(ip)

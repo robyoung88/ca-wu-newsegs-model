@@ -8,11 +8,11 @@ from functools import singledispatchmethod
 import numpy as np
 import numpy.typing as npt
 
-from src.newsegsgrid.newsegsgrid import NewsegsGrid
-from src.util import classfuncs
-from src.core import newsegsmodule
-from src.core import timespan as modtimespan
-from src.newsegsmodel import newsegsmodel
+from newsegsgrid.newsegsgrid import NewsegsGrid
+from util import classfuncs
+from core import newsegsmodule
+from core import timespan as modtimespan
+from newsegsmodel import newsegsmodel
 
 class SprakeGridResult(newsegsmodule.ABCNewsegsModuleResult):
     def __init__(

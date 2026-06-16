@@ -14,7 +14,7 @@ setup_script_env()
 
 from config import settings
 
-from src.util import wind_resource_helpers
+from util import wind_resource_helpers
 
 if __name__ == '__main__':
     import os

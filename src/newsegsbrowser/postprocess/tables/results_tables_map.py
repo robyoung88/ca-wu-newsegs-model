@@ -1,4 +1,4 @@
-from src.newsegsbrowser.postprocess.tables import result_tables_sprake
+from newsegsbrowser.postprocess.tables import result_tables_sprake
 
 SPRAKE_RESULT_TABLES = {
     'wind': result_tables_sprake.create_wind_results,

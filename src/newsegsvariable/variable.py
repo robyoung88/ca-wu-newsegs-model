@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Mapping
 import copy
+from functools import partial
 from typing import Any, cast, Callable, Literal, List, Sequence, Sized, get_args, Union, overload, override
 from typing import TypeAlias
 import warnings
@@ -12,9 +13,11 @@ import numpy as np
 import numpy.typing as npt
 from useful_types import SequenceNotStr
 
-from src.newsegsmodel import newsegsmodel
-from src.newsegsfinance import newsegsfinance
-from src.stats.dirichlet import fit_dirichlet
+from core import newsegscomponent
+from newsegsmodel import newsegsmodel
+from newsegsfinance import newsegsfinance
+from newsegsstats.dirichlet import fit_dirichlet
+from util import classfuncs
 
 ScalarParam = Union[str | int | float]
 ScalarNumParam = Union[int | float]
@@ -146,6 +149,7 @@ class VectorParameterisation(Parameterisation):
         ...
         
 class Distribution(metaclass = Singleton):
+    distribution : VARIABLE_DISTRIBUTION
     parameterisations: Sequence[Parameterisation]
     dsa_possible: bool
     psa_possible: bool
@@ -653,6 +657,7 @@ class ConstantParameterisationDefault(
         
 
 class ConstantDistribution(ScalarValuedDistribution):
+    distribution = 'constant'
     parameterisations = [
         ConstantParameterisationDefault(),
     ]
@@ -770,6 +775,7 @@ def _binomial_interval_function(
     return binom.interval(interval, parameters[0], parameters[1])
 
 class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
+    distribution = 'binomial'
     parameterisations: Sequence[_BinomialParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         BinomialParameterisationDefault(),
         BinomialParameterisationExpected(),
@@ -974,6 +980,7 @@ def _lognormal_interval(
     return lognorm.interval(interval, parameters[1], scale=np.exp(parameters[0]))
     
 class NormalDistribution(TwoParamNumericScalarValuedDistribution):
+    distribution = 'normal'
     parameterisations: Sequence[_NormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         NormalParameterisationDefault(),
         LogNormalParameterisationDefault(),
@@ -1151,6 +1158,7 @@ def _beta_interval(
     return beta.interval(interval, parameters[0], parameters[1])
 
 class BetaDistribution(TwoParamNumericScalarValuedDistribution):
+    distribution = 'beta'
     parameterisations: Sequence[_BetaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         BetaParameterisationDefault(),
         BetaParameterisationExpected(),
@@ -1265,10 +1273,12 @@ class GammaParameterisationExpected(
         # scale = mean/shape
         # sd = sqrt(shape) * mean / shape = mean / sqrt(shape)
         # shape = (mean / sd) **2
-        if sd <= 0:
+        if sd < 0:
             raise ValueError(f'sd must be positive, is: {sd}')
-        if mean <= 0:
+        if mean < 0:
             raise ValueError(f'Mean must be positive, is: {mean}')
+        if mean == 0:
+            return(0., 0.)
         shape = (mean / sd) ** 2
         scale = mean / shape
         return (shape, scale)
@@ -1320,6 +1330,7 @@ def _loggamma_interval(
     return (np.exp(interval_values[0]), np.exp(interval_values[1]))
 
 class GammaDistribution(TwoParamNumericScalarValuedDistribution):
+    distribution = 'gamma'
     parameterisations: Sequence[_GammaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         GammaParameterisationDefault(),
         GammaParameterisationExpected(),
@@ -1367,6 +1378,8 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
             
             return integrate.quad(lambda x: 1 - gamma_dist.cdf(np.log(x), a = shape, scale = scale), 0, np.inf)[0]
         else:
+            if scale == 0:
+                return 0.
             return shape * scale
         
     @classmethod
@@ -1469,6 +1482,7 @@ class ConstantVectorParameterisationDefault(
             return (values, )
 
 class ConstantVectorDistribution(VectorValuedDistribution):
+    distribution = 'constant_vector'
     parameterisations: Sequence[_ConstantVectorParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         ConstantVectorParameterisationDefault(),
     ]
@@ -1650,6 +1664,7 @@ class MultivariateLogNormalParameterisationExpected(
         return any(trans == 'ln' for trans in var.transform)
 
 class MultivariateNormalDistribution(NumericVectorValuedDistribution):
+    distribution = 'mvn'
     parameterisations: Sequence[_MultivariateNormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         MultivariateNormalParameterisationDefault(),
         MultivariateLogNormalParameterisationDefault(),
@@ -1860,6 +1875,7 @@ class DirichletParameterisationExpected(
         return all(trans == 'identity' for trans in var.transform)
 
 class DirichletDistribution(NumericVectorValuedDistribution):
+    distribution = 'dirichlet'
     parameterisations: Sequence[_DirichletParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         DirichletParameterisationDefault(),
         DirichletParameterisationExpected(),
@@ -2104,7 +2120,9 @@ def update_model_with_value(
     model.update(update_dict)
 
 
-class Variable:
+class Variable(
+    newsegscomponent.NewsegsComponent
+):
     """
     A single unit of variation in a model.
 
@@ -2206,6 +2224,7 @@ class Variable:
         interface_step: float | None = None,
     ):
         self.name = name
+        #self.distribution = distribution
 
         self.configuration_type = configuration_type
 
@@ -2537,12 +2556,34 @@ class Variable:
         in the metamodel and update from that direction.
         """
 
+    def to_dict(self) -> dict[str, Any]:
+        odict = {
+            'class': classfuncs.get_class(self)
+        }
+        odict.update(vars(self))
+        return odict
+    
+    def update(self, config: dict[str, Any]) -> None:
+        config = copy.copy(config)
+        config_class = config.pop('class')
+        if config_class is not None:
+            if config_class != classfuncs.get_class(self):
+                raise ValueError(f'Mismatched configuration - is for class {config_class}, is updating {classfuncs.get_class(self)}')
+
+        vars(self).update(config)   
+
+
 class ScalarVariable(Variable):
 
     distribution: ScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: ScalarParam
     _dsa_upper: ScalarParam
     _transform: tuple[VARIABLE_TRANSFORM]
+
+    model_parameter: str
+    model_section: str | None
+    interface_key: str
+    interface_section: str | None    
 
     def _validate_bound(self, value: Value) -> ScalarParam:
         if not isinstance(value, str) and isinstance(value, Sequence):
@@ -3137,6 +3178,28 @@ class DirichletVariable(NumericVectorVariable):
             # It is fairly trivial to write the VCV matrix, but just needs to be done,
             # especially considering we are messing with the matrix.
 
+VARIABLE_CONSTRUCTORS = {
+    'ConstantVariable': partial(Variable, distribution = 'constant'),
+    'BinomialVariable': partial(Variable, distribution = 'binomial'),
+    'NormalVariable': partial(Variable, distribution = 'normal'),
+    'BetaVariable': partial(Variable, distribution = 'beta'),
+    'GammaVariable': partial(Variable, distribution = 'gamma'),
+    'ConstantVectorVariable': partial(Variable, distribution = 'constant_vector'),
+    'MultivariateNormalVariable': partial(Variable, distribution = 'mvn'),
+    'DirichletVariable': partial(Variable, distribution = 'dirichlet'),
+}
+
+def variable_from_dict(config: dict[str, Any]) -> Variable:
+    classname = config.get('class')
+    if classname is None:
+        raise ValueError(f'`class` not found in configuration dictionary with keys {config.keys()}')
+    constructor = VARIABLE_CONSTRUCTORS.get(classname)
+    if constructor is None:
+        raise ValueError(f'Constructor not found for {classname}')
+    var = constructor('Placeholder')
+    var.update(config)
+    return var
+    
 
 # class Variable2():
 #     """

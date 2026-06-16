@@ -1,2 +1,3 @@
-from src.newsegscs.newsegscs import NewsegsCS
-from src.newsegscs.sprakecs import SprakeCS
+from newsegscs.newsegscs import NewsegsCS
+from newsegscs.sprakecs import SprakeCS
+__all__ = ['NewsegsCS', 'SprakeCS']

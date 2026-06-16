@@ -9,7 +9,7 @@ from typing import List, Literal, Optional, overload
 from dash import html
 from useful_types import SequenceNotStr
 
-from src.util import flatten_string_lists
+from util import flatten_string_lists
 
 DEFAULT_ICONS = {
     'latlon': 'bi bi-geo-alt',

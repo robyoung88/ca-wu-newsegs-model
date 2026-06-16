@@ -5,7 +5,7 @@ setup_script_env()
 
 from config import settings
 
-from src.newsegscs.elexon_profiles import characterise_dates_elexon
+from newsegscs.elexon_profiles import characterise_dates_elexon
 
 if __name__ == '__main__':
     import os

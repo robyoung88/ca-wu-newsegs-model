@@ -9,7 +9,7 @@ Provides the following stats, broken down by meter type:
 """
 import pandas as pd
 
-from src.stats.core import assign_year_index, assign_day_index
+from newsegsstats.core import assign_year_index, assign_day_index
 
 def meter_annual_summary(
     data: pd.DataFrame | pd.Series,

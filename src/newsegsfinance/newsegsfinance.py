@@ -8,12 +8,13 @@ from typing import Any
 import uuid
 import re
 
-from src.newsegsmodel import NewsegsModel
+from core import newsegscomponent
+from newsegsmodel import NewsegsModel
 import pandas as pd
 
-from src.util import classfuncs
+from util import classfuncs
 
-class NewsegsFinance(metaclass=ABCMeta):
+class NewsegsFinance(newsegscomponent.NewsegsComponent):
     """
     Abstract base class of NewSEGS finance model
 

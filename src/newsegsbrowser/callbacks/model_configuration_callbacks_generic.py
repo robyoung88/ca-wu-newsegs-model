@@ -5,8 +5,8 @@ import uuid
 
 from dash import html, no_update
 
-from src.newsegsbrowser import icons
-import src.newsegsbrowser.common as browser
+from newsegsbrowser import icons
+import newsegsbrowser.common as browser
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,8 @@ def sync_config(
     app,
     create_default_model,
     create_default_finance,
+    create_default_variables,
+    
     model_and_finance_to_interface_function
 ):
     if store_selected_configuration is None:

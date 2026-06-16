@@ -13,15 +13,15 @@ from dash import html, no_update
 import pandas as pd
 import plotly.express as px
 
-from src.core import location
-from src.newsegsbrowser import icons
-from src.newsegsbrowser import common as browser
-import src.newsegsbrowser.callbacks.model_configuration_callbacks_generic as generic_callbacks
-from src.newsegsbrowser.callbacks import model_creation_sprake
+from core import location
+from newsegsbrowser import icons
+from newsegsbrowser import common as browser
+import newsegsbrowser.callbacks.model_configuration_callbacks_generic as generic_callbacks
+from newsegsbrowser.callbacks import model_creation_sprake
 
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import sprakefinance
-from src.newsegsbrowser import energy_balance_estimation
+from newsegsmodel import sprakemodel
+from newsegsfinance import sprakefinance
+from newsegsbrowser import energy_balance_estimation
 
 logger = logging.getLogger(__name__)
 

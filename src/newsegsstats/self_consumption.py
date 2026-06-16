@@ -8,9 +8,9 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from src.core.newsegsmodule import filter_meters, ABCNewsegsModuleResult
-from src.stats.core import assign_year_index, assign_season_index
-from src.newsegsgeneration.newsegsgeneration import get_generation_meters
+from core.newsegsmodule import filter_meters, ABCNewsegsModuleResult
+from newsegsstats.core import assign_year_index, assign_season_index
+from newsegsgeneration.newsegsgeneration import get_generation_meters
 
 def self_consume(generation: npt.NDArray, 
                  consumption: npt.NDArray

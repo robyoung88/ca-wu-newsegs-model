@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from src.stats.core import assign_delta_hours
+from newsegsstats.core import assign_delta_hours
 
 def in_range(
     timeseries: npt.NDArray|pd.Series,

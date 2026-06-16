@@ -10,7 +10,7 @@ import numpy.testing
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.core.timespan import month_index
+from core.timespan import month_index
 
 class TestTimeIndices(unittest.TestCase):
     

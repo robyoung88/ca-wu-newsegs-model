@@ -4,7 +4,7 @@ Create a landing layout for an app.
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
-from src.newsegsbrowser.layouts import navigation
+from newsegsbrowser.layouts import navigation
 
 def create_landing_header():
     return html.H1('A NewSEGS model')

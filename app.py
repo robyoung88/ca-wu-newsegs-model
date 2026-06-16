@@ -14,28 +14,28 @@ import diskcache
 
 from config import settings
 
-from src.newsegsmodel import newsegsmodel
-from src.newsegsfinance import newsegsfinance
+from newsegsmodel import newsegsmodel
+from newsegsfinance import newsegsfinance
 
-from src.newsegsbrowser.layouts import model_selection_layout
-from src.newsegsbrowser.layouts import template_landing_layout
-from src.newsegsbrowser.layouts import template_model_configuration_layout
-from src.newsegsbrowser.layouts import template_dsa_configuration_layout
-from src.newsegsbrowser.layouts import layout_registry
+from newsegsbrowser.layouts import model_selection_layout
+from newsegsbrowser.layouts import template_landing_layout
+from newsegsbrowser.layouts import template_model_configuration_layout
+from newsegsbrowser.layouts import template_dsa_configuration_layout
+from newsegsbrowser.layouts import layout_registry
 
-from src.newsegsbrowser.callbacks import model_selection_callbacks
-from src.newsegsbrowser.callbacks import model_configuration_callbacks
-from src.newsegsbrowser.callbacks import model_run_callbacks
-from src.newsegsbrowser.callbacks import postprocess_callbacks
-from src.newsegsbrowser.callbacks import results_callbacks
-from src.newsegsbrowser.callbacks import callbacks_map
-from src.newsegsbrowser.callbacks import timeseries_callbacks
-from src.newsegsbrowser.callbacks import configuration_selector_callbacks
-from src.newsegsbrowser.map import add_site_selector_callbacks
+from newsegsbrowser.callbacks import model_selection_callbacks
+from newsegsbrowser.callbacks import model_configuration_callbacks
+from newsegsbrowser.callbacks import model_run_callbacks
+from newsegsbrowser.callbacks import postprocess_callbacks
+from newsegsbrowser.callbacks import results_callbacks
+from newsegsbrowser.callbacks import callbacks_map
+from newsegsbrowser.callbacks import timeseries_callbacks
+from newsegsbrowser.callbacks import configuration_selector_callbacks
+from newsegsbrowser.map import add_site_selector_callbacks
 
-from src.newsegsbrowser.postprocess import postprocess_utils
+from newsegsbrowser.postprocess import postprocess_utils
 
-from src.newsegsbrowser import energy_balance_estimation
+from newsegsbrowser import energy_balance_estimation
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from dash import html
 import dash_bootstrap_components as dbc
 from functools import partial
 
-from src.newsegsbrowser import icons
+from newsegsbrowser import icons
 
 create_navbutton = partial(
     dbc.Button,

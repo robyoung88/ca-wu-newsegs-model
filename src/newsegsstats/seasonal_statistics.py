@@ -5,7 +5,7 @@ from typing import Tuple
 
 import pandas as pd
 
-from src.stats.core import assign_season_index, assign_year_index, grouped_default_stats, index_by, normalise_common_index
+from newsegsstats.core import assign_season_index, assign_year_index, grouped_default_stats, index_by, normalise_common_index
 
 def get_meters_by_year_season(df: pd.DataFrame):
     """

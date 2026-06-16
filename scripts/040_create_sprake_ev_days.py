@@ -5,7 +5,7 @@ setup_script_env()
 
 from config import settings
 
-from src.newsegscs.ev_profiles import characterise_dates_evprofile
+from newsegscs.ev_profiles import characterise_dates_evprofile
 
 if __name__ == '__main__':
     import os

@@ -14,19 +14,18 @@ Exports:
 """
 from __future__ import annotations
 
-from typing import override, Type, TypeVar, Union, SupportsFloat
 import copy
+from typing import Any, override, Type, TypeVar, SupportsFloat
 from functools import singledispatchmethod
 from pyproj import Transformer
 
-import numpy as np
-
-from src.util import classfuncs
+from core import serialisation
+from util import classfuncs
 
 T = TypeVar('T')
 Real = SupportsFloat
 
-class Location:
+class Location(serialisation.SerialiseToDictMixin):
     """
     A point geographic location with valid latitude and longitude.
 
@@ -42,6 +41,9 @@ class Location:
     """
     _name = 'Site'
     _crs = 'EPSG:4326'
+
+    # Override of SerialiseToDictMixin _constructor_class
+    _constructor_class = 'Location'
 
     @singledispatchmethod
     def __init__(
@@ -229,7 +231,7 @@ class Location:
         return odict
 
     @classmethod
-    def from_dict(cls, input: dict) -> Location:
+    def from_dict(cls, input: dict[str, Any]) -> Location:
         input.pop('class', None)
         return cls.from_characteristics(**input)
 
@@ -498,7 +500,7 @@ _LOCATION_CONSTRUCTORS = {
     'AspectLocation': AspectLocation
 }
 
-def location_from_dict(input: dict):
+def location_from_dict(input: dict[str, Any]):
     input = copy.copy(input)
     classname = input.pop('class')
     constructor = _LOCATION_CONSTRUCTORS.get(classname, None)

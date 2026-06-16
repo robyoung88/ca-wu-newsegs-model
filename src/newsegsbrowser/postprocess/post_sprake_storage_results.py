@@ -1,13 +1,13 @@
 import numpy as np
 import pandas as pd
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegscs import newsegscs
-from src.stats.core import assign_year_index
-from src.stats.core import assign_delta_hours
-from src.stats import basic_summary_stats
-from src.stats import time_in_range
-from src.stats import locate_timeseries_extrema
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegscs import newsegscs
+from newsegsstats.core import assign_year_index
+from newsegsstats.core import assign_delta_hours
+from newsegsstats import basic_summary_stats
+from newsegsstats import time_in_range
+from newsegsstats import locate_timeseries_extrema
 
 # Will count minimum soc as < 1%
 MIN_SOC_THRESHOLD_PROP = 0.01

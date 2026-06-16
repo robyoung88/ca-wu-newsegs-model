@@ -8,16 +8,16 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from src.util import classfuncs
-from src.core.timespan import delta_days
-from src.core.newsegsmodule import filter_meter_indices
-from src.newsegsfinance import newsegsfinance
-from src.newsegsfinance import common as common_finance
-from src.newsegsmodel import newsegsmodel
+from util import classfuncs
+from core.timespan import delta_days
+from core.newsegsmodule import filter_meter_indices
+from newsegsfinance import newsegsfinance
+from newsegsfinance import common as common_finance
+from newsegsmodel import newsegsmodel
 
-from src.newsegsfinance import NewsegsFinance, apply_discount_factor, sum_all_to_horizon
-from src.newsegsmodel import NewsegsModel
-from src.stats import core as stats_core
+from newsegsfinance import apply_discount_factor, sum_all_to_horizon
+from newsegsmodel import NewsegsModel
+from newsegsstats import core as stats_core
 
 # Not strictly true, but good enough for finance.
 HOURS_IN_YEAR = 8760.0

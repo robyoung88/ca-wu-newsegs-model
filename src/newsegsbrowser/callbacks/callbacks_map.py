@@ -1,8 +1,8 @@
-from src.newsegsbrowser.callbacks import model_configuration_callbacks_generic
-from src.newsegsbrowser.callbacks import model_configuration_callbacks_sprake
-from src.newsegsbrowser.callbacks import postprocess_callbacks_generic
-from src.newsegsbrowser.callbacks import postprocess_callbacks_sprake
-from src.newsegsbrowser.callbacks import results_callbacks_sprake
+from newsegsbrowser.callbacks import model_configuration_callbacks_generic
+from newsegsbrowser.callbacks import model_configuration_callbacks_sprake
+from newsegsbrowser.callbacks import postprocess_callbacks_generic
+from newsegsbrowser.callbacks import postprocess_callbacks_sprake
+from newsegsbrowser.callbacks import results_callbacks_sprake
 SPRAKE_CALLBACKS = {
     'sync_config': model_configuration_callbacks_sprake.sync_config,
     'sync_loc_inputs_to_store': model_configuration_callbacks_generic.sync_loc_inputs_to_store,

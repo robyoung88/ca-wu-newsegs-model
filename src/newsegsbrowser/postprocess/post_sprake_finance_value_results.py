@@ -1,9 +1,9 @@
 import pandas as pd
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegsfinance.sprakefinance import SprakeFinance
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegsfinance.sprakefinance import SprakeFinance
 
-from src.stats import basic_summary_stats
+from newsegsstats import basic_summary_stats
 
 import dash
 from timeit import default_timer as timer

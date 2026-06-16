@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from src.core.timespan import year_index
+from core.timespan import year_index
 
 def discount_factor_discrete(datetimes:pd.Series, discount_rate:float) -> pd.Series:
     """

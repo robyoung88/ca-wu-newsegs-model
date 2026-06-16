@@ -45,25 +45,25 @@ else:
     background_callback_manager = DiskcacheManager(cache, cache_by = [lambda: launch_uid])
     noncaching_background_callback_manager = DiskcacheManager(cache)
 
-from src.newsegsmodel import newsegsmodel
-from src.newsegsfinance import newsegsfinance
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import sprakefinance
-from src.core import location
+from newsegsmodel import newsegsmodel
+from newsegsfinance import newsegsfinance
+from newsegsmodel import sprakemodel
+from newsegsfinance import sprakefinance
+from core import location
 
-from src.newsegsbrowser import common as browser
-from src.newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
-from src.newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
-from src.newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
-from src.newsegsbrowser import results_table
-from src.newsegsbrowser.stats import *
-from src.newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results
-from src.newsegsbrowser.postprocess import post_sprake_consumption_results, post_sprake_net_results
-from src.newsegsbrowser.postprocess import post_sprake_finance_benefits_results, post_sprake_finance_costs_results
-from src.newsegsbrowser.postprocess import post_sprake_finance_value_results
-from src.newsegsbrowser import energy_balance_estimation
+from newsegsbrowser import common as browser
+from newsegsbrowser.common import get_icon, create_numeric_card_input, unescape_html_icons
+from newsegsbrowser.map import create_site_selector_map, add_site_selector_callbacks
+from newsegsbrowser.results_table import create_tbl_head, create_configuration_selector
+from newsegsbrowser import results_table
+from newsegsbrowser.stats import *
+from newsegsbrowser.postprocess import post_sprake_gen_results, post_sprake_storage_results
+from newsegsbrowser.postprocess import post_sprake_consumption_results, post_sprake_net_results
+from newsegsbrowser.postprocess import post_sprake_finance_benefits_results, post_sprake_finance_costs_results
+from newsegsbrowser.postprocess import post_sprake_finance_value_results
+from newsegsbrowser import energy_balance_estimation
 
-from src.newsegsbrowser import ROOTDIR, STATICDATA
+from newsegsbrowser import ROOTDIR, STATICDATA
 #from config import settings
 
 _CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
@@ -1789,7 +1789,7 @@ def create_generation_results_card():
                 html.Div([
                     create_wind_results()
                     ],
-                    id="res-gen-wind-tbl")
+                    id = "res-gen-wind-tbl")
             ]),
             html.Details([
                 html.Summary("Solar PV Generation"),

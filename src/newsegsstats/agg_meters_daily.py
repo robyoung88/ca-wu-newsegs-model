@@ -3,7 +3,7 @@ Sum meters to daily totals
 """
 import pandas as pd
 
-from src.stats.core import assign_day_index
+from newsegsstats.core import assign_day_index
 
 def agg_meters_daily(
     data: pd.DataFrame|pd.Series

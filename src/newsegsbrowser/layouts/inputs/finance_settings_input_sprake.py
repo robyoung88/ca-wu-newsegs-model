@@ -1,8 +1,8 @@
 from dash import html
 import dash_bootstrap_components as dbc
 
-from src.newsegsbrowser import icons
-from src.newsegsbrowser import common as browser
+from newsegsbrowser import icons
+from newsegsbrowser import common as browser
 
 def create_finance_settings_input_card():
     """

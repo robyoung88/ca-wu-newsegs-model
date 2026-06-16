@@ -9,11 +9,11 @@ from dash import html, Patch, Input, Output, dcc, ALL, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from src.util import jsonfuncs
-from src.newsegsbrowser import common as browser
-from src.newsegsbrowser.common import get_icon
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import sprakefinance
+from util import jsonfuncs
+from newsegsbrowser import common as browser
+from newsegsbrowser.common import get_icon
+from newsegsmodel import sprakemodel
+from newsegsfinance import sprakefinance
 
 def config_to_dict(name, mdl: sprakemodel.SprakeModel, fnc: sprakefinance.SprakeFinance):
     """
@@ -302,8 +302,8 @@ def add_configuration_selection_callbacks(app):
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data', allow_duplicate = True),
 
-        Output('store-model-interface-configurations', 'data'),
-        Output('store-finance-interface-configurations', 'data'),
+        Output('store-model-interface-configurations', 'data', allow_duplicate = True),
+        Output('store-finance-interface-configurations', 'data', allow_duplicate = True),
         
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
         State('store-configurations', 'data'),

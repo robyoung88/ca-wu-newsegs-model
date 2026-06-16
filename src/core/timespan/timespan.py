@@ -17,10 +17,11 @@ from datetime import timedelta, tzinfo
 import zoneinfo
 import pytz
 import dateutil
-from pandas.core.tools.datetimes import DatetimeScalar, Timedelta
+from pandas.core.tools.datetimes import DatetimeScalar
 import numpy.typing as npt
 
-from src.util import classfuncs
+from util import classfuncs
+from core import serialisation
 
 SECONDS_IN_DAY = (24 * 3600)
 
@@ -43,7 +44,7 @@ PEAK_PERIODS = [
      'index': 1}
 ]
 
-TimedeltaScalar: TypeAlias = Timedelta|timedelta|np.timedelta64|str|int|float
+TimedeltaScalar: TypeAlias = timedelta|np.timedelta64|str|int|float
 TimeZoneScalar: TypeAlias = str|tzinfo
 
 def timestamp_to_dict(ts: pd.Timestamp) -> Mapping:
@@ -63,8 +64,11 @@ def timedelta_to_dict(td: pd.Timedelta) -> Mapping:
 def timedelta_from_dict(td_dict: Mapping) -> pd.Timedelta:
     return pd.Timedelta(**td_dict)
 
-class TimeSpan:
+class TimeSpan(serialisation.SerialiseToDictMixin):
     _tz = 'utc'
+
+    # Override of SerialiseToDictMixin _constructor_class
+    _constructor_class = 'TimeSpan'
 
     @singledispatchmethod
     def __init__(

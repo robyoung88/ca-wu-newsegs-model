@@ -4,8 +4,8 @@ from dash import html, dcc, Input, Output, State, ALL, no_update
 import dash_leaflet as dl
 import dash_bootstrap_components as dbc
 
-from src.core import location as modlocation
-from src.newsegsbrowser.common import get_icon
+from core import location as modlocation
+from newsegsbrowser.common import get_icon
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 

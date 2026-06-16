@@ -7,7 +7,7 @@ import json
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.newsegsfinance import sprakefinance
+from newsegsfinance import sprakefinance
 
 class TestSprakeFinanceConfigEqualities(unittest.TestCase):
 

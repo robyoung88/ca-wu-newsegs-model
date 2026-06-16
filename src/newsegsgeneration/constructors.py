@@ -1,17 +1,21 @@
-from collections.abc import Mapping
+import copy
+from typing import Any
 
-from src.newsegsgeneration import newsegsgeneration
-from src.newsegsgeneration import sprakegeneration
+from newsegsgeneration import newsegsgeneration
+from newsegsgeneration import sprakegeneration
 
 _GENERATION_MODULE_CONSTRUCTORS = {
     'SprakeGeneration': sprakegeneration.SprakeGeneration,
 }
 
 def generation_module_from_dict(
-    ip: Mapping
+    config: dict[str, Any]
 ) -> newsegsgeneration.NewsegsGeneration:
-    classname = ip.pop('class')
+    config = copy.copy(config)
+    classname = config.pop('class')
+    if classname is None:
+        raise ValueError(f'`class` not found in configuration dictionary with keys: {config.keys()}')
     constructor = _GENERATION_MODULE_CONSTRUCTORS.get(classname, None)
     if constructor is None:
-        raise ValueError('Generation module constructor not known: ', classname)
-    return constructor.from_dict(ip)
+        raise ValueError(f'Generation module constructor not found for {classname}')
+    return constructor.from_dict(config)

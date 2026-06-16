@@ -3,9 +3,9 @@ import json
 from dash import html, no_update
 import pandas as pd
 
-from src.newsegsbrowser import icons
-from src.newsegsbrowser.postprocess import postprocess_utils
-from src.newsegsbrowser.postprocess.tables import result_tables_sprake
+from newsegsbrowser import icons
+from newsegsbrowser.postprocess import postprocess_utils
+from newsegsbrowser.postprocess.tables import result_tables_sprake
 
 def update_generation_results_header(
     res_trigger, 

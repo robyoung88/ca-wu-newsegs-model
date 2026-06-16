@@ -1,0 +1,775 @@
+[
+    {
+        "class": "ConstantVariable",
+        "name": "Storage capacity",
+        "configuration_type": "model",
+        "model_section": "mod_cs.storage_params",
+        "model_parameter": "storage_capacity",
+        "interface_section": "stor_input",
+        "interface_key": "storage_capacity",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "dsa_bounds_type": "relative",
+        "_raw_parameters": [
+            4000.0
+        ],
+        "_parameters": [
+            4000.0
+        ],
+        "_dsa_lower": 0.9,
+        "_dsa_upper": 1.1,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "kWh",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 5.0
+    },
+    {
+        "class": "BetaVariable",
+        "name": "Storage round trip efficiency",
+        "configuration_type": "model",
+        "model_section": "mod_cs.storage_params",
+        "model_parameter": "storage_rte",
+        "interface_section": "stor_input",
+        "interface_key": "storage_rte",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.8799999999999999,
+            0.02
+        ],
+        "_parameters": [
+            231.4400000000001,
+            31.56000000000005
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": false,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "",
+        "configuration_show": false,
+        "interface_min": null,
+        "interface_max": null,
+        "interface_step": null
+    },
+    {
+        "class": "ConstantVariable",
+        "name": "No. of households",
+        "configuration_type": "model",
+        "model_section": "mod_cs",
+        "model_parameter": "n_units",
+        "interface_section": "bc_input",
+        "interface_key": "n_units",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "dsa_bounds_type": "absolute",
+        "_raw_parameters": [
+            100
+        ],
+        "_parameters": [
+            100
+        ],
+        "_dsa_lower": 90,
+        "_dsa_upper": 110,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "",
+        "configuration_show": true,
+        "interface_min": 1,
+        "interface_max": 1000,
+        "interface_step": 1
+    },
+    {
+        "class": "NormalVariable",
+        "name": "HLP",
+        "configuration_type": "model",
+        "model_section": "mod_cs.spaceheat_params",
+        "model_parameter": "hlp",
+        "interface_section": "bc_input",
+        "interface_key": "hlp",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.3,
+            0.06
+        ],
+        "_parameters": [
+            0.3,
+            0.06
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "W/m\u00b2/K",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 3.0,
+        "interface_step": 0.1
+    },
+    {
+        "class": "NormalVariable",
+        "name": "Mean GFA",
+        "configuration_type": "model",
+        "model_section": "mod_cs.spaceheat_params",
+        "model_parameter": "gfa",
+        "interface_section": "bc_input",
+        "interface_key": "gfa",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            105.0,
+            21.0
+        ],
+        "_parameters": [
+            105.0,
+            21.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "m\u00b2/household",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 300,
+        "interface_step": 1
+    },
+    {
+        "class": "NormalVariable",
+        "name": "Reference hot water demand",
+        "configuration_type": "model",
+        "model_section": "mod_cs.dhw_params",
+        "model_parameter": "ref_daily_consumption",
+        "interface_section": "bc_input",
+        "interface_key": "ref_daily_consumption",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            4.5,
+            0.9
+        ],
+        "_parameters": [
+            4.5,
+            0.9
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "kWh/day",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10.0,
+        "interface_step": 0.1
+    },
+    {
+        "class": "BetaVariable",
+        "name": "Seasonal variation",
+        "configuration_type": "model",
+        "model_section": "mod_cs.dhw_params",
+        "model_parameter": "seasonal_variance",
+        "interface_section": "bc_input",
+        "interface_key": "seasonal_variance",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.2,
+            0.04000000000000001
+        ],
+        "_parameters": [
+            19.799999999999997,
+            79.19999999999999
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "factor",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.05
+    },
+    {
+        "class": "BetaVariable",
+        "name": "High-efficiency appliances consumption reduction",
+        "configuration_type": "model",
+        "model_section": "mod_cs.appliance_params",
+        "model_parameter": "efficiency_reduction",
+        "interface_section": "dc_input",
+        "interface_key": "efficiency_reduction",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.09999999999999999,
+            0.02
+        ],
+        "_parameters": [
+            22.399999999999995,
+            201.59999999999997
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "factor",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.05
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Residential charging per EV",
+        "configuration_type": "model",
+        "model_section": "mod_cs.ev_params",
+        "model_parameter": "annual_residential_consumption_per_ev",
+        "interface_section": "dc_input",
+        "interface_key": "annual_residential_consumption_per_ev",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            1314.72,
+            262.944
+        ],
+        "_parameters": [
+            25.0,
+            52.5888
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "kWh/yr",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.05
+    },
+    {
+        "class": "GammaVariable",
+        "name": "EVs per household",
+        "configuration_type": "model",
+        "model_section": "mod_cs",
+        "model_parameter": "ev_per_unit",
+        "interface_section": "dc_input",
+        "interface_key": "n_evs_per_household",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.2,
+            0.04000000000000001
+        ],
+        "_parameters": [
+            24.999999999999993,
+            0.008000000000000002
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "n",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 3.0,
+        "interface_step": 0.05
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Wind Capex",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "wind_capex_per_kw",
+        "interface_section": "unit_costs",
+        "interface_key": "wind_capex_per_kw",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            1500.0,
+            300.0
+        ],
+        "_parameters": [
+            25.0,
+            60.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kW",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 50
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Wind Ongoing",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "wind_om_per_kw_year",
+        "interface_section": "unit_costs",
+        "interface_key": "wind_om_per_kw_year",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            46.0,
+            9.200000000000001
+        ],
+        "_parameters": [
+            24.999999999999993,
+            1.8400000000000005
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kW/yr",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 5000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Solar PV Capex",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "pv_capex_per_kw",
+        "interface_section": "unit_costs",
+        "interface_key": "pv_capex_per_kw",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            1000.0,
+            200.0
+        ],
+        "_parameters": [
+            25.0,
+            40.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWp",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 50
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Solar PV Ongoing",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "pv_om_per_kw_year",
+        "interface_section": "unit_costs",
+        "interface_key": "pv_om_per_kw_year",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            10.5,
+            2.1
+        ],
+        "_parameters": [
+            25.0,
+            0.42
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWp/yr",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 5000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "name": "BESS Capex",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "bess_capex_per_kwh",
+        "interface_section": "unit_costs",
+        "interface_key": "bess_capex_per_kwh",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            191.772,
+            38.3544
+        ],
+        "_parameters": [
+            25.0,
+            7.6708799999999995
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWh",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 50
+    },
+    {
+        "class": "GammaVariable",
+        "name": "BESS Ongoing",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "bess_om_per_kwh_year",
+        "interface_section": "unit_costs",
+        "interface_key": "bess_om_per_kwh_year",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            16.719,
+            3.3438000000000003
+        ],
+        "_parameters": [
+            25.0,
+            0.66876
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWh",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 5000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Resident standing charge",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "resident_sc_per_unit_day",
+        "interface_section": "unit_costs",
+        "interface_key": "resident_sc_per_unit_day",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.0,
+            0.0
+        ],
+        "_parameters": [
+            0.0,
+            0.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/household/day",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Resident per unit charge",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "resident_var_per_unit",
+        "interface_section": "unit_costs",
+        "interface_key": "resident_var_per_unit",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.2975,
+            0.0595
+        ],
+        "_parameters": [
+            25.0,
+            0.011899999999999999
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWh",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Grid export - mean per unit",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "grid_export_var_per_unit",
+        "interface_section": "unit_costs",
+        "interface_key": "grid_export_var_per_unit",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.1,
+            0.020000000000000004
+        ],
+        "_parameters": [
+            24.999999999999993,
+            0.004000000000000001
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWh",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Fixed costs for backup",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "grid_import_sc_per_day",
+        "interface_section": "unit_costs",
+        "interface_key": "grid_import_sc_per_day",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.0,
+            0.0
+        ],
+        "_parameters": [
+            0.0,
+            0.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/site/day",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "name": "Per-unit costs for backup",
+        "configuration_type": "finance",
+        "model_section": "unit_costs",
+        "model_parameter": "grid_import_var_per_unit",
+        "interface_section": "unit_costs",
+        "interface_key": "grid_import_var_per_unit",
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "dsa_bounds_type": "interval",
+        "_raw_parameters": [
+            0.35,
+            0.06999999999999999
+        ],
+        "_parameters": [
+            25.0,
+            0.013999999999999999
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_selected": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_selected": false,
+        "psa_active": false,
+        "unit": "\u00a3/kWh",
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01
+    }
+]
