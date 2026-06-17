@@ -28,8 +28,8 @@ PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
                         start_day_seconds = lambda df: df['timestamp'].dt.total_seconds(),
                         end_day_seconds = lambda df: df['start_day_seconds'].shift(-1, fill_value = df['start_day_seconds'].iloc[-1] + (df['start_day_seconds'].iloc[1] - df['start_day_seconds'].iloc[0])))
 
-def calibrate_hlp(target_specific_heat_loss:float=52.0, #kWh/m²/yr
-                  calibration_degree_days:npt.ArrayLike=CALIBRATION_DEGREE_DAYS['hdd_15_5'].values
+def calibrate_hlp(target_specific_heat_loss: float = 52.0, #kWh/m²/yr
+                  calibration_degree_days: npt.ArrayLike = np.asarray(CALIBRATION_DEGREE_DAYS['hdd_15_5'].values)
                   ) -> float:
     # degree days to degree hours
     dh = 24.0 * np.sum(calibration_degree_days)

@@ -61,7 +61,7 @@ class TestParameterisations(unittest.TestCase):
             (2., )
         )
 
-        dummyvar = variable.Variable('dummy')
+        dummyvar = variable.Variable('dummy') # pyright: ignore[reportAbstractUsage]
 
         self.assertEqual(
             dist.n_values(dummyvar),
@@ -92,14 +92,14 @@ class TestPolymorphicFactory(unittest.TestCase):
     """
     
     def test_construction(self):
-        const_var = variable.Variable('const var', distribution = 'constant')
-        binom_var = variable.Variable('binom var', distribution = 'binomial')
-        normal_var = variable.Variable('normal var', distribution = 'normal')
-        beta_var = variable.Variable('beta var', distribution = 'beta')
-        gamma_var = variable.Variable('gamma var', distribution = 'gamma')
-        constant_vector_var = variable.Variable('constant_vector var', distribution = 'constant_vector')
-        mvn_var = variable.Variable('mvn var', distribution = 'mvn')
-        dirichlet_var = variable.Variable('dirichlet var', distribution = 'dirichlet')
+        const_var = variable.Variable('const var', distribution = 'constant') # pyright: ignore[reportAbstractUsage]
+        binom_var = variable.Variable('binom var', distribution = 'binomial') # pyright: ignore[reportAbstractUsage]
+        normal_var = variable.Variable('normal var', distribution = 'normal') # pyright: ignore[reportAbstractUsage]
+        beta_var = variable.Variable('beta var', distribution = 'beta') # pyright: ignore[reportAbstractUsage]
+        gamma_var = variable.Variable('gamma var', distribution = 'gamma') # pyright: ignore[reportAbstractUsage]
+        constant_vector_var = variable.Variable('constant_vector var', distribution = 'constant_vector') # pyright: ignore[reportAbstractUsage]
+        mvn_var = variable.Variable('mvn var', distribution = 'mvn') # pyright: ignore[reportAbstractUsage]
+        dirichlet_var = variable.Variable('dirichlet var', distribution = 'dirichlet') # pyright: ignore[reportAbstractUsage]
 
         self.assertIsInstance(const_var, variable.ConstantVariable)
         self.assertIsInstance(binom_var, variable.BinomialVariable)

@@ -8,7 +8,7 @@ _CS_MODULE_CONSTRUCTORS = {
 }
 
 def cs_module_from_dict(
-    ip: Mapping
+    ip: dict
 ) -> newsegscs.NewsegsCS:
     classname = ip.pop('class')
     constructor = _CS_MODULE_CONSTRUCTORS.get(classname, None)

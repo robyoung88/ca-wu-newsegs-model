@@ -1,6 +1,7 @@
 """
 Unit tests for newsegscs/sprakecs
 """
+from typing import cast
 import unittest
 import json
 
@@ -80,6 +81,7 @@ class TestSprakeCSConfigEqualities(unittest.TestCase):
         d1 = cs1.to_dict()
 
         cs2 = csconstructors.cs_module_from_dict(d1)
+        cs2 = cast(sprakecs.SprakeCS, cs2)
 
         self.assertEqual(cs1.n_units, cs2.n_units)
         self.assertDictEqual(cs1.storage_params, cs2.storage_params)

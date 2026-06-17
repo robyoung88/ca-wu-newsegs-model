@@ -44,6 +44,7 @@ import numpy.typing as npt
 import pandas as pd
 import pvlib
 
+from core.newsegsmodelinterface import NewsegsModelInterface
 from util import classfuncs
 from core import SerialiseToDictMixin, serialisation
 from core import newsegscomponent
@@ -93,7 +94,7 @@ class ABCElecGenerator(
     - accessing the nameplate electrical capacity of the generator.
     """
     _name: str = 'Generator'
-    _model: environmentserverinterface.EnvironmentServerInterface
+    _model: NewsegsModelInterface
 
     _constructor_class = 'Generator'
 
@@ -123,7 +124,7 @@ class ABCElecGenerator(
         self._name = name
 
     @property
-    def model(self) -> environmentserverinterface.EnvironmentServerInterface: 
+    def model(self) -> NewsegsModelInterface: 
         """
         The callback NewsegsModel model associated with the generator.
         """
@@ -132,7 +133,7 @@ class ABCElecGenerator(
         return self._model
 
     @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerInterface):
+    def model(self, model: NewsegsModelInterface):
         self._model = model
 
     # @abstractmethod
@@ -259,7 +260,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         cut_out: Real | None = None,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         """
         Default assumes None
@@ -278,7 +279,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         cut_out: Real | None = None,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         
         self.set_cp_curve(cp_curve)
@@ -300,8 +301,6 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         
         if model is not None:
             self._model = model
-        else:
-            self._model = None
     
     @classmethod
     def from_none(cls) -> WindTurbineElecGenerator:
@@ -692,7 +691,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         raise ValueError('First argument must be a WindTurbineElecGenerator or PowerPlantHomogeneousWind, is %s', type(turbine))
     
@@ -704,7 +703,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         # Take a copy of the turbine, primarily to ensure that
         # changing its location does not break its parent
@@ -727,7 +726,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
 
     @property
     @override
-    def model(self) -> environmentserverinterface.EnvironmentServerInterface:
+    def model(self) -> NewsegsModelInterface:
         """
         The NewSEGS Model for environmental data.
 
@@ -738,7 +737,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
     
     @model.setter
     @override
-    def model(self, model: environmentserverinterface.EnvironmentServerInterface) -> None:
+    def model(self, model: NewsegsModelInterface) -> None:
         self.turbine.model = model
     
     @property
@@ -823,7 +822,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         n: Real,
         loc: location.RaisedLocation | None = None,
         name: str|None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None,
+        model: NewsegsModelInterface | None = None,
     ) -> 'PowerPlantHomogeneousWind':
         a = locals()
         del a['cls']
@@ -904,7 +903,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         """
         Default assumes None
@@ -922,7 +921,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         self._peak_power = float(peak_power)
         self._total_area = float(total_area) if total_area is not None else self._peak_power / 0.435
@@ -1054,7 +1053,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> T:
         
         a = locals()
@@ -1246,7 +1245,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         dc_efficiency: Real = 0.98,
         inverter_efficiency: Real = 0.96,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         """
         Default assumes None
@@ -1452,7 +1451,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None,
+        model: NewsegsModelInterface | None = None,
         dc_efficiency: Real | None = None,
         inverter_efficiency: Real | None = None
     ) -> SprakePVGISElecGenerator:
@@ -1526,7 +1525,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         raise ValueError('First argument must be an ABCPVElecGenerator or PowerPlantHomogeneousPV, is %s', type(pv_array))
 
@@ -1538,7 +1537,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None
+        model: NewsegsModelInterface | None = None
     ) -> None:
         # Take a copy of the pv array, primarily to ensure that
         # changing its location does not break its parent
@@ -1561,7 +1560,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
 
     @property
     @override
-    def model(self) -> environmentserverinterface.EnvironmentServerInterface:
+    def model(self) -> NewsegsModelInterface:
         """
         The NewSEGS Model for environmental data.
 
@@ -1572,7 +1571,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
     
     @model.setter
     @override
-    def model(self, model: environmentserverinterface.EnvironmentServerInterface) -> None:
+    def model(self, model: NewsegsModelInterface) -> None:
         self._pv_array.model = model
 
     @property
@@ -1654,7 +1653,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         n: Real,
         loc: location.AspectLocation | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None,
+        model: NewsegsModelInterface | None = None,
     ) -> PowerPlantHomogeneousPV:
 
         a = locals()
@@ -1749,7 +1748,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         generators: Collection[ABCScalingPowerPlant] | PowerPlantHeterogeneousGenerators,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None,
+        model: NewsegsModelInterface | None = None,
         do_copy: bool = True
     ) -> None:
         raise ValueError('First argument must be a collection of `ABCElecGenerator`s or a PowerPlantHeterogeneousGenerators, is %s', type(generators))
@@ -1762,7 +1761,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         generators: Collection[ABCScalingPowerPlant],
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None,
+        model: NewsegsModelInterface | None = None,
         do_copy: bool = True,
     ) -> None:
         if do_copy:
@@ -1788,11 +1787,11 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         ])
         
     @property
-    def model(self) -> environmentserverinterface.EnvironmentServerInterface:
+    def model(self) -> NewsegsModelInterface:
         return self._generators[0].model
 
     @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerInterface) -> None:
+    def model(self, model: NewsegsModelInterface) -> None:
         for generator in self.generators:
             generator.model = model
 
@@ -1860,7 +1859,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         cls,
         generators: list[ABCScalingPowerPlant],
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerInterface | None = None,
+        model: NewsegsModelInterface | None = None,
     ) -> PowerPlantHeterogeneousGenerators:
         a = locals()
         del a['cls']

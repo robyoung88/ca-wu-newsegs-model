@@ -6,9 +6,9 @@ from typing import Sequence
 import pandas as pd
 
 from core import NewsegsModule
-from core import ABCNewsegsModuleResult
+from core.newsegsmoduleresult import NewsegsModuleResult
+from core.newsegsmoduleresult import filter_meters
 from core import location as modlocation
-from core.newsegsmodule import filter_meters
 
 class NewsegsGeneration(NewsegsModule):
     
@@ -28,7 +28,7 @@ class NewsegsGeneration(NewsegsModule):
         ...
     
 def get_generation_meters(
-    gen_results: ABCNewsegsModuleResult
+    gen_results: NewsegsModuleResult
 ) -> pd.DataFrame:
     """
     Extract generation meters from a generation module results.

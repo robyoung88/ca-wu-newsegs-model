@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     with open('data/sprake-variable-config-novalues.json', 'r') as f:
         var_conf_list = json.load(f)
-    variables = [variable.Variable(**x) for x in var_conf_list]
+    variables = [variable.Variable(**x) for x in var_conf_list] # pyright: ignore[reportAbstractUsage]
 
     for var in variables:
         if var.is_model_type(mdl):

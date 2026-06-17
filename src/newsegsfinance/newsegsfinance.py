@@ -9,7 +9,7 @@ import uuid
 import re
 
 from core import newsegscomponent
-from newsegsmodel import NewsegsModel
+from core import newsegsmodelinterface
 import pandas as pd
 
 from util import classfuncs
@@ -52,15 +52,15 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     @abstractmethod
-    def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:
+    def set_model(self, mdl: newsegsmodelinterface.NewsegsModelInterface | None, dirty: bool = True) -> None:
         ...
     
     @property
-    def model(self) -> NewsegsModel | None:
+    def model(self) -> newsegsmodelinterface.NewsegsModelInterface | None:
         return self._model
     
     @model.setter
-    def model(self, mdl: NewsegsModel | None) -> None:
+    def model(self, mdl: newsegsmodelinterface.NewsegsModelInterface | None) -> None:
         self.set_model(mdl)
 
     # Discount rates
@@ -468,79 +468,6 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
             self.last_update = datetime.datetime.now()
         self._dirty = val
 
-    # def to_dict(self) -> dict[str, Any]:
-    #     """
-    #     Configuration as a dictionary
-    #     """
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self.name,
-    #         'finance_version': self.finance_version,
-    #     }
-        
-    #     return odict
-    
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     """
-    #     Update configuration using a dictionary.
-
-    #     In the default implementation, will go through each key in the dict.
-    #     If there is an attribute with an fset attribute, then assume it is a
-    #     read-write property and update it via the fset. Otherwise, set the
-    #     attribute directly.
-    #     """
-    #     config_cls = config.get('class')
-    #     if config_cls is not None and config_cls != classfuncs.get_class(self):
-    #         raise ValueError(f'Config model class inconsistent: {config_cls}')
-        
-    #     config_version = config.get('model_version')
-    #     if config_version is not None and config_version != self.version:
-    #         raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
-        
-    #     config = copy.copy(config)
-
-    #     for k in config.keys():
-    #         if hasattr(self, k):
-    #             v = config.get(k)
-
-    #             # If the attribute is a read-write property, its class attribute 
-    #             # will have an fset
-    #             try:
-    #                 prop = getattr(type(self), k)
-    #                 if hasattr(prop, 'fset'):
-    #                     getattr(prop, 'fset')(self, v)
-    #                 else:
-    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
-    #                     setattr(self, k, v)
-    #             except AttributeError:
-    #                 setattr(self, k, v)
-
-    # def update(
-    #     self,
-    #     config: dict[str, Any] | NewsegsFinance,
-    #     force: bool = False
-    # ) -> None:
-    #     """
-    #     Update configuration using a dictionary or another instance.
-
-    #     Throws TypeError if the configuration is not compatible; e.g. if the
-    #     dict is for a different model or the other model instance is not of
-    #     the same kind.
-
-    #     If the dictionary has no 'class' key, it will be used anyway.
-    #     """
-    #     if isinstance(config, dict):
-    #         conf_class = config.get('class')
-    #         if conf_class and not force:
-    #             if classfuncs.get_class(self) != conf_class:
-    #                 raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
-    #         self.sync_with_dict(config)
-    #     else:
-    #         if not isinstance(config, type(self)):
-    #             if not force:
-    #                 raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
-    #         vars(self).update(copy.deepcopy(vars(config)))
-
     def __hash__(self):
         mdl = self.model
         if mdl is None:
@@ -558,3 +485,5 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
                 mdl.last_run
             )
         )
+
+NewsegsFinance._excluded_attributes = super(NewsegsFinance, NewsegsFinance)._excluded_attributes + ('_model',)

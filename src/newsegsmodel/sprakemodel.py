@@ -9,13 +9,12 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from util import classfuncs
+from core.newsegsmoduleresult import NewsegsModuleResult
 from core import timespan as modtimespan
 from core import location as modlocation
 from core.generation import generators
 from core.environment import environment_servers
 from core.environment import inmem_env_servers
-from core import newsegsmodule
 from newsegsmodel import newsegsmodel
 from newsegsgeneration import newsegsgeneration
 from newsegsgrid import newsegsgrid
@@ -81,7 +80,7 @@ def get_sprake_environment_server():
         )
     )
 
-    pvloc = modlocation.RaisedLocation(
+    pvloc = modlocation.AspectLocation(
         settings.get('SprakeValidationLat'),
         settings.get('SprakeValidationLon'), 
         height_agl = 2
@@ -103,18 +102,18 @@ def get_sprake_environment_server():
     pv_ts.set_offset(pv_ts.start, pv_ts.start)
 
     server.set_horizontal_solar_flux(
-        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].values),
+        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].to_numpy()),
         pvloc,
         pv_ts)
     
     server.set_wind_speed(
-        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].values),
+        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].to_numpy()),
         pvloc,
         pv_ts
     )
 
     server.set_external_temperature(
-        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].values),
+        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].to_numpy()),
         pvloc,
         pv_ts
     )
@@ -312,7 +311,9 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         return self._mod_gen
     
     @generation.setter
-    def generation(self, generation_module: sprakegeneration.SprakeGeneration):
+    def generation(self, generation_module: newsegsgeneration.NewsegsGeneration):
+        if not isinstance(generation_module, sprakegeneration.SprakeGeneration):
+            raise TypeError(f'Sprake model only compatible with SprakeGeneration - {type(generation_module)} provided')
         self._mod_gen = generation_module
         self._mod_gen.model = self
 
@@ -321,16 +322,20 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         return self._mod_grid
 
     @grid.setter
-    def grid(self, grid_module: sprakegrid.SprakeGrid):
+    def grid(self, grid_module: newsegsgrid.NewsegsGrid):
+        if not isinstance(grid_module, sprakegrid.SprakeGrid):
+            raise TypeError(f'Sprake model only compatible with SprakeGrid - {type(grid_module)} provided')
         self._mod_grid = grid_module
         self._mod_grid.model = self
 
     @property
     def consumption_storage(self) -> sprakecs.SprakeCS:
-        return self._mod_cs
+        return cast(sprakecs.SprakeCS, self._mod_cs)
 
     @consumption_storage.setter
-    def consumption_storage(self, cs_module: sprakecs.SprakeCS):
+    def consumption_storage(self, cs_module: newsegscs.NewsegsCS):
+        if not isinstance(cs_module, sprakecs.SprakeCS):
+            raise TypeError(f'Sprake model only compatible with SprakeCS - {type(cs_module)} provided')
         self._mod_cs = cs_module
         self._mod_cs.model = self
 
@@ -346,7 +351,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._local_environment_server = local_environment_server
 
     @property
-    def wider_env(self) -> environment_servers.NewsegsWiderEnvironment | None:
+    def wider_env(self) -> environment_servers.NewsegsWiderEnvironment:
         return self._wider_environment_server
     
     @wider_env.setter
@@ -373,16 +378,16 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         """
         self._mod_cs.location = loc
 
-    def get_generation_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_generation_result(self) -> NewsegsModuleResult | None:
         return self._generation_result
 
-    def get_grid_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_grid_result(self) -> NewsegsModuleResult | None:
         return self._grid_result
 
-    def get_cs_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_cs_result(self) -> NewsegsModuleResult | None:
         return self._cs_result
 
-    def get_consumption_storage_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_consumption_storage_result(self) -> NewsegsModuleResult | None:
         return self._cs_result
 
     @override

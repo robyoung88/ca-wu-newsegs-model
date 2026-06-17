@@ -3,12 +3,13 @@ Summarise self-consumption data.
 """
 import copy
 from collections.abc import Iterable
+from typing import MutableSequence
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from core.newsegsmodule import filter_meters, ABCNewsegsModuleResult
+from core.newsegsmoduleresult import filter_meters, NewsegsModuleResult
 from newsegsstats.core import assign_year_index, assign_season_index
 from newsegsgeneration.newsegsgeneration import get_generation_meters
 
@@ -24,19 +25,20 @@ def self_consume(generation: npt.NDArray,
         generation
     )
 
-def as_iterable(varlist: str|Iterable|None):
+def as_list(varlist: str|MutableSequence[str]|None) -> list[str]:
     if varlist is None:
         return []
     if isinstance(varlist, str):
         return [varlist]
-    return varlist
+    return list(varlist)
 
-def selfcons_summary(df: pd.DataFrame,
-                     unit_grouping_variables: str|Iterable|None = None,
-                     agg_grouping_variables: str|Iterable|None = None
-                     ):
-    unit_grouping_variables = as_iterable(unit_grouping_variables)
-    agg_grouping_variables = as_iterable(agg_grouping_variables)
+def selfcons_summary(
+    df: pd.DataFrame,
+    unit_grouping_variables: str | MutableSequence[str] | None = None,
+    agg_grouping_variables: str | MutableSequence[str] | None = None
+):
+    unit_grouping_variables = as_list(unit_grouping_variables)
+    agg_grouping_variables = as_list(agg_grouping_variables)
 
     init_grouping_variables = (
         ['generator'] 
@@ -90,8 +92,8 @@ def selfcons_summary(df: pd.DataFrame,
         )
 
 def to_self_consumption(
-    consumption_storage_result: ABCNewsegsModuleResult,
-    generation_result: ABCNewsegsModuleResult
+    consumption_storage_result: NewsegsModuleResult,
+    generation_result: NewsegsModuleResult
 ):
     """
     Convert model results to a self-consumption dataframe
@@ -113,7 +115,7 @@ def to_self_consumption(
     selfcons_data = (
         gen_data
         .apply(
-            lambda col: self_consume(col, cons_data)
+            lambda col: self_consume(col, cons_data.to_numpy())
         )
     )
 

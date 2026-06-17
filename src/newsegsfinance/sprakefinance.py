@@ -8,15 +8,16 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
+from core.newsegsmodelinterface import NewsegsModelInterface
 from util import classfuncs
 from core.timespan import delta_days
-from core.newsegsmodule import filter_meter_indices
+from core.newsegsmoduleresult import filter_meter_indices
 from newsegsfinance import newsegsfinance
 from newsegsfinance import common as common_finance
 from newsegsmodel import newsegsmodel
 
 from newsegsfinance import apply_discount_factor, sum_all_to_horizon
-from newsegsmodel import NewsegsModel
+#from newsegsmodel import NewsegsModel
 from newsegsstats import core as stats_core
 
 # Not strictly true, but good enough for finance.
@@ -132,7 +133,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return self._unit_costs.copy()
 
-    def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:
+    def set_model(self, mdl: NewsegsModelInterface | None, dirty: bool = True) -> None:
         self._model = mdl
         self.dirty = self.dirty or dirty 
     

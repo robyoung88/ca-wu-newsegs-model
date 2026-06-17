@@ -238,6 +238,7 @@ sync_config = partial(
     generic_callbacks.sync_config,
     create_default_model = model_creation_sprake.create_default_model,
     create_default_finance = model_creation_sprake.create_default_finance,
+    create_default_variables = model_creation_sprake.create_default_variables,
     model_and_finance_to_interface_function = sprake_model_finance_to_interface_configs,
 )
 

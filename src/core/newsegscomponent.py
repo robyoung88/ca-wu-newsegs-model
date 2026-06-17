@@ -14,8 +14,9 @@ These components require the following common behaviour:
 """
 from __future__ import annotations
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 import copy
+import datetime
 import re
 from typing import Any, Sequence, Type, override
 import uuid as mod_uuid
@@ -30,6 +31,8 @@ class NewsegsComponent(
 ):
     """
     Abstract base class of a NewSEGS model component
+
+    Strictly, has no abstract members but bear with me.
     """
     
     _name: str = 'Model component'
@@ -43,7 +46,7 @@ class NewsegsComponent(
     
     @classmethod
     def _make_id_regex(cls):
-        return re.compile(rf'^{re.escape(cls._id_prefix)}-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')
+        return re.compile(rf'^{re.escape(cls._id_prefix)}' + r'-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')
 
     def __init__(self, *args, **kwargs):
         self.uuid = str(mod_uuid.uuid4())
@@ -123,70 +126,15 @@ class NewsegsComponent(
             except AttributeError:
                 setattr(self, k, v)
     
-    # def verify_config_dict(
-    #     self,
-    #     config: dict[str, Any]
-    # ):
-    #     config_cls = config.pop('class', None)
-    #     if config_cls is not None and config_cls != classfuncs.get_class(self):
-    #         raise ValueError(f'Config class inconsistent: config {config_cls} updating {classfuncs.get_class(self)}')
-        
-    #     config_version = config.pop('version', None)
-    #     if config_version is not None and config_version != self.version:
-    #         raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
-        
-    # def _apply_dict(
-    #     self,
-    #     config: dict[str, Any]
-    # ):
-    #     vars(self).update(config)
-    
-    # def update_from_dict(
-    #     self,
-    #     config: dict[str, Any]
-    # ) -> None:
-    #     """
-    #     Update configuration using a dictionary.
+class RunnableNewsegsComponent(NewsegsComponent):
+    last_run = datetime.datetime.now()
 
-    #     In the default implementation, will go through each key in the dict.
-    #     If there is an attribute with an fset attribute, then assume it is a
-    #     read-write property and update it via the fset. Otherwise, set the
-    #     attribute directly.
-    #     """
-    #     config = copy.copy(config)
-    #     self.verify_config_dict(config)
-    #     self._apply_dict(config)
+    @abstractmethod
+    def run(self) -> Any:
+        """
+        Compute all submodules given current configuration
 
-    # def update(
-    #     self,
-    #     config: dict[str, Any] | NewsegsComponent,
-    #     force: bool = False
-    # ):
-    #     """
-    #     Update configuration using a dictionary or another instance.
+        Results are accessed via the model properties.
 
-    #     Throws TypeError if the configuration is not compatible; e.g. if the
-    #     dict is for a different model or the other model instance is not of
-    #     the same kind.
-
-    #     If the dictionary has no 'class' key, it will be used anyway.
-    #     """
-    #     if isinstance(config, dict):
-    #         self.update_from_dict(config)
-    #     else:
-    #         if not isinstance(config, type(self)):
-    #             if not force:
-    #                 raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
-    #         vars(self).update(copy.deepcopy(vars(config)))
-
-    # @classmethod
-    # def from_dict(
-    #     cls: Type[NewsegsComponent],
-    #     config: dict[str, Any]
-    # ) -> NewsegsComponent:
-    #     """
-    #     An instance of the component configured per a dictionary
-    #     """
-    #     inst = cls.__new__(cls)
-    #     inst.update(config)
-    #     return(inst)
+        Returns a hash representing the model and datetime of run completion.
+        """

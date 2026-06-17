@@ -8,14 +8,16 @@ import numpy as np
 import numpy.typing as npt
 
 from core.environmentserverinterface import EnvironmentServerInterface
+from core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from util import classfuncs
 from core import newsegsmodule
 from core import location
 from core import generation
 from core import timespan as modtimespan
+from core import newsegsmoduleresult
 
-class SprakeGenerationResult(newsegsmodule.ABCNewsegsModuleResult):
+class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
     def __init__(
         self,
         *args,
@@ -134,12 +136,12 @@ class SprakeGeneration(NewsegsGeneration):
 
     @property
     @override
-    def model(self) -> EnvironmentServerInterface:
+    def model(self) -> NewsegsModelInterface:
         return self.generator.model
     
     @model.setter
     @override
-    def model(self, model: EnvironmentServerInterface) -> None:
+    def model(self, model: NewsegsModelInterface) -> None:
         self.generator.model = model
         self.dirty = True
 
@@ -155,7 +157,8 @@ class SprakeGeneration(NewsegsGeneration):
         r_timespan.timestep = timestep
         self.dirty = False
         return SprakeGenerationResult(
-            self,
+            self.id,
+            self.last_run,
             timespan = r_timespan,
             wind_energy = energy[0,:],
             solar_energy = energy[1,:]
@@ -190,38 +193,6 @@ class SprakeGeneration(NewsegsGeneration):
             o.model = model
         
         return o
-
-    # @override
-    # def to_dict(self) -> dict:
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self._name,
-    #         'generator': self.generator.to_dict()
-    #     }
-    #     return odict
-    
-    # @override
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     config = copy.copy(config)
-
-    #     generator = config.pop('generator', None)
-    #     if generator is not None:
-    #         if isinstance(generator, dict):
-    #             generator = generation.generator_from_dict(generator)
-    #         if not isinstance(generator, generation.PowerPlantHeterogeneousGenerators):
-    #             raise TypeError(f'generator is of type {type(generator)}')
-    #         self._generator = generator
-        
-    #     super().sync_with_dict(config)
-
-    # @override
-    # @classmethod
-    # def from_dict(cls, config: dict) -> SprakeGeneration:
-    #     input = copy.copy(config)
-    #     input.pop('class', None)
-    #     if input.get('generator', None) is not None:
-    #         input['generator'] = generation.generator_from_dict(input['generator'])
-    #     return cls.from_characteristics(**input)
 
 # SprakeGeneration copy constructor
 @SprakeGeneration.__init__.register(SprakeGeneration) # pyright: ignore[reportFunctionMemberAccess]
