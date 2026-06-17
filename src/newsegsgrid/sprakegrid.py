@@ -105,23 +105,6 @@ class SprakeGrid(NewsegsGrid):
         return cls(0.20)
 
     @property
-    def model(self) -> newsegsmodel.NewsegsModel | None:
-        return self._model
-
-    @model.setter
-    def model(self, model: newsegsmodel.NewsegsModel) -> None:
-        self._model = model
-        self.dirty = True
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, name:str) -> None:
-        self._name = name
-
-    @property
     def import_rate(self) -> float:
         return self._import_rate
 
@@ -161,60 +144,60 @@ class SprakeGrid(NewsegsGrid):
             export_unit_cost = self.export_rate * np.ones(model_length)
         )
 
-    @classmethod
-    def from_characteristics(
-        cls,
-        import_rate: Number,
-        export_rate: Number,
-        name: str|None,
-        model: newsegsmodel.NewsegsModel | None = None
-    ) -> SprakeGrid:
+    # @classmethod
+    # def from_characteristics(
+    #     cls,
+    #     import_rate: Number,
+    #     export_rate: Number,
+    #     name: str|None,
+    #     model: newsegsmodel.NewsegsModel | None = None
+    # ) -> SprakeGrid:
         
-        o = cls(import_rate, export_rate)
-        if name is not None:
-            o.name = name
-        if model is not None:
-            o.model = model
-        return o
+    #     o = cls(import_rate, export_rate)
+    #     if name is not None:
+    #         o.name = name
+    #     if model is not None:
+    #         o.model = model
+    #     return o
 
-    @override
-    def to_dict(self) -> Mapping:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'import_rate': self._import_rate,
-            'export_rate': self._export_rate
-        }
+    # @override
+    # def to_dict(self) -> Mapping:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'import_rate': self._import_rate,
+    #         'export_rate': self._export_rate
+    #     }
 
-        return odict
+    #     return odict
     
-    @override
-    def sync_with_dict(self, config: Mapping) -> None:
-        config = copy.copy(config)
+    # @override
+    # def sync_with_dict(self, config: Mapping) -> None:
+    #     config = copy.copy(config)
 
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
+    #     conf_keys = config.keys()
+    #     for k in conf_keys:
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
 
-    @override
-    @classmethod
-    def from_dict(cls, input: dict) -> SprakeGrid:
-        input = copy.copy(input)
-        input.pop('class', None)
-        return cls.from_characteristics(**input)
+    # @override
+    # @classmethod
+    # def from_dict(cls, input: dict) -> SprakeGrid:
+    #     input = copy.copy(input)
+    #     input.pop('class', None)
+    #     return cls.from_characteristics(**input)
 
 # SprakeGrid copy constructor
 @SprakeGrid.__init__.register(SprakeGrid)
@@ -226,4 +209,7 @@ def _SprakeGrid_from_other(
     self.import_rate = other.import_rate
     self.export_rate = other.export_rate
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass

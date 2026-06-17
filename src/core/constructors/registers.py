@@ -1,9 +1,13 @@
 """
 Registers of classes implementing SerialiseToDictMixin.
+
+Note the lazy imports, as SerialiseToDictMixin is dependent upon 
+core.constructors, so to avoid circularity these imports can only
+occur at runtime.
 """
 import inspect
 from types import ModuleType
-from typing import Literal
+from typing import Any, Literal
 
 CONSTRUCTOR_CLASS = Literal[
     'NewsegsComponent',
@@ -12,7 +16,15 @@ CONSTRUCTOR_CLASS = Literal[
     'Generator',
     'Location',
     'Timespan',
+    'Timestamp',
+    'Timedelta',
+    'datetime',
+    'PVLib'
 ]
+
+class NakedConstructor:
+    def from_dict(self, config: dict[str, Any]) -> object:
+        ...
 
 def get_subclasses_in_module(
     pymod: ModuleType,
@@ -113,7 +125,61 @@ def get_timespan_register():
             
     return TIMESPAN_CONSTRUCTORS
 
-def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, type]:
+def get_timestamp_register():
+    import pandas as pd
+    def timestamp_from_dict(config: dict[str, Any]) -> pd.Timestamp:
+        config = config.copy()
+        config.pop('constructor_class', None)
+        config.pop('class', None)
+        return pd.Timestamp(**config)
+    
+    retobj = NakedConstructor()
+    setattr(retobj, 'from_dict', timestamp_from_dict)
+
+    return {
+        'Timestamp': retobj
+    }
+
+def get_timedelta_register():
+    import pandas as pd
+
+    def timedelta_from_dict(config: dict[str, Any]) -> pd.Timedelta:
+        config = config.copy()
+        config.pop('constructor_class', None)
+        config.pop('class', None)
+        return pd.Timedelta(**config)
+
+    retobj = NakedConstructor()
+    setattr(retobj, 'from_dict', timedelta_from_dict)
+    return {
+        'Timedelta': retobj
+    }
+
+def get_datetime_register():
+    import datetime
+
+    def datetime_from_dict(config: dict[str, Any]) -> datetime.datetime:
+        config = config.copy()
+        config.pop('constructor_class', None)
+        config.pop('class', None)
+        return datetime.datetime.fromisoformat(config['value'])
+
+    retobj = NakedConstructor()
+    setattr(retobj, 'from_dict', datetime_from_dict)
+    return {
+        'datetime': retobj
+    }
+
+def get_pvlib_register():
+    from core import location
+
+    LOCATION_CONSTRUCTORS = {}
+    for pymod in [location]:
+        LOCATION_CONSTRUCTORS.update(get_subclasses_in_module(pymod, location.PVLibLocation))
+            
+    return LOCATION_CONSTRUCTORS
+
+def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, object]:
     """
     A dictionary of classes indexed by name for construction
     """
@@ -128,7 +194,15 @@ def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, type]:
             return get_generator_register()
         case 'Location':
             return get_location_register()
-        case 'Timespan':
+        case 'TimeSpan':
             return get_timespan_register()
+        case 'Timestamp':
+            return get_timestamp_register()
+        case 'Timedelta':
+            return get_timedelta_register()
+        case 'datetime':
+            return get_datetime_register()
+        case 'PVLib':
+            return get_pvlib_register()
         case _:
             raise ValueError(f'constructor_class not recognised: {constructor_class}')

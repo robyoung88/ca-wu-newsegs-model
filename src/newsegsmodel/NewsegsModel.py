@@ -21,7 +21,7 @@ from newsegscs import NewsegsCS
 from util import classfuncs
 
 class NewsegsModel(
-    environmentserverinterface.EnvironmentServerIntrface,
+    environmentserverinterface.EnvironmentServerInterface,
     newsegscomponent.NewsegsComponent
 ):
     """
@@ -260,6 +260,28 @@ class NewsegsModel(
             self.consumption_storage.dirty or
             self._dirty
         )
+    
+    @override
+    def update(self, config: dict[str, Any]):
+        for mod_name in ('mod_gen', '_mod_gen'):
+            generation = config.pop(mod_name, None)
+            if generation:
+                self.update_generation(generation)
+                break
+
+        for mod_name in ('mod_grid', '_mod_grid'):
+            grid = config.pop(mod_name, None)
+            if grid:
+                self.update_grid(grid)
+                break
+        
+        for mod_name in ('mod_cs', '_mod_cs'):
+            cs = config.pop(mod_name, None)
+            if cs:
+                self.update_consumption_storage(cs)
+                break
+        
+        return super().update(config)
 
     #def to_dict(self) -> dict[str, Any]:
     #    """
@@ -273,68 +295,68 @@ class NewsegsModel(
     #
     #    return odict
     
-    @override
-    def _apply_dict(self, config: dict[str, Any]):
-        generation = config.pop('mod_gen', None)
-        if generation:
-            self.update_generation(generation)
+    # @override
+    # def _apply_dict(self, config: dict[str, Any]):
+    #     generation = config.pop('mod_gen', None)
+    #     if generation:
+    #         self.update_generation(generation)
 
-        grid = config.pop('mod_grid', None)
-        if grid:
-            self.update_grid(grid)
+    #     grid = config.pop('mod_grid', None)
+    #     if grid:
+    #         self.update_grid(grid)
 
-        cs = config.pop('mod_cs', None)
-        if cs:
-            self.update_consumption_storage(cs)
+    #     cs = config.pop('mod_cs', None)
+    #     if cs:
+    #         self.update_consumption_storage(cs)
         
-        return super()._apply_dict(config)
+    #     return super()._apply_dict(config)
     
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        """
-        Update configuration using a dictionary.
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     """
+    #     Update configuration using a dictionary.
 
-        In the default implementation, will go through each key in the dict.
-        If there is an attribute with an fset attribute, then assume it is a
-        read-write property and update it via the fset. Otherwise, set the
-        attribute directly.
-        """
-        config_cls = config.get('class')
-        if config_cls is not None and config_cls != classfuncs.get_class(self):
-            raise ValueError(f'Config model class inconsistent: {config_cls}')
+    #     In the default implementation, will go through each key in the dict.
+    #     If there is an attribute with an fset attribute, then assume it is a
+    #     read-write property and update it via the fset. Otherwise, set the
+    #     attribute directly.
+    #     """
+    #     config_cls = config.get('class')
+    #     if config_cls is not None and config_cls != classfuncs.get_class(self):
+    #         raise ValueError(f'Config model class inconsistent: {config_cls}')
         
-        config_version = config.get('model_version')
-        if config_version is not None and config_version != self.version:
-            raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
+    #     config_version = config.get('model_version')
+    #     if config_version is not None and config_version != self.version:
+    #         raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
         
-        config = copy.copy(config)
+    #     config = copy.copy(config)
         
-        generation = config.pop('mod_gen', None)
-        if generation:
-            self.update_generation(generation)
+    #     generation = config.pop('mod_gen', None)
+    #     if generation:
+    #         self.update_generation(generation)
 
-        grid = config.pop('mod_grid', None)
-        if grid:
-            self.update_grid(grid)
+    #     grid = config.pop('mod_grid', None)
+    #     if grid:
+    #         self.update_grid(grid)
 
-        cs = config.pop('mod_cs', None)
-        if cs:
-            self.update_consumption_storage(cs)
+    #     cs = config.pop('mod_cs', None)
+    #     if cs:
+    #         self.update_consumption_storage(cs)
         
-        for k in config.keys():
-            if hasattr(self, k):
-                v = config.get(k)
+    #     for k in config.keys():
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
     
     # def update(
     #     self,
@@ -364,3 +386,5 @@ class NewsegsModel(
 
     def __hash__(self) -> int:
         return self._last_hash
+
+NewsegsModel._excluded_attributes = tuple(newsegscomponent.NewsegsComponent._excluded_attributes) + ('_generation_result', '_grid_result', '_cs_result')

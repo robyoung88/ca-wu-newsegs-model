@@ -99,7 +99,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_none()
-        mdl2.sync_with_dict(d2)
+        mdl2.update(d2)
 
         self.assertEqual(
             mdl.generation.generator.nameplate_capacity,
@@ -147,6 +147,8 @@ class TestSprakeModelRun(unittest.TestCase):
 
         gen_meters_1 = mdl.get_generation_result().meters_to_pandas()
         cs_meters_1 = mdl.get_consumption_storage_result().meters_to_pandas()
+
+        print(mdl.generation.generator.generators[1]._excluded_attributes)
 
         d1 = mdl.to_dict()
 

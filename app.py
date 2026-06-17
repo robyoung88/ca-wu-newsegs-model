@@ -12,6 +12,16 @@ import dash_bootstrap_components as dbc
 # regardless of background callback manager
 import diskcache
 
+# For local testing
+import sys
+curdir = os.path.dirname(__file__)
+src_path = os.path.join(
+    curdir,
+    'src'
+)
+sys.path.append(src_path)
+
+
 from config import settings
 
 from newsegsmodel import newsegsmodel

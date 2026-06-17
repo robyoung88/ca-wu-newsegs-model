@@ -182,9 +182,10 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
 
     _dirty = True
     _model: environmentserverinterface.EnvironmentServerInterface
+    _excluded_attributes = ('_model')
 
     def __init__(self, *args, **kwargs):
-        self.uuid = str(uuid.uuid4())
+        super().__init__(*args, **kwargs)
 
     @abstractmethod
     def run(
@@ -202,9 +203,9 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         """
         The callback model associated with the module
         """
-        if self._model is None:
-            raise AttributeError('model has not been set')
-        return self._model
+        if hasattr(self, '_model'):
+            return self._model
+        raise AttributeError('model has not been set')
 
     @model.setter
     def model(self, model: environmentserverinterface.EnvironmentServerInterface):
@@ -216,64 +217,63 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
             self._dirty = self._dirty or True
         self._model = model
 
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     """
+    #     Update configuration using a dictionary.
+
+    #     In the default implementation, will go through each key in the dict.
+    #     If there is an attribute with an fset attribute, then assume it is a
+    #     read-write property and update it via the fset. Otherwise, set the
+    #     attribute directly.
+    #     """
+    #     for k in config.keys():
+    #         if hasattr(self, k):
+    #             v = config.get(k)
+
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
     
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        """
-        Update configuration using a dictionary.
+    # def update(
+    #     self, 
+    #     config: dict | NewsegsModule, 
+    #     force: bool = False
+    # ) -> None:
+    #     """
+    #     Update configuration using a dictionary or another instance.
 
-        In the default implementation, will go through each key in the dict.
-        If there is an attribute with an fset attribute, then assume it is a
-        read-write property and update it via the fset. Otherwise, set the
-        attribute directly.
-        """
-        for k in config.keys():
-            if hasattr(self, k):
-                v = config.get(k)
+    #     Throws TypeError if the configuration is not compatible; e.g. if the
+    #     dict is for a different module or the other module instance is not of
+    #     the same kind.
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
-    
-    def update(
-        self, 
-        config: dict | NewsegsModule, 
-        force: bool = False
-    ) -> None:
-        """
-        Update configuration using a dictionary or another instance.
+    #     If the dictionary is has no 'class' key, it will be used anyway.
+    #     """
+    #     if isinstance(config, dict):
+    #         conf_class = config.get('class')
+    #         if conf_class and not force:
+    #             if classfuncs.get_class(self) != conf_class:
+    #                 raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
+    #         self.sync_with_dict(config)
+    #     else:
+    #         if not isinstance(config, type(self)):
+    #             if not force:
+    #                 raise TypeError(f'Update module is of mismatched class: {type(config)} vs {type(self)}')
+    #         vars(self).update(copy.deepcopy(vars(config)))
 
-        Throws TypeError if the configuration is not compatible; e.g. if the
-        dict is for a different module or the other module instance is not of
-        the same kind.
-
-        If the dictionary is has no 'class' key, it will be used anyway.
-        """
-        if isinstance(config, dict):
-            conf_class = config.get('class')
-            if conf_class and not force:
-                if classfuncs.get_class(self) != conf_class:
-                    raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
-            self.sync_with_dict(config)
-        else:
-            if not isinstance(config, type(self)):
-                if not force:
-                    raise TypeError(f'Update module is of mismatched class: {type(config)} vs {type(self)}')
-            vars(self).update(copy.deepcopy(vars(config)))
-
-    @classmethod
-    @abstractmethod
-    def from_dict(cls, config: dict) -> NewsegsModule:
-        """
-        An instance of the module configured per a dictionary.
-        """
+    # @classmethod
+    # @abstractmethod
+    # def from_dict(cls, config: dict) -> NewsegsModule:
+    #     """
+    #     An instance of the module configured per a dictionary.
+    #     """
 
     @property
     def dirty(self) -> bool:

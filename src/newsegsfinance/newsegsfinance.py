@@ -24,42 +24,20 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
     """
 
     _dirty = True
+
     _name = 'NewSEGS Finance'
     _finance_version = '0.0.1'
+    _id_prefix = 'f'
     
     _model = None
     
     last_update = datetime.datetime.now()
-    uuid = "1"
 
     _benefit_discount_rate: float = 0.
     _cost_discount_rate: float = 0.
 
     def __init__(self, *args, **kwargs):
-        self.uuid = str(uuid.uuid4())
-    
-    @property
-    def id(self) -> str:
-        return 'f-' + self.uuid
-    
-    @id.setter
-    def id(self, id: str) -> None:
-        uid = re.sub('^f-', '', id)
-        if len(id) != 38 or len(uid) != 36:
-            raise ValueError(f'id: {id} is not a valid NewsegsFinance identifier')
-        self.uuid = uid
-
-    @property
-    def name(self) -> str:
-        return self._name
-    
-    @name.setter
-    def name(self, name: str) -> None:
-        self._name = name
-
-    @property
-    def version(self) -> str:
-        return self._finance_version
+        super().__init__(self, *args, **kwargs)
     
     @property
     def finance_version(self) -> str:
@@ -490,78 +468,78 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
             self.last_update = datetime.datetime.now()
         self._dirty = val
 
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Configuration as a dictionary
-        """
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self.name,
-            'finance_version': self.finance_version,
-        }
+    # def to_dict(self) -> dict[str, Any]:
+    #     """
+    #     Configuration as a dictionary
+    #     """
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self.name,
+    #         'finance_version': self.finance_version,
+    #     }
         
-        return odict
+    #     return odict
     
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        """
-        Update configuration using a dictionary.
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     """
+    #     Update configuration using a dictionary.
 
-        In the default implementation, will go through each key in the dict.
-        If there is an attribute with an fset attribute, then assume it is a
-        read-write property and update it via the fset. Otherwise, set the
-        attribute directly.
-        """
-        config_cls = config.get('class')
-        if config_cls is not None and config_cls != classfuncs.get_class(self):
-            raise ValueError(f'Config model class inconsistent: {config_cls}')
+    #     In the default implementation, will go through each key in the dict.
+    #     If there is an attribute with an fset attribute, then assume it is a
+    #     read-write property and update it via the fset. Otherwise, set the
+    #     attribute directly.
+    #     """
+    #     config_cls = config.get('class')
+    #     if config_cls is not None and config_cls != classfuncs.get_class(self):
+    #         raise ValueError(f'Config model class inconsistent: {config_cls}')
         
-        config_version = config.get('model_version')
-        if config_version is not None and config_version != self.version:
-            raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
+    #     config_version = config.get('model_version')
+    #     if config_version is not None and config_version != self.version:
+    #         raise ValueError(f'Config has inconsistent model version {config_version}  vs {self.version}')
         
-        config = copy.copy(config)
+    #     config = copy.copy(config)
 
-        for k in config.keys():
-            if hasattr(self, k):
-                v = config.get(k)
+    #     for k in config.keys():
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
 
-    def update(
-        self,
-        config: dict[str, Any] | NewsegsFinance,
-        force: bool = False
-    ) -> None:
-        """
-        Update configuration using a dictionary or another instance.
+    # def update(
+    #     self,
+    #     config: dict[str, Any] | NewsegsFinance,
+    #     force: bool = False
+    # ) -> None:
+    #     """
+    #     Update configuration using a dictionary or another instance.
 
-        Throws TypeError if the configuration is not compatible; e.g. if the
-        dict is for a different model or the other model instance is not of
-        the same kind.
+    #     Throws TypeError if the configuration is not compatible; e.g. if the
+    #     dict is for a different model or the other model instance is not of
+    #     the same kind.
 
-        If the dictionary has no 'class' key, it will be used anyway.
-        """
-        if isinstance(config, dict):
-            conf_class = config.get('class')
-            if conf_class and not force:
-                if classfuncs.get_class(self) != conf_class:
-                    raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
-            self.sync_with_dict(config)
-        else:
-            if not isinstance(config, type(self)):
-                if not force:
-                    raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
-            vars(self).update(copy.deepcopy(vars(config)))
+    #     If the dictionary has no 'class' key, it will be used anyway.
+    #     """
+    #     if isinstance(config, dict):
+    #         conf_class = config.get('class')
+    #         if conf_class and not force:
+    #             if classfuncs.get_class(self) != conf_class:
+    #                 raise TypeError(f'Update dictionary is for mismatched class: {conf_class} vs {classfuncs.get_class(self)}')
+    #         self.sync_with_dict(config)
+    #     else:
+    #         if not isinstance(config, type(self)):
+    #             if not force:
+    #                 raise TypeError(f'Update model is of mismatched class: {type(config)} vs {type(self)}')
+    #         vars(self).update(copy.deepcopy(vars(config)))
 
     def __hash__(self):
         mdl = self.model

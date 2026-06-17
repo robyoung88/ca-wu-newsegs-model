@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 import copy
 import datetime
-from typing import cast, override, Any, Mapping
+from typing import cast, override, Any, Mapping, Sequence
 from functools import singledispatchmethod
 from functools import lru_cache
 
@@ -395,7 +395,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
-
+    
     @override
     def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
@@ -403,11 +403,44 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         odict['local_environment_server'] = str(self._local_environment_server)
         odict['wider_environment_server'] = str(self._wider_environment_server)
 
-        odict['mod_gen'] = self._mod_gen.to_dict()
-        odict['mod_grid'] = self._mod_grid.to_dict()
-        odict['mod_cs'] = self._mod_cs.to_dict()
+        #odict['mod_gen'] = self._mod_gen.to_dict()
+        #odict['mod_grid'] = self._mod_grid.to_dict()
+        #odict['mod_cs'] = self._mod_cs.to_dict()
 
         return odict
+    
+    @classmethod
+    @override
+    def from_dict(cls: type[SprakeModel], config: dict[str, Any]) -> SprakeModel:
+        config = config.copy()
+        local_environment_server = config.pop('local_environment_server', None)
+        wider_environment_server = config.pop('wider_environment_server', None)
+        inst = super().from_dict(config)
+
+        if local_environment_server:
+            if isinstance(local_environment_server, str):
+                testenv = get_sprake_environment_server()
+                if str(testenv) != local_environment_server:
+                    raise ValueError('Mismatched local environments')
+                inst.local_env = testenv
+            else:
+                inst.local_env = local_environment_server
+        else:
+            inst.local_env = get_sprake_environment_server()
+        
+        if wider_environment_server:
+            if isinstance(wider_environment_server, str):
+                testenv = None
+                if str(testenv) != wider_environment_server:
+                    raise ValueError('Mismatched wider environments')
+                inst._wider_environment_server = testenv
+            else:
+                inst.wider_env = wider_environment_server
+        else:
+            inst._wider_environment_server = None
+        
+        return inst
+
     
     # @classmethod
     # def from_dict(cls, config: dict) -> SprakeModel:
@@ -429,6 +462,11 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     #     mod_gen = config.pop('mod_gen')
 
     #     return cls(mod_gen, **config)
+
+SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_attributes) + (
+    '_local_environment_server',
+    '_wider_environment_server'
+)
 
 # SprakeModel copy constructor
 @SprakeModel.__init__.register(SprakeModel)

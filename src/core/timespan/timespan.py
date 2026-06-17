@@ -5,7 +5,7 @@ Ways of defining and comparing blocks of time.
 from __future__ import annotations
 
 import copy
-from typing import Mapping
+from typing import Any, Mapping, Sequence
 
 from functools import singledispatchmethod
 import operator
@@ -21,7 +21,7 @@ from pandas.core.tools.datetimes import DatetimeScalar
 import numpy.typing as npt
 
 from util import classfuncs
-from core import serialisation
+from core import SerialiseToDictMixin, find_constructor
 
 SECONDS_IN_DAY = (24 * 3600)
 
@@ -47,24 +47,22 @@ PEAK_PERIODS = [
 TimedeltaScalar: TypeAlias = timedelta|np.timedelta64|str|int|float
 TimeZoneScalar: TypeAlias = str|tzinfo
 
-def timestamp_to_dict(ts: pd.Timestamp) -> Mapping:
-    return {
-        'ts_input' : str(ts),
-        'tz': str(ts.tz)
-    }
+# def timestamp_to_dict(ts: pd.Timestamp) -> Mapping:
+#     return {
+#         'class': 'Timestamp',
+#         'constructor_class': 'Timestamp',
+#         'ts_input' : str(ts),
+#         'tz': str(ts.tz)
+#     }
 
-def timestamp_from_dict(ts_dict: Mapping) -> pd.Timestamp:
-    return pd.Timestamp(**ts_dict)
+# def timedelta_to_dict(td: pd.Timedelta) -> Mapping:
+#     return{
+#         'class': 'Timedelta',
+#         'constructor_class': 'Timedelta',
+#         'value': str(td)
+#     }
 
-def timedelta_to_dict(td: pd.Timedelta) -> Mapping:
-    return{
-        'value': str(td)
-    }
-
-def timedelta_from_dict(td_dict: Mapping) -> pd.Timedelta:
-    return pd.Timedelta(**td_dict)
-
-class TimeSpan(serialisation.SerialiseToDictMixin):
+class TimeSpan(SerialiseToDictMixin):
     _tz = 'utc'
 
     # Override of SerialiseToDictMixin _constructor_class
@@ -279,32 +277,56 @@ class TimeSpan(serialisation.SerialiseToDictMixin):
             +  "(" + repr(self.start) + ", " 
             + repr(self.end) + ")"
         )
-    
-    def to_dict(self) -> Mapping:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'start': timestamp_to_dict(self._start_dt),
-            'end': timestamp_to_dict(self._end_dt)
-        }
-        if hasattr(self, '_tz'):
-            odict['tz'] = str(self._tz)
-        return odict
+
+    # @override
+    # def _represent(self, value):
+    #     if isinstance(value, object):
+    #         if hasattr(value, 'to_dict'):
+    #             return value.to_dict() # pyright: ignore[reportAttributeAccessIssue]
+    #         elif isinstance(value, pd.Timestamp):
+    #             return timestamp_to_dict(value)
+    #         elif isinstance(value, pd.Timedelta):
+    #             return timedelta_to_dict(value)
+    #         elif isinstance(value, TimeZoneScalar):
+    #             return str(value)
+    #         else:
+    #             return value
+    #     else:
+    #         return value
     
     @classmethod
-    def from_dict(cls, ip: Mapping) -> TimeSpan:
-        ip = copy.copy(ip)
+    @override
+    def from_dict(cls: type[TimeSpan], config: dict[str, Any]) -> TimeSpan:
+        inst = super(TimeSpan, cls).from_dict(config)
+        if hasattr(inst, '_tz'):
+            inst._tz = pytz.timezone(inst._tz) # pyright: ignore[reportAttributeAccessIssue]
+        return inst # pyright: ignore[reportReturnType]
+    
+    # def to_dict(self) -> Mapping:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'start': timestamp_to_dict(self._start_dt),
+    #         'end': timestamp_to_dict(self._end_dt)
+    #     }
+    #     if hasattr(self, '_tz'):
+    #         odict['tz'] = str(self._tz)
+    #     return odict
+    
+    # @classmethod
+    # def from_dict(cls, ip: Mapping) -> TimeSpan:
+    #     ip = copy.copy(ip)
 
-        ip['start'] = timestamp_from_dict(ip.get('start'))
-        ip['end'] = timestamp_from_dict(ip.get('end'))
+    #     ip['start'] = timestamp_from_dict(ip.get('start'))
+    #     ip['end'] = timestamp_from_dict(ip.get('end'))
 
-        # To allow for the self-dispatch magic, need to
-        # set start as a positional arg
-        posargs = (ip.pop('start'),)
+    #     # To allow for the self-dispatch magic, need to
+    #     # set start as a positional arg
+    #     posargs = (ip.pop('start'),)
 
-        if ('class' in ip.keys()):
-            ip.pop('class')
+    #     if ('class' in ip.keys()):
+    #         ip.pop('class')
         
-        return cls(*posargs, **ip)
+    #     return cls(*posargs, **ip)
 
 # TimeSpan copy constructor
 @TimeSpan.__init__.register(TimeSpan)
@@ -456,17 +478,17 @@ class RegTimeSpan(TimeSpan):
             + " timestep = " + repr(self.timestep) + ")"
         )
     
-    def to_dict(self) -> Mapping:
-        odict = super().to_dict()
-        odict['timestep'] = timedelta_to_dict(self._timestep)
-        return odict
+    # def to_dict(self) -> Mapping:
+    #     odict = super().to_dict()
+    #     odict['timestep'] = timedelta_to_dict(self._timestep)
+    #     return odict
     
-    @classmethod
-    def from_dict(cls, ip: Mapping) -> RegTimeSpan:
-        ip = copy.copy(ip)
+    # @classmethod
+    # def from_dict(cls, ip: Mapping) -> RegTimeSpan:
+    #     ip = copy.copy(ip)
 
-        ip['timestep'] = timedelta_from_dict(ip.get('timestep'))
-        return super(RegTimeSpan, cls).from_dict(ip)
+    #     ip['timestep'] = timedelta_from_dict(ip.get('timestep'))
+    #     return super(RegTimeSpan, cls).from_dict(ip)
 
 # RegTimeSpan copy constructor
 @RegTimeSpan.__init__.register(TimeSpan)
@@ -663,27 +685,27 @@ class OffsetRegTimeSpan(RegTimeSpan):
             )
         return root_str + ")"
 
-    def to_dict(self) -> Mapping:
-        odict = super().to_dict()
-        if self._offset_initialised:
-            odict['local_start'] = timestamp_to_dict(self._local_start)
-            odict['remote_start'] = timestamp_to_dict(self._remote_start)
-        return odict
+    # def to_dict(self) -> Mapping:
+    #     odict = super().to_dict()
+    #     if self._offset_initialised:
+    #         odict['local_start'] = timestamp_to_dict(self._local_start)
+    #         odict['remote_start'] = timestamp_to_dict(self._remote_start)
+    #     return odict
     
-    @classmethod
-    def from_dict(cls, ip: Mapping) -> OffsetRegTimeSpan:
-        ip = copy.copy(ip)
+    # @classmethod
+    # def from_dict(cls, ip: Mapping) -> OffsetRegTimeSpan:
+    #     ip = copy.copy(ip)
 
-        local_start = ip.pop('local_start', None)
-        remote_start = ip.pop('remote_start', None)
-        o = super(OffsetRegTimeSpan, cls).from_dict(ip)
+    #     local_start = ip.pop('local_start', None)
+    #     remote_start = ip.pop('remote_start', None)
+    #     o = super(OffsetRegTimeSpan, cls).from_dict(ip)
 
-        if local_start is not None:
-            o.set_offset(
-                timestamp_from_dict(local_start),
-                timestamp_from_dict(remote_start)
-            )
-        return o
+    #     if local_start is not None:
+    #         o.set_offset(
+    #             timestamp_from_dict(local_start),
+    #             timestamp_from_dict(remote_start)
+    #         )
+    #     return o
 
 # OffsetRegTimeSpan copy constructor
 @OffsetRegTimeSpan.__init__.register(TimeSpan)

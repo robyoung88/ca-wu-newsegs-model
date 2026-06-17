@@ -2,7 +2,7 @@
     {
         "name": "Storage capacity",
         "configuration_type": "model",
-        "model_section": "mod_cs.storage_params",
+        "model_section": "mod_cs._storage_params",
         "model_parameter": "storage_capacity",
         "interface_section": "stor_input",
         "interface_key": "storage_capacity",
@@ -21,7 +21,7 @@
     {
         "name": "Storage round trip efficiency",
         "configuration_type": "model",
-        "model_section": "mod_cs.storage_params",
+        "model_section": "mod_cs._storage_params",
         "model_parameter": "storage_rte",
         "interface_section": "stor_input",
         "interface_key": "storage_rte",
@@ -58,7 +58,7 @@
     {
         "name": "HLP",
         "configuration_type": "model",
-        "model_section": "mod_cs.spaceheat_params",
+        "model_section": "mod_cs._spaceheat_params",
         "model_parameter": "hlp",
         "interface_section": "bc_input",
         "interface_key": "hlp",
@@ -77,7 +77,7 @@
     {
         "name": "Mean GFA",
         "configuration_type": "model",
-        "model_section": "mod_cs.spaceheat_params",
+        "model_section": "mod_cs._spaceheat_params",
         "model_parameter": "gfa",
         "interface_section": "bc_input",
         "interface_key": "gfa",
@@ -96,7 +96,7 @@
     {
         "name": "Reference hot water demand",
         "configuration_type": "model",
-        "model_section": "mod_cs.dhw_params",
+        "model_section": "mod_cs._dhw_params",
         "model_parameter": "ref_daily_consumption",
         "interface_section": "bc_input",
         "interface_key": "ref_daily_consumption",
@@ -115,7 +115,7 @@
     {
         "name": "Seasonal variation",
         "configuration_type": "model",
-        "model_section": "mod_cs.dhw_params",
+        "model_section": "mod_cs._dhw_params",
         "model_parameter": "seasonal_variance",
         "interface_section": "bc_input",
         "interface_key": "seasonal_variance",
@@ -134,7 +134,7 @@
     {
         "name": "High-efficiency appliances consumption reduction",
         "configuration_type": "model",
-        "model_section": "mod_cs.appliance_params",
+        "model_section": "mod_cs._appliance_params",
         "model_parameter": "efficiency_reduction",
         "interface_section": "dc_input",
         "interface_key": "efficiency_reduction",
@@ -153,7 +153,7 @@
     {
         "name": "Residential charging per EV",
         "configuration_type": "model",
-        "model_section": "mod_cs.ev_params",
+        "model_section": "mod_cs._ev_params",
         "model_parameter": "annual_residential_consumption_per_ev",
         "interface_section": "dc_input",
         "interface_key": "annual_residential_consumption_per_ev",
@@ -192,7 +192,7 @@
     {
         "name": "Wind Capex",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "wind_capex_per_kw",
         "interface_section": "unit_costs",
         "interface_key": "wind_capex_per_kw",
@@ -211,7 +211,7 @@
     {
         "name": "Wind Ongoing",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "wind_om_per_kw_year",
         "interface_section": "unit_costs",
         "interface_key": "wind_om_per_kw_year",
@@ -230,7 +230,7 @@
     {
         "name": "Solar PV Capex",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "pv_capex_per_kw",
         "interface_section": "unit_costs",
         "interface_key": "pv_capex_per_kw",
@@ -249,7 +249,7 @@
     {
         "name": "Solar PV Ongoing",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "pv_om_per_kw_year",
         "interface_section": "unit_costs",
         "interface_key": "pv_om_per_kw_year",
@@ -268,7 +268,7 @@
     {
         "name": "BESS Capex",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "bess_capex_per_kwh",
         "interface_section": "unit_costs",
         "interface_key": "bess_capex_per_kwh",
@@ -287,7 +287,7 @@
     {
         "name": "BESS Ongoing",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "bess_om_per_kwh_year",
         "interface_section": "unit_costs",
         "interface_key": "bess_om_per_kwh_year",
@@ -306,7 +306,7 @@
     {
         "name": "Resident standing charge",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "resident_sc_per_unit_day",
         "interface_section": "unit_costs",
         "interface_key": "resident_sc_per_unit_day",
@@ -325,7 +325,7 @@
     {
         "name": "Resident per unit charge",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "resident_var_per_unit",
         "interface_section": "unit_costs",
         "interface_key": "resident_var_per_unit",
@@ -344,7 +344,7 @@
     {
         "name": "Grid export - mean per unit",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "grid_export_var_per_unit",
         "interface_section": "unit_costs",
         "interface_key": "grid_export_var_per_unit",
@@ -363,7 +363,7 @@
     {
         "name": "Fixed costs for backup",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "grid_import_sc_per_day",
         "interface_section": "unit_costs",
         "interface_key": "grid_import_sc_per_day",
@@ -382,7 +382,7 @@
     {
         "name": "Per-unit costs for backup",
         "configuration_type": "finance",
-        "model_section": "unit_costs",
+        "model_section": "_unit_costs",
         "model_parameter": "grid_import_var_per_unit",
         "interface_section": "unit_costs",
         "interface_key": "grid_import_var_per_unit",

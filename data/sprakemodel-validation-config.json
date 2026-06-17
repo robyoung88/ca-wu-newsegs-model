@@ -1,48 +1,22 @@
 {
     "class": "SprakeModel",
-    "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
-    "mod_cs": {
-        "appliance_params": {
-            "efficiency_reduction": 0.1,
-            "n_households": 100.0
-        },
-        "class": "SprakeCS",
-        "dhw_params": {
-            "n_households": 100.0,
-            "ref_daily_consumption": 4.5,
-            "seasonal_variance": 0.2
-        },
-        "ev_params": {
-            "annual_residential_consumption_per_ev": 1314.72,
-            "n_evs": 20.0
-        },
-        "ev_per_unit": 0.2,
-        "n_units": 100.0,
-        "name": "Sprake Consumption and Storage Module",
-        "spaceheat_params": {
-            "gfa": 105.0,
-            "hlp": 0.3,
-            "n_households": 100.0,
-            "timeseries_hdd_start": "2000-01-01 00:00:00+00:00",
-            "timeseries_model_start": "2000-01-01 00:00:00+00:00"
-        },
-        "storage_params": {
-            "storage_capacity": 4000.0,
-            "storage_rte": 0.88
-        }
-    },
-    "mod_gen": {
+    "constructor_class": "NewsegsComponent",
+    "uuid": "c74a0125-030f-45b6-a027-ed0c49910468",
+    "_mod_gen": {
         "class": "SprakeGeneration",
-        "generator": {
+        "constructor_class": "NewsegsModule",
+        "uuid": "e5d59802-c0bf-486b-a0a8-ccbec0ad9757",
+        "_generator": {
             "class": "PowerPlantHeterogeneousGenerators",
-            "generators": [
+            "constructor_class": "Generator",
+            "_generators": [
                 {
                     "class": "PowerPlantHomogeneousWind",
-                    "n": 2.0,
-                    "name": "Wind Farm",
-                    "turbine": {
+                    "constructor_class": "Generator",
+                    "_turbine": {
                         "class": "WindTurbineElecGenerator",
-                        "cp_curve": [
+                        "constructor_class": "Generator",
+                        "_cp_curve": [
                             [
                                 0.0,
                                 1.0,
@@ -198,59 +172,143 @@
                                 0.0
                             ]
                         ],
-                        "cut_in": 3.0,
-                        "cut_out": 20.0,
-                        "hub_height": 10.0,
-                        "loc": {
+                        "_swept_area": 452.3893421169302,
+                        "_hub_height": 10.0,
+                        "_rated_power": 100.0,
+                        "_cut_in": 3.0,
+                        "_cut_out": 20.0,
+                        "_location": {
                             "class": "RaisedLocation",
-                            "crs": "EPSG:4326",
-                            "height_agl": 10.0,
-                            "lat": 53.25535,
-                            "lon": -3.47697,
-                            "name": "Site"
+                            "constructor_class": "Location",
+                            "_lat": 53.25535,
+                            "_lon": -3.47697,
+                            "_name": "Site",
+                            "_height": 10.0
                         },
-                        "name": "Norvento nED 100 (Sprake)",
-                        "rated_power": 100.0,
-                        "swept_area": 452.3893421169302
-                    }
+                        "_name": "Norvento nED 100 (Sprake)"
+                    },
+                    "_n": 2.0
                 },
                 {
                     "class": "PowerPlantHomogeneousPV",
-                    "n": 200.0,
-                    "name": "Solar PV Array",
-                    "pv_array": {
+                    "constructor_class": "Generator",
+                    "_pv_array": {
                         "class": "SprakePVGISElecGenerator",
-                        "collector_area": 2.2988505747126435,
-                        "dc_efficiency": 0.98,
-                        "frame_factor": 1.0,
-                        "inverter_efficiency": 0.96,
-                        "loc": {
-                            "azimuth": 180.0,
+                        "constructor_class": "Generator",
+                        "_peak_power": 1.0,
+                        "_total_area": 2.2988505747126435,
+                        "_frame_factor": 1.0,
+                        "_collector_area": 2.2988505747126435,
+                        "_location": {
                             "class": "AspectLocation",
-                            "crs": "EPSG:4326",
-                            "height_agl": 2.0,
-                            "lat": 53.25535,
-                            "lon": -3.47697,
-                            "name": "Site",
-                            "pitch": 35.0
+                            "constructor_class": "Location",
+                            "_lat": 53.25535,
+                            "_lon": -3.47697,
+                            "_name": "Site",
+                            "_height": 2.0,
+                            "_azimuth": 180.0,
+                            "_pitch": 35.0
                         },
-                        "name": "Reduced PVGIS modelled panel",
-                        "peak_power": 1.0,
-                        "total_area": 2.2988505747126435
-                    }
+                        "_dc_efficiency": 0.98,
+                        "_inverter_efficiency": 0.96
+                    },
+                    "_n": 200.0
                 }
-            ],
-            "name": "Site power plant"
+            ]
         },
-        "name": "Sprake Generation Module"
+        "_dirty": true
     },
-    "mod_grid": {
+    "_mod_grid": {
         "class": "SprakeGrid",
-        "export_rate": 0.07,
-        "import_rate": 0.2,
-        "name": "Sprake Grid Module"
+        "constructor_class": "NewsegsModule",
+        "uuid": "fcd699a3-9e2f-404c-b511-3b42551b43f3",
+        "_import_rate": 0.2,
+        "_dirty": true,
+        "_export_rate": 0.07
     },
-    "model_version": "0.0.1",
-    "name": "Sprake Model",
+    "_mod_cs": {
+        "class": "SprakeCS",
+        "constructor_class": "NewsegsModule",
+        "uuid": "d280169b-71fa-40a3-aa2f-0cfa5f209826",
+        "_appliance_params": {
+            "efficiency_reduction": 0.1,
+            "n_households": 100
+        },
+        "_ev_params": {
+            "annual_residential_consumption_per_ev": 1314.72,
+            "n_evs": 20.0
+        },
+        "_dhw_params": {
+            "ref_daily_consumption": 4.5,
+            "seasonal_variance": 0.2,
+            "n_households": 100
+        },
+        "_spaceheat_params": {
+            "hlp": 0.3,
+            "gfa": 105.0,
+            "timeseries_hdd_start": {
+                "class": "Timestamp",
+                "constructor_class": "Timestamp",
+                "ts_input": "2000-01-01 00:00:00+00:00",
+                "tz": "UTC"
+            },
+            "timeseries_model_start": {
+                "class": "Timestamp",
+                "constructor_class": "Timestamp",
+                "ts_input": "2000-01-01 00:00:00+00:00",
+                "tz": "UTC"
+            },
+            "n_households": 100
+        },
+        "_storage_params": {
+            "storage_capacity": 4000.0,
+            "storage_rte": 0.88
+        },
+        "_ev_per_unit": 0.2,
+        "_dirty": true,
+        "_location": {
+            "class": "Location",
+            "constructor_class": "Location",
+            "_lat": 53.255,
+            "_lon": -3.477,
+            "_name": "St Asaph V72"
+        }
+    },
+    "_default_timestep": {
+        "class": "Timedelta",
+        "constructor_class": "Timedelta",
+        "value": "0 days 01:00:00"
+    },
+    "_run_period": {
+        "class": "RegTimeSpan",
+        "constructor_class": "TimeSpan",
+        "_start_dt": {
+            "class": "Timestamp",
+            "constructor_class": "Timestamp",
+            "ts_input": "2005-01-01 00:00:00+00:00",
+            "tz": "UTC"
+        },
+        "_tz": "UTC",
+        "_end_dt": {
+            "class": "Timestamp",
+            "constructor_class": "Timestamp",
+            "ts_input": "2015-01-01 00:00:00+00:00",
+            "tz": "UTC"
+        },
+        "_delta": {
+            "class": "Timedelta",
+            "constructor_class": "Timedelta",
+            "value": "3652 days 00:00:00"
+        },
+        "_timestep": {
+            "class": "Timedelta",
+            "constructor_class": "Timedelta",
+            "value": "0 days 01:00:00"
+        },
+        "_n": 87648
+    },
+    "_name": "Sprake Model",
+    "_dirty": true,
+    "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
     "wider_environment_server": "None"
 }

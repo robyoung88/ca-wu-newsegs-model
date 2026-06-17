@@ -108,7 +108,7 @@ class TestSprakeCSConfigEqualities(unittest.TestCase):
         d2 = json.loads(sd1)
 
         cs2 = sprakecs.SprakeCS.from_none()
-        cs2.sync_with_dict(d2)
+        cs2.update(d2)
 
         self.assertEqual(cs1.n_units, cs2.n_units)
         self.assertDictEqual(cs1.storage_params, cs2.storage_params)

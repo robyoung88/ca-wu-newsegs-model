@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 
 from core.environment import environment_servers
 
-class EnvironmentServerIntrface(metaclass = ABCMeta):
+class EnvironmentServerInterface(metaclass = ABCMeta):
     @property
     @abstractmethod
     def local_env(

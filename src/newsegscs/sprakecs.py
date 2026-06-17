@@ -279,24 +279,7 @@ class SprakeCS(NewsegsCS):
             }
         
         return cls(100, spaceheat_params = spaceheat_params)
-        
-    @property
-    def model(self) -> newsegsmodel.NewsegsModel | None:
-        return self._model
     
-    @model.setter
-    def model(self, model: newsegsmodel.NewsegsModel) -> None:
-        self._model = model
-        self.dirty = True
-
-    @property
-    def name(self) -> str:
-        return self._name
-    
-    @name.setter
-    def name(self, name: str) -> None:
-        self._name = name
-
     @property
     @override
     def location(self) -> modlocation.Location:
@@ -508,102 +491,102 @@ class SprakeCS(NewsegsCS):
 
         return res
 
-    @classmethod
-    def from_characteristics(
-        cls,
-        n_units: Number,
-        ev_per_unit: Number,
-        appliance_params: Mapping,
-        ev_params: Mapping,
-        dhw_params: Mapping,
-        spaceheat_params: Mapping,
-        storage_params: Mapping,
-        loc: modlocation.Location | None = None,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
-    ) -> SprakeCS:
+    # @classmethod
+    # def from_characteristics(
+    #     cls,
+    #     n_units: Number,
+    #     ev_per_unit: Number,
+    #     appliance_params: Mapping,
+    #     ev_params: Mapping,
+    #     dhw_params: Mapping,
+    #     spaceheat_params: Mapping,
+    #     storage_params: Mapping,
+    #     loc: modlocation.Location | None = None,
+    #     name: str | None = None,
+    #     model: newsegsmodel.NewsegsModel | None = None
+    # ) -> SprakeCS:
 
-        a = locals()
-        del a['cls']
-        del a['n_units']
+    #     a = locals()
+    #     del a['cls']
+    #     del a['n_units']
 
-        return cls(n_units, **a)
+    #     return cls(n_units, **a)
 
-    @override
-    def to_dict(self) -> Mapping:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'n_units': self._n_units,
-            'ev_per_unit': self._ev_per_unit,
-            'appliance_params': self._appliance_params,
-            'ev_params': self._ev_params,
-            'dhw_params': self._dhw_params,
-            'spaceheat_params': self._spaceheat_params,
-            'storage_params': self._storage_params,
-            'loc': self.location.to_dict()
-        }
+    # @override
+    # def to_dict(self) -> Mapping:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'n_units': self._n_units,
+    #         'ev_per_unit': self._ev_per_unit,
+    #         'appliance_params': self._appliance_params,
+    #         'ev_params': self._ev_params,
+    #         'dhw_params': self._dhw_params,
+    #         'spaceheat_params': self._spaceheat_params,
+    #         'storage_params': self._storage_params,
+    #         'loc': self.location.to_dict()
+    #     }
 
-        return odict
+    #     return odict
 
-    @override
-    def sync_with_dict(self, config: Mapping) -> None:
-        config = copy.copy(config)
+    # @override
+    # def sync_with_dict(self, config: Mapping) -> None:
+    #     config = copy.copy(config)
 
-        # For all the params, we have no fset so must set explicitly
-        appliance_params = config.pop('appliance_params', None)
-        if appliance_params:
-            self.set_appliance_params(appliance_params)
+    #     # For all the params, we have no fset so must set explicitly
+    #     appliance_params = config.pop('appliance_params', None)
+    #     if appliance_params:
+    #         self.set_appliance_params(appliance_params)
         
-        ev_params = config.pop('ev_params', None)
-        if ev_params:
-            self.set_ev_params(ev_params)
+    #     ev_params = config.pop('ev_params', None)
+    #     if ev_params:
+    #         self.set_ev_params(ev_params)
         
-        dhw_params = config.pop('dhw_params', None)
-        if dhw_params:
-            self.set_dhw_params(dhw_params)
+    #     dhw_params = config.pop('dhw_params', None)
+    #     if dhw_params:
+    #         self.set_dhw_params(dhw_params)
         
-        spaceheat_params = config.pop('spaceheat_params', None)
-        if spaceheat_params:
-            self.set_spaceheat_params(spaceheat_params)
+    #     spaceheat_params = config.pop('spaceheat_params', None)
+    #     if spaceheat_params:
+    #         self.set_spaceheat_params(spaceheat_params)
         
-        storage_params = config.pop('storage_params', None)
-        if storage_params:
-            self.set_storage_params(storage_params)
+    #     storage_params = config.pop('storage_params', None)
+    #     if storage_params:
+    #         self.set_storage_params(storage_params)
         
-        loc = config.pop('loc', None)
-        if loc:
-            if isinstance(loc, Mapping):
-                loc = modlocation.location_from_dict(loc)
-            self.location = loc
+    #     loc = config.pop('loc', None)
+    #     if loc:
+    #         if isinstance(loc, Mapping):
+    #             loc = modlocation.location_from_dict(loc)
+    #         self.location = loc
         
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
+    #     conf_keys = config.keys()
+    #     for k in conf_keys:
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
     
-    @override
-    @classmethod
-    def from_dict(cls, config: Mapping) -> SprakeCS:
-        config = copy.copy(config)
-        config.pop('class', None)
-        loc = config.get('loc', None)
-        if loc:
-            if isinstance(loc, Mapping):
-                config['loc'] = modlocation.location_from_dict(loc)
-        return cls.from_characteristics(**config)
+    # @override
+    # @classmethod
+    # def from_dict(cls, config: Mapping) -> SprakeCS:
+    #     config = copy.copy(config)
+    #     config.pop('class', None)
+    #     loc = config.get('loc', None)
+    #     if loc:
+    #         if isinstance(loc, Mapping):
+    #             config['loc'] = modlocation.location_from_dict(loc)
+    #     return cls.from_characteristics(**config)
 
 #SprakeCS copy constructor
 @SprakeCS.__init__.register(SprakeCS)
@@ -622,4 +605,7 @@ def _SprakeCS_from_other(
     self.ev_per_unit = other.ev_per_unit
 
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass

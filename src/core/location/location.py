@@ -19,6 +19,8 @@ from typing import Any, override, Type, TypeVar, SupportsFloat
 from functools import singledispatchmethod
 from pyproj import Transformer
 
+import pvlib
+
 from core import serialisation
 from util import classfuncs
 
@@ -220,20 +222,20 @@ class Location(serialisation.SerialiseToDictMixin):
 
         return o
 
-    def to_dict(self) -> dict:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'lat': self._lat,
-            'lon': self._lon,
-            'crs': self._crs
-        }
-        return odict
+    #def to_dict(self) -> dict:
+    #    odict = {
+    #        'class': classfuncs.get_class(self),
+    #        'name': self._name,
+    #        'lat': self._lat,
+    #        'lon': self._lon,
+    #        'crs': self._crs
+    #    }
+    #    return odict
 
-    @classmethod
-    def from_dict(cls, input: dict[str, Any]) -> Location:
-        input.pop('class', None)
-        return cls.from_characteristics(**input)
+    #@classmethod
+    #def from_dict(cls, input: dict[str, Any]) -> Location:
+    #    input.pop('class', None)
+    #    return cls.from_characteristics(**input)
 
 # Location copy constructor
 @Location.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
@@ -342,10 +344,10 @@ class RaisedLocation(Location):
         
         return o
 
-    def to_dict(self) -> dict:
-        odict = super().to_dict()
-        odict['height_agl'] = self._height
-        return odict
+    # def to_dict(self) -> dict:
+    #     odict = super().to_dict()
+    #     odict['height_agl'] = self._height
+    #     return odict
 
 # RaisedLocation copy constructor
 @RaisedLocation.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
@@ -470,11 +472,11 @@ class AspectLocation(RaisedLocation):
 
         return o
 
-    def to_dict(self) -> dict:
-        odict = super().to_dict()
-        odict['azimuth'] = self._azimuth
-        odict['pitch'] = self._pitch
-        return odict
+    # def to_dict(self) -> dict:
+    #     odict = super().to_dict()
+    #     odict['azimuth'] = self._azimuth
+    #     odict['pitch'] = self._pitch
+    #     return odict
 
 # AspectLocation copy constructor
 @AspectLocation.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
@@ -507,3 +509,15 @@ def location_from_dict(input: dict[str, Any]):
     if constructor is None:
         raise ValueError('No location class found for ', classname)
     return constructor.from_dict(input)
+
+class PVLibLocation(
+    serialisation.SerialiseToDictMixin,
+    pvlib.location.Location
+):
+    _constructor_class = 'PVLib'
+
+class PVLibPVSystem(
+    serialisation.SerialiseToDictMixin,
+    pvlib.pvsystem.PVSystem
+):
+    _constructor_class = 'PVLib'

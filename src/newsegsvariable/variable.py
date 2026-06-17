@@ -13,7 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from useful_types import SequenceNotStr
 
-from core import newsegscomponent
+from core import newsegscomponent, serialisation
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsstats.dirichlet import fit_dirichlet
@@ -1279,6 +1279,8 @@ class GammaParameterisationExpected(
             raise ValueError(f'Mean must be positive, is: {mean}')
         if mean == 0:
             return(0., 0.)
+        if sd == 0:
+            return(0, mean)
         shape = (mean / sd) ** 2
         scale = mean / shape
         return (shape, scale)
@@ -1380,6 +1382,8 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         else:
             if scale == 0:
                 return 0.
+            elif shape == 0:
+                return scale
             return shape * scale
         
     @classmethod
@@ -2170,6 +2174,11 @@ class Variable(
 
     variable_type: VARIABLE_TYPE = 'scalar'
 
+    # NewsegsComponent constants
+    _id_prefix = 'v'
+    # SerialiseToDictMixin constants
+    _constructor_class = 'Variable'
+
     def __new__(
         cls,
         *args,
@@ -2223,7 +2232,10 @@ class Variable(
         interface_max: float | None = None,
         interface_step: float | None = None,
     ):
+        super().__init__()
         self.name = name
+
+        # `distribution` will be absorbed by __new__
         #self.distribution = distribution
 
         self.configuration_type = configuration_type
@@ -2556,21 +2568,33 @@ class Variable(
         in the metamodel and update from that direction.
         """
 
-    def to_dict(self) -> dict[str, Any]:
-        odict = {
-            'class': classfuncs.get_class(self)
-        }
-        odict.update(vars(self))
-        return odict
-    
-    def update(self, config: dict[str, Any]) -> None:
-        config = copy.copy(config)
-        config_class = config.pop('class')
-        if config_class is not None:
-            if config_class != classfuncs.get_class(self):
-                raise ValueError(f'Mismatched configuration - is for class {config_class}, is updating {classfuncs.get_class(self)}')
+    @override
+    def update(self, config: dict[str, Any] | type[serialisation.T]):
+        super().update(config)
+        # Convert required attributes to tuple in case they have come from json
+        if isinstance(config, dict):
+            if '_raw_parameters' in config.keys():
+                self._raw_parameters = tuple(self._raw_parameters)
+            if '_parameters' in config.keys():
+                self._parameters = tuple(self._parameters)
+            if '_transform' in config.keys():
+                self._transform = tuple(self._transform)
 
-        vars(self).update(config)   
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = {
+    #         'class': classfuncs.get_class(self)
+    #     }
+    #     odict.update(vars(self))
+    #     return odict
+    
+    # def update(self, config: dict[str, Any]) -> None:
+    #     config = copy.copy(config)
+    #     config_class = config.pop('class')
+    #     if config_class is not None:
+    #         if config_class != classfuncs.get_class(self):
+    #             raise ValueError(f'Mismatched configuration - is for class {config_class}, is updating {classfuncs.get_class(self)}')
+
+    #     vars(self).update(config)   
 
 
 class ScalarVariable(Variable):

@@ -45,6 +45,7 @@ import pandas as pd
 import pvlib
 
 from util import classfuncs
+from core import SerialiseToDictMixin, serialisation
 from core import newsegscomponent
 from core import timespan as modtimespan
 from core import location
@@ -73,7 +74,10 @@ def _cp_interpolant_factory(
         )
     return interpolant
 
-class ABCElecGenerator(newsegscomponent.NewsegsComponent):
+class ABCElecGenerator(
+    SerialiseToDictMixin,
+    metaclass = ABCMeta
+):
     """
     Represents a converter of environmental conditions to electrical energy.
 
@@ -88,7 +92,10 @@ class ABCElecGenerator(newsegscomponent.NewsegsComponent):
     - setting and accessing the location data for the generator.
     - accessing the nameplate electrical capacity of the generator.
     """
-    _name = 'Generator'
+    _name: str = 'Generator'
+    _model: environmentserverinterface.EnvironmentServerInterface
+
+    _constructor_class = 'Generator'
 
     @abstractmethod
     def run(
@@ -103,63 +110,68 @@ class ABCElecGenerator(newsegscomponent.NewsegsComponent):
         """
 
     @property
-    @abstractmethod
     def name(self) -> str:
         """
         A friendly string identifier for the configuration.
 
         Not strictly unique, but used for identification of stored configurations.
         """
+        return self._name
+    
+    @name.setter
+    def name(self, name: str) -> None:
+        self._name = name
 
     @property
-    @abstractmethod
-    def model(self) -> environmentserverinterface.EnvironmentServerIntrface: 
+    def model(self) -> environmentserverinterface.EnvironmentServerInterface: 
         """
         The callback NewsegsModel model associated with the generator.
         """
+        if self._model is None:
+            raise AttributeError('model has not been set')
+        return self._model
 
     @model.setter
-    @abstractmethod
-    def model(self, model: environmentserverinterface.EnvironmentServerIntrface):
-        ...
+    def model(self, model: environmentserverinterface.EnvironmentServerInterface):
+        self._model = model
 
-    @abstractmethod
-    def to_dict(self) -> Mapping:
-        """
-        Returns Generator/Powerplant configuration as a dictionary.
-        """
+    # @abstractmethod
+    # def to_dict(self) -> Mapping:
+    #     """
+    #     Returns Generator/Powerplant configuration as a dictionary.
+    #     """
 
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        """
-        Update configuration using a dictionary.
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     """
+    #     Update configuration using a dictionary.
 
-        In the default implementation, will go through each key in the dict.
-        If there is an attribute with an fset attribute, then assume it is a
-        read-write property and update it via the fset. Otherwise, set the
-        attribute directly.
-        """
-        for k in config.keys():
-            if hasattr(self, k):
-                v = config.get(k)
+    #     In the default implementation, will go through each key in the dict.
+    #     If there is an attribute with an fset attribute, then assume it is a
+    #     read-write property and update it via the fset. Otherwise, set the
+    #     attribute directly.
+    #     """
+    #     for k in config.keys():
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
     
-    @classmethod
-    @abstractmethod
-    def from_dict(cls: Type['ABCElecGenerator'], config: dict[str, Any]) -> 'ABCElecGenerator':
-        """
-        An instance of the generator configured per a dictionary.
-        """
+    # @classmethod
+    # @abstractmethod
+    # def from_dict(cls: Type['ABCElecGenerator'], config: dict[str, Any]) -> 'ABCElecGenerator':
+    #     """
+    #     An instance of the generator configured per a dictionary.
+    #     """
 
     @property
     @abstractmethod
@@ -179,6 +191,8 @@ class ABCElecGenerator(newsegscomponent.NewsegsComponent):
         """
         The total nameplate capacity in kW.
         """
+
+ABCElecGenerator._excluded_attributes = super(ABCElecGenerator,ABCElecGenerator)._excluded_attributes + ('_model',)
 
 class ABCScalingPowerPlant(ABCElecGenerator):
     """
@@ -245,7 +259,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         cut_out: Real | None = None,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         """
         Default assumes None
@@ -264,7 +278,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         cut_out: Real | None = None,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         
         self.set_cp_curve(cp_curve)
@@ -292,17 +306,6 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     @classmethod
     def from_none(cls) -> WindTurbineElecGenerator:
         return cls(cls._default_cp_curve)
-
-    @property
-    @override
-    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
-        if self._model is None:
-            raise AttributeError('model has not been set')
-        return self._model
-
-    @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
-        self._model = model
 
     @property
     def cut_in(self) -> float:
@@ -389,15 +392,6 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             self.location.height_agl = height
         except AttributeError:
             pass
-
-    @property
-    @override
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, name:str) -> None:
-        self._name = name
 
     @property
     @override
@@ -582,56 +576,64 @@ class WindTurbineElecGenerator(ABCElecGenerator):
             raise ValueError("Either cp_curve or power_curve must be specified")
 
         return o
-
-    @override
-    def to_dict(self) -> dict:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'cut_in': self._cut_in,
-            'cut_out': self._cut_out,
-            'rated_power': self._rated_power,
-            'swept_area': self._swept_area,
-            'hub_height': self._hub_height,
-            'loc': self._location.to_dict(),
-            'cp_curve': self._cp_curve
-        }
-
-        return odict
+    
+    _excluded_attributes = ('_model', '_cp_func',)
     
     @override
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        config = copy.copy(config)
+    def update(self, config: dict[str, Any] | type[serialisation.T]):
+        super().update(config)
+        if isinstance(config, dict) and '_cp_curve' in config.keys():
+            self.set_cp_curve(np.asarray(self._cp_curve))
 
-        cp_curve = config.pop('cp_curve', None)
-        if cp_curve is not None:
-            cp_curve = np.asarray(cp_curve)
-            self.set_cp_curve(cp_curve)
+    # @override
+    # def to_dict(self) -> dict:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'cut_in': self._cut_in,
+    #         'cut_out': self._cut_out,
+    #         'rated_power': self._rated_power,
+    #         'swept_area': self._swept_area,
+    #         'hub_height': self._hub_height,
+    #         'loc': self._location.to_dict(),
+    #         'cp_curve': self._cp_curve
+    #     }
+
+    #     return odict
+    
+    # @override
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     config = copy.copy(config)
+
+    #     cp_curve = config.pop('cp_curve', None)
+    #     if cp_curve is not None:
+    #         cp_curve = np.asarray(cp_curve)
+    #         self.set_cp_curve(cp_curve)
         
-        loc = config.pop('loc', None)
-        if loc is not None:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                if isinstance(loc, location.Location):
-                    self.location = loc
-                elif isinstance(loc, dict):
-                    self.location = location.location_from_dict(loc)
+    #     loc = config.pop('loc', None)
+    #     if loc is not None:
+    #         with warnings.catch_warnings():
+    #             warnings.simplefilter('ignore')
+    #             if isinstance(loc, location.Location):
+    #                 self.location = loc
+    #             elif isinstance(loc, dict):
+    #                 self.location = location.location_from_dict(loc)
 
-        super().sync_with_dict(config)
+    #     super().sync_with_dict(config)
 
-    @classmethod
-    def from_dict(
-        cls: Type[WindTurbineElecGenerator],
-        config: dict[str, Any]
-    ) -> WindTurbineElecGenerator:
-        """
-        Return a WindTurbineElecGenerator from a dictionary.
-        """
-        config = copy.copy(config)
-        config.pop('class', None)
-        if config.get('loc', None) is not None:
-            config['loc'] = location.location_from_dict(config['loc'])
-        return cls.from_characteristics(**config)
+    # @classmethod
+    # def from_dict(
+    #     cls: Type[WindTurbineElecGenerator],
+    #     config: dict[str, Any]
+    # ) -> WindTurbineElecGenerator:
+    #     """
+    #     Return a WindTurbineElecGenerator from a dictionary.
+    #     """
+    #     config = copy.copy(config)
+    #     config.pop('class', None)
+    #     if config.get('loc', None) is not None:
+    #         config['loc'] = location.location_from_dict(config['loc'])
+    #     return cls.from_characteristics(**config)
     
     def __getstate__(self):
         """
@@ -690,7 +692,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         raise ValueError('First argument must be a WindTurbineElecGenerator or PowerPlantHomogeneousWind, is %s', type(turbine))
     
@@ -702,7 +704,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         # Take a copy of the turbine, primarily to ensure that
         # changing its location does not break its parent
@@ -724,7 +726,8 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         return cls(WindTurbineElecGenerator.from_none())
 
     @property
-    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
+    @override
+    def model(self) -> environmentserverinterface.EnvironmentServerInterface:
         """
         The NewSEGS Model for environmental data.
 
@@ -734,16 +737,9 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         return self.turbine.model
     
     @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
+    @override
+    def model(self, model: environmentserverinterface.EnvironmentServerInterface) -> None:
         self.turbine.model = model
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, name:str) -> None:
-        self._name = name
     
     @property
     def location(self) -> location.RaisedLocation:
@@ -827,7 +823,7 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         n: Real,
         loc: location.RaisedLocation | None = None,
         name: str|None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        model: environmentserverinterface.EnvironmentServerInterface | None = None,
     ) -> 'PowerPlantHomogeneousWind':
         a = locals()
         del a['cls']
@@ -835,49 +831,49 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
 
         return cls(turbine, **a)
 
-    @override
-    def to_dict(self) -> Mapping:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'turbine': self.turbine.to_dict(),
-            "n": self._n
-        }
-        return odict
+    # @override
+    # def to_dict(self) -> Mapping:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'turbine': self.turbine.to_dict(),
+    #         "n": self._n
+    #     }
+    #     return odict
     
-    @override
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        config = copy.copy(config)
-        turbine = config.pop('turbine', None)
-        if turbine is not None:
-            if isinstance(turbine, dict):
-                turbine = generator_from_dict(turbine)
-                if not isinstance(turbine, WindTurbineElecGenerator):
-                    raise TypeError(f'generator is of incorrect type: {type(turbine)}')
-            self._turbine = turbine
-            # Expect the location to get overwritten in the setter;
-            # as this is recovery, we do actually want the location
-            # though we don't want to mess with the model.
-            self.location = turbine.location
+    # @override
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     config = copy.copy(config)
+    #     turbine = config.pop('turbine', None)
+    #     if turbine is not None:
+    #         if isinstance(turbine, dict):
+    #             turbine = generator_from_dict(turbine)
+    #             if not isinstance(turbine, WindTurbineElecGenerator):
+    #                 raise TypeError(f'generator is of incorrect type: {type(turbine)}')
+    #         self._turbine = turbine
+    #         # Expect the location to get overwritten in the setter;
+    #         # as this is recovery, we do actually want the location
+    #         # though we don't want to mess with the model.
+    #         self.location = turbine.location
         
-        # This looks risky, but practically may only result in
-        # some redundant attributes if the config is bad.
-        super().sync_with_dict(config)
+    #     # This looks risky, but practically may only result in
+    #     # some redundant attributes if the config is bad.
+    #     super().sync_with_dict(config)
     
-    @classmethod
-    def from_dict(
-        cls: Type['PowerPlantHomogeneousWind'],
-        config: dict[str, Any]
-    ) -> 'PowerPlantHomogeneousWind':
-        ip = copy.copy(config)
-        ip.pop('class', None)
+    # @classmethod
+    # def from_dict(
+    #     cls: Type['PowerPlantHomogeneousWind'],
+    #     config: dict[str, Any]
+    # ) -> 'PowerPlantHomogeneousWind':
+    #     ip = copy.copy(config)
+    #     ip.pop('class', None)
 
-        if ip.get('turbine', None) is not None:
-            ip['turbine'] = generator_from_dict(ip['turbine'])
-            if not isinstance(ip['turbine'], WindTurbineElecGenerator):
-                    raise TypeError(f'generator is of incorrect type: {type(ip['turbine'])}')
+    #     if ip.get('turbine', None) is not None:
+    #         ip['turbine'] = generator_from_dict(ip['turbine'])
+    #         if not isinstance(ip['turbine'], WindTurbineElecGenerator):
+    #                 raise TypeError(f'generator is of incorrect type: {type(ip['turbine'])}')
 
-        return cls.from_characteristics(**ip)
+    #     return cls.from_characteristics(**ip)
 
 # PowerPlantHomogeneousWind copy constructor
 @PowerPlantHomogeneousWind.__init__.register(PowerPlantHomogeneousWind) # pyright: ignore[reportFunctionMemberAccess]
@@ -908,7 +904,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         """
         Default assumes None
@@ -926,7 +922,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         self._peak_power = float(peak_power)
         self._total_area = float(total_area) if total_area is not None else self._peak_power / 0.435
@@ -953,30 +949,10 @@ class ABCPVElecGenerator(ABCElecGenerator):
         
         if model is not None:
             self._model = model
-        else:
-            self._model = None
 
     @classmethod
     def from_none(cls) -> ABCPVElecGenerator:
         return cls(1.0)
-
-    @property
-    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
-        if self._model is None:
-            raise AttributeError('model has not been set')
-        return self._model
-    
-    @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
-        self._model = model
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, name: str) -> None:
-        self._name = name
 
     @property
     def peak_power(self) -> float:
@@ -1078,7 +1054,7 @@ class ABCPVElecGenerator(ABCElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> T:
         
         a = locals()
@@ -1089,59 +1065,59 @@ class ABCPVElecGenerator(ABCElecGenerator):
             **a
         )
     
-    @override
-    def to_dict(self) -> dict[str, Any]:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'peak_power': self._peak_power,
-            'loc': self._location.to_dict(),
-            'total_area': self._total_area,
-            'collector_area': self._collector_area,
-            'frame_factor': self._frame_factor,
-        }
+    # @override
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'peak_power': self._peak_power,
+    #         'loc': self._location.to_dict(),
+    #         'total_area': self._total_area,
+    #         'collector_area': self._collector_area,
+    #         'frame_factor': self._frame_factor,
+    #     }
 
-        return odict
+    #     return odict
     
-    @override
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        config = copy.copy(config)
+    # @override
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     config = copy.copy(config)
 
-        loc = config.pop('loc', None)
-        if loc is not None:
-            if isinstance(loc, dict):
-                loc = location.location_from_dict(loc)
-            self.location = loc
+    #     loc = config.pop('loc', None)
+    #     if loc is not None:
+    #         if isinstance(loc, dict):
+    #             loc = location.location_from_dict(loc)
+    #         self.location = loc
         
-        # This looks risky, but practically may only result in
-        # some redundant attributes if the config is bad.
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
+    #     # This looks risky, but practically may only result in
+    #     # some redundant attributes if the config is bad.
+    #     conf_keys = config.keys()
+    #     for k in conf_keys:
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
 
-    @classmethod
-    def from_dict(
-        cls: Type[ABCPVElecGenerator],
-        config: dict[str, Any]
-    ) -> ABCPVElecGenerator:
-        ip = copy.copy(config)
-        ip.pop('class', None)
-        if ip.get('loc', None) is not None:
-            ip['loc'] = location.location_from_dict(ip['loc'])
-        return cls.from_characteristics(**ip)
+    # @classmethod
+    # def from_dict(
+    #     cls: Type[ABCPVElecGenerator],
+    #     config: dict[str, Any]
+    # ) -> ABCPVElecGenerator:
+    #     ip = copy.copy(config)
+    #     ip.pop('class', None)
+    #     if ip.get('loc', None) is not None:
+    #         ip['loc'] = location.location_from_dict(ip['loc'])
+    #     return cls.from_characteristics(**ip)
 
 # ABCPVElecGenerator copy constructor
 @ABCPVElecGenerator.__init__.register(ABCPVElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
@@ -1253,6 +1229,8 @@ def ABCPVElecGenerator_from_other(
 #
 #        return odict
 
+
+
 class SprakePVGISElecGenerator(ABCPVElecGenerator):
     """
     An alternative Sprake PV generator for enhanced generation modelling.
@@ -1268,7 +1246,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         dc_efficiency: Real = 0.98,
         inverter_efficiency: Real = 0.96,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         """
         Default assumes None
@@ -1306,7 +1284,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         return cls(1.0)
         
     def _set_pvlib_location(self):
-        self._pvlib_location = pvlib.location.Location(
+        self._pvlib_location = location.PVLibLocation(
             self._location.lat,
             self._location.lon
         )
@@ -1338,7 +1316,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         }
 
     def _create_system(self):
-        self._system = pvlib.pvsystem.PVSystem(
+        self._system = location.PVLibPVSystem(
             surface_tilt = int(self.location.pitch),
             surface_azimuth = int(self.location.azimuth),
             module_parameters = self._module_parameters,
@@ -1474,7 +1452,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         collector_area: Real | None = None,
         frame_factor: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        model: environmentserverinterface.EnvironmentServerInterface | None = None,
         dc_efficiency: Real | None = None,
         inverter_efficiency: Real | None = None
     ) -> SprakePVGISElecGenerator:
@@ -1497,19 +1475,30 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         a = locals()
         del a['cls']
         o = cls.from_none()
-        o.sync_with_dict(a)
+        o.update(a)
 
         return o
 
-    def to_dict(self) -> dict[str, Any]:
-        odict = super().to_dict()
-        odict['dc_efficiency'] = self._dc_efficiency
-        odict['inverter_efficiency'] = self._inverter_efficiency
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = super().to_dict()
+    #     odict['dc_efficiency'] = self._dc_efficiency
+    #     odict['inverter_efficiency'] = self._inverter_efficiency
 
-        return odict
+    #     return odict
     
     # sync_with_dict should inherit ok
     # from_dict should inherit ok
+
+SprakePVGISElecGenerator._excluded_attributes = tuple(super(SprakePVGISElecGenerator, SprakePVGISElecGenerator)._excluded_attributes) + (
+    '_pvlib_location',
+    '_module_parameters',
+    '_temperature_module_parameters',
+    '_losses_parameters',
+    '_inverter_parameters',
+    '_system',
+    '_mc',
+
+)
 
 # SprakePVGISElecGenerator copy constructor
 @SprakePVGISElecGenerator.__init__.register(SprakePVGISElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
@@ -1537,7 +1526,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         raise ValueError('First argument must be an ABCPVElecGenerator or PowerPlantHomogeneousPV, is %s', type(pv_array))
 
@@ -1549,7 +1538,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         loc: location.Location | None = None,
         n: Real | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None
+        model: environmentserverinterface.EnvironmentServerInterface | None = None
     ) -> None:
         # Take a copy of the pv array, primarily to ensure that
         # changing its location does not break its parent
@@ -1569,17 +1558,10 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
     @classmethod
     def from_none(cls) -> PowerPlantHomogeneousPV:
         return cls(SprakePVGISElecGenerator.from_none())
-    
-    @property
-    def name(self):
-        return self._name
-    
-    @name.setter
-    def name(self, name):
-        self._name = name
 
     @property
-    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
+    @override
+    def model(self) -> environmentserverinterface.EnvironmentServerInterface:
         """
         The NewSEGS Model for environmental data.
 
@@ -1589,7 +1571,8 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         return self.pv_array.model
     
     @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
+    @override
+    def model(self, model: environmentserverinterface.EnvironmentServerInterface) -> None:
         self._pv_array.model = model
 
     @property
@@ -1671,7 +1654,7 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         n: Real,
         loc: location.AspectLocation | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        model: environmentserverinterface.EnvironmentServerInterface | None = None,
     ) -> PowerPlantHomogeneousPV:
 
         a = locals()
@@ -1683,62 +1666,62 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
             **a
         )
     
-    @override
-    def to_dict(self) -> Mapping:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'pv_array': self._pv_array.to_dict(),
-            'n': self._n
-        }
+    # @override
+    # def to_dict(self) -> Mapping:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'pv_array': self._pv_array.to_dict(),
+    #         'n': self._n
+    #     }
 
-        return odict
+    #     return odict
 
-    @override
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        config = copy.copy(config)
-        pv_array = config.pop('pv_array', None)
-        if pv_array is not None:
-            if isinstance(pv_array, dict):
-                pv_array = generator_from_dict(pv_array)
-                if not isinstance(pv_array, ABCPVElecGenerator):
-                    raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(pv_array)}')
-            self._pv_array = pv_array
-            # Expect the location to get overwritten in the setter;
-            # as this is recovery, we do actually want the location
-            # though we don't want to mess with the model.
-            self.location = pv_array.location
+    # @override
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     config = copy.copy(config)
+    #     pv_array = config.pop('pv_array', None)
+    #     if pv_array is not None:
+    #         if isinstance(pv_array, dict):
+    #             pv_array = generator_from_dict(pv_array)
+    #             if not isinstance(pv_array, ABCPVElecGenerator):
+    #                 raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(pv_array)}')
+    #         self._pv_array = pv_array
+    #         # Expect the location to get overwritten in the setter;
+    #         # as this is recovery, we do actually want the location
+    #         # though we don't want to mess with the model.
+    #         self.location = pv_array.location
         
-        # This looks risky, but practically may only result in
-        # some redundant attributes if the config is bad.
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
+    #     # This looks risky, but practically may only result in
+    #     # some redundant attributes if the config is bad.
+    #     conf_keys = config.keys()
+    #     for k in conf_keys:
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
 
-    @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> PowerPlantHomogeneousPV:
-        ip = copy.copy(config)
-        ip.pop('class', None)
+    # @classmethod
+    # def from_dict(cls, config: dict[str, Any]) -> PowerPlantHomogeneousPV:
+    #     ip = copy.copy(config)
+    #     ip.pop('class', None)
 
-        if ip.get('pv_array', None) is not None:
-            ip['pv_array'] = generator_from_dict(ip['pv_array'])
-            if not isinstance(ip['pv_array'], ABCPVElecGenerator):
-                raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(ip['pv_array'])}')
+    #     if ip.get('pv_array', None) is not None:
+    #         ip['pv_array'] = generator_from_dict(ip['pv_array'])
+    #         if not isinstance(ip['pv_array'], ABCPVElecGenerator):
+    #             raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(ip['pv_array'])}')
         
-        return cls.from_characteristics(**ip)
+    #     return cls.from_characteristics(**ip)
 
 # PowerPlantHomogeneousPV copy constructor
 @PowerPlantHomogeneousPV.__init__.register(PowerPlantHomogeneousPV) # pyright: ignore[reportFunctionMemberAccess]
@@ -1766,7 +1749,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         generators: Collection[ABCScalingPowerPlant] | PowerPlantHeterogeneousGenerators,
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        model: environmentserverinterface.EnvironmentServerInterface | None = None,
         do_copy: bool = True
     ) -> None:
         raise ValueError('First argument must be a collection of `ABCElecGenerator`s or a PowerPlantHeterogeneousGenerators, is %s', type(generators))
@@ -1779,7 +1762,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         generators: Collection[ABCScalingPowerPlant],
         loc: location.Location | None = None,
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        model: environmentserverinterface.EnvironmentServerInterface | None = None,
         do_copy: bool = True,
     ) -> None:
         if do_copy:
@@ -1805,21 +1788,13 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         ])
         
     @property
-    def model(self) -> environmentserverinterface.EnvironmentServerIntrface:
+    def model(self) -> environmentserverinterface.EnvironmentServerInterface:
         return self._generators[0].model
 
     @model.setter
-    def model(self, model: environmentserverinterface.EnvironmentServerIntrface) -> None:
+    def model(self, model: environmentserverinterface.EnvironmentServerInterface) -> None:
         for generator in self.generators:
             generator.model = model
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, name:str) -> None:
-        self._name = name
 
     @property
     def generators(self) -> list[ABCScalingPowerPlant]:
@@ -1885,7 +1860,7 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         cls,
         generators: list[ABCScalingPowerPlant],
         name: str | None = None,
-        model: environmentserverinterface.EnvironmentServerIntrface | None = None,
+        model: environmentserverinterface.EnvironmentServerInterface | None = None,
     ) -> PowerPlantHeterogeneousGenerators:
         a = locals()
         del a['cls']
@@ -1896,69 +1871,69 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
             **a
         )
 
-    @override
-    def to_dict(self) -> dict[str, Any]:
-        odict = {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'generators': [x.to_dict() for x in self.generators]
-        }
-        return odict
+    # @override
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'generators': [x.to_dict() for x in self.generators]
+    #     }
+    #     return odict
     
-    @override
-    def sync_with_dict(self, config: dict[str, Any]) -> None:
-        config = copy.copy(config)
-        generators = config.pop('generators', None)
-        if generators is not None:
-            try:
-                mdl = self.model
-            except AttributeError:
-                mdl = None
+    # @override
+    # def sync_with_dict(self, config: dict[str, Any]) -> None:
+    #     config = copy.copy(config)
+    #     generators = config.pop('generators', None)
+    #     if generators is not None:
+    #         try:
+    #             mdl = self.model
+    #         except AttributeError:
+    #             mdl = None
 
-            generators = [
-                x if isinstance(x, ABCScalingPowerPlant) else generator_from_dict(x) for x in generators
-            ]
-            for x in generators:
-                if not isinstance(x, ABCScalingPowerPlant):
-                    raise TypeError(f'configuration contains generators of incorrect type: {type(x)}')
-            generators = [
-                cast(ABCScalingPowerPlant, x) for x in generators
-            ]
-            self.clear()
-            self.extend(generators)
-            # Sync up the model
-            if mdl is not None:
-                self.model = mdl
-            # Note that the location is not synchronised for this type of generator
+    #         generators = [
+    #             x if isinstance(x, ABCScalingPowerPlant) else generator_from_dict(x) for x in generators
+    #         ]
+    #         for x in generators:
+    #             if not isinstance(x, ABCScalingPowerPlant):
+    #                 raise TypeError(f'configuration contains generators of incorrect type: {type(x)}')
+    #         generators = [
+    #             cast(ABCScalingPowerPlant, x) for x in generators
+    #         ]
+    #         self.clear()
+    #         self.extend(generators)
+    #         # Sync up the model
+    #         if mdl is not None:
+    #             self.model = mdl
+    #         # Note that the location is not synchronised for this type of generator
         
-        # This looks risky, but practically may only result in
-        # some redundant attributes if the config is bad.
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
+    #     # This looks risky, but practically may only result in
+    #     # some redundant attributes if the config is bad.
+    #     conf_keys = config.keys()
+    #     for k in conf_keys:
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        getattr(prop, 'fset')(self, v)
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     getattr(prop, 'fset')(self, v)
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
     
-    @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> PowerPlantHeterogeneousGenerators:
-        ip = copy.copy(config)
-        ip.pop('class', None)
+    # @classmethod
+    # def from_dict(cls, config: dict[str, Any]) -> PowerPlantHeterogeneousGenerators:
+    #     ip = copy.copy(config)
+    #     ip.pop('class', None)
 
-        if ip.get('generators', None) is not None:
-            ip['generators'] = [generator_from_dict(x) for x in ip['generators']]
+    #     if ip.get('generators', None) is not None:
+    #         ip['generators'] = [generator_from_dict(x) for x in ip['generators']]
         
-        return cls.from_characteristics(**ip)
+    #     return cls.from_characteristics(**ip)
 
     @property
     def location(self) -> location.Location:

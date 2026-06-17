@@ -687,10 +687,11 @@ class TestVariableDeterministic(unittest.TestCase):
             0
         )
 
+        # This break from gamma behaviour to allow for constant values to be used.
         var = create_var(parameters = (0, 2))
         self.assertEqual(
             var.deterministic_value,
-            0
+            2
         )
 
         with self.assertRaises(ValueError):
@@ -736,11 +737,19 @@ class TestVariableDeterministic(unittest.TestCase):
             5
         )
 
-        with self.assertRaises(ValueError):
-            var = create_var(parameters = (0, 2))
+        #with self.assertRaises(ValueError):
+        var = create_var(parameters = (0, 2))
+        self.assertEqual(
+            var.deterministic_value,
+            0
+        )
 
-        with self.assertRaises(ValueError):
-            var = create_var(parameters = (20.20, 0.0))
+        #with self.assertRaises(ValueError):
+        var = create_var(parameters = (20.20, 0.0))
+        self.assertEqual(
+            var.deterministic_value,
+            20.2
+        )
 
         with self.assertRaises(ValueError):
             var = create_var(parameters = (-1, 2))
@@ -1110,7 +1119,7 @@ class TestVariablePSA(unittest.TestCase):
             distribution = 'binomial',
             parameterisation_index=1,
             parameters = (true_mean, 100)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1157,7 +1166,7 @@ class TestVariablePSA(unittest.TestCase):
             distribution = 'normal',
             parameterisation_index=0,
             parameters = (true_mean, true_sd)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1215,7 +1224,7 @@ class TestVariablePSA(unittest.TestCase):
             transform = 'ln',
             parameterisation_index=2,
             parameters = (true_mean, true_sd)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1272,7 +1281,7 @@ class TestVariablePSA(unittest.TestCase):
             distribution = 'beta',
             parameterisation_index=1,
             parameters = (true_mean, true_sd)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1326,7 +1335,7 @@ class TestVariablePSA(unittest.TestCase):
             'Variable name',
             distribution = 'beta',
             transform = 'ln'
-        )
+        ) # pyright: ignore[reportAbstractUsage]
 
         true_mean = var.deterministic_value
         
@@ -1364,7 +1373,7 @@ class TestVariablePSA(unittest.TestCase):
             distribution = 'gamma',
             parameterisation_index=1,
             parameters = (true_mean, true_sd)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1420,7 +1429,7 @@ class TestVariablePSA(unittest.TestCase):
             transform = 'ln',
             parameterisation_index=2,
             parameters = (1.2, 0.2)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
 
         true_mean = var.deterministic_value
         
@@ -1474,7 +1483,7 @@ class TestVariablePSA(unittest.TestCase):
             distribution = 'mvn',
             parameterisation_index=0,
             parameters = (true_means, true_vcv)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1516,7 +1525,7 @@ class TestVariablePSA(unittest.TestCase):
             transform = 'ln',
             parameterisation_index=2,
             parameters = (true_means, true_vcv)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         
         activate_psa(var)
         rng = np.random.default_rng(123)
@@ -1553,7 +1562,7 @@ class TestVariablePSA(unittest.TestCase):
                 transform = ('identity','ln'),
                 parameterisation_index=2,
                 parameters = (true_means, true_vcv)
-            )
+            ) # pyright: ignore[reportAbstractUsage]
         )
         
         activate_psa(var)
@@ -1600,7 +1609,7 @@ class TestVariablePSA(unittest.TestCase):
                 distribution = 'dirichlet',
                 parameterisation_index=0,
                 parameters = (true_alphas,)
-            )
+            ) # pyright: ignore[reportAbstractUsage]
         )
         
 
@@ -1635,7 +1644,7 @@ class TestVariableConstructionFromJSON(unittest.TestCase):
             var_conf_list = json.load(f)
         
         self.assertIsInstance(var_conf_list, list)
-        variables = [variable.Variable(**x) for x in var_conf_list]
+        variables = [variable.Variable(**x) for x in var_conf_list] # pyright: ignore[reportAbstractUsage]
         for var in variables:
             self.assertIsInstance(var, variable.Variable)
 
@@ -1647,7 +1656,7 @@ class TestVariableSynchronisation(unittest.TestCase):
     def load_sprake_variables(self):
         with open('data/sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
-        return [variable.Variable(**x) for x in var_conf_list]
+        return [variable.Variable(**x) for x in var_conf_list] # pyright: ignore[reportAbstractUsage]
     
     def test_synchronisation_scalar_constant(self):
         vars = self.load_sprake_variables()
@@ -1701,7 +1710,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         variable.update_model_with_value(
             100.0,
             mdl,
-            'mod_cs.storage_params',
+            'mod_cs._storage_params',
             'storage_capacity'
         )
         self.assertEqual(
@@ -1717,7 +1726,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         variable.update_model_with_value(
             25,
             fnc,
-            'unit_costs',
+            '_unit_costs',
             'grid_import_sc_per_day'
         )
         self.assertEqual(
@@ -1817,8 +1826,8 @@ class TestVariableSerialisation(unittest.TestCase):
         vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
         self.assertEqual(vbl.distribution.distribution, 'constant')
         self.assertEqual(vbl.name, 'Storage capacity')
-        #TODO: json isn't able to return a tuple; do we care?
-        self.assertListEqual(cast(list,vbl._raw_parameters), [4000])
+        
+        self.assertTupleEqual(vbl._raw_parameters, (4000,))
     
 
 class TestVariableValidation(unittest.TestCase):
@@ -1833,7 +1842,7 @@ class TestVariableValidation(unittest.TestCase):
             parameters = 'String Constant',
             dsa_lower = 'Different String',
             dsa_upper = 'Another Different String'
-        )
+        ) # pyright: ignore[reportAbstractUsage]
     
     def make_constant_variable_numeric(self):
         return variable.Variable(
@@ -1843,10 +1852,10 @@ class TestVariableValidation(unittest.TestCase):
             parameters = 12.34,
             dsa_lower = 9.9,
             dsa_upper = 20
-        )
+        ) # pyright: ignore[reportAbstractUsage]
     
     def test_constant_constructors(self):
-        var = variable.Variable('aconst')
+        var = variable.Variable('aconst') # pyright: ignore[reportAbstractUsage]
 
         self.assertEqual(
             var.deterministic_value,
@@ -1857,7 +1866,7 @@ class TestVariableValidation(unittest.TestCase):
             var.get_dsa_value('upper', True)
         )
 
-        var = variable.Variable('aconst', dsa_bounds_type='relative')
+        var = variable.Variable('aconst', dsa_bounds_type='relative') # pyright: ignore[reportAbstractUsage]
         self.assertEqual(
             var.deterministic_value,
             var.get_dsa_value('lower', True)
@@ -1867,7 +1876,7 @@ class TestVariableValidation(unittest.TestCase):
             var.get_dsa_value('upper', True)
         )
 
-        var = variable.Variable('aconst', dsa_bounds_type='offset')
+        var = variable.Variable('aconst', dsa_bounds_type='offset') # pyright: ignore[reportAbstractUsage]
         self.assertEqual(
             var.deterministic_value,
             var.get_dsa_value('lower', True)
@@ -1877,7 +1886,7 @@ class TestVariableValidation(unittest.TestCase):
             var.get_dsa_value('upper', True)
         )
 
-        var = variable.Variable('aconst', parameters = 'A string')
+        var = variable.Variable('aconst', parameters = 'A string') # pyright: ignore[reportAbstractUsage]
         self.assertEqual(
             var.deterministic_value,
             'A string'
@@ -1886,7 +1895,7 @@ class TestVariableValidation(unittest.TestCase):
         var = variable.Variable(
             'aconst',
             parameters = ('A string',)
-        )
+        ) # pyright: ignore[reportAbstractUsage]
         self.assertEqual(
             var.deterministic_value,
             'A string'
@@ -1898,7 +1907,7 @@ class TestVariableValidation(unittest.TestCase):
                 parameters = 'A string',
                 transform = 'ln',
                 dsa_bounds_type = 'relative'
-            )
+            ) # pyright: ignore[reportAbstractUsage]
         
         var = variable.Variable(
                 'aconst',
@@ -1906,7 +1915,7 @@ class TestVariableValidation(unittest.TestCase):
                 dsa_bounds_type = 'relative',
                 dsa_lower = 0.9,
                 dsa_upper = 1.1
-            )
+            ) # pyright: ignore[reportAbstractUsage]
         
         with self.assertRaises(TypeError):
             var.get_dsa_value('lower', True)
@@ -2039,7 +2048,7 @@ class TestVariableValidation(unittest.TestCase):
             distribution = 'constant',
             transform = 'identity',
             parameters = 'String Constant'
-        )
+        ) # pyright: ignore[reportAbstractUsage]
 
         with self.assertRaises(TypeError):
             var1.set_parameters('Test', 'Param')
@@ -2072,7 +2081,7 @@ class TestVariableValidation(unittest.TestCase):
                 distribution = 'constant',
                 transform = 'ln',
                 parameters = 'String Constant'
-            )
+            ) # pyright: ignore[reportAbstractUsage]
 
     def make_binomial_variable(self):
         return variable.Variable(
@@ -2082,13 +2091,13 @@ class TestVariableValidation(unittest.TestCase):
             parameters = [0.2, 5],
             dsa_lower = 0,
             dsa_upper = 3
-        )
+        ) # pyright: ignore[reportAbstractUsage]
     
     def test_binomial_constructors(self):
         var = variable.Variable(
             'abinom',
             distribution = 'binomial'
-        )
+        ) # pyright: ignore[reportAbstractUsage]
 
     def test_binomial_deterministic(self):
         var1 = self.make_binomial_variable()
@@ -2180,13 +2189,13 @@ class TestVariableValidation(unittest.TestCase):
             parameters = [10, 2],
             dsa_lower = 6,
             dsa_upper = 14
-        )
+        ) # pyright: ignore[reportAbstractUsage]
     
     def test_normal_constructors(self):
         var = variable.Variable(
             'norm1',
             distribution = 'normal'
-        )
+        ) # pyright: ignore[reportAbstractUsage]
     
     def test_normal_deterministic(self):
         var1 = self.make_normal_variable()
@@ -2324,13 +2333,13 @@ class TestVariableValidation(unittest.TestCase):
             parameters = [1, 3],
             dsa_lower = 0.1,
             dsa_upper = 0.5
-        )
+        ) # pyright: ignore[reportAbstractUsage]
     
     def test_beta_constructors(self):
         var = variable.Variable(
             'beta1',
             distribution = 'beta'
-        )
+        ) # pyright: ignore[reportAbstractUsage]
 
     def test_beta_deterministic(self):
         var1 = self.make_beta_variable()
@@ -2427,7 +2436,7 @@ class TestVariableValidation(unittest.TestCase):
             parameters = [1, 1],
             dsa_lower = 1.,
             dsa_upper = 3.
-        )
+        ) # pyright: ignore[reportAbstractUsage]
 
     def test_gamma_deterministic(self):
         ...

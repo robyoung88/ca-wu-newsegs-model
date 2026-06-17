@@ -72,9 +72,6 @@ if __name__ == '__main__':
         vd[vn].dsa_bounds_type = 'interval'
         vd[vn].set_parameters(vd[vn].deterministic_value, 0.2 * vd[vn].deterministic_value)
     
-
-
-
     variables_ser = [var.to_dict() for var in variables]
     
     with open('data/sprake-variable-config.json', 'w') as f:
