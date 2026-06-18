@@ -1,12 +1,12 @@
-from core.constructors.constructors import find_constructor
-from core.serialisation import SerialiseToDictMixin
-from core.location import Location,RaisedLocation,AspectLocation,location_from_dict
-from core.timespan import TimeSpan,RegTimeSpan,OffsetRegTimeSpan,TimedeltaScalar,SECONDS_TO_HOURS
-from core.environment.environment_servers import NewsegsLocalEnvironment,NewsegsWiderEnvironment
-from core.newsegsmoduleresult import NewsegsModuleResult
-from core.newsegscomponent import NewsegsComponent, RunnableNewsegsComponent
-from core.newsegsmodelinterface import NewsegsModelInterface
-from core.newsegsmodule import NewsegsModule
+from .constructors.constructors import find_constructor
+from .serialisation import SerialiseToDictMixin
+from .location import Location,RaisedLocation,AspectLocation,location_from_dict
+from .timespan import TimeSpan,RegTimeSpan,OffsetRegTimeSpan,TimedeltaScalar,SECONDS_TO_HOURS
+from .environment.environment_servers import NewsegsLocalEnvironment,NewsegsWiderEnvironment
+from .newsegsmoduleresult import NewsegsModuleResult
+from .newsegscomponent import NewsegsComponent, RunnableNewsegsComponent
+from .newsegsmodelinterface import NewsegsModelInterface
+from .newsegsmodule import NewsegsModule
 __all__ = [
     'find_constructor',
     'SerialiseToDictMixin',

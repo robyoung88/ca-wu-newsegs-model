@@ -9,11 +9,9 @@ import unittest
 
 import numpy as np
 import numpy.testing as nptest
-from scipy.special import psi
 from scipy.stats import lognorm
 from scipy.stats import gamma as gamma_dist
-from scipy.stats import loggamma
-from scipy.stats import beta as betadist
+from scipy.stats import beta as beta_dist
 import scipy.integrate as integrate
 
 from unit_tests.common import setup_test_env
@@ -639,10 +637,10 @@ class TestVariableDeterministic(unittest.TestCase):
 
         var = create_var()
         self.assertEqual(var.parameterisation_index, 2)
-        self.assertAlmostEqual(var.deterministic_value, betadist.expect(np.exp, (1,1)))
+        self.assertAlmostEqual(var.deterministic_value, beta_dist.expect(np.exp, (1,1)))
 
         var = create_var(parameters = (2.5, 0.75))
-        self.assertAlmostEqual(var.deterministic_value, betadist.expect(np.exp, (2.5, 0.75)))
+        self.assertAlmostEqual(var.deterministic_value, beta_dist.expect(np.exp, (2.5, 0.75)))
 
         with self.assertRaises(TypeError):
             create_var(parameters = ('foo', 1))
@@ -652,7 +650,7 @@ class TestVariableDeterministic(unittest.TestCase):
 
         var = create_var(parameters = (2.5, 0.75))
         var.set_parameters(1.2, 0.8)
-        self.assertAlmostEqual(var.deterministic_value, betadist.expect(np.exp, (1.2, 0.8)))
+        self.assertAlmostEqual(var.deterministic_value, beta_dist.expect(np.exp, (1.2, 0.8)))
 
         var.set_transform('identity')
         var.parameterisation_index = 1
