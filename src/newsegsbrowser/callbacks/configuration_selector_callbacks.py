@@ -1,6 +1,7 @@
 import base64
 import copy
 import json
+from typing import cast, Any
 
 from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
 from dash.exceptions import PreventUpdate
@@ -11,24 +12,26 @@ from newsegsbrowser import common as browser
 from newsegsbrowser.layouts.results import configuration_selector
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
+from newsegsmetamodel import NewsegsMetaModel
 
-def config_to_dict(name, mdl: newsegsmodel.NewsegsModel, fnc: newsegsfinance.NewsegsFinance):
+def metamodel_to_dict(mm: NewsegsMetaModel) -> dict[str, Any]:
     """
     Encapsulate a model and finance configuration in a dictionary.
     """
-    
     odict = {
-        'config_name': name,
-        'model_config': mdl.to_dict(),
-        'finance_config': fnc.to_dict(),
+        'config_name': mm.name,
+        'metamodel': mm.to_dict(),
+        'model': mm.model.to_dict(),
+        'finance': mm.finance.to_dict()
     }
-
     return odict
 
 def add_configuration_selection_callbacks(app: Dash):
     """
     Make the buttons on the configuration selector live.
     """
+
+    # RENAME
     @app.callback(
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data'),
@@ -47,24 +50,31 @@ def add_configuration_selection_callbacks(app: Dash):
         
         if configurations is None or selected_config is None:
             return NUP
-
-        selected_config = json.loads(selected_config)
         
         trigger_index = trig['index']
         if config_name[trigger_index] is None:
             return NUP
         
+        selected_config = json.loads(selected_config)
+        
         w_conf = json.loads(configurations[trigger_index])
-        w_conf['name'] = config_name[trigger_index]
-        configurations[trigger_index] = json.dumps(w_conf)
+        mm_working = cast(NewsegsMetaModel, app.metamodels.get(w_conf['metamodel_id']))
+        if mm_working is None:
+            raise ValueError(f'selected metamodel cannot be located: {w_conf['metamodel_id']}')
+
+        mm_working.name = config_name[trigger_index]
+        configurations[trigger_index] = mm_working.to_config()
+
         if selected_config['config_index'] == trigger_index:
-            selected_config['name'] = config_name[trigger_index]
+            selected_config = mm_working.to_config()
+            selected_config['config_index'] = trigger_index
             rval = (json.dumps(configurations), json.dumps(selected_config))
         else:
             rval = (json.dumps(configurations), no_update)
         
         return rval
-
+    
+    # DUPLICATE
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
@@ -153,8 +163,17 @@ def add_configuration_selection_callbacks(app: Dash):
 
             # Make the copy
             ref_config = json.loads(configurations[trigger_index])
-            mdl = app.duplicate_model(ref_config['model_id'])
-            fnc = app.duplicate_finance(ref_config['finance_id'], mdl.id)
+            #mm = app.metamodels.get(ref_config['metamodel_id'])
+            #if mm is None:
+            #    raise ValueError(f'selected metamodel cannot be located: {ref_config['metamodel_id']}')
+            
+            mm_dup = cast(NewsegsMetaModel, app.duplicate_metamodel(ref_config['metamodel_id']))
+            mdl = mm_dup.model
+            fnc = mm_dup.finance
+
+
+            #mdl = app.duplicate_model(ref_config['model_id'])
+            #fnc = app.duplicate_finance(ref_config['finance_id'], mdl.id)
 
             store_model_interface_configurations[mdl.id] = copy.copy(
                 store_model_interface_configurations.get(
@@ -170,11 +189,8 @@ def add_configuration_selection_callbacks(app: Dash):
             )
             store_finance_interface_configurations[fnc.id]['finance_id'] = fnc.id
 
-            new_config = browser.compose_configuration(
-                ref_config['name'] + " Copy",
-                mdl,
-                fnc,
-            )
+            mm_dup.name = mm_dup.name + " Copy"
+            new_config = mm_dup.to_config()
 
             configurations.append(json.dumps(new_config))
             
@@ -233,6 +249,7 @@ def add_configuration_selection_callbacks(app: Dash):
             json.dumps(store_finance_interface_configurations)
         )  
     
+    # REMOVE
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
@@ -303,6 +320,9 @@ def add_configuration_selection_callbacks(app: Dash):
         if safe_drop:
             app.remove_finance(dropped['finance_id'])
 
+        # Always safe to drop the metamodel, just don't necessarily remove the children
+        app.remove_metamodel(dropped['metamodel_id'], False)
+
         n_conf = len(configurations)
 
         contents = [configuration_selector.create_single_configuration_selector_row(i, configurations, selected_config) for i in range(n_conf)]
@@ -316,6 +336,7 @@ def add_configuration_selection_callbacks(app: Dash):
             json.dumps(selected_config)
         )
 
+    # FOCUS
     @app.callback(
         Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
@@ -381,6 +402,7 @@ def add_configuration_selection_callbacks(app: Dash):
             json.dumps(selected_config)
         )
 
+    # DOWNLOAD CONFIG
     @app.callback(
         Output('download-config-json', 'data'),
         Input({'type': 'config-download-btn', 'index': ALL}, 'n_clicks'),
@@ -407,17 +429,18 @@ def add_configuration_selection_callbacks(app: Dash):
 
         config = json.loads(configurations[trigger_index])
 
-        mdl = app.models.get(config['model_id'])
-        fnc = app.finances.get(config['finance_id'])
-        
-        odict = config_to_dict(config['name'], mdl, fnc)
+        mm = app.models.get(config['metamodel_id'])
+        odict = metamodel_to_dict(mm)
+
         fn = odict.get('config_name','model_configuration') + ".json"
         fn = pathvalidate.sanitize_filename(fn)
+        
         return dict(
             content = json.dumps(odict, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4), 
             filename = fn
         )
 
+    # UPLOAD CONFIG
     @app.callback(
         Output('comparator-selector-container', 'children', allow_duplicate = True),
         Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
@@ -451,22 +474,40 @@ def add_configuration_selection_callbacks(app: Dash):
             return NUP
         
         working_conf = json.loads(configurations[trigger_index])
-        mdl = app.models.get(working_conf['model_id'])
-        fnc = app.finances.get(working_conf['finance_id'])
+
+        working_mm = app.metamodel.get(working_conf['metamodel_id'])
+        mdl = working_mm.model
+        fnc = working_mm.finance
 
         cfg = config_jsons[trigger_index]
         ctype, cstr = cfg.split(',')
         cfg = json.loads(base64.b64decode(cstr))
 
-        mdl.sync_with_dict(cfg['model_config'])
-        fnc.sync_with_dict(cfg['finance_config'])
-        working_conf['name'] = cfg['config_name']
-
-        selected_config = working_conf.copy()
-        selected_config['config_index'] = trigger_index
-        configurations[trigger_index]  = json.dumps(selected_config)
+        mm_id = working_mm.id
+        mdl_id = mdl.id
+        fnc_id = fnc.id
+        working_mm.update(cfg['metamodel'])
+        mdl.update(cfg['model'])
+        fnc.update(cfg['finance'])
         
-        contents = [configuration_selector.create_single_configuration_selector_row(i, configurations, selected_config) for i in range(n_conf)]
+        # Caution - this will invalidate the results
+        working_mm.id = mm_id
+        mdl.id = mdl_id
+        fnc.id = fnc_id
+        fnc.set_model(mdl)
+        working_mm.model = mdl
+        working_mm.finance = fnc
+        
+        selected_config = working_mm.to_config()
+        configurations[trigger_index]  = json.dumps(selected_config)
+        selected_config['config_index'] = trigger_index
+        
+        contents = [
+            configuration_selector.create_single_configuration_selector_row(
+                i, configurations, selected_config
+            ) 
+            for i in range(n_conf)
+        ]
 
         return (
             contents,

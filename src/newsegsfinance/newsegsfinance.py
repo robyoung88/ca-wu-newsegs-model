@@ -8,13 +8,12 @@ from typing import Any
 import uuid
 import re
 
-from core import newsegscomponent
-from core import newsegsmodelinterface
 import pandas as pd
 
-from util import classfuncs
+from core.newsegsfinanceinterface import NewsegsFinanceInterface
+from core import newsegsmodelinterface
 
-class NewsegsFinance(newsegscomponent.NewsegsComponent):
+class NewsegsFinance(NewsegsFinanceInterface):
     """
     Abstract base class of NewSEGS finance model
 
@@ -29,7 +28,7 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
     _finance_version = '0.0.1'
     _id_prefix = 'f'
     
-    _model = None
+    _model: newsegsmodelinterface.NewsegsModelInterface
     
     last_update = datetime.datetime.now()
 
@@ -51,32 +50,69 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
         return hash(self)
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
-    @abstractmethod
-    def set_model(self, mdl: newsegsmodelinterface.NewsegsModelInterface | None, dirty: bool = True) -> None:
-        ...
+    def set_model(
+        self, 
+        mdl: newsegsmodelinterface.NewsegsModelInterface,
+        dirty: bool = True
+    ) -> None:
+        self._model = mdl
+        self.dirty = self.dirty or dirty
     
     @property
-    def model(self) -> newsegsmodelinterface.NewsegsModelInterface | None:
+    def model(self) -> newsegsmodelinterface.NewsegsModelInterface:
+        if not hasattr(self, '_model'):
+            raise AttributeError('model has not yet been set')
         return self._model
     
     @model.setter
-    def model(self, mdl: newsegsmodelinterface.NewsegsModelInterface | None) -> None:
+    def model(self, mdl: newsegsmodelinterface.NewsegsModelInterface) -> None:
         self.set_model(mdl)
 
     # Discount rates
     @property
-    @abstractmethod
     def benefit_discount_rate(self) -> float:
-        ...
+        return self._benefit_discount_rate
+
+    @benefit_discount_rate.setter
+    def benefit_discount_rate(self, v: float) -> None:
+        self.dirty = self.dirty or not(self._benefit_discount_rate == v)
+        self._benefit_discount_rate = v
 
     @property
-    @abstractmethod
     def cost_discount_rate(self) -> float:
-        ...
+        return self._cost_discount_rate
     
-    @abstractmethod
+    @cost_discount_rate.setter
+    def cost_discount_rate(self, v:float) -> None:
+        self.dirty = self.dirty or not(self._cost_discount_rate == v)
+        self._cost_discount_rate = v
+    
     def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
-        ...
+        """
+        Set the benefit and cost discount rates
+
+        Note that if only one positional argument is given, both discount rates
+        will be set to this value.
+
+        If mixing positional and keyword arguments, note that `benefit_discount_rate`
+        is always the first positional argument, and will be over-written by a
+        subsequent keyword argument of that key.
+
+        Args:
+            benefit_discount_rate: Also first positional argument (float)
+            cost_discount_rate: Also second positional argument (float)
+        """
+        if len(drs) == 1 and len(kwdrs) == 0:
+            # Assume that user wants to set both discount rates to nominated value
+            dr = drs[0]
+            self.benefit_discount_rate = dr
+            self.cost_discount_rate = dr
+        else:
+            argnames = ['benefit_discount_rate', 'cost_discount_rate']
+            argdict = dict(zip(argnames, drs))
+            argdict.update(kwdrs)
+            self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
+            self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
     
     # Benefits
     @property
@@ -486,4 +522,7 @@ class NewsegsFinance(newsegscomponent.NewsegsComponent):
             )
         )
 
-NewsegsFinance._excluded_attributes = super(NewsegsFinance, NewsegsFinance)._excluded_attributes + ('_model',)
+NewsegsFinance._excluded_attributes = (
+    super(NewsegsFinance, NewsegsFinance)._excluded_attributes 
+    + ('_model',)
+)

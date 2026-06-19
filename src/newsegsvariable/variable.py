@@ -13,9 +13,8 @@ import numpy.typing as npt
 from useful_types import SequenceNotStr
 
 from core import newsegscomponent, serialisation
+from core.newsegsfinanceinterface import NewsegsFinanceInterface
 from core.newsegsmodelinterface import NewsegsModelInterface
-#from newsegsmodel import newsegsmodel
-from newsegsfinance import newsegsfinance
 from newsegsstats.dirichlet import fit_dirichlet
 
 ScalarParam = Union[str | int | float]
@@ -29,7 +28,7 @@ Value = Union[ScalarParam, VectorParam]
 Param = Union[ScalarParam, VectorParam, MatrixNumParam]
 ParamList = Union[Param, Sequence[Param]]
 
-ModelType = Union[NewsegsModelInterface, newsegsfinance.NewsegsFinance]
+ModelType = Union[NewsegsModelInterface, NewsegsFinanceInterface]
 
 VARIABLE_TYPE = Literal[
     'scalar',
@@ -2492,7 +2491,7 @@ class Variable(
             case 'model':
                 return isinstance(model, NewsegsModelInterface)
             case 'finance':
-                return isinstance(model, newsegsfinance.NewsegsFinance)
+                return isinstance(model, NewsegsFinanceInterface)
         return False
     
     def _update_model(self, model: ModelType, value: Value) -> None:

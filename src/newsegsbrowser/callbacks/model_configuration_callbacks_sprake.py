@@ -202,7 +202,8 @@ def sync_interface_config_to_model(
 def sprake_finance_to_interface_config(
     fnc: sprakefinance.SprakeFinance,
 ) -> dict:
-    fcfg = fnc.to_dict()
+    fcfg0 = fnc.to_dict()
+    fcfg = {str(k).lstrip('_'): v for k, v in fcfg0.items()}
     fcfg['benefit_discount_rate'] *= 100.
     fcfg['cost_discount_rate'] *= 100.
     fcfg['finance_uuid'] = fnc.uuid
@@ -215,11 +216,15 @@ def sync_interface_config_to_finance(
 ) -> bool:
     fcfg = local_finance_config
     w_fcfg = sprake_finance_to_interface_config(fnc)
+    logger.info('Synchronising interface to finance')
 
     if (
         fcfg is not None
         and w_fcfg != fcfg
     ):
+        logger.info('Synchronisation of finance is necessary')
+        #logger.info(str(fcfg))
+        #logger.info(str(w_fcfg))
         sprake_finance_set_finance_config(fcfg, fnc)
     return fnc.dirty
 

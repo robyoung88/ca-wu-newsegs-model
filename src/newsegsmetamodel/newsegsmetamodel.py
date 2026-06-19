@@ -25,6 +25,7 @@ For a psa run, a (small) number of statistics must be nominated to be held in a
 dataframe which will be accessible after completion; each row will correspond
 to a sample across all enabled PSA variables.
 """
+import datetime
 from typing import Any, Mapping, MutableSequence
 
 from core import newsegscomponent
@@ -36,6 +37,11 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
 
     model_id: str
     finance_id: str
+
+    _name = 'NewSEGS MetaModel'
+    _version = '0.0.1'
+    _id_prefix = 'metam'
+    _last_modified: datetime.datetime = datetime.datetime.now()
 
     def __init__(
         self,
@@ -103,6 +109,31 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     # We will also not use a custom pickler, because we don't want to switch out picklers
     # depending on what is being pickled, and ultimately we do want models and finances to be
     # picklable in other circumstances.
+
+    def to_config(self) -> dict[str, str]:
+        """
+        Simplify metamodel to a simple dictionary for passing around.
+        """
+        return {
+            'name': self.name,
+            'metamodel_id': self.id,
+            'model_id': self.model_id,
+            'finance_id': self.finance_id,
+            'last_modified': self._last_modified.isoformat()
+        }
+    
+    @classmethod
+    def generate_new_config(cls) -> dict[str, str]:
+        """
+        Generate a configuration using random ids for self, model and finance.
+        """
+        return {
+            'name': cls._name,
+            'metamodel_id': cls.generate_new_id(),
+            'model_id': newsegsmodel.NewsegsModel.generate_new_id(),
+            'finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
+            'last_modified': datetime.datetime.now().isoformat()
+        }
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + ('_model', '_finance')
     

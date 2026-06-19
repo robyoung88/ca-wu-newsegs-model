@@ -47,6 +47,10 @@ class NewsegsComponent(
     @classmethod
     def _make_id_regex(cls):
         return re.compile(rf'^{re.escape(cls._id_prefix)}' + r'-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')
+    
+    @classmethod
+    def generate_new_id(cls) -> str:
+        return cls._id_prefix + '-' + str(mod_uuid.uuid4())
 
     def __init__(self, *args, **kwargs):
         self.uuid = str(mod_uuid.uuid4())

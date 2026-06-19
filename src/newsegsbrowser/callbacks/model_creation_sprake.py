@@ -42,14 +42,3 @@ def create_default_variables() -> list[variable.Variable]:
     with open(os.path.join(STATICDATA, 'sprake-variable-config.json')) as f:
         var_conf_list = json.load(f)
     return [variable.variable_from_dict(x) for x in var_conf_list]
-
-def create_default_metamodel(
-    mdl: newsegsmodel.NewsegsModel,
-    fnc: newsegsfinance.NewsegsFinance,
-    vars: MutableSequence[variable.Variable]
-) -> newsegsmetamodel.NewsegsMetaModel:
-    return newsegsmetamodel.NewsegsMetaModel(
-        mdl,
-        fnc,
-        vars
-    )

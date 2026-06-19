@@ -4,7 +4,7 @@ NewSEGS model as a multi-page app.
 import copy
 import os
 import logging
-from typing import cast
+from typing import cast, MutableMapping
 
 from dash import Dash, dcc, html, Input, Output, State, callback
 import dash_bootstrap_components as dbc
@@ -14,6 +14,7 @@ import diskcache
 
 # For local testing
 import sys
+
 curdir = os.path.dirname(__file__)
 src_path = os.path.join(
     curdir,
@@ -26,6 +27,7 @@ from config import settings
 
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
+from newsegsmetamodel import NewsegsMetaModel
 
 from newsegsbrowser.layouts import model_selection_layout
 from newsegsbrowser.layouts import template_landing_layout
@@ -51,9 +53,10 @@ logger = logging.getLogger(__name__)
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
-models = {}
-finances = {}
+models: MutableMapping[str, newsegsmodel.NewsegsModel] = {}
+finances: MutableMapping[str, newsegsfinance.NewsegsFinance] = {}
 results = {}
+metamodels: MutableMapping[str, NewsegsMetaModel] = {}
 cache = diskcache.Cache(settings.get('DiskcacheCache', './cache'))
 
 # Manager for background callbacks
@@ -228,9 +231,11 @@ def create_app(external_stylesheets = None) -> Dash:
 
     ])
 
+    # TODO: Extend the app class to create these attributes
     app.models = models # pyright: ignore[reportAttributeAccessIssue]
     app.finances = finances # pyright: ignore[reportAttributeAccessIssue]
     app.results = results # pyright: ignore[reportAttributeAccessIssue]
+    app.metamodels = metamodels # pyright: ignore[reportAttributeAccessIssue]
     app.estimated_energy_balance = energy_balance_estimation.EstimatedEnergyBalance() # pyright: ignore[reportAttributeAccessIssue]
     app.cache = cache # pyright: ignore[reportAttributeAccessIssue]
     app.noncaching_background_callback_manager = noncaching_background_callback_manager # pyright: ignore[reportAttributeAccessIssue]
@@ -243,7 +248,7 @@ def create_app(external_stylesheets = None) -> Dash:
         logger.info('writing model %s to cache was successful', model_id)
     
     def model_from_cache(model_id) -> newsegsmodel.NewsegsModel:
-        logger.info('retrieiving model %s from cache', model_id)
+        logger.info('retrieving model %s from cache', model_id)
         mdl = cache.get(model_id)
         if not isinstance(mdl, newsegsmodel.NewsegsModel):
             raise TypeError(f'{model_id} retrieved from cache is of type {type(mdl)}')
@@ -266,10 +271,29 @@ def create_app(external_stylesheets = None) -> Dash:
     app.finance_to_cache = finance_to_cache # pyright: ignore[reportAttributeAccessIssue]
     app.finance_from_cache = finance_from_cache # pyright: ignore[reportAttributeAccessIssue]
 
-    def duplicate_model(model_id: str):
+    def metamodel_to_cache(metamodel_id: str):
+        mm = metamodels.get(metamodel_id)
+        logger.info('writing metamodel %s to cache', metamodel_id)
+        if mm:
+            cache[metamodel_id] = mm
+        logger.info('writing metamodel %s to cache was successful', metamodel_id)
+
+    def metamodel_from_cache(metamodel_id: str) -> NewsegsMetaModel:
+        logger.info('retrieving metamodel %s from cache', metamodel_id)
+        mm = cache.get(metamodel_id)
+        if not isinstance(mm, NewsegsMetaModel):
+            raise TypeError(f'{metamodel_id} retrieved from cache is of type {type(mm)}')
+        mm.reattach_model(cache) # pyright: ignore[reportArgumentType]
+        mm.reattach_finance(cache) # pyright: ignore[reportArgumentType]
+        return mm
+    
+    app.metamodel_to_cache = metamodel_to_cache  # pyright: ignore[reportAttributeAccessIssue]
+    app.metamodel_from_cache = metamodel_from_cache # pyright: ignore[reportAttributeAccessIssue]
+    
+    def duplicate_model(model_id: str) -> newsegsmodel.NewsegsModel:
         ref = models.get(model_id, None)
         if ref is None:
-            return None
+            raise ValueError(f'NewsegsModel not found: {model_id}')
         mdl = type(ref)(ref)
         models[mdl.id] = mdl
         new_model_id = mdl.id
@@ -289,37 +313,69 @@ def create_app(external_stylesheets = None) -> Dash:
 
         return mdl
     
-    def duplicate_finance(finance_id: str, model_id: str|None = None):
+    def duplicate_finance(
+            finance_id: str, 
+            model_id: str|None = None
+        ) -> newsegsfinance.NewsegsFinance:
         ref = finances.get(finance_id, None)
         if ref is None:
-            return None
+            raise ValueError(f'NewsegsFinance not found: {finance_id}')
         
-        ref_model_id = ref.model.id
+        fnc = type(ref)(ref)
+
+        try:
+            ref_model_id = ref.model.id
+        except AttributeError:
+            ref_model_id = None
         if not model_id:
             model_id = ref_model_id
-        fnc = type(ref)(ref)
-        fnc.model = models.get(model_id, None)
+        
+        if model_id is not None:
+            mdl = models.get(model_id, None)
+            if mdl is not None:
+                fnc.model = mdl
         finances[fnc.id] = fnc
         
         # Copy over any results
-        for res_class in ['finance_benefits_so', 'finance_costs_so', 'finance_value_so']:
-            ref_id = postprocess_utils.get_finance_result_id(
-                postprocess_utils.RESULT_CACHE_PREFIXES[res_class], 
-                ref.id, 
-                ref_model_id
-            )
-            new_id = postprocess_utils.get_finance_result_id(
-                postprocess_utils.RESULT_CACHE_PREFIXES[res_class], 
-                fnc.id,
-                model_id
-            )
-            results[new_id] = copy.copy(results.get(ref_id))
-            results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
+        if ref_model_id is not None:
+            for res_class in ['finance_benefits_so', 'finance_costs_so', 'finance_value_so']:
+                ref_id = postprocess_utils.get_finance_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES[res_class], 
+                    ref.id, 
+                    ref_model_id
+                )
+                new_id = postprocess_utils.get_finance_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES[res_class], 
+                    fnc.id,
+                    model_id
+                )
+                results[new_id] = copy.copy(results.get(ref_id))
+                results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
             
         return fnc
     
+    def duplicate_metamodel(metamodel_id: str):
+        ref = metamodels.get(metamodel_id, None)
+        if ref is None:
+            raise ValueError(f'NewsegsMetaModel not found: {metamodel_id}')
+        
+        dup_mdl = duplicate_model(ref.model_id)
+        #models[dup_mdl.id] = dup_mdl
+
+        dup_fnc = duplicate_finance(ref.finance_id, dup_mdl.id)
+        #dup_fnc.set_model(dup_mdl)
+        #finances[dup_fnc.id] = dup_fnc
+
+        variables = copy.deepcopy(ref.variables)
+        dup_mm = NewsegsMetaModel(dup_mdl, dup_fnc, variables)
+
+        metamodels[dup_mm.id] = dup_mm
+        
+        return dup_mm
+
     app.duplicate_model = duplicate_model # pyright: ignore[reportAttributeAccessIssue]
     app.duplicate_finance = duplicate_finance # pyright: ignore[reportAttributeAccessIssue]
+    app.duplicate_metamodel = duplicate_metamodel # pyright: ignore[reportAttributeAccessIssue]
 
     def remove_model(model_id):
         cache.delete(model_id)
@@ -343,8 +399,18 @@ def create_app(external_stylesheets = None) -> Dash:
                 results.pop(k)
         return finances.pop(finance_id, None)
     
+    def remove_metamodel(metamodel_id: str, remove_children: bool = True):
+        if remove_children:
+            mm = metamodels.get(metamodel_id)
+            if mm:
+                remove_model(mm.model_id)
+                remove_finance(mm.finance_id)
+        cache.delete(metamodel_id)
+        return metamodels.pop(metamodel_id)
+    
     app.remove_model = remove_model # pyright: ignore[reportAttributeAccessIssue]
-    app.remove_finace = remove_finance # pyright: ignore[reportAttributeAccessIssue]
+    app.remove_finance = remove_finance # pyright: ignore[reportAttributeAccessIssue]
+    app.remove_metamodel = remove_metamodel # pyright: ignore[reportAttributeAccessIssue]
 
     app = add_display_callbacks(app)
 

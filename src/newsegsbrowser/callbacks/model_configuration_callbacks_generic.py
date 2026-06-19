@@ -1,12 +1,18 @@
 from functools import partial
 import json
 import logging
+from typing import Callable, MutableSequence
 import uuid
 
 from dash import html, no_update
 
 from newsegsbrowser import icons
 import newsegsbrowser.common as browser
+
+from newsegsfinance.newsegsfinance import NewsegsFinance
+from newsegsmodel.newsegsmodel import NewsegsModel
+from newsegsvariable import variable
+import newsegsmetamodel
 
 logger = logging.getLogger(__name__)
 
@@ -15,22 +21,25 @@ def sync_config(
     store_selected_configuration,
     store_configurations,
     app,
-    create_default_model,
-    create_default_finance,
-    create_default_variables,
+
+    create_default_model: Callable[[], NewsegsModel],
+    create_default_finance: Callable[[], NewsegsFinance],
+    create_default_variables: Callable[[], MutableSequence[variable.Variable]],
     
     model_and_finance_to_interface_function
 ):
+    """
+    Take values from model/finance and push to interface.
+
+    This is also fired on first load of model page, so is responsible for
+    creation of the first metamodel / configuration.
+    """
     if store_selected_configuration is None:
         if store_configurations is None or len(store_configurations) == 0:
             # On first load, we can generate a random configuration
             store_configurations = [
                 json.dumps(
-                    browser.compose_configuration(
-                        'Configuration Name',
-                        'm-' + str(uuid.uuid4()),
-                        'f-' + str(uuid.uuid4())
-                    )
+                    newsegsmetamodel.NewsegsMetaModel.generate_new_config()
                 )
             ]
         
@@ -57,7 +66,21 @@ def sync_config(
         fnc.id = store_selected_configuration['finance_id']
         fnc.set_model(mdl, False)
         app.finances[fnc.id] = fnc
-    
+
+    mm = app.metamodels.get(store_selected_configuration['metamodel_id'])
+    if mm is None:
+        variables = create_default_variables()
+        for v in variables:
+            v.update_model(mdl)
+            v.update_model(fnc)
+        mm = newsegsmetamodel.NewsegsMetaModel(
+            mdl,
+            fnc,
+            variables
+        )
+        mm.id = store_selected_configuration['metamodel_id']
+        app.metamodels[mm.id] = mm
+
     # TODO - these do not require an update if store_configurations was the trigger
     
     mcfg, fcfg = model_and_finance_to_interface_function(mdl, fnc)

@@ -395,6 +395,8 @@ def add_interface_to_model_callbacks(app):
             logger.info('model configuration changes have added %d items to prequeue, which is now %d items long', l2, l2)
         elif finance_changed:
             logger.info('finance configuration changes have added %d items to prequeue, which is now %d items long', l2, l2)
+            for item in prequeue:
+                logger.info(str(item))
         else:
             logger.info('no changes to prequeue, which is %d items long', l2)   
         

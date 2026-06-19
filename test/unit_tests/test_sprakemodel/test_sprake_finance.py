@@ -79,7 +79,7 @@ class TestSprakeFinanceConfigEqualities(unittest.TestCase):
         d2 = json.loads(sd1)
 
         fnc2 = sprakefinance.SprakeFinance.from_none()
-        fnc2.sync_with_dict(d2)
+        fnc2.update(d2)
         self.assertEqual(fnc2.wind_capex_per_kw, 1500.0)
         self.assertEqual(fnc2.resident_var_per_unit, 0.2)
         self.assertEqual(fnc2.benefit_discount_rate, 0.0)
