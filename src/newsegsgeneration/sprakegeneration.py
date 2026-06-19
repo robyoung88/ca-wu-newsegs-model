@@ -1,13 +1,17 @@
 from __future__ import annotations
+
+import os
 import copy
 import datetime
-from typing import Any, override, Mapping, Sequence
+from typing import Any, Type, cast, override, Mapping, Sequence
 from functools import singledispatchmethod
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 
 from core.environmentserverinterface import EnvironmentServerInterface
+from core.location.location import RaisedLocation
 from core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from util import classfuncs
@@ -16,6 +20,66 @@ from core import location
 from core import generation
 from core import timespan as modtimespan
 from core import newsegsmoduleresult
+
+from config import settings
+_LOOKUP_DIR = settings.get('SprakeDataLoc')
+
+NOMINAL_WT_HEIGHT = 10.0
+
+def get_sprake_gamesa_126():
+    pcurve = (
+        pd.read_excel(
+            os.path.join(
+                _LOOKUP_DIR,
+                'wind_power_curve_investigation.xlsx'
+            ),
+            sheet_name="gamesa_25_power_curve",
+            header=0
+        )
+    )
+    
+    tloc = location.RaisedLocation.from_none()
+    tloc.height_agl = NOMINAL_WT_HEIGHT
+    
+    turbine = generation.WindTurbineElecGenerator.from_characteristics(
+        cut_in=2.0,
+        cut_out=21.0,
+        rated_power=2500.0,
+        swept_area=np.pi*(0.5 * 126)**2,
+        hub_height=NOMINAL_WT_HEIGHT,
+        name="Gamesa 126 (Sprake)",
+        loc = tloc,
+        power_curve=pcurve.to_numpy().T
+    )
+
+    return turbine
+
+def get_sprake_ned100():
+    cpcurve = (
+        pd.read_excel(
+            os.path.join(
+                _LOOKUP_DIR,
+                'power-curve-ned-100.xlsx'
+            ),
+            sheet_name='power_curve',
+            header=0
+        )
+        .loc[:,['wind_speed','coeff_power']]
+    )
+    tloc = location.RaisedLocation.from_none()
+    tloc.height_agl = NOMINAL_WT_HEIGHT
+    turbine = generation.WindTurbineElecGenerator.from_characteristics(
+        cut_in=3.0,
+        cut_out=20.0,
+        rated_power=100.0,
+        swept_area=np.pi*(0.5 * 24)**2,
+        hub_height=NOMINAL_WT_HEIGHT,
+        name="Norvento nED 100 (Sprake)",
+        loc = tloc,
+        cp_curve=cpcurve.to_numpy().T
+    )
+
+    return turbine
 
 class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
     def __init__(
@@ -74,6 +138,7 @@ class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
 class SprakeGeneration(NewsegsGeneration):
 
     _name = "Sprake Generation Module"
+        
 
     @singledispatchmethod
     def __init__(
@@ -103,6 +168,8 @@ class SprakeGeneration(NewsegsGeneration):
             )
         ])
 
+        self._generator.generators[1].location.height_agl = 2. # pyright: ignore[reportAttributeAccessIssue]
+
         if loc is not None:
             self.set_location(loc)
         
@@ -127,6 +194,11 @@ class SprakeGeneration(NewsegsGeneration):
         
         if model is not None:
             self.model = model
+
+    @classmethod
+    def from_none(cls) -> SprakeGeneration:
+        turbine = get_sprake_ned100()
+        return cls(turbine)
 
     @property
     def generator(self) -> generation.PowerPlantHeterogeneousGenerators:
@@ -171,12 +243,42 @@ class SprakeGeneration(NewsegsGeneration):
 
     @property
     @override
-    def location(self) -> location.Location | Sequence[location.Location]:
-        return self.generator.location
+    def location(self) -> location.Location:# | Sequence[location.Location]:
+        return self.generator.location#[0]
     
     @location.setter
     def location(self, loc: location.Location):
         self.generator.location = loc
+
+    @property
+    def wind_capacity(self) -> float:
+        """
+        Capacity (kW) of wind turbines
+        """
+        return self.generator.generators[0].nameplate_capacity
+    
+    @wind_capacity.setter
+    def wind_capacity(self, capacity: float) -> None:
+        if self.wind_capacity != capacity:
+            turbine_size = self.generator.generators[0].turbine.nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
+            n_turbines = capacity / turbine_size
+            self.generator.generators[0].n_turbines = n_turbines # pyright: ignore[reportAttributeAccessIssue]
+            self.dirty = True        
+    
+    @property
+    def pv_capacity(self) -> float:
+        """
+        Capacity (kWp) of PV array
+        """
+        return self.generator.generators[1].nameplate_capacity
+    
+    @pv_capacity.setter
+    def pv_capacity(self, capacity: float) -> None:
+        if self.pv_capacity != capacity:
+            pv_size = self.generator.generators[1].pv_array.nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
+            n_arrays = capacity / pv_size
+            self.generator.generators[1].n_arrays = n_arrays # pyright: ignore[reportAttributeAccessIssue]
+            self.dirty = True
 
     @classmethod
     def from_characteristics(cls,
@@ -193,6 +295,25 @@ class SprakeGeneration(NewsegsGeneration):
             o.model = model
         
         return o
+    
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        odict = super().to_dict()
+        odict['wind_capacity'] = self.wind_capacity
+        odict['pv_capacity'] = self.pv_capacity
+        odict['location'] = self.location.to_dict() # pyright: ignore[reportAttributeAccessIssue]
+        return odict
+    
+    @override
+    @classmethod
+    def from_dict(
+        cls: type[SprakeGeneration], 
+        config: dict[str, Any]
+    ) -> SprakeGeneration:
+        inst = cls.from_none()
+        inst.update(config)
+        #cast(RaisedLocation, inst.generator.generators[1].location).height_agl = 2.
+        return inst
 
 # SprakeGeneration copy constructor
 @SprakeGeneration.__init__.register(SprakeGeneration) # pyright: ignore[reportFunctionMemberAccess]
@@ -207,3 +328,10 @@ def _SprakeGeneration_from_other(
         self.model = other.model
     except AttributeError:
         pass
+
+# Exclude generator as not necessary - add it back in afterwards
+SprakeGeneration._excluded_attributes = (
+    super(SprakeGeneration, SprakeGeneration)._excluded_attributes
+    + ('_generator',)
+)
+    

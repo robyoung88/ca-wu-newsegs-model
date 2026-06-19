@@ -19,7 +19,7 @@ from newsegsgeneration import constructors as genconstructors
 class TestSprakeGenerationConfigEqualities(unittest.TestCase):
 
     def test_basic_construction(self):
-        turbine = sprakemodel.get_sprake_ned100()
+        turbine = sprakegeneration.get_sprake_ned100()
         loc = location.RaisedLocation(50, -3, 10)
 
         inst = sprakegeneration.SprakeGeneration(turbine)
@@ -32,7 +32,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
 
         d1 = inst.to_dict()
 
-        turbine2 = sprakemodel.get_sprake_gamesa_126()
+        turbine2 = sprakegeneration.get_sprake_gamesa_126()
 
         inst2 = sprakegeneration.SprakeGeneration.from_dict(d1)
 
@@ -57,7 +57,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         )
     
     def test_copy_construction(self):
-        turbine = sprakemodel.get_sprake_ned100()
+        turbine = sprakegeneration.get_sprake_ned100()
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen1 = sprakegeneration.SprakeGeneration(
             turbine,
@@ -89,7 +89,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         )
     
     def test_serialisation(self):
-        turbine = sprakemodel.get_sprake_ned100()
+        turbine = sprakegeneration.get_sprake_ned100()
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen1 = sprakegeneration.SprakeGeneration(
             turbine,
@@ -128,7 +128,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         )
     
     def test_json_serialisation(self):
-        turbine = sprakemodel.get_sprake_ned100()
+        turbine = sprakegeneration.get_sprake_ned100()
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen1 = sprakegeneration.SprakeGeneration(
             turbine,
@@ -171,7 +171,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         """
         Testing update from other and partial updates.
         """
-        turbine = sprakemodel.get_sprake_ned100()
+        turbine = sprakegeneration.get_sprake_ned100()
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen_1 = sprakegeneration.SprakeGeneration(
             turbine,
@@ -179,7 +179,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
             name = 'Test generation module'
         )
 
-        turbine_2 = sprakemodel.get_sprake_gamesa_126()
+        turbine_2 = sprakegeneration.get_sprake_gamesa_126()
         loc_2 = location.RaisedLocation(55, -2, 50)
         mod_gen_2 = sprakegeneration.SprakeGeneration(
             turbine_2,

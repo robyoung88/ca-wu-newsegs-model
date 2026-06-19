@@ -29,7 +29,7 @@ from config import settings
 lookup_dir = settings.get('SprakeDataLoc')
 
 # TODO: Fix that changing this prevents construction. Hub height must be somewhere fixed at 10m before location is set.
-_NOMINAL_WT_HEIGHT = 10.0
+
 _DEFAULT_TS = pd.Timedelta(hours=1)
 
 def get_sprake_environment_server():
@@ -54,7 +54,7 @@ def get_sprake_environment_server():
     )
    
     windloc = modlocation.RaisedLocation.from_none()
-    windloc.height_agl = _NOMINAL_WT_HEIGHT
+    windloc.height_agl = sprakegeneration.NOMINAL_WT_HEIGHT
     wind_ts = modtimespan.OffsetRegTimeSpan(
         pd.Timestamp(wind_data['timestamp'].iloc[0], tz='utc'),
         pd.Timestamp(wind_data['timestamp'].iloc[-1], tz='utc')
@@ -124,61 +124,6 @@ def get_sprake_environment_server():
 
 def get_sprake_wider_env_server():
     return DummyWiderEnv()
-
-def get_sprake_gamesa_126():
-    pcurve = (
-        pd.read_excel(
-            os.path.join(
-                lookup_dir,
-                'wind_power_curve_investigation.xlsx'
-            ),
-            sheet_name="gamesa_25_power_curve",
-            header=0
-        )
-    )
-    
-    tloc = modlocation.RaisedLocation.from_none()
-    tloc.height_agl = _NOMINAL_WT_HEIGHT
-    
-    turbine = generators.WindTurbineElecGenerator.from_characteristics(
-        cut_in=2.0,
-        cut_out=21.0,
-        rated_power=2500.0,
-        swept_area=np.pi*(0.5 * 126)**2,
-        hub_height=_NOMINAL_WT_HEIGHT,
-        name="Gamesa 126 (Sprake)",
-        loc = tloc,
-        power_curve=pcurve.to_numpy().T
-    )
-
-    return turbine
-
-def get_sprake_ned100():
-    cpcurve = (
-        pd.read_excel(
-            os.path.join(
-                lookup_dir,
-                'power-curve-ned-100.xlsx'
-            ),
-            sheet_name='power_curve',
-            header=0
-        )
-        .loc[:,['wind_speed','coeff_power']]
-    )
-    tloc = modlocation.RaisedLocation.from_none()
-    tloc.height_agl = _NOMINAL_WT_HEIGHT
-    turbine = generators.WindTurbineElecGenerator.from_characteristics(
-        cut_in=3.0,
-        cut_out=20.0,
-        rated_power=100.0,
-        swept_area=np.pi*(0.5 * 24)**2,
-        hub_height=_NOMINAL_WT_HEIGHT,
-        name="Norvento nED 100 (Sprake)",
-        loc = tloc,
-        cp_curve=cpcurve.to_numpy().T
-    )
-
-    return turbine
 
 class SprakeModel(newsegsmodel.NewsegsModel):
     _name = 'Sprake Model'
@@ -286,7 +231,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         name: str
     ) -> None:
 
-        mod_gen = sprakegeneration.SprakeGeneration(get_sprake_ned100())
+        mod_gen = sprakegeneration.SprakeGeneration(sprakegeneration.get_sprake_ned100())
         mod_gen.set_location(
             modlocation.Location(
                 settings.get('SprakeValidationLat'),

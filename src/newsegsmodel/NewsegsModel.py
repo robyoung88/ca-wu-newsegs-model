@@ -124,8 +124,13 @@ class NewsegsModel(
         try:
             self.generation.update(generation_config)
         except (AttributeError, TypeError):
-            from newsegsgeneration import constructors as genmodconstructors
-            gen = genmodconstructors.generation_module_from_dict(generation_config)
+            from core import find_constructor
+            constr = find_constructor(
+                generation_config.get('constructor_class'),
+                generation_config.get('class')
+            )
+            
+            gen = constr(generation_config)
             gen.model = self
             self.generation = gen
 

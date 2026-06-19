@@ -277,22 +277,6 @@ class TimeSpan(SerialiseToDictMixin):
             +  "(" + repr(self.start) + ", " 
             + repr(self.end) + ")"
         )
-
-    # @override
-    # def _represent(self, value):
-    #     if isinstance(value, object):
-    #         if hasattr(value, 'to_dict'):
-    #             return value.to_dict() # pyright: ignore[reportAttributeAccessIssue]
-    #         elif isinstance(value, pd.Timestamp):
-    #             return timestamp_to_dict(value)
-    #         elif isinstance(value, pd.Timedelta):
-    #             return timedelta_to_dict(value)
-    #         elif isinstance(value, TimeZoneScalar):
-    #             return str(value)
-    #         else:
-    #             return value
-    #     else:
-    #         return value
     
     @classmethod
     @override
@@ -302,34 +286,8 @@ class TimeSpan(SerialiseToDictMixin):
             inst._tz = pytz.timezone(inst._tz) # pyright: ignore[reportAttributeAccessIssue]
         return inst # pyright: ignore[reportReturnType]
     
-    # def to_dict(self) -> Mapping:
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'start': timestamp_to_dict(self._start_dt),
-    #         'end': timestamp_to_dict(self._end_dt)
-    #     }
-    #     if hasattr(self, '_tz'):
-    #         odict['tz'] = str(self._tz)
-    #     return odict
-    
-    # @classmethod
-    # def from_dict(cls, ip: Mapping) -> TimeSpan:
-    #     ip = copy.copy(ip)
-
-    #     ip['start'] = timestamp_from_dict(ip.get('start'))
-    #     ip['end'] = timestamp_from_dict(ip.get('end'))
-
-    #     # To allow for the self-dispatch magic, need to
-    #     # set start as a positional arg
-    #     posargs = (ip.pop('start'),)
-
-    #     if ('class' in ip.keys()):
-    #         ip.pop('class')
-        
-    #     return cls(*posargs, **ip)
-
 # TimeSpan copy constructor
-@TimeSpan.__init__.register(TimeSpan)
+@TimeSpan.__init__.register(TimeSpan) # pyright: ignore[reportFunctionMemberAccess]
 def TimeSpan_from_other(self, start: TimeSpan, end: None = None):
     """
     Initialise a TimeSpan using another TimeSpan
@@ -340,6 +298,7 @@ def TimeSpan_from_other(self, start: TimeSpan, end: None = None):
     self._post_calc()
 
 setattr(TimeSpan, '_from_other', TimeSpan_from_other)
+
 
 class RegTimeSpan(TimeSpan):
     """

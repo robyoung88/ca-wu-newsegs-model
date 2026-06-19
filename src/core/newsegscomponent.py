@@ -91,14 +91,18 @@ class NewsegsComponent(
         # We want to be able to accept property updates, but need to strip
         # them out of the update dict and apply them after other updates
         property_updates = {}
-        type_ = type(self)
         for k in config.keys():
             if hasattr(type_, k):
                 prop = getattr(type_, k)
                 if hasattr(prop, 'fset') and getattr(prop, 'fset') is not None:
                     v = config.get(k)
                     if isinstance(v, dict):
-                        v = type_.unserialise_dict(v.copy())
+                        child_cc = v.get('constructor_class', None)
+                        child_classname = v.get('class', None)
+                        if child_cc is not None and child_classname is not None:
+                            v = find_constructor(child_cc, child_classname)(v)
+                        else:
+                            v = type_.unserialise_dict(v.copy())
                     elif not isinstance(v, str) and isinstance (v, Sequence):
                         requiresupdate = False
                         for childv in v:

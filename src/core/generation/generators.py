@@ -136,44 +136,6 @@ class ABCElecGenerator(
     def model(self, model: NewsegsModelInterface):
         self._model = model
 
-    # @abstractmethod
-    # def to_dict(self) -> Mapping:
-    #     """
-    #     Returns Generator/Powerplant configuration as a dictionary.
-    #     """
-
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     """
-    #     Update configuration using a dictionary.
-
-    #     In the default implementation, will go through each key in the dict.
-    #     If there is an attribute with an fset attribute, then assume it is a
-    #     read-write property and update it via the fset. Otherwise, set the
-    #     attribute directly.
-    #     """
-    #     for k in config.keys():
-    #         if hasattr(self, k):
-    #             v = config.get(k)
-
-    #             # If the attribute is a read-write property, its class attribute 
-    #             # will have an fset
-    #             try:
-    #                 prop = getattr(type(self), k)
-    #                 if hasattr(prop, 'fset'):
-    #                     getattr(prop, 'fset')(self, v)
-    #                 else:
-    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
-    #                     setattr(self, k, v)
-    #             except AttributeError:
-    #                 setattr(self, k, v)
-    
-    # @classmethod
-    # @abstractmethod
-    # def from_dict(cls: Type['ABCElecGenerator'], config: dict[str, Any]) -> 'ABCElecGenerator':
-    #     """
-    #     An instance of the generator configured per a dictionary.
-    #     """
-
     @property
     @abstractmethod
     def location(self) -> location.Location:
@@ -583,56 +545,6 @@ class WindTurbineElecGenerator(ABCElecGenerator):
         super().update(config)
         if isinstance(config, dict) and '_cp_curve' in config.keys():
             self.set_cp_curve(np.asarray(self._cp_curve))
-
-    # @override
-    # def to_dict(self) -> dict:
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self._name,
-    #         'cut_in': self._cut_in,
-    #         'cut_out': self._cut_out,
-    #         'rated_power': self._rated_power,
-    #         'swept_area': self._swept_area,
-    #         'hub_height': self._hub_height,
-    #         'loc': self._location.to_dict(),
-    #         'cp_curve': self._cp_curve
-    #     }
-
-    #     return odict
-    
-    # @override
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     config = copy.copy(config)
-
-    #     cp_curve = config.pop('cp_curve', None)
-    #     if cp_curve is not None:
-    #         cp_curve = np.asarray(cp_curve)
-    #         self.set_cp_curve(cp_curve)
-        
-    #     loc = config.pop('loc', None)
-    #     if loc is not None:
-    #         with warnings.catch_warnings():
-    #             warnings.simplefilter('ignore')
-    #             if isinstance(loc, location.Location):
-    #                 self.location = loc
-    #             elif isinstance(loc, dict):
-    #                 self.location = location.location_from_dict(loc)
-
-    #     super().sync_with_dict(config)
-
-    # @classmethod
-    # def from_dict(
-    #     cls: Type[WindTurbineElecGenerator],
-    #     config: dict[str, Any]
-    # ) -> WindTurbineElecGenerator:
-    #     """
-    #     Return a WindTurbineElecGenerator from a dictionary.
-    #     """
-    #     config = copy.copy(config)
-    #     config.pop('class', None)
-    #     if config.get('loc', None) is not None:
-    #         config['loc'] = location.location_from_dict(config['loc'])
-    #     return cls.from_characteristics(**config)
     
     def __getstate__(self):
         """
@@ -1063,60 +975,6 @@ class ABCPVElecGenerator(ABCElecGenerator):
             peak_power, # pyright: ignore[reportCallIssue]
             **a
         )
-    
-    # @override
-    # def to_dict(self) -> dict[str, Any]:
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self._name,
-    #         'peak_power': self._peak_power,
-    #         'loc': self._location.to_dict(),
-    #         'total_area': self._total_area,
-    #         'collector_area': self._collector_area,
-    #         'frame_factor': self._frame_factor,
-    #     }
-
-    #     return odict
-    
-    # @override
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     config = copy.copy(config)
-
-    #     loc = config.pop('loc', None)
-    #     if loc is not None:
-    #         if isinstance(loc, dict):
-    #             loc = location.location_from_dict(loc)
-    #         self.location = loc
-        
-    #     # This looks risky, but practically may only result in
-    #     # some redundant attributes if the config is bad.
-    #     conf_keys = config.keys()
-    #     for k in conf_keys:
-    #         if hasattr(self, k):
-    #             v = config.get(k)
-
-    #             # If the attribute is a read-write property, its class attribute 
-    #             # will have an fset
-    #             try:
-    #                 prop = getattr(type(self), k)
-    #                 if hasattr(prop, 'fset'):
-    #                     getattr(prop, 'fset')(self, v)
-    #                 else:
-    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
-    #                     setattr(self, k, v)
-    #             except AttributeError:
-    #                 setattr(self, k, v)
-
-    # @classmethod
-    # def from_dict(
-    #     cls: Type[ABCPVElecGenerator],
-    #     config: dict[str, Any]
-    # ) -> ABCPVElecGenerator:
-    #     ip = copy.copy(config)
-    #     ip.pop('class', None)
-    #     if ip.get('loc', None) is not None:
-    #         ip['loc'] = location.location_from_dict(ip['loc'])
-    #     return cls.from_characteristics(**ip)
 
 # ABCPVElecGenerator copy constructor
 @ABCPVElecGenerator.__init__.register(ABCPVElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
@@ -1134,100 +992,6 @@ def ABCPVElecGenerator_from_other(
         self._model = other.model
     except AttributeError:
         pass
-
-##### Fully deprecated ####
-# class SprakePVElecGenerator(ABCPVElecGenerator):
-#     _name = "Simple PV Panel"
-
-#     @override
-#     def __init__( # pyright: ignore[reportIncompatibleVariableOverride]
-#         self,
-#         other:SprakePVElecGenerator|None = None
-#     ) -> None:
-#         super().__init__(other)
-#         if other is None:
-#             self._self_consumption = 0.04
-#             self._aspect_factor = 0.7
-#         elif isinstance(other, SprakePVElecGenerator):
-#             self._self_consumption = other.self_consumption
-#             self._aspect_factor = other.aspect_factor
-#         else:
-#             raise ValueError("'other' must be a SprakePVElecGenerator")
-
-#     @property
-#     def self_consumption(self) -> float:
-#         """
-#         The maximum self-consumption of the module or array in kW. 
-
-#         In the Sprake model, this is taken from mean production rate over the timestep. If the result is < 0, then it is clipped to 0
-#         """
-#         return self._self_consumption
-
-#     @self_consumption.setter
-#     def self_consumption(self, self_consumption_kw:int|float) -> None:
-#         if self_consumption_kw < 0:
-#             warnings.warn("Self consumption is defined positive - negative implies baseline generation without solar resource")
-#         if self_consumption_kw > self._peak_power:
-#             warnings.warn("Self-consumption greater than peak power under STC. Have you checked units?")
-#         self._self_consumption = self_consumption_kw
-    
-#     @property
-#     def aspect_factor(self) -> float:
-#         """
-#         The Sprake model reduces production at all times by a factor reflecting the reduction from total horizontal radiation received by collectors due to pitch and azimuth of collectors.
-
-#         This simple model does not vary this loss by the actual solar position and the azimuth and pitch of the array
-#         """
-#         return self._aspect_factor
-
-#     @aspect_factor.setter
-#     def aspect_factor(self, factor:float) -> None:
-#         assert factor >= 0.0, "`factor` should be positive."
-#         if factor > 1.0:
-#             warnings.warn("Setting `factor` > 1 implies some form of concentrating technology is in use.")
-#         self._aspect_factor = factor
-
-#     def run(
-#         self,
-#         timespan: modtimespan.TimeSpan
-#     ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
-#         if self.model is None:
-#             raise ValueError("Electrical generator requires a model to serve environmental data")
-#         global_horizontal_flux = self.model.local_env.get_horizontal_solar_flux(self.location, timespan)
-#         # Scale flux to collector area
-#         # NB - in Sprake model, the aspect factor does not get applied until after the removal of
-#         # self-consumption. This is counter-intuitive, and we have reversed it here
-#         collector_flux = global_horizontal_flux * self.collector_area * self.aspect_factor - self.self_consumption
-#         collector_flux = np.asarray(collector_flux)
-        
-#         # Apply assumption of no consumption when under low irradiation
-#         collector_flux[collector_flux<0.0] = 0.0
-
-#         return collector_flux.reshape((1,-1))
-#
-#    @classmethod
-#    def from_characteristics(
-#        cls: Type[SprakePVElecGenerator],
-#        *args,
-#        self_consumption:float,
-#        aspect_factor:float,
-#        **kwargs
-#    ) -> SprakePVElecGenerator:
-#
-#        o = super(SprakePVElecGenerator, cls).from_characteristics(*args, **kwargs)
-#
-#        o.self_consumption = self_consumption
-#        o.aspect_factor = aspect_factor
-#
-#        return o
-#    
-#    def to_dict(self) -> dict[str, Any]:
-#        odict = super().to_dict()
-#        odict['self_consumption'] = self._self_consumption
-#        odict['aspect_factor'] = self._aspect_factor
-#
-#        return odict
-
 
 
 class SprakePVGISElecGenerator(ABCPVElecGenerator):
@@ -1664,63 +1428,6 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
             pv_array,
             **a
         )
-    
-    # @override
-    # def to_dict(self) -> Mapping:
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self._name,
-    #         'pv_array': self._pv_array.to_dict(),
-    #         'n': self._n
-    #     }
-
-    #     return odict
-
-    # @override
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     config = copy.copy(config)
-    #     pv_array = config.pop('pv_array', None)
-    #     if pv_array is not None:
-    #         if isinstance(pv_array, dict):
-    #             pv_array = generator_from_dict(pv_array)
-    #             if not isinstance(pv_array, ABCPVElecGenerator):
-    #                 raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(pv_array)}')
-    #         self._pv_array = pv_array
-    #         # Expect the location to get overwritten in the setter;
-    #         # as this is recovery, we do actually want the location
-    #         # though we don't want to mess with the model.
-    #         self.location = pv_array.location
-        
-    #     # This looks risky, but practically may only result in
-    #     # some redundant attributes if the config is bad.
-    #     conf_keys = config.keys()
-    #     for k in conf_keys:
-    #         if hasattr(self, k):
-    #             v = config.get(k)
-
-    #             # If the attribute is a read-write property, its class attribute 
-    #             # will have an fset
-    #             try:
-    #                 prop = getattr(type(self), k)
-    #                 if hasattr(prop, 'fset'):
-    #                     getattr(prop, 'fset')(self, v)
-    #                 else:
-    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
-    #                     setattr(self, k, v)
-    #             except AttributeError:
-    #                 setattr(self, k, v)
-
-    # @classmethod
-    # def from_dict(cls, config: dict[str, Any]) -> PowerPlantHomogeneousPV:
-    #     ip = copy.copy(config)
-    #     ip.pop('class', None)
-
-    #     if ip.get('pv_array', None) is not None:
-    #         ip['pv_array'] = generator_from_dict(ip['pv_array'])
-    #         if not isinstance(ip['pv_array'], ABCPVElecGenerator):
-    #             raise TypeError(f'`pv_array is not of type ABCPVElecGenerator, is {type(ip['pv_array'])}')
-        
-    #     return cls.from_characteristics(**ip)
 
 # PowerPlantHomogeneousPV copy constructor
 @PowerPlantHomogeneousPV.__init__.register(PowerPlantHomogeneousPV) # pyright: ignore[reportFunctionMemberAccess]
@@ -1735,6 +1442,7 @@ def PowerPlantHomogeneousPV_from_other(
         self.model = other.model
     except AttributeError:
         pass
+
 
 class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     """
@@ -1870,70 +1578,6 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
             **a
         )
 
-    # @override
-    # def to_dict(self) -> dict[str, Any]:
-    #     odict = {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self._name,
-    #         'generators': [x.to_dict() for x in self.generators]
-    #     }
-    #     return odict
-    
-    # @override
-    # def sync_with_dict(self, config: dict[str, Any]) -> None:
-    #     config = copy.copy(config)
-    #     generators = config.pop('generators', None)
-    #     if generators is not None:
-    #         try:
-    #             mdl = self.model
-    #         except AttributeError:
-    #             mdl = None
-
-    #         generators = [
-    #             x if isinstance(x, ABCScalingPowerPlant) else generator_from_dict(x) for x in generators
-    #         ]
-    #         for x in generators:
-    #             if not isinstance(x, ABCScalingPowerPlant):
-    #                 raise TypeError(f'configuration contains generators of incorrect type: {type(x)}')
-    #         generators = [
-    #             cast(ABCScalingPowerPlant, x) for x in generators
-    #         ]
-    #         self.clear()
-    #         self.extend(generators)
-    #         # Sync up the model
-    #         if mdl is not None:
-    #             self.model = mdl
-    #         # Note that the location is not synchronised for this type of generator
-        
-    #     # This looks risky, but practically may only result in
-    #     # some redundant attributes if the config is bad.
-    #     conf_keys = config.keys()
-    #     for k in conf_keys:
-    #         if hasattr(self, k):
-    #             v = config.get(k)
-
-    #             # If the attribute is a read-write property, its class attribute 
-    #             # will have an fset
-    #             try:
-    #                 prop = getattr(type(self), k)
-    #                 if hasattr(prop, 'fset'):
-    #                     getattr(prop, 'fset')(self, v)
-    #                 else:
-    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
-    #                     setattr(self, k, v)
-    #             except AttributeError:
-    #                 setattr(self, k, v)
-    
-    # @classmethod
-    # def from_dict(cls, config: dict[str, Any]) -> PowerPlantHeterogeneousGenerators:
-    #     ip = copy.copy(config)
-    #     ip.pop('class', None)
-
-    #     if ip.get('generators', None) is not None:
-    #         ip['generators'] = [generator_from_dict(x) for x in ip['generators']]
-        
-    #     return cls.from_characteristics(**ip)
-
     @property
     def location(self) -> location.Location:
         if self._generators is None:
@@ -1966,6 +1610,7 @@ def PowerPlantHeterogeneousGenerators_from_other(
         self.model = other.model
     except AttributeError:
         pass
+
 
 GENERATOR_CONSTRUCTORS = {
     'WindTurbineElecGenerator': WindTurbineElecGenerator,
