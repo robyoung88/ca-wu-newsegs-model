@@ -1,11 +1,11 @@
 {
     "class": "SprakeModel",
     "constructor_class": "NewsegsComponent",
-    "uuid": "c74a0125-030f-45b6-a027-ed0c49910468",
+    "uuid": "5786daf7-f9a2-40ae-ad7f-a1ff99c2b208",
     "_mod_gen": {
         "class": "SprakeGeneration",
         "constructor_class": "NewsegsModule",
-        "uuid": "e5d59802-c0bf-486b-a0a8-ccbec0ad9757",
+        "uuid": "beb8086e-5eac-49ba-beb6-da248d6bcf7c",
         "_generator": {
             "class": "PowerPlantHeterogeneousGenerators",
             "constructor_class": "Generator",
@@ -221,7 +221,7 @@
     "_mod_grid": {
         "class": "SprakeGrid",
         "constructor_class": "NewsegsModule",
-        "uuid": "fcd699a3-9e2f-404c-b511-3b42551b43f3",
+        "uuid": "3c499428-0772-44ce-bf42-da37678906af",
         "_import_rate": 0.2,
         "_dirty": true,
         "_export_rate": 0.07
@@ -229,7 +229,7 @@
     "_mod_cs": {
         "class": "SprakeCS",
         "constructor_class": "NewsegsModule",
-        "uuid": "d280169b-71fa-40a3-aa2f-0cfa5f209826",
+        "uuid": "442d4e8d-2425-4072-b6ed-ad224f464a56",
         "_appliance_params": {
             "efficiency_reduction": 0.1,
             "n_households": 100
@@ -310,5 +310,5 @@
     "_name": "Sprake Model",
     "_dirty": true,
     "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
-    "wider_environment_server": "None"
+    "wider_environment_server": "DummyWiderEnv v0.0.1"
 }

@@ -110,7 +110,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     # depending on what is being pickled, and ultimately we do want models and finances to be
     # picklable in other circumstances.
 
-    def to_config(self) -> dict[str, str]:
+    def to_config(self) -> dict[str, str|int|float]:
         """
         Simplify metamodel to a simple dictionary for passing around.
         """
@@ -123,7 +123,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         }
     
     @classmethod
-    def generate_new_config(cls) -> dict[str, str]:
+    def generate_new_config(cls) -> dict[str, str|int|float]:
         """
         Generate a configuration using random ids for self, model and finance.
         """
@@ -136,5 +136,3 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         }
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + ('_model', '_finance')
-    
-

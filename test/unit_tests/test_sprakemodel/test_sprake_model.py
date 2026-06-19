@@ -253,36 +253,36 @@ class TestSprakeFinanceRun(unittest.TestCase):
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_costs_undiscounted(),
-            external_finance_data.loc['total_cost_undiscounted', 'value'],
+            float(external_finance_data.loc['total_cost_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_costs_discounted(),
-            external_finance_data.loc['total_cost_discounted', 'value'],
+            float(external_finance_data.loc['total_cost_discounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_benefits_undiscounted(),
-            external_finance_data.loc['total_benefits_undiscounted', 'value'],
+            float(external_finance_data.loc['total_benefits_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_benefits_discounted(),
-            external_finance_data.loc['total_benefits_discounted', 'value'],
+            float(external_finance_data.loc['total_benefits_discounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_net_present_value_undiscounted(),
-            external_finance_data.loc['npv_undiscounted', 'value'],
+            float(external_finance_data.loc['npv_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = 10*RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_net_present_value_discounted(),
-            external_finance_data.loc['npv_discounted', 'value'],
+            float(external_finance_data.loc['npv_discounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = 10*RTOL
         )

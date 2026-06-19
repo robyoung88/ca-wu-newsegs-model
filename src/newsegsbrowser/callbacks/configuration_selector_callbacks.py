@@ -199,12 +199,15 @@ def add_configuration_selection_callbacks(app: Dash):
 
             # Let's copy over the results
             mdl_ref = app.models.get(ref_config['model_id'])
-            mdl._generation_result = copy.copy(mdl_ref._generation_result)
-            mdl.generation._dirty = False
-            mdl._grid_result = copy.copy(mdl_ref._grid_result)
-            mdl.grid._dirty = False
-            mdl._cs_result = copy.copy(mdl_ref._cs_result)
-            mdl.consumption_storage._dirty = False
+            if hasattr(mdl_ref, '_generation_result'):
+                mdl._generation_result = copy.copy(mdl_ref._generation_result) # pyright: ignore[reportAttributeAccessIssue]
+                mdl.generation._dirty = False
+            if hasattr(mdl_ref, '_grid_result'):
+                mdl._grid_result = copy.copy(mdl_ref._grid_result) # pyright: ignore[reportAttributeAccessIssue]
+                mdl.grid._dirty = False
+            if hasattr(mdl_ref, '_cs_result')    :
+                mdl._cs_result = copy.copy(mdl_ref._cs_result) # pyright: ignore[reportAttributeAccessIssue]
+                mdl.consumption_storage._dirty = False
             mdl._dirty = False
             
             # Because of the different uuid, the caches will not recognise this model,
