@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any, Literal, Union, Sequence, SupportsFloat
+from typing import Any, Literal, Union, Sequence, SupportsFloat, overload
 import re
 
 import numpy as np
@@ -171,6 +171,24 @@ class NewsegsLocalEnvironment(
     @abstractmethod
     def get_solar_flux_on_plane_timestep(self) -> pd.Timedelta:
         """Timestep for solar flux on plane data."""
+        ...
+
+    @overload
+    def get_true_datetimes(
+        self,
+        measure: LOCAL_ENVIRONMENT_MEASURE,
+        location: Location,
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex:
+        ...
+    
+    @overload
+    def get_true_datetimes(
+        self,
+        measure: LOCAL_ENVIRONMENT_MEASURE,
+        location: Sequence[Location],
+        timespan: TimeSpan
+    ) -> list[pd.DatetimeIndex]:
         ...
     
     @abstractmethod

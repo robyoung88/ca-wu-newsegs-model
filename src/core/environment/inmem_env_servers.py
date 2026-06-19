@@ -1,9 +1,11 @@
 from __future__ import annotations
-from typing import Any, Sequence, overload, override
+from typing import Any, Sequence, cast, overload, override
+
+from useful_types import SequenceNotStr
 # Very simple environment servers that provide in-memory stores for timeseries data which are returned on request
 
 from core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
-from core.environment.environment_servers import LOCAL_ENVIRONMENT_MEASURE, RealArrayLike
+from core.environment.environment_servers import LOCAL_ENVIRONMENT_MEASURE, WIDER_ENVIRONMENT_MEASURE, RealArrayLike
 from core.location import Location,RaisedLocation,AspectLocation
 from core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
 import numpy as np
@@ -92,7 +94,7 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     @override
     def get_wind_timestep(self) -> pd.Timedelta:
         try:
-            return next(iter(self._wind_series.values())).get('timespan').timestep
+            return next(iter(self._wind_series.values())).get('timespan').timestep # pyright: ignore[reportOptionalMemberAccess]
         except:
             return pd.Timedelta(1, 'hour')
 
@@ -263,13 +265,19 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         
         match measure:
             case 'wind_speeds':
-                return _get_true_datetimes_srs(self.access_wind_series(location), timespan)
+                srs = self.access_wind_series(cast(RaisedLocation, location))
+                if srs is None:
+                    raise ValueError(f'Wind series has not been set for location {str(location)}')
+                return _get_true_datetimes_srs(srs, timespan)
             case 'horizontal_solar_flux':
                 return _get_true_datetimes_srs(self.access_horizontal_solar_flux_series(location), timespan)
             case 'external_temperature':
                 return _get_true_datetimes_srs(self.access_external_temperature_series(location), timespan)
             case 'solar_flux_on_plane':
-                return _get_true_datetimes_srs(self.access_solar_flux_on_plane_series(location), timespan)
+                srs = self.access_solar_flux_on_plane_series(cast(AspectLocation, location))
+                if srs is None:
+                    raise ValueError(f'Solar flux on plane has not been set for location {str(location)}')
+                return _get_true_datetimes_srs(srs, timespan)
             case _:
                 timestep = self.get_wind_timestep()
                 ts2 = RegTimeSpan(timespan)
@@ -299,61 +307,71 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         self._temperature_series = None
         self._horizontal_solar_flux_series = None
     
-    def set_temperature_series(self,
-                               effective_temperatures:npt.ArrayLike,
-                               timespan:OffsetRegTimeSpan):
+    def set_temperature_series(
+        self,
+        effective_temperatures: npt.ArrayLike,
+        timespan: OffsetRegTimeSpan
+    ):
         self._temperature_series = {
             'timespan': timespan,
             'timeseries': effective_temperatures
         }
 
-    def get_temperature(self, timespan:TimeSpan):
+    @override
+    def get_temperature(self, timespan: TimeSpan) -> RealArrayLike:
         srs = self._temperature_series
         if srs is None:
-            return srs
+            raise AttributeError('temperature series has not been set')
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_temperature_timestep(self) -> pd.Timedelta | None:
+    @override
+    def get_temperature_timestep(self) -> pd.Timedelta:
         srs = self._temperature_series
         if srs is None:
-            return None
+            return pd.Timedelta(1, 'h')
         return srs['timespan'].timestep
 
-    def set_horizontal_solar_flux_series(self,
-                                         horizontal_solar_flux:npt.ArrayLike,
-                                         timespan=OffsetRegTimeSpan):
+    def set_horizontal_solar_flux_series(
+        self,
+        horizontal_solar_flux: npt.ArrayLike,
+        timespan = OffsetRegTimeSpan
+    ):
         self._horizontal_solar_flux_series = {
             'timespan': timespan,
             'timeseries': horizontal_solar_flux
         }
     
-    def get_horizontal_solar_flux(self, timespan:TimeSpan):
+    @override
+    def get_horizontal_solar_flux(self, timespan: TimeSpan) -> RealArrayLike:
         srs = self._horizontal_solar_flux_series
         if srs is None:
-            return srs
+            raise AttributeError('horizontal solar flux series has not been set')
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta | None:
+    @override
+    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta:
         srs = self._horizontal_solar_flux_series
         if srs is None:
-            return None
+            return pd.Timedelta(1, 'h')
         return srs['timespan'].timestep
 
+    @override
     def get_true_datetimes(
         self,
-        measure: Literal[
-            'temperature',
-            'horizontal_solar_flux'
-        ],
+        measure: WIDER_ENVIRONMENT_MEASURE,
         timespan: TimeSpan
     ) -> pd.DatetimeIndex:
         
         match measure:
             case 'temperature':
+                if self._temperature_series is None:
+                    raise AttributeError('temperature series has not been set')
                 return _get_true_datetimes_srs(self._temperature_series, timespan)
             case 'horizontal_solar_flux':
+                if self._horizontal_solar_flux_series is None:
+                    raise AttributeError('horizontal solar fluz series has not been set')
                 return _get_true_datetimes_srs(self._horizontal_solar_flux_series, timespan)
             case _:
                 return None
