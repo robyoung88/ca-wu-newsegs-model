@@ -148,8 +148,6 @@ class TestSprakeModelRun(unittest.TestCase):
         gen_meters_1 = mdl.get_generation_result().meters_to_pandas()
         cs_meters_1 = mdl.get_consumption_storage_result().meters_to_pandas()
 
-        print(mdl.generation.generator.generators[1]._excluded_attributes)
-
         d1 = mdl.to_dict()
 
         sd1 = json.dumps(d1, cls = jsonfuncs.NumpyEncoder)

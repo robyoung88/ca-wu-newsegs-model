@@ -24,7 +24,7 @@ class SerialiseToDictMixin:
     _excluded_attributes: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        odict =  {
+        odict : dict[str, Any] =  {
             'class': self.__class__.__name__,
             'constructor_class': self._constructor_class,
         }

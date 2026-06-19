@@ -2135,6 +2135,11 @@ class Variable(
     distribution: Distribution
     parameterisation_index: int
 
+    configuration_show: bool = True
+    """
+    Create an input field on the model configuration page?
+    """
+
     """
     Can variable participate in DSA?
     """
@@ -2154,6 +2159,12 @@ class Variable(
     """
     Has the variable been set as varying in the current run?
     """
+    _dsa_show: bool = False
+    """
+    Create an input field on the dsa page?
+
+    Variable must also be dsa_possible and dsa_selectable.
+    """
 
     dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute'
 
@@ -2168,6 +2179,12 @@ class Variable(
     psa_active: bool = False
     """
     Has the variable been notified that the system is running a PSA?
+    """
+    _psa_show: bool = False
+    """
+    Create an input field on the psa page?
+
+    Variable must also be psa_possible and psa_selectable.
     """
 
     variable_type: VARIABLE_TYPE = 'scalar'
@@ -2204,7 +2221,9 @@ class Variable(
     def __init__(
         self,
         name: str,
+        label: str | None = None,
         unit: str = "",
+        icon_name: str | SequenceNotStr[str] = "",
         configuration_type: CONFIGURATION_TYPE = 'model',
         model_section: str | SequenceNotStr[str] | None = None,
         model_parameter: str | SequenceNotStr[str] | None = None,
@@ -2226,6 +2245,8 @@ class Variable(
         psa_selected: bool = False,
         psa_active: bool = False,
         configuration_show: bool = True,
+        dsa_show: bool = False,
+        psa_show: bool = False,
         interface_min: float | None = None,
         interface_max: float | None = None,
         interface_step: float | None = None,
@@ -2233,8 +2254,14 @@ class Variable(
         super().__init__()
         self.name = name
 
-        # `distribution` will be absorbed by __new__
-        #self.distribution = distribution
+        if label is None:
+            self.label = self.name
+        else:
+            self.label = label
+
+        self.unit = unit
+
+        self.icon_name = icon_name
 
         self.configuration_type = configuration_type
 
@@ -2249,6 +2276,9 @@ class Variable(
             self.interface_key = interface_key
         else:
             self.interface_key = self.name
+
+        # `distribution` will be absorbed by __new__
+        #self.distribution = distribution
 
         self.set_distribution()
         if isinstance(transform, str) or not isinstance(transform, Sequence):
@@ -2291,6 +2321,7 @@ class Variable(
         self.dsa_selected = dsa_selected
         self.dsa_active = dsa_active
         self.dsa_focussed = dsa_focussed
+        self._dsa_show = dsa_show
 
         if value_name is None:
             self.value_name = [f'Value {i+1}' for i in range(self.n_values)]
@@ -2300,8 +2331,8 @@ class Variable(
         self.psa_selectable = psa_selectable
         self.psa_selected = psa_selected
         self.psa_active = psa_active
+        self._psa_show = psa_show
 
-        self.unit = unit
         self.configuration_show = configuration_show
         self.interface_min = interface_min
         self.interface_max = interface_max
@@ -2354,6 +2385,34 @@ class Variable(
     @property
     def psa_possible(self) -> bool:
         return self.distribution.psa_possible
+    
+    @property
+    def dsa_show(self) -> bool:
+        """
+        True if an input field should be created on the DSA page.
+
+        NB - even if `.dsa_show` is set `True`, cannot return `True` if not 
+        `.dsa_possible` or not `.dsa_selectable`
+        """
+        return self._dsa_show and self.dsa_possible and self.dsa_selectable
+    
+    @dsa_show.setter
+    def dsa_show(self, show: bool) -> None:
+        self._dsa_show = show
+
+    @property
+    def psa_show(self) -> bool:
+        """
+        True if an input field should be created on the PSA page.
+
+        NB - even if `.psa_show` is set `True`, cannot return `True` if not 
+        `.psa_possible` or not `.psa_selectable`
+        """
+        return self._psa_show and self.psa_possible and self.psa_selectable
+    
+    @psa_show.setter
+    def psa_show(self, show: bool) -> None:
+        self._psa_show = show
     
     def get_indexed_parameterisations(self):
         return [
@@ -2534,6 +2593,12 @@ class Variable(
 
     
     def update_model(self, model: ModelType) -> None:
+        self.update_model_deterministic(model)
+
+    def update_model_deterministic(self, model: ModelType) -> None:
+        """
+        Set the associated parameter(s) in the model/finance to deterministic value(s).
+        """
         if not self.is_model_type(model):
             return
         self._update_model(model, self.deterministic_value)

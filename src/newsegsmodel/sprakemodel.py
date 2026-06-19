@@ -9,6 +9,8 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
+from core.environment.dummy_env_servers import DummyWiderEnv
+from core.location.location import RaisedLocation
 from core.newsegsmoduleresult import NewsegsModuleResult
 from core import timespan as modtimespan
 from core import location as modlocation
@@ -120,6 +122,9 @@ def get_sprake_environment_server():
 
     return server
 
+def get_sprake_wider_env_server():
+    return DummyWiderEnv()
+
 def get_sprake_gamesa_126():
     pcurve = (
         pd.read_excel(
@@ -179,9 +184,9 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     _name = 'Sprake Model'
     _version = '0.0.1'
 
-    _generation_result = None
-    _grid_result = None
-    _cs_result = None
+    _generation_result: sprakegeneration.SprakeGenerationResult
+    _grid_result: sprakegrid.SprakeGridResult
+    _cs_result: sprakecs.SprakeCSResult
 
     @singledispatchmethod
     def __init__(
@@ -226,14 +231,14 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         if wider_environment_server:
             if isinstance(wider_environment_server, str):
-                testenv = None
+                testenv = get_sprake_wider_env_server()
                 if str(testenv) != wider_environment_server:
                     raise ValueError('Mismatched wider environments')
                 self.wider_env = testenv
             else:
                 self.wider_env = wider_environment_server
         else:
-            self._wider_environment_server = None
+            self._wider_environment_server = get_sprake_wider_env_server()
 
         if not isinstance(mod_gen, sprakegeneration.SprakeGeneration):
             raise TypeError(f'mod_gen must be of type SprakeGeneration, is {type(mod_gen)}')
@@ -288,7 +293,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
                 settings.get('SprakeValidationLon')
             )
         )
-        mod_gen.generator.generators[1].location.height_agl = 2.
+        cast(RaisedLocation, mod_gen.generator.generators[1].location).height_agl = 2.
 
         # Re-dispatch to SprakeGeneration singledispatchmethod
         self.__init__(mod_gen, name = name)
@@ -378,16 +383,16 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         """
         self._mod_cs.location = loc
 
-    def get_generation_result(self) -> NewsegsModuleResult | None:
+    def get_generation_result(self) -> NewsegsModuleResult:
         return self._generation_result
 
-    def get_grid_result(self) -> NewsegsModuleResult | None:
+    def get_grid_result(self) -> NewsegsModuleResult:
         return self._grid_result
 
-    def get_cs_result(self) -> NewsegsModuleResult | None:
+    def get_cs_result(self) -> NewsegsModuleResult:
         return self._cs_result
 
-    def get_consumption_storage_result(self) -> NewsegsModuleResult | None:
+    def get_consumption_storage_result(self) -> NewsegsModuleResult:
         return self._cs_result
 
     @override
@@ -435,14 +440,14 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         if wider_environment_server:
             if isinstance(wider_environment_server, str):
-                testenv = None
+                testenv = get_sprake_wider_env_server()
                 if str(testenv) != wider_environment_server:
                     raise ValueError('Mismatched wider environments')
                 inst._wider_environment_server = testenv
             else:
                 inst.wider_env = wider_environment_server
         else:
-            inst._wider_environment_server = None
+            inst._wider_environment_server = get_sprake_wider_env_server()
         
         return inst
 
@@ -474,7 +479,7 @@ SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_att
 )
 
 # SprakeModel copy constructor
-@SprakeModel.__init__.register(SprakeModel)
+@SprakeModel.__init__.register(SprakeModel) # pyright: ignore[reportFunctionMemberAccess]
 def _SprakeModel_from_other(
     self,
     other: SprakeModel

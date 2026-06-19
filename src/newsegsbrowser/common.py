@@ -39,7 +39,7 @@ def create_numeric_card_input(
     ])
 
 def create_numeric_card_input_compound_key(
-     icon_name: str | SequenceNotStr[str],
+    icon_name: str | SequenceNotStr[str],
     label: str,
     type_id: str,
     key: str,

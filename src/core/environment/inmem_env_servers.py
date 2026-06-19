@@ -1,7 +1,9 @@
 from __future__ import annotations
+from typing import Any, Sequence, overload, override
 # Very simple environment servers that provide in-memory stores for timeseries data which are returned on request
 
 from core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
+from core.environment.environment_servers import LOCAL_ENVIRONMENT_MEASURE, RealArrayLike
 from core.location import Location,RaisedLocation,AspectLocation
 from core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan
 import numpy as np
@@ -22,6 +24,8 @@ def _get_true_datetimes_srs(
 class InMemoryLocalEnv(NewsegsLocalEnvironment):
     _version = '0.0.1'
     _name = 'Local environment'
+
+    _wind_series: dict[float, dict[str, Any]]
 
     def __init__(self):
         self._wind_series = {}
@@ -44,44 +48,60 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     #        for j in self._solar_flux_on_plane_series[k].keys():
     #            self._solar_flux_on_plane_series[j][k].timestep = timestep
 
-    def set_wind_speed(self,
-                       wind_speeds:npt.ArrayLike,
-                       location:RaisedLocation,
-                       timespan:OffsetRegTimeSpan):
+    
+
+    def set_wind_speed(
+        self,
+        wind_speeds:npt.ArrayLike,
+        location:RaisedLocation,
+        timespan:OffsetRegTimeSpan
+    ):
         height = location.height_agl
         self._wind_series[height] = {
             'timespan': timespan,
             'timeseries': wind_speeds
         }
 
-    def access_wind_series(self,location:RaisedLocation):
+    def access_wind_series(
+            self,
+            location: RaisedLocation
+        ) -> dict[str, Any] | None:
         """
         Providing an accessor just in case we need to tweak the timespan offsets after the fact
         """
         height = location.height_agl
         return self._wind_series.get(height, None)
     
-    def get_wind_speeds(self, 
-                        location:RaisedLocation|tuple[RaisedLocation, ...]|list[RaisedLocation], 
-                        timespan: TimeSpan):
-        if (isinstance(location, Iterable)):
+    @override
+    def get_wind_speeds(
+        self, 
+        location: RaisedLocation | Sequence[RaisedLocation], 
+        timespan: TimeSpan
+    ) -> RealArrayLike:
+        if (isinstance(location, Sequence)):
             olist = [self.get_wind_speeds(x, timespan=timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
 
         srs = self.access_wind_series(location)
         if srs is None:
-            return srs
+            raise ValueError(f'Wind speed data not available for location {str(location)}')
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_wind_timestep(self) -> pd.Timedelta | None:
-        return next(iter(self._wind_series.values())).get('timespan').timestep
+    @override
+    def get_wind_timestep(self) -> pd.Timedelta:
+        try:
+            return next(iter(self._wind_series.values())).get('timespan').timestep
+        except:
+            return pd.Timedelta(1, 'hour')
 
-    def set_horizontal_solar_flux(self,
-                       horizontal_solar_flux:npt.ArrayLike,
-                       location:AspectLocation,
-                       timespan:OffsetRegTimeSpan):
+    def set_horizontal_solar_flux(
+        self,
+        horizontal_solar_flux:npt.ArrayLike,
+        location:AspectLocation,
+        timespan:OffsetRegTimeSpan
+    ):
         # Only store a single series for horizontal solar flux
         self._horizontal_solar_flux_series[None] = {
             'timespan': timespan,
@@ -90,23 +110,30 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
 
     def access_horizontal_solar_flux_series(self,location:Location):
         return self._horizontal_solar_flux_series[None]
-
-    def get_horizontal_solar_flux(self,
-                                  location:Location|tuple[Location, ...]|list[Location],
-                                  timespan:TimeSpan):
-        if (isinstance(location, Iterable)):
-            olist = [self.get_horizontal_solar_flux(x) for x in location]
+    
+    @override
+    def get_horizontal_solar_flux(
+        self,
+        location: Location | Sequence[Location],
+        timespan:TimeSpan
+    ) -> RealArrayLike:
+        if (isinstance(location, Sequence)):
+            olist = [self.get_horizontal_solar_flux(x, timespan = timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
         
         srs = self.access_horizontal_solar_flux_series(location)
         if srs is None:
-            return srs
+            raise ValueError(f'Horizontal solar flux data not available for location {str(location)}')
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_horizontal_solar_flux_timestep(self) -> pd.TimeDelta|None:
-        return next(iter(self._horizontal_solar_flux_series.values())).get('timespan').timestep
+    @override
+    def get_horizontal_solar_flux_timestep(self) -> pd.Timedelta:
+        try:
+            return next(iter(self._horizontal_solar_flux_series.values())).get('timespan').timestep
+        except:
+            return pd.Timedelta(1, 'hour')
 
     def set_external_temperature(self,
                        external_temperature:npt.ArrayLike,
@@ -121,27 +148,33 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     def access_external_temperature_series(self,location:Location):
         return self._external_temperature_series[None]
 
-    def get_external_temperature(self,
-                                 location:Location|tuple[Location, ...]|list[Location],
-                                 timespan:TimeSpan):
+    @override
+    def get_external_temperature(
+        self,
+        location: Location | Sequence[Location],
+        timespan:TimeSpan
+    ) -> RealArrayLike:
         if (isinstance(location, Iterable)):
-            olist = [self.get_external_temperature(x) for x in location]
+            olist = [self.get_external_temperature(x, timespan = timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
         
         srs = self.access_external_temperature_series(location)
         if srs is None:
-            return srs
+            raise ValueError(f'Temperature data not available for location {str(location)}')
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_external_temperature_timestep(self) -> pd.TimeDelta|None:
-        return None
+    @override
+    def get_external_temperature_timestep(self) -> pd.Timedelta:
+        return pd.Timedelta(100*365, 'days')
 
-    def set_solar_flux_on_plane(self,
-                                solar_flux:npt.ArrayLike,
-                                location:AspectLocation,
-                                timespan:OffsetRegTimeSpan):
+    def set_solar_flux_on_plane(
+        self,
+        solar_flux: npt.ArrayLike,
+        location: AspectLocation,
+        timespan: OffsetRegTimeSpan
+    ):
         az = location.azimuth
         pitch = location.pitch
         if not az in self._solar_flux_on_plane_series.keys():
@@ -160,45 +193,72 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
             return azd
         return azd.get(pitch, None)
 
-    def get_solar_flux_on_plane(self,
-                                location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
-                                timespan:TimeSpan):
+    @override
+    def get_solar_flux_on_plane(
+        self,
+        location: AspectLocation | Sequence[AspectLocation],
+        timespan:TimeSpan
+    ) -> RealArrayLike:
         if (isinstance(location, Iterable)):
-            olist = [self.get_solar_flux_on_plane(x) for x in location]
+            olist = [self.get_solar_flux_on_plane(x, timespan = timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
         
         srs = self.access_solar_flux_on_plane_series(location)
         if srs is None:
-            return srs
+            raise ValueError(f'Solar flux data not available for location {str(location)}')
         idxs = srs['timespan'].get_local_index(timespan)
         return(srs['timeseries'][idxs])
 
-    def get_solar_flux_on_plane_timestep(self) -> pd.TimeDelta|None:
-        return self._horizontal_solar_flux_series.values()[0].get('timespan').timestep
+    @override
+    def get_solar_flux_on_plane_timestep(self) -> pd.Timedelta:
+        try:
+            return next(iter(self._solar_flux_on_plane_series.values())).get('timespan').timestep
+        except:
+            return pd.Timedelta(1, 'h')
 
-    def get_air_density(self,
-                        location:AspectLocation|tuple[AspectLocation, ...]|list[AspectLocation],
-                        timespan:TimeSpan):
+    @override
+    def get_air_density(
+        self,
+        location: RaisedLocation | Sequence[RaisedLocation],
+        timespan:TimeSpan
+    ) -> RealArrayLike:
         return 1.225
     
-    def get_air_density_timestep(self) -> pd.TimeDelta|None:
-        return None
+    @override
+    def get_air_density_timestep(self) -> pd.Timedelta:
+        return pd.Timedelta(100*365, 'days')
     
+    @overload
     def get_true_datetimes(
         self,
-        measure: Literal[
-            'wind_speeds',
-            'air_density',
-            'horizontal_solar_flux',
-            'external_temperature',
-            'solar_flux_on_plane'
-        ],
-        location: Location|tuple[Location, ...]|list[Location],
+        measure: LOCAL_ENVIRONMENT_MEASURE,
+        location: Location,
         timespan: TimeSpan
-    ) -> pd.DatetimeIndex|list[pd.DatetimeIndex]:
-        if (isinstance(location, Iterable)):
-            olist = [self.get_true_datetimes(measure, x, timespan = timespan) for x in location]
+    ) -> pd.DatetimeIndex:
+        ...
+    
+    @overload
+    def get_true_datetimes(
+        self,
+        measure: LOCAL_ENVIRONMENT_MEASURE,
+        location: Sequence[Location],
+        timespan: TimeSpan
+    ) -> list[pd.DatetimeIndex]:
+        ...
+
+    @override
+    def get_true_datetimes(
+        self,
+        measure: LOCAL_ENVIRONMENT_MEASURE,
+        location: Location | Sequence[Location],
+        timespan: TimeSpan
+    ) -> pd.DatetimeIndex | list[pd.DatetimeIndex]:
+        if (isinstance(location, Sequence)):
+            olist = [
+                self.get_true_datetimes(measure, x, timespan = timespan)
+                for x in location
+            ]
             return olist
         
         match measure:

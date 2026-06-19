@@ -22,7 +22,7 @@ class TestRegisters(unittest.TestCase):
 
         self.assertEqual(
             len(envreg),
-            2
+            4
         )
 
     def test_generator_register(self):
