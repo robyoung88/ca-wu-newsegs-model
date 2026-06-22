@@ -27,30 +27,33 @@ def create_finance_settings_input_card():
 
             html.Details([
                 html.Summary(""),
-                html.Div([
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'finance-settings-benefit-discount',
-                            'Benefit discount rate (%)',
-                            'input-finance-config',
-                            'benefit_discount_rate',
-                            section = None,
-                            max = 100,
-                            step = 1
-                        )
-                    ),
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'finance-settings-cost-discount',
-                            'Benefit discount rate (%)',
-                            'input-finance-config',
-                            'cost_discount_rate',
-                            section = None,
-                            max = 100,
-                            step = 1
-                        )
-                    )
-                ])
+                html.Div(#[
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'finance-settings-benefit-discount',
+                    #         'Benefit discount rate (%)',
+                    #         'input-finance-config',
+                    #         'benefit_discount_rate',
+                    #         section = None,
+                    #         max = 100,
+                    #         step = 1
+                    #     )
+                    # ),
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'finance-settings-cost-discount',
+                    #         'Benefit discount rate (%)',
+                    #         'input-finance-config',
+                    #         'cost_discount_rate',
+                    #         section = None,
+                    #         max = 100,
+                    #         step = 1
+                    #     )
+                    # )
+                #]
+                id = {'type': 'input-container', 'supersection': 'finance-config', 'section': 'finance_settings'},
+                className = 'input-container model-config-input-container'
+                )
             ])
         ]),
     ])

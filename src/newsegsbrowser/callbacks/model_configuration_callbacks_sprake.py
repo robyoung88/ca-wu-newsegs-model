@@ -6,7 +6,7 @@ functions:
 
 import json
 import logging
-from typing import Tuple
+from typing import Any, Tuple, cast
 from functools import partial
 
 from dash import html, no_update
@@ -22,6 +22,7 @@ from newsegsbrowser.callbacks import model_creation_sprake
 from newsegsmodel import sprakemodel
 from newsegsfinance import sprakefinance
 from newsegsbrowser import energy_balance_estimation
+from newsegsvariable import variable
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +247,145 @@ sync_config = partial(
     create_default_variables = model_creation_sprake.create_default_variables,
     model_and_finance_to_interface_function = sprake_model_finance_to_interface_configs,
 )
+
+def _get_val(mm, key) -> int | float:
+    return cast(variable.NumericScalarVariable, mm.variables.get(key)).deterministic_value
+
+def _create_generation_header_summary(mm):
+    wind_cap = _get_val(mm, 'gen_input.wind_capacity.0')
+    pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
+    return [
+        'Total generation: ',
+        icons.get_icon('gen-wind','p-1 my-1, ml-1', 'unpadded'),
+        " = ",
+        html.Span(f"{wind_cap:,.1f}"),
+        " kW; ",
+        icons.get_icon('gen-pv','p-1 my-1, ml-1', 'unpadded'),
+        " = ",
+        html.Span(f"{pv_cap:,.1f}",),
+        " kWp"
+    ]
+
+def _create_storage_header_summary(mm):
+    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
+    return [
+        'Storage capacity: ',
+        html.Span(f"{stor_cap:,.0f}"),
+        " kWh"
+    ]
+
+def _create_bc_header_summary(mm):
+    site_size = _get_val(mm, 'bc_input.n_units.0')
+    return [
+        'Site size: ',
+        html.Span(f"{site_size:,.0f}"),
+        " units"
+    ]
+
+def _create_dc_header_summary(mm):
+    efficiency_reduction = _get_val(mm, 'dc_input.efficiency_reduction.0')
+    n_evs_per_household = _get_val(mm, 'dc_input.n_evs_per_household.0')
+    ev_consumption_per_year = _get_val(mm, 'dc_input.annual_residential_consumption_per_ev.0')
+    ann_appliance = (
+        (1.0 - float(efficiency_reduction))  # pyright: ignore[reportArgumentType]
+        * model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
+    )
+    ann_ev = (
+        n_evs_per_household * ev_consumption_per_year
+    ) # pyright: ignore[reportOperatorIssue]
+
+    return [
+        icons.get_icon('consumption-direct-appliance'),
+        " = ",
+        html.Span('{:,.0f}'.format(ann_appliance)),
+        " kWh/yr/household; ",
+        icons.get_icon('consumption-direct-ev'),
+        " = ",
+        html.Span('{:,.0f}'.format(ann_ev)),
+        " kWh/yr/household"
+    ]
+
+def _create_model_config_header_summary(mm):
+    time_horizon = _get_val(mm, 'mc_input.horizon.0')
+    return [
+        icons.get_icon('model-settings-time-horizon'),
+        " = ",
+        html.Span(f"{time_horizon:.0f}"),
+        " years"
+    ]
+
+def update_headers_model_config(
+    model_config_trigger,
+    selected_configuration,
+    header_ids,
+    app,
+):
+    olist: list[Any] = [no_update] * len(header_ids)
+
+    mm_id = json.loads(selected_configuration).get('metamodel_id')
+    mm = app.metamodels.get(mm_id)
+    if mm is None:
+        raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
+
+    for i, id in enumerate(header_ids):
+        match id['key']:
+            case 'gen-smry':
+                olist[i] = _create_generation_header_summary(mm)
+            case 'stor-smry':
+                olist[i] = _create_storage_header_summary(mm)
+            case 'bc-smry':
+                olist[i] = _create_bc_header_summary(mm)
+            case 'dc-smry':
+                olist[i] = _create_dc_header_summary(mm)
+            case 'mc-smry':
+                olist[i] = _create_model_config_header_summary(mm)
+    return olist
+
+def _create_cost_generation_header_summary(mm):
+    wind_cap = _get_val(mm, 'gen_input.wind_capacity.0')
+    pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
+    capex_rate_wind = _get_val(mm, 'gen_costs.wind_capex_per_kw.0')
+    capex_rate_pv = _get_val(mm, 'gen_costs.pv_capex_per_kw.0')
+    om_rate_wind = _get_val(mm, 'gen_costs.wind_om_per_kw_year.0')
+    om_rate_pv = _get_val(mm, 'gen_costs.pv_om_per_kw_year.0')
+
+    tot_capex = (
+        capex_rate_wind * wind_cap
+        + capex_rate_pv * pv_cap
+    )
+
+    tot_ongoing = (
+        om_rate_wind * wind_cap
+        + om_rate_pv * pv_cap
+    )
+    return [
+        "Capital cost = £",
+        html.Span('{:,.0f}'.format(tot_capex)),
+        "; Ongoing costs = £",
+        html.Span('{:,.0f}'.format(tot_ongoing)),
+        "/yr"
+    ]
+
+def update_headers_finance_config(
+    finance_config_trigger,
+    selected_configuration,
+    header_ids,
+    app
+):
+    olist: list[Any] = [no_update] * len(header_ids)
+
+    mm_id = json.loads(selected_configuration).get('metamodel_id')
+    mm = app.metamodels.get(mm_id)
+    if mm is None:
+        raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
+    
+    for i, id in enumerate(header_ids):
+        match id['key']:
+            case 'cost-gen-smry':
+                olist[i] = _create_cost_generation_header_summary(mm)
+    
+    return olist                
+    
 
 def sync_dc_inputs_to_store(mcfg, input_values, input_ids, app):
     NUP = (no_update, [no_update] * len(input_values))

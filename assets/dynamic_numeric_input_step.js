@@ -58,7 +58,8 @@ document.addEventListener('keydown', function(e) {
             currentValue -= stepAmount;
         }
 
-        const precision = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+        let precision = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+        precision = precision > 5 ? 5 : precision;
         input.value = currentValue.toFixed(precision);
         input.dataset.lastVal = input.value;
 

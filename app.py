@@ -105,21 +105,32 @@ def add_display_callbacks(app: Dash) -> Dash:
     )
     def display_page(pathname, selected_model, selected_conf):
         print(selected_conf)
+        print(pathname)
+
         if pathname == '/' or pathname == '/model_selection':
             return model_selection_layout.model_selection_layout
-        elif pathname == '/landing':
+        
+        splitname = str(pathname).lstrip('/').split("/")
+        selected_model = splitname[0]
+        print(selected_model)
+        if not selected_model in ['sprake','localised']:
+            return model_selection_layout.model_selection_layout
+        
+        pagename = '/'.join(splitname[1:])
+        print(pagename)
+        if pagename == 'landing':
             return template_landing_layout.create_landing_layout(
                 **layout_registry.get_landing_layout_config(
                     selected_model
                 )
             )
-        elif pathname == '/site-config':
+        elif pagename == 'site-config':
             return template_model_configuration_layout.create_model_configuration_layout(
                 **layout_registry.get_model_configuration_layout_config(
                     selected_model
                 )
             )
-        elif pathname == '/dsa':
+        elif pagename == 'dsa':
             return template_dsa_configuration_layout.create_dsa_layout(
                 **layout_registry.get_dsa_layout_config(
                     selected_model
@@ -366,7 +377,8 @@ def create_app(external_stylesheets = None) -> Dash:
         #dup_fnc.set_model(dup_mdl)
         #finances[dup_fnc.id] = dup_fnc
 
-        variables = copy.deepcopy(ref.variables)
+        #variables = copy.deepcopy(list(ref.variables.values()))
+        variables = list(ref.variables.values())
         dup_mm = NewsegsMetaModel(dup_mdl, dup_fnc, variables)
 
         metamodels[dup_mm.id] = dup_mm

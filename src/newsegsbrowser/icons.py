@@ -18,6 +18,7 @@ DEFAULT_ICONS = {
     'gen-wind': 'bi bi-wind',
     'gen-pv': 'bi bi-sun',
     'storage': 'bi bi-battery-half',
+    'storage-rte': ['bi bi-battery-half', 'bi bi-arrow-clockwise'],
     'import-export': 'bi bi-arrow-down-up',
     'consumption-building': 'bi bi-houses',
     'consumption-building-nunits': 'bi bi-houses',

@@ -25,8 +25,9 @@ For a psa run, a (small) number of statistics must be nominated to be held in a
 dataframe which will be accessible after completion; each row will correspond
 to a sample across all enabled PSA variables.
 """
+from collections import OrderedDict
 import datetime
-from typing import Any, Mapping, MutableSequence
+from typing import Any, Mapping, MutableSequence, Sequence
 
 from core import newsegscomponent
 from newsegsmodel import newsegsmodel
@@ -96,6 +97,77 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if not isinstance(fnc, newsegsfinance.NewsegsFinance):
             raise TypeError(f'finance_provider did not provide a NewsegsFinance for key {self.finance_id} - {type(fnc)} returned instead')
         self.finance = fnc
+
+    @property
+    def variables(self) -> OrderedDict[str, variable.Variable]:
+        return self._variables
+    
+    @variables.setter
+    def variables(self, variables: Sequence[variable.Variable]):
+        if not hasattr(self, '_variables'):
+            self._variables = OrderedDict()
+        for var in variables:
+            uid = variable.variable_uid(var)
+            if isinstance(uid, list):
+                for id in uid:
+                    self._variables[id] = var
+            else:
+                self._variables[uid] = var
+
+
+    def update_variable_from_interface(
+        self,
+        section: str,
+        key: str,
+        subindex: int,
+        parameter_index: int,
+        vector_location: int,
+        value: variable.ScalarParam
+    ) -> tuple[bool, bool, tuple[variable.Param,...]]:
+        varid = section + "." + key + "." + str(subindex)
+        var = self.variables.get(varid)
+        if var is None:
+            raise ValueError(f'variable {varid} not found')
+        old_value = var.deterministic_value
+        is_ok, new_params = var.set_single_parameter(value,parameter_index, vector_location)
+        new_value = var.deterministic_value
+        return is_ok, old_value != new_value, new_params
+
+        # for var in self.variables:
+        #     if var.interface_section == section and var.interface_key == key and var.interface_subindex == subindex:
+                
+        #         old_value = var.deterministic_value
+        #         #print (f'updating variable {var.name}')
+        #         #print (var.deterministic_value)
+        #         is_ok, new_params = var.set_single_parameter(value,parameter_index, vector_location)
+        #         #var.set_parameters(*rp)
+        #         new_value = var.deterministic_value
+        #         #print (var.deterministic_value)
+        #         return is_ok, old_value != new_value, new_params
+        # raise ValueError(f'Variable not found: {section}.{key}.{subindex}')
+    
+    def update_model_from_variable_deterministic(
+        self,
+        section: str,
+        key: str,
+        subindex: int
+    ):
+        varid = section + "." + key + "." + str(subindex)
+        
+        var = self.variables.get(varid)
+        if var is None:
+            raise ValueError(f'variable {varid} not found')
+        if var.configuration_type == 'finance':
+            var.update_model(self.finance)
+        else:
+            var.update_model(self.model)
+        #for var in self.variables.values():
+        #    if var.interface_section == section and var.interface_key == key and var.interface_subindex == subindex:
+        #        if var.configuration_type == 'finance':
+        #            var.update_model(self.finance)
+        #        else:
+        #            var.update_model(self.model)
+
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()

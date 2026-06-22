@@ -25,30 +25,33 @@ def create_storage_cost_input_card():
 
             html.Details([
                 html.Summary(""),
-                html.Div([
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'storage',
-                            'BESS Capex (£/kWh)',
-                            'input-finance-config',
-                            'bess_capex_per_kwh',
-                            section = 'unit_costs',
-                            max = 10000,
-                            step = 50
-                        )
-                    ),
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            ['storage', 'cost-recurrent'],
-                            'BESS Ongoing (£/kWh/yr)',
-                            'input-finance-config',
-                            'bess_om_per_kwh_year',
-                            section = 'unit_costs',
-                            max = 5000,
-                            step = 10
-                        )
-                    ),
-                ])
+                html.Div(#[
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'storage',
+                    #         'BESS Capex (£/kWh)',
+                    #         'input-finance-config',
+                    #         'bess_capex_per_kwh',
+                    #         section = 'unit_costs',
+                    #         max = 10000,
+                    #         step = 50
+                    #     )
+                    # ),
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         ['storage', 'cost-recurrent'],
+                    #         'BESS Ongoing (£/kWh/yr)',
+                    #         'input-finance-config',
+                    #         'bess_om_per_kwh_year',
+                    #         section = 'unit_costs',
+                    #         max = 5000,
+                    #         step = 10
+                    #     )
+                    # ),
+                #]
+                id = {'type': 'input-container', 'supersection': 'finance-config', 'section': 'stor_costs'},
+                className = 'input-container model-config-input-container'
+                )
             ])
         ])
     ])

@@ -5,7 +5,7 @@ Ways of defining and comparing blocks of time.
 from __future__ import annotations
 
 import copy
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, Type
 
 from functools import singledispatchmethod
 import operator
@@ -67,6 +67,7 @@ class TimeSpan(SerialiseToDictMixin):
 
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'TimeSpan'
+    _delta: pd.Timedelta
 
     @singledispatchmethod
     def __init__(
@@ -174,11 +175,10 @@ class TimeSpan(SerialiseToDictMixin):
         self._post_calc()
 
     @property
-    def delta(self) -> pd.Timedelta|None:
+    def delta(self) -> pd.Timedelta:
         if hasattr(self, '_delta'):
             return self._delta
-        else:
-            return None
+        raise AttributeError('TimeSpan has not been set')
 
     def set_delta(self, time_delta:TimedeltaScalar):
         if isinstance(time_delta, pd.Timedelta):
@@ -196,20 +196,25 @@ class TimeSpan(SerialiseToDictMixin):
         return o
     
     @classmethod
-    def from_date_delta(cls, start_datetime:DatetimeScalar, time_delta:TimedeltaScalar, tz:TimeZoneScalar|None='utc'):
+    def from_date_delta(
+        cls: Type[TimeSpan],
+        start_datetime: DatetimeScalar,
+        time_delta: TimedeltaScalar,
+        tz: TimeZoneScalar | None = 'utc'
+    ) -> TimeSpan:
         o = cls()
         o.start = start_datetime
         if type(time_delta in ('str','int','float')):
-            o.end = o.start + pd.Timedelta(time_range, unit='h')
+            o.end = o.start + pd.Timedelta(time_delta, unit='h')
         else:
-            o.end = o.start + pd.Timedelta(time_range)
+            o.end = o.start + pd.Timedelta(time_delta)
         if not (tz is None):
             o.tz = tz
         
         return o
 
     @classmethod
-    def from_timespan(cls, timespan:TimeSpan):
+    def from_timespan(cls, timespan: TimeSpan):
         return cls(timespan)
 
     def __lt__(self, other:TimeSpan) -> bool:
@@ -224,16 +229,20 @@ class TimeSpan(SerialiseToDictMixin):
         """
         return (self.start <= other.start)
 
-    def __eq__(self, other:TimeSpan) -> bool:
+    def __eq__(self, other) -> bool:
         """
         Do both start and end of time spans match?
         """
+        if not isinstance(other, TimeSpan):
+            raise TypeError(f'Comparison not implemented for type {type(self)} against {type(other)}')
         return (self.start == other.start) and (self.end == other.end)
 
-    def __ne__(self, other:TimeSpan) -> bool:
+    def __ne__(self, other) -> bool:
         """
         Do not both start and end of time spans match?
         """
+        if not isinstance(other, TimeSpan):
+            raise TypeError(f'Comparison not implemented for type {type(self)} against {type(other)}')
         return (self.start != other.start) or (self.end != other.end)
 
     def __ge__(self, other:TimeSpan) -> bool:
@@ -374,8 +383,8 @@ class RegTimeSpan(TimeSpan):
         cls,
         start_datetime: DatetimeScalar,
         end_datetime: DatetimeScalar,
-        timestep:TimedeltaScalar,
-        tz:TimeZoneScalar|None='utc',
+        timestep: TimedeltaScalar,
+        tz: TimeZoneScalar | None='utc',
         unit=None
     ):
         o = super(RegTimeSpan, cls).from_dates(start_datetime,end_datetime,tz)
@@ -450,7 +459,7 @@ class RegTimeSpan(TimeSpan):
     #     return super(RegTimeSpan, cls).from_dict(ip)
 
 # RegTimeSpan copy constructor
-@RegTimeSpan.__init__.register(TimeSpan)
+@RegTimeSpan.__init__.register(TimeSpan) # pyright: ignore[reportFunctionMemberAccess]
 def RegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
     super(RegTimeSpan, self).__init__(start)
     if isinstance(start, RegTimeSpan):
@@ -681,7 +690,7 @@ _TIMESPAN_CONSTRUCTORS = {
     'OffsetRegTimeSpan': OffsetRegTimeSpan
 }
 
-def timespan_from_dict(ip: Mapping):
+def timespan_from_dict(ip: dict):
     """
     Returns an instance of the correct timespan from a dictionary.
     """

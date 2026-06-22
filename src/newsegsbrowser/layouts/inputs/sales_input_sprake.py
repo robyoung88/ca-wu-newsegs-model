@@ -28,41 +28,44 @@ def create_sales_input_card():
 
             html.Details([
                 html.Summary(""),
-                html.Div([
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'cost-residents-standing',
-                            'Standing charge (£/household/day)',
-                            'input-finance-config',
-                            'resident_sc_per_unit_day',
-                            section = 'unit_costs',
-                            max = 10,
-                            step = 0.01
-                        )
-                    ),
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'cost-residents-perunit',
-                            'Per unit charge (£/kWh)',
-                            'input-finance-config',
-                            'resident_var_per_unit',
-                            section = 'unit_costs',
-                            max = 10,
-                            step = 0.01
-                        )
-                    ),
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'cost-export',
-                            'Grid export - mean per unit (£/kWh)',
-                            'input-finance-config',
-                            'grid_export_var_per_unit',
-                            section = 'unit_costs',
-                            max = 10,
-                            step = 0.01
-                        )
-                    ),
-                ])
+                html.Div(#[
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'cost-residents-standing',
+                    #         'Standing charge (£/household/day)',
+                    #         'input-finance-config',
+                    #         'resident_sc_per_unit_day',
+                    #         section = 'unit_costs',
+                    #         max = 10,
+                    #         step = 0.01
+                    #     )
+                    # ),
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'cost-residents-perunit',
+                    #         'Per unit charge (£/kWh)',
+                    #         'input-finance-config',
+                    #         'resident_var_per_unit',
+                    #         section = 'unit_costs',
+                    #         max = 10,
+                    #         step = 0.01
+                    #     )
+                    # ),
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'cost-export',
+                    #         'Grid export - mean per unit (£/kWh)',
+                    #         'input-finance-config',
+                    #         'grid_export_var_per_unit',
+                    #         section = 'unit_costs',
+                    #         max = 10,
+                    #         step = 0.01
+                    #     )
+                    # ),
+                #]
+                id = {'type': 'input-container', 'supersection': 'finance-config', 'section': 'sales_costs'},
+                className = 'input-container model-config-input-container'
+                )
             ])
         ])
     ])

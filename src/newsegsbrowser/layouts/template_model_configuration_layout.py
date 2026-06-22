@@ -49,6 +49,8 @@ DEFAULT_LAYOUT_CONFIGURATION = {
     'width_direct_consumption_input': 6,
     'layout_grid_input': NULL_LAYOUT,
     'width_grid_input': 12,
+    'layout_environment_input': NULL_LAYOUT,
+    'width_environment_input': 12,
     'layout_model_settings_input': model_settings_input_sprake.create_model_settings_input_card,
     'width_model_settings_input': 12,
     'layout_generation_cost_input': gen_cost_input_sprake.create_gen_cost_input_card,
@@ -87,7 +89,7 @@ def create_model_configuration_layout(*args, **kwargs):
     header = [dbc.Row([
         dbc.Col(
             html.Div(
-                config_dict['layout_navigation'](),
+                config_dict['layout_navigation'](config_dict.get('selected_model')),
             ),
             class_name = 'newsegs-navbar-vertical collapsed',
             width = config_dict['width_navigation'],
@@ -105,7 +107,9 @@ def create_model_configuration_layout(*args, **kwargs):
         'storage_input',
         'building_consumption_input',
         'direct_consumption_input',
-        'grid_input'
+        'grid_input',
+        'environment_input',
+        'model_settings_input',
     ]:
         model_input_sections.append(
             dbc.Col(
@@ -176,14 +180,18 @@ def create_model_configuration_layout(*args, **kwargs):
                 ),
 
                 # Watched to trigger after the layout loads
-                dcc.Store(id = 'firstload-config-watcher'),
+                dcc.Store(id = {
+                    'type': 'firstload-config-watcher',
+                    'selected_model': kwargs.get('selected_model'), 
+                    'page_type': kwargs.get('page_type')
+                }),
 
                 ##### Queues
                 
                 # A queue of actions performed by the user
                 # Generally will hold changes to model and finance configurations
                 # to enact.
-                dcc.Store(id = 'queue-action-user'),
+                dcc.Store(id = 'queue-action-user', data = []),
                 # A pre-queue holds individual actions on the way to the queue
                 # manager
                 dcc.Store(id = 'prequeue-action-user', data = []),
@@ -197,10 +205,10 @@ def create_model_configuration_layout(*args, **kwargs):
                 # A queue of model run requests
                 # Will generally get added to when a configuration changes
                 # but the running of the model is latched off
-                dcc.Store(id = 'queue-model-run'),
+                dcc.Store(id = 'queue-model-run', data = []),
                 # A pre-queue to transfer model run requests to the queue
                 # manager
-                dcc.Store(id = 'prequeue-model-run'),
+                dcc.Store(id = 'prequeue-model-run', data = []),
                 # An Interval element to trigger the queue until it is cleared
                 dcc.Interval(id = 'interval-model-run', interval = 1000, disabled = True),
                 # A dispatch object holding id of a model permitted to run
@@ -215,9 +223,9 @@ def create_model_configuration_layout(*args, **kwargs):
                 # A queue of finance run requests
                 # A pre-queue to transfer finance run requests to the queue
                 # manager
-                dcc.Store(id = 'prequeue-finance-run'),
+                dcc.Store(id = 'prequeue-finance-run', data = []),
                 # The queue to hold scheduled finance runs
-                dcc.Store(id = 'queue-finance-run'),
+                dcc.Store(id = 'queue-finance-run', data = []),
                 # An Interval to trigger the queue manager until queue is cleared
                 dcc.Interval(id = 'interval-finance-run', interval = 1000, disabled = True),
                 # A dispatch object holding id of a finance permitted to run
@@ -256,6 +264,11 @@ def create_model_configuration_layout(*args, **kwargs):
                 dcc.Store(id='model-config'),
                 dcc.Store(id='finance-config'),
 
+                # Triggers
+                # Trigger after model configuration updates
+                dcc.Store(id = {'type': 'trigger', 'page': kwargs.get('page_type'), 'key': 'model-config'}),
+                dcc.Store(id = {'type': 'trigger', 'page': kwargs.get('page_type'), 'key': 'finance-config'}),
+
                 # Triggers for result table updates after postprocessing
                 dcc.Store(id='res-gen'),
                 dcc.Store(id='res-stor'),
@@ -293,7 +306,11 @@ def create_model_configuration_layout(*args, **kwargs):
                 + site_details
                 + [html.Hr()]
                 + results_section
-                + [html.Div(id='onload-div')] # To trigger first callback
+                + [html.Div(id = {
+                    'type': 'onload-div',
+                    'selected_model': kwargs.get('selected_model'), 
+                    'page_type': kwargs.get('page_type')
+                })] # To trigger first callback
             ),
             id = 'main-content-pane',
         ),

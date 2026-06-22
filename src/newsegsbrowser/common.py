@@ -44,7 +44,11 @@ def create_numeric_card_input_compound_key(
     type_id: str,
     key: str,
     section: str | None = None,
+    subindex: int = 0,
+    parameter_index: int = 0,
+    vector_location: int = 0,
     placeholder: int | float = 0.0,
+    value: int | float | None = None,
     min: int | float | None = 0.0,
     max: int | float | None = None,
     step: int | float  = 1
@@ -55,7 +59,10 @@ def create_numeric_card_input_compound_key(
     input_id = {
         'type': type_id,
         'key': key,
-        'section': section
+        'section': section,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
     }
     if float(int(step)) == float(step):
         step = int(step)
@@ -75,6 +82,7 @@ def create_numeric_card_input_compound_key(
         dbc.Input(
             id = input_id,
             type = 'number',
+            value = value,
             placeholder = placeholder,
             debounce = True,
             min = min,
@@ -139,42 +147,53 @@ def compose_configuration(
     return rval
 
 def model_interface_action(
-    model_id,
-    input_key,
-    input_value,
-    key_section = None,
-    input_time = None
+    metamodel_id,
+    section,
+    key,
+    subindex,
+    parameter_index,
+    vector_location,
+    input_time = None,
+    **kwargs
 ):
     if input_time is None:
         input_time = datetime.datetime.now()
     return {
         'type': 'model_config_interface_update',
-        'model_id': model_id,
-        'key': input_key,
-        'val': input_value,
-        'key_section': key_section,
+        'metamodel_id': metamodel_id,
+        'section': section,
+        'key': key,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
         'time': input_time.timestamp(),
     }
 
 def finance_interface_action(
-    finance_id,
-    input_key,
-    input_value,
-    key_section = None,
-    input_time = None
+    metamodel_id,
+    section,
+    key,
+    subindex,
+    parameter_index,
+    vector_location,
+    input_time = None,
+    **kwargs
 ):
     if input_time is None:
         input_time = datetime.datetime.now()
     return {
         'type': 'finance_config_interface_update',
-        'finance_id': finance_id,
-        'key': input_key,
-        'val': input_value,
-        'key_section': key_section,
+        'metamodel_id': metamodel_id,
+        'section': section,
+        'key': key,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
         'time': input_time.timestamp(),
     }
 
 def model_run_request(
+    metamodel_id,
     model_id,
     request_time = None
 ):
@@ -182,11 +201,13 @@ def model_run_request(
         request_time = datetime.datetime.now()
     return {
         'type': 'model_run_request',
+        'metamodel_id': metamodel_id,
         'model_id': model_id,
         'time': request_time.timestamp()
     }
 
 def finance_run_request(
+    metamodel_id,
     finance_id,
     model_id,
     request_time = None
@@ -195,6 +216,7 @@ def finance_run_request(
         request_time = datetime.datetime.now()
     return {
         'type': 'finance_run_request',
+        'metamodel_id': metamodel_id,
         'finance_id': finance_id,
         'model_id': model_id,
         'time': request_time.timestamp()

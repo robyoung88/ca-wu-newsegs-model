@@ -14,7 +14,7 @@ create_navbutton = partial(
     class_name = 'newsegs-nav-button btn-block',    
 )
 
-def create_nav_landing():
+def create_nav_landing(selected_model: str):
     return create_navbutton(
         [
             html.I(
@@ -24,10 +24,10 @@ def create_nav_landing():
         ],
         id = {'type': 'btn-nav', 'label': 'landing'},
         title = 'Landing page',
-        href = '/landing',
+        href = f'/{selected_model}/landing',
     )
 
-def create_nav_system_config():
+def create_nav_system_config(selected_model: str):
     return create_navbutton(
         [
             html.I(
@@ -37,10 +37,10 @@ def create_nav_system_config():
         ],
         id = {'type': 'btn-nav', 'label': 'system-config'},
         title = 'Site configuration',
-        href = '/site-config',
+        href = f'/{selected_model}/site-config',
     )
 
-def create_nav_buildings():
+def create_nav_buildings(selected_model: str):
     return create_navbutton(
         [
             html.I(
@@ -50,10 +50,10 @@ def create_nav_buildings():
         ],
         id = {'type': 'btn-nav', 'label': 'build-arch'},
         title = 'Buildings',
-        href = '/buildings',
+        href = f'/{selected_model}/buildings',
     )
 
-def create_nav_dsa():
+def create_nav_dsa(selected_model: str):
     return create_navbutton(
         [
             html.I(
@@ -63,10 +63,10 @@ def create_nav_dsa():
         ],
         id = {'type': 'btn-nav', 'label': 'dsa'},
         title = 'Sensitivity analysis',
-        href = 'dsa',
+        href = f'/{selected_model}/dsa',
     )
 
-def create_nav_psa():
+def create_nav_psa(selected_model: str):
     return create_navbutton(
         [
             html.I(
@@ -76,14 +76,14 @@ def create_nav_psa():
         ],
         id = {'type': 'btn-nav', 'label': 'psa'},
         title = 'Probabilistic analysis',
-        href = 'psa',
+        href = f'/{selected_model}/psa',
     )
 
-def create_navigator_buttons_default():
+def create_navigator_buttons_default(selected_model: str = 'sprake'):
     return [
-        create_nav_landing(),
-        create_nav_system_config(),
-        create_nav_buildings(),
-        create_nav_dsa(),
-        create_nav_psa(),
+        create_nav_landing(selected_model),
+        create_nav_system_config(selected_model),
+        create_nav_buildings(selected_model),
+        create_nav_dsa(selected_model),
+        create_nav_psa(selected_model),
     ]

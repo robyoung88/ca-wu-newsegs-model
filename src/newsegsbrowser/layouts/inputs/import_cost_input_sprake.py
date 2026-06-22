@@ -25,30 +25,33 @@ def create_import_cost_input_card():
 
             html.Details([
                 html.Summary(""),
-                html.Div([
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'cost-import-fixed',
-                            'Fixed costs for backup (£/site/day)',
-                            'input-finance-config',
-                            'grid_import_sc_per_day',
-                            section = 'unit_costs',
-                            max = 10000,
-                            step = 10
-                        )
-                    ),
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'cost-import-perunit',
-                            'Per-unit costs for backup (£/kWh)',
-                            'input-finance-config',
-                            'grid_import_var_per_unit',
-                            section = 'unit_costs',
-                            max = 10,
-                            step = 0.01
-                        )
-                    ),
-                ])
+                html.Div(#[
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'cost-import-fixed',
+                    #         'Fixed costs for backup (£/site/day)',
+                    #         'input-finance-config',
+                    #         'grid_import_sc_per_day',
+                    #         section = 'unit_costs',
+                    #         max = 10000,
+                    #         step = 10
+                    #     )
+                    # ),
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'cost-import-perunit',
+                    #         'Per-unit costs for backup (£/kWh)',
+                    #         'input-finance-config',
+                    #         'grid_import_var_per_unit',
+                    #         section = 'unit_costs',
+                    #         max = 10,
+                    #         step = 0.01
+                    #     )
+                    # ),
+                #]
+                id = {'type': 'input-container', 'supersection': 'finance-config', 'section': 'import_costs'},
+                className = 'input-container model-config-input-container'
+                )
             ])
         ])
     ])

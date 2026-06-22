@@ -74,6 +74,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         self,
         benefit_discount_rate: float|int,
         cost_discount_rate: float|int = 0.0,
+        horizon: int = -1,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None,
     ) -> None:
@@ -82,6 +83,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
         self.benefit_discount_rate = benefit_discount_rate
         self.cost_discount_rate = cost_discount_rate
+
+        self.horizon = horizon
 
         if name is not None:
             self.name = name

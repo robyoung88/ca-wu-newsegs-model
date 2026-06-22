@@ -5,6 +5,7 @@ from typing import Callable, MutableSequence
 import uuid
 
 from dash import html, no_update
+import dash_bootstrap_components as dbc
 
 from newsegsbrowser import icons
 import newsegsbrowser.common as browser
@@ -20,6 +21,7 @@ def sync_config(
     firstload_config_watcher,
     store_selected_configuration,
     store_configurations,
+    input_containers,
     app,
 
     create_default_model: Callable[[], NewsegsModel],
@@ -34,6 +36,8 @@ def sync_config(
     This is also fired on first load of model page, so is responsible for
     creation of the first metamodel / configuration.
     """
+    NUP = no_update, no_update, no_update, [no_update] * len(input_containers)
+
     if store_selected_configuration is None:
         if store_configurations is None or len(store_configurations) == 0:
             # On first load, we can generate a random configuration
@@ -81,6 +85,33 @@ def sync_config(
         mm.id = store_selected_configuration['metamodel_id']
         app.metamodels[mm.id] = mm
 
+    inputs = []
+    for ic in input_containers:
+        cnts = []
+        section = ic.get('section')
+        for var in mm.variables.values():
+            if var.interface_section == section and var.configuration_show:
+                if not isinstance(var, variable.ScalarVariable):
+                    raise TypeError(f'Cannot handle variables of type {type(var)}')
+                # Create an input
+                cnts.append(
+                    dbc.Row(
+                        browser.create_numeric_card_input_compound_key(
+                            var.icon_name,
+                            f'{var.label} ({var.unit})',
+                            'input-finance-config' if var.configuration_type == 'finance' else 'input-model-config',
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
+                            min = var.interface_min,
+                            max = var.interface_max,
+                            step = var.interface_step if var.interface_step else 1
+                        )
+                    )
+                )
+        inputs.append(cnts)
+
     # TODO - these do not require an update if store_configurations was the trigger
     
     mcfg, fcfg = model_and_finance_to_interface_function(mdl, fnc)
@@ -89,7 +120,8 @@ def sync_config(
         json.dumps(store_selected_configuration),
         store_configurations,
         json.dumps(mcfg),
-        json.dumps(fcfg)
+        json.dumps(fcfg),
+        inputs
     )
 
 def sync_loc_inputs_to_store(mcfg, app):

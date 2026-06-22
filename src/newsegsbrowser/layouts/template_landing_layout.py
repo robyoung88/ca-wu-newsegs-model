@@ -26,7 +26,7 @@ def create_landing_layout(*args, **kwargs):
 
     header = dbc.Row([
         dbc.Col(
-            config_dict['layout_navigation'](),
+            config_dict['layout_navigation'](config_dict.get('selected_model','')),
             width = config_dict['width_navigation'],
             class_name = 'newsegs-navbar-vertical flex-shrink-1',
         ),

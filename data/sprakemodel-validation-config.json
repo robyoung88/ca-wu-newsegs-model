@@ -1,11 +1,11 @@
 {
     "class": "SprakeModel",
     "constructor_class": "NewsegsComponent",
-    "uuid": "a95d9869-7d2d-46a8-917a-bcf229b1643b",
+    "uuid": "bf66a9bc-7158-4e74-a36c-492069716319",
     "_mod_gen": {
         "class": "SprakeGeneration",
         "constructor_class": "NewsegsModule",
-        "uuid": "ad19f750-3b3d-417d-836a-fd0e2b019d9a",
+        "uuid": "b64e11d7-e914-4733-a987-d88dce22851c",
         "_dirty": true,
         "wind_capacity": 200.0,
         "pv_capacity": 200.0,
@@ -21,7 +21,7 @@
     "_mod_grid": {
         "class": "SprakeGrid",
         "constructor_class": "NewsegsModule",
-        "uuid": "696ecf75-3e51-4efa-9ea0-0ebf8fac00a6",
+        "uuid": "8413f1fd-a588-46e3-a9ae-33f88fca396f",
         "_import_rate": 0.2,
         "_dirty": true,
         "_export_rate": 0.07
@@ -29,7 +29,7 @@
     "_mod_cs": {
         "class": "SprakeCS",
         "constructor_class": "NewsegsModule",
-        "uuid": "c6e4d6e6-bf4b-4039-89b8-e4dd26712fc3",
+        "uuid": "b7404dc2-18ac-4e98-90db-b9dfe0729699",
         "_appliance_params": {
             "efficiency_reduction": 0.1,
             "n_households": 100
@@ -88,13 +88,13 @@
             "ts_input": "2005-01-01 00:00:00+00:00",
             "tz": "UTC"
         },
-        "_tz": "UTC",
         "_end_dt": {
             "class": "Timestamp",
             "constructor_class": "Timestamp",
             "ts_input": "2015-01-01 00:00:00+00:00",
             "tz": "UTC"
         },
+        "_tz": "UTC",
         "_delta": {
             "class": "Timedelta",
             "constructor_class": "Timedelta",
@@ -107,8 +107,9 @@
         },
         "_n": 87648
     },
-    "_name": "Sprake Model",
+    "_horizon": 10,
     "_dirty": true,
+    "_name": "Sprake Model",
     "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
     "wider_environment_server": "DummyWiderEnv v0.0.1"
 }

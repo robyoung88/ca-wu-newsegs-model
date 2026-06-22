@@ -148,7 +148,7 @@ def create_dsa_layout(*args, **kwargs):
     header = dbc.Row([
         dbc.Col(
             html.Div(
-                config_dict['layout_navigation']()
+                config_dict['layout_navigation'](config_dict.get('selected_model'))
             ),
             class_name = 'newsegs-navbar-vertical collapsed',
             width = config_dict['width_navigation'],

@@ -36,8 +36,11 @@ class TestDSA(unittest.TestCase):
     
     def test_short_dsa(self):
         mm = self.make_sprake_metamodel()
-        for v_idx in range(2):
-            mm.variables[v_idx].dsa_selected = True
+        for v in mm.variables:
+            if v.model_parameter == 'storage_capacity' or v.model_parameter == 'storage_rte':
+                v.dsa_selected = True
+            else:
+                v.dsa_selected = False
 
         dsa_results = dsa.run_dsa(
             mm, 
@@ -56,6 +59,9 @@ class TestDSA(unittest.TestCase):
         dsa_results = dsa_results.set_index(['variable', 'bound'])
         #det_npv = dsa_results.loc[('deterministic', 'central'), 'net_present_value_discounted']
         det_cost = float(dsa_results.loc[('deterministic', 'central'), 'total_present_costs_undiscounted']) # pyright: ignore[reportArgumentType]
+
+        # NB -these tests are specific to a low impact storage set-up. If the storage makes a large impact, then
+        # it could reduce imports enough to offset its cost.
         self.assertLess(
             float(dsa_results.loc[('Storage capacity','lower'),'total_present_costs_undiscounted']), # pyright: ignore[reportArgumentType]
             det_cost

@@ -17,6 +17,7 @@ from core import location as modlocation
 from core.generation import generators
 from core.environment import environment_servers
 from core.environment import inmem_env_servers
+from core.timespan.timespan import SECONDS_TO_DAYS
 from newsegsmodel import newsegsmodel
 from newsegsgeneration import newsegsgeneration
 from newsegsgrid import newsegsgrid
@@ -209,12 +210,12 @@ class SprakeModel(newsegsmodel.NewsegsModel):
             self._default_timestep = _DEFAULT_TS
         
         if run_period:
-            self._run_period = modtimespan.RegTimeSpan(run_period)
+            self.set_run_period(modtimespan.RegTimeSpan(run_period))
         else:
-            self._run_period = modtimespan.RegTimeSpan(
+            self.set_run_period(modtimespan.RegTimeSpan(
                 pd.Timestamp('2005-01-01T00:00:00', tz='utc'),
                 pd.Timestamp('2015-01-01T00:00:00', tz='utc')
-            )
+                        ))
         self._run_period.timestep = self._default_timestep
 
         if loc:
@@ -251,10 +252,28 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
         self._run_period = modtimespan.RegTimeSpan(timespan)
         self._run_period.timestep = self._default_timestep
+        self._horizon = int(round((self._run_period.end - self._run_period.start).total_seconds() * SECONDS_TO_DAYS / 365.25))
         self._dirty = True
 
     def get_run_period(self) -> modtimespan.TimeSpan:
         return self._run_period
+    
+    @property
+    def horizon(self) -> int:
+        return self._horizon
+    
+    @horizon.setter
+    def horizon(self, new_horizon: int):
+        if hasattr(self, '_horizon') and new_horizon == self._horizon:
+            return
+        ts = modtimespan.RegTimeSpan(self.get_run_period())
+        ts.end = ts.start + pd.Timedelta(new_horizon*365, unit='d') 
+        while ts.end.day != ts.start.day:
+            ts.end = ts.end + pd.Timedelta(1, unit='d')
+        ts.timestep = self._default_timestep
+        self._run_period = ts
+        self._horizon = new_horizon
+        self._dirty = True
 
     @property
     def generation(self) -> sprakegeneration.SprakeGeneration:

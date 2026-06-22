@@ -1,7 +1,7 @@
 """
 Functions and classes for performing deterministic sensitivity analysis
 """
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, cast
 from typing import get_args
 
 import pandas as pd
@@ -9,6 +9,7 @@ import pandas as pd
 from newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel import NewsegsModel
 from newsegsfinance import NewsegsFinance
+from newsegsvariable.variable import DSA_BOUND
 
 DSA_FLOAT_STATISTIC = Literal[
     'total_present_costs_undiscounted',
@@ -86,6 +87,7 @@ def run_dsa(
 
             try:
                 for bound in ['lower', 'upper']:
+                    bound = cast(DSA_BOUND, bound)
                     v.update_model_dsa(mdl, bound)
                     v.update_model_dsa(fnc, bound)
                     mdl.run()

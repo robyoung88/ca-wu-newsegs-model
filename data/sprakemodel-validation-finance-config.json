@@ -1,7 +1,7 @@
 {
     "class": "SprakeFinance",
     "constructor_class": "NewsegsComponent",
-    "uuid": "cbbc474b-c3d1-480d-b89f-b8a71c26e014",
+    "uuid": "84f05e0f-080b-4b18-bb3b-20e658612161",
     "_unit_costs": {
         "wind_capex_per_kw": 1500.0,
         "wind_om_per_kw_year": 46.0,
@@ -18,9 +18,10 @@
     "last_update": {
         "class": "datetime",
         "constructor_class": "datetime",
-        "value": "2026-06-18T14:04:12.814581"
+        "value": "2026-06-19T16:22:22.539499"
     },
     "_dirty": true,
     "_benefit_discount_rate": 0.035,
-    "_cost_discount_rate": 0.035
+    "_cost_discount_rate": 0.035,
+    "horizon": -1
 }

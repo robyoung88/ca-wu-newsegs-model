@@ -35,6 +35,8 @@ class NewsegsFinance(NewsegsFinanceInterface):
     _benefit_discount_rate: float = 0.
     _cost_discount_rate: float = 0.
 
+    checked_out: bool = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(self, *args, **kwargs)
     

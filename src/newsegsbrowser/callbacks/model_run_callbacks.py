@@ -4,12 +4,20 @@ Functions:
 - add_model_run_callbacks
 - add_finance_run_callbacks
 """
+import datetime
 import json
 import logging
+from typing import cast
 
 from dash import ctx, Dash, Input, no_update, Output, State
 
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodel.newsegsmodel import NewsegsModel
+
 logger = logging.getLogger(__name__)
+
+RUN_DEBOUNCE_SECONDS = 1.0
+FINANCE_DEBOUNCE_SECONDS = 0.5
 
 def add_model_run_callbacks(app: Dash):
     """
@@ -76,16 +84,20 @@ def add_model_run_callbacks(app: Dash):
         if latch_model_run_global is None:
             latch_model_run_global = True
 
+        nowtime = datetime.datetime.now().timestamp()
+
         if latch_model_run_global:
             for i, request in enumerate(queue_model_run):
-                # There are no conditions, so we automatically run the first model
-                dispatch_request = queue_model_run.pop(i)
-                logger.info('model run dispatched: %s', dispatch_request)
-                return (
-                    queue_model_run,
-                    dispatch_request,
-                    len(queue_model_run) == 0
-                )
+                request_l = json.loads(request)
+                if nowtime - request_l['time'] > RUN_DEBOUNCE_SECONDS:
+                    # There are no conditions, so we automatically run the first model
+                    dispatch_request = queue_model_run.pop(i)
+                    logger.info('model run dispatched: %s', dispatch_request)
+                    return (
+                        queue_model_run,
+                        dispatch_request,
+                        len(queue_model_run) == 0
+                    )
         
         return (
             queue_model_run,
@@ -94,16 +106,16 @@ def add_model_run_callbacks(app: Dash):
         )
     
     @app.callback(
-        Output('latch-models-checkedout', 'data', allow_duplicate = True),
+        #Output('latch-models-checkedout', 'data', allow_duplicate = True),
         Output('latch-model-run-global', 'data', allow_duplicate = True),
         Output('trigger-model-run', 'data'),
         Input('dispatchitem-model-run', 'data'),
-        State('latch-models-checkedout', 'data'),
+        #State('latch-models-checkedout', 'data'),
         prevent_initial_call = True,
     )
     def dispatcher_model_run(
         dispatchitem_model_run,
-        latch_models_checkedout,
+        #latch_models_checkedout,
     ):
         """
         Handle a model run request.
@@ -114,7 +126,11 @@ def add_model_run_callbacks(app: Dash):
         checked-out list, and the trigger for the background model run can be 
         fired.
         """
-        NUP = no_update, no_update, no_update
+        NUP = (
+            #no_update, 
+            no_update, 
+            no_update
+        )
 
         if dispatchitem_model_run is None:
             return NUP
@@ -125,18 +141,24 @@ def add_model_run_callbacks(app: Dash):
         if isinstance(model_run, list):
             raise TypeError('Cannot handle a list of model run requests.')
         
-        if latch_models_checkedout is None:
-            latch_models_checkedout = set() # Empty set, not dict
-        else:
-            latch_models_checkedout = set(latch_models_checkedout)
+        #if latch_models_checkedout is None:
+        #    latch_models_checkedout = set() # Empty set, not dict
+        #else:
+        #    latch_models_checkedout = set(latch_models_checkedout)        
 
         app.model_to_cache(model_run['model_id'])
-        latch_models_checkedout.add(model_run['model_id'])
+        mdl = cast(NewsegsModel, app.models.get(model_run['model_id']))
+        if mdl is None:
+            logger.warning('model to be run not found: %s')
+        else:
+            mdl.checked_out = True
+
+        #latch_models_checkedout.add(model_run['model_id'])
 
         logging.info('model dispatched to run: %s', model_run)
 
         return (
-            list(latch_models_checkedout),
+            #list(latch_models_checkedout),
             False,
             dispatchitem_model_run,
         )
@@ -145,15 +167,15 @@ def add_model_run_callbacks(app: Dash):
     
     @app.callback(
         Output('trigger-postprocess-model-run', 'data', allow_duplicate = True),
-        Output('latch-models-checkedout', 'data', allow_duplicate = True),
+        #Output('latch-models-checkedout', 'data', allow_duplicate = True),
         Output('latch-model-run-global', 'data', allow_duplicate = True),
         Input('trigger-post-model-run', 'data'),
-        State('latch-models-checkedout', 'data'),
+        #State('latch-models-checkedout', 'data'),
         prevent_initial_call = True
     )
     def receiver_model_run(
         trigger_post_model_run,
-        latch_models_checkedout
+        #latch_models_checkedout
     ):
         """
         After a (background) model run completes, resync the local model.
@@ -163,16 +185,22 @@ def add_model_run_callbacks(app: Dash):
         
         # Sync with background cache
         app.models[model_id] = app.model_from_cache(model_id)
+        # The synced model should have checked_out = False
+        if app.models[model_id].checked_out:
+            raise ValueError(f'model should not be checked out: {model_id}')
+        # Reattach to metamodel
+        mm = cast(NewsegsMetaModel, app.metamodels.get(model_run['metamodel_id']))
+        mm.reattach_model(app.models)
         
         # Clear model for editing
-        latch_models_checkedout = set(latch_models_checkedout)
-        latch_models_checkedout.remove(model_id)
+        #latch_models_checkedout = set(latch_models_checkedout)
+        #latch_models_checkedout.remove(model_id)
 
         logging.info('model run completed: %s', model_run)
 
         return (
             trigger_post_model_run,
-            list(latch_models_checkedout),
+            #list(latch_models_checkedout),
             True,
         )
 
@@ -189,14 +217,14 @@ def add_finance_run_callbacks(app: Dash):
         Output('interval-finance-run', 'disabled'),
         Input('prequeue-finance-run', 'data'),
         Input('interval-finance-run', 'n_intervals'),
-        State('latch-models-checkedout', 'data'),
+        #State('latch-models-checkedout', 'data'),
         State('queue-finance-run', 'data'),
         prevent_initial_call = True,
     )
     def queueman_finance_run(
         prequeue_finance_run,
         interval_finance_run,
-        latch_models_checkedout,
+        #latch_models_checkedout,
         queue_finance_run
     ):
         """
@@ -239,21 +267,29 @@ def add_finance_run_callbacks(app: Dash):
                         queue_finance_run.pop(i)
                 queue_finance_run.append(requests)
 
-        if latch_models_checkedout is None:
-            latch_models_checkedout = set()
-        else:
-            latch_models_checkedout = set(latch_models_checkedout)
+        #if latch_models_checkedout is None:
+        #    latch_models_checkedout = set()
+        #else:
+        #    latch_models_checkedout = set(latch_models_checkedout)
         
-        for i, request in enumerate(queue_finance_run):
-            # Cannot run if model is checked out
-            if not json.loads(request)['model_id'] in latch_models_checkedout:
-                dispatch_request = queue_finance_run.pop(i)
+        nowtime = datetime.datetime.now().timestamp()
 
-                return (
-                    queue_finance_run,
-                    dispatch_request,
-                    len(queue_finance_run) == 0
-                )
+        for i, request in enumerate(queue_finance_run):
+            request_l = json.loads(request)
+            if nowtime - request_l['time'] > FINANCE_DEBOUNCE_SECONDS:
+                # Cannot run if model is checked out
+                mdl = app.models.get(request_l['model_id'])
+                if mdl is None:
+                    raise ValueError(f'model {request_l['model_id']} not found')
+                fnc = app.finances.get(request_l['finance_id'])
+                if not mdl.checked_out and not fnc.checked_out:
+                    dispatch_request = queue_finance_run.pop(i)
+
+                    return (
+                        queue_finance_run,
+                        dispatch_request,
+                        len(queue_finance_run) == 0
+                    )
         
         return (
             queue_finance_run,
@@ -262,7 +298,7 @@ def add_finance_run_callbacks(app: Dash):
         )
     
     @app.callback(
-        Output('latch-finances-checkedout', 'data', allow_duplicate = True),
+        #Output('latch-finances-checkedout', 'data', allow_duplicate = True),
         Output('latch-finance-run-global', 'data', allow_duplicate = True),
         Output('trigger-finance-run', 'data'),
         Input('dispatchitem-finance-run', 'data'),
@@ -292,36 +328,37 @@ def add_finance_run_callbacks(app: Dash):
         if isinstance(finance_run, list):
             raise TypeError('Cannot handle a list of finance run requests')
         
-        if latch_finances_checkedout is None:
-            latch_finances_checkedout = set()
-        else:
-            latch_finances_checkedout = set(latch_finances_checkedout)
+        #if latch_finances_checkedout is None:
+        #    latch_finances_checkedout = set()
+        #else:
+        #    latch_finances_checkedout = set(latch_finances_checkedout)
         
         # Model is synced to cache, but no need to lock
         app.model_to_cache(finance_run['model_id'])
 
         app.finance_to_cache(finance_run['finance_id'])
-        latch_finances_checkedout.add(finance_run['finance_id'])
+        app.finances.get(finance_run['finance_id']).checked_out = True
+        #latch_finances_checkedout.add(finance_run['finance_id'])
 
         logging.info('finance dispatched to run: %s', finance_run)
 
         return(
-            list(latch_finances_checkedout),
+            #list(latch_finances_checkedout),
             False,
             dispatchitem_finance_run
         )
 
     @app.callback(
         Output('trigger-postprocess-finance-run', 'data', allow_duplicate = True),
-        Output('latch-finances-checkedout', 'data', allow_duplicate = True),
+        #Output('latch-finances-checkedout', 'data', allow_duplicate = True),
         Output('latch-finance-run-global', 'data', allow_duplicate = True),
         Input('trigger-post-finance-run', 'data'),
-        State('latch-finances-checkedout', 'data'),
+        #State('latch-finances-checkedout', 'data'),
         prevent_initial_call = True
     )
     def receiver_finance_run(
         trigger_post_finance_run,
-        latch_finances_checkedout
+        #latch_finances_checkedout
     ):
         """
         After a (background) finance run completes, resync the local finance.
@@ -338,16 +375,18 @@ def add_finance_run_callbacks(app: Dash):
             app.models.get(finance_run['model_id']), 
             False
         )
+        mm = cast(NewsegsMetaModel, app.metamodels.get(finance_run['metamodel_id']))
+        mm.reattach_finance(app.finances)
 
         # Clear finance for editing
-        latch_finances_checkedout = set(latch_finances_checkedout)
-        latch_finances_checkedout.remove(finance_id)
+        #latch_finances_checkedout = set(latch_finances_checkedout)
+        #latch_finances_checkedout.remove(finance_id)
 
         logging.info('finance run completed: %s', finance_run)
 
         return (
             trigger_post_finance_run,
-            list(latch_finances_checkedout),
+            #list(latch_finances_checkedout),
             True,
         )
     

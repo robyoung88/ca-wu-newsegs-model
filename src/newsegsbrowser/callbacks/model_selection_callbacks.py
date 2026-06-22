@@ -33,15 +33,15 @@ def assign_callbacks(app: Dash):
             case _:
                 raise ValueError(f'Unknown prop has called update_model_type: {pid}')
         
-        return '/landing', selected_model
+        return f'/{selected_model}/landing', selected_model
     
-    @app.callback(
-        Output('dsa_config_element_container', 'children'),
-        Input('selected-model', 'data'),
-        prevent_initial_call = True,
-    )
-    def update_dsa_configuration_options(selected_model):
-        return [var_dc.create_dsa_input_scalar_constant('Wind Capacity (kW rated)', 'input-model-config', 'wind_capacity', section = 'gen_input')]
+    #@app.callback(
+    #    Output('dsa_config_element_container', 'children'),
+    #    Input('selected-model', 'data'),
+    #    prevent_initial_call = True,
+    #)
+    #def update_dsa_configuration_options(selected_model):
+    #    return [var_dc.create_dsa_input_scalar_constant('Wind Capacity (kW rated)', 'input-model-config', 'wind_capacity', section = 'gen_input')]
     
 
     

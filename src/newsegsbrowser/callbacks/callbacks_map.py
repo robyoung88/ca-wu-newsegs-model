@@ -14,6 +14,8 @@ SPRAKE_CALLBACKS = {
     'sync_unit_cost_inputs_to_store': model_configuration_callbacks_sprake.sync_unit_cost_inputs_to_store,
     'sync_fnc_inputs_to_store': model_configuration_callbacks_generic.sync_fnc_inputs_to_store,
 
+    'update_headers_model_config': model_configuration_callbacks_sprake.update_headers_model_config,
+    'update_headers_finance_config': model_configuration_callbacks_sprake.update_headers_finance_config,
     'update_feedback_graphs': model_configuration_callbacks_sprake.update_feedback_graphs,
     'dispatcher_action_user': model_configuration_callbacks_sprake.dispatcher_action_user,
 

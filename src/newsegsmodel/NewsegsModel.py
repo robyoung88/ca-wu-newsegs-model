@@ -59,6 +59,8 @@ class NewsegsModel(
 
     _last_hash = 1
 
+    checked_out: bool = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(self, *args, **kwargs)
 
@@ -107,13 +109,13 @@ class NewsegsModel(
         """
 
     @property
-    def mod_generation(self) -> NewsegsGeneration:
+    def mod_gen(self) -> NewsegsGeneration:
         """
         Alternative accessor for generation module
         """
         return self.generation
     
-    @mod_generation.setter
+    @mod_gen.setter
     def mod_generation(self, generation_module: NewsegsGeneration):
         self.generation = generation_module
 
@@ -125,12 +127,18 @@ class NewsegsModel(
             self.generation.update(generation_config)
         except (AttributeError, TypeError):
             from core import find_constructor
+            cclass = generation_config.get('constructor_class')
+            classname = generation_config.get('class')
+            if cclass is None or classname is None:
+                raise AttributeError('No generation module present to update')
             constr = find_constructor(
-                generation_config.get('constructor_class'),
-                generation_config.get('class')
+                cclass,
+                classname
             )
             
             gen = constr(generation_config)
+            if not isinstance(gen, NewsegsGeneration):
+                raise TypeError(f'config did not produce a generation module - {type(gen)} instanced')
             gen.model = self
             self.generation = gen
 
@@ -166,8 +174,19 @@ class NewsegsModel(
         try:
             self.grid.update(grid_config)
         except (AttributeError, TypeError):
-            from newsegsgrid import constructors as gridmodconstructors
-            grd = gridmodconstructors.grid_module_from_dict(grid_config)
+            from core import find_constructor
+            cclass = grid_config.get('constructor_class')
+            classname = grid_config.get('class')
+            if cclass is None or classname is None:
+                raise AttributeError('No grid module present to update')
+            constr = find_constructor(
+                cclass,
+                classname
+            )
+
+            grd = constr(grid_config)
+            if not isinstance(grd, NewsegsGrid):
+                raise TypeError(f'config did not produce a grid module - {type(grd)} instanced')
             grd.model = self
             self.grid = grd
 
@@ -203,8 +222,19 @@ class NewsegsModel(
         try:
             self.consumption_storage.update(cs_config)
         except (AttributeError, TypeError):
-            from newsegscs import constructors as csmodconstructors
-            cs = csmodconstructors.cs_module_from_dict(cs_config)
+            from core import find_constructor
+            cclass = cs_config.get('constructor_class')
+            classname = cs_config.get('class')
+            if cclass is None or classname is None:
+                raise AttributeError('No consumption_storage module present to update')
+            constr = find_constructor(
+                cclass,
+                classname
+            )
+
+            cs = constr(cs_config)
+            if not isinstance(cs, NewsegsCS):
+                raise TypeError(f'config did not produce a consumption_storage module - {type(cs)} instanced')
             cs.model = self
             self.consumption_storage = cs
     

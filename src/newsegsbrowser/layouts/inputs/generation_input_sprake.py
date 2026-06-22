@@ -26,30 +26,35 @@ def create_generation_input_card():
             className='card-subtitle'),
             html.Details([
                 html.Summary(""),
-                html.Div([
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'gen-wind',
-                            'Wind Capacity (kW rated)',
-                            'input-model-config',
-                            'wind_capacity',
-                            section = 'gen_input',
-                            max = 10000,
-                            step = 5.0
-                        )    
-                    ),
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'gen-pv',
-                            'Solar PV Capacity (kWp)',
-                            'input-model-config',
-                            'pv_capacity',
-                            section = 'gen_input',
-                            max = 10000,
-                            step = 5.0
-                        )
-                    )
-                ])
+                html.Div(#[
+            #        dbc.Row(
+            #            browser.create_numeric_card_input_compound_key(
+            #                'gen-wind',
+            #                'Wind Capacity (kW rated)',
+            #                'input-model-config',
+            #                'wind_capacity',
+            #                section = 'gen_input',
+            #                max = 10000,
+            #                step = 5.0
+            #            )    
+            #        ),
+            #        dbc.Row(
+            #            browser.create_numeric_card_input_compound_key(
+            #                'gen-pv',
+            #                'Solar PV Capacity (kWp)',
+            #                'input-model-config',
+            #                'pv_capacity',
+            #                section = 'gen_input',
+            #                max = 10000,
+            #                step = 5.0
+            #            )
+            #        )
+            #    ],
+                id = {'type': 'input-container', 'supersection': 'model-config', 'section': 'gen_input'},
+                className = 'input-container model-config-input-container'
+                )
             ])
         ])
-    ])
+    ],
+    className = 'input-card'
+    )

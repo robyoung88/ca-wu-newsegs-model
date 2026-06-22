@@ -52,7 +52,7 @@ def add_postprocess_callbacks(app: Dash):
             if config['model_id'] == model_id:
                 prequeue_finance_run.append(
                     json.dumps(
-                        browser.finance_run_request(config['finance_id'], model_id)
+                        browser.finance_run_request(config['metamodel_id'], config['finance_id'], model_id)
                     )
                 )
                 do_update = True

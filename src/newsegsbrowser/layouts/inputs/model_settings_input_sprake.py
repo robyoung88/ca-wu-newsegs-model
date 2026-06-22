@@ -24,19 +24,22 @@ def create_model_settings_input_card():
 
             html.Details([
                 html.Summary(""),
-                html.Div([
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            'model-settings-time-horizon',
-                            'Time horizon (years)',
-                            'input-model-config',
-                            'horizon',
-                            section = 'mc_input',
-                            max = 10,
-                            step = 1
-                        )
-                    ),
-                ])
+                html.Div(#[
+                    # dbc.Row(
+                    #     browser.create_numeric_card_input_compound_key(
+                    #         'model-settings-time-horizon',
+                    #         'Time horizon (years)',
+                    #         'input-model-config',
+                    #         'horizon',
+                    #         section = 'mc_input',
+                    #         max = 10,
+                    #         step = 1
+                    #     )
+                    # ),
+                #],
+                id = {'type': 'input-container', 'supersection': 'model-config', 'section': 'mc_input'},
+                className = 'input-container model-config-input-container'
+                )
             ])
         ]),
     ])

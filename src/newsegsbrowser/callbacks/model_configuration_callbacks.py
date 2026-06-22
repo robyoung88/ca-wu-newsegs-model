@@ -10,14 +10,19 @@ Functions:
 import datetime
 import json
 import logging
+from typing import Any, cast
 
-from dash import ALL, ctx, Dash, Input, Output, Patch, State, no_update
+from dash import ALL, NoUpdate, ctx, Dash, Input, Output, Patch, State, no_update
 from dash import clientside_callback, ClientsideFunction
+import numpy as np
 
 from newsegsbrowser import common as browser
 from newsegsbrowser.callbacks import callbacks_map
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 logger = logging.getLogger(__name__)
+
+SYNC_DEBOUNCE_SECONDS = 0.1
 
 def add_initial_callbacks(app: Dash):
     """
@@ -31,19 +36,20 @@ def add_initial_callbacks(app: Dash):
             function_name = 'attach_drawer'
         ),
         Output('post-drawer-attach', 'children'),
-        Input('onload-div', 'children')
+        Input({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'children')
     )
 
     @app.callback(
-        Output('firstload-config-watcher', 'data'),
-        Input('onload-div', 'children')
+        Output({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
+        Input({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'children'),
+        State({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'id'),
     )
-    def sync_config_init(_):
+    def sync_config_init(_, config_watcher_ids):
         """
         Trigger any initial actions after a page load
         """
         logger.info('Model configuration onload div constructed.')
-        return datetime.datetime.now().timestamp()
+        return [datetime.datetime.now().timestamp()] * len(config_watcher_ids)
     
     return app
 
@@ -60,9 +66,11 @@ def add_model_to_interface_callbacks(app: Dash):
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('model-config', 'data', allow_duplicate=True),
         Output('finance-config', 'data', allow_duplicate=True),
-        Input('firstload-config-watcher', 'data'),
+        Output({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'children'),
+        Input({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
         Input('store-selected-configuration', 'data'),
         Input('store-configurations', 'data'),
+        State({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call=True
     )
@@ -70,6 +78,7 @@ def add_model_to_interface_callbacks(app: Dash):
         firstload_config_watcher,
         store_selected_configuration,
         store_configurations,
+        input_containers,
         selected_model
     ):
         logger.info('sync_config triggered.')
@@ -77,6 +86,7 @@ def add_model_to_interface_callbacks(app: Dash):
             firstload_config_watcher,
             store_selected_configuration,
             store_configurations,
+            input_containers,
             app
         )
     
@@ -97,120 +107,120 @@ def add_model_to_interface_callbacks(app: Dash):
             app
         )
     
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'model-config', 'key': 'gen-smry'}, 'children'),
-        Output({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        State({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'value'),
-        State({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_gen_inputs_to_store(
-        mcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_gen_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_gen_inputs_to_store'](
-            mcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'gen-smry'}, 'children'),
+    #     Output({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     State({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'value'),
+    #     State({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_gen_inputs_to_store(
+    #     mcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_gen_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_gen_inputs_to_store'](
+        #     mcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
     
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'model-config', 'key': 'stor-smry'}, 'children'),
-        Output({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        State({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'value'),
-        State({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_stor_inputs_to_store(
-        mcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_stor_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_stor_inputs_to_store'](
-            mcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'stor-smry'}, 'children'),
+    #     Output({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     State({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'value'),
+    #     State({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_stor_inputs_to_store(
+    #     mcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_stor_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_stor_inputs_to_store'](
+        #     mcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
     
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'model-config', 'key': 'bc-smry'}, 'children'),
-        Output({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        State({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'value'),
-        State({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_bc_inputs_to_store(
-        mcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_bc_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_bc_inputs_to_store'](
-            mcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'bc-smry'}, 'children'),
+    #     Output({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     State({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'value'),
+    #     State({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_bc_inputs_to_store(
+    #     mcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_bc_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_bc_inputs_to_store'](
+        #     mcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
     
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'model-config', 'key': 'dc-smry'}, 'children'),
-        Output({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        State({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'value'),
-        State({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_dc_inputs_to_store(
-        mcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_dc_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_dc_inputs_to_store'](
-            mcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'dc-smry'}, 'children'),
+    #     Output({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     State({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'value'),
+    #     State({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_dc_inputs_to_store(
+    #     mcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_dc_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_dc_inputs_to_store'](
+        #     mcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
     
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'model-config', 'key': 'mc-smry'}, 'children'),
-        Output({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        State({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'value'),
-        State({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_mc_inputs_to_store(
-        mcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_mc_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_mc_inputs_to_store'](
-            mcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'mc-smry'}, 'children'),
+    #     Output({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     State({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'value'),
+    #     State({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_mc_inputs_to_store(
+    #     mcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_mc_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_mc_inputs_to_store'](
+        #     mcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
     
     ##### FINANCE ######
     
@@ -218,60 +228,61 @@ def add_model_to_interface_callbacks(app: Dash):
     # dictionary holds most information, and the discount rates are at top
     # level. This may prove to be restrictive, but we shall work with it 
     # for now.
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-gen-smry'}, 'children'),
-        Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-stor-smry'}, 'children'),
-        Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-sales-smry'}, 'children'),
-        Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-import-smry'}, 'children'),
-        Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        Input('finance-config', 'data'),
-        State({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'value'),
-        State({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_unit_cost_inputs_to_store(
-        mcfg, 
-        fcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_unit_cost_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_unit_cost_inputs_to_store'](
-            mcfg,
-            fcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-gen-smry'}, 'children'),
+    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-stor-smry'}, 'children'),
+    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-sales-smry'}, 'children'),
+    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-import-smry'}, 'children'),
+    #     Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     Input('finance-config', 'data'),
+    #     State({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'value'),
+    #     State({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_unit_cost_inputs_to_store(
+    #     mcfg, 
+    #     fcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_unit_cost_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_unit_cost_inputs_to_store'](
+        #     mcfg,
+        #     fcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
     
-    @app.callback(
-        Output({'type': 'input-header', 'section': 'finance-config', 'key': 'fnc-smry'}, 'children'),
-        Output({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'value'),
-        Input('model-config', 'data'),
-        Input('finance-config', 'data'),
-        State({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'value'),
-        State({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'id'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def sync_fnc_inputs_to_store(
-        mcfg,
-        fcfg,
-        current_input_values,
-        current_input_ids,
-        selected_model
-    ):
-        logger.info('sync_fnc_inputs_to_store triggered.')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_fnc_inputs_to_store'](
-            mcfg,
-            fcfg,
-            current_input_values,
-            current_input_ids,
-            app
-        )
+    # @app.callback(
+    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'fnc-smry'}, 'children'),
+    #     Output({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'value'),
+    #     Input('model-config', 'data'),
+    #     Input('finance-config', 'data'),
+    #     State({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'value'),
+    #     State({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'id'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call = True
+    # )
+    # def sync_fnc_inputs_to_store(
+    #     mcfg,
+    #     fcfg,
+    #     current_input_values,
+    #     current_input_ids,
+    #     selected_model
+    # ):
+        # logger.info('sync_fnc_inputs_to_store triggered.')
+        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_fnc_inputs_to_store'](
+        #     mcfg,
+        #     fcfg,
+        #     current_input_values,
+        #     current_input_ids,
+        #     app
+        # )
+        
     
     return app
     
@@ -279,6 +290,51 @@ def add_feedback_callbacks(app):
     """
     Callbacks for updating feedback elements given current configuration
     """
+
+    @app.callback(
+        Output({'type': 'input-header', 'section': 'model-config', 'key': ALL}, 'children'),
+        Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State({'type': 'input-header', 'section': 'model-config', 'key': ALL}, 'id'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def update_headers_model_config(
+        model_config_trigger,
+        selected_configuration,
+        header_ids,
+        selected_model
+    ):
+        logger.info('update_headers_model_config triggered.')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_headers_model_config'](
+            model_config_trigger,
+            selected_configuration,
+            header_ids,
+            app
+        )
+    
+    # Trigger on both model and finance config updates
+    @app.callback(
+        Output({'type': 'input-header', 'section': 'finance-config', 'key': ALL}, 'children'),
+        Input({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State({'type': 'input-header', 'section': 'finance-config', 'key': ALL}, 'id'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def update_headers_finance_config(
+        finance_config_trigger,
+        selected_configuration,
+        header_ids,
+        selected_model
+    ):
+        logger.info('update_headers_finance_config triggered.')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_headers_finance_config'](
+            finance_config_trigger,
+            selected_configuration,
+            header_ids,
+            app
+        )
     
     @app.callback(
         Output({'type': 'feedback-graph', 'section': 'feedback', 'key': ALL}, 'figure'),
@@ -308,11 +364,22 @@ def add_interface_to_model_callbacks(app):
 
     @app.callback(
         Output('prequeue-action-user', 'data'),
-        Input({'type': 'input-model-config', 'section': ALL, 'key': ALL}, 'value'),
-        Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL}, 'value'),
+        Output({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
+        Output({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
+        Output({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'invalid'),
+        Output({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'invalid'),
+        Output({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
+        Output({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'data'),
+
+        Input({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
+        Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         #Input('model-config','data'), # Trying to suppress circular callbacks
         #State('prequeue-action-user', 'data'),
         State('store-selected-configuration', 'data'),
+        State({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
+        State({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
+        State({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'id'),
+        State({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'id'),
         prevent_initial_call=True
     )
     def interface_update_config(
@@ -320,7 +387,11 @@ def add_interface_to_model_callbacks(app):
         inputs_finance,
         #model_config,
         #prequeue,
-        selected_config
+        selected_config,
+        model_input_ids,
+        finance_input_ids,
+        model_config_trigger_ids,
+        finance_config_trigger_ids,
     ):
         """
         Add model configuration update events to the user action prequeue.
@@ -331,9 +402,24 @@ def add_interface_to_model_callbacks(app):
         data are held, and it may be that we can just append a list rather than
         full json deserialise/serialise.
         """
-        NUP = no_update
+        NUP = (
+            no_update, # prequeue-action-user patch
+            [no_update] * len(model_input_ids), # model input values
+            [no_update] * len(finance_input_ids), # finance input values
+            [no_update] * len(model_input_ids), # model input invalid
+            [no_update] * len(finance_input_ids), # finance input invalid
+            [no_update] * len(model_config_trigger_ids), 
+            [no_update] * len(finance_config_trigger_ids), 
+        )
 
         if ctx.triggered_id == 'model-config':
+            return NUP
+        
+        selected_mm = json.loads(selected_config).get('metamodel_id', None)
+        if selected_mm is None:
+            return NUP
+        selected_mm = cast(NewsegsMetaModel, app.metamodels.get(selected_mm))
+        if selected_mm is None:
             return NUP
 
         selected_model = json.loads(selected_config).get('model_id', None)
@@ -353,35 +439,86 @@ def add_interface_to_model_callbacks(app):
         model_changed = False
         finance_changed = False
 
+        rval: list[Any] = list(NUP)
+
         trig = ctx.triggered
         for prop in trig:
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
+            update_ok, deterministic_changed, raw_params = selected_mm.update_variable_from_interface(
+                pid['section'], pid['key'], pid['subindex'], pid['parameter_index'], pid['vector_location'], val
+            )
             match pid['type']:
                 case 'input-model-config':
-                    model_changed = True
-                    prequeue.append(
-                        json.dumps(
-                            browser.model_interface_action(
-                                model_id = selected_model,
-                                input_key = pid['key'],
-                                input_value = val,
-                                key_section = pid['section']
+                    for i, id in enumerate(model_input_ids):
+                        if (
+                            id['section'] == pid['section']
+                            and id['key'] == pid['key']
+                            and id['subindex'] == pid['subindex']
+                        ):
+                            if id['parameter_index'] == pid['parameter_index'] and id['vector_location'] == pid['vector_location']:
+                                rval[3][i] = not(update_ok)  # type: ignore
+                            pi = id['parameter_index']
+                            new_param = raw_params[pi]
+                            if not isinstance(new_param, np.ndarray):
+                                rval[1][i] = new_param # type: ignore
+                            else:
+                                vi = id['vector_location']
+                                new_val = new_param.flat[vi]
+                                rval[1][i] = new_val # type: ignore
+                    
+                    if deterministic_changed:
+                        model_changed = True
+                        prequeue.append(
+                            json.dumps(
+                                browser.model_interface_action(
+                                    metamodel_id = selected_mm.id,
+                                    **pid
+                                )
                             )
                         )
-                    )
+                        rval[5] = [datetime.datetime.now().timestamp()] * len(model_config_trigger_ids)
                 case 'input-finance-config':
-                    finance_changed = True
-                    prequeue.append(
-                        json.dumps(
-                            browser.finance_interface_action(
-                                finance_id = selected_finance,
-                                input_key = pid['key'],
-                                input_value = val,
-                                key_section = pid['section']
+                    for i, id in enumerate(finance_input_ids):
+                        if (
+                            id['section'] == pid['section']
+                            and id['key'] == pid['key']
+                            and id['subindex'] == pid['subindex']
+                        ):
+                            if id['parameter_index'] == pid['parameter_index'] and id['vector_location'] == pid['vector_location']:
+                                rval[4][i] = not(update_ok)  # type: ignore
+                            pi = id['parameter_index']
+                            new_param = raw_params[pi]
+                            if not isinstance(new_param, np.ndarray):
+                                rval[2][i] = new_param # type: ignore
+                            else:
+                                vi = id['vector_location']
+                                new_val = new_param.flat[vi]
+                                rval[2][i] = new_val # type: ignore
+
+                    if deterministic_changed:
+                        # Need to check if model results are available
+                        # If not, add a model run and allow that to trigger
+                        # finance
+                        if not hasattr(selected_mm.model, '_cs_result'):
+                            prequeue.append(
+                                json.dumps(
+                                    browser.model_interface_action(
+                                        metamodel_id = selected_mm.id,
+                                        **pid
+                                    )
+                                )
                             )
-                        )
-                    )
+                        else:
+                            prequeue.append(
+                                json.dumps(
+                                    browser.finance_interface_action(
+                                            metamodel_id = selected_mm.id,
+                                            **pid
+                                        )
+                                )
+                            )
+                        rval[6] = [datetime.datetime.now().timestamp()] * len(finance_config_trigger_ids)
                 case _:
                     raise ValueError('Triggered by an unknown input type %s', pid['type'])
         l2 = len(prequeue)
@@ -401,7 +538,8 @@ def add_interface_to_model_callbacks(app):
             logger.info('no changes to prequeue, which is %d items long', l2)   
         
         prequeue_patch.extend(prequeue)
-        return prequeue_patch
+        rval[0] = prequeue_patch # type: ignore
+        return tuple(rval)
 
         if l2 == l1:
             return NUP
@@ -411,18 +549,20 @@ def add_interface_to_model_callbacks(app):
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
         Output('queue-action-user', 'data'),
-        Output('dispatchitem-action-user', 'data'),
+        Output('prequeue-model-run', 'data', allow_duplicate = True),
+        Output('prequeue-finance-run', 'data', allow_duplicate = True),
+        #Output('dispatchitem-action-user', 'data'),
         Output('interval-action-user', 'disabled'),
         Input('prequeue-action-user', 'data'),
         Input('interval-action-user', 'n_intervals'),
-        State('latch-models-checkedout', 'data'),
+        #State('latch-models-checkedout', 'data'),
         State('queue-action-user', 'data'),
         prevent_initial_call = True
     )
     def queueman_action_user(
         prequeue_action_user, 
         interval_action_user,
-        latch_models_checkedout,
+        #latch_models_checkedout,
         queue_action_user,
     ):
         """
@@ -453,76 +593,127 @@ def add_interface_to_model_callbacks(app):
                 queue_action_user.append(action)
             
             # TODO: Rationalise queue
-        
-        if latch_models_checkedout is None:
-            latch_models_checkedout = set()
-        else:
-            latch_models_checkedout = set(latch_models_checkedout)
+
+        nowtime = datetime.datetime.now().timestamp()
 
         # Loop through action queue
         for i, action_json in enumerate(queue_action_user):
             action = json.loads(action_json)
             match action['type']:
                 case 'model_config_interface_update':
-                    if action['model_id'] not in latch_models_checkedout:
-                        # Have a positive dispatch
-                        # Find other appropriate actions
-                        action_indexes = [i]
-                        j = i + 1
-                        if j < len(queue_action_user):
-                            for j in range(i + 1, len(queue_action_user)):
-                                act_j = json.loads(queue_action_user[j])
-                                if (
-                                    act_j['type'] == 'model_config_interface_update'
-                                    and act_j['model_id'] == action['model_id']
-                                ):
-                                    action_indexes.append(j)
-                        action_indexes.reverse()
-                        dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
-                        dispatch_actions.reverse()
+                    if (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
+                        mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                        logger.info('Checking if model %s is checked out: %s', mm.model.id, mm.model.checked_out)
+                        if not mm.model.checked_out:
+                            # Have a positive dispatch
+                            # Find other appropriate actions
+                            action_indexes = [i]
+                            j = i + 1
+                            if j < len(queue_action_user):
+                                for j in range(i + 1, len(queue_action_user)):
+                                    act_j = json.loads(queue_action_user[j])
+                                    if (
+                                        act_j['type'] == 'model_config_interface_update'
+                                        and act_j['metamodel_id'] == action['metamodel_id']
+                                    ):
+                                        action_indexes.append(j)
+                            action_indexes.reverse()
+                            dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
+                            dispatch_actions.reverse()
 
-                        logger.info('dispatching %d model config interface actions', len(dispatch_actions))
+                            logger.info('dispatching %d model config interface actions', len(dispatch_actions))
 
-                        return (
-                            [], # The prequeue is consumed
-                            queue_action_user,
-                            dispatch_actions,
-                            len(queue_action_user) == 0 # Disable Interval
-                        )
+                            # Might as well carry them out here
+                            # By definition, if we have got this far then the parameter change has impacted
+                            # the deterministic value and the model parameterisation will have changed. A
+                            # run should therefore be queued.
+                            synced = []
+                            for action in dispatch_actions:
+                                action = json.loads(action)
+                                varid = action['section'] + "." + action['key'] + "." + str(action['subindex'])
+                                if varid not in synced:
+                                    mm.update_model_from_variable_deterministic(
+                                        action['section'],
+                                        action['key'],
+                                        action['subindex']
+                                    )
+                                    synced.append(varid)
+
+                            r_model_run_request = browser.model_run_request(mm.id, mm.model.id)
+                            model_prequeue_patch = Patch()
+                            model_prequeue_patch.append(json.dumps(r_model_run_request))
+
+                            logger.info('Adding a run request for %s', mm.model.id)
+
+                            return (
+                                [], # The prequeue is consumed
+                                queue_action_user,
+                                model_prequeue_patch,
+                                no_update,
+                                #dispatch_actions,
+                                len(queue_action_user) == 0 # Disable Interval
+                            )
+
                 case 'finance_config_interface_update':
-                    # Currently, have no latches in place for finance.
-                    # Will go here when defined.
+                    if (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
+                        mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                        logger.info('Checking if finance %s is checked out: %s', mm.finance.id, mm.finance.checked_out)
+                        if not mm.finance.checked_out:
+                            action_indexes = [i]
+                            j = i + 1
+                            if j < len(queue_action_user):
+                                for j in range(i + 1, len(queue_action_user)):
+                                    act_j = json.loads(queue_action_user[j])
+                                    if (
+                                        act_j['type'] == 'finance_config_interface_update'
+                                        and act_j['metamodel_id'] == action['metamodel_id']
+                                    ):
+                                        action_indexes.append(j)
+                            action_indexes.reverse()
+                            dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
+                            dispatch_actions.reverse()
 
-                    # Collate actions relating to this finance
-                    action_indexes = [i]
-                    j = i + 1
-                    if j < len(queue_action_user):
-                        for j in range(i + 1, len(queue_action_user)):
-                            act_j = json.loads(queue_action_user[j])
-                            if (
-                                act_j['type'] == 'finance_config_interface_update'
-                                and act_j['finance_id'] == action['finance_id']
-                            ):
-                                action_indexes.append(j)
-                    action_indexes.reverse()
-                    dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
-                    dispatch_actions.reverse()
+                            logger.info('dispatching %d finance config interface actions', len(dispatch_actions))
 
-                    logger.info('dispatching %d finance config interface actions', len(dispatch_actions))
+                            # Might as well carry them out here
+                            # By definition, if we have got this far then the parameter change has impacted
+                            # the deterministic value and the model parameterisation will have changed. A
+                            # run should therefore be queued.
+                            synced = []
+                            for action in dispatch_actions:
+                                action = json.loads(action)
+                                varid = action['section'] + "." + action['key'] + "." + str(action['subindex'])
+                                if varid not in synced:
+                                    mm.update_model_from_variable_deterministic(
+                                        action['section'],
+                                        action['key'],
+                                        action['subindex']
+                                    )
+                                    synced.append(varid)
 
-                    return (
-                        [], # The prequeue is consumed
-                        queue_action_user,
-                        dispatch_actions,
-                        len(queue_action_user) == 0 # Disable Interval
-                    )
+                            r_finance_run_request = browser.finance_run_request(mm.id, mm.finance.id, mm.model.id)
+                            finance_prequeue_patch = Patch()
+                            finance_prequeue_patch.append(json.dumps(r_finance_run_request))
+
+                            logger.info('Adding a finance run request for %s', mm.finance.id)
+
+                            return (
+                                [], # The prequeue is consumed
+                                queue_action_user,
+                                no_update,
+                                finance_prequeue_patch,
+                                #dispatch_actions,
+                                len(queue_action_user) == 0 # Disable Interval
+                            )
+
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')
         
         # Fall-through - do not update dispatchitem-action-user
         return (
-            None, # The prequeue is consumed
+            [], # The prequeue is consumed
             queue_action_user,
+            no_update,
             no_update,
             len(queue_action_user) == 0 # Disable Interval
         )

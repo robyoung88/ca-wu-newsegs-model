@@ -1660,17 +1660,17 @@ class TestVariableSynchronisation(unittest.TestCase):
         vars = self.load_sprake_variables()
         mdl = sprakemodel.SprakeModel.from_none()
 
-        storcap = vars[0]
-        self.assertEqual(storcap.model_parameter, 'storage_capacity')
-        self.assertNotEqual(storcap.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
-        storcap.synchronise_from_model(mdl)
-        self.assertEqual(storcap.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
+        self.assertEqual(vbl.model_parameter, 'storage_capacity')
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        vbl.synchronise_from_model(mdl)
+        self.assertEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
 
     def test_synchronisation_scalar_beta(self):
         vars = self.load_sprake_variables()
         mdl = sprakemodel.SprakeModel.from_none()
 
-        vbl = vars[1]
+        vbl = [x for x in vars if x.model_parameter == 'storage_rte'][0]
         self.assertEqual(vbl.model_parameter, 'storage_rte')
         self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
         vbl.synchronise_from_model(mdl)
@@ -1680,7 +1680,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         vars = self.load_sprake_variables()
         mdl = sprakemodel.SprakeModel.from_none()
 
-        vbl = vars[3]
+        vbl = [x for x in vars if x.model_parameter == 'hlp'][0]
         self.assertEqual(vbl.model_parameter, 'hlp')
         self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
         vbl.synchronise_from_model(mdl)

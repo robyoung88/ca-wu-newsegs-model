@@ -100,6 +100,33 @@ def _n_values_default(var: Variable):
         return 1
     return len(p0)
 
+def _multiparameter_partial_generation_broadcast(
+    parameter: tuple[Param, ...],
+    parameter_index: tuple[int, ...],
+    current_params: tuple[Param, ...],
+) -> tuple[Param, ...] | None:
+    if not isinstance(parameter, tuple):
+        raise TypeError(f'Expecting `parameter` to be provided as a tuple of parameters, got: {type(parameter)}')
+    n_parameters = len(current_params)
+    pargs = None
+    if len(parameter_index) == n_parameters:
+        if set(parameter_index) == set(range(n_parameters)):
+            if len(parameter) == 1:
+                pargs = (parameter[0],) * n_parameters
+            elif len(parameter) == len(parameter_index):
+                pargs = list(parameter)                    
+                for pidx, pval in zip(parameter_index, parameter):
+                    pargs[pidx] = pval
+                pargs = tuple(pargs)
+            else:
+                raise TypeError(f'Mismatched parameter tuple length, expecting {len(parameter_index)}, got {len(parameter)}')
+        else:
+            raise ValueError(f'`parameter_index` inconsistent with parameterisation of max index {n_parameters-1}: {parameter_index}')
+    elif len(parameter_index) > n_parameters or len(parameter_index) == 0:
+        raise ValueError(f'`parameter_index` inconsistent with parameterisation of max index {n_parameters-1}: {parameter_index}')
+    
+    return pargs
+
 # NB - we don't really use the features of a Singleton here, as no Singletons have any instance parameters that are modified.
 # In the future, this may be stripped out and the classes re-composed.
 class Singleton(type):
@@ -124,8 +151,27 @@ class Parameterisation(metaclass = Singleton):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> Sequence[Param]:
-        ...
+        """
+        Convert parameters into conventional form.
+        """
     
+    @classmethod
+    @abstractmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[Param, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param, ...],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[Param, ...], tuple[Param, ...]]:
+        """
+        Generate a parameter set given a change of some raw parameters.
+
+        Returns:
+            A tuple containing the raw parameters and the conventional parameters.
+        """
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
@@ -138,12 +184,38 @@ class TwoParamParameterisation(Parameterisation):
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarNumParam, ScalarNumParam]:
         ...
+    
+    @classmethod
+    @abstractmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[Param, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param, ...],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        ...
 
 class VectorParameterisation(Parameterisation):
 
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[VectorParam|MatrixNumParam, ...]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[Param, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param, ...],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[Param, ...], tuple[VectorParam|MatrixNumParam, ...]]:
         ...
         
 class Distribution(metaclass = Singleton):
@@ -198,6 +270,35 @@ class Distribution(metaclass = Singleton):
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[Value, Value]:
         ...
+
+    @classmethod
+    def change_single_scalar_param(
+        cls, 
+        var: Variable, 
+        parameter_value: ScalarParam,
+        parameter_index: int,
+        parameter_vector_index: int = 0,
+        autoscale = True
+    ) -> tuple[tuple[Param, ...], tuple[Param, ...]]:
+        """
+        When a parameter changes in a user interface, trial that change down into the variable
+        """
+        current_params = var._raw_parameters
+        change_param = current_params[parameter_index]
+        prm = cls.parameterisations[var.parameterisation_index]
+        if isinstance(change_param, str) or not isinstance(change_param, Sequence) or not isinstance(change_param, np.ndarray):
+            new_raw, new_params = prm.partial_generator((parameter_value,), (parameter_index,), current_params, autoscale = autoscale)
+            return new_raw, new_params
+        elif isinstance(change_param, np.ndarray):
+            change_param = copy.copy(change_param)
+            change_param.flat[parameter_vector_index] = parameter_value
+            new_raw, new_params = prm.partial_generator((change_param,), (parameter_index,), current_params, autoscale = autoscale)
+            return new_raw, new_params
+        else:
+            change_param = copy.copy(change_param)
+            change_param[parameter_vector_index] = parameter_value
+            new_raw, new_params = prm.partial_generator((change_param,), (parameter_index,), current_params, autoscale = autoscale)
+            return new_raw, new_params
 
 
 class ScalarValuedDistribution(Distribution):
@@ -627,6 +728,19 @@ class _ConstantParameterisation(Parameterisation):
     def generator(cls, *args, **kwargs) -> tuple[ScalarParam]:
         ...
 
+    @classmethod
+    @abstractmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[Param, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param, ...],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarParam], tuple[ScalarParam]]:
+        ...
+
 
 class ConstantParameterisationDefault(
     _ConstantParameterisation
@@ -652,6 +766,24 @@ class ConstantParameterisationDefault(
             return (flat[0], )
         else:
             return (value, )
+    
+    @override
+    @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[ScalarParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarParam], tuple[ScalarParam]]:
+        # As there is only a single parameter, there is no difference between setting a single parameter and all
+        raw_par = (parameter[0],)
+        if not isinstance(raw_par[0], str) and (isinstance(raw_par[0], Sequence) or isinstance(raw_par[0], np.ndarray)):
+            raise TypeError(f'parameter expected to be of scalar type, is {type(parameter)}')
+
+        return raw_par, cls.generator(parameter[0])
         
 
 class ConstantDistribution(ScalarValuedDistribution):
@@ -739,6 +871,40 @@ class BinomialParameterisationDefault(
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
         return (trials, probability)
+    
+    @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0 or parameter[0] > 1:
+                        raise ValueError(f'first parameter must be a probability in [0, 1], is: {parameter[0]}')
+                    pargs = list(current_params)
+                    pargs[0] = parameter[0]
+                    pargs = tuple(pargs)
+                case 1:
+                    if parameter[0] < 0 or int(parameter[0]) != parameter[0]:
+                        raise ValueError(f'second parameter must be a positive integer number of trials, is: {parameter[0]}')
+                    pargs = list(current_params)
+                    pargs[1] = parameter[0]
+                    pargs = tuple(pargs)
+        
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
 
 
 class BinomialParameterisationExpected(
@@ -762,6 +928,52 @@ class BinomialParameterisationExpected(
                 raise ValueError('Number of trials cannot be zero with a non-zero mean')
 
         return (trials, mean / trials)
+    
+    @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0:
+                        raise ValueError(f'first parameter must be a positive expected number of successes, is {parameter[0]}')
+                    if parameter[0] > current_params[1]:
+                        if autoscale:
+                            current_p = current_params[0] / current_params[1]
+                            new_trials = int(round(parameter[0] / current_p))
+                            pargs = (parameter[0], new_trials)
+                        else:
+                            raise ValueError(f'first parameter must be bounded by the number of trials ({current_params[1]}), is {parameter[0]}')
+                    else:    
+                        pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0 or int(parameter[0]) != parameter[0]:
+                        raise ValueError(f'second parameter must be a positive integer number of trials, is: {parameter[0]}')
+                    if parameter[0] < current_params[0]:
+                        if autoscale:
+                            current_p = current_params[0] / current_params[1]
+                            new_expected = current_p * parameter[0]
+                            pargs = (new_expected, parameter[0])
+                        else:
+                            raise ValueError(f'second parameter (trials) cannot be less than the expected number of successes: {current_params[0]}; is {parameter[0]}')
+                    else:
+                        pargs = (current_params[0], parameter[0])
+        
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
     
 def _binomial_interval_function(
     interval: float,
@@ -906,6 +1118,35 @@ class NormalParameterisationDefault(
         return (mean, sd)
     
     @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    # Just about any value of mean is acceptable
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (sd) must be positive; is {parameter[0]}')
+                    # Just about any postive value of sd is acceptable
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+    
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'identity'
     
@@ -926,7 +1167,36 @@ class LogNormalParameterisationDefault(
         if sigma < 0:
             raise ValueError(f'Sigma parameter must be positive, is {sigma}')
         return (mu, sigma)
-
+    
+    @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    # Just about any value of mu is acceptable
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (sigma) must be positive; is {parameter[0]}')
+                    # Just about any postive value of sd is acceptable
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+        
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'ln'
@@ -952,6 +1222,36 @@ class LogNormalParameterisationExpected(
         sigma_squared = np.log((sd*sd) / (mean*mean) + 1)
         mu = np.log(mean) - 0.5 * sigma_squared
         return (mu, np.sqrt(sigma_squared))
+    
+    @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] <= 0:
+                        raise ValueError(f'first parameter (mean) must be positive nonzero; is {parameter[0]}')
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (sigma) must be positive; is {parameter[0]}')
+                    # Just about any postive value of sd is acceptable
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
@@ -1094,6 +1394,35 @@ class BetaParameterisationDefault(
         return (a, b)
     
     @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0:
+                        raise ValueError(f'first parameter (a) must be positive; is {parameter[0]}')
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (b) must be positive; is {parameter[0]}')
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'identity'
 
@@ -1123,6 +1452,59 @@ class BetaParameterisationExpected(
         return (a, b)
     
     @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0 or parameter[0] > 1:
+                        raise ValueError(f'first parameter (mean) must be in [0, 1]; is {parameter[0]}')
+                    numer = parameter[0] * (1 - parameter[0])
+                    denom = current_params[1] * current_params[1]
+                    if (numer / denom) < 1:
+                        if autoscale:
+                            sd = np.sqrt(numer)
+                            pargs = (parameter[0], sd)
+                        else:
+                            raise ValueError(f'mean ({parameter[0]}) incompatible with Beta sd ({current_params[1]})')
+                    else:
+                        pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0 or parameter[0] > 0.5:
+                        raise ValueError(f'second parameter (sd) must be in [0, 0.5], is {parameter[0]}')
+                    
+                    numer = current_params[0] * (1 - current_params[0])
+                    denom = parameter[0] * parameter[0]
+                    if (numer / denom) < 1:
+                        if autoscale:
+                            is_left = current_params[0] < 0.5
+                            numer = denom
+                            mean_ = (1. + np.sqrt(1. - 4. * numer)) / 2.
+                            if is_left:
+                                pargs = (1-mean_, parameter[0])
+                            else:
+                                pargs = (mean_, parameter[0])
+                        else:
+                            raise ValueError(f'second parameter (sd) incompatible with mean; mean = {current_params[0]}, sd attempted = {parameter[0]}')
+                    else:
+                        pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'identity'
 
@@ -1141,6 +1523,35 @@ class LogBetaParameterisationDefault(
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
         return (a_log, b_log)
+    
+    @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0:
+                        raise ValueError(f'first parameter (a_log) must be positive; is {parameter[0]}')
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (b_log) must be positive; is {parameter[0]}')
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
@@ -1245,6 +1656,35 @@ class GammaParameterisationDefault(
         return (shape, scale)
     
     @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0:
+                        raise ValueError(f'first parameter (shape) must be positive; is {parameter[0]}')
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (scale) must be positive; is {parameter[0]}')
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+    
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'identity'
     
@@ -1284,6 +1724,35 @@ class GammaParameterisationExpected(
         return (shape, scale)
     
     @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0:
+                        raise ValueError(f'first parameter (mean) must be positive; is {parameter[0]}')
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (sd) must be positive; is {parameter[0]}')
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+    
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return var.transform[0] == 'identity'
 
@@ -1302,6 +1771,35 @@ class LogGammaParameterisationDefault(
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
         return (shape_log, scale_log)
+    
+    @classmethod
+    def partial_generator(cls,
+        parameter: tuple[ScalarNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[ScalarNumParam, ScalarNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    if parameter[0] < 0:
+                        raise ValueError(f'first parameter (shape_log) must be positive; is {parameter[0]}')
+                    pargs = (parameter[0], current_params[1])
+                case 1:
+                    if parameter[0] < 0:
+                        raise ValueError(f'second parameter (scale_log) must be positive; is {parameter[0]}')
+                    pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
@@ -1482,6 +1980,21 @@ class ConstantVectorParameterisationDefault(
             return ([values], )
         else:
             return (values, )
+    
+    @override
+    @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[VectorParam],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[VectorParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[VectorParam], tuple[VectorParam]]:
+        # As there is only a single parameter, there is no difference between setting a single parameter and all
+        return parameter, cls.generator(parameter[0])
+    
 
 class ConstantVectorDistribution(VectorValuedDistribution):
     distribution = 'constant_vector'
@@ -1601,6 +2114,69 @@ class MultivariateNormalParameterisationDefault(
         return (mean, vcv)
     
     @classmethod
+    def partial_generator(cls,
+        parameter: tuple[NumericVectorParam | MatrixNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[NumericVectorParam, MatrixNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam, MatrixNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    # Just about any value of the mean vector is acceptable, so long as conformable with vcv
+                    if len(parameter[0]) != current_params[1].shape[0]:
+                        if autoscale:
+                            if len(parameter[0]) < current_params[1].shape[0]:
+                                pargs = (parameter[0], current_params[1][range(len(parameter[0])), range(len(parameter[0]))])
+                            else:
+                                prev_size = current_params[1].shape[0]
+                                new_size = len(parameter[0])
+                                vcv_ = np.zeros((new_size, new_size), dtype = np.float64)
+                                for i in range(new_size):
+                                    for j in range(new_size):
+                                        if i < prev_size:
+                                            if j < prev_size:
+                                                vcv_[i,j] = current_params[1][i,j]
+                                        else:
+                                            if i == j:
+                                                v  = parameter[0][i]
+                                                if v > 1e-10:
+                                                    vcv_[i,j] = (v * 0.2)**2 # Assumed 20% SD
+                                                else:
+                                                    vcv_[i,j] = (0.0001)
+                                pargs = (parameter[0], vcv_)
+                        else:
+                            raise ValueError(f'first parameter (mean vector) of length {len(parameter[0])} not conformable with vcv matrix of shape {current_params[1].shape}')
+                    else:
+                        pargs = (parameter[0], current_params[1])
+                case 1:
+                    # Will accept any vcv so long as conformable with mean vector
+                    new_vcv = np.asarray(parameter[0])
+                    if len(current_params[0]) != new_vcv.shape[0]:
+                        if autoscale:
+                            if len(current_params[0]) < new_vcv.shape[0]:
+                                new_means = np.zeros(new_vcv.shape[0], dtype=np.float64)
+                                new_means[0:len(current_params[1])] = current_params[0]
+                            else:
+                                new_means = current_params[0][0:new_vcv.shape[0]]
+                            pargs = (new_means, new_vcv)
+                        else:
+                            raise ValueError(f'second parameter (vcv matrix) of shape {new_vcv.shape} not conformable with mean vector of length {len(current_params[0])}')
+                    else:
+                        pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
+    
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return all(trans == 'identity' for trans in var.transform)
     
@@ -1626,6 +2202,69 @@ class MultivariateLogNormalParameterisationDefault(
         n_means = len(mu)
         vcv = vcv.reshape((n_means, n_means))
         return (mu, vcv)
+    
+    @classmethod
+    def partial_generator(cls,
+        parameter: tuple[NumericVectorParam | MatrixNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[NumericVectorParam, MatrixNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam, MatrixNumParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            # _multiparameter_partial_generation_broadcast has already ruled out any length of parameter_index other than 1
+            match parameter_index[0]:
+                case 0:
+                    # Just about any value of the mean vector is acceptable, so long as conformable with vcv
+                    if len(parameter[0]) != current_params[1].shape[0]:
+                        if autoscale:
+                            if len(parameter[0]) < current_params[1].shape[0]:
+                                pargs = (parameter[0], current_params[1][range(len(parameter[0])), range(len(parameter[0]))])
+                            else:
+                                prev_size = current_params[1].shape[0]
+                                new_size = len(parameter[0])
+                                vcv_ = np.zeros((new_size, new_size), dtype = np.float64)
+                                for i in range(new_size):
+                                    for j in range(new_size):
+                                        if i < prev_size:
+                                            if j < prev_size:
+                                                vcv_[i,j] = current_params[1][i,j]
+                                        else:
+                                            if i == j:
+                                                v  = parameter[0][i]
+                                                if v > 1e-10:
+                                                    vcv_[i,j] = (v * 0.2)**2 # Assumed 20% SD
+                                                else:
+                                                    vcv_[i,j] = (0.0001)
+                                pargs = (parameter[0], vcv_)
+                        else:
+                            raise ValueError(f'first parameter (mu vector) of length {len(parameter[0])} not conformable with vcv matrix of shape {current_params[1].shape}')
+                    else:
+                        pargs = (parameter[0], current_params[1])
+                case 1:
+                    # Will accept any vcv so long as conformable with mean vector
+                    new_vcv = np.asarray(parameter[0])
+                    if len(current_params[0]) != new_vcv.shape[0]:
+                        if autoscale:
+                            if len(current_params[0]) < new_vcv.shape[0]:
+                                new_means = np.zeros(new_vcv.shape[0], dtype=np.float64)
+                                new_means[0:len(current_params[1])] = current_params[0]
+                            else:
+                                new_means = current_params[0][0:new_vcv.shape[0]]
+                            pargs = (new_means, new_vcv)
+                        else:
+                            raise ValueError(f'second parameter (vcv matrix) of shape {new_vcv.shape} not conformable with mu vector of length {len(current_params[0])}')
+                    else:
+                        pargs = (current_params[0], parameter[0])
+            
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+                    
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
@@ -1833,6 +2472,19 @@ class DirichletParameterisationDefault(
         return (alpha, )
     
     @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[NumericVectorParam],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[NumericVectorParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[NumericVectorParam], tuple[NumericVectorParam]]:
+        # As there is only a single parameter, there is no difference between setting a single parameter and all
+        return parameter, cls.generator(parameter[0]) # pyright: ignore[reportReturnType, reportArgumentType]
+    
+    @classmethod
     def eligibility(cls, var: Variable) -> bool:
         return all(trans == 'identity' for trans in var.transform)
     
@@ -1871,6 +2523,71 @@ class DirichletParameterisationExpected(
             raise ArithmeticError(f'Dirichlet fitting unable to recover means - {alpha/np.sum(alpha)}.')
 
         return (alpha, )
+    
+    @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[NumericVectorParam | MatrixNumParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[NumericVectorParam, MatrixNumParam],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam]]:
+        pargs = _multiparameter_partial_generation_broadcast(
+            parameter, parameter_index, current_params
+        )
+        if pargs is None:
+            match parameter_index[0]:
+                case 0:
+                    means_ = parameter[0]
+                    if autoscale:
+                        means_ = means_ / np.sum(means_)
+                    if len(means_) != current_params[1].shape[0]:
+                        if autoscale:
+                            if len(parameter[0]) < current_params[1].shape[0]:
+                                pargs = (parameter[0], current_params[1][range(len(parameter[0])), range(len(parameter[0]))])
+                            else:
+                                prev_size = current_params[1].shape[0]
+                                new_size = len(parameter[0])
+                                vcv_ = np.zeros((new_size, new_size), dtype = np.float64)
+                                for i in range(new_size):
+                                    for j in range(new_size):
+                                        if i < prev_size:
+                                            if j < prev_size:
+                                                vcv_[i,j] = current_params[1][i,j]
+                                        else:
+                                            if i == j:
+                                                v  = parameter[0][i]
+                                                if v > 1e-10:
+                                                    vcv_[i,j] = (v * 0.2)**2 # Assumed 20% SD
+                                                else:
+                                                    vcv_[i,j] = (0.0001)
+                                pargs = (parameter[0], vcv_)
+                        else:
+                            raise ValueError(f'first parameter (mean vector) of length {len(parameter[0])} not conformable with vcv matrix of shape {current_params[1].shape}')
+                    else:
+                        pargs = (parameter[0], current_params[1])
+                case 1:
+                    # Will accept any vcv so long as conformable with mean vector
+                    new_vcv = np.asarray(parameter[0])
+                    if len(current_params[0]) != new_vcv.shape[0]:
+                        if autoscale:
+                            if len(current_params[0]) < new_vcv.shape[0]:
+                                new_means = np.zeros(new_vcv.shape[0], dtype=np.float64)
+                                new_means[0:len(current_params[1])] = current_params[0]
+                            else:
+                                new_means = current_params[0][0:new_vcv.shape[0]]
+                            pargs = (new_means, new_vcv)
+                        else:
+                            raise ValueError(f'second parameter (vcv matrix) of shape {new_vcv.shape} not conformable with mean vector of length {len(current_params[0])}')
+                    else:
+                        pargs = (current_params[0], parameter[0])
+
+        if pargs is None:
+            raise ValueError(f'Unable to set parameters: {parameter}')
+        
+        return pargs, cls.generator(*pargs) # pyright: ignore[reportReturnType, reportArgumentType]
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
@@ -2188,6 +2905,7 @@ class Variable(
     """
 
     variable_type: VARIABLE_TYPE = 'scalar'
+    _label: str | None = None
 
     # NewsegsComponent constants
     _id_prefix = 'v'
@@ -2229,11 +2947,15 @@ class Variable(
         model_parameter: str | SequenceNotStr[str] | None = None,
         interface_section: str | SequenceNotStr[str] | None = None,
         interface_key: str | SequenceNotStr[str] | None = None,
+        interface_subindex: int = 0,
         distribution: VARIABLE_DISTRIBUTION = 'constant',
         transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM] = 'identity',
         parameterisation_index: int | None = None,
         parameters: ParamList | None = None,
         value_name: Sequence[str]| None = None,
+        configuration_show: bool = True,
+        dsa_show: bool = False,
+        psa_show: bool = False,
         dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute',
         dsa_lower: Value | None = None,
         dsa_upper: Value | None = None,
@@ -2244,19 +2966,14 @@ class Variable(
         psa_selectable: bool = False,
         psa_selected: bool = False,
         psa_active: bool = False,
-        configuration_show: bool = True,
-        dsa_show: bool = False,
-        psa_show: bool = False,
         interface_min: float | None = None,
         interface_max: float | None = None,
         interface_step: float | None = None,
     ):
         super().__init__()
         self.name = name
-
-        if label is None:
-            self.label = self.name
-        else:
+    
+        if label is not None:
             self.label = label
 
         self.unit = unit
@@ -2276,6 +2993,8 @@ class Variable(
             self.interface_key = interface_key
         else:
             self.interface_key = self.name
+
+        self.interface_subindex = interface_subindex
 
         # `distribution` will be absorbed by __new__
         #self.distribution = distribution
@@ -2339,6 +3058,16 @@ class Variable(
         self.interface_step = interface_step
 
     @property
+    def label(self) -> str:
+        if self._label is None:
+            return self.name
+        return self._label
+    
+    @label.setter
+    def label(self, label: str) -> None:
+        self._label = label
+
+    @property
     def parameterisation(self) -> Parameterisation:
         if self.parameterisation_index is None:
             raise AttributeError('No parameterisation index set')
@@ -2350,12 +3079,33 @@ class Variable(
         ...
     
     def set_parameters(self, *parameters: Param):
-        self._raw_parameters = copy.copy(parameters)
+        raw_parameters = copy.copy(parameters)
         
         native_params = self.distribution.parameterisations[self.parameterisation_index].generator(*parameters)
         self.distribution.parameter_validation(self, *native_params)
 
+        self._raw_parameters = raw_parameters
         self._parameters = native_params
+
+    def set_single_parameter(
+        self,
+        parameter_value: ScalarParam,
+        parameter_index: int,
+        parameter_vector_index: int = 0,
+        autoscale = True
+    ) -> tuple[bool, tuple[Param, ...]]:
+        """
+        Set a single indexed parameter and return whether setting was successful
+        """
+        try:
+            raw_parameters, native_parameters = self.distribution.change_single_scalar_param(
+                self, parameter_value, parameter_index, parameter_vector_index, autoscale
+            )
+            self._raw_parameters = raw_parameters
+            self._parameters = native_parameters
+        except (ValueError, TypeError):
+            return False, self._raw_parameters
+        return True, self._raw_parameters
     
     @property
     @abstractmethod
@@ -3056,6 +3806,10 @@ class BetaVariable(TwoParamNumericScalarVariable):
         if self.transform[0] == 'identity':
             a, b = self.parameters
             sd = np.sqrt(a*b / ((a+b)**2 * (a + b + 1.)))
+            numer_ = model_val * (1 - model_val)
+            denom_ = sd * sd
+            if denom_ > numer_:
+                sd = np.sqrt(0.9 * numer_)
         else:
             raise NotImplementedError('Derivation of log-beta parameters not supported')
         
@@ -3269,3 +4023,12 @@ def variable_from_dict(config: dict[str, Any]) -> Variable:
     var = constructor('Placeholder')
     var.update(config)
     return var
+
+def variable_uid(variable: Variable) -> str | list[str]:
+    if not isinstance(variable.interface_key, str) and isinstance(variable.interface_key, Sequence):
+        if isinstance(variable.interface_section, str):
+            return list([lambda x: str(variable.interface_section) + "." + str(x) + "." + str(variable.interface_subindex) for x in variable.interface_key])
+        else:
+            return list([lambda x,y: str(y) + "." + str(x) + "." + str(variable.interface_subindex) for x,y in zip(variable.interface_key, variable.interface_section)])
+    else:
+        return str(variable.interface_section) + "." + str(variable.interface_key) + "." + str(variable.interface_subindex)
