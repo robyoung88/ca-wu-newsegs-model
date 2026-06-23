@@ -67,10 +67,13 @@ def add_model_to_interface_callbacks(app: Dash):
         Output('model-config', 'data', allow_duplicate=True),
         Output('finance-config', 'data', allow_duplicate=True),
         Output({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'children'),
+        Output({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data', allow_duplicate = True),
+        
         Input({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
         Input('store-selected-configuration', 'data'),
         Input('store-configurations', 'data'),
         State({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'id'),
+        State({'type': 'trigger', 'page': ALL, 'key': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call=True
     )
@@ -79,6 +82,7 @@ def add_model_to_interface_callbacks(app: Dash):
         store_selected_configuration,
         store_configurations,
         input_containers,
+        trigger_ids,
         selected_model
     ):
         logger.info('sync_config triggered.')
@@ -87,6 +91,7 @@ def add_model_to_interface_callbacks(app: Dash):
             store_selected_configuration,
             store_configurations,
             input_containers,
+            trigger_ids,
             app
         )
     
@@ -338,19 +343,22 @@ def add_feedback_callbacks(app):
     
     @app.callback(
         Output({'type': 'feedback-graph', 'section': 'feedback', 'key': ALL}, 'figure'),
-        Input('model-config', 'data'),
+        Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
+        State('store-selected-configuration', 'data'),
         State({'type': 'feedback-graph', 'section': 'feedback', 'key': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
     def update_feedback_graphs(
-        mcfg,
+        model_config_trigger,
+        selected_configuration,
         figure_ids,
         selected_model
     ):
         logger.info('update_feedback_graphs triggered.')
         return callbacks_map.CALLBACKS_MAP[selected_model]['update_feedback_graphs'](
-            mcfg,
+            model_config_trigger,
+            selected_configuration,
             figure_ids,
             app
         )
@@ -363,18 +371,18 @@ def add_interface_to_model_callbacks(app):
     """
 
     @app.callback(
-        Output('prequeue-action-user', 'data'),
+        Output('prequeue-action-user', 'data', allow_duplicate = True),
         Output({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Output({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Output({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'invalid'),
         Output({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'invalid'),
-        Output({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
-        Output({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'data'),
+        Output({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data', allow_duplicate = True),
+        Output({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'data', allow_duplicate = True),
 
         Input({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         #Input('model-config','data'), # Trying to suppress circular callbacks
-        #State('prequeue-action-user', 'data'),
+
         State('store-selected-configuration', 'data'),
         State({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
         State({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
@@ -385,8 +393,7 @@ def add_interface_to_model_callbacks(app):
     def interface_update_config(
         inputs_model,
         inputs_finance,
-        #model_config,
-        #prequeue,
+        
         selected_config,
         model_input_ids,
         finance_input_ids,
@@ -408,8 +415,8 @@ def add_interface_to_model_callbacks(app):
             [no_update] * len(finance_input_ids), # finance input values
             [no_update] * len(model_input_ids), # model input invalid
             [no_update] * len(finance_input_ids), # finance input invalid
-            [no_update] * len(model_config_trigger_ids), 
-            [no_update] * len(finance_config_trigger_ids), 
+            [no_update] * len(model_config_trigger_ids), # trigger model config
+            [no_update] * len(finance_config_trigger_ids), # trigger finance config
         )
 
         if ctx.triggered_id == 'model-config':
@@ -553,16 +560,15 @@ def add_interface_to_model_callbacks(app):
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
         #Output('dispatchitem-action-user', 'data'),
         Output('interval-action-user', 'disabled'),
+
         Input('prequeue-action-user', 'data'),
         Input('interval-action-user', 'n_intervals'),
-        #State('latch-models-checkedout', 'data'),
         State('queue-action-user', 'data'),
         prevent_initial_call = True
     )
     def queueman_action_user(
         prequeue_action_user, 
         interval_action_user,
-        #latch_models_checkedout,
         queue_action_user,
     ):
         """
@@ -719,25 +725,26 @@ def add_interface_to_model_callbacks(app):
         )
     
     @app.callback(
-        Output('store-model-interface-configurations', 'data', allow_duplicate = True),
-        Output('store-finance-interface-configurations', 'data', allow_duplicate = True),
+        #Output('store-model-interface-configurations', 'data', allow_duplicate = True),
+        #Output('store-finance-interface-configurations', 'data', allow_duplicate = True),
         Output('model-config', 'data'),
         Output('finance-config', 'data'),
         Output('prequeue-model-run', 'data'),
         Output('prequeue-finance-run', 'data'),
         Output('trigger-postprocess-model-run', 'data', allow_duplicate = True),
         Output('trigger-postprocess-finance-run', 'data', allow_duplicate = True),
+        
         Input('dispatchitem-action-user', 'data'),
-        State('store-model-interface-configurations', 'data'),
-        State('store-finance-interface-configurations', 'data'),
+        #State('store-model-interface-configurations', 'data'),
+        #State('store-finance-interface-configurations', 'data'),
         State('store-selected-configuration', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
     def dispatcher_action_user(
         dispatchitem_action_user,
-        store_model_interface_configurations,
-        store_finance_interface_configurations,
+        #store_model_interface_configurations,
+        #store_finance_interface_configurations,
         store_selected_configuration,
         selected_model,
     ):
@@ -758,8 +765,6 @@ def add_interface_to_model_callbacks(app):
         logger.info('dispatcher_action_user triggered')
         return callbacks_map.CALLBACKS_MAP[selected_model]['dispatcher_action_user'](
             dispatchitem_action_user,
-            store_model_interface_configurations,
-            store_finance_interface_configurations,
             store_selected_configuration,
             app
         )

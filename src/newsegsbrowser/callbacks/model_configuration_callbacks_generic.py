@@ -1,3 +1,4 @@
+import datetime
 from functools import partial
 import json
 import logging
@@ -22,6 +23,7 @@ def sync_config(
     store_selected_configuration,
     store_configurations,
     input_containers,
+    trigger_ids,
     app,
 
     create_default_model: Callable[[], NewsegsModel],
@@ -36,7 +38,7 @@ def sync_config(
     This is also fired on first load of model page, so is responsible for
     creation of the first metamodel / configuration.
     """
-    NUP = no_update, no_update, no_update, [no_update] * len(input_containers)
+    NUP = no_update, no_update, no_update, [no_update] * len(input_containers), [no_update] * len(trigger_ids)
 
     if store_selected_configuration is None:
         if store_configurations is None or len(store_configurations) == 0:
@@ -121,7 +123,8 @@ def sync_config(
         store_configurations,
         json.dumps(mcfg),
         json.dumps(fcfg),
-        inputs
+        inputs,
+        [datetime.datetime.now().timestamp()] * len(trigger_ids)
     )
 
 def sync_loc_inputs_to_store(mcfg, app):

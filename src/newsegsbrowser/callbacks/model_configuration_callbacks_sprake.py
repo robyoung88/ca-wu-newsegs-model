@@ -19,6 +19,7 @@ from newsegsbrowser import common as browser
 import newsegsbrowser.callbacks.model_configuration_callbacks_generic as generic_callbacks
 from newsegsbrowser.callbacks import model_creation_sprake
 
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel import sprakemodel
 from newsegsfinance import sprakefinance
 from newsegsbrowser import energy_balance_estimation
@@ -251,6 +252,44 @@ sync_config = partial(
 def _get_val(mm, key) -> int | float:
     return cast(variable.NumericScalarVariable, mm.variables.get(key)).deterministic_value
 
+def _update_estimated_energy_balance(
+    mm: NewsegsMetaModel,
+    energy_balance: energy_balance_estimation.EstimatedEnergyBalance
+) -> energy_balance_estimation.EstimatedEnergyBalance:
+    # Generation
+    wind_capacity = _get_val(mm, 'gen_input.wind_capacity.0')
+    pv_capacity = _get_val(mm, 'gen_input.pv_capacity.0')
+    energy_balance.set_wind_generation(wind_capacity)
+    energy_balance.set_pv_generation(pv_capacity)
+
+    # Consumption
+    n_units = _get_val(mm, 'bc_input.n_units.0')
+    
+    hlp = _get_val(mm, 'bc_input.hlp.0')
+    gfa = _get_val(mm, 'bc_input.gfa.0')
+    # Could use this, but default is more than ok
+    # ann_hdd = model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_hdd_per_year']
+    energy_balance.set_spaceheat_consumption(n_units, hlp, gfa)
+
+    ref_daily_consumption = _get_val(mm, 'bc_input.ref_daily_consumption.0')
+    # Assume conversion efficiency of 1
+    energy_balance.set_dhw_consumption(n_units, ref_daily_consumption)
+
+    efficiency_reduction = _get_val(mm, 'dc_input.efficiency_reduction.0')
+    energy_balance.set_direct_consumption(
+        n_units,
+        (1 - efficiency_reduction) * model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
+    )
+
+    n_evs_per_household = _get_val(mm, 'dc_input.n_evs_per_household.0')
+    ev_consumption_per_year = _get_val(mm, 'dc_input.annual_residential_consumption_per_ev.0')
+    energy_balance.set_ev_consumption(n_units, ev_consumption_per_year, n_evs_per_household)
+
+    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
+    energy_balance.set_storage_capacity(stor_cap)
+
+    return energy_balance
+
 def _create_generation_header_summary(mm):
     wind_cap = _get_val(mm, 'gen_input.wind_capacity.0')
     pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
@@ -327,6 +366,8 @@ def update_headers_model_config(
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
 
+    eb = _update_estimated_energy_balance(mm, app.estimated_energy_balance)
+
     for i, id in enumerate(header_ids):
         match id['key']:
             case 'gen-smry':
@@ -366,6 +407,136 @@ def _create_cost_generation_header_summary(mm):
         "/yr"
     ]
 
+def _create_cost_storage_header_summary(mm):
+    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
+    capex_rate_bess = _get_val(mm, 'stor_costs.bess_capex_per_kwh.0')
+    om_rate_bess = _get_val(mm, 'stor_costs.bess_om_per_kwh_year.0')
+
+    tot_capex = capex_rate_bess * stor_cap
+    tot_ongoing = om_rate_bess * stor_cap
+
+    return [
+        "Capital cost = £",
+        html.Span('{:,.0f}'.format(tot_capex)),
+        "; Ongoing costs = £",
+        html.Span('{:,.0f}'.format(tot_ongoing)),
+        "/yr"
+    ]
+
+def _create_cost_sales_header_summary(mm, eb: energy_balance_estimation.EstimatedEnergyBalance):
+    
+    n_units = _get_val(mm, 'bc_input.n_units.0')
+
+    standing_charge = _get_val(mm, 'sales_costs.resident_sc_per_unit_day.0')
+    per_unit_resident = _get_val(mm, 'sales_costs.resident_var_per_unit.0')
+    per_unit_ev = per_unit_resident
+
+    per_unit_export = _get_val(mm, 'sales_costs.grid_export_var_per_unit.0')
+
+    aeb = eb.estimated_annual_energy_balance
+
+    resident_consumption = (
+        aeb
+        .query('type == "Consumption"')
+        .query('label != "EV charging"')
+        .loc[:, 'value']
+        .sum()
+    )
+
+    ev_consumption = (
+        aeb
+        .query('label == "EV charging"')
+        .loc[:, 'value']
+        .sum()
+    )
+
+    generation = (
+        aeb
+        .query('label == "Generation"')
+        .loc[:, 'value']
+        .sum()
+    )
+
+    overproduction = generation - (resident_consumption + ev_consumption)
+    if overproduction < 0:
+        overproduction = 0
+
+    res_receipts = 365 * standing_charge * n_units + resident_consumption * per_unit_resident
+    ev_receipts = ev_consumption * per_unit_ev
+
+    estimated_export_receipts = overproduction * per_unit_export
+
+    tot_receipts = res_receipts + ev_receipts + estimated_export_receipts
+
+    return [
+        icons.get_icon('cost-residents'),
+        " ≈ £",
+        html.Span(f'{float(f'{res_receipts:.2g}'):,.0f}'),
+        "/yr; ",
+        icons.get_icon('cost-ev'),
+        " ≈ £",
+        html.Span(f'{float(f'{ev_receipts:.2g}'):,.0f}'),
+        "/yr; ",
+        icons.get_icon('cost-export'),
+        " >≈ £",
+        html.Span(f'{float(f'{estimated_export_receipts:.2g}'):,.0f}'),
+        "/yr; ",
+        html.H3("Σ ", style={'display': 'inline'}),
+        " ≈ £",
+        html.Span(f'{float(f'{tot_receipts:.2g}'):,.0f}'),
+        "/yr"
+    ]
+
+def _create_cost_import_header_summary(mm, eb: energy_balance_estimation.EstimatedEnergyBalance):
+    aeb = eb.estimated_annual_energy_balance
+    total_consumption = (
+        aeb
+        .query('type == "Consumption"')
+        .loc[:, 'value']
+        .sum()
+    )
+    total_generation = (
+        aeb
+        .query('label == "Generation"')
+        .loc[:, 'value']
+        .sum()
+    )
+
+    underproduction = total_consumption - total_generation
+    if underproduction < 0:
+        underproduction = 0
+    
+    standing_charge = _get_val(mm, 'import_costs.grid_import_sc_per_day.0')
+    per_unit_import = _get_val(mm, 'import_costs.grid_import_var_per_unit.0')
+
+    import_costs = underproduction * per_unit_import
+    import_standing_costs = standing_charge * 365
+
+    return [
+        "Fixed costs",
+        " ≈ £",
+        html.Span(f'{float(f'{import_standing_costs:.2g}'):,.0f}'),
+        "/yr; ",
+        "Variable costs",
+        " ≈ £",
+        html.Span(f'{float(f'{import_costs:.2g}'):,.0f}'),
+        "/yr"
+    ]
+
+def _create_finance_header_summary(mm):
+    benefit_dr = _get_val(mm, 'finance_settings.benefit_discount_rate.0')
+    cost_dr = _get_val(mm, 'finance_settings.cost_discount_rate.0')
+    return [
+        icons.get_icon('finance-settings-benefit-discount'),
+        " = ",
+        html.Span(f"{benefit_dr:,.1%}"),
+        "; ",
+        icons.get_icon('finance-settings-cost-discount'),
+        " = ",
+        html.Span(f"{cost_dr:,.1%}"),
+    ]
+
+
 def update_headers_finance_config(
     finance_config_trigger,
     selected_configuration,
@@ -379,12 +550,86 @@ def update_headers_finance_config(
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
     
+    eb = _update_estimated_energy_balance(mm, app.estimated_energy_balance)
+
     for i, id in enumerate(header_ids):
         match id['key']:
             case 'cost-gen-smry':
                 olist[i] = _create_cost_generation_header_summary(mm)
+            case 'cost-stor-smry':
+                olist[i] = _create_cost_storage_header_summary(mm)
+            case 'cost-sales-smry':
+                olist[i] = _create_cost_sales_header_summary(mm, eb)
+            case 'cost-import-smry':
+                olist[i] = _create_cost_import_header_summary(mm, eb)
+            case 'fnc-smry':
+                olist[i] = _create_finance_header_summary(mm)
     
-    return olist                
+    return olist
+
+_feedback_graph_bar = partial(
+    px.bar,
+    x = 'value',
+    color = 'label',
+    orientation = 'h'
+)
+
+_feedback_graph_layout = dict(
+    height=120,
+    margin={'l': 0, 'r': 0, 't': 28, 'b': 0},
+    title={
+        'x': 0.5,
+        'xanchor': 'center',
+        'yanchor': 'top',
+        'font': {'size': 12, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
+    },
+    showlegend=False,
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    bargap=0.75
+)
+
+def update_feedback_graphs(
+    model_config_trigger,
+    selected_configuration,
+    figure_ids,
+    app,
+):
+    NUP = [no_update] * len(figure_ids)
+
+    mm_id = json.loads(selected_configuration).get('metamodel_id')
+    mm = app.metamodels.get(mm_id)
+    if mm is None:
+        raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
+    
+    eb = _update_estimated_energy_balance(mm, app.estimated_energy_balance)
+    df = eb.estimated_annual_energy_balance
+
+    fig_ann = _feedback_graph_bar(df, y = 'type')
+    fig_ann.update_layout(**_feedback_graph_layout) # pyright: ignore[reportArgumentType]
+    fig_ann.update_layout(title = {'text': 'Annual'})
+    fig_ann.update_traces(width=0.35, marker_line_width=0)
+    fig_ann.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
+    fig_ann.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
+
+    df = eb.estimated_maximum_daily_balance
+    fig_max = _feedback_graph_bar(df, y = 'label')
+    fig_max.update_layout(**_feedback_graph_layout) # pyright: ignore[reportArgumentType]
+    fig_max.update_layout(title = {'text': '(Max) Daily'})
+    fig_max.update_traces(width=0.35, marker_line_width=0)
+    fig_max.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
+    fig_max.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
+
+    rval = NUP
+    for i, id in enumerate(figure_ids):
+        match id['key']:
+            case 'estimated-annual-energy':
+                rval[i] = fig_ann  # pyright: ignore[reportArgumentType, reportCallIssue]
+            case 'estimated-maximum-daily-energy':
+                rval[i] = fig_max # pyright: ignore[reportArgumentType, reportCallIssue]
+    
+    return rval
+
     
 
 def sync_dc_inputs_to_store(mcfg, input_values, input_ids, app):
@@ -510,104 +755,12 @@ def sync_mc_inputs_to_store(mcfg, input_values, input_ids, app):
     
     return (header_children, input_list)
 
-def _sync_estimated_energy_balance(
-    mcfg: dict,
-    energy_balance: energy_balance_estimation.EstimatedEnergyBalance
-) -> energy_balance_estimation.EstimatedEnergyBalance:
-    """
-    Set up the energy balance according to Sprake assumptions and config.
-    """
-    energy_balance.set_wind_generation(mcfg['gen_input']['wind_capacity'])
-    energy_balance.set_pv_generation(mcfg['gen_input']['pv_capacity'])
-    energy_balance.set_spaceheat_consumption(mcfg['bc_input']['n_units'], mcfg['bc_input']['hlp'], mcfg['bc_input']['gfa'])
-    energy_balance.set_dhw_consumption(mcfg['bc_input']['n_units'], mcfg['bc_input']['ref_daily_consumption'])
-    energy_balance.set_direct_consumption(
-        mcfg['bc_input']['n_units'], 
-        (
-            (1. - mcfg['dc_input'].get('efficiency_reduction', 0))
-            * model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
-        )
-    )
-    energy_balance.set_ev_consumption(
-        mcfg['bc_input']['n_units'],
-        mcfg['dc_input']['annual_residential_consumption_per_ev'],
-        mcfg['dc_input']['n_evs_per_household'],
-    )
-    energy_balance.set_storage_capacity(
-        mcfg['stor_input']['storage_capacity']
-    )
-
-    return energy_balance
-
-_feedback_graph_bar = partial(
-    px.bar,
-    x = 'value',
-    color = 'label',
-    orientation = 'h'
-)
-
-_feedback_graph_layout = dict(
-    height=120,
-    margin={'l': 0, 'r': 0, 't': 28, 'b': 0},
-    title={
-        'x': 0.5,
-        'xanchor': 'center',
-        'yanchor': 'top',
-        'font': {'size': 12, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
-    },
-    showlegend=False,
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    bargap=0.75
-)
-
-def update_feedback_graphs(
-    mcfg,
-    figure_ids,
-    app
-):
-    NUP = [no_update] * len(figure_ids)
-    if mcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    eb = _sync_estimated_energy_balance(mcfg, app.estimated_energy_balance)
-    df = eb.estimated_annual_energy_balance
-
-    fig_ann = _feedback_graph_bar(df, y = 'type')
-    fig_ann.update_layout(**_feedback_graph_layout) # pyright: ignore[reportArgumentType]
-    fig_ann.update_layout(title = {'text': 'Annual'})
-    fig_ann.update_traces(width=0.35, marker_line_width=0)
-    fig_ann.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
-    fig_ann.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
-
-    df = eb.estimated_maximum_daily_balance
-    fig_max = _feedback_graph_bar(df, y = 'label')
-    fig_max.update_layout(**_feedback_graph_layout) # pyright: ignore[reportArgumentType]
-    fig_max.update_layout(title = {'text': '(Max) Daily'})
-    fig_max.update_traces(width=0.35, marker_line_width=0)
-    fig_max.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
-    fig_max.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
-
-    rval = NUP
-    for i, id in enumerate(figure_ids):
-        match id['key']:
-            case 'estimated-annual-energy':
-                rval[i] = fig_ann  # pyright: ignore[reportArgumentType, reportCallIssue]
-            case 'estimated-maximum-daily-energy':
-                rval[i] = fig_max # pyright: ignore[reportArgumentType, reportCallIssue]
-    
-    return rval
-
 def dispatcher_action_user(
     dispatchitem_action_user,
-    store_model_interface_configurations,
-    store_finance_interface_configurations,
     store_selected_configuration,
     app
 ):
     NUP = (
-        no_update, # store-model-interface-configurations
-        no_update, # store-finance-interface-configurations
         no_update, # model-config
         no_update, # finance-config
         no_update, # prequeue-model-run
@@ -624,19 +777,25 @@ def dispatcher_action_user(
     else:
         dispatchitem_action_user = [json.loads(dispatchitem_action_user)]
     
-    if store_model_interface_configurations is None:
-        store_model_interface_configurations = {}
-    else:
-        store_model_interface_configurations = json.loads(
-            store_model_interface_configurations
-        )
+    # May reinstate this later, but currently take care of all user actions in the
+    # main queue handler. The dispatcher may become more necessary if arbitrary user
+    # actions result in a remote operation.
+
+    return NUP
+
+    # if store_model_interface_configurations is None:
+    #     store_model_interface_configurations = {}
+    # else:
+    #     store_model_interface_configurations = json.loads(
+    #         store_model_interface_configurations
+    #     )
     
-    if store_finance_interface_configurations is None:
-        store_finance_interface_configurations = {}
-    else:
-        store_finance_interface_configurations = json.loads(
-            store_finance_interface_configurations
-        )
+    # if store_finance_interface_configurations is None:
+    #     store_finance_interface_configurations = {}
+    # else:
+    #     store_finance_interface_configurations = json.loads(
+    #         store_finance_interface_configurations
+    #     )
     
     mdl_change_list = []
     fnc_change_list = []
@@ -654,10 +813,10 @@ def dispatcher_action_user(
                     if model_id not in mdl_change_list:
                         mdl_change_list.append(model_id)
                     lastmodel = model_id
-                    mdl_conf = store_model_interface_configurations.get(model_id, {})
-                    if not mdl_conf:
+                    #mdl_conf = store_model_interface_configurations.get(model_id, {})
+                    #if not mdl_conf:
                         # Empty dictionary returned - ensure key-val pair set
-                        store_model_interface_configurations[model_id] = mdl_conf
+                        #store_model_interface_configurations[model_id] = mdl_conf
 
                 # First update the interface conf
                 update_val = {action['key']: action['val']}
@@ -783,8 +942,6 @@ def dispatcher_action_user(
         ]
         
     return (
-        r_local_model_config,
-        r_local_finance_config,
         r_model_config,
         r_finance_config,
         r_model_run_requests,

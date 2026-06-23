@@ -84,16 +84,10 @@ def add_configuration_selection_callbacks(app: Dash):
 
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data', allow_duplicate = True),
-
-        Output('store-model-interface-configurations', 'data', allow_duplicate = True),
-        Output('store-finance-interface-configurations', 'data', allow_duplicate = True),
         
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
         State('store-configurations', 'data'),
         State('store-selected-configuration', 'data'),
-
-        State('store-model-interface-configurations', 'data'),
-        State('store-finance-interface-configurations', 'data'),
 
         State({'type': 'config-focus-btn', 'index': ALL}, 'id'),
         State({'type': 'config-hdrfocus-btn', 'index': ALL}, 'id'),
@@ -104,8 +98,6 @@ def add_configuration_selection_callbacks(app: Dash):
         n_clicks, 
         configurations, 
         selected_config,
-        store_model_interface_configurations,
-        store_finance_interface_configurations,
         focus_btn_ids,
         header_focus_btn_ids
     ):
@@ -122,8 +114,6 @@ def add_configuration_selection_callbacks(app: Dash):
             [no_update] * len(header_focus_btn_ids), 
             no_update,
             no_update,
-            no_update,
-            no_update
         )
         
         update_outlines = [True] * n_conf
@@ -140,20 +130,6 @@ def add_configuration_selection_callbacks(app: Dash):
             return NUP
 
         n_conf += 1
-
-        if store_model_interface_configurations is None:
-            store_model_interface_configurations = {}
-        else:
-            store_model_interface_configurations = json.loads(
-                store_model_interface_configurations
-            )
-
-        if store_finance_interface_configurations is None:
-            store_finance_interface_configurations = {}
-        else:
-            store_finance_interface_configurations = json.loads(
-                store_finance_interface_configurations
-            )
 
         if trig['type'] == 'config-dup-btn':
             trigger_index = trig['index']
@@ -175,19 +151,19 @@ def add_configuration_selection_callbacks(app: Dash):
             #mdl = app.duplicate_model(ref_config['model_id'])
             #fnc = app.duplicate_finance(ref_config['finance_id'], mdl.id)
 
-            store_model_interface_configurations[mdl.id] = copy.copy(
-                store_model_interface_configurations.get(
-                    ref_config['model_id']
-                )
-            )
-            store_model_interface_configurations[mdl.id]['model_id'] = mdl.id
+            # store_model_interface_configurations[mdl.id] = copy.copy(
+            #     store_model_interface_configurations.get(
+            #         ref_config['model_id']
+            #     )
+            # )
+            # store_model_interface_configurations[mdl.id]['model_id'] = mdl.id
 
-            store_finance_interface_configurations[fnc.id] = copy.copy(
-                store_finance_interface_configurations.get(
-                    ref_config['finance_id']
-                )
-            )
-            store_finance_interface_configurations[fnc.id]['finance_id'] = fnc.id
+            # store_finance_interface_configurations[fnc.id] = copy.copy(
+            #     store_finance_interface_configurations.get(
+            #         ref_config['finance_id']
+            #     )
+            # )
+            # store_finance_interface_configurations[fnc.id]['finance_id'] = fnc.id
 
             mm_dup.name = mm_dup.name + " Copy"
             new_config = mm_dup.to_config()
@@ -248,8 +224,8 @@ def add_configuration_selection_callbacks(app: Dash):
             configurations,
             json.dumps(selected_config),
 
-            json.dumps(store_model_interface_configurations),
-            json.dumps(store_finance_interface_configurations)
+            #json.dumps(store_model_interface_configurations),
+            #json.dumps(store_finance_interface_configurations)
         )  
     
     # REMOVE
@@ -268,7 +244,12 @@ def add_configuration_selection_callbacks(app: Dash):
         prevent_initial_call=True
     )
     def remove_config(n_clicks, configurations, selected_config, ids):
-        NUP = (no_update, no_update, no_update, no_update)
+        NUP = (
+            no_update, 
+            no_update, 
+            no_update, 
+            no_update
+        )
 
         trig = ctx.triggered_id
         if trig is None:

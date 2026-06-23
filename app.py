@@ -319,8 +319,10 @@ def create_app(external_stylesheets = None) -> Dash:
                 postprocess_utils.RESULT_CACHE_PREFIXES[res_class],
                 new_model_id
             )
-            results[new_id] = copy.copy(results.get(ref_id))
-            results[new_id]['run_hash'] = hash(mdl)
+            res = results.get(ref_id)
+            if res is not None:
+                results[new_id] = copy.copy(res)
+                results[new_id]['run_hash'] = hash(mdl)
 
         return mdl
     
@@ -360,8 +362,10 @@ def create_app(external_stylesheets = None) -> Dash:
                     fnc.id,
                     model_id
                 )
-                results[new_id] = copy.copy(results.get(ref_id))
-                results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
+                res = results.get(ref_id)
+                if res is not None:
+                    results[new_id] = copy.copy(res)
+                    results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
             
         return fnc
     

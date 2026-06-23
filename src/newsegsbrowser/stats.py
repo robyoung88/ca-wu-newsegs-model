@@ -442,7 +442,7 @@ def present_single_stat_per_row(
 ) -> pd.DataFrame:
     n_configs = len(data_list)
 
-    src_data = [as_df(x.get(table_name)) for x in data_list]
+    src_data = [as_df(x.get(table_name)) for x in data_list if x is not None]
 
     if isinstance(variable_names, str):
         variable_names = [variable_names]

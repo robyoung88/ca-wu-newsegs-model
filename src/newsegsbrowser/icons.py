@@ -38,6 +38,7 @@ DEFAULT_ICONS = {
     'cost-storage': ['bi bi-cash-stack', 'bi bi-battery-half'],
     'cost-sales': 'bi bi-receipt-cutoff',
     'cost-residents': 'bi bi-people',
+    'cost-ev': 'bi bi-ev-front',
     'cost-export': 'bi bi-box-arrow-up-right',
     'cost-residents-standing': 'bi bi-people',
     'cost-residents-perunit': ['bi bi-people', 'bi bi-lightning-charge'],
