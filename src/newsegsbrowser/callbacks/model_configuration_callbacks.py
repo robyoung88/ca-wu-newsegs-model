@@ -42,6 +42,7 @@ def add_initial_callbacks(app: Dash):
 
     @app.callback(
         Output({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
+        
         Input({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'children'),
         State({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'id'),
     )
@@ -65,8 +66,6 @@ def add_model_to_interface_callbacks(app: Dash):
     @app.callback(
         Output('store-selected-configuration', 'data', allow_duplicate = True),
         Output('store-configurations', 'data', allow_duplicate = True),
-        Output('model-config', 'data', allow_duplicate=True),
-        Output('finance-config', 'data', allow_duplicate=True),
         Output({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'children'),
         Output({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data', allow_duplicate = True),
         Output('prequeue-action-user', 'data', allow_duplicate = True),
@@ -100,196 +99,20 @@ def add_model_to_interface_callbacks(app: Dash):
     # Updates to inputs based on config
     @app.callback(
         Output('site-location', 'data', allow_duplicate = True),
-        Input('model-config', 'data'),
+        
+        Input('store-selected-configuration', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
     def sync_loc_inputs_to_store(
-        mcfg,
+        selected_configuration,
         selected_model
     ):
         logger.info('sync_loc_inputs_to_store triggered.')
         return callbacks_map.CALLBACKS_MAP[selected_model]['sync_loc_inputs_to_store'](
-            mcfg,
+            selected_configuration,
             app
         )
-    
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'gen-smry'}, 'children'),
-    #     Output({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     State({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'value'),
-    #     State({'type': 'input-model-config', 'section': 'gen_input', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_gen_inputs_to_store(
-    #     mcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_gen_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_gen_inputs_to_store'](
-        #     mcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-    
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'stor-smry'}, 'children'),
-    #     Output({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     State({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'value'),
-    #     State({'type': 'input-model-config', 'section': 'stor_input', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_stor_inputs_to_store(
-    #     mcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_stor_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_stor_inputs_to_store'](
-        #     mcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-    
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'bc-smry'}, 'children'),
-    #     Output({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     State({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'value'),
-    #     State({'type': 'input-model-config', 'section': 'bc_input', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_bc_inputs_to_store(
-    #     mcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_bc_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_bc_inputs_to_store'](
-        #     mcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-    
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'dc-smry'}, 'children'),
-    #     Output({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     State({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'value'),
-    #     State({'type': 'input-model-config', 'section': 'dc_input', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_dc_inputs_to_store(
-    #     mcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_dc_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_dc_inputs_to_store'](
-        #     mcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-    
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'model-config', 'key': 'mc-smry'}, 'children'),
-    #     Output({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     State({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'value'),
-    #     State({'type': 'input-model-config', 'section': 'mc_input', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_mc_inputs_to_store(
-    #     mcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_mc_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_mc_inputs_to_store'](
-        #     mcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-    
-    ##### FINANCE ######
-    
-    # The finance configuration is essentially monolithic - a "unit_costs"
-    # dictionary holds most information, and the discount rates are at top
-    # level. This may prove to be restrictive, but we shall work with it 
-    # for now.
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-gen-smry'}, 'children'),
-    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-stor-smry'}, 'children'),
-    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-sales-smry'}, 'children'),
-    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'cost-import-smry'}, 'children'),
-    #     Output({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     Input('finance-config', 'data'),
-    #     State({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'value'),
-    #     State({'type': 'input-finance-config', 'section': 'unit_costs', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_unit_cost_inputs_to_store(
-    #     mcfg, 
-    #     fcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_unit_cost_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_unit_cost_inputs_to_store'](
-        #     mcfg,
-        #     fcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-    
-    # @app.callback(
-    #     Output({'type': 'input-header', 'section': 'finance-config', 'key': 'fnc-smry'}, 'children'),
-    #     Output({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'value'),
-    #     Input('model-config', 'data'),
-    #     Input('finance-config', 'data'),
-    #     State({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'value'),
-    #     State({'type': 'input-finance-config', 'section': 'None', 'key': ALL}, 'id'),
-    #     State('selected-model', 'data'),
-    #     prevent_initial_call = True
-    # )
-    # def sync_fnc_inputs_to_store(
-    #     mcfg,
-    #     fcfg,
-    #     current_input_values,
-    #     current_input_ids,
-    #     selected_model
-    # ):
-        # logger.info('sync_fnc_inputs_to_store triggered.')
-        # return callbacks_map.CALLBACKS_MAP[selected_model]['sync_fnc_inputs_to_store'](
-        #     mcfg,
-        #     fcfg,
-        #     current_input_values,
-        #     current_input_ids,
-        #     app
-        # )
-        
     
     return app
     
@@ -394,8 +217,7 @@ def add_interface_to_model_callbacks(app):
     )
     def interface_update_config(
         inputs_model,
-        inputs_finance,
-        
+        inputs_finance,   
         selected_config,
         model_input_ids,
         finance_input_ids,
@@ -420,9 +242,6 @@ def add_interface_to_model_callbacks(app):
             [no_update] * len(model_config_trigger_ids), # trigger model config
             [no_update] * len(finance_config_trigger_ids), # trigger finance config
         )
-
-        if ctx.triggered_id == 'model-config':
-            return NUP
         
         selected_mm = json.loads(selected_config).get('metamodel_id', None)
         if selected_mm is None:
@@ -797,50 +616,5 @@ def add_interface_to_model_callbacks(app):
         rval[1] = queue_action_user
         rval[-1] = len(queue_action_user) == 0 # Disable Interval
         return tuple(rval)
-    
-    @app.callback(
-        #Output('store-model-interface-configurations', 'data', allow_duplicate = True),
-        #Output('store-finance-interface-configurations', 'data', allow_duplicate = True),
-        Output('model-config', 'data'),
-        Output('finance-config', 'data'),
-        Output('prequeue-model-run', 'data'),
-        Output('prequeue-finance-run', 'data'),
-        Output('trigger-postprocess-model-run', 'data', allow_duplicate = True),
-        Output('trigger-postprocess-finance-run', 'data', allow_duplicate = True),
-        
-        Input('dispatchitem-action-user', 'data'),
-        #State('store-model-interface-configurations', 'data'),
-        #State('store-finance-interface-configurations', 'data'),
-        State('store-selected-configuration', 'data'),
-        State('selected-model', 'data'),
-        prevent_initial_call = True
-    )
-    def dispatcher_action_user(
-        dispatchitem_action_user,
-        #store_model_interface_configurations,
-        #store_finance_interface_configurations,
-        store_selected_configuration,
-        selected_model,
-    ):
-        """
-        Handle a user action.
-
-        When a user action gets this far, it has been cleared for actioning
-        (i.e. it has passed any latches). This means that if it is a local 
-        model configuration change, that may now be applied into the local
-        configuration dictionary and the local copy of the model updated.
-        If we have a change to a model, then it will be necessary to queue
-        the model for running.
-        To allow processing of the queue efficiently, the dispatchitem-action-user
-        may be a list of actions for a single model, finance, or configuration.
-        All updates should be applied prior to the model run request being
-        sent.
-        """
-        logger.info('dispatcher_action_user triggered')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['dispatcher_action_user'](
-            dispatchitem_action_user,
-            store_selected_configuration,
-            app
-        )
     
     return app

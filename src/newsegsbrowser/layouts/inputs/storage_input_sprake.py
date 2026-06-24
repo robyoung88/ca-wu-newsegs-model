@@ -13,31 +13,16 @@ def create_storage_input_card():
             html.H2([icons.get_icon('storage'), "Storage"], 
             className='card-title'),
             
-            html.H4([
-                'Storage capacity: ',
-                html.Span("0.0"),
-                " kWh"
-            ],
-            id = {'type': 'input-header', 'section': 'model-config', 'key': 'stor-smry'},
-            className='card-subtitle'),
+            html.H4(
+                id = {'type': 'input-header', 'section': 'model-config', 'key': 'stor-smry'},
+                className='card-subtitle'
+            ),
             
             html.Details([
                 html.Summary(""),
-                html.Div(#[
-                    # dbc.Row([
-                    #     browser.create_numeric_card_input_compound_key(
-                    #         'storage',
-                    #         'Storage Capacity (kWh)',
-                    #         'input-model-config',
-                    #         'storage_capacity',
-                    #         section = 'stor_input',
-                    #         max = 10000,
-                    #         step = 5.0
-                    #     ),
-                    # ])
-                #],
-                id = {'type': 'input-container', 'supersection': 'model-config', 'section': 'stor_input'},
-                className = 'input-container model-config-input-container'
+                html.Div(
+                    id = {'type': 'input-container', 'supersection': 'model-config', 'section': 'stor_input'},
+                    className = 'input-container model-config-input-container'
                 )
             ])
         ])

@@ -271,13 +271,15 @@ def compose_dsa_input(
     header_component,
     parameter_component,
     dsa_bound_type_selector,
-    dsa_bound_component
+    dsa_bound_component,
+    is_selected: bool
 ):
     return html.Div([
         daq.ToggleSwitch(
             #vertical = True,
             className = 'dsa-toggle',
-            size = 30
+            size = 30,
+            value = is_selected
         ),
         html.Details([
             html.Summary(
@@ -299,6 +301,7 @@ def compose_dsa_input(
 
 def create_dsa_input_scalar_constant(
     label: str,
+    is_selected: bool,
     type_id: str,
     key: str,
     section: str | None = None,
@@ -317,7 +320,8 @@ def create_dsa_input_scalar_constant(
             type_id,
             key,
             section
-        )
+        ),
+        is_selected
     )
 
 
@@ -325,6 +329,7 @@ def create_dsa_input_scalar_constant(
 # e.g. a scaling factor for expected annual insolation
 def create_dsa_input_scalar_normal(
     label: str,
+    is_selected: bool,
     type_id: str,
     key: str,
     section: str | None = None,
@@ -349,11 +354,13 @@ def create_dsa_input_scalar_normal(
             type_id,
             key,
             section
-        )
+        ),
+        is_selected
     )
 
 def create_dsa_input_scalar_beta(
     label: str,
+    is_selected: bool,
     type_id: str,
     key: str,
     section: str | None = None,
@@ -378,11 +385,13 @@ def create_dsa_input_scalar_beta(
             type_id,
             key,
             section
-        )
+        ),
+        is_selected
     )
 
 def create_dsa_input_scalar_gamma(
     label: str,
+    is_selected: bool,
     type_id: str,
     key: str,
     section: str | None = None,
@@ -407,11 +416,13 @@ def create_dsa_input_scalar_gamma(
             type_id,
             key,
             section
-        )
+        ),
+        is_selected
     )
 
 def create_dsa_input_vector_mvn(
     label: str,
+    is_selected: bool,
     type_id: str,
     key: str,
     section: str | None = None,
@@ -420,5 +431,6 @@ def create_dsa_input_vector_mvn(
         create_dsa_input_vector_numeric_header(label, type_id, key, section),
         create_dsa_input_vector_parameter_input(OrderedDict(mean = ['shape', 'scale'], vcv = ['covariance']), ('vector', 'matrix'), type_id, key, section),
         create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
-        create_dsa_bounds_input_vector('relative', type_id, key, section)
+        create_dsa_bounds_input_vector('relative', type_id, key, section),
+        is_selected
     )

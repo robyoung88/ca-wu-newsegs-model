@@ -630,139 +630,12 @@ def update_feedback_graphs(
     
     return rval
 
-    
-
-def sync_dc_inputs_to_store(mcfg, input_values, input_ids, app):
-    NUP = (no_update, [no_update] * len(input_values))
-    if mcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    conf = mcfg.get('dc_input', {})
-
-    ann_appliance = (
-        (1.0 - float(conf.get('efficiency_reduction', 0))) 
-        * model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
-    )
-    ann_ev = (
-        conf.get('n_evs_per_household', 0) * conf.get('annual_residential_consumption_per_ev', 0)
-    )
-    
-    header_children = [
-        icons.get_icon('consumption-direct-appliance'),
-        " = ",
-        html.Span('{:,.0f}'.format(ann_appliance)),
-        " kWh/yr/household; ",
-        icons.get_icon('consumption-direct-ev'),
-        " = ",
-        html.Span('{:,.0f}'.format(ann_ev)),
-        " kWh/yr/household"
-    ]
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in conf.keys():
-            v = conf[id['key']]
-            if input_values[i] != v:
-                input_list[i] = v
-    
-    return (header_children, input_list)
-
-def sync_unit_cost_inputs_to_store(
-        mcfg,
-        fcfg,
-        input_values,
-        input_ids,
-        app
-):
-    NUP = (no_update, no_update, no_update, no_update, [no_update] * len(input_values))
-    if mcfg is None or fcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    fcfg = json.loads(fcfg)
-
-    uc = fcfg.get('unit_costs', {})
-    # Generation
-    gen_conf = mcfg.get('gen_input', {})
-
-    wind_cap = gen_conf.get('wind_capacity', 0.0)
-    pv_cap = gen_conf.get('pv_capacity', 0.0)
-    tot_capex = (
-        uc.get('wind_capex_per_kw', 0) * wind_cap
-        + uc.get('pv_capex_per_kw', 0) * pv_cap
-    )
-    tot_ongoing = (
-        uc.get('wind_om_per_kw_year', 0) * wind_cap
-        + uc.get('pv_om_per_kw_year', 0) * pv_cap
-    )
-    gen_header = [
-            "Capital cost = £",
-            html.Span('{:,.0f}'.format(tot_capex)),
-            "; Ongoing costs = £",
-            html.Span('{:,.0f}'.format(tot_ongoing)),
-            "/yr"
-        ]
-    
-    # Storage
-    stor_conf = mcfg.get('stor_input', {})
-    bess_cap = stor_conf.get('storage_capacity', 0.0)
-    tot_capex = bess_cap * uc.get('bess_capex_per_kwh', 0)
-    tot_ongoing = bess_cap * uc.get('bess_om_per_kwh_year', 0)
-    stor_header = [
-        "Capital cost = £",
-        html.Span('{:,.0f}'.format(tot_capex)),
-        "; Ongoing costs = £",
-        html.Span('{:,.0f}'.format(tot_ongoing)),
-        "/yr"
-    ]
-
-    # Sales
-    # TODO: Incorporate the indicative net energy to allow estimation here.
-    # For now, leave it.
-    sales_header = no_update
-
-    # Import
-    # TODO: Incorporate indicative net energy
-    # For now, leave.
-    import_header = no_update
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in uc.keys():
-            input_list[i] = uc[id['key']]
-    
-    return (gen_header, stor_header, sales_header, import_header, input_list)
-
-def sync_mc_inputs_to_store(mcfg, input_values, input_ids, app):
-    NUP = (no_update, [no_update] * len(input_values))
-    if mcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    conf = mcfg.get('mc_input', {})
-    
-    header_children = [
-                icons.get_icon('model-settings-time-horizon'),
-                " = ",
-                html.Span(f"{conf.get('horizon', 1):.0f}"),
-                " years"
-            ]
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in conf.keys():
-            v = conf[id['key']]
-            if input_values[i] != v:
-                input_list[i] = v
-    
-    return (header_children, input_list)
-
 def dispatcher_action_user(
     dispatchitem_action_user,
     store_selected_configuration,
     app
 ):
     NUP = (
-        no_update, # model-config
-        no_update, # finance-config
         no_update, # prequeue-model-run
         no_update, # prequeue-finance-run
         no_update, # trigger-postprocess-model-run
@@ -782,20 +655,6 @@ def dispatcher_action_user(
     # actions result in a remote operation.
 
     return NUP
-
-    # if store_model_interface_configurations is None:
-    #     store_model_interface_configurations = {}
-    # else:
-    #     store_model_interface_configurations = json.loads(
-    #         store_model_interface_configurations
-    #     )
-    
-    # if store_finance_interface_configurations is None:
-    #     store_finance_interface_configurations = {}
-    # else:
-    #     store_finance_interface_configurations = json.loads(
-    #         store_finance_interface_configurations
-    #     )
     
     mdl_change_list = []
     fnc_change_list = []
@@ -942,8 +801,6 @@ def dispatcher_action_user(
         ]
         
     return (
-        r_model_config,
-        r_finance_config,
         r_model_run_requests,
         r_finance_run_requests,
         r_trigger_postprocess_model_run,

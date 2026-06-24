@@ -2,7 +2,7 @@ import datetime
 from functools import partial
 import json
 import logging
-from typing import Callable, MutableSequence
+from typing import Callable, MutableSequence, cast
 import uuid
 
 from dash import Patch, html, no_update
@@ -10,6 +10,7 @@ import dash_bootstrap_components as dbc
 
 from newsegsbrowser import icons
 import newsegsbrowser.common as browser
+from newsegsbrowser import variable_dash_component as var_dc
 
 from newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodel.newsegsmodel import NewsegsModel
@@ -41,8 +42,7 @@ def sync_config(
     NUP = (
         no_update, # store-selected-configurations
         no_update, # store-configurations
-        no_update, # model-config
-        no_update, # finance-config
+
         [no_update] * len(input_containers), # input-container children
         [no_update] * len(trigger_ids), # trigger data
         no_update # prequeue-action-user patch
@@ -99,28 +99,73 @@ def sync_config(
     logger.info('Creating inputs for metamodel: %s', mm.id)
     for ic in input_containers:
         cnts = []
-        section = ic.get('section')
-        for var in mm.variables.values():
-            if var.interface_section == section and var.configuration_show:
-                if not isinstance(var, variable.ScalarVariable):
-                    raise TypeError(f'Cannot handle variables of type {type(var)}')
-                # Create an input
-                cnts.append(
-                    dbc.Row(
-                        browser.create_numeric_card_input_compound_key(
-                            var.icon_name,
-                            f'{var.label} ({var.unit})',
-                            'input-finance-config' if var.configuration_type == 'finance' else 'input-model-config',
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
-                            min = var.interface_min,
-                            max = var.interface_max,
-                            step = var.interface_step if var.interface_step else 1
+        ss = ic.get('supersection')
+        if ss == 'dsa':
+            for var in mm.variables.values():
+                if var.dsa_show:
+                    if var.unit != '':
+                        lbl = f'{var.name} ({var.unit})'
+                    else:
+                        lbl = f'{var.name}'
+                    match var.distribution.distribution:
+                        case 'constant':
+                            is_scalar = True,
+                            creation_func = var_dc.create_dsa_input_scalar_constant
+                        case 'normal':
+                            is_scalar = True,
+                            creation_func = var_dc.create_dsa_input_scalar_normal
+                        case 'beta':
+                            is_scalar = True,
+                            creation_func = var_dc.create_dsa_input_scalar_beta
+                        case 'gamma':
+                            is_scalar = True,
+                            creation_func = var_dc.create_dsa_input_scalar_gamma
+                        case _:
+                            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+                    
+                    if is_scalar:
+                        var = cast(variable.ScalarVariable, var)
+                        if not var.interface_section:
+                            cnts.append(
+                                creation_func(
+                                    lbl, 
+                                    var.dsa_selected,
+                                    'dsa-input-model-config',
+                                    var.interface_key,
+                                ),
+                            )
+                        else:
+                            cnts.append(
+                                creation_func(
+                                    lbl, 
+                                    var.dsa_selected,
+                                    'dsa-input-model-config',
+                                    var.interface_key,
+                                    section = var.interface_section),
+                            )
+        else:
+            section = ic.get('section')
+            for var in mm.variables.values():
+                if var.interface_section == section and var.configuration_show:
+                    if not isinstance(var, variable.ScalarVariable):
+                        raise TypeError(f'Cannot handle variables of type {type(var)}')
+                    # Create an input
+                    cnts.append(
+                        dbc.Row(
+                            browser.create_numeric_card_input_compound_key(
+                                var.icon_name,
+                                f'{var.label} ({var.unit})',
+                                'input-finance-config' if var.configuration_type == 'finance' else 'input-model-config',
+                                var.interface_key,
+                                section = var.interface_section,
+                                subindex = var.interface_subindex,
+                                value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
+                                min = var.interface_min,
+                                max = var.interface_max,
+                                step = var.interface_step if var.interface_step else 1
+                            )
                         )
                     )
-                )
         inputs.append(cnts)
 
     # TODO - these do not require an update if store_configurations was the trigger
@@ -141,120 +186,23 @@ def sync_config(
     return (
         json.dumps(store_selected_configuration), # store-selected-configurations
         store_configurations, # store-configurations
-        json.dumps(mcfg), # model-config
-        json.dumps(fcfg), # finance-config
+
         inputs,  # input-container children
         [datetime.datetime.now().timestamp()] * len(trigger_ids), # trigger data
         prequeue_patch # prequeue-action-user patch
     ) 
 
-def sync_loc_inputs_to_store(mcfg, app):
-    if mcfg is None:
+def sync_loc_inputs_to_store(selected_configuration, app):
+    if selected_configuration is None:
         return no_update
-    mcfg = json.loads(mcfg)
-    loc_input = mcfg.get('loc_input', None)
+    selected_configuration = json.loads(selected_configuration)
+    mdl = app.models.get(selected_configuration['model_id'])
+    if mdl is None:
+        return no_update
+    
+    loc_input = {
+        'lat': mdl.location.lat,
+        'lon': mdl.location.lon,
+        'name': mdl.location.name
+    }
     return json.dumps(loc_input)
-
-def sync_gen_inputs_to_store(mcfg, input_values, input_ids, app):
-    NUP = (no_update, [no_update] * len(input_values))
-    if mcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    conf = mcfg.get('gen_input', {})
-    
-    header_children = [
-        'Total generation: ',
-        icons.get_icon('gen-wind','p-1 my-1, ml-1', 'unpadded'),
-        " = ",
-        html.Span(f"{conf.get('wind_capacity', 0.0):,.1f}"),
-        " kW; ",
-        icons.get_icon('gen-pv','p-1 my-1, ml-1', 'unpadded'),
-        " = ",
-        html.Span(f"{conf.get('pv_capacity', 0.0):,.1f}",),
-        " kWp"
-    ]
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in conf.keys():
-            v = conf[id['key']]
-            if input_values[i] != v:
-                input_list[i] = v
-    
-    return (header_children, input_list)
-
-def sync_stor_inputs_to_store(mcfg, input_values, input_ids, app):
-    NUP = (no_update, [no_update] * len(input_values))
-    if mcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    conf = mcfg.get('stor_input', {})
-    
-    header_children = [
-        'Storage capacity: ',
-        html.Span(f"{conf.get('storage_capacity', 0.0):,.0f}"),
-        " kWh"
-    ]
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in conf.keys():
-            v = conf[id['key']]
-            if input_values[i] != v:
-                input_list[i] = v
-    
-    return (header_children, input_list)
-
-def sync_bc_inputs_to_store(mcfg, input_values, input_ids, app):
-    NUP = (no_update, [no_update] * len(input_values))
-    if mcfg is None:
-        return NUP
-    mcfg = json.loads(mcfg)
-    conf = mcfg.get('bc_input', {})
-    
-    header_children = [
-        'Site size: ',
-        html.Span(f"{conf.get('n_units', 0):,.0f}"),
-        " units"
-    ]
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in conf.keys():
-            v = conf[id['key']]
-            if input_values[i] != v:
-                input_list[i] = v
-    
-    return (header_children, input_list)
-
-def sync_fnc_inputs_to_store(
-    mcfg,
-    fcfg,
-    input_values,
-    input_ids,
-    app
-):
-    NUP = (no_update, [no_update] * len(input_values))
-    if mcfg is None or fcfg is None:
-        return NUP
-    #mcfg = json.loads(mcfg)
-    fcfg = json.loads(fcfg)
-    
-    header_children = [
-        icons.get_icon('finance-settings-benefit-discount'),
-        " = ",
-        html.Span(f"{fcfg.get('benefit_discount_rate', 0.0)/100:,.1%}"),
-        "; ",
-        icons.get_icon('finance-settings-cost-discount'),
-        " = ",
-        html.Span(f"{fcfg.get('cost_discount_rate', 0.0)/100:,.1%}"),
-    ]
-
-    input_list = [no_update] * len(input_values)
-    for i, id in enumerate(input_ids):
-        if id['key'] in fcfg.keys():
-            v = fcfg[id['key']]
-            if input_values[i] != v:
-                input_list[i] = v
-    
-    return (header_children, input_list)

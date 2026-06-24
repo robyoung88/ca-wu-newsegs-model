@@ -13,32 +13,16 @@ def create_model_settings_input_card():
             html.H2([icons.get_icon('model-settings'), 'Model Settings'],
             className='card-title'),
 
-            html.H4([
-                icons.get_icon('model-settings-time-horizon'),
-                " = ",
-                html.Span("10"),
-                " years"
-            ],
-            id = {'type': 'input-header', 'section': 'model-config', 'key': 'mc-smry'},
-            className='card-subtitle'),
+            html.H4(
+                id = {'type': 'input-header', 'section': 'model-config', 'key': 'mc-smry'},
+                className='card-subtitle'
+            ),
 
             html.Details([
                 html.Summary(""),
-                html.Div(#[
-                    # dbc.Row(
-                    #     browser.create_numeric_card_input_compound_key(
-                    #         'model-settings-time-horizon',
-                    #         'Time horizon (years)',
-                    #         'input-model-config',
-                    #         'horizon',
-                    #         section = 'mc_input',
-                    #         max = 10,
-                    #         step = 1
-                    #     )
-                    # ),
-                #],
-                id = {'type': 'input-container', 'supersection': 'model-config', 'section': 'mc_input'},
-                className = 'input-container model-config-input-container'
+                html.Div(
+                    id = {'type': 'input-container', 'supersection': 'model-config', 'section': 'mc_input'},
+                    className = 'input-container model-config-input-container'
                 )
             ])
         ]),

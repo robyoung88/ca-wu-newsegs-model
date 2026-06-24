@@ -13,44 +13,14 @@ def create_finance_settings_input_card():
             html.H2([icons.get_icon('finance-settings'), 'Finance Settings'],
             className='card-title'),
 
-            html.H4([
-                icons.get_icon('finance-settings-benefit-discount'),
-                " = ",
-                html.Span("0%"),
-                "; ",
-                icons.get_icon('finance-settings-cost-discount'),
-                " = ",
-                html.Span("0%"),
-            ],
-            id = {'type': 'input-header', 'section': 'finance-config', 'key': 'fnc-smry'},
-            className='card-subtitle'),
+            html.H4(
+                id = {'type': 'input-header', 'section': 'finance-config', 'key': 'fnc-smry'},
+                className='card-subtitle'
+            ),
 
             html.Details([
                 html.Summary(""),
-                html.Div(#[
-                    # dbc.Row(
-                    #     browser.create_numeric_card_input_compound_key(
-                    #         'finance-settings-benefit-discount',
-                    #         'Benefit discount rate (%)',
-                    #         'input-finance-config',
-                    #         'benefit_discount_rate',
-                    #         section = None,
-                    #         max = 100,
-                    #         step = 1
-                    #     )
-                    # ),
-                    # dbc.Row(
-                    #     browser.create_numeric_card_input_compound_key(
-                    #         'finance-settings-cost-discount',
-                    #         'Benefit discount rate (%)',
-                    #         'input-finance-config',
-                    #         'cost_discount_rate',
-                    #         section = None,
-                    #         max = 100,
-                    #         step = 1
-                    #     )
-                    # )
-                #]
+                html.Div(
                 id = {'type': 'input-container', 'supersection': 'finance-config', 'section': 'finance_settings'},
                 className = 'input-container model-config-input-container'
                 )

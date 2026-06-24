@@ -6,13 +6,6 @@ from newsegsbrowser.callbacks import results_callbacks_sprake
 SPRAKE_CALLBACKS = {
     'sync_config': model_configuration_callbacks_sprake.sync_config,
     'sync_loc_inputs_to_store': model_configuration_callbacks_generic.sync_loc_inputs_to_store,
-    'sync_gen_inputs_to_store': model_configuration_callbacks_generic.sync_gen_inputs_to_store,
-    'sync_stor_inputs_to_store': model_configuration_callbacks_generic.sync_stor_inputs_to_store,
-    'sync_bc_inputs_to_store': model_configuration_callbacks_generic.sync_bc_inputs_to_store,
-    'sync_dc_inputs_to_store': model_configuration_callbacks_sprake.sync_dc_inputs_to_store,
-    'sync_mc_inputs_to_store': model_configuration_callbacks_sprake.sync_mc_inputs_to_store,
-    'sync_unit_cost_inputs_to_store': model_configuration_callbacks_sprake.sync_unit_cost_inputs_to_store,
-    'sync_fnc_inputs_to_store': model_configuration_callbacks_generic.sync_fnc_inputs_to_store,
 
     'update_headers_model_config': model_configuration_callbacks_sprake.update_headers_model_config,
     'update_headers_finance_config': model_configuration_callbacks_sprake.update_headers_finance_config,
@@ -29,12 +22,6 @@ SPRAKE_CALLBACKS = {
 
     'update_model_result_headers': results_callbacks_sprake.update_model_result_headers,
     'update_finance_result_headers': results_callbacks_sprake.update_finance_result_headers,
-
-    'update_generation_results_header': results_callbacks_sprake.update_generation_results_header,
-    'update_storage_results_header': results_callbacks_sprake.update_storage_results_header,
-    'update_consumption_results_header': results_callbacks_sprake.update_consumption_results_header,
-    'update_net_results_header': results_callbacks_sprake.update_net_results_header,
-    'update_finance_results_header': results_callbacks_sprake.update_finance_results_header,
 
     'sync_gen_results_table_to_store': results_callbacks_sprake.sync_gen_results_table_to_store,
     'sync_stor_results_table_to_store': results_callbacks_sprake.sync_stor_results_table_to_store,

@@ -363,7 +363,7 @@ def as_df(
     df: None|pd.DataFrame|dict,
     orient: str = 'columns',
     index_variables: list = ['variable', 'statistic']
-) -> pd.DataFrame:
+) -> pd.DataFrame | None:
     if df is None:
         return None
     if isinstance(df, pd.DataFrame):
@@ -374,7 +374,7 @@ def as_df(
                 df.set_index(index_variables)
             else:
                 df.reset_index().set_index(index_variables)
-    return pd.DataFrame.from_dict(df, orient=orient).set_index(index_variables)
+    return pd.DataFrame.from_dict(df, orient=orient).set_index(index_variables) # pyright: ignore[reportCallIssue, reportArgumentType]
 
 def _label_demap(str_list:Iterable, mapper: None|Callable|Mapping = None) -> Iterable:
     if mapper is None:
