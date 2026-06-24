@@ -277,3 +277,22 @@ def finance_run_request(
         'model_id': model_id,
         'time': ts
     }
+
+def metamodel_process_request(
+    metamodel_id,
+    request_type,
+    request_time = None
+):
+    if request_time is None:
+        request_time = datetime.datetime.now()
+
+    if isinstance(request_time, float):
+        ts = request_time
+    else:
+        ts = request_time.timestamp()
+    
+    return {
+        'type': 'type',
+        'metamodel_id': metamodel_id,
+        'time': ts
+    }

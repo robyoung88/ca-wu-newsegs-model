@@ -102,6 +102,7 @@ def create_dsa_layout(*args, **kwargs):
             + clayouts.user_action_components()
             + clayouts.model_run_components()
             + clayouts.finance_run_components()
+            + clayouts.metamodel_process_components()
             + clayouts.post_page_load_components(
                 kwargs.get('selected_model'),
                 kwargs.get('page_type')

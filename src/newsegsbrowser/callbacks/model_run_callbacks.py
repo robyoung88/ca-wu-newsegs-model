@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 RUN_DEBOUNCE_SECONDS = 1.0
 FINANCE_DEBOUNCE_SECONDS = 0.5
+METAMODEL_PROCESS_DEBOUNCE_SECONDS = 1.0
 
 def add_model_run_callbacks(app: Dash):
     """
@@ -379,6 +380,170 @@ def add_finance_run_callbacks(app: Dash):
 
         return (
             trigger_post_finance_run,
+            True,
+        )
+
+    # handling of arbitrary metamodel processes, assumed to take place in a background
+    # process
+    @app.callback(
+        Output('prequeue-metamodel-process', 'data', allow_duplicate = True),
+        Output('queue-metamodel-process', 'data'),
+        Output('dispatchitem-metamodel-process', 'data'),
+        Output('interval-metamodel-process', 'disabled'),
+
+        Input('prequeue-metamodel-process', 'data'),
+        Input('interval-metamodel-process', 'n_intervals'),
+        State('latch-metamodel-process-global', 'data'),
+        State('queue-metamodel-process', 'data'),
+
+        prevent_initial_call = True
+    )
+    def queueman_metamodel_processs(
+        prequeue_metamodel_process,
+        interval_metamodel_process,
+        latch_metamodel_process,
+        queue_metamodel_process,
+    ):
+        """
+        Receives and dispatches arbitrary metamodel processes.
+        """
+        if not queue_metamodel_process:
+            queue_metamodel_process = []
+        
+        logger.info('processing metamodel queue, triggered by %s', ctx.triggered_id)
+
+        if ctx.triggered_id == 'prequeue-metamodel-process':
+            requests = prequeue_metamodel_process
+            if not isinstance(requests, list):
+                requests = [requests]
+
+            # For the moment, assume that any new metamodel request will
+            # replace any equivalents
+            requests_dejson = [json.loads(x) for x in requests]
+            
+            for req in requests_dejson:
+                queue_dejson = [json.loads(x) for x in queue_metamodel_process]
+                remove_indexes = [
+                    i for i, x in enumerate(queue_dejson)
+                    if x['metamodel_id'] == req['metamodel_id'] and x['type'] == req['type']
+                ]
+                remove_indexes.sort(reverse = True)
+                if remove_indexes:
+                    for i in remove_indexes:
+                        queue_metamodel_process.pop(i)
+            queue_metamodel_process += requests
+
+        if latch_metamodel_process is None:
+            latch_metamodel_process = True
+        
+        nowtime = datetime.datetime.now().timestamp()
+
+        logger.info('%s processes are in queue', len(queue_metamodel_process))
+        logger.info('latch_metamodel_process_global is %s', latch_metamodel_process)
+
+        if latch_metamodel_process:
+            for i, request in enumerate(queue_metamodel_process):
+                request_l = json.loads(request)
+                logger.info('checking if metamodel %s should be run', request_l['metamodel_id'])
+                if nowtime - request_l['time'] > METAMODEL_PROCESS_DEBOUNCE_SECONDS:
+                    mm_id = request_l['metamodel_id']
+                    mm = app.metamodels.get(mm_id)
+                    if not mm.model.checked_out and not mm.finance.checked_out and not mm.checked_out:
+                        dispatch_request = queue_metamodel_process.pop(i)
+                        logger.info('metamodel process dispatched: %s', dispatch_request)
+                        return (
+                            [], # consume prequeue
+                            queue_metamodel_process,
+                            dispatch_request,
+                            len(queue_metamodel_process) == 0
+                        )
+                    else:
+                        logger.info('Metamodel or child is checked out: %s', request_l['metamodel_id'])
+                else:
+                    logger.info('debounce has not expired for metamodel %s', request_l['metamodel_id'])
+        
+        return (
+            [],
+            queue_metamodel_process,
+            no_update,
+            len(queue_metamodel_process) == 0
+        )
+
+    @app.callback(
+        Output('trigger-metamodel-process', 'data'),
+        Output('latch-metamodel-process-global', 'data', allow_duplicate = True),
+
+        Input('dispatchitem-metamodel-process', 'data'),
+        prevent_initial_call = True,
+    )
+    def dispatcher_metamodel_process(
+        dispatchitem_metamodel_process,
+    ):
+        """
+        Handle a metamodel process request
+        """
+        NUP = (
+            no_update,
+            no_update
+        )
+
+        if dispatchitem_metamodel_process is None:
+            return NUP
+        
+        metamodel_process = json.loads(dispatchitem_metamodel_process)
+
+        # No plan to handle a list or requests here
+        if isinstance(metamodel_process, list):
+            raise TypeError('Cannot handle a list of metamodel processes')
+        
+        mm = cast(NewsegsMetaModel, app.metamodels.get(metamodel_process['metamodel_id']))
+        if mm is None:
+            logger.warning('metamodel to process not found: %s', metamodel_process['metamodel_id'])
+            return (
+                no_update,
+                True,
+            )
+        
+        app.metamodel_to_cache(metamodel_process['metamodel_id'])
+        app.model_to_cache(mm.model.id)
+        app.finance_to_cache(mm.finance.id)
+        mm.checked_out = True
+        mm.model.checked_out = True
+        mm.finance.checked_out = True
+
+        logging.info('metamodel dispatched to process: %s', metamodel_process)
+
+        return (
+            dispatchitem_metamodel_process,
+            False
+        )
+    
+    # See app.py for the run logic
+
+    @app.callback(
+        Output('trigger-postprocess-metamodel-process', 'data', allow_duplicate = True),
+        Output('latch-metamodel-process-global', 'data', allow_duplicate = True),
+
+        Input('trigger-post-metamodel-process', 'data'),
+        prevent_initial_call = True
+    )
+    def receiver_metamodel_process(
+        trigger_post_metamodel_process,
+    ):
+        process_request = json.loads(trigger_post_metamodel_process)
+        mm = app.metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
+        app.metamodels[mm.id] = mm
+        app.models[mm.model.id] = mm.model
+        app.finances[mm.finance.id] = mm.finance
+
+        logging.info('resyncing metamodel after process completed: %s', process_request)
+
+        match process_request['type']:
+            case 'dsa_run':
+                app.results[mm.dsa_result_id] = app.cache[mm.dsa_result_id]
+        
+        return (
+            trigger_post_metamodel_process,
             True,
         )
     

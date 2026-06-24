@@ -78,3 +78,29 @@ def finance_run_components():
         # A global switch to disable finance runs
         dcc.Store(id = 'latch-finance-run-global', data = True),
     ]
+
+def metamodel_process_components():
+    return [
+        # A queue of model run requests
+        # Will generally get added to when a configuration changes
+        # but the running of the model is latched off
+        dcc.Store(id = 'queue-metamodel-process', data = []),
+        # A pre-queue to transfer model run requests to the queue
+        # manager
+        dcc.Store(id = 'prequeue-metamodel-process', data = []),
+        # An Interval element to trigger the queue until it is cleared
+        dcc.Interval(id = 'interval-metamodel-process', interval = 500, disabled = True),
+        # A dispatch object holding id of a model permitted to run
+        dcc.Store(id = 'dispatchitem-metamodel-process'),
+        # Trigger object for the model run
+        dcc.Store(id = 'trigger-metamodel-process'),
+        # Trigger object for relocalising model after run
+        dcc.Store(id = 'trigger-post-metamodel-process'),
+        # A store to trigger handling of model run completion
+        dcc.Store(id = 'trigger-postprocess-metamodel-process'),
+        # A global switch to disable model runs
+        dcc.Store(id = 'latch-metamodel-process-global', data = True),
+
+        dcc.Store(id = 'background_cancel_trigger'),
+        dcc.Store(id = 'background_progress_tracker', data = '{"value":"0","max":"1"}'),
+    ]

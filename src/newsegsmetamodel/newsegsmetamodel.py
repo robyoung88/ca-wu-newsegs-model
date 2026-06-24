@@ -38,6 +38,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
 
     model_id: str
     finance_id: str
+    checked_out: bool = False
 
     _name = 'NewSEGS MetaModel'
     _version = '0.0.1'

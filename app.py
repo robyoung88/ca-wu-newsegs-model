@@ -3,10 +3,11 @@ NewSEGS model as a multi-page app.
 """
 import copy
 import os
+import time
 import logging
 from typing import Literal, cast, MutableMapping
 
-from dash import Dash, dcc, html, Input, Output, State, callback
+from dash import ALL, Dash, dcc, html, Input, Output, State, callback, no_update
 import dash_bootstrap_components as dbc
 # At the moment, use a diskcache cache for transferring models 
 # regardless of background callback manager
@@ -28,6 +29,7 @@ from config import settings
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
+from newsegssensitivity import dsa
 
 from newsegsbrowser.layouts import model_selection_layout
 from newsegsbrowser.layouts import template_landing_layout
@@ -194,7 +196,70 @@ def add_caching_callbacks(app):
         cache[finance_id] = fnc
         
         return finance_run_request
+    
+    @app.callback(
+        Output('trigger-post-metamodel-process', 'data'),
 
+        Input('trigger-metamodel-process', 'data'),
+        prevent_initial_call = True,
+        background = True,
+        manager = noncaching_background_callback_manager,
+        running = [
+            (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
+            (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
+            (
+                Output({'type':'progress_bar','key':ALL}, "style"),
+                {"visibility": "visible"},
+                {"visibility": "hidden"},
+            ),
+        ],
+        cancel=Input('background_cancel_trigger', "data"),
+        progress=[Output('background_progress_tracker', 'data')],
+        progress_default='{"value":"0","max":"1"}',
+    )
+    def run_metamodel_process(metamodel_process):
+        process_request = json.loads(metamodel_process)
+        mm = app.metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
+
+        # Do the process
+        match process_request['type']:
+            case 'dsa_run':
+                dsa_results = dsa.run_dsa(
+                    mm
+                )
+                mm.dsa_result_id = 'res-dsa-'+str(mm.metamodel.id)
+                cache[mm.dsa_result_id] = dsa_results
+
+        # Resynchronise
+        app.metamodel_to_cache(mm.id)
+        app.model_to_cache(mm.model.id)
+        app.finance_to_cache(mm.finance.id)
+
+        return metamodel_process
+
+    @app.callback(
+        Output('background_cancel_trigger', 'data'),
+
+        Input({'type': 'background_callback_cancel_button', 'key': ALL}, 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def set_cancel_trigger(n_clicks):
+        return time.time_ns()
+
+    @app.callback(
+        Output({'type':'progress_bar','key':ALL}, "value"), 
+        Output({'type':'progress_bar','key':ALL}, "max"),
+
+        Input('background_progress_tracker', 'data'),
+        State({'type':'progress_bar','key':ALL}, "id"),
+        prevent_initial_call = True
+    )
+    def set_progress_bars(progress, ids):
+        if progress is None:
+            return [no_update] * len(ids)
+        progress = json.loads(progress)
+        return ([progress['value']] * len(ids), [progress['max']] * len(ids))
+    
     return app
 
 def create_app(external_stylesheets = None) -> Dash:
@@ -309,6 +374,7 @@ def create_app(external_stylesheets = None) -> Dash:
             case 'cache':
                 mm.reattach_model(cache) # pyright: ignore[reportArgumentType]
                 mm.reattach_finance(cache) # pyright: ignore[reportArgumentType]
+                mm.finance.set_model(mm.model, False)
         logger.info('retrieving metamodel %s was successful', metamodel_id)
         return mm
     
