@@ -4,7 +4,7 @@ NewSEGS model as a multi-page app.
 import copy
 import os
 import logging
-from typing import cast, MutableMapping
+from typing import Literal, cast, MutableMapping
 
 from dash import Dash, dcc, html, Input, Output, State, callback
 import dash_bootstrap_components as dbc
@@ -166,6 +166,7 @@ def add_caching_callbacks(app):
     
     @app.callback(
         Output('trigger-post-finance-run', 'data'),
+
         Input('trigger-finance-run', 'data'),
         prevent_initial_call = True,
         background = True,
@@ -178,6 +179,8 @@ def add_caching_callbacks(app):
         mdl = cast(newsegsmodel.NewsegsModel, cache.get(model_id))
 
         fnc = cast(newsegsfinance.NewsegsFinance, cache.get(finance_id))
+        if fnc is None:
+            return finance_run_request
         # Suspect that if we don't do this, things will rapidly break
         # unless the pickle serialises the model for the finance
         # in which case, we may need to re-write the reduce function
@@ -263,6 +266,7 @@ def create_app(external_stylesheets = None) -> Dash:
         mdl = cache.get(model_id)
         if not isinstance(mdl, newsegsmodel.NewsegsModel):
             raise TypeError(f'{model_id} retrieved from cache is of type {type(mdl)}')
+        logger.info('retrieving model %s was successful', model_id)
         return mdl
     
     app.model_to_cache = model_to_cache # pyright: ignore[reportAttributeAccessIssue]
@@ -270,13 +274,17 @@ def create_app(external_stylesheets = None) -> Dash:
 
     def finance_to_cache(finance_id):
         fnc = finances.get(finance_id)
+        logger.info('writing finance %s to cache', finance_id)
         if fnc:
             cache[finance_id] = fnc
+        logger.info('writing finance %s to cache was successful', finance_id)
     
     def finance_from_cache(finance_id) -> newsegsfinance.NewsegsFinance:
+        logger.info('retrieving finance %s from cache', finance_id)
         fnc = cache.get(finance_id)
         if not isinstance(fnc, newsegsfinance.NewsegsFinance):
-            raise TypeError(f'{finance_id} retrieved form cache is of type {type(fnc)}')
+            raise TypeError(f'{finance_id} retrieved from cache is of type {type(fnc)}')
+        logger.info('retrieving finance %s was successful', finance_id)
         return fnc
     
     app.finance_to_cache = finance_to_cache # pyright: ignore[reportAttributeAccessIssue]
@@ -289,13 +297,19 @@ def create_app(external_stylesheets = None) -> Dash:
             cache[metamodel_id] = mm
         logger.info('writing metamodel %s to cache was successful', metamodel_id)
 
-    def metamodel_from_cache(metamodel_id: str) -> NewsegsMetaModel:
+    def metamodel_from_cache(metamodel_id: str, reattach_location: Literal['local', 'cache'] = 'local') -> NewsegsMetaModel:
         logger.info('retrieving metamodel %s from cache', metamodel_id)
         mm = cache.get(metamodel_id)
         if not isinstance(mm, NewsegsMetaModel):
             raise TypeError(f'{metamodel_id} retrieved from cache is of type {type(mm)}')
-        mm.reattach_model(cache) # pyright: ignore[reportArgumentType]
-        mm.reattach_finance(cache) # pyright: ignore[reportArgumentType]
+        match reattach_location:
+            case 'local':
+                mm.reattach_model(models)
+                mm.reattach_finance(finances)
+            case 'cache':
+                mm.reattach_model(cache) # pyright: ignore[reportArgumentType]
+                mm.reattach_finance(cache) # pyright: ignore[reportArgumentType]
+        logger.info('retrieving metamodel %s was successful', metamodel_id)
         return mm
     
     app.metamodel_to_cache = metamodel_to_cache  # pyright: ignore[reportAttributeAccessIssue]
@@ -382,7 +396,7 @@ def create_app(external_stylesheets = None) -> Dash:
         #finances[dup_fnc.id] = dup_fnc
 
         #variables = copy.deepcopy(list(ref.variables.values()))
-        variables = list(ref.variables.values())
+        variables = copy.deepcopy(list(ref.variables.values()))
         dup_mm = NewsegsMetaModel(dup_mdl, dup_fnc, variables)
 
         metamodels[dup_mm.id] = dup_mm

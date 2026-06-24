@@ -2,6 +2,7 @@
 Unit tests for newsegsbrowser/variable.
 """
 
+import copy
 from functools import partial
 import json
 from typing import cast
@@ -1827,6 +1828,40 @@ class TestVariableSerialisation(unittest.TestCase):
         
         self.assertTupleEqual(vbl._raw_parameters, (4000,))
     
+class TestVariableCopy(unittest.TestCase):
+    """
+    Check copy behaviour of variables
+    """
+
+    def test_deep_copy(self):
+        create_var = partial(
+            variable.Variable,
+            'Variable name',
+            distribution = 'normal'
+        )
+
+        var = create_var(parameters = (5,2))
+        self.assertEqual(
+            var.deterministic_value,
+            5
+        )
+
+        varlist = [var]
+
+        varlist_2 = copy.deepcopy(varlist)
+        self.assertEqual(
+            varlist_2[0].deterministic_value,
+            5
+        )
+        varlist_2[0].set_parameters(10,1)
+        self.assertEqual(
+            varlist_2[0].deterministic_value,
+            10
+        )
+        self.assertEqual(
+            varlist[0].deterministic_value,
+            5
+        )
 
 class TestVariableValidation(unittest.TestCase):
     """

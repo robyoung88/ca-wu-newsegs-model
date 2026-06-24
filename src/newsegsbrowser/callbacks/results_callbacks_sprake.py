@@ -1,11 +1,297 @@
 import json
+from typing import Any
 
-from dash import html, no_update
+from dash import html, no_update, ctx
 import pandas as pd
 
 from newsegsbrowser import icons
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsbrowser.postprocess.tables import result_tables_sprake
+
+def _make_generation_result_header(
+    res,
+    ann_hori_toggle: bool,
+):
+    gm = res.get('generator_meter_summary')
+    
+    if ann_hori_toggle:
+        str_1 = 'Total generation: '
+        wind_ann = gm.get('wind_export').get('sum')
+        pv_ann = gm.get('solar_export').get('sum')
+        total_ann = wind_ann + pv_ann
+    else:
+        str_1 = 'Annual generation: '
+        wind_ann = gm.get('wind_export').get('mean')
+        pv_ann = gm.get('solar_export').get('mean')
+        total_ann = wind_ann + pv_ann
+    
+    return [
+        str_1,
+        icons.get_icon('generation'),
+        " = ",
+        html.Span(f'{total_ann:,.1f}'),
+        " kWh; ",
+        icons.get_icon('gen-wind'),
+        " = ",
+        html.Span(f'{wind_ann:,.1f}'),
+        " kWh; ",
+        icons.get_icon('gen-pv'),
+        " = ",
+        html.Span(f'{pv_ann:,.1f}'),
+        " kWh"
+    ]
+
+def _make_storage_result_header(
+    res,
+    ann_hori_toggle: bool,
+):
+    hrs_full = res.get('stor_hours_at_max').get('hrs_at_max_soc')
+    hrs_empty = res.get('stor_hours_at_min').get('hrs_at_min_soc')
+    cc = res.get('no_charge_cycles').get('charge_cycles')
+    
+    if ann_hori_toggle:
+        stat='sum'
+    else:
+        stat='mean'
+    
+    hrs_full = hrs_full.get(stat)
+    hrs_empty = hrs_empty.get(stat)
+    cc = cc.get(stat)
+
+    return [
+        'Hours full = ',
+        html.Span(f'{hrs_full:,.0f}'),
+        "; Hours empty = ",
+        html.Span(f'{hrs_empty:,.0f}'),
+        "; Charge cycles = ",
+        html.Span(f'{cc:,.0f}')
+    ]
+
+def _make_consumption_result_header(
+    res,
+    ann_hori_toggle: bool,
+):
+    if ann_hori_toggle:
+        str_1 = 'Total consumption: '
+        stat='sum'
+    else:
+        str_1 = 'Annual consumption: '
+        stat='mean'
+    residential_cons = res.get('consumption_meter_summaries').get('residential').get(stat)
+    ev_cons = res.get('consumption_meter_summaries').get('evcharge_import').get(stat)
+
+    return [
+        str_1,
+        icons.get_icon('consumption-building'),
+        ' = ',
+        html.Span(f'{residential_cons:,.1f}'),
+        ' kWh; ',
+        icons.get_icon('consumption-direct-ev'),
+        ' = ',
+        html.Span(f'{ev_cons:,.1f}'),
+        ' kWh'                
+    ]
+
+def _make_net_result_header(
+    res,
+    ann_hori_toggle: bool,
+):
+    if ann_hori_toggle:
+        str_1 = 'Total export = '
+        str_2 = 'Total import = '
+        stat = 'sum'
+    else:
+        str_1 = 'Annual export = '
+        str_2 = 'Annual import = '
+        stat = 'mean'
+    
+    ms = (
+        pd.DataFrame
+        .from_dict(res['meter_summaries'], orient='columns')
+        .set_index(['variable', 'statistic'])
+    )
+    energy_export = ms.loc[('grid_export',stat),'value']
+    energy_import = ms.loc[('grid_import',stat),'value']
+    storage_loss = ms.loc[('storage_loss',stat),'value']
+
+    return [
+        str_1,
+        html.Span(f'{energy_export:,.1f}'),
+        ' kWh; ',
+        str_2,
+        html.Span(f'{energy_import:,.1f}'),
+        ' kWh; Storage losses = ',
+        html.Span(f'{storage_loss:,.1f}'),
+        ' kWh'
+    ]
+
+_MODEL_RESULT_HEADER_MAP = {
+    'generation': _make_generation_result_header,
+    'storage': _make_storage_result_header,
+    'consumption': _make_consumption_result_header,
+    'net_energy': _make_net_result_header,
+}
+
+def _make_model_result_header(
+    result_type,
+    model_id,
+    ann_hori_toggle: bool,
+    app
+):
+    res_id = postprocess_utils.get_model_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES[result_type],
+        model_id
+    )
+    res = app.results.get(res_id)
+    if res is None:
+        return None
+    return _MODEL_RESULT_HEADER_MAP[result_type](res, ann_hori_toggle)
+
+def update_model_result_headers(
+    res_trigger,
+    ann_hori_toggle: bool,
+    selected_config,
+    result_trigger_ids,
+    result_header_ids,
+    app
+):
+    NUP = [no_update] * len(result_header_ids)
+
+    rval: list[Any] = NUP
+
+    if ctx.triggered_id == 'annual-horizon_toggle':
+        update_triggers = result_trigger_ids
+    else:
+        update_triggers = [v for v in ctx.triggered_prop_ids.values()]
+    
+    selected_config = json.loads(selected_config)
+    model_id = selected_config['model_id']
+
+    for i, header_id in enumerate(result_header_ids):
+        hdr = None
+        match header_id['key']:
+            case 'gen-ressmry':
+                if any(x['key'] == 'res-gen' for x in update_triggers):
+                    hdr = _make_model_result_header(
+                        'generation', model_id, ann_hori_toggle, app
+                    )        
+            case 'stor-ressmry':
+                if any(x['key'] == 'res-stor' for x in update_triggers):
+                    hdr = _make_model_result_header(
+                        'storage', model_id, ann_hori_toggle, app
+                    )
+            case 'cons-ressmry':
+                if any(x['key'] == 'res-cons' for x in update_triggers):
+                    hdr = _make_model_result_header(
+                        'consumption', model_id, ann_hori_toggle, app
+                    )
+            case 'net-ressmry':
+                if any(x['key'] == 'res-net' for x in update_triggers):
+                    hdr = _make_model_result_header(
+                        'net_energy', model_id, ann_hori_toggle, app
+                    )
+        if hdr:
+            rval[i] = hdr
+    return rval
+
+def _make_finance_result_header(
+    res_benefits,
+    res_costs,
+    res_value,
+    ann_hori_toggle
+):
+    dr_benefits = res_benefits.get('benefits_discount_rate')
+    prval_benefits = res_benefits.get('present_benefits_discounted')
+    dr_costs = res_costs.get('costs_discount_rate')
+    prval_costs = res_costs.get('present_costs_discounted')
+    value = (
+        pd.DataFrame
+        .from_dict(res_value.get('value_summaries'), orient='columns')
+        .set_index(['variable', 'statistic'])
+    )
+    npv = value.loc[('net_present_value_discounted','sum'),'value']
+
+    return [
+        'Total benefits (',
+        html.Span(f'{dr_benefits:,.1%}'),
+        ') = ',
+        html.Span(f'£{prval_benefits:,.2f}'),
+        '; Total costs (',
+        html.Span(f'{dr_costs:,.1%}'),
+        ') = ',
+        html.Span(f'£{prval_costs:,.2f}'),
+        '; NPV = ',
+        html.Span(f'£{npv:,.2f}'),
+    ]
+
+def update_finance_result_headers(
+    res_trigger,
+    ann_hori_toggle: bool,
+    selected_config,
+    result_trigger_ids,
+    result_header_ids,
+    app
+):
+    NUP = [no_update] * len(result_header_ids)
+
+    rval: list[Any] = NUP
+
+    if ctx.triggered_id == 'annual-horizon_toggle':
+        update_triggers = result_trigger_ids
+    else:
+        update_triggers = [v for v in ctx.triggered_prop_ids.values()]
+
+    selected_config = json.loads(selected_config)
+    model_id = selected_config['model_id']
+    finance_id = selected_config['finance_id']
+
+    for i, header_id in enumerate(result_header_ids):
+        hdr = None
+        match header_id['key']:
+            case 'finance-ressmry':
+                if any(x['key'] in (
+                    'res-finance-so-benefits',
+                    'res-finance-so-costs',
+                    'res-finance-so-value'
+                ) for x in update_triggers):
+                    res_benefits = app.results.get(
+                        postprocess_utils.get_finance_result_id(
+                            postprocess_utils.RESULT_CACHE_PREFIXES['finance_benefits_so'], 
+                            finance_id, 
+                            model_id
+                        )
+                    )
+                    if not res_benefits:
+                        continue
+                    
+                    res_costs = app.results.get(
+                        postprocess_utils.get_finance_result_id(
+                            postprocess_utils.RESULT_CACHE_PREFIXES['finance_costs_so'],
+                            finance_id,
+                            model_id
+                        )
+                    )
+                    if not res_costs:
+                        continue
+                    
+                    res_value = app.results.get(
+                        postprocess_utils.get_finance_result_id(
+                            postprocess_utils.RESULT_CACHE_PREFIXES['finance_value_so'],
+                            finance_id,
+                            model_id
+                        )
+                    )
+                    if not res_value:
+                        continue
+
+                    hdr = _make_finance_result_header(
+                        res_benefits, res_costs, res_value,
+                        ann_hori_toggle
+                    )
+        if hdr:
+            rval[i] = hdr
+
+    return rval
 
 def update_generation_results_header(
     res_trigger, 
@@ -259,7 +545,7 @@ def sync_gen_results_table_to_store(
 
     if store_configurations is None:
         return NUP
-    
+
     res = postprocess_utils.get_model_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['generation'], 
         store_configurations,

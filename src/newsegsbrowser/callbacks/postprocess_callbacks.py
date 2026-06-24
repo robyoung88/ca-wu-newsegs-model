@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 
@@ -12,6 +13,7 @@ def add_postprocess_callbacks(app: Dash):
 
     @app.callback(
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
+
         Input('trigger-post-model-run', 'data'),
         State('prequeue-finance-run', 'data'),
         State('store-configurations', 'data'),
@@ -50,9 +52,16 @@ def add_postprocess_callbacks(app: Dash):
         for s_config in store_configurations:
             config = json.loads(s_config)
             if config['model_id'] == model_id:
+                mm = app.metamodels.get(config['metamodel_id'])
+                logger.info('metamodel %s uses model that has been run; finance %s added to run list', mm.id, mm.finance.id)
                 prequeue_finance_run.append(
                     json.dumps(
-                        browser.finance_run_request(config['metamodel_id'], config['finance_id'], model_id)
+                        browser.finance_run_request(
+                            config['metamodel_id'], 
+                            config['finance_id'], 
+                            model_id,
+                            datetime.datetime.now().timestamp() - 100. # Put request into the past as this is an automatic run which should happen immediately
+                        )
                     )
                 )
                 do_update = True
@@ -66,7 +75,8 @@ def add_postprocess_callbacks(app: Dash):
         return prequeue_finance_run
     
     @app.callback(
-        Output('res-gen', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-gen'}, 'data'),
+        
         Input('trigger-postprocess-model-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -79,13 +89,14 @@ def add_postprocess_callbacks(app: Dash):
         Create the generation results for a completed model run.
         """
         logger.info('postprocessing generation')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_gen'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_gen'](
             model_run_json,
             app
-        )
+        )]
     
     @app.callback(
-        Output('res-stor', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-stor'}, 'data'),
+        
         Input('trigger-postprocess-model-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -98,13 +109,14 @@ def add_postprocess_callbacks(app: Dash):
         Create the storage results for a completed model run.
         """
         logger.info('postprocessing storage')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_stor'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_stor'](
             model_run_json,
             app
-        )
+        )]
     
     @app.callback(
-        Output('res-cons', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-cons'}, 'data'),
+        
         Input('trigger-postprocess-model-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -117,13 +129,14 @@ def add_postprocess_callbacks(app: Dash):
         Create the consumption results for a completed model run.
         """
         logger.info('postprocessing consumption')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_cons'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_cons'](
             model_run_json,
             app
-        )
+        )]
     
     @app.callback(
-        Output('res-net', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-net'}, 'data'),
+
         Input('trigger-postprocess-model-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -136,13 +149,14 @@ def add_postprocess_callbacks(app: Dash):
         Create the net energy results for a completed model run.
         """
         logger.info('postprocessing net energy')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_net'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_net'](
             model_run_json,
             app
-        )
+        )]
     
     @app.callback(
-        Output('res-finance-so-benefits', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-benefits'}, 'data'),
+        
         Input('trigger-postprocess-finance-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -155,13 +169,14 @@ def add_postprocess_callbacks(app: Dash):
         Create the system owner financial benefits results.
         """
         logger.info('postprocessing financial benefits')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_benefits_so'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_benefits_so'](
             finance_run_json,
             app
-        )
+        )]
     
     @app.callback(
-        Output('res-finance-so-costs', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-costs'}, 'data'),
+
         Input('trigger-postprocess-finance-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -174,13 +189,14 @@ def add_postprocess_callbacks(app: Dash):
         Create the system owner financial costs results.
         """
         logger.info('postprocessing financial costs')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_costs_so'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_costs_so'](
             finance_run_json,
             app
-        )
+        )]
     
     @app.callback(
-        Output('res-finance-so-value', 'data'),
+        Output({'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-value'}, 'data'),
+        
         Input('trigger-postprocess-finance-run', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
@@ -193,9 +209,9 @@ def add_postprocess_callbacks(app: Dash):
         Create the system owner financial value results.
         """
         logger.info('postprocessing financial value')
-        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_value_so'](
+        return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_value_so'](
             finance_run_json,
             app
-        )
+        )]
     
     return app

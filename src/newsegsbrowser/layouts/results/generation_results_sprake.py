@@ -30,7 +30,8 @@ def create_generation_results_card(results_table_functions: Mapping[str, Callabl
                 html.Span("0.0"),
                 " kWh"
             ],
-            id='gen-ressmry-container',
+            id = {'type': 'result-header', 'section': 'deterministic-results', 'key': 'gen-ressmry'},
+            #id='gen-ressmry-container',
             className='card-subtitle'),
 
             results_details.create_results_details(

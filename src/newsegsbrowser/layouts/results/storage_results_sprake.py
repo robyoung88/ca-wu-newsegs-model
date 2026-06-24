@@ -23,7 +23,8 @@ def create_storage_results_card(results_table_functions: Mapping[str, Callable])
                 "; Charge cycles = ",
                 html.Span("0")
             ],
-            id='stor-ressmry-container',
+            id = {'type': 'result-header', 'section': 'deterministic-results', 'key': 'stor-ressmry'},
+            #id='stor-ressmry-container',
             className='card-subtitle'),
 
             results_details.create_results_details(

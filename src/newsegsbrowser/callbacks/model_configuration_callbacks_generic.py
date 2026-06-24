@@ -5,7 +5,7 @@ import logging
 from typing import Callable, MutableSequence
 import uuid
 
-from dash import html, no_update
+from dash import Patch, html, no_update
 import dash_bootstrap_components as dbc
 
 from newsegsbrowser import icons
@@ -38,7 +38,15 @@ def sync_config(
     This is also fired on first load of model page, so is responsible for
     creation of the first metamodel / configuration.
     """
-    NUP = no_update, no_update, no_update, [no_update] * len(input_containers), [no_update] * len(trigger_ids)
+    NUP = (
+        no_update, # store-selected-configurations
+        no_update, # store-configurations
+        no_update, # model-config
+        no_update, # finance-config
+        [no_update] * len(input_containers), # input-container children
+        [no_update] * len(trigger_ids), # trigger data
+        no_update # prequeue-action-user patch
+    )
 
     if store_selected_configuration is None:
         if store_configurations is None or len(store_configurations) == 0:
@@ -88,6 +96,7 @@ def sync_config(
         app.metamodels[mm.id] = mm
 
     inputs = []
+    logger.info('Creating inputs for metamodel: %s', mm.id)
     for ic in input_containers:
         cnts = []
         section = ic.get('section')
@@ -118,14 +127,26 @@ def sync_config(
     
     mcfg, fcfg = model_and_finance_to_interface_function(mdl, fnc)
 
+    if mdl.dirty:
+        prequeue_patch = Patch()
+        prequeue_patch.append(
+            json.dumps(browser.model_run_interface_action(mm.id, mdl.id))
+        )
+    else:
+        prequeue_patch = Patch()
+        prequeue_patch.append(
+            json.dumps(browser.result_update_interface_action(mm.id))
+        )
+
     return (
-        json.dumps(store_selected_configuration),
-        store_configurations,
-        json.dumps(mcfg),
-        json.dumps(fcfg),
-        inputs,
-        [datetime.datetime.now().timestamp()] * len(trigger_ids)
-    )
+        json.dumps(store_selected_configuration), # store-selected-configurations
+        store_configurations, # store-configurations
+        json.dumps(mcfg), # model-config
+        json.dumps(fcfg), # finance-config
+        inputs,  # input-container children
+        [datetime.datetime.now().timestamp()] * len(trigger_ids), # trigger data
+        prequeue_patch # prequeue-action-user patch
+    ) 
 
 def sync_loc_inputs_to_store(mcfg, app):
     if mcfg is None:

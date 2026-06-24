@@ -27,6 +27,9 @@ SPRAKE_CALLBACKS = {
     'postproc_finance_costs_so': postprocess_callbacks_sprake.postproc_finance_costs_so,
     'postproc_finance_value_so': postprocess_callbacks_sprake.postproc_finance_value_so,
 
+    'update_model_result_headers': results_callbacks_sprake.update_model_result_headers,
+    'update_finance_result_headers': results_callbacks_sprake.update_finance_result_headers,
+
     'update_generation_results_header': results_callbacks_sprake.update_generation_results_header,
     'update_storage_results_header': results_callbacks_sprake.update_storage_results_header,
     'update_consumption_results_header': results_callbacks_sprake.update_consumption_results_header,

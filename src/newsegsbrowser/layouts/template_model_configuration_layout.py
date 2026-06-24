@@ -270,6 +270,13 @@ def create_model_configuration_layout(*args, **kwargs):
                 dcc.Store(id = {'type': 'trigger', 'page': kwargs.get('page_type'), 'key': 'finance-config'}),
 
                 # Triggers for result table updates after postprocessing
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-gen'}, data = "[]"),
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-stor'}, data = "[]"),
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-cons'}, data = "[]"),
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-net'}, data = "[]"),
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-benefits'}, data = "[]"),
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-costs'}, data = "[]"),
+                dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-value'}, data = "[]"),
                 dcc.Store(id='res-gen'),
                 dcc.Store(id='res-stor'),
                 dcc.Store(id='res-cons'),

@@ -25,7 +25,8 @@ def create_net_results_card(results_table_functions: Mapping[str, Callable]):
                 html.Span('0.0'),
                 ' kWh'
             ],
-            id='net-ressmry-container',
+            id = {'type': 'result-header', 'section': 'deterministic-results', 'key': 'net-ressmry'},
+            #id='net-ressmry-container',
             className='card-subtitle'),
 
             results_details.create_results_details(

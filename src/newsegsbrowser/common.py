@@ -158,6 +158,12 @@ def model_interface_action(
 ):
     if input_time is None:
         input_time = datetime.datetime.now()
+
+    if isinstance(input_time, float):
+        ts = input_time
+    else:
+        ts = input_time.timestamp()
+    
     return {
         'type': 'model_config_interface_update',
         'metamodel_id': metamodel_id,
@@ -166,7 +172,7 @@ def model_interface_action(
         'subindex': subindex,
         'parameter_index': parameter_index,
         'vector_location': vector_location,
-        'time': input_time.timestamp(),
+        'time': ts,
     }
 
 def finance_interface_action(
@@ -192,6 +198,44 @@ def finance_interface_action(
         'time': input_time.timestamp(),
     }
 
+def model_run_interface_action(
+    metamodel_id,
+    model_id,
+    input_time = None
+):
+    if input_time is None:
+        input_time = datetime.datetime.now()
+
+    if isinstance(input_time, float):
+        ts = input_time
+    else:
+        ts = input_time.timestamp()
+
+    return {
+        'type': 'model_run_interface_request',
+        'metamodel_id': metamodel_id,
+        'model_id': model_id,
+        'time': ts
+    }
+
+def result_update_interface_action(
+    metamodel_id,
+    input_time = None
+):
+    if input_time is None:
+        input_time = datetime.datetime.now()
+
+    if isinstance(input_time, float):
+        ts = input_time
+    else:
+        ts = input_time.timestamp()
+
+    return {
+        'type': 'result_update_interface_request',
+        'metamodel_id': metamodel_id,
+        'time': ts
+    }
+
 def model_run_request(
     metamodel_id,
     model_id,
@@ -199,11 +243,17 @@ def model_run_request(
 ):
     if request_time is None:
         request_time = datetime.datetime.now()
+
+    if isinstance(request_time, float):
+        ts = request_time
+    else:
+        ts = request_time.timestamp()
+
     return {
         'type': 'model_run_request',
         'metamodel_id': metamodel_id,
         'model_id': model_id,
-        'time': request_time.timestamp()
+        'time': ts
     }
 
 def finance_run_request(
@@ -214,10 +264,16 @@ def finance_run_request(
 ):
     if request_time is None:
         request_time = datetime.datetime.now()
+
+    if isinstance(request_time, float):
+        ts = request_time
+    else:
+        ts = request_time.timestamp()
+    
     return {
         'type': 'finance_run_request',
         'metamodel_id': metamodel_id,
         'finance_id': finance_id,
         'model_id': model_id,
-        'time': request_time.timestamp()
+        'time': ts
     }

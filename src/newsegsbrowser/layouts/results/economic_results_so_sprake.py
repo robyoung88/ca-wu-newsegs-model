@@ -27,7 +27,8 @@ def create_economic_results_so_card(results_table_functions: Mapping[str, Callab
                 '; NPV = ',
                 html.Span('£0.00'),
             ],
-            id='finance-ressmry-container',
+            id = {'type': 'result-header', 'section': 'deterministic-results', 'key': 'finance-ressmry'},
+            #id='finance-ressmry-container',
             className='card-subtitle'),
 
             results_details.create_results_details(

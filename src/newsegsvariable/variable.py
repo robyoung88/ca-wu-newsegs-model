@@ -3393,6 +3393,12 @@ class Variable(
             if '_transform' in config.keys():
                 self._transform = tuple(self._transform)
 
+    def __deepcopy__(self, memo):
+        o = Variable(self.name, distribution = self.distribution.distribution) # pyright: ignore[reportAbstractUsage]
+        o.__dict__.update(copy.deepcopy(self.__dict__)) # pyright: ignore[reportAttributeAccessIssue]
+        return o
+
+
 class ScalarVariable(Variable):
 
     distribution: ScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]

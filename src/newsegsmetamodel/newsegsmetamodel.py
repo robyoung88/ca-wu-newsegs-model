@@ -50,6 +50,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         finance: newsegsfinance.NewsegsFinance,
         variables: MutableSequence[variable.Variable] = [],
     ):
+        super().__init__()
         self.model = model
         self.finance = finance
         self.variables = variables

@@ -15,6 +15,7 @@ from typing import Any, cast
 from dash import ALL, NoUpdate, ctx, Dash, Input, Output, Patch, State, no_update
 from dash import clientside_callback, ClientsideFunction
 import numpy as np
+from useful_types import SequenceNotStr
 
 from newsegsbrowser import common as browser
 from newsegsbrowser.callbacks import callbacks_map
@@ -68,7 +69,8 @@ def add_model_to_interface_callbacks(app: Dash):
         Output('finance-config', 'data', allow_duplicate=True),
         Output({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'children'),
         Output({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data', allow_duplicate = True),
-        
+        Output('prequeue-action-user', 'data', allow_duplicate = True),
+
         Input({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
         Input('store-selected-configuration', 'data'),
         Input('store-configurations', 'data'),
@@ -552,12 +554,37 @@ def add_interface_to_model_callbacks(app):
             return NUP
         
         return prequeue
+    
+    def find_matching_actions(
+        queue_action_user: list[str],
+        action: dict[str, Any],
+        i: int,
+        type_: str | SequenceNotStr[str],
+        filter = lambda x, y: x['metamodel_id'] == y['metamodel_id']
+    ) -> list[str]:
+        """
+        Removes matching items from queue_action_user and returns as dispatch_actions list
+        """
+        action_indexes = [i]
+        j = i + 1
+        if j < len(queue_action_user):
+            for j in range(j, len(queue_action_user)):
+                act_j = json.loads(queue_action_user[j])
+                if act_j['type'] == type_:
+                    if filter(act_j, action):
+                        action_indexes.append(j)
+        action_indexes.reverse()
+        dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
+        dispatch_actions.reverse
+        return dispatch_actions
 
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
         Output('queue-action-user', 'data'),
         Output('prequeue-model-run', 'data', allow_duplicate = True),
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
+        Output('trigger-postprocess-model-run', 'data', allow_duplicate = True),
+        Output('trigger-postprocess-finance-run', 'data', allow_duplicate = True),
         #Output('dispatchitem-action-user', 'data'),
         Output('interval-action-user', 'disabled'),
 
@@ -586,7 +613,7 @@ def add_interface_to_model_callbacks(app):
         if not queue_action_user:
             queue_action_user = []
 
-        logger.info('queueman_action_user triggered by: %s', ctx.triggered_id)
+        logger.info('processing user action queue, triggered by: %s', ctx.triggered_id)
         
         if ctx.triggered_id == 'prequeue-action-user':
             action = prequeue_action_user
@@ -602,6 +629,19 @@ def add_interface_to_model_callbacks(app):
 
         nowtime = datetime.datetime.now().timestamp()
 
+        rval = [
+            [], # The prequeue is consumed
+            queue_action_user,
+
+            no_update, # run prequeues
+            no_update,
+            
+            no_update, # postprocess triggers
+            no_update,
+
+            len(queue_action_user) == 0 # Disable Interval
+        ]
+
         # Loop through action queue
         for i, action_json in enumerate(queue_action_user):
             action = json.loads(action_json)
@@ -611,22 +651,15 @@ def add_interface_to_model_callbacks(app):
                         mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if model %s is checked out: %s', mm.model.id, mm.model.checked_out)
                         if not mm.model.checked_out:
-                            # Have a positive dispatch
-                            # Find other appropriate actions
-                            action_indexes = [i]
-                            j = i + 1
-                            if j < len(queue_action_user):
-                                for j in range(i + 1, len(queue_action_user)):
-                                    act_j = json.loads(queue_action_user[j])
-                                    if (
-                                        act_j['type'] == 'model_config_interface_update'
-                                        and act_j['metamodel_id'] == action['metamodel_id']
-                                    ):
-                                        action_indexes.append(j)
-                            action_indexes.reverse()
-                            dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
-                            dispatch_actions.reverse()
+                            # Have a positive dispatch - find other appropriate actions
 
+                            # NB - this function has side effect of popping matches from queue_action_user
+                            dispatch_actions = find_matching_actions(
+                                queue_action_user,
+                                action,
+                                i,
+                                'model_config_interface_update'
+                            )
                             logger.info('dispatching %d model config interface actions', len(dispatch_actions))
 
                             # Might as well carry them out here
@@ -651,34 +684,24 @@ def add_interface_to_model_callbacks(app):
 
                             logger.info('Adding a run request for %s', mm.model.id)
 
-                            return (
-                                [], # The prequeue is consumed
-                                queue_action_user,
-                                model_prequeue_patch,
-                                no_update,
-                                #dispatch_actions,
-                                len(queue_action_user) == 0 # Disable Interval
-                            )
+                            rval[2] = model_prequeue_patch
+                            rval[1] = queue_action_user
+                            rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                            return tuple(rval)
 
                 case 'finance_config_interface_update':
                     if (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
                         mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if finance %s is checked out: %s', mm.finance.id, mm.finance.checked_out)
                         if not mm.finance.checked_out:
-                            action_indexes = [i]
-                            j = i + 1
-                            if j < len(queue_action_user):
-                                for j in range(i + 1, len(queue_action_user)):
-                                    act_j = json.loads(queue_action_user[j])
-                                    if (
-                                        act_j['type'] == 'finance_config_interface_update'
-                                        and act_j['metamodel_id'] == action['metamodel_id']
-                                    ):
-                                        action_indexes.append(j)
-                            action_indexes.reverse()
-                            dispatch_actions = [queue_action_user.pop(x) for x in action_indexes]
-                            dispatch_actions.reverse()
 
+                            # NB - this function has side effect of popping matches from queue_action_user
+                            dispatch_actions = find_matching_actions(
+                                queue_action_user,
+                                action,
+                                i,
+                                'finance_config_interface_update'
+                            )
                             logger.info('dispatching %d finance config interface actions', len(dispatch_actions))
 
                             # Might as well carry them out here
@@ -703,26 +726,77 @@ def add_interface_to_model_callbacks(app):
 
                             logger.info('Adding a finance run request for %s', mm.finance.id)
 
-                            return (
-                                [], # The prequeue is consumed
-                                queue_action_user,
-                                no_update,
-                                finance_prequeue_patch,
-                                #dispatch_actions,
-                                len(queue_action_user) == 0 # Disable Interval
-                            )
+                            rval[3] = finance_prequeue_patch
+                            rval[1] = queue_action_user
+                            rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                            return tuple(rval)
+                        
+                case 'model_run_interface_request':
+                    # No debounce on a model run request
+                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    if mm is None:
+                        raise ValueError(f'metamodel {action['metamodel_id']} could not be recovered.')
+                    if not mm.model.checked_out:
 
+                        # NB - this function has side effect of popping matches from queue_action_user
+                        dispatch_actions = find_matching_actions(
+                            queue_action_user,
+                            action,
+                            i,
+                            'model_run_interface_request'
+                        )
+                        logger.info('dispatching %d model run interface requests', len(dispatch_actions))
+
+                        # Nothing to do but to make the request with the first action
+                        r_model_run_request = browser.model_run_request(mm.id, mm.model.id)
+                        model_prequeue_patch = Patch()
+                        model_prequeue_patch.append(json.dumps(r_model_run_request))
+
+                        logger.info('Adding a run request for %s', mm.model.id)
+                        
+                        rval[2] = model_prequeue_patch
+                        rval[1] = queue_action_user
+                        rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                        return tuple(rval)
+                
+                case 'result_update_interface_request':
+                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    if mm is None:
+                        raise ValueError(f'metamodel {action['metamodel_id']} could not be recovered.')
+                    if not mm.model.checked_out and not mm.finance.checked_out:
+                        dispatch_actions = find_matching_actions(
+                            queue_action_user,
+                            action,
+                            i,
+                            'result_update_interface_request'
+                        )
+                        logger.info('dispatching %d result update interface requests', len(dispatch_actions))
+
+                        mrr = browser.model_run_request(
+                            mm.id,
+                            mm.model.id,
+                            mm.model.last_run
+                        )
+                        frr = browser.finance_run_request(
+                            mm.id,
+                            mm.finance.id,
+                            mm.model.id,
+                            mm.finance.last_run
+                        )
+
+                        rval[4] = mrr
+                        rval[5] = frr
+                        rval[1] = queue_action_user
+                        rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                        return tuple(rval)
+                    
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')
         
         # Fall-through - do not update dispatchitem-action-user
-        return (
-            [], # The prequeue is consumed
-            queue_action_user,
-            no_update,
-            no_update,
-            len(queue_action_user) == 0 # Disable Interval
-        )
+        rval[1] = queue_action_user
+        rval[-1] = len(queue_action_user) == 0 # Disable Interval
+        return tuple(rval)
     
     @app.callback(
         #Output('store-model-interface-configurations', 'data', allow_duplicate = True),

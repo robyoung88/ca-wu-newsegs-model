@@ -26,7 +26,8 @@ def create_consumption_results_card(results_table_functions: Mapping[str, Callab
                 html.Span('0.0'),
                 ' kWh'                
             ],
-            id='cons-ressmry-container',
+            id = {'type': 'result-header', 'section': 'deterministic-results', 'key': 'cons-ressmry'},
+            #id='cons-ressmry-container',
             className='card-subtitle'),
 
             results_details.create_results_details(

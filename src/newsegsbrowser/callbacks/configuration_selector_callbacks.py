@@ -55,22 +55,21 @@ def add_configuration_selection_callbacks(app: Dash):
         if config_name[trigger_index] is None:
             return NUP
         
-        selected_config = json.loads(selected_config)
-        
         w_conf = json.loads(configurations[trigger_index])
         mm_working = cast(NewsegsMetaModel, app.metamodels.get(w_conf['metamodel_id']))
         if mm_working is None:
             raise ValueError(f'selected metamodel cannot be located: {w_conf['metamodel_id']}')
 
         mm_working.name = config_name[trigger_index]
-        configurations[trigger_index] = mm_working.to_config()
+        configurations[trigger_index] = json.dumps(mm_working.to_config())
 
+        selected_config = json.loads(selected_config)
         if selected_config['config_index'] == trigger_index:
             selected_config = mm_working.to_config()
             selected_config['config_index'] = trigger_index
-            rval = (json.dumps(configurations), json.dumps(selected_config))
+            rval = (configurations, json.dumps(selected_config))
         else:
-            rval = (json.dumps(configurations), no_update)
+            rval = (configurations, no_update)
         
         return rval
     
@@ -96,7 +95,7 @@ def add_configuration_selection_callbacks(app: Dash):
     )
     def add_duplicate_config(
         n_clicks, 
-        configurations, 
+        configurations,
         selected_config,
         focus_btn_ids,
         header_focus_btn_ids
@@ -146,24 +145,6 @@ def add_configuration_selection_callbacks(app: Dash):
             mm_dup = cast(NewsegsMetaModel, app.duplicate_metamodel(ref_config['metamodel_id']))
             mdl = mm_dup.model
             fnc = mm_dup.finance
-
-
-            #mdl = app.duplicate_model(ref_config['model_id'])
-            #fnc = app.duplicate_finance(ref_config['finance_id'], mdl.id)
-
-            # store_model_interface_configurations[mdl.id] = copy.copy(
-            #     store_model_interface_configurations.get(
-            #         ref_config['model_id']
-            #     )
-            # )
-            # store_model_interface_configurations[mdl.id]['model_id'] = mdl.id
-
-            # store_finance_interface_configurations[fnc.id] = copy.copy(
-            #     store_finance_interface_configurations.get(
-            #         ref_config['finance_id']
-            #     )
-            # )
-            # store_finance_interface_configurations[fnc.id]['finance_id'] = fnc.id
 
             mm_dup.name = mm_dup.name + " Copy"
             new_config = mm_dup.to_config()
@@ -223,9 +204,6 @@ def add_configuration_selection_callbacks(app: Dash):
 
             configurations,
             json.dumps(selected_config),
-
-            #json.dumps(store_model_interface_configurations),
-            #json.dumps(store_finance_interface_configurations)
         )  
     
     # REMOVE
@@ -243,7 +221,12 @@ def add_configuration_selection_callbacks(app: Dash):
         State({'type': 'config-remove-btn', 'index': ALL}, 'id'),
         prevent_initial_call=True
     )
-    def remove_config(n_clicks, configurations, selected_config, ids):
+    def remove_config(
+        n_clicks, 
+        configurations, 
+        selected_config, 
+        ids
+    ):
         NUP = (
             no_update, 
             no_update, 

@@ -7,115 +7,176 @@ from newsegsbrowser.callbacks import callbacks_map
 def add_result_header_callbacks(app: Dash):
 
     @app.callback(
-        Output('gen-ressmry-container', 'children'),
-        Input('res-gen', 'data'),
+        Output({'type': 'result-header', 'section': ALL, 'key': ALL}, 'children', allow_duplicate = True),
+
+        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': ALL}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State('store-selected-configuration', 'data'),
+        State({'type': 'result-statistics', 'supersection': 'model-results', 'key': ALL}, 'id'),
+        State({'type': 'result-header', 'section': ALL, 'key': ALL}, 'id'),
         State('selected-model', 'data'),
-        prevent_initial_call=True
+        prevent_initial_call = True,
     )
-    def update_generation_results_header(
+    def update_model_result_headers(
         res_trigger,
         ann_hori_toggle,
         selected_config,
+        result_trigger_ids,
+        result_header_ids,
         selected_model
     ):
-        return callbacks_map.CALLBACKS_MAP[selected_model]['update_generation_results_header'](
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_model_result_headers'](
             res_trigger,
             ann_hori_toggle,
             selected_config,
+            result_trigger_ids,
+            result_header_ids,
             app
         )
     
     @app.callback(
-        Output('stor-ressmry-container', 'children'),
-        Input('res-stor', 'data'),
+        Output({'type': 'result-header', 'section': ALL, 'key': ALL}, 'children', allow_duplicate = True),
+
+        Input({'type': 'result-statistics', 'supersection': 'finance-results', 'key': ALL}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State('store-selected-configuration', 'data'),
+        State({'type': 'result-statistics', 'supersection': 'finance-results', 'key': ALL}, 'id'),
+        State({'type': 'result-header', 'section': ALL, 'key': ALL}, 'id'),
         State('selected-model', 'data'),
-        prevent_initial_call=True
+        prevent_initial_call = True,
     )
-    def update_storage_results_header(
+    def update_finance_result_headers(
         res_trigger,
         ann_hori_toggle,
         selected_config,
+        result_trigger_ids,
+        result_header_ids,
         selected_model
     ):
-        return callbacks_map.CALLBACKS_MAP[selected_model]['update_storage_results_header'](
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_finance_result_headers'](
             res_trigger,
             ann_hori_toggle,
             selected_config,
+            result_trigger_ids,
+            result_header_ids,
             app
         )
+
+    # @app.callback(
+    #     Output('gen-ressmry-container', 'children'),
+
+    #     Input('res-gen', 'data'),
+    #     Input('annual-horizon-toggle', 'value'),
+    #     State('store-selected-configuration', 'data'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call=True
+    # )
+    # def update_generation_results_header(
+    #     res_trigger,
+    #     ann_hori_toggle,
+    #     selected_config,
+    #     selected_model
+    # ):
+    #     return callbacks_map.CALLBACKS_MAP[selected_model]['update_generation_results_header'](
+    #         res_trigger,
+    #         ann_hori_toggle,
+    #         selected_config,
+    #         app
+    #     )
     
-    @app.callback(
-        Output('cons-ressmry-container', 'children'),
-        Input('res-cons', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        State('store-selected-configuration', 'data'),
-        State('selected-model', 'data'),
-        prevent_initial_call=True
-    )
-    def update_consumption_results_header(
-        res_trigger,
-        ann_hori_toggle,
-        selected_config,
-        selected_model
-    ):
-        return callbacks_map.CALLBACKS_MAP[selected_model]['update_consumption_results_header'](
-            res_trigger,
-            ann_hori_toggle,
-            selected_config,
-            app
-        )
+    # @app.callback(
+    #     Output('stor-ressmry-container', 'children'),
+
+    #     Input('res-stor', 'data'),
+    #     Input('annual-horizon-toggle', 'value'),
+    #     State('store-selected-configuration', 'data'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call=True
+    # )
+    # def update_storage_results_header(
+    #     res_trigger,
+    #     ann_hori_toggle,
+    #     selected_config,
+    #     selected_model
+    # ):
+    #     return callbacks_map.CALLBACKS_MAP[selected_model]['update_storage_results_header'](
+    #         res_trigger,
+    #         ann_hori_toggle,
+    #         selected_config,
+    #         app
+    #     )
     
-    @app.callback(
-        Output('net-ressmry-container', 'children'),
-        Input('res-net', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        State('store-selected-configuration', 'data'),
-        State('selected-model', 'data'),
-        prevent_initial_call=True
-    )
-    def update_net_results_header(
-        res_trigger,
-        ann_hori_toggle,
-        selected_config,
-        selected_model
-    ):
-        return callbacks_map.CALLBACKS_MAP[selected_model]['update_net_results_header'](
-            res_trigger,
-            ann_hori_toggle,
-            selected_config,
-            app
-        )
+    # @app.callback(
+    #     Output('cons-ressmry-container', 'children'),
+
+    #     Input('res-cons', 'data'),
+    #     Input('annual-horizon-toggle', 'value'),
+    #     State('store-selected-configuration', 'data'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call=True
+    # )
+    # def update_consumption_results_header(
+    #     res_trigger,
+    #     ann_hori_toggle,
+    #     selected_config,
+    #     selected_model
+    # ):
+    #     return callbacks_map.CALLBACKS_MAP[selected_model]['update_consumption_results_header'](
+    #         res_trigger,
+    #         ann_hori_toggle,
+    #         selected_config,
+    #         app
+    #     )
     
-    @app.callback(
-        Output('finance-ressmry-container', 'children'),
-        Input('res-finance-so-benefits', 'data'),
-        Input('res-finance-so-costs', 'data'),
-        Input('res-finance-so-value', 'data'),
-        Input('annual-horizon-toggle', 'value'),
-        State('store-selected-configuration', 'data'),
-        State('selected-model', 'data'),
-        prevent_initial_call=True
-    )
-    def update_finance_results_header(
-        res_benefits_trigger,
-        res_costs_trigger,
-        res_value_trigger,
-        ann_hori_toggle,
-        selected_config,
-        selected_model
-    ):
-        return callbacks_map.CALLBACKS_MAP[selected_model]['update_finance_results_header'](
-            res_benefits_trigger,
-            res_costs_trigger,
-            res_value_trigger,
-            ann_hori_toggle,
-            selected_config,
-            app
-        )
+    # @app.callback(
+    #     Output('net-ressmry-container', 'children'),
+
+    #     Input('res-net', 'data'),
+    #     Input('annual-horizon-toggle', 'value'),
+    #     State('store-selected-configuration', 'data'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call=True
+    # )
+    # def update_net_results_header(
+    #     res_trigger,
+    #     ann_hori_toggle,
+    #     selected_config,
+    #     selected_model
+    # ):
+    #     return callbacks_map.CALLBACKS_MAP[selected_model]['update_net_results_header'](
+    #         res_trigger,
+    #         ann_hori_toggle,
+    #         selected_config,
+    #         app
+    #     )
+    
+    # @app.callback(
+    #     Output('finance-ressmry-container', 'children'),
+
+    #     Input('res-finance-so-benefits', 'data'),
+    #     Input('res-finance-so-costs', 'data'),
+    #     Input('res-finance-so-value', 'data'),
+    #     Input('annual-horizon-toggle', 'value'),
+    #     State('store-selected-configuration', 'data'),
+    #     State('selected-model', 'data'),
+    #     prevent_initial_call=True
+    # )
+    # def update_finance_results_header(
+    #     res_benefits_trigger,
+    #     res_costs_trigger,
+    #     res_value_trigger,
+    #     ann_hori_toggle,
+    #     selected_config,
+    #     selected_model
+    # ):
+    #     return callbacks_map.CALLBACKS_MAP[selected_model]['update_finance_results_header'](
+    #         res_benefits_trigger,
+    #         res_costs_trigger,
+    #         res_value_trigger,
+    #         ann_hori_toggle,
+    #         selected_config,
+    #         app
+    #     )
     
     return app
     
@@ -126,7 +187,8 @@ def add_result_table_callbacks(app):
 
     @app.callback(
         Output({'type': 'results-table', 'section': 'generation', 'key': ALL}, 'children'),
-        Input('res-gen', 'data'),
+
+        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-gen'}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State({'type': 'results-table', 'section': 'generation', 'key': ALL}, 'id'),
         State('store-configurations', 'data'),
@@ -150,7 +212,8 @@ def add_result_table_callbacks(app):
     
     @app.callback(
         Output({'type': 'results-table', 'section': 'storage', 'key': ALL}, 'children'),
-        Input('res-stor', 'data'),
+
+        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res=stor'}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State({'type': 'results-table', 'section': 'storage', 'key': ALL}, 'id'),
         State('store-configurations', 'data'),
@@ -174,7 +237,8 @@ def add_result_table_callbacks(app):
     
     @app.callback(
         Output({'type': 'results-table', 'section': 'consumption', 'key': ALL}, 'children'),
-        Input('res-cons', 'data'),
+
+        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-cons'}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State({'type': 'results-table', 'section': 'consumption', 'key': ALL}, 'id'),
         State('store-configurations', 'data'),
@@ -198,7 +262,8 @@ def add_result_table_callbacks(app):
 
     @app.callback(
         Output({'type': 'results-table', 'section': 'net', 'key': ALL}, 'children'),
-        Input('res-net', 'data'),
+
+        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-net'}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State({'type': 'results-table', 'section': 'net', 'key': ALL}, 'id'),
         State('store-configurations', 'data'),
@@ -222,9 +287,10 @@ def add_result_table_callbacks(app):
     
     @app.callback(
         Output({'type': 'results-table', 'section': 'finance_so', 'key': ALL}, 'children'),
-        Input('res-finance-so-benefits', 'data'),
-        Input('res-finance-so-costs', 'data'),
-        Input('res-finance-so-value', 'data'),
+
+        Input({'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-benefits'}, 'data'),
+        Input({'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-costs'}, 'data'),
+        Input({'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-value'}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State({'type': 'results-table', 'section': 'finance_so', 'key': ALL}, 'id'),
         State('store-configurations', 'data'),
