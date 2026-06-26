@@ -104,3 +104,8 @@ def metamodel_process_components():
         dcc.Store(id = 'background_cancel_trigger'),
         dcc.Store(id = 'background_progress_tracker', data = '{"value":"0","max":"1"}'),
     ]
+
+def dsa_process_components(**kwargs):
+    return [
+        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'dsa_input_change'}, data = [])
+    ]

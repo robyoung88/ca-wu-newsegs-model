@@ -9,29 +9,43 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from newsegsvariable import variable
+import newsegsbrowser.common as browser
+
+def _autoformat(val) -> str:
+    if isinstance(val, float):
+        return f'{val:,.1f}' # If you want other precision, deal with that before passing it in
+    elif isinstance(val, int):
+        return f'{val:d}'
+    elif isinstance(val, str):
+        return val
+    else:
+        return str(val)
 
 def create_dsa_input_scalar_numeric_header(
     label: str,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+    value,
+    lower,
+    upper,
 ):
+    value = _autoformat(value)
+    lower = _autoformat(lower)
+    upper = _autoformat(upper)
     return [
         html.H4(
             label,
         ),
         html.Div([
             html.Span(
-                '100.0'
+                value
             ),
             html.Div([
                 '[',
                 html.Span(
-                    '80.0'
+                    lower
                 ),
-                ',',
+                ', ',
                 html.Span(
-                    '120.0'
+                    upper
                 ),
                 ']'
 
@@ -162,29 +176,41 @@ def create_dsa_input_vector_parameter_input(
 
 def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
-    type_id: str,
-    key: str,
-    section: str | None = None,
-    #var: variable.Variable
+    var: variable.ScalarVariable,
 ):
+    type_id_lower = f'input-dsabound-lower'
+    type_id_upper = f'input-dsabound-upper'
     match bounds_type:
         case 'absolute' | 'relative' | 'offset':
+            if bounds_type == 'relative':
+                step_size = 0.05
+            else:
+                step_size = float(f'{var.deterministic_value / 10:2g}')
+                if step_size == 0:
+                    step_size = 0.05
+
             return [
                 dbc.InputGroup([
                     dbc.InputGroupText('Lower:'),
-                    dbc.Input(
-                        type = 'number',
-                        debounce = True,
-                        placeholder = 'Lower'
+                    browser.create_numeric_input_compound_key(
+                        type_id_lower,
+                        var.interface_key,
+                        section = var.interface_section,
+                        subindex = var.interface_subindex,
+                        value = var.dsa_lower,
+                        step = step_size
                     )
                 ]
                 ),
                 dbc.InputGroup([
                     dbc.InputGroupText('Upper:'),
-                    dbc.Input(
-                        type = 'number',
-                        debounce = True,
-                        placeholder = 'Upper'
+                    browser.create_numeric_input_compound_key(
+                        type_id_upper,
+                        var.interface_key,
+                        section = var.interface_section,
+                        subindex = var.interface_subindex,
+                        value = var.dsa_upper,
+                        step = step_size
                     )
                 ]
                 ),
@@ -193,9 +219,12 @@ def create_dsa_bounds_inputs_scalar(
             return [
                 dbc.InputGroup([
                     dbc.InputGroupText('Confidence:'),
-                    dbc.Input(
-                        type = 'number',
-                        debounce = True
+                    browser.create_numeric_input_compound_key(
+                        type_id_lower,
+                        var.interface_key,
+                        section = var.interface_section,
+                        subindex = var.interface_subindex,
+                        value = var.dsa_lower
                     )
                 ])
             ] 
@@ -254,14 +283,23 @@ def create_dsa_bounds_input_vector(
 def create_dsa_bound_type_selector(
     permitted_dsa_bounds,
     selected_bound,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+    var: variable.Variable,
 ):
+    type_id = f'dropdown-dsaboundtype'
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+    id_ = {
+        'type': type_id,
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
     return [
         dcc.Dropdown(
             permitted_dsa_bounds,
             selected_bound,
+            id = id_,
             searchable = False,
             clearable = False
         )
@@ -272,165 +310,269 @@ def compose_dsa_input(
     parameter_component,
     dsa_bound_type_selector,
     dsa_bound_component,
-    is_selected: bool
+    var: variable.Variable,
 ):
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+    
+    header_id = {
+        'type': 'dsa-input-header',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    bounds_id = {
+        'type': 'dsa-bounds-inputcontainer',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+
     return html.Div([
         daq.ToggleSwitch(
             #vertical = True,
             className = 'dsa-toggle',
             size = 30,
-            value = is_selected
+            value = var.dsa_selected
         ),
         html.Details([
             html.Summary(
                 header_component,
-                className='dsa-configuration-summary'
+                className='dsa-configuration-summary',
+                id = header_id
             ),
             html.Div((
-                parameter_component 
+                parameter_component
                 + dsa_bound_type_selector
-                + dsa_bound_component
+                + [
+                    html.Span(
+                        dsa_bound_component,
+                        id = bounds_id
+                    )
+                ]
             ))
         ],
         ),
-        
-
     ],
     className='dsa-input-single-value-block',
     )
 
-def create_dsa_input_scalar_constant(
-    label: str,
-    is_selected: bool,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+def create_dsa_header(
+    var: variable.ScalarVariable,
 ):
+    if var.distribution.distribution == 'constant':
+        fmt = _autoformat
+    else:
+        fmt = var.value_formatter
+    label = f'{var.label} ({var.unit})'
+    type_id = f'input-{var.configuration_type}-config'
+
+    hdr = create_dsa_input_scalar_numeric_header(
+        label, 
+        fmt(var.deterministic_value),
+        fmt(var.get_dsa_value('lower', True)),
+        fmt(var.get_dsa_value('upper', True)),
+    )
+    
+    return hdr
+
+
+def create_dsa_input_scalar_constant(
+    var: variable.ScalarVariable,
+):
+    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
-        create_dsa_input_scalar_numeric_header(label, type_id, key, section),
+        create_dsa_header(var),
         [
             dbc.InputGroup([
                 dbc.InputGroupText('Value:'),
-                dbc.Input(type = 'number', debounce = True, placeholder = 'Value')
+                browser.create_numeric_input_compound_key(
+                    type_id,
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
+                    min = var.interface_min,
+                    max = var.interface_max,
+                    step = var.interface_step if var.interface_step else 1
+                ),
             ])
         ],
-        create_dsa_bound_type_selector(['absolute', 'relative', 'offset'],'relative', type_id, key, section),
-        create_dsa_bounds_inputs_scalar(
-            'relative',
-            type_id,
-            key,
-            section
+        create_dsa_bound_type_selector(
+            ['absolute', 'relative', 'offset'],
+            var.dsa_bounds_type,
+            var,
         ),
-        is_selected
+        create_dsa_bounds_inputs_scalar(
+            var.dsa_bounds_type,
+            var,
+        ),
+        var
     )
 
 
 # A form element for a normally distributed variable
 # e.g. a scaling factor for expected annual insolation
 def create_dsa_input_scalar_normal(
-    label: str,
-    is_selected: bool,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+    var: variable.NumericScalarVariable,
 ):
+    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
-        create_dsa_input_scalar_numeric_header(label, type_id, key, section),
+        create_dsa_header(var),
         [
             dbc.InputGroup([
                         dbc.InputGroupText('Mean:'),
-                        dbc.Input(type = 'number', debounce = True, placeholder = 'Value')
+                        browser.create_numeric_input_compound_key(
+                            type_id,
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                            placeholder = 'Mean',
+                            min = var.interface_min,
+                            max = var.interface_max,
+                            step = var.interface_step if var.interface_step else 1
+                        )
                     ]
                     ),
                     dbc.InputGroup([
                         dbc.InputGroupText('SD:'),
-                        dbc.Input(type = 'number', debounce = True, placeholder = 'SD')
+                        browser.create_numeric_input_compound_key(
+                            type_id,
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            parameter_index = 1,
+                            value = var._raw_parameters[1], # pyright: ignore[reportArgumentType]
+                            placeholder = 'SD',
+                            step = var.interface_step/10 if var.interface_step else 1
+                        )
                     ]
                     ),
         ],
-        create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
-        create_dsa_bounds_inputs_scalar(
-            'interval',
-            type_id,
-            key,
-            section
+        create_dsa_bound_type_selector(
+            ['absolute', 'relative', 'offset', 'interval'],
+            var.dsa_bounds_type,
+            var,
         ),
-        is_selected
+        create_dsa_bounds_inputs_scalar(
+            var.dsa_bounds_type,
+            var,
+        ),
+        var
     )
 
 def create_dsa_input_scalar_beta(
-    label: str,
-    is_selected: bool,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+    var: variable.NumericScalarVariable,
 ):
+    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
-        create_dsa_input_scalar_numeric_header(label, type_id, key, section),
+        create_dsa_header(var),
         [
             dbc.InputGroup([
                         dbc.InputGroupText('Mean:'),
-                        dbc.Input(type = 'number', debounce = True, placeholder = 'Value')
+                       browser.create_numeric_input_compound_key(
+                            type_id,
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                            placeholder = 'Mean',
+                            min = var.interface_min,
+                            max = var.interface_max,
+                            step = var.interface_step if var.interface_step else 1
+                        )
                     ]
                     ),
                     dbc.InputGroup([
                         dbc.InputGroupText('SD:'),
-                        dbc.Input(type = 'number', debounce = True, placeholder = 'SD')
+                        browser.create_numeric_input_compound_key(
+                            type_id,
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            parameter_index = 1,
+                            value = var._raw_parameters[1], # pyright: ignore[reportArgumentType]
+                            placeholder = 'SD',
+                            step = var.interface_step/10 if var.interface_step else 1
+                        )
                     ]
                     ),
         ],
-        create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
-        create_dsa_bounds_inputs_scalar(
-            'interval',
-            type_id,
-            key,
-            section
+        create_dsa_bound_type_selector(
+            ['absolute', 'relative', 'offset', 'interval'],
+            var.dsa_bounds_type,
+            var,
         ),
-        is_selected
+        create_dsa_bounds_inputs_scalar(
+            var.dsa_bounds_type,
+            var,
+        ),
+        var
     )
 
 def create_dsa_input_scalar_gamma(
-    label: str,
-    is_selected: bool,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+    var: variable.NumericScalarVariable,
 ):
+    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
-        create_dsa_input_scalar_numeric_header(label, type_id, key, section),
+        create_dsa_header(var),
         [
             dbc.InputGroup([
                         dbc.InputGroupText('Mean:'),
-                        dbc.Input(type = 'number', debounce = True, placeholder = 'Value')
+                        browser.create_numeric_input_compound_key(
+                            type_id,
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                            placeholder = 'Mean',
+                            min = var.interface_min,
+                            max = var.interface_max,
+                            step = var.interface_step if var.interface_step else 1
+                        )
                     ]
                     ),
                     dbc.InputGroup([
                         dbc.InputGroupText('SD:'),
-                        dbc.Input(type = 'number', debounce = True, placeholder = 'SD')
+                        browser.create_numeric_input_compound_key(
+                            type_id,
+                            var.interface_key,
+                            section = var.interface_section,
+                            subindex = var.interface_subindex,
+                            parameter_index = 1,
+                            value = var._raw_parameters[1], # pyright: ignore[reportArgumentType]
+                            placeholder = 'SD',
+                            step = var.interface_step/10 if var.interface_step else 1
+                        )
                     ]
                     ),
         ],
-        create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
-        create_dsa_bounds_inputs_scalar(
-            'interval',
-            type_id,
-            key,
-            section
+        create_dsa_bound_type_selector(
+            ['absolute', 'relative', 'offset', 'interval'],
+            var.dsa_bounds_type,
+            var,
         ),
-        is_selected
+        create_dsa_bounds_inputs_scalar(
+            var.dsa_bounds_type,
+            var,
+        ),
+        var
     )
 
 def create_dsa_input_vector_mvn(
-    label: str,
-    is_selected: bool,
-    type_id: str,
-    key: str,
-    section: str | None = None,
+    var: variable.NumericVectorVariable,
 ):
+    fmt = var.value_formatter
+    label = f'{var.label} ({var.unit})'
+    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
         create_dsa_input_vector_numeric_header(label, type_id, key, section),
         create_dsa_input_vector_parameter_input(OrderedDict(mean = ['shape', 'scale'], vcv = ['covariance']), ('vector', 'matrix'), type_id, key, section),
         create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
         create_dsa_bounds_input_vector('relative', type_id, key, section),
-        is_selected
+        var
     )

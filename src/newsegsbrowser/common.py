@@ -38,16 +38,14 @@ def create_numeric_card_input(
                   })
     ])
 
-def create_numeric_card_input_compound_key(
-    icon_name: str | SequenceNotStr[str],
-    label: str,
+def create_numeric_input_compound_key(
     type_id: str,
     key: str,
     section: str | None = None,
     subindex: int = 0,
     parameter_index: int = 0,
     vector_location: int = 0,
-    placeholder: int | float = 0.0,
+    placeholder: int | float | str = 0.0,
     value: int | float | None = None,
     min: int | float | None = 0.0,
     max: int | float | None = None,
@@ -69,8 +67,39 @@ def create_numeric_card_input_compound_key(
         cn = f'dynamic-step-field step-val-{step:d}'
     else:
         cn = f'dynamic-step-field step-val-{step:f}'
-
     
+    return dbc.Input(
+        id = input_id,
+        type = 'number',
+        value = value,
+        placeholder = placeholder,
+        debounce = True,
+        min = min,
+        max = max,
+        step = 'any',
+        style = {
+            'display':'inline-block',
+            'float':'right',
+            'width':'30%'
+        },
+        className = cn
+    )
+
+def create_numeric_card_input_compound_key(
+    icon_name: str | SequenceNotStr[str],
+    label: str,
+    type_id: str,
+    key: str,
+    section: str | None = None,
+    subindex: int = 0,
+    parameter_index: int = 0,
+    vector_location: int = 0,
+    placeholder: int | float = 0.0,
+    value: int | float | None = None,
+    min: int | float | None = 0.0,
+    max: int | float | None = None,
+    step: int | float  = 1
+):  
     return html.Div([
         html.H5(
             [
@@ -79,21 +108,18 @@ def create_numeric_card_input_compound_key(
             ],
             style={'display':'inline'}
         ),
-        dbc.Input(
-            id = input_id,
-            type = 'number',
-            value = value,
-            placeholder = placeholder,
-            debounce = True,
-            min = min,
-            max = max,
-            step = 'any',
-            style = {
-                'display':'inline-block',
-                'float':'right',
-                'width':'30%'
-            },
-            className = cn
+        create_numeric_input_compound_key(
+            type_id,
+            key,
+            section,
+            subindex,
+            parameter_index,
+            vector_location,
+            placeholder,
+            value,
+            min,
+            max,
+            step
         )
     ])
 
@@ -195,6 +221,33 @@ def finance_interface_action(
         'subindex': subindex,
         'parameter_index': parameter_index,
         'vector_location': vector_location,
+        'time': input_time.timestamp(),
+    }
+
+def dsa_impacting_interface_action(
+    metamodel_id,
+    section,
+    key,
+    subindex,
+    input_time = None,
+    bounds_type_change = False,
+    **kwargs
+):
+    """
+    Action to raise if an interface change has impacted a DSA value.
+
+    Primary outcome is the update of DSA headers.
+    """
+    if input_time is None:
+        input_time = datetime.datetime.now()
+    return {
+        'type': 'dsa_impacting_interface_action',
+        'action_key': 'dsa_input_change',
+        'metamodel_id': metamodel_id,
+        'section': section,
+        'key': key,
+        'subindex': subindex,
+        'bounds_type_change': bounds_type_change,
         'time': input_time.timestamp(),
     }
 

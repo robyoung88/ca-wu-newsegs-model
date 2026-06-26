@@ -114,6 +114,30 @@ def add_model_to_interface_callbacks(app: Dash):
             app
         )
     
+    
+    @app.callback(
+        Output({'type':'dsa-bounds-inputcontainer', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'children'),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'dsa_input_change'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State({'type':'dsa-bounds-inputcontainer', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'id'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def update_dsa_bounds_inputs(
+        dsa_input_change_trigger,
+        selected_configuration,
+        bounds_container_ids,
+        selected_model
+    ):
+        logger.info('update_dsa_bounds_inputs triggered.')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_dsa_boundsinputs'](
+            dsa_input_change_trigger,
+            selected_configuration,
+            bounds_container_ids,
+            app
+        )
+    
     return app
     
 def add_feedback_callbacks(app):
@@ -123,6 +147,7 @@ def add_feedback_callbacks(app):
 
     @app.callback(
         Output({'type': 'input-header', 'section': 'model-config', 'key': ALL}, 'children'),
+        
         Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
         State('store-selected-configuration', 'data'),
         State({'type': 'input-header', 'section': 'model-config', 'key': ALL}, 'id'),
@@ -146,7 +171,9 @@ def add_feedback_callbacks(app):
     # Trigger on both model and finance config updates
     @app.callback(
         Output({'type': 'input-header', 'section': 'finance-config', 'key': ALL}, 'children'),
-        Input({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data'),
+        
+        Input({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'data'),
+        Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
         State('store-selected-configuration', 'data'),
         State({'type': 'input-header', 'section': 'finance-config', 'key': ALL}, 'id'),
         State('selected-model', 'data'),
@@ -154,6 +181,7 @@ def add_feedback_callbacks(app):
     )
     def update_headers_finance_config(
         finance_config_trigger,
+        model_config_trigger,
         selected_configuration,
         header_ids,
         selected_model
@@ -167,7 +195,31 @@ def add_feedback_callbacks(app):
         )
     
     @app.callback(
+        Output({'type':'dsa-input-header', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'children'),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'dsa_input_change'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State({'type':'dsa-input-header', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'id'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def update_headers_dsa_inputs(
+        dsa_input_change_trigger,
+        selected_configuration,
+        header_ids,
+        selected_model
+    ):
+        logger.info('update_headers_dsa_inputs triggered.')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_headers_dsa_inputs'](
+            dsa_input_change_trigger,
+            selected_configuration,
+            header_ids,
+            app
+        )
+    
+    @app.callback(
         Output({'type': 'feedback-graph', 'section': 'feedback', 'key': ALL}, 'figure'),
+        
         Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
         State('store-selected-configuration', 'data'),
         State({'type': 'feedback-graph', 'section': 'feedback', 'key': ALL}, 'id'),
@@ -197,16 +249,18 @@ def add_interface_to_model_callbacks(app):
 
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
+        
         Output({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Output({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
+        
         Output({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'invalid'),
         Output({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'invalid'),
+        
         Output({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data', allow_duplicate = True),
         Output({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'data', allow_duplicate = True),
 
         Input({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
-        #Input('model-config','data'), # Trying to suppress circular callbacks
 
         State('store-selected-configuration', 'data'),
         State({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
@@ -273,7 +327,7 @@ def add_interface_to_model_callbacks(app):
         for prop in trig:
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
-            update_ok, deterministic_changed, raw_params = selected_mm.update_variable_from_interface(
+            update_ok, deterministic_changed, dsa_changed, raw_params = selected_mm.update_variable_from_interface(
                 pid['section'], pid['key'], pid['subindex'], pid['parameter_index'], pid['vector_location'], val
             )
             match pid['type']:
@@ -284,8 +338,11 @@ def add_interface_to_model_callbacks(app):
                             and id['key'] == pid['key']
                             and id['subindex'] == pid['subindex']
                         ):
+                            # Set model input invalid if bad update
                             if id['parameter_index'] == pid['parameter_index'] and id['vector_location'] == pid['vector_location']:
                                 rval[3][i] = not(update_ok)  # type: ignore
+                            
+                            # Feed back the current parameters. This is necessary in case e.g. setting the mean required a change in the SD to make the distribution tractable.
                             pi = id['parameter_index']
                             new_param = raw_params[pi]
                             if not isinstance(new_param, np.ndarray):
@@ -349,6 +406,15 @@ def add_interface_to_model_callbacks(app):
                         rval[6] = [datetime.datetime.now().timestamp()] * len(finance_config_trigger_ids)
                 case _:
                     raise ValueError('Triggered by an unknown input type %s', pid['type'])
+            if dsa_changed:
+                prequeue.append(
+                    json.dumps(
+                        browser.dsa_impacting_interface_action(
+                            metamodel_id = selected_mm.id,
+                            **pid
+                        )
+                    )
+                )
         l2 = len(prequeue)
 
         if not prequeue:
@@ -368,11 +434,125 @@ def add_interface_to_model_callbacks(app):
         prequeue_patch.extend(prequeue)
         rval[0] = prequeue_patch # type: ignore
         return tuple(rval)
+    
+    @app.callback(
+        Output('prequeue-action-user', 'data', allow_duplicate = True),
+        Output({'type':'input-dsabound-lower', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
+        Output({'type':'input-dsabound-upper', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
 
-        if l2 == l1:
-            return NUP
+        Input({'type': 'dropdown-dsaboundtype', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'value'),
+        Input({'type':'input-dsabound-lower', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
+        Input({'type':'input-dsabound-upper', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         
-        return prequeue
+        State('store-selected-configuration', 'data'),
+        State({'type':'input-dsabound-lower', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
+        State({'type':'input-dsabound-upper', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
+        prevent_initial_call = True
+    )
+    def interface_update_dsa(
+        dsaboundtype_dropdown_value,
+        dsabound_lower,
+        dsabound_upper,
+        selected_config,
+        dsabound_lower_ids,
+        dsabound_upper_ids,
+    ):
+        """
+        Handle a change to DSA-specific interface components.
+        """
+        rval = [
+            no_update, # prequeue-action-user
+            [no_update] * len(dsabound_lower_ids),
+            [no_update] * len(dsabound_upper_ids),
+        ]
+
+        RVAL_INDICES = {
+            'prequeue': 0,
+            'dsabound_lower': 1,
+            'dsabound_upper': 2,
+        }
+
+        if selected_config is None:
+            return tuple(rval)
+        selected_config = json.loads(selected_config)
+        mm = cast(NewsegsMetaModel, app.metamodels.get(selected_config.get('metamodel_id')))
+        if mm is None:
+            return tuple(rval)
+        
+        prequeue_patch = Patch()
+        logger.info('dsa input field changed')
+
+        forward_prequeue = False
+
+        trig = ctx.triggered
+        for prop in trig:
+            pid = json.loads(prop['prop_id'].rstrip('.value'))
+            val = prop['value']
+
+            varid = pid['section']+'.'+pid['key']+'.'+str(pid['subindex'])
+            var = mm.variables.get(varid)
+            if var is None:
+                continue
+
+            match pid['type']:
+                case 'dropdown-dsaboundtype':
+                    if not val == var.dsa_bounds_type:
+                        var.dsa_bounds_type = val
+                        dsa_lower, dsa_upper = var.distribution.dsa_auto_values(var)
+                        var.dsa_lower = dsa_lower
+                        var.dsa_upper = dsa_upper
+
+                        for i, bound_id in enumerate(dsabound_lower_ids):
+                            if bound_id['section'] == pid['section'] and bound_id['key'] == pid['key'] and bound_id['subindex'] == pid['subindex']:
+                                rval[RVAL_INDICES['dsabound_lower']][i] = dsa_lower
+                        for i, bound_id in enumerate(dsabound_upper_ids):
+                            if bound_id['section'] == pid['section'] and bound_id['key'] == pid['key'] and bound_id['subindex'] == pid['subindex']:
+                                rval[RVAL_INDICES['dsabound_upper']][i] = dsa_upper
+                        prequeue_patch.append(
+                            json.dumps(
+                                browser.dsa_impacting_interface_action(
+                                    metamodel_id = mm.id,
+                                    bounds_type_change = True,
+                                    **pid
+                                )
+                            )
+                        )
+                        forward_prequeue = True
+                case 'input-dsabound-lower':
+                    if val is None:
+                        continue
+                    if not val == var.dsa_lower:
+                        var.dsa_lower = val
+                        prequeue_patch.append(
+                            json.dumps(
+                                browser.dsa_impacting_interface_action(
+                                    metamodel_id = mm.id,
+                                    **pid
+                                )
+                            )
+                        )
+                        forward_prequeue = True
+                case 'input_dsabound-upper':
+                    if val is None:
+                        continue
+                    if not val == var.dsa_upper:
+                        var.dsa_upper = val
+                        prequeue_patch.append(
+                            json.dumps(
+                                browser.dsa_impacting_interface_action(
+                                    metamodel_id = mm.id,
+                                    **pid
+                                )
+                            )
+                        )
+                        forward_prequeue = True
+
+        
+        if forward_prequeue:
+            rval[RVAL_INDICES['prequeue']] = prequeue_patch
+
+        return tuple(rval)
+
     
     def find_matching_actions(
         queue_action_user: list[str],
@@ -404,7 +584,7 @@ def add_interface_to_model_callbacks(app):
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
         Output('trigger-postprocess-model-run', 'data', allow_duplicate = True),
         Output('trigger-postprocess-finance-run', 'data', allow_duplicate = True),
-        #Output('dispatchitem-action-user', 'data'),
+        Output('dispatchitem-action-user', 'data'),
         Output('interval-action-user', 'disabled'),
 
         Input('prequeue-action-user', 'data'),
@@ -458,6 +638,8 @@ def add_interface_to_model_callbacks(app):
             no_update, # postprocess triggers
             no_update,
 
+            no_update, # Dispatch actions
+
             len(queue_action_user) == 0 # Disable Interval
         ]
 
@@ -503,6 +685,7 @@ def add_interface_to_model_callbacks(app):
 
                             logger.info('Adding a run request for %s', mm.model.id)
 
+                            # Do nothing with dispatch_actions
                             rval[2] = model_prequeue_patch
                             rval[1] = queue_action_user
                             rval[-1] = len(queue_action_user) == 0 # Disable Interval
@@ -545,6 +728,7 @@ def add_interface_to_model_callbacks(app):
 
                             logger.info('Adding a finance run request for %s', mm.finance.id)
 
+                            # Do nothing with dispatch_actions
                             rval[3] = finance_prequeue_patch
                             rval[1] = queue_action_user
                             rval[-1] = len(queue_action_user) == 0 # Disable Interval
@@ -573,6 +757,7 @@ def add_interface_to_model_callbacks(app):
 
                         logger.info('Adding a run request for %s', mm.model.id)
                         
+                        # Do nothing with dispatch_actions
                         rval[2] = model_prequeue_patch
                         rval[1] = queue_action_user
                         rval[-1] = len(queue_action_user) == 0 # Disable Interval
@@ -608,6 +793,20 @@ def add_interface_to_model_callbacks(app):
                         rval[1] = queue_action_user
                         rval[-1] = len(queue_action_user) == 0 # Disable Interval
                         return tuple(rval)
+
+                case 'dsa_impacting_interface_action':
+                    # Simply dispatch this onwards for the dispatcher to handle
+                    # - We don't want to over-clutter the interface for the queue
+                    # manager.
+                    dispatch_actions = find_matching_actions(
+                        queue_action_user,
+                        action,
+                        i,
+                        'dsa_impacting_interface_action'
+                    )
+                    # TODO - add to dispatch list once we've sorted out
+                    # the dispatcher
+                    rval[6] = dispatch_actions
                     
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')
@@ -617,4 +816,38 @@ def add_interface_to_model_callbacks(app):
         rval[-1] = len(queue_action_user) == 0 # Disable Interval
         return tuple(rval)
     
+    @app.callback(
+        Output({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data', allow_duplicate = True),
+
+        Input('dispatchitem-action-user', 'data'),
+        State({'type': 'trigger', 'page': ALL, 'key': ALL}, 'id'),
+        prevent_initial_call = True
+    )
+    def dispatcher_action_user(
+        dispatchitems,
+        trigger_ids
+    ):
+        """
+        Acts as a simple postman; goes through the list of triggers it has
+        access to, and checks them against the dispatchitems. It gathers up
+        matching items, and then puts them in the data for the appropriate
+        trigger.
+        Callbacks watching for specific triggers (i.e. without the wildcard 
+        'key') are expected to pick up from here and complete the action.
+        """
+        if trigger_ids is None:
+            return 
+        rval: NoUpdate|list[Any] = [no_update] * len(trigger_ids)
+
+        for i, trig_id in enumerate(trigger_ids):
+            for itm in dispatchitems:
+                if trig_id['key'] == json.loads(itm).get('action_key', 'None'):
+                    if isinstance(rval[i], NoUpdate):
+                        rval[i] = []
+                    rval[i].append(itm)
+                    logger.info('adding %s to %s', itm, trig_id)
+
+        return tuple(rval)
+
+
     return app

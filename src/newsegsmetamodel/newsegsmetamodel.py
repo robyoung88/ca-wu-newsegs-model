@@ -125,28 +125,38 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         parameter_index: int,
         vector_location: int,
         value: variable.ScalarParam
-    ) -> tuple[bool, bool, tuple[variable.Param,...]]:
+    ) -> tuple[bool, bool, bool, tuple[variable.Param,...]]:
+        """
+        Update the addressed variable with the new value.
+
+        The Variable is addressed by {section}.{key}.{subindex} in the 
+        .variables OrderedDict. After identifying the variable, the nominated 
+        parameter index is updated with the scalar value; if the parameter is
+        an array type, it is addressed by its location in the flattened array
+        using the vector_location.
+
+        Returns:
+            - bool - The parameter has been set
+            - bool - The deterministic value of the Variable has been impacted
+            - bool - The DSA value(s) of the Variable has/have been impacted
+            - tuple[Param, ...] - The set of parameters now held by the Variable
+        """
         varid = section + "." + key + "." + str(subindex)
         var = self.variables.get(varid)
         if var is None:
             raise ValueError(f'variable {varid} not found')
         old_value = var.deterministic_value
+        old_dsa_low = var.get_dsa_value('lower', True)
+        old_dsa_high = var.get_dsa_value('upper', True)
         is_ok, new_params = var.set_single_parameter(value,parameter_index, vector_location)
         new_value = var.deterministic_value
-        return is_ok, old_value != new_value, new_params
 
-        # for var in self.variables:
-        #     if var.interface_section == section and var.interface_key == key and var.interface_subindex == subindex:
-                
-        #         old_value = var.deterministic_value
-        #         #print (f'updating variable {var.name}')
-        #         #print (var.deterministic_value)
-        #         is_ok, new_params = var.set_single_parameter(value,parameter_index, vector_location)
-        #         #var.set_parameters(*rp)
-        #         new_value = var.deterministic_value
-        #         #print (var.deterministic_value)
-        #         return is_ok, old_value != new_value, new_params
-        # raise ValueError(f'Variable not found: {section}.{key}.{subindex}')
+        dsa_changed = (
+            (var.get_dsa_value('lower', True) != old_dsa_low)
+            or (var.get_dsa_value('upper', True) != old_dsa_high)
+        )   
+
+        return is_ok, old_value != new_value, dsa_changed, new_params
     
     def update_model_from_variable_deterministic(
         self,
@@ -154,6 +164,11 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         key: str,
         subindex: int
     ):
+        """
+        Update the attached model with the deterministic value of the addressed variable
+
+        Variable address is {section}.{key}.{subindex} in the .variables OrderedDict
+        """
         varid = section + "." + key + "." + str(subindex)
         
         var = self.variables.get(varid)
@@ -163,12 +178,6 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             var.update_model(self.finance)
         else:
             var.update_model(self.model)
-        #for var in self.variables.values():
-        #    if var.interface_section == section and var.interface_key == key and var.interface_subindex == subindex:
-        #        if var.configuration_type == 'finance':
-        #            var.update_model(self.finance)
-        #        else:
-        #            var.update_model(self.model)
 
 
     def __getstate__(self) -> dict[str, Any]:

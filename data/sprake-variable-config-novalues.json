@@ -101,7 +101,8 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 1.0,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 3
     },
     {
         "name": "No. of households",
@@ -150,7 +151,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 3.0,
-        "interface_step": 0.1
+        "interface_step": 0.1,
+        "formatter_dp": 3
     },
     {
         "name": "Mean GFA",
@@ -198,7 +200,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 10.0,
-        "interface_step": 0.1
+        "interface_step": 0.1,
+        "formatter_dp": 2
     },
     {
         "name": "Seasonal variation",
@@ -222,7 +225,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 1.0,
-        "interface_step": 0.05
+        "interface_step": 0.05,
+        "formatter_dp": 2
     },
     {
         "name": "High-efficiency appliances consumption reduction",
@@ -246,7 +250,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 1.0,
-        "interface_step": 0.05
+        "interface_step": 0.05,
+        "formatter_dp": 2
     },
     {
         "name": "Residential charging per EV",
@@ -270,7 +275,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 1.0,
-        "interface_step": 0.05
+        "interface_step": 0.05,
+        "formatter_dp": 0
     },
     {
         "name": "EVs per household",
@@ -294,7 +300,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 3.0,
-        "interface_step": 0.05
+        "interface_step": 0.05,
+        "formatter_dp": 2
     },
 
     {
@@ -320,7 +327,8 @@
         "psa_selectable": false,
         "interface_min": 1,
         "interface_max": 10,
-        "interface_step": 1
+        "interface_step": 1,
+        "formatter_dp": 0
     },
 
 
@@ -346,7 +354,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 10000,
-        "interface_step": 50
+        "interface_step": 50,
+        "formatter_dp": 0
     },
     {
         "name": "Wind Ongoing",
@@ -394,7 +403,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 10000,
-        "interface_step": 50
+        "interface_step": 50,
+        "formatter_dp": 0
     },
     {
         "name": "Solar PV Ongoing",
@@ -490,7 +500,8 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 10,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 5
     },
     {
         "name": "Resident per unit charge",
@@ -514,7 +525,8 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 10,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 5
     },
     {
         "name": "Grid export - mean per unit",
@@ -538,7 +550,8 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 10,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 5
     },
     {
         "name": "Fixed costs for backup",
@@ -562,7 +575,8 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 10000,
-        "interface_step": 10
+        "interface_step": 10,
+        "formatter_dp": 2
     },
     {
         "name": "Per-unit costs for backup",
@@ -586,7 +600,8 @@
         "psa_selectable": true,
         "psa_selected": true,
         "interface_max": 10,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 5
     },
 
     {
@@ -611,7 +626,8 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 1.0,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 3
     },
     {
         "name": "Cost discount rate",
@@ -635,6 +651,7 @@
         "psa_selectable": true,
         "psa_selected": false,
         "interface_max": 1.0,
-        "interface_step": 0.01
+        "interface_step": 0.01,
+        "formatter_dp": 3
     }
 ]

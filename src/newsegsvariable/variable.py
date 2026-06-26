@@ -2851,6 +2851,11 @@ class Variable(
     """
     distribution: Distribution
     parameterisation_index: int
+    
+    value_formatter = '{:}'.format
+    """
+    Function for sensible formatting of the value
+    """
 
     configuration_show: bool = True
     """
@@ -2969,6 +2974,7 @@ class Variable(
         interface_min: float | None = None,
         interface_max: float | None = None,
         interface_step: float | None = None,
+        formatter_dp: int | None = None,
     ):
         super().__init__()
         self.name = name
@@ -3056,6 +3062,9 @@ class Variable(
         self.interface_min = interface_min
         self.interface_max = interface_max
         self.interface_step = interface_step
+
+        if formatter_dp is not None:
+            self.formatter_dp = formatter_dp
 
     @property
     def label(self) -> str:
@@ -3481,6 +3490,15 @@ class NumericScalarVariable(ScalarVariable):
     distribution: NumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _parameters : tuple[ScalarNumParam, ...]
 
+    formatter_dp = 1
+    @property
+    def value_formatter(self) -> Callable[[float|int], str]:        
+        """
+        Function for sensible formatting of the value or bound
+        """
+        fstring = '{:,.' + f'{self.formatter_dp:d}'+'f}'   
+        return fstring.format
+
     @property
     def parameters(self) -> tuple[ScalarNumParam, ...]:
         return self._parameters
@@ -3618,6 +3636,17 @@ class NumericVectorVariable(VectorVariable):
 
     dsa_value_index = 1
     """Which Value is of interest in DSA?"""
+
+    formatter_dp = 1
+    @property
+    def value_formatter(self) -> Callable[[NumericVectorParam], Sequence[str]]:        
+        """
+        Function for sensible formatting of the value or bound
+        """
+        fstring = '{:,.' + f'{self.formatter_dp:d}'+'f}'
+        def formatter(seq: NumericVectorParam) -> Sequence[str]:
+            return [fstring.format(x) for x in seq]
+        return formatter
 
     @property
     def dsa_lower(self) -> NumericVectorParam:
@@ -4033,8 +4062,8 @@ def variable_from_dict(config: dict[str, Any]) -> Variable:
 def variable_uid(variable: Variable) -> str | list[str]:
     if not isinstance(variable.interface_key, str) and isinstance(variable.interface_key, Sequence):
         if isinstance(variable.interface_section, str):
-            return list([lambda x: str(variable.interface_section) + "." + str(x) + "." + str(variable.interface_subindex) for x in variable.interface_key])
+            return list([lambda x: str(variable.interface_section) + "." + str(x) + "." + str(variable.interface_subindex) for x in variable.interface_key]) # type: ignore
         else:
-            return list([lambda x,y: str(y) + "." + str(x) + "." + str(variable.interface_subindex) for x,y in zip(variable.interface_key, variable.interface_section)])
+            return list([lambda x,y: str(y) + "." + str(x) + "." + str(variable.interface_subindex) for x,y in zip(variable.interface_key, variable.interface_section)]) # type: ignore
     else:
         return str(variable.interface_section) + "." + str(variable.interface_key) + "." + str(variable.interface_subindex)

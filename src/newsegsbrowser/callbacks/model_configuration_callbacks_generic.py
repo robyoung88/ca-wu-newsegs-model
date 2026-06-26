@@ -2,7 +2,7 @@ import datetime
 from functools import partial
 import json
 import logging
-from typing import Callable, MutableSequence, cast
+from typing import Any, Callable, MutableSequence, cast
 import uuid
 
 from dash import Patch, html, no_update
@@ -18,6 +18,34 @@ from newsegsvariable import variable
 import newsegsmetamodel
 
 logger = logging.getLogger(__name__)
+
+def create_dsa_input(
+    var: variable.Variable
+):
+    if not var.dsa_show:
+        return []
+    match var.distribution.distribution:
+        case 'constant':
+            is_scalar = True,
+            creation_func = var_dc.create_dsa_input_scalar_constant
+        case 'normal':
+            is_scalar = True,
+            creation_func = var_dc.create_dsa_input_scalar_normal
+        case 'beta':
+            is_scalar = True,
+            creation_func = var_dc.create_dsa_input_scalar_beta
+        case 'gamma':
+            is_scalar = True,
+            creation_func = var_dc.create_dsa_input_scalar_gamma
+        case _:
+            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+    
+    if is_scalar:
+        var = cast(variable.NumericScalarVariable, var)
+        return creation_func(var)
+    else:
+        raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+    
 
 def sync_config(
     firstload_config_watcher,
@@ -102,47 +130,7 @@ def sync_config(
         ss = ic.get('supersection')
         if ss == 'dsa':
             for var in mm.variables.values():
-                if var.dsa_show:
-                    if var.unit != '':
-                        lbl = f'{var.name} ({var.unit})'
-                    else:
-                        lbl = f'{var.name}'
-                    match var.distribution.distribution:
-                        case 'constant':
-                            is_scalar = True,
-                            creation_func = var_dc.create_dsa_input_scalar_constant
-                        case 'normal':
-                            is_scalar = True,
-                            creation_func = var_dc.create_dsa_input_scalar_normal
-                        case 'beta':
-                            is_scalar = True,
-                            creation_func = var_dc.create_dsa_input_scalar_beta
-                        case 'gamma':
-                            is_scalar = True,
-                            creation_func = var_dc.create_dsa_input_scalar_gamma
-                        case _:
-                            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
-                    
-                    if is_scalar:
-                        var = cast(variable.ScalarVariable, var)
-                        if not var.interface_section:
-                            cnts.append(
-                                creation_func(
-                                    lbl, 
-                                    var.dsa_selected,
-                                    'dsa-input-model-config',
-                                    var.interface_key,
-                                ),
-                            )
-                        else:
-                            cnts.append(
-                                creation_func(
-                                    lbl, 
-                                    var.dsa_selected,
-                                    'dsa-input-model-config',
-                                    var.interface_key,
-                                    section = var.interface_section),
-                            )
+                cnts.append(create_dsa_input(var))
         else:
             section = ic.get('section')
             for var in mm.variables.values():
@@ -183,6 +171,8 @@ def sync_config(
             json.dumps(browser.result_update_interface_action(mm.id))
         )
 
+    
+
     return (
         json.dumps(store_selected_configuration), # store-selected-configurations
         store_configurations, # store-configurations
@@ -206,3 +196,81 @@ def sync_loc_inputs_to_store(selected_configuration, app):
         'name': mdl.location.name
     }
     return json.dumps(loc_input)
+
+def update_dsa_boundsinputs(
+    dsa_input_change_trigger,
+    selected_configuration,
+    bounds_container_ids,
+    app
+):
+    rval: list[Any] = [no_update] * len(bounds_container_ids)
+    if dsa_input_change_trigger is None:
+        return rval
+    
+    mm = None
+    
+    selected_configuration = json.loads(selected_configuration)
+    logger.info('updating dsa bounds after dsa input change')
+
+    for change_list in dsa_input_change_trigger: # As we have the page wildcard in the callback signature, we have a list of lists
+        if isinstance(change_list, list):
+            for dic in change_list:
+                dic_l = json.loads(dic)
+                if dic_l.get('bounds_type_change'):
+                    if dic_l.get('metamodel_id') == selected_configuration.get('metamodel_id'):
+                        for i, bnd_id in enumerate(bounds_container_ids):
+                            if bnd_id['section'] == dic_l['section'] and bnd_id['key'] == dic_l['key'] and bnd_id['subindex'] == dic_l['subindex']:
+                                if mm is None:
+                                    mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                                var = mm.variables.get(varid)
+                                if var is not None:
+                                    rval[i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+        else: # Force update all bounds
+            for i, hdr_id in enumerate(bounds_container_ids):
+                if mm is None:
+                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
+                var = mm.variables.get(varid)
+                if var is not None:
+                    rval[i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+    
+    return rval
+
+def update_headers_dsa_inputs(
+    dsa_input_change_trigger,
+    selected_configuration,
+    header_ids,
+    app
+):
+    rval: list[Any] = [no_update] * len(header_ids)
+    if dsa_input_change_trigger is None:
+        return rval
+    mm = None
+    
+    selected_configuration = json.loads(selected_configuration)
+    logger.info('updating headers after dsa input change')
+    
+    for change_list in dsa_input_change_trigger: # As we have the page wildcard in the callback signature, we have a list of lists
+        if isinstance(change_list, list):
+            for dic in change_list:
+                dic_l = json.loads(dic)
+                if dic_l.get('metamodel_id') == selected_configuration.get('metamodel_id'):
+                    for i, hdr_id in enumerate(header_ids):
+                        if hdr_id['section'] == dic_l['section'] and hdr_id['key'] == dic_l['key'] and hdr_id['subindex'] == dic_l['subindex']:
+                            if mm is None:
+                                mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                            varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                            var = mm.variables.get(varid)
+                            if var is not None:
+                                rval[i] = var_dc.create_dsa_header(var)
+        else: # Force update all headers
+            for i, hdr_id in enumerate(header_ids):
+                if mm is None:
+                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
+                var = mm.variables.get(varid)
+                if var is not None:
+                    rval[i] = var_dc.create_dsa_header(var)
+    
+    return rval
