@@ -13,7 +13,10 @@ RESULT_CACHE_PREFIXES = {
     'net_energy': 'res_net_',
     'finance_benefits_so': 'res_fnc_ben_so_',
     'finance_costs_so': 'res_fnc_cost_so_',
-    'finance_value_so': 'res_fnc_val_so_'
+    'finance_value_so': 'res_fnc_val_so_',
+    'dsa_results': 'res_dsa_',
+    'dsa_table': 'dsa_table_',
+    'dsa_label': 'dsa_label_',
 }
 
 def get_model_result_id(prefix, model_id):
@@ -21,6 +24,9 @@ def get_model_result_id(prefix, model_id):
 
 def get_finance_result_id(prefix, finance_id, model_id):
     return prefix + "fnc_" + str(finance_id) + "_mdl_" + str(model_id)
+
+def get_dsa_result_id(prefix: str, metamodel_id: str) -> str:
+    return prefix + metamodel_id
 
 def get_model_result_list(prefix, configs, app):
     return [app.results.get(get_model_result_id(prefix, json.loads(x)['model_id'])) for x in configs]

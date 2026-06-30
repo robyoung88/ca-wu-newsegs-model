@@ -345,7 +345,17 @@ def metamodel_process_request(
         ts = request_time.timestamp()
     
     return {
-        'type': 'type',
+        'type': request_type,
         'metamodel_id': metamodel_id,
         'time': ts
     }
+
+def dsa_run_request(
+    metamodel_id,
+    request_time = None
+):
+    return metamodel_process_request(
+        metamodel_id,
+        'dsa-run-request',
+        request_time
+    )

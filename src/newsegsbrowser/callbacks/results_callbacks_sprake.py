@@ -1,12 +1,16 @@
 import json
 from typing import Any
 
-from dash import html, no_update, ctx
+from dash import dcc, html, no_update, ctx
 import pandas as pd
+import dash_ag_grid as dag
 
 from newsegsbrowser import icons
+from newsegsbrowser import stats as browserstats
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsbrowser.postprocess.tables import result_tables_sprake
+from newsegssensitivity import common as sensitivity
+
 
 def _make_generation_result_header(
     res,
@@ -159,7 +163,7 @@ def update_model_result_headers(
 
     rval: list[Any] = NUP
 
-    if ctx.triggered_id == 'annual-horizon_toggle':
+    if ctx.triggered_id == 'annual-horizon-toggle':
         update_triggers = result_trigger_ids
     else:
         update_triggers = [v for v in ctx.triggered_prop_ids.values()]
@@ -236,7 +240,7 @@ def update_finance_result_headers(
 
     rval: list[Any] = NUP
 
-    if ctx.triggered_id == 'annual-horizon_toggle':
+    if ctx.triggered_id == 'annual-horizon-toggle':
         update_triggers = result_trigger_ids
     else:
         update_triggers = [v for v in ctx.triggered_prop_ids.values()]
@@ -462,3 +466,105 @@ def sync_fnc_so_table_to_store(
             case 'so_value':
                 rval[i] = value_results # pyright: ignore[reportArgumentType, reportCallIssue]
     return rval
+
+def sync_dsa_results_table_to_store(
+    dsa_table_trigger,
+    dsa_statistic_dropdown_values,
+    table_ids,
+    selected_conf,
+    app
+):
+    if len(table_ids) == 0:
+        return
+    elif len(table_ids) > 1:
+        raise ValueError('There are multiple containers for DSA results tables')
+    NUP = [no_update]
+    
+    if len(dsa_statistic_dropdown_values) > 1:
+        raise ValueError('App is receiving DSA statistic dropdown values from more than one page')
+    elif len(dsa_statistic_dropdown_values) == 0:
+        dsa_statistic = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0]
+    else:
+        dsa_statistic = dsa_statistic_dropdown_values[0]
+    
+    if selected_conf is None:
+        return NUP
+    selected_conf = json.loads(selected_conf)
+    
+    tbl_id = postprocess_utils.get_dsa_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES['dsa_table'],
+        selected_conf.get('metamodel_id')
+    )
+
+    tbl = app.results.get(tbl_id)
+    if tbl is None:
+        return NUP
+
+    otable = (
+        tbl
+        .xs(dsa_statistic, level=1, axis=0)
+        .xs('absolute', level = 0, axis = 1)
+        .loc[:,['central', 'interval', 'lower', 'upper']]
+        .reset_index()
+    )
+    rval = []
+    formatters = {
+        'variable': {"function":  "params.value ? params.value : '-' "},
+    }
+    columnDefs = [
+        {
+            'field': i,
+            "valueFormatter": formatters.get(i, {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "})
+        }
+        for i in otable.columns
+    ]
+    rval.append(
+        dag.AgGrid(
+            rowData = otable.to_dict('records'),
+            columnDefs = columnDefs
+        )
+    )
+
+    return rval
+
+def sync_dsa_tornado_to_store(
+    dsa_table_trigger,
+    dsa_statistic_dropdown_values,
+    plot_container_ids,
+    selected_conf,
+    app
+):
+    if len(plot_container_ids) == 0:
+        return
+    elif len(plot_container_ids) > 1:
+        raise ValueError('There are multiple containers for DSA tornado diagrams')
+    NUP = [no_update]
+    
+    if len(dsa_statistic_dropdown_values) > 1:
+        raise ValueError('App is receiving DSA statistic dropdown values from more than one page')
+    elif len(dsa_statistic_dropdown_values) == 0:
+        dsa_statistic = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0]
+    else:
+        dsa_statistic = dsa_statistic_dropdown_values[0]
+    
+    if selected_conf is None:
+        return NUP
+    selected_conf = json.loads(selected_conf)
+    
+    tbl_id = postprocess_utils.get_dsa_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES['dsa_table'],
+        selected_conf.get('metamodel_id')
+    )
+    tbl = app.results.get(tbl_id)
+    lbl_id = postprocess_utils.get_dsa_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES['dsa_label'],
+        selected_conf.get('metamodel_id')
+    )
+    lbl = app.results.get(lbl_id)
+
+    if tbl is None or lbl is None:
+        return NUP
+    
+    plt = browserstats.tornado_plot(tbl, lbl, dsa_statistic)
+
+    return [plt]

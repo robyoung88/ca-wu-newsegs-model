@@ -178,6 +178,7 @@ def create_model_configuration_layout(*args, **kwargs):
                     )
                 ],
                 id = 'drawer-content',
+                className = 'drawer-content',
                 ),
                 # Stores for the -to-interface configurations of the models
                 # and finances that are in the current session.
@@ -212,11 +213,13 @@ def create_model_configuration_layout(*args, **kwargs):
 
             )
         ],
-        id = 'drawer-container'
+        id = 'drawer-container',
+        className = 'drawer-container',
         ),
 
         html.Div(
-            id = 'post-drawer-attach',
+            id = {'type':'post-drawer-attach', 'page': kwargs.get('page-type', 'None')},
+            #id = 'post-drawer-attach',
             style = {'display': 'none'}
         ),   
     ]
@@ -234,9 +237,11 @@ def create_model_configuration_layout(*args, **kwargs):
                     kwargs.get('page_type')
                 )
             ),
-            id = 'main-content-pane',
+            #id = 'main-content-pane',
+            className = 'main-content-pane',
         ),
         fluid = False,
-        id = 'app-layout-wrapper'
+        #id = 'app-layout-wrapper',
+        class_name = 'app-layout-wrapper',
     )
     

@@ -377,7 +377,8 @@ class ScalarValuedDistribution(Distribution):
                 if trans == 'ln':
                     out_val = np.exp(out_val)
                 
-                return out_val
+                return out_val              
+                
             case 'absolute':
                 return bound_value
             case _:
@@ -490,7 +491,8 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
 
             case _:
                 raise ValueError(f'Unknown bound_type: {bound_type}')
-            
+    
+    @override
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
         if var.dsa_bounds_type == 'interval':
@@ -507,7 +509,7 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
                     lbound, ubound = cls.interval_function(float(var.dsa_upper), var.parameters)
                     return ubound
                 case _:
-                    raise ValueError(f'Unknown DSA bounds: {bound}')
+                    raise ValueError(f'Unknown DSA bounds: {bound} for variable {var.name} of type {type(var)}')
             
         return cast(float, super().dsa_value(var, bound))
     
@@ -1884,23 +1886,38 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
-        if var.transform[0] == 'ln' and var.dsa_bounds_type == 'interval':
-            if not isinstance(var, NumericScalarVariable):
-                raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
+        if var.dsa_bounds_type == 'interval':
 
-            interval_function = _loggamma_interval
-            
-            match bound:
-                case 'central':
-                    return cast(float, super().dsa_value(var, bound))
-                case 'lower':
-                    lbound, ubound = interval_function(float(var.dsa_lower), var.parameters)
-                    return lbound
-                case 'upper':
-                    lbound, ubound = interval_function(float(var.dsa_upper), var.parameters)
-                    return ubound
-                case _:
-                    raise ValueError(f'Unknown DSA bounds: {bound}')
+
+            if var.transform[0] == 'ln':
+                if not isinstance(var, NumericScalarVariable):
+                    raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
+
+                interval_function = _loggamma_interval
+                
+                match bound:
+                    case 'central':
+                        return cast(float, super().dsa_value(var, bound))
+                    case 'lower':
+                        lbound, ubound = interval_function(float(var.dsa_lower), var.parameters)
+                        if not np.isfinite(lbound):
+                            return var.deterministic_value
+                        return lbound
+                    case 'upper':
+                        lbound, ubound = interval_function(float(var.dsa_upper), var.parameters)
+                        if not np.isfinite(ubound):
+                            return var.deterministic_value
+                        return ubound
+                    case _:
+                        raise ValueError(f'Unknown DSA bounds: {bound}')
+            else:
+                shape, scale = var.parameters
+                if scale == 0:
+                    return 0.
+                elif shape == 0:
+                    return scale # pyright: ignore[reportReturnType]
+                else:
+                    return super().dsa_value(var, bound)
 
         return super().dsa_value(var, bound)
 
@@ -1914,6 +1931,10 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
         
         shape, scale = var.parameters
+        if scale == 0:
+            return 0
+        elif shape == 0:
+            return scale
         
         v = rng.gamma(shape, scale)
         
@@ -3406,7 +3427,16 @@ class Variable(
         o = Variable(self.name, distribution = self.distribution.distribution) # pyright: ignore[reportAbstractUsage]
         o.__dict__.update(copy.deepcopy(self.__dict__)) # pyright: ignore[reportAttributeAccessIssue]
         return o
+    
+    def __reduce__(self) -> str | tuple[Any, ...]:
+        return (
+            _recover_variable, # Callable for initial object version # pyright: ignore[reportAbstractUsage]
+            (self.name, self.distribution.distribution), # Args for initial construction
+            self.__dict__,
+        )
 
+def _recover_variable(name, dist):
+    return Variable(name, distribution = dist) # pyright: ignore[reportAbstractUsage]
 
 class ScalarVariable(Variable):
 

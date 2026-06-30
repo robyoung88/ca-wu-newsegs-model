@@ -2,7 +2,7 @@ import datetime
 import json
 import logging
 
-from dash import Dash, Input, no_update, Output, State
+from dash import ALL, Dash, Input, no_update, Output, State
 
 from newsegsbrowser import common as browser
 from newsegsbrowser.callbacks import callbacks_map
@@ -213,5 +213,25 @@ def add_postprocess_callbacks(app: Dash):
             finance_run_json,
             app
         )]
+    
+    @app.callback(
+        Output({'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, 'data'),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def postproc_dsa(
+        dsa_triggers,
+        selected_model
+    ):
+        """
+        Transform the dsa output table into something useful
+        """
+        logger.info('postprocessing dsa results')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_dsa'](
+            dsa_triggers,
+            app
+        )
     
     return app

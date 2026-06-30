@@ -6,8 +6,10 @@ from dash import html
 from functools import reduce, partial
 
 import pandas as pd
+import plotly.graph_objects as go
 
 from core.timespan import SEASON_NAMES
+from newsegssensitivity import common as sensitivity
 
 DEFAULT_SEASON_MAPPER = {k: v for k,v in enumerate(SEASON_NAMES)}
 
@@ -914,3 +916,111 @@ def present_event_and_daterange(data_list,
     )
 
     return [val_row, date_row]
+
+def tornado_plot(
+    dsa_df,
+    label_df,
+    statistic = 'net_present_value_undiscounted'
+):
+    plot_data = (
+        dsa_df
+        .xs(statistic, axis = 0, level = 'statistic')
+        .sort_values(
+            ('absolute', 'interval'),
+            ascending = False
+        )
+    )
+
+    label_data = (
+        label_df
+        .xs('variable_value', axis = 0, level = 'statistic')
+        .loc[plot_data.index, :]
+    )
+
+    color_low = '#e1ceff'
+    color_high = '#ff6262'
+    labels = plot_data.index.tolist()
+    central_values = plot_data[('absolute', 'central')].to_numpy()
+    lower_values = plot_data[('absolute', 'lower')].to_numpy()
+    upper_values = plot_data[('absolute', 'upper')].to_numpy()
+
+    hover_text = []
+    for var in labels:
+        label_row = label_data.loc[var].dropna()
+        label_parts = []
+        for key, value in label_row.items():
+            try:
+                value = float(value)
+            except:
+                value = value
+            if isinstance(key, tuple) and len(key) >= 2:
+                if isinstance(value, float):
+                    if value > 10:
+                        label_parts.append(f"{key[1]}: {value:,.1f}")
+                    elif value > 1:
+                        label_parts.append(f"{key[1]}: {value:.2f}")
+                    else:
+                        label_parts.append(f"{key[1]}: {float(f'{value:.3g}')}")
+                else:
+                    label_parts.append(f"{key[1]}: {value}")
+            else:
+                if isinstance(value, float):
+                    if value > 10:
+                        label_parts.append(f"{key}: {value:,.1f}")
+                    elif value > 1:
+                        label_parts.append(f"{key}: {value:.2f}")
+                    else:
+                        label_parts.append(f"{key}: {float(f'{value:.3g}')}")
+                else:
+                    label_parts.append(f"{key}: {value}")
+        hover_text.append(
+            "<br>".join([f"<b>{var}</b>", *label_parts])
+        )
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=central_values - lower_values,
+            y=labels,
+            orientation='h',
+            base=lower_values,
+            marker=dict(color=color_low),
+            name='Lower',
+            hovertext=hover_text,
+            hovertemplate='%{hovertext}<br>Lower variation: %{x:,.0f}<extra></extra>'
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=upper_values - central_values,
+            y=labels,
+            orientation='h',
+            base=central_values,
+            marker=dict(color=color_high),
+            name='Upper',
+            hovertext=hover_text,
+            hovertemplate='%{hovertext}<br>Upper variation: %{x:,.0f}<extra></extra>'
+        )
+    )
+
+    fig.add_vline(
+        x=central_values[0],
+        line_color='black',
+        line_width=1,
+        annotation_text='Deterministic',
+        annotation_position='bottom left'
+    )
+
+    fig.update_layout(
+        title='Lower and Upper DSA variation',
+        xaxis_title = sensitivity.DSA_STATISTIC_LABELS.get(statistic, statistic),
+        yaxis_title='Variable',
+        barmode='overlay',
+        template='plotly_white',
+        height=800,
+        margin=dict(l=20, r=20, t=60, b=20)
+    )
+    fig.update_yaxes(autorange='reversed')
+    #fig.show()
+
+    return fig

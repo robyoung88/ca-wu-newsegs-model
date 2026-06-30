@@ -60,7 +60,7 @@ def run_dsa(
     mm: NewsegsMetaModel,
     statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC)
 ) -> pd.DataFrame:
-    variables = mm.variables
+    variables = mm.variables.values()
     mdl = mm.model
     fnc = mm.finance
 

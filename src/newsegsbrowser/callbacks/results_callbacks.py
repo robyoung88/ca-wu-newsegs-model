@@ -97,7 +97,7 @@ def add_result_table_callbacks(app):
     @app.callback(
         Output({'type': 'results-table', 'section': 'storage', 'key': ALL}, 'children'),
 
-        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res=stor'}, 'data'),
+        Input({'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-stor'}, 'data'),
         Input('annual-horizon-toggle', 'value'),
         State({'type': 'results-table', 'section': 'storage', 'key': ALL}, 'id'),
         State('store-configurations', 'data'),
@@ -202,6 +202,56 @@ def add_result_table_callbacks(app):
             ann_hori_toggle,
             table_ids,
             store_configurations,
+            app
+        )
+
+    @app.callback(
+        Output({'type': 'result-table-container', 'page': ALL, 'key': 'dsa-results-table'}, 'children'),
+
+        Input({'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, 'data'),
+        Input({'type': 'dsa-results-statistic-dropdown', 'page': ALL}, 'value'),
+        State({'type': 'result-table-container', 'page': ALL, 'key': 'dsa-results-table'}, 'id'),
+        State('store-selected-configuration', 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def sync_dsa_results_table_to_store(
+        dsa_table_trigger,
+        dsa_statistic_dropdown_values,
+        table_ids,
+        selected_conf,
+        selected_model
+    ):
+        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_dsa_results_table_to_store'](
+            dsa_table_trigger,
+            dsa_statistic_dropdown_values,
+            table_ids,
+            selected_conf,
+            app
+        )
+    
+    @app.callback(
+        Output({'type': 'plot', 'page': ALL, 'key': 'dsa-tornado-plot'}, 'figure'),
+
+        Input({'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, 'data'),
+        Input({'type': 'dsa-results-statistic-dropdown', 'page': ALL}, 'value'),
+        State({'type': 'plot', 'page': ALL, 'key': 'dsa-tornado-plot'}, 'id'),
+        State('store-selected-configuration', 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def sync_dsa_tornado_to_store(
+        dsa_table_trigger,
+        dsa_statistic_dropdown_values,
+        plot_ids,
+        selected_conf,
+        selected_model
+    ):
+        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_dsa_tornado_to_store'](
+            dsa_table_trigger,
+            dsa_statistic_dropdown_values,
+            plot_ids,
+            selected_conf,
             app
         )
 

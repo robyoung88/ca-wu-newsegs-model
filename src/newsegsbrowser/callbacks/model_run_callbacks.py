@@ -7,9 +7,9 @@ Functions:
 import datetime
 import json
 import logging
-from typing import cast
+from typing import Any, cast
 
-from dash import ctx, Dash, Input, no_update, Output, State
+from dash import ALL, NoUpdate, ctx, Dash, Input, no_update, Output, State
 
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel.newsegsmodel import NewsegsModel
@@ -91,7 +91,9 @@ def add_model_run_callbacks(app: Dash):
                 request_l = json.loads(request)
                 logger.info('checking if model %s should be run', request_l['model_id'])
                 if nowtime - request_l['time'] > RUN_DEBOUNCE_SECONDS:
-                    if not app.models.get(request_l['model_id']).checked_out:
+                    mdl = app.models.get(request_l['model_id'])
+                    if not mdl.checked_out:
+                        mdl.checked_out = True
                         dispatch_request = queue_model_run.pop(i)
                         logger.info('model run dispatched: %s', dispatch_request)
                         return (
@@ -153,6 +155,7 @@ def add_model_run_callbacks(app: Dash):
                 True
             )
         
+        mdl.checked_out = False
         app.model_to_cache(model_run['model_id'])
         mdl.checked_out = True
 
@@ -280,6 +283,7 @@ def add_finance_run_callbacks(app: Dash):
                         raise ValueError(f'model {request_l['model_id']} not found')
                     fnc = app.finances.get(request_l['finance_id'])
                     if not mdl.checked_out and not fnc.checked_out:
+                        fnc.checked_out = True
                         dispatch_request = queue_finance_run.pop(i)
 
                         return (
@@ -332,6 +336,7 @@ def add_finance_run_callbacks(app: Dash):
         # Model is synced to cache, but no need to lock
         app.model_to_cache(finance_run['model_id'])
 
+        app.finances.get(finance_run['finance_id']).checked_out = False
         app.finance_to_cache(finance_run['finance_id'])
         app.finances.get(finance_run['finance_id']).checked_out = True
         
@@ -449,6 +454,10 @@ def add_finance_run_callbacks(app: Dash):
                     mm_id = request_l['metamodel_id']
                     mm = app.metamodels.get(mm_id)
                     if not mm.model.checked_out and not mm.finance.checked_out and not mm.checked_out:
+                        # Check out before starting the callback chain
+                        mm.model.checked_out = True
+                        mm.finance.checked_out = True
+                        mm.checked_out = True
                         dispatch_request = queue_metamodel_process.pop(i)
                         logger.info('metamodel process dispatched: %s', dispatch_request)
                         return (
@@ -504,6 +513,9 @@ def add_finance_run_callbacks(app: Dash):
                 True,
             )
         
+        mm.checked_out = False
+        mm.model.checked_out = False
+        mm.finance.checked_out = False
         app.metamodel_to_cache(metamodel_process['metamodel_id'])
         app.model_to_cache(mm.model.id)
         app.finance_to_cache(mm.finance.id)
@@ -537,14 +549,45 @@ def add_finance_run_callbacks(app: Dash):
         app.finances[mm.finance.id] = mm.finance
 
         logging.info('resyncing metamodel after process completed: %s', process_request)
+        print('resyncing after metamodel')
+        print(process_request)
 
         match process_request['type']:
-            case 'dsa_run':
+            case 'dsa-run-request':
+                print('storing results')
                 app.results[mm.dsa_result_id] = app.cache[mm.dsa_result_id]
+                print (app.results[mm.dsa_result_id])
         
         return (
             trigger_post_metamodel_process,
             True,
         )
+    
+    @app.callback(
+        Output({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data'),
+        
+        Input('trigger-postprocess-metamodel-process', 'data'),
+        State({'type': 'trigger', 'page': ALL, 'key': ALL}, 'id'),
+        prevent_initial_call = True
+    )
+    def dispatch_metamodel_postprocess(
+        trigger_postprocess_metamodel_process,
+        trigger_ids
+    ):
+        rval: list[Any] = [no_update] * len(trigger_ids)
+        if not isinstance(trigger_postprocess_metamodel_process, list):
+            trigger_postprocess_metamodel_process = [trigger_postprocess_metamodel_process]
+        
+        for process_str in trigger_postprocess_metamodel_process:
+            process = json.loads(process_str)
+            match process['type']:
+                case 'dsa-run-request':
+                    for i, trigger_id in enumerate(trigger_ids):
+                        if trigger_id['key'] == 'dsa-run-postprocess':
+                            if isinstance(rval[i], NoUpdate):
+                                rval[i] = []
+                            rval[i].append(process_str)
+        
+        return rval
     
     return app

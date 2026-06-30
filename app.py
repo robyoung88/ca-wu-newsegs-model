@@ -2,6 +2,7 @@
 NewSEGS model as a multi-page app.
 """
 import copy
+import datetime
 import os
 import time
 import logging
@@ -12,6 +13,7 @@ import dash_bootstrap_components as dbc
 # At the moment, use a diskcache cache for transferring models 
 # regardless of background callback manager
 import diskcache
+import pandas as pd
 
 # For local testing
 import sys
@@ -45,6 +47,7 @@ from newsegsbrowser.callbacks import results_callbacks
 from newsegsbrowser.callbacks import callbacks_map
 from newsegsbrowser.callbacks import timeseries_callbacks
 from newsegsbrowser.callbacks import configuration_selector_callbacks
+from newsegsbrowser.callbacks import dsa_run_callbacks
 from newsegsbrowser.map import add_site_selector_callbacks
 
 from newsegsbrowser.postprocess import postprocess_utils
@@ -202,33 +205,50 @@ def add_caching_callbacks(app):
 
         Input('trigger-metamodel-process', 'data'),
         prevent_initial_call = True,
-        background = True,
-        manager = noncaching_background_callback_manager,
-        running = [
-            (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
-            (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
-            (
-                Output({'type':'progress_bar','key':ALL}, "style"),
-                {"visibility": "visible"},
-                {"visibility": "hidden"},
-            ),
-        ],
-        cancel=Input('background_cancel_trigger', "data"),
-        progress=[Output('background_progress_tracker', 'data')],
-        progress_default='{"value":"0","max":"1"}',
+        # background = True,
+        # manager = noncaching_background_callback_manager,
+        # running = [
+        #     (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
+        #     (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
+        #     (
+        #         Output({'type':'progress_bar','key':ALL}, "style"),
+        #         {"visibility": "visible"},
+        #         {"visibility": "hidden"},
+        #     ),
+        # ],
+        # cancel=Input('background_cancel_trigger', "data"),
+        # progress=[Output('background_progress_tracker', 'data')],
+        # progress_default='{"value":"0","max":"1"}',
     )
     def run_metamodel_process(metamodel_process):
         process_request = json.loads(metamodel_process)
         mm = app.metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
-
+        
         # Do the process
         match process_request['type']:
-            case 'dsa_run':
-                dsa_results = dsa.run_dsa(
-                    mm
+            case 'dsa-run-request':
+                debug_dsa_run_results_fn = os.path.join('.', 'temp_dsa_run_results.csv')
+                if os.path.isfile(debug_dsa_run_results_fn):
+                    dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
+                else:
+                    dsa_results = dsa.run_dsa(
+                        mm
+                    ).set_index(['variable', 'bound'])
+                    dsa_results.to_csv(debug_dsa_run_results_fn)
+                dsa_result_id = postprocess_utils.get_dsa_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES['dsa_results'],
+                    mm.id
                 )
-                mm.dsa_result_id = 'res-dsa-'+str(mm.metamodel.id)
-                cache[mm.dsa_result_id] = dsa_results
+                mm.last_dsa_run = datetime.datetime.now().isoformat()
+                setattr(dsa_results, '_run_time', mm.last_dsa_run)
+                cache[dsa_result_id] = dsa_results
+
+                # Not convinced this is necessary
+                mm.dsa_result_id = dsa_result_id
+
+        app.metamodels[mm.id] = mm
+        app.models[mm.model.id] = mm.model
+        app.finances[mm.finance.id] = mm.finance
 
         # Resynchronise
         app.metamodel_to_cache(mm.id)
@@ -523,6 +543,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = results_callbacks.add_result_table_callbacks(app)
     app = timeseries_callbacks.add_result_timeseries_callbacks(app)
     app = configuration_selector_callbacks.add_configuration_selection_callbacks(app)
+    app = dsa_run_callbacks.add_dsa_run_callbacks(app)
     app = add_site_selector_callbacks(app)
 
     app = add_caching_callbacks(app)

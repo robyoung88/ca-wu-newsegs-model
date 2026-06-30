@@ -3,6 +3,7 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from newsegsbrowser import icons
+from newsegssensitivity import common as sensitivity
 
 def create_results_header():
     """
@@ -11,7 +12,10 @@ def create_results_header():
     """
     return html.Div(
         [
-            html.Div(id='resize-handle'),
+            html.Div(
+                id='resize-handle', 
+                className='resize-handle'
+            ),
 
             html.Div(
                 dbc.Container([
@@ -85,7 +89,63 @@ def create_results_header():
                     )
                 ]),
             id = 'drawer-title',
+            className = 'drawer-title'
             ),
         ],
-    id='drawer-header'
+    id='drawer-header',
+    className = 'drawer-header'
+    )
+
+def create_results_header_dsa(**kwargs):
+    return html.Div(
+        [
+            html.Div(
+                #id='resize-handle',
+                className = 'resize-handle',
+            ),
+
+            html.Div(
+                dbc.Container([
+                    dbc.Row([
+                        html.H1(
+                            [icons.get_icon('results'), 'DSA Results'],
+                            style = {
+                                'float': 'left',
+                                'width':'75%'
+                            }
+                        ),
+                        html.Span(
+                            dbc.Button(
+                                'Run DSA',
+                                color = 'primary',
+                                id = {'type': 'dsa-run-button', 'page': kwargs.get('page-type', 'None')},
+                                disabled = False,
+                                style = {
+                                    'display': 'inline',
+                                }
+                            ),
+                            style = {
+                                'float': 'right',
+                                'width': '25%'
+                            }
+                        )
+                    ]),
+                    dbc.Row([
+                        dcc.Dropdown(
+                            options = [
+                                {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
+                            ],
+                            value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
+                            id = {'type': 'dsa-results-statistic-dropdown', 'page': kwargs.get('page-type', 'None')},
+                            searchable = False,
+                            clearable = False,
+                        )
+                    ])
+                ]),
+            #id = 'drawer-title',
+            className = 'drawer-title',
+            )
+        ],
+    #id = 'drawer-header'
+    className = 'drawer-header',
     )

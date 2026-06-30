@@ -36,7 +36,8 @@ def add_initial_callbacks(app: Dash):
             namespace = 'clientside',
             function_name = 'attach_drawer'
         ),
-        Output('post-drawer-attach', 'children'),
+        Output({'type': 'post-drawer-attach', 'page': ALL}, 'children'),
+        
         Input({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'children')
     )
 
@@ -580,10 +581,14 @@ def add_interface_to_model_callbacks(app):
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
         Output('queue-action-user', 'data'),
+
         Output('prequeue-model-run', 'data', allow_duplicate = True),
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
+        Output('prequeue-metamodel-process', 'data', allow_duplicate = True),
+        
         Output('trigger-postprocess-model-run', 'data', allow_duplicate = True),
         Output('trigger-postprocess-finance-run', 'data', allow_duplicate = True),
+        
         Output('dispatchitem-action-user', 'data'),
         Output('interval-action-user', 'disabled'),
 
@@ -634,6 +639,7 @@ def add_interface_to_model_callbacks(app):
 
             no_update, # run prequeues
             no_update,
+            no_update,
             
             no_update, # postprocess triggers
             no_update,
@@ -642,6 +648,18 @@ def add_interface_to_model_callbacks(app):
 
             len(queue_action_user) == 0 # Disable Interval
         ]
+
+        RVAL_INDICES = {
+            'prequeue-action-user': 0,
+            'queue-action-user': 1,
+            'prequeue-model-run': 2,
+            'prequeue-finance-run': 3,
+            'prequeue-metamodel-process': 4,
+            'trigger-postprocess-model-run': 5,
+            'trigger-postprocess-finance-run': 6,
+            'dispatchitem-action-user': 7,
+            'interval-action-user': 8,
+        }
 
         # Loop through action queue
         for i, action_json in enumerate(queue_action_user):
@@ -686,9 +704,9 @@ def add_interface_to_model_callbacks(app):
                             logger.info('Adding a run request for %s', mm.model.id)
 
                             # Do nothing with dispatch_actions
-                            rval[2] = model_prequeue_patch
-                            rval[1] = queue_action_user
-                            rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                            rval[RVAL_INDICES['prequeue-model-run']] = model_prequeue_patch
+                            rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                            rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                             return tuple(rval)
 
                 case 'finance_config_interface_update':
@@ -729,9 +747,9 @@ def add_interface_to_model_callbacks(app):
                             logger.info('Adding a finance run request for %s', mm.finance.id)
 
                             # Do nothing with dispatch_actions
-                            rval[3] = finance_prequeue_patch
-                            rval[1] = queue_action_user
-                            rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                            rval[RVAL_INDICES['prequeue-finance-run']] = finance_prequeue_patch
+                            rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                            rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                             return tuple(rval)
                         
                 case 'model_run_interface_request':
@@ -758,9 +776,9 @@ def add_interface_to_model_callbacks(app):
                         logger.info('Adding a run request for %s', mm.model.id)
                         
                         # Do nothing with dispatch_actions
-                        rval[2] = model_prequeue_patch
-                        rval[1] = queue_action_user
-                        rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                        rval[RVAL_INDICES['prequeue-model-run']] = model_prequeue_patch
+                        rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                        rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                         return tuple(rval)
                 
                 case 'result_update_interface_request':
@@ -788,10 +806,10 @@ def add_interface_to_model_callbacks(app):
                             mm.finance.last_run
                         )
 
-                        rval[4] = mrr
-                        rval[5] = frr
-                        rval[1] = queue_action_user
-                        rval[-1] = len(queue_action_user) == 0 # Disable Interval
+                        rval[RVAL_INDICES['trigger-postprocess-model-run']] = mrr
+                        rval[RVAL_INDICES['trigger-postprocess-finance-run']] = frr
+                        rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                        rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                         return tuple(rval)
 
                 case 'dsa_impacting_interface_action':
@@ -806,14 +824,36 @@ def add_interface_to_model_callbacks(app):
                     )
                     # TODO - add to dispatch list once we've sorted out
                     # the dispatcher
-                    rval[6] = dispatch_actions
+                    rval[RVAL_INDICES['dispatchitem-action-user']] = dispatch_actions
+
+                case 'dsa-run-request':
+                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    if mm.model.checked_out or mm.finance.checked_out:
+                        continue
+
+                    dispatch_actions = find_matching_actions(
+                        queue_action_user,
+                        action,
+                        i,
+                        'dsa-run-request'
+                    )
+                    logger.info('dispatching %d dsa run requests', len(dispatch_actions))
+
+                    # Requests go straight out to the metamodel process
+                    metamodel_prequeue_patch = Patch()
+                    metamodel_prequeue_patch.append(dispatch_actions[0])
+
+                    rval[RVAL_INDICES['prequeue-metamodel-process']] = metamodel_prequeue_patch
+                    rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                    rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
+                    return tuple(rval)
                     
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')
         
         # Fall-through - do not update dispatchitem-action-user
-        rval[1] = queue_action_user
-        rval[-1] = len(queue_action_user) == 0 # Disable Interval
+        rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+        rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
         return tuple(rval)
     
     @app.callback(

@@ -176,7 +176,7 @@ def create_dsa_input_vector_parameter_input(
 
 def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
-    var: variable.ScalarVariable,
+    var: variable.NumericScalarVariable,
 ):
     type_id_lower = f'input-dsabound-lower'
     type_id_upper = f'input-dsabound-upper'
@@ -197,7 +197,7 @@ def create_dsa_bounds_inputs_scalar(
                         var.interface_key,
                         section = var.interface_section,
                         subindex = var.interface_subindex,
-                        value = var.dsa_lower,
+                        value = var.dsa_lower, # pyright: ignore[reportArgumentType]
                         step = step_size
                     )
                 ]
@@ -209,7 +209,7 @@ def create_dsa_bounds_inputs_scalar(
                         var.interface_key,
                         section = var.interface_section,
                         subindex = var.interface_subindex,
-                        value = var.dsa_upper,
+                        value = var.dsa_upper, # pyright: ignore[reportArgumentType]
                         step = step_size
                     )
                 ]
@@ -224,7 +224,7 @@ def create_dsa_bounds_inputs_scalar(
                         var.interface_key,
                         section = var.interface_section,
                         subindex = var.interface_subindex,
-                        value = var.dsa_lower
+                        value = var.dsa_lower # pyright: ignore[reportArgumentType]
                     )
                 ])
             ] 
@@ -408,7 +408,7 @@ def create_dsa_input_scalar_constant(
         ),
         create_dsa_bounds_inputs_scalar(
             var.dsa_bounds_type,
-            var,
+            var, # pyright: ignore[reportArgumentType]
         ),
         var
     )
@@ -563,16 +563,16 @@ def create_dsa_input_scalar_gamma(
         var
     )
 
-def create_dsa_input_vector_mvn(
-    var: variable.NumericVectorVariable,
-):
-    fmt = var.value_formatter
-    label = f'{var.label} ({var.unit})'
-    type_id = f'input-{var.configuration_type}-config'
-    return compose_dsa_input(
-        create_dsa_input_vector_numeric_header(label, type_id, key, section),
-        create_dsa_input_vector_parameter_input(OrderedDict(mean = ['shape', 'scale'], vcv = ['covariance']), ('vector', 'matrix'), type_id, key, section),
-        create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
-        create_dsa_bounds_input_vector('relative', type_id, key, section),
-        var
-    )
+# def create_dsa_input_vector_mvn(
+#     var: variable.NumericVectorVariable,
+# ):
+#     fmt = var.value_formatter
+#     label = f'{var.label} ({var.unit})'
+#     type_id = f'input-{var.configuration_type}-config'
+#     return compose_dsa_input(
+#         create_dsa_input_vector_numeric_header(label, type_id, key, section),
+#         create_dsa_input_vector_parameter_input(OrderedDict(mean = ['shape', 'scale'], vcv = ['covariance']), ('vector', 'matrix'), type_id, key, section),
+#         create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
+#         create_dsa_bounds_input_vector('relative', type_id, key, section),
+#         var
+#     )
