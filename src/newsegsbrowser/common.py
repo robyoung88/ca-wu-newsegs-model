@@ -231,6 +231,7 @@ def dsa_impacting_interface_action(
     subindex,
     input_time = None,
     bounds_type_change = False,
+    selected_status_change = False,
     **kwargs
 ):
     """
@@ -248,6 +249,7 @@ def dsa_impacting_interface_action(
         'key': key,
         'subindex': subindex,
         'bounds_type_change': bounds_type_change,
+        'selected_status_change': selected_status_change,
         'time': input_time.timestamp(),
     }
 

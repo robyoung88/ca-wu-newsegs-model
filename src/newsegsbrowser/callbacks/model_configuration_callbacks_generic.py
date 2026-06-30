@@ -201,11 +201,16 @@ def update_dsa_boundsinputs(
     dsa_input_change_trigger,
     selected_configuration,
     bounds_container_ids,
+    dsa_input_element_ids,
     app
 ):
-    rval: list[Any] = [no_update] * len(bounds_container_ids)
+    rval: MutableSequence[list[Any]] = [
+        [no_update] * len(bounds_container_ids),
+        [no_update] * len(dsa_input_element_ids)
+    ]
+
     if dsa_input_change_trigger is None:
-        return rval
+        return tuple(rval)
     
     mm = None
     
@@ -225,15 +230,39 @@ def update_dsa_boundsinputs(
                                 varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
                                 var = mm.variables.get(varid)
                                 if var is not None:
-                                    rval[i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+                                    rval[0][i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+                elif dic_l.get('selected_status_change'):
+                    if dic_l.get('metamodel_id') == selected_configuration.get('metamodel_id'):
+                        for i, el_id in enumerate(dsa_input_element_ids):
+                            if el_id['section'] == dic_l['section'] and el_id['key'] == dic_l['key'] and el_id['subindex'] == dic_l['subindex']:
+                                if mm is None:
+                                    mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                                var = mm.variables.get(varid)
+                                if var is not None:
+                                    if var.dsa_selected:
+                                        cn = 'dsa-input-single-value-block'
+                                    else:
+                                        cn = 'dsa-input-single-value-block deselected'
+                                    rval[1][i] = cn
+
         else: # Force update all bounds
-            for i, hdr_id in enumerate(bounds_container_ids):
-                if mm is None:
+            if mm is None:
                     mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+            for i, hdr_id in enumerate(bounds_container_ids):
                 varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
                 var = mm.variables.get(varid)
                 if var is not None:
-                    rval[i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+                    rval[0][i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+            for i, el_id in enumerate(dsa_input_element_ids):
+                varid =  el_id['section']+'.'+el_id['key']+'.'+str(el_id['subindex'])
+                var = mm.variables.get(varid)
+                if var is not None:
+                    if var.dsa_selected:
+                        cn = 'dsa-input-single-value-block'
+                    else:
+                        cn = 'dsa-input-single-value-block deselected'
+                    rval[1][i] = cn
     
     return rval
 

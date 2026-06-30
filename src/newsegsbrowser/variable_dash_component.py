@@ -316,6 +316,20 @@ def compose_dsa_input(
     if section is None:
         section = 'None'
     
+    overall_id = {
+        'type': 'dsa-input-element',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    toggle_id = {
+        'type': 'toggle-dsa-variable',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
     header_id = {
         'type': 'dsa-input-header',
         'section': section,
@@ -330,13 +344,18 @@ def compose_dsa_input(
         'subindex': var.interface_subindex
     }
 
+    if var.dsa_selected:
+        cn = 'dsa-input-single-value-block'
+    else:
+        cn = 'dsa-input-single-value-block deselected'
 
     return html.Div([
         daq.ToggleSwitch(
             #vertical = True,
             className = 'dsa-toggle',
             size = 30,
-            value = var.dsa_selected
+            value = var.dsa_selected,
+            id = toggle_id,
         ),
         html.Details([
             html.Summary(
@@ -357,7 +376,8 @@ def compose_dsa_input(
         ],
         ),
     ],
-    className='dsa-input-single-value-block',
+    className=cn,
+    id = overall_id,
     )
 
 def create_dsa_header(

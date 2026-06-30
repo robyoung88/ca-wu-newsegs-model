@@ -107,3 +107,9 @@ div.dsa-input-single-value-block > .dsa-toggle {
 .dsa-configuration-summaryinfo-dsa-live-values {
     font-size: 0.8em;
 }
+
+
+.deselected .dsa-configuration-summary {
+    filter: brightness(5);
+}
+

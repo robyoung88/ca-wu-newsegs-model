@@ -118,10 +118,12 @@ def add_model_to_interface_callbacks(app: Dash):
     
     @app.callback(
         Output({'type':'dsa-bounds-inputcontainer', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'children'),
+        Output({'type':'dsa-input-element', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'className'),
 
         Input({'type': 'trigger', 'page': ALL, 'key': 'dsa_input_change'}, 'data'),
         State('store-selected-configuration', 'data'),
         State({'type':'dsa-bounds-inputcontainer', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'id'),
+        State({'type':'dsa-input-element', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
@@ -129,6 +131,7 @@ def add_model_to_interface_callbacks(app: Dash):
         dsa_input_change_trigger,
         selected_configuration,
         bounds_container_ids,
+        dsa_input_element_ids,
         selected_model
     ):
         logger.info('update_dsa_bounds_inputs triggered.')
@@ -136,6 +139,7 @@ def add_model_to_interface_callbacks(app: Dash):
             dsa_input_change_trigger,
             selected_configuration,
             bounds_container_ids,
+            dsa_input_element_ids,
             app
         )
     
@@ -441,6 +445,7 @@ def add_interface_to_model_callbacks(app):
         Output({'type':'input-dsabound-lower', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Output({'type':'input-dsabound-upper', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
 
+        Input({'type': 'toggle-dsa-variable', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'value'),
         Input({'type': 'dropdown-dsaboundtype', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'value'),
         Input({'type':'input-dsabound-lower', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
         Input({'type':'input-dsabound-upper', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
@@ -451,6 +456,7 @@ def add_interface_to_model_callbacks(app):
         prevent_initial_call = True
     )
     def interface_update_dsa(
+        toggle_dsa_variable,
         dsaboundtype_dropdown_value,
         dsabound_lower,
         dsabound_upper,
@@ -547,7 +553,21 @@ def add_interface_to_model_callbacks(app):
                             )
                         )
                         forward_prequeue = True
-
+                case 'toggle-dsa-variable':
+                    if val is None:
+                        continue
+                    if not val == var.dsa_selected:
+                        var.dsa_selected = val
+                        prequeue_patch.append(
+                            json.dumps(
+                                browser.dsa_impacting_interface_action(
+                                    metamodel_id = mm.id,
+                                    selected_status_change = True,
+                                    **pid
+                                )
+                            )
+                        )
+                        forward_prequeue = True
         
         if forward_prequeue:
             rval[RVAL_INDICES['prequeue']] = prequeue_patch
