@@ -13,6 +13,7 @@ from dash import ALL, NoUpdate, ctx, Dash, Input, no_update, Output, State
 
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel.newsegsmodel import NewsegsModel
+from newsegsbrowser.postprocess import postprocess_utils
 
 logger = logging.getLogger(__name__)
 
@@ -549,14 +550,14 @@ def add_finance_run_callbacks(app: Dash):
         app.finances[mm.finance.id] = mm.finance
 
         logging.info('resyncing metamodel after process completed: %s', process_request)
-        print('resyncing after metamodel')
-        print(process_request)
 
         match process_request['type']:
             case 'dsa-run-request':
-                print('storing results')
-                app.results[mm.dsa_result_id] = app.cache[mm.dsa_result_id]
-                print (app.results[mm.dsa_result_id])
+                dsa_result_id = postprocess_utils.get_dsa_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES['dsa_results'],
+                    mm.id
+                )
+                app.results[dsa_result_id] = app.cache[dsa_result_id]
         
         return (
             trigger_post_metamodel_process,

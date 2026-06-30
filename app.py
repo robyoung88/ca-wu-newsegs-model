@@ -83,6 +83,32 @@ else:
     #background_callback_manager = DiskcacheManager(cache, cache_by = [lambda: launch_uid])
     noncaching_background_callback_manager = DiskcacheManager(cache)
 
+def metamodel_to_cache(metamodel_id: str):
+    mm = metamodels.get(metamodel_id)
+    logger.info('writing metamodel %s to cache', metamodel_id)
+    if mm:
+        cache[metamodel_id] = mm
+    logger.info('writing metamodel %s to cache was successful', metamodel_id)
+
+def metamodel_from_cache(
+        metamodel_id: str, 
+        reattach_location: Literal['local', 'cache'] = 'local'
+    ) -> NewsegsMetaModel:
+        logger.info('retrieving metamodel %s from cache', metamodel_id)
+        mm = cache.get(metamodel_id)
+        if not isinstance(mm, NewsegsMetaModel):
+            raise TypeError(f'{metamodel_id} retrieved from cache is of type {type(mm)}')
+        match reattach_location:
+            case 'local':
+                mm.reattach_model(models)
+                mm.reattach_finance(finances)
+            case 'cache':
+                mm.reattach_model(cache) # pyright: ignore[reportArgumentType]
+                mm.reattach_finance(cache) # pyright: ignore[reportArgumentType]
+                mm.finance.set_model(mm.model, False)
+        logger.info('retrieving metamodel %s was successful', metamodel_id)
+        return mm
+
 def serve_layout():
     """
     
@@ -205,8 +231,8 @@ def add_caching_callbacks(app):
 
         Input('trigger-metamodel-process', 'data'),
         prevent_initial_call = True,
-        # background = True,
-        # manager = noncaching_background_callback_manager,
+        background = True,
+        manager = noncaching_background_callback_manager,
         # running = [
         #     (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
         #     (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
@@ -222,7 +248,7 @@ def add_caching_callbacks(app):
     )
     def run_metamodel_process(metamodel_process):
         process_request = json.loads(metamodel_process)
-        mm = app.metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
+        mm = metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
         
         # Do the process
         match process_request['type']:
@@ -244,16 +270,16 @@ def add_caching_callbacks(app):
                 cache[dsa_result_id] = dsa_results
 
                 # Not convinced this is necessary
-                mm.dsa_result_id = dsa_result_id
+                #mm.dsa_result_id = dsa_result_id
 
-        app.metamodels[mm.id] = mm
-        app.models[mm.model.id] = mm.model
-        app.finances[mm.finance.id] = mm.finance
+        metamodels[mm.id] = mm
+        models[mm.model.id] = mm.model
+        finances[mm.finance.id] = mm.finance
 
         # Resynchronise
-        app.metamodel_to_cache(mm.id)
-        app.model_to_cache(mm.model.id)
-        app.finance_to_cache(mm.finance.id)
+        metamodel_to_cache(mm.id)
+        cache[mm.model.id] = mm.model
+        cache[mm.finance.id] = mm.finance
 
         return metamodel_process
 
@@ -374,29 +400,6 @@ def create_app(external_stylesheets = None) -> Dash:
     
     app.finance_to_cache = finance_to_cache # pyright: ignore[reportAttributeAccessIssue]
     app.finance_from_cache = finance_from_cache # pyright: ignore[reportAttributeAccessIssue]
-
-    def metamodel_to_cache(metamodel_id: str):
-        mm = metamodels.get(metamodel_id)
-        logger.info('writing metamodel %s to cache', metamodel_id)
-        if mm:
-            cache[metamodel_id] = mm
-        logger.info('writing metamodel %s to cache was successful', metamodel_id)
-
-    def metamodel_from_cache(metamodel_id: str, reattach_location: Literal['local', 'cache'] = 'local') -> NewsegsMetaModel:
-        logger.info('retrieving metamodel %s from cache', metamodel_id)
-        mm = cache.get(metamodel_id)
-        if not isinstance(mm, NewsegsMetaModel):
-            raise TypeError(f'{metamodel_id} retrieved from cache is of type {type(mm)}')
-        match reattach_location:
-            case 'local':
-                mm.reattach_model(models)
-                mm.reattach_finance(finances)
-            case 'cache':
-                mm.reattach_model(cache) # pyright: ignore[reportArgumentType]
-                mm.reattach_finance(cache) # pyright: ignore[reportArgumentType]
-                mm.finance.set_model(mm.model, False)
-        logger.info('retrieving metamodel %s was successful', metamodel_id)
-        return mm
     
     app.metamodel_to_cache = metamodel_to_cache  # pyright: ignore[reportAttributeAccessIssue]
     app.metamodel_from_cache = metamodel_from_cache # pyright: ignore[reportAttributeAccessIssue]
