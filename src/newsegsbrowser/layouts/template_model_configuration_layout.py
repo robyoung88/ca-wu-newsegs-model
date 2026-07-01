@@ -201,7 +201,7 @@ def create_model_configuration_layout(*args, **kwargs):
                 dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-benefits'}, data = "[]"),
                 dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-costs'}, data = "[]"),
                 dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-value'}, data = "[]"),
-            ] + clayouts.user_action_components() + clayouts.model_run_components() + clayouts.finance_run_components() + clayouts.metamodel_process_components(),
+            ] + clayouts.user_action_components() + clayouts.model_run_components(**kwargs) + clayouts.finance_run_components(**kwargs) + clayouts.metamodel_process_components(),
 
             overlay_style = {
                 'visibility': 'visible',

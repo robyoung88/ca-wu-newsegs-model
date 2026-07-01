@@ -163,8 +163,8 @@ def create_dsa_layout(*args, **kwargs):
             ] 
             + results_section
             + clayouts.user_action_components()
-            + clayouts.model_run_components()
-            + clayouts.finance_run_components()
+            + clayouts.model_run_components(**kwargs)
+            + clayouts.finance_run_components(**kwargs)
             + clayouts.metamodel_process_components()
             + clayouts.dsa_process_components(**kwargs)
             + clayouts.post_page_load_components(

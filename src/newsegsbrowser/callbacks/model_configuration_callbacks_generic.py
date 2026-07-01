@@ -11,6 +11,7 @@ import dash_bootstrap_components as dbc
 from newsegsbrowser import icons
 import newsegsbrowser.common as browser
 from newsegsbrowser import variable_dash_component as var_dc
+from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 
 from newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodel.newsegsmodel import NewsegsModel
@@ -51,6 +52,10 @@ def sync_config(
     firstload_config_watcher,
     store_selected_configuration,
     store_configurations,
+
+    prequeue_lock_ids,
+    prequeue_lock_values,
+
     input_containers,
     generic_text_ids,
     trigger_ids,
@@ -170,9 +175,10 @@ def sync_config(
 
     if mdl.dirty:
         prequeue_patch = Patch()
-        prequeue_patch.append(
-            json.dumps(browser.model_run_interface_action(mm.id, mdl.id))
-        )
+        if ok_run_model(prequeue_lock_ids, prequeue_lock_values):
+            prequeue_patch.append(
+                json.dumps(browser.model_run_interface_action(mm.id, mdl.id))
+            )
     else:
         prequeue_patch = Patch()
         prequeue_patch.append(

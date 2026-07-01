@@ -10,7 +10,7 @@ Functions:
 import datetime
 import json
 import logging
-from typing import Any, cast
+from typing import Any, Sequence, cast
 
 from dash import ALL, NoUpdate, ctx, Dash, Input, Output, Patch, State, no_update
 from dash import clientside_callback, ClientsideFunction
@@ -19,6 +19,7 @@ from useful_types import SequenceNotStr
 
 from newsegsbrowser import common as browser
 from newsegsbrowser.callbacks import callbacks_map
+from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,10 @@ def add_model_to_interface_callbacks(app: Dash):
         Input({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
         Input('store-selected-configuration', 'data'),
         Input('store-configurations', 'data'),
+
+        State({'type': 'lock', 'target': ALL, 'stage': 'prequeue', 'key': ALL}, 'id'),
+        State({'type': 'lock', 'target': ALL, 'stage': 'prequeue', 'key': ALL}, 'data'),
+
         State({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'id'),
         State({'type': 'generic_text', 'section': ALL, 'key': ALL}, 'id'),
         State({'type': 'trigger', 'page': ALL, 'key': ALL}, 'id'),
@@ -85,6 +90,10 @@ def add_model_to_interface_callbacks(app: Dash):
         firstload_config_watcher,
         store_selected_configuration,
         store_configurations,
+
+        prequeue_lock_ids,
+        prequeue_lock_values,
+
         input_containers,
         generic_text_ids,
         trigger_ids,
@@ -95,6 +104,10 @@ def add_model_to_interface_callbacks(app: Dash):
             firstload_config_watcher,
             store_selected_configuration,
             store_configurations,
+
+            prequeue_lock_ids,
+            prequeue_lock_values,
+
             input_containers,
             generic_text_ids,
             trigger_ids,
@@ -249,7 +262,9 @@ def add_feedback_callbacks(app):
             app
         )
 
-    return app 
+    return app
+
+
 
 def add_interface_to_model_callbacks(app):
     """
@@ -272,16 +287,26 @@ def add_interface_to_model_callbacks(app):
         Input({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'value'),
 
         State('store-selected-configuration', 'data'),
+
+        State({'type': 'lock', 'target': ALL, 'stage': 'prequeue', 'key': ALL}, 'id'),
+        State({'type': 'lock', 'target': ALL, 'stage': 'prequeue', 'key': ALL}, 'data'),
+
         State({'type': 'input-model-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
         State({'type': 'input-finance-config', 'section': ALL, 'key': ALL, 'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL}, 'id'),
         State({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'id'),
         State({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'id'),
+        
         prevent_initial_call=True
     )
     def interface_update_config(
         inputs_model,
-        inputs_finance,   
+        inputs_finance,
+
         selected_config,
+
+        prequeue_lock_ids,
+        prequeue_lock_values,
+
         model_input_ids,
         finance_input_ids,
         model_config_trigger_ids,
@@ -362,6 +387,7 @@ def add_interface_to_model_callbacks(app):
                                 rval[1][i] = new_val # type: ignore
                     
                     if deterministic_changed:
+                        #if ok_run_model(prequeue_lock_ids, prequeue_lock_values):
                         model_changed = True
                         prequeue.append(
                             json.dumps(
@@ -404,6 +430,7 @@ def add_interface_to_model_callbacks(app):
                                 )
                             )
                         else:
+                            #if ok_run_finance(prequeue_lock_ids, prequeue_lock_values):
                             prequeue.append(
                                 json.dumps(
                                     browser.finance_interface_action(
@@ -604,7 +631,7 @@ def add_interface_to_model_callbacks(app):
 
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
-        Output('queue-action-user', 'data'),
+        #Output('queue-action-user', 'data'),
 
         Output('prequeue-model-run', 'data', allow_duplicate = True),
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
@@ -618,13 +645,23 @@ def add_interface_to_model_callbacks(app):
 
         Input('prequeue-action-user', 'data'),
         Input('interval-action-user', 'n_intervals'),
-        State('queue-action-user', 'data'),
+
+        State({'type': 'lock', 'target': ALL, 'stage': 'prequeue', 'key': ALL}, 'id'),
+        State({'type': 'lock', 'target': ALL, 'stage': 'prequeue', 'key': ALL}, 'data'),
+
+        #State('queue-action-user', 'data'),
+        #State('dispatchitem-action-user', 'data'),
         prevent_initial_call = True
     )
     def queueman_action_user(
         prequeue_action_user, 
         interval_action_user,
-        queue_action_user,
+
+        prequeue_lock_ids,
+        prequeue_lock_values,
+
+        #queue_action_user,
+        #dispatch_status
     ):
         """
         Receives and dispatches user actions.
@@ -638,10 +675,15 @@ def add_interface_to_model_callbacks(app):
         A change to the latch conditions or a trigger through the postdispatch-trigger
         will result in the queue being run through again.
         """
-        if not queue_action_user:
-            queue_action_user = []
+        # if not queue_action_user:
+        #     queue_action_user = []
 
         logger.info('processing user action queue, triggered by: %s', ctx.triggered_id)
+
+        queue_action_user = app.sts.get('queue-action-user')
+        if queue_action_user is None:
+            app.sts['queue-action-user'] = []
+            queue_action_user = app.sts.get('queue-action-user')
         
         if ctx.triggered_id == 'prequeue-action-user':
             action = prequeue_action_user
@@ -659,7 +701,7 @@ def add_interface_to_model_callbacks(app):
 
         rval = [
             [], # The prequeue is consumed
-            queue_action_user,
+            #queue_action_user,
 
             no_update, # run prequeues
             no_update,
@@ -675,15 +717,20 @@ def add_interface_to_model_callbacks(app):
 
         RVAL_INDICES = {
             'prequeue-action-user': 0,
-            'queue-action-user': 1,
-            'prequeue-model-run': 2,
-            'prequeue-finance-run': 3,
-            'prequeue-metamodel-process': 4,
-            'trigger-postprocess-model-run': 5,
-            'trigger-postprocess-finance-run': 6,
-            'dispatchitem-action-user': 7,
-            'interval-action-user': 8,
+            #'queue-action-user': 1,
+            'prequeue-model-run': 1,
+            'prequeue-finance-run': 2,
+            'prequeue-metamodel-process': 3,
+            'trigger-postprocess-model-run': 4,
+            'trigger-postprocess-finance-run': 5,
+            'dispatchitem-action-user': 6,
+            'interval-action-user': 7,
         }
+
+        # As there are multiple exits from this function, it is not as trivial to ensure that
+        # we avoid overwriting a dispatch. 
+        # May need to re-write the flow again.
+        #app_dispatch = app.sts.get('dispatchitem-action-user')
 
         # Loop through action queue
         for i, action_json in enumerate(queue_action_user):
@@ -721,15 +768,17 @@ def add_interface_to_model_callbacks(app):
                                     )
                                     synced.append(varid)
 
-                            r_model_run_request = browser.model_run_request(mm.id, mm.model.id)
-                            model_prequeue_patch = Patch()
-                            model_prequeue_patch.append(json.dumps(r_model_run_request))
+                            if ok_run_model(prequeue_lock_ids, prequeue_lock_values):
+                                r_model_run_request = browser.model_run_request(mm.id, mm.model.id)
+                                model_prequeue_patch = Patch()
+                                model_prequeue_patch.append(json.dumps(r_model_run_request))
 
-                            logger.info('Adding a run request for %s', mm.model.id)
+                                logger.info('Adding a run request for %s', mm.model.id)
 
-                            # Do nothing with dispatch_actions
-                            rval[RVAL_INDICES['prequeue-model-run']] = model_prequeue_patch
-                            rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                                # Do nothing with dispatch_actions
+                                rval[RVAL_INDICES['prequeue-model-run']] = model_prequeue_patch
+                            
+                            #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                             rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                             return tuple(rval)
 
@@ -764,15 +813,17 @@ def add_interface_to_model_callbacks(app):
                                     )
                                     synced.append(varid)
 
-                            r_finance_run_request = browser.finance_run_request(mm.id, mm.finance.id, mm.model.id)
-                            finance_prequeue_patch = Patch()
-                            finance_prequeue_patch.append(json.dumps(r_finance_run_request))
+                            if ok_run_finance(prequeue_lock_ids, prequeue_lock_values):
+                                r_finance_run_request = browser.finance_run_request(mm.id, mm.finance.id, mm.model.id)
+                                finance_prequeue_patch = Patch()
+                                finance_prequeue_patch.append(json.dumps(r_finance_run_request))
 
-                            logger.info('Adding a finance run request for %s', mm.finance.id)
+                                logger.info('Adding a finance run request for %s', mm.finance.id)
 
-                            # Do nothing with dispatch_actions
-                            rval[RVAL_INDICES['prequeue-finance-run']] = finance_prequeue_patch
-                            rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                                # Do nothing with dispatch_actions
+                                rval[RVAL_INDICES['prequeue-finance-run']] = finance_prequeue_patch
+                            
+                            #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                             rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                             return tuple(rval)
                         
@@ -792,16 +843,19 @@ def add_interface_to_model_callbacks(app):
                         )
                         logger.info('dispatching %d model run interface requests', len(dispatch_actions))
 
-                        # Nothing to do but to make the request with the first action
-                        r_model_run_request = browser.model_run_request(mm.id, mm.model.id)
-                        model_prequeue_patch = Patch()
-                        model_prequeue_patch.append(json.dumps(r_model_run_request))
+                        if ok_run_model(prequeue_lock_ids, prequeue_lock_values):
 
-                        logger.info('Adding a run request for %s', mm.model.id)
+                            # Nothing to do but to make the request with the first action
+                            r_model_run_request = browser.model_run_request(mm.id, mm.model.id)
+                            model_prequeue_patch = Patch()
+                            model_prequeue_patch.append(json.dumps(r_model_run_request))
+
+                            logger.info('Adding a run request for %s', mm.model.id)
+                            
+                            # Do nothing with dispatch_actions
+                            rval[RVAL_INDICES['prequeue-model-run']] = model_prequeue_patch
                         
-                        # Do nothing with dispatch_actions
-                        rval[RVAL_INDICES['prequeue-model-run']] = model_prequeue_patch
-                        rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                        #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                         rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                         return tuple(rval)
                 
@@ -832,7 +886,7 @@ def add_interface_to_model_callbacks(app):
 
                         rval[RVAL_INDICES['trigger-postprocess-model-run']] = mrr
                         rval[RVAL_INDICES['trigger-postprocess-finance-run']] = frr
-                        rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                        #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                         rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                         return tuple(rval)
 
@@ -868,7 +922,7 @@ def add_interface_to_model_callbacks(app):
                     metamodel_prequeue_patch.append(dispatch_actions[0])
 
                     rval[RVAL_INDICES['prequeue-metamodel-process']] = metamodel_prequeue_patch
-                    rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+                    #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                     rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                     return tuple(rval)
                     
@@ -876,7 +930,7 @@ def add_interface_to_model_callbacks(app):
                     raise ValueError(f'action type not recognised: {action['type']}')
         
         # Fall-through - do not update dispatchitem-action-user
-        rval[RVAL_INDICES['queue-action-user']] = queue_action_user
+        #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
         rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
         return tuple(rval)
     

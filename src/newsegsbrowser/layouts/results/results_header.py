@@ -5,11 +5,13 @@ import dash_daq as daq
 from newsegsbrowser import icons
 from newsegssensitivity import common as sensitivity
 
-def create_results_header():
+def create_results_header(**kwargs):
     """
     HTML separating the results and providing controls for setting result format per annum or
     to horizon
     """
+    autorun = kwargs.get('autorun_model', True)
+    autorun_icon = 'autorun-true' if autorun else 'autorun-stop'
     return html.Div(
         [
             html.Div(
@@ -21,7 +23,23 @@ def create_results_header():
                 dbc.Container([
                     dbc.Row([
                         html.H1(
-                            [icons.get_icon('results'), 'Results'],
+                            [
+                                icons.get_icon('results'), 
+                                'Results',
+                                dbc.Button(
+                                    html.I(
+                                        className = icons.get_icon(autorun_icon, style_name = 'raw'),
+                                        style={'display': 'inline'}
+                                    ),
+                                    color = 'primary' if autorun else 'secondary',
+                                    id = {'type': 'autorun-btn', 'page': kwargs.get('page_type', 'None')},
+                                    outline = not(autorun),
+                                    style = {
+                                        'margin-left': '5px',
+                                        'border-radius': '50%',
+                                    }
+                                )
+                            ],
                             style={
                                 'display': 'inline-block',
                                 'width':'33%',

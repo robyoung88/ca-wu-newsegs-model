@@ -72,6 +72,9 @@ DEFAULT_ICONS = {
     'nav-dsa-config': 'bi bi-tornado',
     'nav-psa-config': 'bi bi-dice-3',
     'nav-build-arch-config': 'bi bi-houses',
+    'autorun-true': 'bi bi-play-circle-fill',
+    'autorun-false': 'bi bi-stop-circle',
+
 }
 
 @overload

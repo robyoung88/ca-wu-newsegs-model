@@ -378,10 +378,10 @@ def create_app(external_stylesheets = None) -> Dash:
 
     def model_to_cache(model_id):
         mdl = models.get(model_id)
-        logger.info('writing model %s to cache', model_id)
+        logger.info('writing model %s to cache, %s', model_id, datetime.datetime.now())
         if mdl:
             cache[model_id] = mdl
-        logger.info('writing model %s to cache was successful', model_id)
+        logger.info('writing model %s to cache was successful, %s', model_id, datetime.datetime.now())
     
     def model_from_cache(model_id) -> newsegsmodel.NewsegsModel:
         logger.info('retrieving model %s from cache', model_id)
@@ -541,6 +541,9 @@ def create_app(external_stylesheets = None) -> Dash:
     app.remove_model = remove_model # pyright: ignore[reportAttributeAccessIssue]
     app.remove_finance = remove_finance # pyright: ignore[reportAttributeAccessIssue]
     app.remove_metamodel = remove_metamodel # pyright: ignore[reportAttributeAccessIssue]
+
+    # Short-term stor
+    app.sts = {} # pyright: ignore[reportAttributeAccessIssue]
 
     app = add_display_callbacks(app)
 
