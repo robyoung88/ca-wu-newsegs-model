@@ -1,8 +1,6 @@
 """
 Functions for creating a deterministic sensitivity analysis layout
 """
-import os
-import json
 from typing import cast
 
 from dash import dcc, html

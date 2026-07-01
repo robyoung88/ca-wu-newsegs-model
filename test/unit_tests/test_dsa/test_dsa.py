@@ -36,7 +36,7 @@ class TestDSA(unittest.TestCase):
     
     def test_short_dsa(self):
         mm = self.make_sprake_metamodel()
-        for v in mm.variables:
+        for v in mm.variables.values():
             if v.model_parameter == 'storage_capacity' or v.model_parameter == 'storage_rte':
                 v.dsa_selected = True
             else:
@@ -74,7 +74,7 @@ class TestDSA(unittest.TestCase):
     def test_long_dsa(self):
         mm = self.make_sprake_metamodel()
         dsa_variable_count = 0
-        for v in mm.variables:
+        for v in mm.variables.values():
             if v.dsa_possible and v.dsa_selectable:
                 v.dsa_selected = True
                 dsa_variable_count += 1
