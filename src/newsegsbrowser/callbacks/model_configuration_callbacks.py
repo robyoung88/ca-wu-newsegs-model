@@ -68,6 +68,7 @@ def add_model_to_interface_callbacks(app: Dash):
         Output('store-selected-configuration', 'data', allow_duplicate = True),
         Output('store-configurations', 'data', allow_duplicate = True),
         Output({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'children'),
+        Output({'type': 'generic_text', 'section': ALL, 'key': ALL}, 'children'),
         Output({'type': 'trigger', 'page': ALL, 'key': ALL}, 'data', allow_duplicate = True),
         Output('prequeue-action-user', 'data', allow_duplicate = True),
 
@@ -75,6 +76,7 @@ def add_model_to_interface_callbacks(app: Dash):
         Input('store-selected-configuration', 'data'),
         Input('store-configurations', 'data'),
         State({'type': 'input-container', 'supersection': ALL, 'section': ALL}, 'id'),
+        State({'type': 'generic_text', 'section': ALL, 'key': ALL}, 'id'),
         State({'type': 'trigger', 'page': ALL, 'key': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call=True
@@ -84,6 +86,7 @@ def add_model_to_interface_callbacks(app: Dash):
         store_selected_configuration,
         store_configurations,
         input_containers,
+        generic_text_ids,
         trigger_ids,
         selected_model
     ):
@@ -93,6 +96,7 @@ def add_model_to_interface_callbacks(app: Dash):
             store_selected_configuration,
             store_configurations,
             input_containers,
+            generic_text_ids,
             trigger_ids,
             app
         )

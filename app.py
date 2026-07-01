@@ -33,7 +33,7 @@ from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
 from newsegssensitivity import dsa
 
-from newsegsbrowser.layouts import model_selection_layout
+from newsegsbrowser.layouts import model_selection_layout, template_psa_configuration_layout
 from newsegsbrowser.layouts import template_landing_layout
 from newsegsbrowser.layouts import template_model_configuration_layout
 from newsegsbrowser.layouts import template_dsa_configuration_layout
@@ -164,6 +164,12 @@ def add_display_callbacks(app: Dash) -> Dash:
         elif pagename == 'dsa':
             return template_dsa_configuration_layout.create_dsa_layout(
                 **layout_registry.get_dsa_layout_config(
+                    selected_model
+                )
+            )
+        elif pagename == 'psa':
+            return template_psa_configuration_layout.create_psa_layout(
+                **layout_registry.get_psa_layout_config(
                     selected_model
                 )
             )
@@ -349,10 +355,15 @@ def create_app(external_stylesheets = None) -> Dash:
             )
         ),
         template_dsa_configuration_layout.create_dsa_layout(
-                **layout_registry.get_dsa_layout_config(
-                    'sprake'
-                )
+            **layout_registry.get_dsa_layout_config(
+                'sprake'
             )
+        ),
+        template_psa_configuration_layout.create_psa_layout(
+            **layout_registry.get_psa_layout_config(
+                'sprake'
+            )
+        ),
 
     ])
 

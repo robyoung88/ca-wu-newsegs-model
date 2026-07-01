@@ -149,3 +149,56 @@ def create_results_header_dsa(**kwargs):
     #id = 'drawer-header'
     className = 'drawer-header',
     )
+
+def create_results_header_psa(**kwargs):
+    return html.Div(
+        [
+            html.Div(
+                className = 'resize-handle',
+            ),
+
+            html.Div(
+                dbc.Container([
+                    dbc.Row([
+                        html.H1(
+                            [icons.get_icon('results'), 'PSA Results'],
+                            style = {
+                                'float': 'left',
+                                'width':'75%'
+                            }
+                        ),
+                        html.Span(
+                            dbc.Button(
+                                'Run PSA',
+                                color = 'primary',
+                                id = {'type': 'psa-run-button', 'page': kwargs.get('page-type', 'None')},
+                                disabled = False,
+                                style = {
+                                    'display': 'inline',
+                                }
+                            ),
+                            style = {
+                                'float': 'right',
+                                'width': '25%'
+                            }
+                        )
+                    ]),
+                    dbc.Row([
+                        dcc.Dropdown(
+                            options = [
+                                {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
+                            ],
+                            value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0], # TODO: make a bespoke list
+                            id = {'type': 'psa-results-statistic-dropdown', 'page': kwargs.get('page-type', 'None')},
+                            searchable = False,
+                            clearable = False,
+                        )
+                    ])
+                ]),
+            #id = 'drawer-title',
+            className = 'drawer-title',
+            )
+        ],
+    #id = 'drawer-header'
+    className = 'drawer-header',
+    )

@@ -52,6 +52,7 @@ def sync_config(
     store_selected_configuration,
     store_configurations,
     input_containers,
+    generic_text_ids,
     trigger_ids,
     app,
 
@@ -72,6 +73,7 @@ def sync_config(
         no_update, # store-configurations
 
         [no_update] * len(input_containers), # input-container children
+        [no_update] * len(generic_text_ids), # Generic text children
         [no_update] * len(trigger_ids), # trigger data
         no_update # prequeue-action-user patch
     )
@@ -156,9 +158,15 @@ def sync_config(
                     )
         inputs.append(cnts)
 
-    # TODO - these do not require an update if store_configurations was the trigger
-    
-    mcfg, fcfg = model_and_finance_to_interface_function(mdl, fnc)
+    text_values = []
+    for text_id in generic_text_ids:
+        match text_id.get('key'):
+            case 'site-name':
+                text_values.append(mm.model.location.name)
+            case 'configuration-name':
+                text_values.append(mm.name)
+            case _:
+                text_values.append(no_update)
 
     if mdl.dirty:
         prequeue_patch = Patch()
@@ -171,13 +179,12 @@ def sync_config(
             json.dumps(browser.result_update_interface_action(mm.id))
         )
 
-    
-
     return (
         json.dumps(store_selected_configuration), # store-selected-configurations
         store_configurations, # store-configurations
 
         inputs,  # input-container children
+        text_values, # generic_text children
         [datetime.datetime.now().timestamp()] * len(trigger_ids), # trigger data
         prequeue_patch # prequeue-action-user patch
     ) 
