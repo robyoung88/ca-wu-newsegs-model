@@ -271,7 +271,7 @@ def add_caching_callbacks(app):
                     postprocess_utils.RESULT_CACHE_PREFIXES['dsa_results'],
                     mm.id
                 )
-                mm.last_dsa_run = datetime.datetime.now().isoformat()
+                mm.last_dsa_run = datetime.datetime.now().timestamp()
                 setattr(dsa_results, '_run_time', mm.last_dsa_run)
                 cache[dsa_result_id] = dsa_results
 
