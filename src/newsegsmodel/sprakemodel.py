@@ -2,33 +2,35 @@ from __future__ import annotations
 import os
 import copy
 import datetime
-from typing import override, Mapping
+from typing import cast, override, Any, Mapping, Sequence
 from functools import singledispatchmethod
 from functools import lru_cache
 
 import numpy as np
 import pandas as pd
 
-from src.util import classfuncs
-from src.core import timespan as modtimespan
-from src.core import location as modlocation
-from src.core.generation import generators
-from src.core.environment import environment_servers
-from src.core.environment import inmem_env_servers
-from src.core import newsegsmodule
-from src.newsegsmodel import newsegsmodel
-from src.newsegsgeneration import newsegsgeneration
-from src.newsegsgrid import newsegsgrid
-from src.newsegscs import newsegscs
-from src.newsegsgeneration import sprakegeneration
-from src.newsegsgrid import sprakegrid
-from src.newsegscs import sprakecs
+from core.environment.dummy_env_servers import DummyWiderEnv
+from core.location.location import RaisedLocation
+from core.newsegsmoduleresult import NewsegsModuleResult
+from core import timespan as modtimespan
+from core import location as modlocation
+from core.generation import generators
+from core.environment import environment_servers
+from core.environment import inmem_env_servers
+from core.timespan.timespan import SECONDS_TO_DAYS
+from newsegsmodel import newsegsmodel
+from newsegsgeneration import newsegsgeneration
+from newsegsgrid import newsegsgrid
+from newsegscs import newsegscs
+from newsegsgeneration import sprakegeneration
+from newsegsgrid import sprakegrid
+from newsegscs import sprakecs
 
 from config import settings
 lookup_dir = settings.get('SprakeDataLoc')
 
 # TODO: Fix that changing this prevents construction. Hub height must be somewhere fixed at 10m before location is set.
-_NOMINAL_WT_HEIGHT = 10.0
+
 _DEFAULT_TS = pd.Timedelta(hours=1)
 
 def get_sprake_environment_server():
@@ -53,7 +55,7 @@ def get_sprake_environment_server():
     )
    
     windloc = modlocation.RaisedLocation.from_none()
-    windloc.height_agl = _NOMINAL_WT_HEIGHT
+    windloc.height_agl = sprakegeneration.NOMINAL_WT_HEIGHT
     wind_ts = modtimespan.OffsetRegTimeSpan(
         pd.Timestamp(wind_data['timestamp'].iloc[0], tz='utc'),
         pd.Timestamp(wind_data['timestamp'].iloc[-1], tz='utc')
@@ -61,8 +63,9 @@ def get_sprake_environment_server():
     wind_ts.timestep = _DEFAULT_TS
     wind_ts.set_offset(wind_ts.start, wind_ts.start)
 
-    server.set_wind_speed(wind_data['wind_speed'].values,
-                          windloc,
+    server.set_wind_speed(
+        wind_data['wind_speed'].values, # pyright: ignore[reportArgumentType]
+        windloc,
                           wind_ts)
     
     ### Solar
@@ -80,7 +83,7 @@ def get_sprake_environment_server():
         )
     )
 
-    pvloc = modlocation.RaisedLocation(
+    pvloc = modlocation.AspectLocation(
         settings.get('SprakeValidationLat'),
         settings.get('SprakeValidationLon'), 
         height_agl = 2
@@ -102,90 +105,34 @@ def get_sprake_environment_server():
     pv_ts.set_offset(pv_ts.start, pv_ts.start)
 
     server.set_horizontal_solar_flux(
-        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].values),
+        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].to_numpy()),
         pvloc,
         pv_ts)
     
     server.set_wind_speed(
-        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].values),
+        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].to_numpy()),
         pvloc,
         pv_ts
     )
 
     server.set_external_temperature(
-        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].values),
+        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].to_numpy()),
         pvloc,
         pv_ts
     )
 
     return server
 
-def get_sprake_gamesa_126():
-    pcurve = (
-        pd.read_excel(
-            os.path.join(
-                lookup_dir,
-                'wind_power_curve_investigation.xlsx'
-            ),
-            sheet_name="gamesa_25_power_curve",
-            header=0
-        )
-    )
-    
-    tloc = modlocation.RaisedLocation.from_none()
-    tloc.height_agl = _NOMINAL_WT_HEIGHT
-    
-    turbine = generators.WindTurbineElecGenerator.from_characteristics(
-        cut_in=2.0,
-        cut_out=21.0,
-        rated_power=2500.0,
-        swept_area=np.pi*(0.5 * 126)**2,
-        hub_height=_NOMINAL_WT_HEIGHT,
-        name="Gamesa 126 (Sprake)",
-        loc = tloc,
-        power_curve=pcurve.to_numpy().T
-    )
-
-    return turbine
-
-def get_sprake_ned100():
-    cpcurve = (
-        pd.read_excel(
-            os.path.join(
-                lookup_dir,
-                'power-curve-ned-100.xlsx'
-            ),
-            sheet_name='power_curve',
-            header=0
-        )
-        .loc[:,['wind_speed','coeff_power']]
-    )
-    tloc = modlocation.RaisedLocation.from_none()
-    tloc.height_agl = _NOMINAL_WT_HEIGHT
-    turbine = generators.WindTurbineElecGenerator.from_characteristics(
-        cut_in=3.0,
-        cut_out=20.0,
-        rated_power=100.0,
-        swept_area=np.pi*(0.5 * 24)**2,
-        hub_height=_NOMINAL_WT_HEIGHT,
-        name="Norvento nED 100 (Sprake)",
-        loc = tloc,
-        cp_curve=cpcurve.to_numpy().T
-    )
-
-    return turbine
-
-# Deferred results 
-#@lru_cache
-#def d
+def get_sprake_wider_env_server():
+    return DummyWiderEnv()
 
 class SprakeModel(newsegsmodel.NewsegsModel):
     _name = 'Sprake Model'
-    _model_version = '0.0.1'
+    _version = '0.0.1'
 
-    _generation_result = None
-    _grid_result = None
-    _cs_result = None
+    _generation_result: sprakegeneration.SprakeGenerationResult
+    _grid_result: sprakegrid.SprakeGridResult
+    _cs_result: sprakecs.SprakeCSResult
 
     @singledispatchmethod
     def __init__(
@@ -230,23 +177,29 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         if wider_environment_server:
             if isinstance(wider_environment_server, str):
-                testenv = None
+                testenv = get_sprake_wider_env_server()
                 if str(testenv) != wider_environment_server:
                     raise ValueError('Mismatched wider environments')
                 self.wider_env = testenv
             else:
                 self.wider_env = wider_environment_server
         else:
-            self._wider_environment_server = None
+            self._wider_environment_server = get_sprake_wider_env_server()
 
+        if not isinstance(mod_gen, sprakegeneration.SprakeGeneration):
+            raise TypeError(f'mod_gen must be of type SprakeGeneration, is {type(mod_gen)}')
         self.generation = mod_gen
 
         if mod_grid:
-            self.grid= mod_grid
+            if not isinstance(mod_grid, sprakegrid.SprakeGrid):
+                raise TypeError(f'mod_grid must be of type SprakeGrid, is {type(mod_grid)}')
+            self.grid = mod_grid
         else:
             self.grid = sprakegrid.SprakeGrid.from_none()
         
         if mod_cs:
+            if not isinstance(mod_cs, sprakecs.SprakeCS):
+                raise TypeError(f'mod_cs must be of type SprakeCS, is {type(mod_cs)}')
             self.consumption_storage = mod_cs
         else:
             self.consumption_storage = sprakecs.SprakeCS.from_none()
@@ -257,12 +210,12 @@ class SprakeModel(newsegsmodel.NewsegsModel):
             self._default_timestep = _DEFAULT_TS
         
         if run_period:
-            self._run_period = modtimespan.RegTimeSpan(run_period)
+            self.set_run_period(modtimespan.RegTimeSpan(run_period))
         else:
-            self._run_period = modtimespan.RegTimeSpan(
+            self.set_run_period(modtimespan.RegTimeSpan(
                 pd.Timestamp('2005-01-01T00:00:00', tz='utc'),
                 pd.Timestamp('2015-01-01T00:00:00', tz='utc')
-            )
+                        ))
         self._run_period.timestep = self._default_timestep
 
         if loc:
@@ -279,14 +232,14 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         name: str
     ) -> None:
 
-        mod_gen = sprakegeneration.SprakeGeneration(get_sprake_ned100())
+        mod_gen = sprakegeneration.SprakeGeneration(sprakegeneration.get_sprake_ned100())
         mod_gen.set_location(
             modlocation.Location(
                 settings.get('SprakeValidationLat'),
                 settings.get('SprakeValidationLon')
             )
         )
-        mod_gen.generator.generators[1].location.height_agl = 2.
+        cast(RaisedLocation, mod_gen.generator.generators[1].location).height_agl = 2.
 
         # Re-dispatch to SprakeGeneration singledispatchmethod
         self.__init__(mod_gen, name = name)
@@ -299,17 +252,37 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
         self._run_period = modtimespan.RegTimeSpan(timespan)
         self._run_period.timestep = self._default_timestep
+        self._horizon = int(round((self._run_period.end - self._run_period.start).total_seconds() * SECONDS_TO_DAYS / 365.25))
         self._dirty = True
 
     def get_run_period(self) -> modtimespan.TimeSpan:
         return self._run_period
+    
+    @property
+    def horizon(self) -> int:
+        return self._horizon
+    
+    @horizon.setter
+    def horizon(self, new_horizon: int):
+        if hasattr(self, '_horizon') and new_horizon == self._horizon:
+            return
+        ts = modtimespan.RegTimeSpan(self.get_run_period())
+        ts.end = ts.start + pd.Timedelta(new_horizon*365, unit='d') 
+        while ts.end.day != ts.start.day:
+            ts.end = ts.end + pd.Timedelta(1, unit='d')
+        ts.timestep = self._default_timestep
+        self._run_period = ts
+        self._horizon = new_horizon
+        self._dirty = True
 
     @property
     def generation(self) -> sprakegeneration.SprakeGeneration:
         return self._mod_gen
     
     @generation.setter
-    def generation(self, generation_module: sprakegeneration.SprakeGeneration):
+    def generation(self, generation_module: newsegsgeneration.NewsegsGeneration):
+        if not isinstance(generation_module, sprakegeneration.SprakeGeneration):
+            raise TypeError(f'Sprake model only compatible with SprakeGeneration - {type(generation_module)} provided')
         self._mod_gen = generation_module
         self._mod_gen.model = self
 
@@ -318,16 +291,20 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         return self._mod_grid
 
     @grid.setter
-    def grid(self, grid_module: sprakegrid.SprakeGrid):
+    def grid(self, grid_module: newsegsgrid.NewsegsGrid):
+        if not isinstance(grid_module, sprakegrid.SprakeGrid):
+            raise TypeError(f'Sprake model only compatible with SprakeGrid - {type(grid_module)} provided')
         self._mod_grid = grid_module
         self._mod_grid.model = self
 
     @property
     def consumption_storage(self) -> sprakecs.SprakeCS:
-        return self._mod_cs
+        return cast(sprakecs.SprakeCS, self._mod_cs)
 
     @consumption_storage.setter
-    def consumption_storage(self, cs_module: sprakecs.SprakeCS):
+    def consumption_storage(self, cs_module: newsegscs.NewsegsCS):
+        if not isinstance(cs_module, sprakecs.SprakeCS):
+            raise TypeError(f'Sprake model only compatible with SprakeCS - {type(cs_module)} provided')
         self._mod_cs = cs_module
         self._mod_cs.model = self
 
@@ -343,7 +320,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._local_environment_server = local_environment_server
 
     @property
-    def wider_env(self) -> environment_servers.NewsegsWiderEnvironment | None:
+    def wider_env(self) -> environment_servers.NewsegsWiderEnvironment:
         return self._wider_environment_server
     
     @wider_env.setter
@@ -370,16 +347,16 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         """
         self._mod_cs.location = loc
 
-    def get_generation_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_generation_result(self) -> NewsegsModuleResult:
         return self._generation_result
 
-    def get_grid_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_grid_result(self) -> NewsegsModuleResult:
         return self._grid_result
 
-    def get_cs_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_cs_result(self) -> NewsegsModuleResult:
         return self._cs_result
 
-    def get_consumption_storage_result(self) -> newsegsmodule.ABCNewsegsModuleResult | None:
+    def get_consumption_storage_result(self) -> NewsegsModuleResult:
         return self._cs_result
 
     @override
@@ -392,72 +369,81 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
-
+    
     @override
-    def to_dict(self) -> Mapping:
+    def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
-        odict['model_version'] = self._model_version
-
+        
         odict['local_environment_server'] = str(self._local_environment_server)
         odict['wider_environment_server'] = str(self._wider_environment_server)
 
-        odict['mod_gen'] = self._mod_gen.to_dict()
-        odict['mod_grid'] = self._mod_grid.to_dict()
-        odict['mod_cs'] = self._mod_cs.to_dict()
+        #odict['mod_gen'] = self._mod_gen.to_dict()
+        #odict['mod_grid'] = self._mod_grid.to_dict()
+        #odict['mod_cs'] = self._mod_cs.to_dict()
 
         return odict
-
-    def sync_with_dict(self, config: Mapping) -> None:
-        """
-        Synchronise configuration with a config dictionary.
-        """
-        from src.newsegsgeneration import constructors as genmodconstructors
-        from src.newsegsgrid import constructors as gridmodconstructors
-        from src.newsegscs import constructors as csmodconstructors
-
-        if config.get('class') != classfuncs.get_class(self):
-            raise ValueError('Config model class inconsistent ', config.get('class'))
-        
-        if config.get('model_version') != self._model_version:
-            raise ValueError('Config has inconsistent model version ', config.get('model_version'), ' vs ', self._model_version )
-        
-        config = copy.copy(config)
-
-        generation = config.get('mod_gen', None)
-        if generation:
-            self.generation = genmodconstructors.generation_module_from_dict(generation)
-        
-        grid = config.get('mod_grid', None)
-        if grid:
-            self.grid = gridmodconstructors.grid_module_from_dict(grid)
-        
-        cs = config.get('mod_cs', None)
-        if cs:
-            self.consumption_storage = csmodconstructors.cs_module_from_dict(cs)
     
     @classmethod
-    def from_dict(cls, config: dict) -> SprakeModel:
-        from src.newsegsgeneration import constructors as genmodconstructors
-        from src.newsegsgrid import constructors as gridmodconstructors
-        from src.newsegscs import constructors as csmodconstructors
+    @override
+    def from_dict(cls: type[SprakeModel], config: dict[str, Any]) -> SprakeModel:
+        config = config.copy()
+        local_environment_server = config.pop('local_environment_server', None)
+        wider_environment_server = config.pop('wider_environment_server', None)
+        inst = super().from_dict(config)
 
-        config = copy.copy(config)
-        config.pop('class', None)
-
-        model_version = config.pop('model_version', None)
-        if model_version != cls._model_version:
-            raise ValueError('Config has inconsistent model version: %s vs %s', model_version, cls._model_version)
+        if local_environment_server:
+            if isinstance(local_environment_server, str):
+                testenv = get_sprake_environment_server()
+                if str(testenv) != local_environment_server:
+                    raise ValueError('Mismatched local environments')
+                inst.local_env = testenv
+            else:
+                inst.local_env = local_environment_server
+        else:
+            inst.local_env = get_sprake_environment_server()
         
-        config['mod_gen'] = genmodconstructors.generation_module_from_dict(config['mod_gen'])
-        config['mod_grid'] = gridmodconstructors.grid_module_from_dict(config['mod_grid'])
-        config['mod_cs'] = csmodconstructors.cs_module_from_dict(config['mod_cs'])
+        if wider_environment_server:
+            if isinstance(wider_environment_server, str):
+                testenv = get_sprake_wider_env_server()
+                if str(testenv) != wider_environment_server:
+                    raise ValueError('Mismatched wider environments')
+                inst._wider_environment_server = testenv
+            else:
+                inst.wider_env = wider_environment_server
+        else:
+            inst._wider_environment_server = get_sprake_wider_env_server()
+        
+        return inst
 
-        mod_gen = config.pop('mod_gen')
+    
+    # @classmethod
+    # def from_dict(cls, config: dict) -> SprakeModel:
+    #     from newsegsgeneration import constructors as genmodconstructors
+    #     from newsegsgrid import constructors as gridmodconstructors
+    #     from newsegscs import constructors as csmodconstructors
 
-        return cls(mod_gen, **config)
+    #     config = copy.copy(config)
+    #     config.pop('class', None)
+
+    #     model_version = config.pop('model_version', None)
+    #     if model_version != cls._model_version:
+    #         raise ValueError('Config has inconsistent model version: %s vs %s', model_version, cls._model_version)
+        
+    #     config['mod_gen'] = genmodconstructors.generation_module_from_dict(config['mod_gen'])
+    #     config['mod_grid'] = gridmodconstructors.grid_module_from_dict(config['mod_grid'])
+    #     config['mod_cs'] = csmodconstructors.cs_module_from_dict(config['mod_cs'])
+
+    #     mod_gen = config.pop('mod_gen')
+
+    #     return cls(mod_gen, **config)
+
+SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_attributes) + (
+    '_local_environment_server',
+    '_wider_environment_server'
+)
 
 # SprakeModel copy constructor
-@SprakeModel.__init__.register(SprakeModel)
+@SprakeModel.__init__.register(SprakeModel) # pyright: ignore[reportFunctionMemberAccess]
 def _SprakeModel_from_other(
     self,
     other: SprakeModel

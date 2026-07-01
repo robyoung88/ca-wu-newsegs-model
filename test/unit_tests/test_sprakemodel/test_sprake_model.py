@@ -14,15 +14,15 @@ setup_test_env()
 
 from config import settings
 
-from src.util import jsonfuncs
-from src.core import location
-from src.newsegsmodel import sprakemodel
-from src.newsegsfinance import sprakefinance
-from src.newsegsgeneration import sprakegeneration
-from src.newsegsgrid import sprakegrid
-from src.newsegscs import sprakecs
-from src.newsegsgeneration import newsegsgeneration
-from src.newsegscs import newsegscs
+from util import jsonfuncs
+from core import location
+from newsegsmodel import sprakemodel
+from newsegsfinance import sprakefinance
+from newsegsgeneration import sprakegeneration
+from newsegsgrid import sprakegrid
+from newsegscs import sprakecs
+from newsegsgeneration import newsegsgeneration
+from newsegscs import newsegscs
 
 class TestSprakeModelConfigEqualities(unittest.TestCase):
     """
@@ -99,7 +99,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_none()
-        mdl2.sync_with_dict(d2)
+        mdl2.update(d2)
 
         self.assertEqual(
             mdl.generation.generator.nameplate_capacity,
@@ -253,36 +253,36 @@ class TestSprakeFinanceRun(unittest.TestCase):
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_costs_undiscounted(),
-            external_finance_data.loc['total_cost_undiscounted', 'value'],
+            float(external_finance_data.loc['total_cost_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_costs_discounted(),
-            external_finance_data.loc['total_cost_discounted', 'value'],
+            float(external_finance_data.loc['total_cost_discounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_benefits_undiscounted(),
-            external_finance_data.loc['total_benefits_undiscounted', 'value'],
+            float(external_finance_data.loc['total_benefits_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_benefits_discounted(),
-            external_finance_data.loc['total_benefits_discounted', 'value'],
+            float(external_finance_data.loc['total_benefits_discounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_net_present_value_undiscounted(),
-            external_finance_data.loc['npv_undiscounted', 'value'],
+            float(external_finance_data.loc['npv_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = 10*RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_net_present_value_discounted(),
-            external_finance_data.loc['npv_discounted', 'value'],
+            float(external_finance_data.loc['npv_discounted', 'value']), # pyright: ignore[reportArgumentType]
             rtol = 10*RTOL
         )

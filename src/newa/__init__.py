@@ -1,1 +1,1 @@
-from src.newa.get_newa_data import get_newa_micro_point, get_newa_meso_point, get_newa_meso_ts_point
+from newa.get_newa_data import get_newa_micro_point, get_newa_meso_point, get_newa_meso_ts_point

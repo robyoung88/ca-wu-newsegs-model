@@ -15,3 +15,5 @@ temp_*
 /**/.ipynb_checkpoints/
 
 .vscode/*
+
+*.log

@@ -1,14 +1,14 @@
 from collections.abc import Mapping
 
-from src.newsegscs import newsegscs
-from src.newsegscs import sprakecs
+from newsegscs import newsegscs
+from newsegscs import sprakecs
 
 _CS_MODULE_CONSTRUCTORS = {
     'SprakeCS': sprakecs.SprakeCS,
 }
 
 def cs_module_from_dict(
-    ip: Mapping
+    ip: dict
 ) -> newsegscs.NewsegsCS:
     classname = ip.pop('class')
     constructor = _CS_MODULE_CONSTRUCTORS.get(classname, None)

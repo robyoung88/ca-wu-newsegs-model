@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from src.admdspenmw import PACKAGEDIR
+from admdspenmw import PACKAGEDIR
 
 lookups = pd.read_csv(os.path.join(PACKAGEDIR,'data','admd_lookups.csv'))\
     .set_index('diversity_level')

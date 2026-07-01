@@ -8,16 +8,18 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from src.util import classfuncs
-from src.core.timespan import delta_days
-from src.core.newsegsmodule import filter_meter_indices
-from src.newsegsfinance import newsegsfinance
-from src.newsegsfinance import common as common_finance
-from src.newsegsmodel import newsegsmodel
+from core.newsegsmodelinterface import NewsegsModelInterface
+from util import classfuncs
+from core.timespan import delta_days
+from core.newsegsmoduleresult import filter_meter_indices
+from newsegsfinance import newsegsfinance
+from newsegsfinance import common as common_finance
+from newsegsmodel import newsegsmodel
+from newsegsmodel import SprakeModel
 
-from src.newsegsfinance import NewsegsFinance, apply_discount_factor, sum_all_to_horizon
-from src.newsegsmodel import NewsegsModel
-from src.stats import core as stats_core
+from newsegsfinance import apply_discount_factor, sum_all_to_horizon
+#from newsegsmodel import NewsegsModel
+from newsegsstats import core as stats_core
 
 # Not strictly true, but good enough for finance.
 HOURS_IN_YEAR = 8760.0
@@ -52,6 +54,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         'grid_import': ('grid_import')
     }
 
+    _model: SprakeModel # pyright: ignore[reportIncompatibleVariableOverride]
+
     @singledispatchmethod
     def __init__(
         self,
@@ -70,6 +74,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         self,
         benefit_discount_rate: float|int,
         cost_discount_rate: float|int = 0.0,
+        horizon: int = -1,
         name: str | None = None,
         model: newsegsmodel.NewsegsModel | None = None,
     ) -> None:
@@ -78,6 +83,8 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
         self.benefit_discount_rate = benefit_discount_rate
         self.cost_discount_rate = cost_discount_rate
+
+        self.horizon = horizon
 
         if name is not None:
             self.name = name
@@ -118,6 +125,27 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         self._unit_costs.update(input_dict)
         self.dirty = self.dirty or (v0 != self._unit_costs)
     
+    @override
+    def set_model(
+        self, 
+        mdl: NewsegsModelInterface,
+        dirty: bool = True
+    ) -> None:
+        if not isinstance(mdl, SprakeModel):
+            raise TypeError(f'SprakeFinance only compatible with SprakeModel, {type(mdl)} provided')
+        self._model: SprakeModel = mdl # pyright: ignore[reportIncompatibleVariableOverride]
+        self.dirty = self.dirty or dirty
+    
+    @property
+    def model(self) -> SprakeModel:
+        if not hasattr(self, '_model'):
+            raise AttributeError('model has not yet been set')
+        return self._model
+    
+    @model.setter
+    def model(self, mdl: NewsegsModelInterface) -> None:
+        self.set_model(mdl)
+
     @classmethod
     def get_default_unit_costs(cls) -> dict:
         """
@@ -131,55 +159,6 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         Get a copy of the current unit cost dictionary
         """
         return self._unit_costs.copy()
-
-    def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:
-        self._model = mdl
-        self.dirty = self.dirty or dirty 
-    
-    @property
-    def benefit_discount_rate(self) -> float:
-        return self._benefit_discount_rate
-
-    @benefit_discount_rate.setter
-    def benefit_discount_rate(self, v: float) -> None:
-        self.dirty = self.dirty or not(self._benefit_discount_rate == v)
-        self._benefit_discount_rate = v
-
-    @property
-    def cost_discount_rate(self) -> float:
-        return self._cost_discount_rate
-    
-    @cost_discount_rate.setter
-    def cost_discount_rate(self, v:float) -> None:
-        self.dirty = self.dirty or not(self._cost_discount_rate == v)
-        self._cost_discount_rate = v
-    
-    def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
-        """
-        Set the benefit and cost discount rates
-
-        Note that if only one positional argument is given, both discount rates
-        will be set to this value.
-
-        If mixing positional and keyword arguments, note that `benefit_discount_rate`
-        is always the first positional argument, and will be over-written by a
-        subsequent keyword argument of that key.
-
-        Args:
-            benefit_discount_rate: Also first positional argument (float)
-            cost_discount_rate: Also second positional argument (float)
-        """
-        if len(drs) == 1 and len(kwdrs) == 0:
-            # Assume that user wants to set both discount rates to nominated value
-            dr = drs[0]
-            self.benefit_discount_rate = dr
-            self.cost_discount_rate = dr
-        else:
-            argnames = ['benefit_discount_rate', 'cost_discount_rate']
-            argdict = dict(zip(argnames, drs))
-            argdict.update(kwdrs)
-            self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
-            self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
 
     def _get_empty_df(self) -> pd.DataFrame:
         return _deferred_get_empty_df(self).copy()
@@ -433,56 +412,56 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     def get_net_present_value_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
         return _deferred_get_net_present_value_discounted(self, horizon)
     
-    @override
-    def to_dict(self) -> dict:
-        return {
-            'class': classfuncs.get_class(self),
-            'name': self._name,
-            'unit_costs': self._unit_costs,
-            'benefit_discount_rate': self._benefit_discount_rate,
-            'cost_discount_rate': self._cost_discount_rate
-        }
+    # @override
+    # def to_dict(self) -> dict:
+    #     return {
+    #         'class': classfuncs.get_class(self),
+    #         'name': self._name,
+    #         'unit_costs': self._unit_costs,
+    #         'benefit_discount_rate': self._benefit_discount_rate,
+    #         'cost_discount_rate': self._cost_discount_rate
+    #     }
     
-    def sync_with_dict(self, config: Mapping) -> None:
-        """
-        Synchronise configuration with a config dictionary.
-        """
+    # def sync_with_dict(self, config: Mapping) -> None:
+    #     """
+    #     Synchronise configuration with a config dictionary.
+    #     """
         
-        config = copy.copy(config)
+    #     config = copy.copy(config)
 
-        unit_costs = config.get('unit_costs', None)
-        if unit_costs:
-            self.set_unit_costs_from_dict(unit_costs)
+    #     unit_costs = config.get('unit_costs', None)
+    #     if unit_costs:
+    #         self.set_unit_costs_from_dict(unit_costs)
         
-        # This looks risky, but practically may only result in
-        # some redundant attributes if the config is bad.
-        conf_keys = config.keys()
-        for k in conf_keys:
-            if hasattr(self, k):
-                v = config.get(k)
+    #     # This looks risky, but practically may only result in
+    #     # some redundant attributes if the config is bad.
+    #     conf_keys = config.keys()
+    #     for k in conf_keys:
+    #         if hasattr(self, k):
+    #             v = config.get(k)
 
-                # If the attribute is a read-write property, its class attribute 
-                # will have an fset
-                try:
-                    prop = getattr(type(self), k)
-                    if hasattr(prop, 'fset'):
-                        if getattr(prop, 'fset') is not None:
-                            getattr(prop, 'fset')(self, v)
-                        else:
-                            # Property is read-only; do nothing
-                            ...
-                    else:
-                        # Otherwise, we assume it is a simple attribute that may be overwritten
-                        setattr(self, k, v)
-                except AttributeError:
-                    setattr(self, k, v)
+    #             # If the attribute is a read-write property, its class attribute 
+    #             # will have an fset
+    #             try:
+    #                 prop = getattr(type(self), k)
+    #                 if hasattr(prop, 'fset'):
+    #                     if getattr(prop, 'fset') is not None:
+    #                         getattr(prop, 'fset')(self, v)
+    #                     else:
+    #                         # Property is read-only; do nothing
+    #                         ...
+    #                 else:
+    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
+    #                     setattr(self, k, v)
+    #             except AttributeError:
+    #                 setattr(self, k, v)
     
-    @classmethod
-    def from_dict(cls, config: Mapping) -> SprakeFinance:
-        o = cls.from_none()
-        o.sync_with_dict(config)
+    # @classmethod
+    # def from_dict(cls, config: Mapping) -> SprakeFinance:
+    #     o = cls.from_none()
+    #     o.sync_with_dict(config)
 
-        return o
+    #     return o
 
 # SprakeFinance copy constructor
 @SprakeFinance.__init__.register(SprakeFinance) # pyright: ignore[reportFunctionMemberAccess]
@@ -496,7 +475,10 @@ def _SprakeFinance_from_other(
     self.benefit_discount_rate = other.benefit_discount_rate
     self.cost_discount_rate = other.cost_discount_rate
     self.name = other.name
-    self.model = other.model
+    try:
+        self.model = other.model
+    except AttributeError:
+        pass
 
 def _make_unit_cost_property(key: str):
     def getter(self) -> float:
@@ -557,8 +539,8 @@ def _deferred_get_resident_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataF
         .assign(
             resident_units = fnc.model.consumption_storage.n_units, # In Sprake model, the number of occupied units is constant over time
             deltaday = lambda df: delta_days(df['datetime']),
-            fixed_receipts = lambda df: df['resident_units'] * df['deltaday'] * fnc.resident_sc_per_unit_day,
-            var_receipts = lambda df: df['consumption'] * fnc.resident_var_per_unit,
+            fixed_receipts = lambda df: df['resident_units'] * df['deltaday'] * fnc.resident_sc_per_unit_day, # pyright: ignore[reportAttributeAccessIssue]
+            var_receipts = lambda df: df['consumption'] * fnc.resident_var_per_unit, # pyright: ignore[reportAttributeAccessIssue]
             receipts = lambda df: df['fixed_receipts'] + df['var_receipts']
         )
         .loc[:, ['datetime', 'fixed_receipts', 'var_receipts', 'receipts']]
@@ -585,7 +567,7 @@ def _deferred_get_ev_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
         consumption
         .assign(
             fixed_receipts = 0.0,
-            var_receipts = lambda df: df['consumption'] * fnc.resident_var_per_unit, # No separate tariff for EV charging in Sprake model
+            var_receipts = lambda df: df['consumption'] * fnc.resident_var_per_unit, # No separate tariff for EV charging in Sprake model # pyright: ignore[reportAttributeAccessIssue]
             receipts = lambda df: df['fixed_receipts'] + df['var_receipts']
         )
         .loc[:, ['datetime', 'fixed_receipts', 'var_receipts', 'receipts']]
@@ -612,7 +594,7 @@ def _deferred_get_export_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFra
         consumption
         .assign(
             fixed_receipts = 0.0,
-            var_receipts = lambda df: df['consumption'] * fnc.grid_export_var_per_unit,
+            var_receipts = lambda df: df['consumption'] * fnc.grid_export_var_per_unit, # pyright: ignore[reportAttributeAccessIssue]
             receipts = lambda df: df['fixed_receipts'] + df['var_receipts']
         )
         .loc[:, ['datetime', 'fixed_receipts', 'var_receipts', 'receipts']]
@@ -693,8 +675,8 @@ def _deferred_get_import_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
         consumption
         .assign(
             deltaday = lambda df: delta_days(df['datetime']),
-            fixed_costs = lambda df: df['deltaday'] * fnc.grid_import_sc_per_day, # Assume only single standing charge in Sprake model. This may be scaled by capacity in other models
-            var_costs = lambda df: df['consumption'] * fnc.grid_import_var_per_unit,
+            fixed_costs = lambda df: df['deltaday'] * fnc.grid_import_sc_per_day, # Assume only single standing charge in Sprake model. This may be scaled by capacity in other models # pyright: ignore[reportAttributeAccessIssue]
+            var_costs = lambda df: df['consumption'] * fnc.grid_import_var_per_unit, # pyright: ignore[reportAttributeAccessIssue]
             costs = lambda df: df['fixed_costs'] + df['var_costs']
         )
         .loc[:, ['datetime', 'fixed_costs', 'var_costs', 'costs']]
@@ -722,8 +704,8 @@ def _deferred_get_om_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.Dat
     odf = fnc._get_empty_df()
     if len(odf) == 0:
         return odf
-    wind_om_per_kw_month = fnc.wind_om_per_kw_year / 12
-    pv_om_per_kw_month = fnc.pv_om_per_kw_year / 12
+    wind_om_per_kw_month = fnc.wind_om_per_kw_year / 12 # pyright: ignore[reportAttributeAccessIssue]
+    pv_om_per_kw_month = fnc.pv_om_per_kw_year / 12 # pyright: ignore[reportAttributeAccessIssue]
     
     # Capacity in Sprake model is constant, so this is fine:
     wind_om_per_month = wind_om_per_kw_month * fnc.model.generation.generator.generators[0].nameplate_capacity
@@ -770,7 +752,7 @@ def _deferred_get_om_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.DataFr
     odf = fnc._get_empty_df()
     if len(odf) == 0:
         return odf
-    bess_om_per_kwh_month = fnc.bess_om_per_kwh_year / 12
+    bess_om_per_kwh_month = fnc.bess_om_per_kwh_year / 12 # pyright: ignore[reportAttributeAccessIssue]
 
     # Capacity in Sprake model is constant
     bess_om_per_month = bess_om_per_kwh_month * fnc.model.consumption_storage.storage_params.get('storage_capacity')
@@ -889,10 +871,10 @@ def _deferred_get_capex_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.
         return odf
     
     odf['wind_costs'] = 0.0
-    odf.iloc[0,-1] = fnc.wind_capex_per_kw * fnc.model.generation.generator.generators[0].nameplate_capacity
+    odf.iloc[0,-1] = fnc.wind_capex_per_kw * fnc.model.generation.generator.generators[0].nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
 
     odf['pv_costs'] = 0.0
-    odf.iloc[0,-1] = fnc.pv_capex_per_kw * fnc.model.generation.generator.generators[1].nameplate_capacity
+    odf.iloc[0,-1] = fnc.pv_capex_per_kw * fnc.model.generation.generator.generators[1].nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
 
     odf['costs'] = odf['wind_costs'] + odf['pv_costs']
     return odf
@@ -912,7 +894,7 @@ def _deferred_get_capex_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.Dat
         return odf
     
     odf['bess_costs'] = 0.0
-    odf.iloc[0,-1] = fnc.bess_capex_per_kwh * fnc.model.consumption_storage.storage_params.get('storage_capacity')
+    odf.iloc[0,-1] = fnc.bess_capex_per_kwh * fnc.model.consumption_storage.storage_params.get('storage_capacity') # pyright: ignore[reportAttributeAccessIssue]
 
     odf['costs'] = odf['bess_costs']
     return odf
@@ -1154,7 +1136,7 @@ def _deferred_get_simple_payback_time_days(fnc: SprakeFinance) -> float:
     capex = fnc.all_capex_costs_undiscounted.sum(axis=1)
     net_revenue = fnc.all_receipts_undiscounted.sum(axis=1) - fnc.all_recurrent_costs_undiscounted.sum(axis=1)
 
-    simple_debt = (net_revenue - capex).cumsum().values.flatten()
+    simple_debt = (net_revenue - capex).cumsum().to_numpy().flatten()
 
     payback = simple_debt >= 0
     # We may want to add a restriction that payback cannot occur within a certain timeframe in

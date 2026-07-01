@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 
-from src.newsegsgrid import newsegsgrid
-from src.newsegsgrid import sprakegrid
+from newsegsgrid import newsegsgrid
+from newsegsgrid import sprakegrid
 
 _GRID_MODULE_CONSTRUCTORS = {
     'SprakeGrid': sprakegrid.SprakeGrid,

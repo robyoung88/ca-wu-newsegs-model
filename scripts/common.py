@@ -12,7 +12,7 @@ def setup_script_env():
     # Add src folder to path
     curdir = os.path.dirname(__file__)
     src_path = os.path.join(
-        os.path.abspath(os.path.join(curdir, os.pardir))
-        #'src'
+        os.path.abspath(os.path.join(curdir, os.pardir)),
+        'src'
     )
     sys.path.append(src_path)

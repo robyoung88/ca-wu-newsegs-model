@@ -7,8 +7,8 @@ import json
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.newsegsgrid import sprakegrid
-from src.newsegsgrid import constructors as gridconstructors
+from newsegsgrid import sprakegrid
+from newsegsgrid import constructors as gridconstructors
 
 class TestSprakeGridConfigEqualities(unittest.TestCase):
 
@@ -49,7 +49,7 @@ class TestSprakeGridConfigEqualities(unittest.TestCase):
         d2 = json.loads(sd1)
 
         gr2 = sprakegrid.SprakeGrid.from_none()
-        gr2.sync_with_dict(d2)
+        gr2.update(d2)
         self.assertEqual(gr1.import_rate, gr2.import_rate)
         self.assertEqual(gr1.export_rate, gr2.export_rate)
         self.assertEqual(gr1.name, gr2.name)

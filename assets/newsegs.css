@@ -1,0 +1,115 @@
+.newsegs-nav-button {
+    width: 48px;
+    margin: 2px 5px 2px 5px;
+}
+
+.newsegs-navbar-vertical .newsegs-nav-button {
+    display: block;
+}
+
+.newsegs-navbar-vertical > div{
+    display: inline-block;
+    border-color: #ccc;
+    border-radius: 10px;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 4px;
+}
+
+/* Collapse behavior: shrink the navbar column (do not hide it) so the
+   remaining columns expand to consume whitespace. Add/remove `.collapsed`
+   on the `dbc.Col` element to toggle. */
+.newsegs-navbar-vertical{
+    transition: flex-basis .18s ease, width .18s ease, padding .18s ease;
+    min-width: 0; /* allow the column to shrink without forcing overflow */
+}
+
+/* When collapsed keep a compact visible navbar instead of fully hiding. */
+.newsegs-navbar-vertical.collapsed{
+    flex: 0 0 64px !important; /* compact width */
+    width: 64px !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Let the content column expand when the navbar is compacted. */
+.newsegs-navbar-vertical.collapsed + .col,
+.newsegs-navbar-vertical.collapsed + [class*="col-"]{
+    flex: 1 1 0% !important;
+    max-width: 100% !important;
+}
+
+/* Ensure normal adjacent columns can flex when navbar is not collapsed. */
+.newsegs-navbar-vertical + .col,
+.newsegs-navbar-vertical + [class*="col-"]{
+    flex: 1 1 0%;
+}
+
+/* Results header */
+
+.configuration-selector-container {
+    width: 33%;
+    float: left;
+    vertical-align: bottom;
+    padding-top: 10px;
+}
+
+/* DSA Configuration */
+
+div.dsa-input-single-value-block {
+    display: block;
+    width: fit-content;
+    margin: 4px 2px 4px 2px;
+}
+
+div.dsa-input-single-value-block > details {
+    display: inline-block;
+    width: auto;
+}
+
+div.dsa-input-single-value-block > details > div div {
+    display: inline-flex;
+    width: fit-content;
+    margin: 5px 2px 5px 2px;
+}
+
+div.dsa-input-single-value-block > .dsa-toggle {
+    display: inline-flex;
+    width: fit-content;
+    vertical-align: top;
+    margin-right: 10px;
+}
+
+.dsa-configuration-summary {
+    display: inline-flex;
+}
+
+.dsa-configuration-summary > h4 {
+    display: inline;
+}
+
+.dsa-configuration-summaryinfo {
+    display: inline-flex;
+    text-align: center;
+    align-items: baseline;
+    vertical-align: baseline;
+    margin-left: 10px;
+    font-size: 1.5rem;
+}
+
+.dsa-configuration-summaryinfo > span {
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.dsa-configuration-summaryinfo-dsa-live-values {
+    font-size: 0.8em;
+}
+
+
+.deselected .dsa-configuration-summary {
+    filter: brightness(5);
+}
+

@@ -6,16 +6,16 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegsgeneration.newsegsgeneration import get_generation_meters
-from src.core.timespan import SEASON_NAMES
-from src.stats.core import assign_year_index, assign_season_index
-from src.stats import basic_summary_stats
-from src.stats import categorise_meter
-from src.stats import time_in_range
-from src.stats import self_consumption
-from src.stats import agg_meters_daily
-from src.stats import locate_timeseries_extrema
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegsgeneration.newsegsgeneration import get_generation_meters
+from core.timespan import SEASON_NAMES
+from newsegsstats.core import assign_year_index, assign_season_index
+from newsegsstats import basic_summary_stats
+from newsegsstats import categorise_meter
+from newsegsstats import time_in_range
+from newsegsstats import self_consumption
+from newsegsstats import agg_meters_daily
+from newsegsstats import locate_timeseries_extrema
 
 SEASON_NAMES_MAP = (
     pd.DataFrame(

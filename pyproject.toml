@@ -21,3 +21,9 @@ license-files = ["LICEN[CS]E*"]
 [project.urls]
 Homepage = "https://github.com/robyoung88/ca-wu-newsegs-model"
 Issues = "https://github.com/robyoung88/ca-wu-newsegs-model/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -9,7 +9,7 @@ import json
 from unit_tests.common import setup_test_env
 setup_test_env()
 
-from src.core import location
+from core import location
 
 class TestLocationEqualities(unittest.TestCase):
 
@@ -77,3 +77,26 @@ class TestLocationRecovery(unittest.TestCase):
         d2 = json.loads(sd1)
         l3 = location.location_from_dict(d2)
         self.assertEqual(l1, l3)
+
+class TestLocationFromCharacteristics(unittest.TestCase):
+    def test_location_fromcharacteristics(self):
+        l1 = location.Location(50.0, -3.0)
+        l2 = location.Location.from_characteristics(50.0, -3.0, crs = 'EPSG:4326')
+        self.assertIsInstance(l2, location.Location)
+        self.assertEqual(l1, l2)
+    
+    def test_raisedlocation_fromcharacteristics(self):
+        l1 = location.RaisedLocation(50.0, -3.0, 55)
+        l2 = location.RaisedLocation.from_characteristics(50.0, -3.0, height_agl = 55)
+        self.assertIsInstance(l2, location.RaisedLocation)
+        self.assertEqual(l1, l2)
+    
+    def test_aspectlocation_fromcharacteristics(self):
+        l1 = location.AspectLocation(50.0, -3.0, 55, 75, 30)
+        l2 = location.AspectLocation.from_characteristics(50.0, -3.0, height_agl = 55, azimuth = 75, pitch = 30)
+        self.assertIsInstance(l2, location.AspectLocation)
+        self.assertEqual(l1, l2)
+        with self.assertRaises(TypeError):
+            # Missing height
+            l2 = location.AspectLocation.from_characteristics(50.0, -3.0, azimuth = 75, pitch = 30)
+        

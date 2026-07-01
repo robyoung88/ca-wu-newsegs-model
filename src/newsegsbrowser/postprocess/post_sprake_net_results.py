@@ -1,23 +1,13 @@
 import numpy as np
 import pandas as pd
 
-from src.core.timespan import SEASON_NAMES
-from src.newsegsmodel.sprakemodel import SprakeModel
-from src.newsegsgeneration import newsegsgeneration
-from src.newsegscs import newsegscs
-from src.stats.core import assign_year_index, assign_peaktime_index, assign_season_index
-from src.stats import basic_summary_stats
-from src.stats import seasonal_statistics
-
-#SEASON_NAMES_MAP = (
-#    pd.DataFrame(
-#        {
-#            'season_index': np.arange(len(SEASON_NAMES)),
-#            'season': SEASON_NAMES
-#        }
-#    )
-#    .set_index('season_index')
-#)
+from core.timespan import SEASON_NAMES
+from newsegsmodel.sprakemodel import SprakeModel
+from newsegsgeneration import newsegsgeneration
+from newsegscs import newsegscs
+from newsegsstats.core import assign_year_index, assign_peaktime_index, assign_season_index
+from newsegsstats import basic_summary_stats
+from newsegsstats import seasonal_statistics
 
 def net_results_to_interface_sprake(
     mdl: SprakeModel

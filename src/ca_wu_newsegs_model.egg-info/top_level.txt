@@ -1,0 +1,14 @@
+admdspenmw
+constants
+core
+newa
+newsegsbrowser
+newsegscs
+newsegsfinance
+newsegsgeneration
+newsegsgrid
+newsegsmetamodel
+newsegsmodel
+newsegsvariable
+stats
+util

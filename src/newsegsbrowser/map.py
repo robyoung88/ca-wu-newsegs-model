@@ -4,8 +4,8 @@ from dash import html, dcc, Input, Output, State, ALL, no_update
 import dash_leaflet as dl
 import dash_bootstrap_components as dbc
 
-from src.core import location as modlocation
-from src.newsegsbrowser.common import get_icon
+from core import location as modlocation
+from newsegsbrowser.common import get_icon
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 
@@ -119,6 +119,7 @@ def create_site_selector_map(map_id='sitemap',
 def add_latlon_sync_callbacks(app):
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
+        
         Input('site-lat-input', 'value'),
         Input('site-lon-input', 'value'),
         Input('site-name-input', 'value'),
@@ -145,6 +146,7 @@ def add_latlon_sync_callbacks(app):
         Output('site-lat-input', 'value'),
         Output('site-lon-input', 'value'),
         Output('site-name-input', 'value'),
+
         Input('site-location', 'data'),
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
@@ -164,7 +166,7 @@ def add_latlon_sync_callbacks(app):
         newloc = modlocation.Location(lat, lon, name = name)
 
         selected_config = json.loads(selected_config)
-        mdl = app.get_model(selected_config['model_id'])
+        mdl = app.models.get(selected_config['model_id'])
 
         if not(newloc == mdl.location):
             mdl.location = newloc
@@ -178,6 +180,7 @@ def add_latlon_sync_callbacks(app):
 def add_map_click_callback(app):
     @app.callback(
         Output('potential-site-location', 'data'),
+
         Input('sitemap', 'dblclickData'),
         State('potential-site-location', 'data'),
         State('site-name-input', 'value'),
@@ -201,6 +204,7 @@ def add_map_click_callback(app):
 def add_potential_site_change_callback(app):
     @app.callback(
         Output('site-confirm-container', 'children',allow_duplicate=True),
+
         Input('potential-site-location', 'data'),
         prevent_initial_call=True
         
@@ -234,6 +238,7 @@ def add_potential_site_change_callback(app):
 def add_confirm_site_change_btn_callback(app):
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
+
         Input({'type': 'confirm-site-popup-btn', 'index': ALL}, 'n_clicks'),
         State('potential-site-location', 'data'),
         prevent_initial_call=True
@@ -247,6 +252,7 @@ def add_confirm_site_change_btn_callback(app):
 def add_remove_confirm_popup(app):
     @app.callback(
         Output('site-confirm-container', 'children'),
+
         Input('site-location', 'data'),
         prevent_initial_call=True,
         allow_duplicate=True
@@ -260,6 +266,7 @@ def add_site_change_callback(app):
         Output('site-marker-container', 'children'),
         Output('site-osgb-easting-text', 'children'),
         Output('site-osgb-northing-text', 'children'),
+
         Input('site-location', 'data'),
         prevent_initial_call=True
     )

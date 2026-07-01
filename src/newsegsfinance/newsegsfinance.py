@@ -1,75 +1,120 @@
 # Abstract base class for NewSEGS financial calculations
+from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+import copy
 import datetime
+from typing import Any
 import uuid
 import re
 
-from src.newsegsmodel import NewsegsModel
 import pandas as pd
-import numpy.typing as npt
 
-class NewsegsFinance(metaclass=ABCMeta):
+from core.newsegsfinanceinterface import NewsegsFinanceInterface
+from core import newsegsmodelinterface
+
+class NewsegsFinance(NewsegsFinanceInterface):
+    """
+    Abstract base class of NewSEGS finance model
+
+    Uses the results timeseries of a NewsegsModel instance in combination with
+    configuration variables to calculate costs and benefits associated with
+    energy generation, sales, and imports.
+    """
+
+    _dirty = True
 
     _name = 'NewSEGS Finance'
-    _model = None
-    _dirty = True
+    _finance_version = '0.0.1'
+    _id_prefix = 'f'
+    
+    _model: newsegsmodelinterface.NewsegsModelInterface
     
     last_update = datetime.datetime.now()
-    uuid = "1"
 
-    _benefit_discount_rate = 0.
-    _cost_discount_rate = 0.
+    _benefit_discount_rate: float = 0.
+    _cost_discount_rate: float = 0.
+
+    checked_out: bool = False
 
     def __init__(self, *args, **kwargs):
-        self.uuid = str(uuid.uuid4())
+        super().__init__(self, *args, **kwargs)
     
     @property
-    def id(self) -> str:
-        return 'f-' + self.uuid
-    
-    @id.setter
-    def id(self, id: str) -> None:
-        uid = re.sub('^f-', '', id)
-        if len(id) != 38 or len(uid) != 36:
-            raise ValueError(f'id: {id} is not a valid NewsegsFinance identifier')
-        self.uuid = uid
+    def finance_version(self) -> str:
+        return self.version
+
+    def run(self):
+        """
+        Perform any expensive computation required to "un-dirty" the finance
+        """
+        self._dirty = False
+        return hash(self)
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
-    @abstractmethod
-    def set_model(self, mdl: NewsegsModel | None, dirty: bool = True) -> None:
-        ...
+    def set_model(
+        self, 
+        mdl: newsegsmodelinterface.NewsegsModelInterface,
+        dirty: bool = True
+    ) -> None:
+        self._model = mdl
+        self.dirty = self.dirty or dirty
     
     @property
-    def model(self) -> NewsegsModel | None:
+    def model(self) -> newsegsmodelinterface.NewsegsModelInterface:
+        if not hasattr(self, '_model'):
+            raise AttributeError('model has not yet been set')
         return self._model
     
     @model.setter
-    def model(self, mdl: NewsegsModel | None) -> None:
+    def model(self, mdl: newsegsmodelinterface.NewsegsModelInterface) -> None:
         self.set_model(mdl)
-
-    @property
-    def name(self) -> str:
-        return self._name
-    
-    @name.setter
-    def name(self, name: str) -> None:
-        self._name = name
 
     # Discount rates
     @property
-    @abstractmethod
     def benefit_discount_rate(self) -> float:
-        ...
+        return self._benefit_discount_rate
+
+    @benefit_discount_rate.setter
+    def benefit_discount_rate(self, v: float) -> None:
+        self.dirty = self.dirty or not(self._benefit_discount_rate == v)
+        self._benefit_discount_rate = v
 
     @property
-    @abstractmethod
     def cost_discount_rate(self) -> float:
-        ...
+        return self._cost_discount_rate
     
-    @abstractmethod
+    @cost_discount_rate.setter
+    def cost_discount_rate(self, v:float) -> None:
+        self.dirty = self.dirty or not(self._cost_discount_rate == v)
+        self._cost_discount_rate = v
+    
     def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
-        ...
+        """
+        Set the benefit and cost discount rates
+
+        Note that if only one positional argument is given, both discount rates
+        will be set to this value.
+
+        If mixing positional and keyword arguments, note that `benefit_discount_rate`
+        is always the first positional argument, and will be over-written by a
+        subsequent keyword argument of that key.
+
+        Args:
+            benefit_discount_rate: Also first positional argument (float)
+            cost_discount_rate: Also second positional argument (float)
+        """
+        if len(drs) == 1 and len(kwdrs) == 0:
+            # Assume that user wants to set both discount rates to nominated value
+            dr = drs[0]
+            self.benefit_discount_rate = dr
+            self.cost_discount_rate = dr
+        else:
+            argnames = ['benefit_discount_rate', 'cost_discount_rate']
+            argdict = dict(zip(argnames, drs))
+            argdict.update(kwdrs)
+            self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
+            self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
     
     # Benefits
     @property
@@ -445,13 +490,6 @@ class NewsegsFinance(metaclass=ABCMeta):
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
         ...
 
-    @abstractmethod
-    def to_dict(self) -> dict:
-        """
-        Configuration as a dictionary
-        """
-        ...
-
     @property
     def dirty(self) -> bool:
         """
@@ -485,3 +523,8 @@ class NewsegsFinance(metaclass=ABCMeta):
                 mdl.last_run
             )
         )
+
+NewsegsFinance._excluded_attributes = (
+    super(NewsegsFinance, NewsegsFinance)._excluded_attributes 
+    + ('_model',)
+)

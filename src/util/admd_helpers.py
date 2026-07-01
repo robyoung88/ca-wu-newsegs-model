@@ -4,8 +4,8 @@ libdir = Path(__file__).parent.parent.absolute()
 os.chdir(libdir)
 from hamilton import registry; registry.disable_autoload
 from hamilton import driver
-import src.admdspenmw as admdcalc
-from src.admdspenmw.model_config import default_model_config, default_model_inputs, default_model_outputs
+import admdspenmw as admdcalc
+from admdspenmw.model_config import default_model_config, default_model_inputs, default_model_outputs
 import numpy as np
 import pandas as pd
 from functools import cache
