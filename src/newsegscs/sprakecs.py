@@ -18,6 +18,7 @@ from core import timespan as modtimespan
 from core import location as modlocation
 from newsegsmodel import newsegsmodel
 
+from newsegsbrowser import STATICDATA
 from newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 from newsegsvariable.variable import ScalarNumParam
 AnyNumber = Union[ScalarNumParam]#, Number]
@@ -159,15 +160,29 @@ class SprakeCSResult(NewsegsModuleResult):
 # so we can't get a cache working.
 
 def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
-    from newsegscs.elexon_profiles import get_elexon_consumption
-    cons = get_elexon_consumption(datetimes)
+    #from newsegscs.elexon_profiles import get_elexon_consumption
+    #cons = get_elexon_consumption(datetimes)
+    cons = (
+        pd.read_parquet(os.path.join(STATICDATA, 'elexon_consumption_sprake.parquet'))
+        .set_index('datetime')
+        .loc[datetimes, :]
+        .reset_index()
+    )
     return cast(np.ndarray, pd.Series(cons['consumption']).array) * (1.0 - efficiency_reduction) * n_households
 
 def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
-    from newsegscs.ev_profiles import get_ev_consumption
-    cons = get_ev_consumption(datetimes,
-                              annual_consumption=annual_residential_consumption_per_ev)
-    return cons['consumption'] * n_evs
+    # from newsegscs.ev_profiles import get_ev_consumption
+    # cons = get_ev_consumption(datetimes,
+    #                           annual_consumption=annual_residential_consumption_per_ev)
+    #                           .set_index('datetime')
+    # return cons['consumption'] * n_evs
+    cons = (
+        pd.read_parquet(os.path.join(STATICDATA, 'ev_consumption_sprake.parquet'))
+        .set_index('datetime')
+        .loc[datetimes, :]
+        .reset_index()
+    )
+    return cons['consumption'] * n_evs * annual_residential_consumption_per_ev
 
 def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
     from newsegscs.dhw_profiles import get_dhw_energy_consumption

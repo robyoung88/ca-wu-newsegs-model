@@ -7,6 +7,7 @@ the bespoke layout creation.
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsbrowser.layouts import navigation
 from newsegsbrowser.layouts.inputs import maps
 from newsegsbrowser.layouts.feedback import indicative_net_energy
@@ -201,13 +202,15 @@ def create_model_configuration_layout(*args, **kwargs):
                 dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-benefits'}, data = "[]"),
                 dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-costs'}, data = "[]"),
                 dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-value'}, data = "[]"),
-            ] + clayouts.user_action_components() + clayouts.model_run_components() + clayouts.finance_run_components() + clayouts.metamodel_process_components(),
+            ] + clayouts.user_action_components() + clayouts.model_run_components(**kwargs) + clayouts.finance_run_components(**kwargs) + clayouts.metamodel_process_components(),
 
             overlay_style = {
                 'visibility': 'visible',
                 'filter': 'blur(2px)',
                 'display': 'block',
             },
+            delay_show = 200,
+            delay_hide = 200,
             id = 'loading-results',
             parent_className = 'drawer-loading-container',
 
@@ -232,6 +235,7 @@ def create_model_configuration_layout(*args, **kwargs):
                 + site_details
                 + [html.Hr()]
                 + results_section
+                + background_callback_error_handler_components()
                 + clayouts.post_page_load_components(
                     kwargs.get('selected_model'),
                     kwargs.get('page_type')

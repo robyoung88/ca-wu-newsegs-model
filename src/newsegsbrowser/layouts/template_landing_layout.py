@@ -4,6 +4,7 @@ Create a landing layout for an app.
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsbrowser.layouts import navigation
 
 def create_landing_header():
@@ -51,10 +52,13 @@ def create_landing_layout(*args, **kwargs):
         ])
     ])
 
-    return html.Div([
-        header,
-        html.Hr(),
-        body,
-        html.Hr(),
-        assumptions
-    ])
+    return html.Div(
+        [
+            header,
+            html.Hr(),
+            body,
+            html.Hr(),
+            assumptions
+        ]
+        + background_callback_error_handler_components()
+    )

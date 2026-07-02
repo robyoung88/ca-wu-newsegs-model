@@ -71,6 +71,10 @@ def add_result_timeseries_callbacks(app: Dash):
                     if model_id == active_model_id:
                         do_continue = True
                         break
+            elif isinstance(model_run, dict):
+                model_id = model_run.get('model_id')
+                if model_id == active_model_id:
+                    do_continue = True
             else:
                 model_id = json.loads(model_run).get('model_id')
                 if model_id == active_model_id:

@@ -14,7 +14,7 @@ def add_postprocess_callbacks(app: Dash):
     @app.callback(
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
 
-        Input('trigger-post-model-run', 'data'),
+        Input({'type': 'background-callback-return', 'target': 'model-run'}, 'data'),
         State('prequeue-finance-run', 'data'),
         State('store-configurations', 'data'),
         prevent_initial_call = True

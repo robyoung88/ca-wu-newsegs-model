@@ -34,49 +34,66 @@ def user_action_components():
         dcc.Interval(id = 'interval-action-user', interval = 1000, disabled = True),
     ]
 
-def model_run_components():
+def model_run_components(**kwargs):
     return [
         # A queue of model run requests
         # Will generally get added to when a configuration changes
         # but the running of the model is latched off
-        dcc.Store(id = 'queue-model-run', data = []),
+        # The queue is now held statefully by the app due to issues with
+        # state captures in near callbacks - i.e. if two callbacks triggered
+        # close to each other, the latter would capture state before the queue
+        # was updated following the first.
+        # dcc.Store(id = 'queue-model-run', data = []),
         # A pre-queue to transfer model run requests to the queue
         # manager
         dcc.Store(id = 'prequeue-model-run', data = []),
         # An Interval element to trigger the queue until it is cleared
         dcc.Interval(id = 'interval-model-run', interval = 1000, disabled = True),
         # A dispatch object holding id of a model permitted to run
-        dcc.Store(id = 'dispatchitem-model-run'),
+        dcc.Store(id = 'dispatchitem-model-run', data = None),
         # Trigger object for the model run
-        dcc.Store(id = 'trigger-model-run'),
+        dcc.Store(id = {'type': 'background-callback-call', 'target': 'model-run'}),
         # Trigger object for relocalising model after run
-        dcc.Store(id = 'trigger-post-model-run'),
+        dcc.Store(id = {'type': 'background-callback-return', 'target': 'model-run'}),
         # A store to trigger handling of model run completion
         dcc.Store(id = 'trigger-postprocess-model-run'),
-        # A global switch to disable model runs
-        dcc.Store(id = 'latch-model-run-global', data = True),
+
+        # Locks to control model running
+        dcc.Store(id = {'type': 'lock', 'target': 'model-run', 'stage': 'prequeue', 'key': 'user-toggle'}, data = True),
+        dcc.Store(id = {'type': 'lock', 'target': 'model-run', 'stage': 'prequeue', 'key': 'page-control'}, data = kwargs.get('autorun_model', True)),
+        dcc.Store(id = {'type': 'lock', 'target': 'model-run', 'stage': 'dispatch', 'key': 'process-in-use'}, data = True),
     ]
 
-def finance_run_components():
+def finance_run_components(**kwargs):
     return [
         # A queue of finance run requests
         # A pre-queue to transfer finance run requests to the queue
         # manager
         dcc.Store(id = 'prequeue-finance-run', data = []),
         # The queue to hold scheduled finance runs
-        dcc.Store(id = 'queue-finance-run', data = []),
+        # The queue is now held statefully by the app due to issues with
+        # state captures in near callbacks - i.e. if two callbacks triggered
+        # close to each other, the latter would capture state before the queue
+        # was updated following the first.
+        # dcc.Store(id = 'queue-finance-run', data = []),
         # An Interval to trigger the queue manager until queue is cleared
         dcc.Interval(id = 'interval-finance-run', interval = 1000, disabled = True),
         # A dispatch object holding id of a finance permitted to run
         dcc.Store(id = 'dispatchitem-finance-run'),
         # Trigger object for the finance run
-        dcc.Store(id = 'trigger-finance-run'),
+        dcc.Store(id = {'type': 'background-callback-call', 'target': 'finance-run'}),
         # Trigger object for relocalising finance after run
-        dcc.Store(id = 'trigger-post-finance-run'),
+        dcc.Store(id = {'type': 'background-callback-return', 'target': 'finance-run'}),
         # Trigger handling of finance run completion
         dcc.Store(id = 'trigger-postprocess-finance-run'),
-        # A global switch to disable finance runs
-        dcc.Store(id = 'latch-finance-run-global', data = True),
+
+        # Locks to control finance running
+        dcc.Store(id = {'type': 'lock', 'target': 'finance-run', 'stage': 'prequeue', 'key': 'user-toggle'}, data = True),
+        dcc.Store(
+            id = {'type': 'lock', 'target': 'finance-run', 'stage': 'prequeue', 'key': 'page-control'}, 
+            data = kwargs.get('autorun_finance', kwargs.get('autorun_model', True))
+        ),
+        dcc.Store(id = {'type': 'lock', 'target': 'finance-run', 'stage': 'dispatch', 'key': 'process-in-use'}, data = True),
     ]
 
 def metamodel_process_components():
@@ -84,7 +101,11 @@ def metamodel_process_components():
         # A queue of model run requests
         # Will generally get added to when a configuration changes
         # but the running of the model is latched off
-        dcc.Store(id = 'queue-metamodel-process', data = []),
+        # The queue is now held statefully by the app due to issues with
+        # state captures in near callbacks - i.e. if two callbacks triggered
+        # close to each other, the latter would capture state before the queue
+        # was updated following the first.
+        # dcc.Store(id = 'queue-metamodel-process', data = []),
         # A pre-queue to transfer model run requests to the queue
         # manager
         dcc.Store(id = 'prequeue-metamodel-process', data = []),
@@ -93,13 +114,14 @@ def metamodel_process_components():
         # A dispatch object holding id of a model permitted to run
         dcc.Store(id = 'dispatchitem-metamodel-process'),
         # Trigger object for the model run
-        dcc.Store(id = 'trigger-metamodel-process'),
+        dcc.Store(id = {'type': 'background-callback-call', 'target': 'metamodel-process'}),
         # Trigger object for relocalising model after run
-        dcc.Store(id = 'trigger-post-metamodel-process'),
+        dcc.Store(id = {'type': 'background-callback-return', 'target': 'metamodel-process'}),
         # A store to trigger handling of model run completion
         dcc.Store(id = 'trigger-postprocess-metamodel-process'),
-        # A global switch to disable model runs
-        dcc.Store(id = 'latch-metamodel-process-global', data = True),
+        
+        # Locks to control metamodel processing
+        dcc.Store(id = {'type': 'lock', 'target': 'metamodel-process', 'stage': 'dispatch', 'key': 'process-in-use'}, data = True),
 
         dcc.Store(id = 'background_cancel_trigger'),
         dcc.Store(id = 'background_progress_tracker', data = '{"value":"0","max":"1"}'),

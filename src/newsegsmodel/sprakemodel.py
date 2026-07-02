@@ -70,16 +70,11 @@ def get_sprake_environment_server():
     
     ### Solar
     pv_data = (
-        pd.read_csv(
+        pd.read_parquet(
             os.path.join(
                 lookup_dir,
-                'default_irradiance.csv'
+                'default_irradiance.parquet'
             )
-        )
-        .rename(
-            columns = {
-                'time': 'timestamp'
-            }
         )
     )
 
@@ -98,8 +93,8 @@ def get_sprake_environment_server():
     # The PV time series holds mean values at half past the hour.
     # Need to extend back one (first obs carried back)
     pv_ts = modtimespan.OffsetRegTimeSpan(
-        pd.Timestamp(pv_data['timestamp'].iloc[0], tz='utc') - pd.Timedelta(30, 'm'),
-        pd.Timestamp(pv_data['timestamp'].iloc[-1], tz='utc') + pd.Timedelta(30, 'm')
+        pd.Timestamp(pv_data['timestamp'].iloc[0]) - pd.Timedelta(30, 'm'),
+        pd.Timestamp(pv_data['timestamp'].iloc[-1]) + pd.Timedelta(30, 'm')
     )
     pv_ts.timestep = _DEFAULT_TS
     pv_ts.set_offset(pv_ts.start, pv_ts.start)

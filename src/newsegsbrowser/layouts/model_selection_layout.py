@@ -1,6 +1,8 @@
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsbrowser.background_callback_errors import background_callback_error_handler_components
+
 model_selection_layout = dbc.Container([
     html.Div([
         dbc.Row([
@@ -55,7 +57,7 @@ model_selection_layout = dbc.Container([
                 width = 6,
             )
         ]),
-    ],
+    ] + background_callback_error_handler_components(),
     className = 'd-flex justify-content-center',
     )
     
