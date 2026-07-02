@@ -189,7 +189,8 @@ def add_caching_callbacks(app):
         Input({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True,
         background = True,
-        manager = noncaching_background_callback_manager
+        manager = noncaching_background_callback_manager,
+        on_error = background_callback_error_handler_factory('model-run')
     )
     def run_model(model_run_request):
         model_run = json.loads(model_run_request)
@@ -210,7 +211,8 @@ def add_caching_callbacks(app):
         Input({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True,
         background = True,
-        manager = noncaching_background_callback_manager
+        manager = noncaching_background_callback_manager,
+        on_error = background_callback_error_handler_factory('finance-run')
     )
     def run_finance(finance_run_request):
         finance_run = json.loads(finance_run_request)

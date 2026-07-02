@@ -100,7 +100,8 @@ def add_model_run_callbacks(app: Dash):
 
         nowtime = datetime.datetime.now().timestamp()
         
-        logger.info('%s models are in queue', len(queue_model_run))
+        #logger.info('%s models are in queue', len(queue_model_run))
+        logger.info('current model run queue: %s', queue_model_run)
 
         app_dispatch = app.sts.get('dispatchitem-model-run')
         if app_dispatch is not None and app_dispatch != dispatch_status:
@@ -380,7 +381,8 @@ def add_finance_run_callbacks(app: Dash):
         
         nowtime = datetime.datetime.now().timestamp()
 
-        logger.info('%s finances are in queue', len(queue_finance_run))
+        #logger.info('%s finances are in queue', len(queue_finance_run))
+        logger.info('current finance run queue: %s', queue_finance_run)
 
         app_dispatch = app.sts.get('dispatchitem-finance-run')
         if app_dispatch is not None and app_dispatch != dispatch_status:
