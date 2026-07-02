@@ -209,6 +209,8 @@ def create_model_configuration_layout(*args, **kwargs):
                 'filter': 'blur(2px)',
                 'display': 'block',
             },
+            delay_show = 200,
+            delay_hide = 200,
             id = 'loading-results',
             parent_className = 'drawer-loading-container',
 

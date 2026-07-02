@@ -39,7 +39,11 @@ def model_run_components(**kwargs):
         # A queue of model run requests
         # Will generally get added to when a configuration changes
         # but the running of the model is latched off
-        dcc.Store(id = 'queue-model-run', data = []),
+        # The queue is now held statefully by the app due to issues with
+        # state captures in near callbacks - i.e. if two callbacks triggered
+        # close to each other, the latter would capture state before the queue
+        # was updated following the first.
+        # dcc.Store(id = 'queue-model-run', data = []),
         # A pre-queue to transfer model run requests to the queue
         # manager
         dcc.Store(id = 'prequeue-model-run', data = []),
@@ -67,7 +71,11 @@ def finance_run_components(**kwargs):
         # manager
         dcc.Store(id = 'prequeue-finance-run', data = []),
         # The queue to hold scheduled finance runs
-        dcc.Store(id = 'queue-finance-run', data = []),
+        # The queue is now held statefully by the app due to issues with
+        # state captures in near callbacks - i.e. if two callbacks triggered
+        # close to each other, the latter would capture state before the queue
+        # was updated following the first.
+        # dcc.Store(id = 'queue-finance-run', data = []),
         # An Interval to trigger the queue manager until queue is cleared
         dcc.Interval(id = 'interval-finance-run', interval = 1000, disabled = True),
         # A dispatch object holding id of a finance permitted to run
@@ -93,7 +101,11 @@ def metamodel_process_components():
         # A queue of model run requests
         # Will generally get added to when a configuration changes
         # but the running of the model is latched off
-        dcc.Store(id = 'queue-metamodel-process', data = []),
+        # The queue is now held statefully by the app due to issues with
+        # state captures in near callbacks - i.e. if two callbacks triggered
+        # close to each other, the latter would capture state before the queue
+        # was updated following the first.
+        # dcc.Store(id = 'queue-metamodel-process', data = []),
         # A pre-queue to transfer model run requests to the queue
         # manager
         dcc.Store(id = 'prequeue-metamodel-process', data = []),

@@ -45,3 +45,19 @@ if __name__ == '__main__':
             'default_irradiance.csv'
         )
     )
+
+    odata = (
+        odata
+        .reset_index()
+        .rename(
+            columns = {
+                'time': 'timestamp'
+            }
+        )
+    )
+    odata.to_parquet(
+        os.path.join(
+            settings.get('SprakeDataLoc'),
+            'default_irradiance.parquet'
+        )
+    )
