@@ -48,9 +48,9 @@ def model_run_components(**kwargs):
         # A dispatch object holding id of a model permitted to run
         dcc.Store(id = 'dispatchitem-model-run', data = None),
         # Trigger object for the model run
-        dcc.Store(id = 'trigger-model-run'),
+        dcc.Store(id = {'type': 'background-callback-call', 'target': 'model-run'}),
         # Trigger object for relocalising model after run
-        dcc.Store(id = 'trigger-post-model-run'),
+        dcc.Store(id = {'type': 'background-callback-return', 'target': 'model-run'}),
         # A store to trigger handling of model run completion
         dcc.Store(id = 'trigger-postprocess-model-run'),
 
@@ -73,15 +73,18 @@ def finance_run_components(**kwargs):
         # A dispatch object holding id of a finance permitted to run
         dcc.Store(id = 'dispatchitem-finance-run'),
         # Trigger object for the finance run
-        dcc.Store(id = 'trigger-finance-run'),
+        dcc.Store(id = {'type': 'background-callback-call', 'target': 'finance-run'}),
         # Trigger object for relocalising finance after run
-        dcc.Store(id = 'trigger-post-finance-run'),
+        dcc.Store(id = {'type': 'background-callback-return', 'target': 'finance-run'}),
         # Trigger handling of finance run completion
         dcc.Store(id = 'trigger-postprocess-finance-run'),
 
         # Locks to control finance running
         dcc.Store(id = {'type': 'lock', 'target': 'finance-run', 'stage': 'prequeue', 'key': 'user-toggle'}, data = True),
-        dcc.Store(id = {'type': 'lock', 'target': 'finance-run', 'stage': 'prequeue', 'key': 'page-control'}, data = kwargs.get('autorun_finance', kwargs.get('autorun_model', True))),
+        dcc.Store(
+            id = {'type': 'lock', 'target': 'finance-run', 'stage': 'prequeue', 'key': 'page-control'}, 
+            data = kwargs.get('autorun_finance', kwargs.get('autorun_model', True))
+        ),
         dcc.Store(id = {'type': 'lock', 'target': 'finance-run', 'stage': 'dispatch', 'key': 'process-in-use'}, data = True),
     ]
 
@@ -99,9 +102,9 @@ def metamodel_process_components():
         # A dispatch object holding id of a model permitted to run
         dcc.Store(id = 'dispatchitem-metamodel-process'),
         # Trigger object for the model run
-        dcc.Store(id = 'trigger-metamodel-process'),
+        dcc.Store(id = {'type': 'background-callback-call', 'target': 'metamodel-process'}),
         # Trigger object for relocalising model after run
-        dcc.Store(id = 'trigger-post-metamodel-process'),
+        dcc.Store(id = {'type': 'background-callback-return', 'target': 'metamodel-process'}),
         # A store to trigger handling of model run completion
         dcc.Store(id = 'trigger-postprocess-metamodel-process'),
         

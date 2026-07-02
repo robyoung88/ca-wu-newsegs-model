@@ -47,7 +47,7 @@ def add_model_run_callbacks(app: Dash):
         State({'type': 'lock', 'target': 'model-run', 'stage': 'dispatch', 'key': ALL}, 'data'),
         #State('queue-model-run', 'data'),
         State('dispatchitem-model-run', 'data'),
-        State('trigger-model-run', 'data'),
+        State({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True
     )
     def queueman_model_run(
@@ -210,7 +210,7 @@ def add_model_run_callbacks(app: Dash):
         )
     
     @app.callback(
-        Output('trigger-model-run', 'data'),
+        Output({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
         #Output('dispatchitem-model-run', 'data', allow_duplicate = True),
         
         Input('dispatchitem-model-run', 'data'),
@@ -273,7 +273,7 @@ def add_model_run_callbacks(app: Dash):
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
 
-        Input('trigger-post-model-run', 'data'),
+        Input({'type': 'background-callback-return', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True
     )
     def receiver_model_run(
@@ -331,7 +331,6 @@ def add_finance_run_callbacks(app: Dash):
         State({'type': 'lock', 'target': 'finance-run', 'stage': 'dispatch', 'key': ALL}, 'data'),
         #State('queue-finance-run', 'data'),
         State('dispatchitem-finance-run', 'data'),
-        #State('trigger-finance-run', 'data'),
         prevent_initial_call = True,
     )
     def queueman_finance_run(
@@ -340,7 +339,6 @@ def add_finance_run_callbacks(app: Dash):
         finance_run_dispatch_lock_values,
         #queue_finance_run,
         dispatch_status,
-        #fr_status,
     ):
         """
         Receives and dispatches finance runs.
@@ -438,7 +436,7 @@ def add_finance_run_callbacks(app: Dash):
         )
     
     @app.callback(
-        Output('trigger-finance-run', 'data'),
+        Output({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
 
         Input('dispatchitem-finance-run', 'data'),
         prevent_initial_call = True,
@@ -487,7 +485,7 @@ def add_finance_run_callbacks(app: Dash):
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
 
-        Input('trigger-post-finance-run', 'data'),
+        Input({'type': 'background-callback-return', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True
     )
     def receiver_finance_run(
@@ -622,7 +620,7 @@ def add_finance_run_callbacks(app: Dash):
         )
 
     @app.callback(
-        Output('trigger-metamodel-process', 'data'),
+        Output({'type': 'background-callback-return', 'target': 'metamodel-process'}, 'data'),
         Output({
             'type': 'lock', 
             'target': 'metamodel-process', 
@@ -695,7 +693,7 @@ def add_finance_run_callbacks(app: Dash):
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
 
-        Input('trigger-post-metamodel-process', 'data'),
+        Input({'type': 'background-callback-return', 'target': 'metamodel-process'}, 'data'),
         prevent_initial_call = True
     )
     def receiver_metamodel_process(

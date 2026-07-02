@@ -7,6 +7,7 @@ the bespoke layout creation.
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsbrowser.layouts import navigation
 from newsegsbrowser.layouts.inputs import maps
 from newsegsbrowser.layouts.feedback import indicative_net_energy
@@ -232,6 +233,7 @@ def create_model_configuration_layout(*args, **kwargs):
                 + site_details
                 + [html.Hr()]
                 + results_section
+                + background_callback_error_handler_components()
                 + clayouts.post_page_load_components(
                     kwargs.get('selected_model'),
                     kwargs.get('page_type')

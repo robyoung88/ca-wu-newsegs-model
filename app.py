@@ -52,6 +52,8 @@ from newsegsbrowser.map import add_site_selector_callbacks
 
 from newsegsbrowser.postprocess import postprocess_utils
 
+from newsegsbrowser.background_callback_errors import add_background_callback_error_dispatch, background_callback_error_handler_factory
+
 from newsegsbrowser import energy_balance_estimation
 
 logger = logging.getLogger(__name__)
@@ -182,8 +184,9 @@ import json
 
 def add_caching_callbacks(app):
     @app.callback(
-        Output('trigger-post-model-run', 'data'),
-        Input('trigger-model-run', 'data'),
+        Output({'type': 'background-callback-return', 'target': 'model-run'}, 'data', allow_duplicate = True),
+
+        Input({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager
@@ -202,9 +205,9 @@ def add_caching_callbacks(app):
         return model_run_request
     
     @app.callback(
-        Output('trigger-post-finance-run', 'data'),
+        Output({'type': 'background-callback-return', 'target': 'finance-run'}, 'data', allow_duplicate = True),
 
-        Input('trigger-finance-run', 'data'),
+        Input({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager
@@ -233,12 +236,13 @@ def add_caching_callbacks(app):
         return finance_run_request
     
     @app.callback(
-        Output('trigger-post-metamodel-process', 'data'),
+        Output({'type': 'background-callback-return', 'target': 'metamodel-process'}, 'data', allow_duplicate = True),
 
-        Input('trigger-metamodel-process', 'data'),
+        Input({'type': 'background-callback-call', 'target': 'metamodel-process'}, 'data'),
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
+        on_error = background_callback_error_handler_factory('metamodel-process'),
         # running = [
         #     (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
         #     (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
@@ -562,6 +566,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = configuration_selector_callbacks.add_configuration_selection_callbacks(app)
     app = dsa_run_callbacks.add_dsa_run_callbacks(app)
     app = add_site_selector_callbacks(app)
+    app = add_background_callback_error_dispatch(app)
 
     app = add_caching_callbacks(app)
 
