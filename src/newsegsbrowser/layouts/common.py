@@ -131,3 +131,8 @@ def dsa_process_components(**kwargs):
     return [
         dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'dsa_input_change'}, data = [])
     ]
+
+def psa_process_components(**kwargs):
+    return [
+        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'psa_input_change'}, data = [])
+    ]

@@ -160,7 +160,7 @@ def create_psa_layout(*args, **kwargs):
             + clayouts.model_run_components(**kwargs)
             + clayouts.finance_run_components(**kwargs)
             + clayouts.metamodel_process_components()
-            + clayouts.dsa_process_components(**kwargs)
+            + clayouts.psa_process_components(**kwargs)
             + background_callback_error_handler_components()
             + clayouts.post_page_load_components(
                 kwargs.get('selected_model'),

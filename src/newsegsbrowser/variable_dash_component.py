@@ -173,6 +173,37 @@ def create_dsa_input_vector_parameter_input(
         
     return rval
     
+def _create_numeric_inputgroup_from_var(
+    var: variable.NumericScalarVariable,
+    parameter_name: str,
+    parameter_index: int = 0,
+    min: int | float | None = 0,
+    max: int | float | None = None,
+    stepscale: float = 1.,
+    type_id: str | None = None,
+    
+
+):
+    if type_id is None:
+        type_id = f'input-{var.configuration_type}-config'
+    
+    return dbc.InputGroup(
+        [
+            dbc.InputGroupText(parameter_name + ":"),
+            browser.create_numeric_input_compound_key(
+                type_id,
+                var.interface_key,
+                section = var.interface_section,
+                subindex = var.interface_subindex,
+                parameter_index = parameter_index,
+                value = var._raw_parameters[parameter_index], # pyright: ignore[reportArgumentType]
+                placeholder = parameter_name,
+                min = min,
+                max = max,
+                step = var.interface_step * stepscale if var.interface_step else 1
+            )
+        ]
+    )
 
 def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
@@ -388,7 +419,6 @@ def create_dsa_header(
     else:
         fmt = var.value_formatter
     label = f'{var.label} ({var.unit})'
-    type_id = f'input-{var.configuration_type}-config'
 
     hdr = create_dsa_input_scalar_numeric_header(
         label, 
@@ -403,23 +433,12 @@ def create_dsa_header(
 def create_dsa_input_scalar_constant(
     var: variable.ScalarVariable,
 ):
-    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
         create_dsa_header(var),
         [
-            dbc.InputGroup([
-                dbc.InputGroupText('Value:'),
-                browser.create_numeric_input_compound_key(
-                    type_id,
-                    var.interface_key,
-                    section = var.interface_section,
-                    subindex = var.interface_subindex,
-                    value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
-                    min = var.interface_min,
-                    max = var.interface_max,
-                    step = var.interface_step if var.interface_step else 1
-                ),
-            ])
+             _create_numeric_inputgroup_from_var(
+                var, 'Value', 0, min = var.interface_min, max = var.interface_max # pyright: ignore[reportArgumentType]
+            ),
         ],
         create_dsa_bound_type_selector(
             ['absolute', 'relative', 'offset'],
@@ -439,39 +458,15 @@ def create_dsa_input_scalar_constant(
 def create_dsa_input_scalar_normal(
     var: variable.NumericScalarVariable,
 ):
-    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
         create_dsa_header(var),
         [
-            dbc.InputGroup([
-                        dbc.InputGroupText('Mean:'),
-                        browser.create_numeric_input_compound_key(
-                            type_id,
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
-                            placeholder = 'Mean',
-                            min = var.interface_min,
-                            max = var.interface_max,
-                            step = var.interface_step if var.interface_step else 1
-                        )
-                    ]
-                    ),
-                    dbc.InputGroup([
-                        dbc.InputGroupText('SD:'),
-                        browser.create_numeric_input_compound_key(
-                            type_id,
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            parameter_index = 1,
-                            value = var._raw_parameters[1], # pyright: ignore[reportArgumentType]
-                            placeholder = 'SD',
-                            step = var.interface_step/10 if var.interface_step else 1
-                        )
-                    ]
-                    ),
+            _create_numeric_inputgroup_from_var(
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+            ),
+            _create_numeric_inputgroup_from_var(
+                var, 'SD', 1, stepscale = 0.1,
+            ),
         ],
         create_dsa_bound_type_selector(
             ['absolute', 'relative', 'offset', 'interval'],
@@ -492,35 +487,12 @@ def create_dsa_input_scalar_beta(
     return compose_dsa_input(
         create_dsa_header(var),
         [
-            dbc.InputGroup([
-                        dbc.InputGroupText('Mean:'),
-                       browser.create_numeric_input_compound_key(
-                            type_id,
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
-                            placeholder = 'Mean',
-                            min = var.interface_min,
-                            max = var.interface_max,
-                            step = var.interface_step if var.interface_step else 1
-                        )
-                    ]
-                    ),
-                    dbc.InputGroup([
-                        dbc.InputGroupText('SD:'),
-                        browser.create_numeric_input_compound_key(
-                            type_id,
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            parameter_index = 1,
-                            value = var._raw_parameters[1], # pyright: ignore[reportArgumentType]
-                            placeholder = 'SD',
-                            step = var.interface_step/10 if var.interface_step else 1
-                        )
-                    ]
-                    ),
+            _create_numeric_inputgroup_from_var(
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+            ),
+            _create_numeric_inputgroup_from_var(
+                var, 'SD', 1, stepscale = 0.1,
+            ),
         ],
         create_dsa_bound_type_selector(
             ['absolute', 'relative', 'offset', 'interval'],
@@ -541,35 +513,12 @@ def create_dsa_input_scalar_gamma(
     return compose_dsa_input(
         create_dsa_header(var),
         [
-            dbc.InputGroup([
-                        dbc.InputGroupText('Mean:'),
-                        browser.create_numeric_input_compound_key(
-                            type_id,
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
-                            placeholder = 'Mean',
-                            min = var.interface_min,
-                            max = var.interface_max,
-                            step = var.interface_step if var.interface_step else 1
-                        )
-                    ]
-                    ),
-                    dbc.InputGroup([
-                        dbc.InputGroupText('SD:'),
-                        browser.create_numeric_input_compound_key(
-                            type_id,
-                            var.interface_key,
-                            section = var.interface_section,
-                            subindex = var.interface_subindex,
-                            parameter_index = 1,
-                            value = var._raw_parameters[1], # pyright: ignore[reportArgumentType]
-                            placeholder = 'SD',
-                            step = var.interface_step/10 if var.interface_step else 1
-                        )
-                    ]
-                    ),
+            _create_numeric_inputgroup_from_var(
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+            ),
+            _create_numeric_inputgroup_from_var(
+                var, 'SD', 1, stepscale = 0.1,
+            ),
         ],
         create_dsa_bound_type_selector(
             ['absolute', 'relative', 'offset', 'interval'],
@@ -596,3 +545,190 @@ def create_dsa_input_scalar_gamma(
 #         create_dsa_bounds_input_vector('relative', type_id, key, section),
 #         var
 #     )
+
+def create_psa_input_scalar_numeric_header(
+    label: str,
+    mean_value,
+    std_value,
+    ci95_lower,
+    ci95_upper,
+):
+    mean_value = _autoformat(mean_value)
+    std_value = _autoformat(std_value)
+    ci95_lower = _autoformat(ci95_lower)
+    ci95_upper = _autoformat(ci95_upper)
+    return [
+        html.H4(
+            label,
+        ),
+        html.Div([
+            html.Span(
+                mean_value + ' ± ' + std_value
+            ),
+            html.Div([
+                '(95% CI: ',
+                html.Span(
+                    ci95_lower
+                ),
+                ', ',
+                html.Span(
+                    ci95_upper
+                ),
+                ')'
+
+            ],
+            className = 'psa-configuration-summaryinfo-psa-live-values'
+            )
+            
+        ],
+        className='psa-configuration-summaryinfo'
+        )
+    ]
+
+def create_psa_header(
+    var: variable.ScalarVariable,
+):
+    if var.distribution.distribution == 'constant':
+        fmt = _autoformat
+    else:
+        fmt = var.value_formatter
+    if var.unit == '':
+        label = var.label
+    else:
+        label = f'{var.label} ({var.unit})'
+
+    ci = var.get_confidence_interval(0.95)
+    hdr = create_psa_input_scalar_numeric_header(
+        label,
+        fmt(var.get_deterministic_value()),
+        fmt(var.get_std()),
+        fmt(ci[0]),
+        fmt(ci[1])
+    )
+
+    return hdr
+
+def create_psa_distribution_component(
+    var: variable.Variable
+):
+    distname = var.distribution.distribution.title()
+    return [
+        html.P(
+            'Distribution:',
+            className = 'distribution-label-title'
+        ),
+        #html.Br(),
+        html.P(
+            distname,
+            className = 'distribution-label-name'
+        ),
+    ]
+
+
+def compose_psa_input(
+    header_component,
+    distribution_component,
+    parameter_component,
+    var: variable.Variable,
+):
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+    
+    overall_id = {
+        'type': 'psa-input-element',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex,
+    }
+
+    toggle_id = {
+        'type': 'toggle-psa-variable',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    header_id = {
+        'type': 'psa-input-header',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    if var.psa_selected:
+        cn = 'psa-input-single-value-block'
+    else:
+        cn = 'psa-input-single-value-block deselected'
+
+    return html.Div([
+        daq.ToggleSwitch(
+            className = 'psa-toggle',
+            size = 30,
+            value = var.psa_selected,
+            id = toggle_id,
+        ),
+        html.Details([
+            html.Summary(
+                header_component,
+                className = 'psa-configuration-summary',
+                id = header_id
+            ),
+            html.Div((
+                [html.Div(
+                    distribution_component,
+                    className = 'distribution-label',
+                )]
+                +parameter_component
+            ))
+        ])
+    ],
+    className = cn,
+    id = overall_id,
+    )
+
+def create_psa_input_scalar_constant(
+    var: variable.ScalarVariable,
+):
+    return compose_psa_input(
+        create_psa_header(var),
+        create_psa_distribution_component(var),
+        [
+            _create_numeric_inputgroup_from_var(
+                var, 'Value', 0, min = var.interface_min, max = var.interface_max # pyright: ignore[reportArgumentType]
+            ),
+        ],
+        var
+    )
+
+def create_psa_input_twoparam(
+    var: variable.NumericScalarVariable,    
+):
+    return compose_psa_input(
+        create_psa_header(var),
+        create_psa_distribution_component(var),
+        [
+            _create_numeric_inputgroup_from_var(
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+            ),
+            _create_numeric_inputgroup_from_var(
+                var, 'SD', 1, stepscale = 0.1,
+            ),
+        ],
+        var
+    )
+
+def create_psa_input_scalar_normal(
+    var: variable.NumericScalarVariable,
+):
+    return create_psa_input_twoparam(var)
+
+def create_psa_input_scalar_beta(
+    var: variable.NumericScalarVariable,
+):
+    return create_psa_input_twoparam(var)
+
+def create_psa_input_scalar_gamma(
+    var: variable.NumericScalarVariable,
+):
+    return create_psa_input_twoparam(var)

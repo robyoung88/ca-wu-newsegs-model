@@ -27,16 +27,16 @@ def create_dsa_input(
         return []
     match var.distribution.distribution:
         case 'constant':
-            is_scalar = True,
+            is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_constant
         case 'normal':
-            is_scalar = True,
+            is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_normal
         case 'beta':
-            is_scalar = True,
+            is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_beta
         case 'gamma':
-            is_scalar = True,
+            is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_gamma
         case _:
             raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
@@ -47,6 +47,32 @@ def create_dsa_input(
     else:
         raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
     
+def create_psa_input(
+    var: variable.Variable
+):
+    if not var.psa_show:
+        return None
+    match var.distribution.distribution:
+        case 'constant':
+            is_scalar = True
+            creation_func = var_dc.create_psa_input_scalar_constant
+        case 'normal':
+            is_scalar = True
+            creation_func = var_dc.create_psa_input_scalar_normal
+        case 'beta':
+            is_scalar = True
+            creation_func = var_dc.create_psa_input_scalar_beta
+        case 'gamma':
+            is_scalar = True
+            creation_func = var_dc.create_psa_input_scalar_gamma
+        case _:
+            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+        
+    if is_scalar:
+        var = cast(variable.NumericScalarVariable, var)
+        return creation_func(var)
+    else:
+        raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
 
 def sync_config(
     firstload_config_watcher,
@@ -138,6 +164,10 @@ def sync_config(
         if ss == 'dsa':
             for var in mm.variables.values():
                 cnts.append(create_dsa_input(var))
+        elif ss == 'psa':
+            for var in mm.variables.values():
+                cnts.append(create_psa_input(var))
+                
         else:
             section = ic.get('section')
             for var in mm.variables.values():
@@ -286,8 +316,11 @@ def update_headers_dsa_inputs(
     app
 ):
     rval: list[Any] = [no_update] * len(header_ids)
+    if len(header_ids) == 0:
+        return rval
     if dsa_input_change_trigger is None:
         return rval
+    
     mm = None
     
     selected_configuration = json.loads(selected_configuration)
@@ -314,5 +347,99 @@ def update_headers_dsa_inputs(
                 var = mm.variables.get(varid)
                 if var is not None:
                     rval[i] = var_dc.create_dsa_header(var)
+    
+    return rval
+
+def update_headers_psa_inputs(
+    psa_input_change_trigger,
+    selected_configuration,
+    header_ids,
+    app
+):
+    rval: list[Any] = [no_update] * len(header_ids)
+    if len(header_ids) == 0:
+        return rval
+    if psa_input_change_trigger is None:
+        return rval
+    
+    mm = None
+    
+    selected_configuration = json.loads(selected_configuration)
+    logger.info('updating headers after psa input change')
+    
+    for change_list in psa_input_change_trigger: # As we have the page wildcard in the callback signature, we have a list of lists
+        if isinstance(change_list, list):
+            for dic in change_list:
+                dic_l = json.loads(dic)
+                if dic_l.get('metamodel_id') == selected_configuration.get('metamodel_id'):
+                    for i, hdr_id in enumerate(header_ids):
+                        if hdr_id['section'] == dic_l['section'] and hdr_id['key'] == dic_l['key'] and hdr_id['subindex'] == dic_l['subindex']:
+                            if mm is None:
+                                mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                            varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                            var = mm.variables.get(varid)
+                            if var is not None:
+                                rval[i] = var_dc.create_psa_header(var)
+        else: # Force update all headers
+            for i, hdr_id in enumerate(header_ids):
+                if mm is None:
+                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
+                var = mm.variables.get(varid)
+                if var is not None:
+                    rval[i] = var_dc.create_psa_header(var)
+    
+    return rval
+
+def update_psa_inputs_status(
+    psa_input_change_trigger,
+    selected_configuration,
+    psa_input_element_ids,
+    app
+):
+    if len(psa_input_element_ids) == 0:
+        return []
+    
+    rval: list[Any] = [no_update] * len(psa_input_element_ids)
+
+    if psa_input_change_trigger is None:
+        return rval
+    
+    mm = None
+    
+    selected_configuration = json.loads(selected_configuration)
+
+    for change_list in psa_input_change_trigger: # As we have the page wildcard in the callback signature, we have a list of lists
+        if isinstance(change_list, list):
+            for dic in change_list:
+                dic_l = json.loads(dic)
+                if dic_l.get('selected_status_change'):
+                    if dic_l.get('metamodel_id') == selected_configuration.get('metamodel_id'):
+                        for i, el_id in enumerate(psa_input_element_ids):
+                            if el_id['section'] == dic_l['section'] and el_id['key'] == dic_l['key'] and el_id['subindex'] == dic_l['subindex']:
+                                if mm is None:
+                                    mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                                var = mm.variables.get(varid)
+                                if var is not None:
+                                    if var.psa_selected:
+                                        cn = 'psa-input-single-value-block'
+                                    else:
+                                        cn = 'psa-input-single-value-block deselected'
+                                    rval[i] = cn
+
+        else: # Force update all bounds
+            if mm is None:
+                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+           
+            for i, el_id in enumerate(psa_input_element_ids):
+                varid =  el_id['section']+'.'+el_id['key']+'.'+str(el_id['subindex'])
+                var = mm.variables.get(varid)
+                if var is not None:
+                    if var.psa_selected:
+                        cn = 'psa-input-single-value-block'
+                    else:
+                        cn = 'psa-input-single-value-block deselected'
+                    rval[i] = cn
     
     return rval

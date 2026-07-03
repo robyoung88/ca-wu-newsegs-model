@@ -361,3 +361,30 @@ def dsa_run_request(
         'dsa-run-request',
         request_time
     )
+
+def psa_impacting_interface_action(
+    metamodel_id,
+    section,
+    key,
+    subindex,
+    input_time = None,
+    selected_status_change = False,
+    **kwargs
+):
+    """
+    Action to raise if an interface change has impacted a PSA value.
+
+    Primary outcome is the update of PSA headers.
+    """
+    if input_time is None:
+        input_time = datetime.datetime.now()
+    return {
+        'type': 'psa_impacting_interface_action',
+        'action_key': 'psa_input_change',
+        'metamodel_id': metamodel_id,
+        'section': section,
+        'key': key,
+        'subindex': subindex,
+        'selected_status_change': selected_status_change,
+        'time': input_time.timestamp(),
+    }
