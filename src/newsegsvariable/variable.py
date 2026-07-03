@@ -3808,6 +3808,9 @@ class VectorVariable(Variable):
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> VectorParam:
         return cast(VectorParam, super().get_dsa_value(bound, force))
     
+    def get_psa_value(self) -> VectorParam:
+        return cast(VectorParam, super().get_psa_value())
+    
     
 class NumericVectorVariable(VectorVariable):
     distribution: NumericVectorValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
