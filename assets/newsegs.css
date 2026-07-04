@@ -190,3 +190,29 @@ div.psa-input-single-value-block > .psa-toggle {
 .deselected .psa-configuration-summary {
     filter: brightness(5);
 }
+
+.input-settings {
+    display: block;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.input-toggle {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.input-settings h4 {
+    display: inline-block;
+    margin: 0 12px 4px 0;
+}
+
+.input-settings .input-group {
+    display: inline-flex;
+    margin: 0 12px 4px 0;
+    width: fit-content;
+}
+
+.input-settings .input-group input {
+    display: inline-block;
+}

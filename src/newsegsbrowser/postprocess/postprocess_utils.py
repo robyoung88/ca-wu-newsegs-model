@@ -17,6 +17,7 @@ RESULT_CACHE_PREFIXES = {
     'dsa_results': 'res_dsa_',
     'dsa_table': 'dsa_table_',
     'dsa_label': 'dsa_label_',
+    'psa_results': 'res_psa_'
 }
 
 def get_model_result_id(prefix, model_id):
@@ -26,6 +27,9 @@ def get_finance_result_id(prefix, finance_id, model_id):
     return prefix + "fnc_" + str(finance_id) + "_mdl_" + str(model_id)
 
 def get_dsa_result_id(prefix: str, metamodel_id: str) -> str:
+    return prefix + metamodel_id
+
+def get_psa_result_id(prefix: str, metamodel_id: str) -> str:
     return prefix + metamodel_id
 
 def get_model_result_list(prefix, configs, app):

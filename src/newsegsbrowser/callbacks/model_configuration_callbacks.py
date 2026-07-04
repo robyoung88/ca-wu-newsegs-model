@@ -1053,7 +1053,28 @@ def add_interface_to_model_callbacks(app):
                     #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                     rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                     return tuple(rval)
-                    
+                
+                case 'psa-run-request':
+                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    if mm.model.checked_out or mm.finance.checked_out:
+                        continue
+
+                    dispatch_actions = find_matching_actions(
+                        queue_action_user,
+                        action,
+                        i,
+                        'psa-run-request'
+                    )
+                    logger.info('dispatching %d psa run requests', len(dispatch_actions))
+
+                    # Requests go straight out to the metamodel process
+                    metamodel_prequeue_patch = Patch()
+                    metamodel_prequeue_patch.append(dispatch_actions[0])
+
+                    rval[RVAL_INDICES['prequeue-metamodel-process']] = metamodel_prequeue_patch
+                    rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
+                    return tuple(rval)
+
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')
         

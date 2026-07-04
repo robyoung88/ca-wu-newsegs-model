@@ -4,6 +4,7 @@ Functions for creating a probabilistic sensitivity analysis layout
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
+import dash_daq as daq
 
 from newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsbrowser.layouts import navigation
@@ -47,6 +48,59 @@ def create_psa_configuration_editor():
             ],
             style = {'vertical-align': 'baseline'}
             ),
+        html.Hr(),
+        html.Div(
+            [
+                html.P(
+                    html.H3(
+                        'PSA Settings'
+                    )
+                ),
+                html.Div([
+                    html.H4('Number of samples:'),
+                    dbc.InputGroup([
+                        dbc.InputGroupText('N'),
+                        dbc.Input(
+                            id = {'type': 'numeric-input', 'target': 'psa-settings', 'key': 'samples'},
+                            placeholder = 'N',
+                            value = 1000,
+                            min = 0,
+                            max = 10000,
+                            step = 1
+                        )
+                    ])
+                ],
+                className = 'input-settings'
+                ),
+                html.Div([
+                    html.H4('Random Seed:'),
+                    dbc.InputGroup([
+                        dbc.InputGroupText('Seed'),
+                        dbc.Input(
+                            id = {'type': 'numeric-input', 'target': 'psa-settings', 'key': 'seed'},
+                            placeholder = 'seed',
+                            value = None,
+                            className = 'input-numeric'
+                        )
+                    ])
+                ],
+                className = 'input-settings'
+                ),
+                html.Div([
+                    html.H4('Keep drawn parameters:'),
+                    daq.ToggleSwitch(
+                        id = {'type': 'toggle-input', 'target': 'psa-settings', 'key': 'return_draws'},
+                        value = False,
+                        size = 36,
+                        className = 'input-toggle',
+                    )
+                ],
+                className = 'input-settings'
+                )
+                
+            ]
+        ),
+        html.Hr(),
         html.Div(
             id = {'type': 'input-container', 'supersection': 'psa', 'section': 'psa'}
         )
@@ -84,16 +138,16 @@ def create_psa_layout(*args, **kwargs):
 
     results_section = [
         html.Div([
-            dcc.Loading([
+            dcc.Loading(([
                 config_dict['layout_results_header'](),
             
                 html.Div([
                     dbc.Col(
                         [
-                            html.H2("DSA Results Table"),
+                            html.H2("PSA Results Table"),
                             html.Div(
-                                'No DSA Run',
-                                id = {'type': 'result-table-container', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-results-table'},
+                                'No PSA Run',
+                                id = {'type': 'result-table-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-results-table'},
                             )
                         ],
                         width = 12
@@ -104,7 +158,7 @@ def create_psa_layout(*args, **kwargs):
                             html.H2("Tornado plot"),
                             html.Div(
                                 dcc.Graph(
-                                    id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-tornado-plot'},
+                                    id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-tornado-plot'},
                                     style= {
                                         'height': '590px',
                                         'border': '1px solid #dee2e6',
@@ -113,18 +167,22 @@ def create_psa_layout(*args, **kwargs):
                                     }
                                 ),
                                 style={'display':'block', 'height': '600px'},
-                                id = {'type': 'plot-container', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-tornado-plot'},
+                                id = {'type': 'plot-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-tornado-plot'},
                             )
                         ],
                         width = 12
                     ),
-                    dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-run-postprocess'}, data = []),
-                    dcc.Store(id={'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, data = []),
+                    dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-run-postprocess'}, data = []),
+                    dcc.Store(id={'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'}, data = []),
                 ],
                 
                 className = 'drawer-content',
                 ),
-            ],
+            ]
+            + clayouts.metamodel_process_components()
+            + clayouts.psa_process_components(**kwargs)
+            + background_callback_error_handler_components()
+            ),
             overlay_style = {
                 'visibility': 'visible',
                 'filter': 'blur(2px)',
@@ -139,7 +197,6 @@ def create_psa_layout(*args, **kwargs):
         ),
 
         html.Div(
-            #id = 'post-drawer-attach',
             id = {'type':'post-drawer-attach', 'page': kwargs.get('page_type', 'None')},
             style = {'display': 'none'}
         ),
@@ -159,9 +216,7 @@ def create_psa_layout(*args, **kwargs):
             + clayouts.user_action_components()
             + clayouts.model_run_components(**kwargs)
             + clayouts.finance_run_components(**kwargs)
-            + clayouts.metamodel_process_components()
-            + clayouts.psa_process_components(**kwargs)
-            + background_callback_error_handler_components()
+            
             + clayouts.post_page_load_components(
                 kwargs.get('selected_model'),
                 kwargs.get('page_type')

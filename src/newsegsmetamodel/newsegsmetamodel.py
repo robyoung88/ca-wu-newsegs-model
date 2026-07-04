@@ -45,6 +45,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     _id_prefix = 'metam'
     _last_modified: datetime.datetime = datetime.datetime.now()
     last_dsa_run: float = 0.
+    last_psa_run: float = 0.
 
     def __init__(
         self,

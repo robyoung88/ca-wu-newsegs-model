@@ -336,7 +336,8 @@ def finance_run_request(
 def metamodel_process_request(
     metamodel_id,
     request_type,
-    request_time = None
+    request_time = None,
+    **kwargs
 ):
     if request_time is None:
         request_time = datetime.datetime.now()
@@ -346,11 +347,14 @@ def metamodel_process_request(
     else:
         ts = request_time.timestamp()
     
-    return {
+    odict = {
         'type': request_type,
         'metamodel_id': metamodel_id,
         'time': ts
     }
+    if len(kwargs):
+        odict.update(kwargs)
+    return odict
 
 def dsa_run_request(
     metamodel_id,
@@ -388,3 +392,19 @@ def psa_impacting_interface_action(
         'selected_status_change': selected_status_change,
         'time': input_time.timestamp(),
     }
+
+def psa_run_request(
+    metamodel_id,
+    request_time = None,
+    samples = 1000,
+    return_draws = False,
+    seed = None,
+):
+    return metamodel_process_request(
+        metamodel_id,
+        'psa-run-request',
+        request_time,
+        samples = samples,
+        return_draws = return_draws,
+        seed = seed,
+    )
