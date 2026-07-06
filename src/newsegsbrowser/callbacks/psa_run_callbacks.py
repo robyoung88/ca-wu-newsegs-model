@@ -17,8 +17,8 @@ def add_psa_run_callbacks(app: Dash):
         Output('prequeue-action-user', 'data', allow_duplicate = True),
 
         Input({'type': 'psa-run-button', 'page': ALL}, 'n_clicks'),
-        State({'type': ALL, 'target': 'psa-settings', 'key': 'seed'}, 'id'),
-        State({'type': ALL, 'target': 'psa-settings', 'key': 'seed'}, 'value'),
+        State({'type': ALL, 'target': 'psa-settings', 'key': ALL}, 'id'),
+        State({'type': ALL, 'target': 'psa-settings', 'key': ALL}, 'value'),
         State('store-selected-configuration', 'data'),
         prevent_initial_call = True
     )
@@ -38,8 +38,15 @@ def add_psa_run_callbacks(app: Dash):
 
         kwargs = {}
         for idx, id in enumerate(input_ids):
-            if id.get('key') in {'samples', 'seed', 'return_draws'}:
-                kwargs[id.get('key')] = input_values[idx]
+            if id.get('key') in {'samples', 'seed'}:
+                if input_values[idx] is not None:
+                    kwargs[id.get('key')] = int(input_values[idx])
+                else:
+                    kwargs[id.get('key')] = input_values[idx]
+            elif id.get('key') in {'return_draws'}:
+                kwargs[id.get('key')] = bool(input_values[idx])
+
+        print(kwargs)
 
         prequeue_patch = Patch()
         prequeue_patch.append(

@@ -285,12 +285,21 @@ def add_caching_callbacks(app):
                 # Not convinced this is necessary
                 #mm.dsa_result_id = dsa_result_id
             case 'psa-run-request':
-                psa_results = psa.run_psa(
-                    mm,
-                    samples = process_request.get('samples', 1000),
-                    return_draws = process_request.get('return_draws', False),
-                    seed = process_request.get('seed', None)
-                )
+                debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
+                if os.path.isfile(debug_psa_run_results_fn):
+                    psa_results = (
+                        pd.read_csv(
+                            debug_psa_run_results_fn
+                        )
+                    )
+                else:
+                    psa_results = psa.run_psa(
+                        mm,
+                        samples = process_request.get('samples', 10),
+                        return_draws = process_request.get('return_draws', False),
+                        seed = process_request.get('seed', None)
+                    )
+                    psa_results.to_csv(debug_psa_run_results_fn)
 
                 psa_result_id = postprocess_utils.get_psa_result_id(
                     postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
