@@ -246,6 +246,14 @@ def add_caching_callbacks(app):
         background = True,
         manager = noncaching_background_callback_manager,
         on_error = background_callback_error_handler_factory('metamodel-process'),
+        running = [
+            (
+                Output({'type': 'metamodel-process-cancel', 'target': ALL}, 'class_name'), 
+                'background-callback-cancel-button',
+                'background-callback-cancel-button background-callback-cancel-button-hidden'
+            )
+        ],
+        cancel=Input('background_cancel_trigger', "data"),
         # running = [
         #     (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
         #     (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
@@ -255,7 +263,7 @@ def add_caching_callbacks(app):
         #         {"visibility": "hidden"},
         #     ),
         # ],
-        # cancel=Input('background_cancel_trigger', "data"),
+        
         # progress=[Output('background_progress_tracker', 'data')],
         # progress_default='{"value":"0","max":"1"}',
     )
@@ -324,10 +332,13 @@ def add_caching_callbacks(app):
     @app.callback(
         Output('background_cancel_trigger', 'data'),
 
-        Input({'type': 'background_callback_cancel_button', 'key': ALL}, 'n_clicks'),
+        Input({'type': 'metamodel-process-cancel', 'target': ALL}, 'n_clicks'),
         prevent_initial_call = True
     )
     def set_cancel_trigger(n_clicks):
+        if n_clicks is None:
+            return no_update
+        logger.info('User has attempted to cancel metamodel process %s', datetime.datetime.now())
         return time.time_ns()
 
     @app.callback(

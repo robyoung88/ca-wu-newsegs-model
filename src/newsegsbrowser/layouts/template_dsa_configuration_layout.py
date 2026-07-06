@@ -137,9 +137,18 @@ def create_dsa_layout(*args, **kwargs):
                 'filter': 'blur(2px)',
                 'display': 'block',
             },
+            delay_show = 200,
+            delay_hide = 200,
             id = 'loading-results',
             parent_className = 'drawer-loading-container',
+            ),
+
+            dbc.Button(
+                'Cancel DSA',
+                id = {'type': 'metamodel-process-cancel', 'target': 'dsa-run-request'},
+                class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
             )
+
         ],
         className = 'drawer-container',
 

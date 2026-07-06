@@ -188,9 +188,18 @@ def create_psa_layout(*args, **kwargs):
                 'filter': 'blur(2px)',
                 'display': 'block',
             },
+            delay_show = 200,
+            delay_hide = 200,
             id = 'loading-results',
             parent_className = 'drawer-loading-container',
+            ),
+
+            dbc.Button(
+                'Cancel PSA',
+                id = {'type': 'metamodel-process-cancel', 'target': 'psa-run-request'},
+                class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
             )
+            
         ],
         className = 'drawer-container',
 

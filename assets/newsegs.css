@@ -216,3 +216,16 @@ div.psa-input-single-value-block > .psa-toggle {
 .input-settings .input-group input {
     display: inline-block;
 }
+
+.background-callback-cancel-button {
+    position: absolute;
+    top: 33%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1100;
+    pointer-events: auto;
+}
+
+.background-callback-cancel-button-hidden {
+    display: none !important;
+}
