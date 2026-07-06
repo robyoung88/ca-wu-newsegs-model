@@ -32,6 +32,7 @@ from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
 from newsegssensitivity import dsa
+from newsegssensitivity import psa
 
 from newsegsbrowser.layouts import model_selection_layout, template_psa_configuration_layout
 from newsegsbrowser.layouts import template_landing_layout
@@ -39,7 +40,7 @@ from newsegsbrowser.layouts import template_model_configuration_layout
 from newsegsbrowser.layouts import template_dsa_configuration_layout
 from newsegsbrowser.layouts import layout_registry
 
-from newsegsbrowser.callbacks import model_selection_callbacks
+from newsegsbrowser.callbacks import model_selection_callbacks, psa_run_callbacks
 from newsegsbrowser.callbacks import model_configuration_callbacks
 from newsegsbrowser.callbacks import model_run_callbacks
 from newsegsbrowser.callbacks import postprocess_callbacks
@@ -283,6 +284,31 @@ def add_caching_callbacks(app):
 
                 # Not convinced this is necessary
                 #mm.dsa_result_id = dsa_result_id
+            case 'psa-run-request':
+                debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
+                if os.path.isfile(debug_psa_run_results_fn):
+                    psa_results = (
+                        pd.read_csv(
+                            debug_psa_run_results_fn
+                        )
+                    )
+                else:
+                    psa_results = psa.run_psa(
+                        mm,
+                        samples = process_request.get('samples', 10),
+                        return_draws = process_request.get('return_draws', False),
+                        seed = process_request.get('seed', None)
+                    )
+                    psa_results.to_csv(debug_psa_run_results_fn)
+
+                psa_result_id = postprocess_utils.get_psa_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
+                    mm.id
+                )
+
+                mm.last_psa_run = datetime.datetime.now().timestamp()
+                setattr(psa_results, '_run_time', mm.last_psa_run)
+                cache[psa_result_id] = psa_results
 
         metamodels[mm.id] = mm
         models[mm.model.id] = mm.model
@@ -567,6 +593,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = timeseries_callbacks.add_result_timeseries_callbacks(app)
     app = configuration_selector_callbacks.add_configuration_selection_callbacks(app)
     app = dsa_run_callbacks.add_dsa_run_callbacks(app)
+    app = psa_run_callbacks.add_psa_run_callbacks(app)
     app = add_site_selector_callbacks(app)
     app = add_background_callback_error_dispatch(app)
 

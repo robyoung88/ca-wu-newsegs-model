@@ -665,6 +665,12 @@ def add_finance_run_callbacks(app: Dash):
                     mm.id
                 )
                 app.results[dsa_result_id] = app.cache[dsa_result_id]
+            case 'psa-run-request':
+                psa_result_id = postprocess_utils.get_psa_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
+                    mm.id
+                )
+                app.results[psa_result_id] = app.cache[psa_result_id]
         
         return (
             trigger_post_metamodel_process,
@@ -683,6 +689,9 @@ def add_finance_run_callbacks(app: Dash):
         trigger_ids
     ):
         rval: list[Any] = [no_update] * len(trigger_ids)
+        if len(trigger_ids) == 0:
+            return rval
+
         if not isinstance(trigger_postprocess_metamodel_process, list):
             trigger_postprocess_metamodel_process = [trigger_postprocess_metamodel_process]
         
@@ -692,6 +701,12 @@ def add_finance_run_callbacks(app: Dash):
                 case 'dsa-run-request':
                     for i, trigger_id in enumerate(trigger_ids):
                         if trigger_id['key'] == 'dsa-run-postprocess':
+                            if isinstance(rval[i], NoUpdate):
+                                rval[i] = []
+                            rval[i].append(process_str)
+                case 'psa-run-request':
+                    for i, trigger_id in enumerate(trigger_ids):
+                        if trigger_id['key'] == 'psa-run-postprocess':
                             if isinstance(rval[i], NoUpdate):
                                 rval[i] = []
                             rval[i].append(process_str)

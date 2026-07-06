@@ -258,6 +258,16 @@ class Distribution(metaclass = Singleton):
 
     @classmethod
     @abstractmethod
+    def std(cls, var: Variable) -> Value:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[Value, Value]:
+        ...
+
+    @classmethod
+    @abstractmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> Value:
         ...
     
@@ -319,6 +329,16 @@ class ScalarValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> ScalarParam:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def std(cls, var: Variable) -> ScalarParam:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarParam, ScalarParam]:
         ...
     
     @classmethod
@@ -444,6 +464,21 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
         ...
 
     @classmethod
+    @abstractmethod
+    def std(cls, var: Variable) -> ScalarNumParam:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        if not isinstance(var, NumericScalarVariable):
+            raise TypeError(f'var is expected to be NumericScalarVariable, is {type(var)}')
+        v = cls.interval_function(confidence, var.parameters)
+        if var.transform[0] == 'ln':
+            v = tuple(np.exp(x) for x in v)
+        return v
+
+    @classmethod
     def _apply_dsa_bound(
         cls,
         deterministic_value: ScalarParam,
@@ -561,7 +596,17 @@ class VectorValuedDistribution(Distribution):
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> VectorParam:
         ...
+    
+    @classmethod
+    @abstractmethod
+    def std(cls, var: Variable) -> VectorParam:
+        ...
 
+    @classmethod
+    @abstractmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[VectorParam, VectorParam]:
+        ...
+    
     @classmethod
     def _apply_dsa_bound(
         cls,
@@ -687,6 +732,18 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
         ...
     
+    @classmethod
+    @abstractmethod
+    def std(cls, var: Variable) -> VectorParam:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[VectorParam, VectorParam]:
+        if not isinstance(var, NumericVectorVariable):
+            raise TypeError(f'var should be a NumericVectorVariable, is {type(var)}')
+        return cls.interval_function(confidence, var)
+
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> NumericVectorParam:
         if var.dsa_bounds_type == 'interval':
@@ -833,6 +890,14 @@ class ConstantDistribution(ScalarValuedDistribution):
             case _:
                 raise ValueError(f'Unknown transform: {var.transform[0]}')
     
+    @classmethod
+    def std(cls, var: Variable) -> ScalarParam:
+        return 0
+    
+    @classmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarParam, ScalarParam]:
+        return(cls.deterministic_value(var), cls.deterministic_value(var))
+
     @classmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarParam:
         if not isinstance(var, ConstantVariable):
@@ -1032,6 +1097,11 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
         if var.transform[0] != 'identity':
             raise ValueError(f'Binomial distribution must provide values with identity transform, is {var.transform[0]}')
         return np.round(float(var.parameters[0]) * float(var.parameters[1]), 0) # NB - 0.5 rounds down
+    
+    @classmethod
+    def std(cls, var: Variable) -> ScalarNumParam:
+        from scipy.stats import binom
+        return float(binom.std(var.parameters[0], var.parameters[1]))
     
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
@@ -1312,6 +1382,26 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
             return np.exp(var.parameters[0] + 0.5 * var.parameters[1]**2)
         else:
             return var.parameters[0]
+    
+    @classmethod
+    def std(cls, var: Variable) -> ScalarNumParam:
+        if not isinstance(var, NormalVariable):
+            raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
+        if var.transform[0] == 'ln':
+            from scipy.stats import lognorm
+            return float(lognorm.std(*var.parameters))
+        else:
+            return var.parameters[1]
+    
+    @classmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        if not isinstance(var, NormalVariable):
+            raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
+        if var.transform[0] == 'ln':
+            interval_function = _lognormal_interval
+        else:
+            interval_function = _normal_interval
+        return interval_function(confidence, var.parameters)
     
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
@@ -1615,7 +1705,19 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
             return float(beta.expect(np.exp, (a,b)))
         else:
             return a / (a + b)
+    
+    @classmethod
+    def std(cls, var: Variable) -> ScalarNumParam:
+        if not isinstance(var, BetaVariable):
+            raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
+        a, b = var.parameters
+        from scipy.stats import beta
         
+        if var.transform[0] == 'ln':
+            raise NotImplementedError('Log beta distribution not fully supported.')
+        else:
+            return float(beta.std(a, b))
+
     # dsa_value can be inherited from NumericScalarValuedDistribution
 
     @classmethod
@@ -1883,6 +1985,17 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
             elif shape == 0:
                 return scale
             return shape * scale
+    
+    @classmethod
+    def std(cls, var: Variable) -> ScalarNumParam:
+        if not isinstance(var, GammaVariable):
+            raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
+        from scipy.stats import gamma as gamma_dist
+        shape, scale = var.parameters
+        if var.transform[0] == 'ln':
+            raise NotImplementedError('Log gamma distribution not fully supported')
+        else:
+            return float(gamma_dist.std(a = shape, scale = scale))
         
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
@@ -2078,6 +2191,10 @@ class ConstantVectorDistribution(VectorValuedDistribution):
                         raise TypeError(f'value[{i}]')
         return rval
     
+    @classmethod
+    def std(cls, var: Variable) -> VectorParam:
+        return np.zeros_like(cls.deterministic_value(var))
+
     # dsa_value should inherit from VectorValuedDistribution
 
     @classmethod
@@ -2364,7 +2481,6 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
         upper_vec[i] = upper
         return (lower_vec, upper_vec)
 
-
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
         if len(parameters) != 2:
@@ -2427,6 +2543,21 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
         for i, trans in enumerate(var.transform):
             if trans == 'ln':
                 oarray[i] = np.exp(oarray[i] + 0.5 * vcv[i,i])
+        return oarray
+    
+    @classmethod
+    def std(cls, var: Variable) -> NumericVectorParam:
+        if not isinstance(var, MultivariateNormalVariable):
+            raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
+        
+        oarray = np.sqrt(np.diag(var.parameters[1]))
+        mu = np.asarray(var.parameters[0]).flatten()
+        for i, trans in enumerate(var.transform):
+            if trans == 'ln':
+                s2 = oarray[i]**2
+                m = mu[i]
+                v = (np.exp(s2) - 1.)*np.exp(2.*m+s2)
+                oarray[i] = np.sqrt(v)
         return oarray
     
     # dsa_value should inherit from VectorValuedDistribution
@@ -2732,6 +2863,17 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         oarray = np.asarray(var.parameters[0]).flatten()
         return oarray / np.sum(oarray)
     
+    @classmethod
+    def std(cls, var: Variable) -> NumericVectorParam:
+        if not isinstance(var, DirichletVariable):
+            raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
+        
+        if any(trans == 'ln' for trans in var.transform):
+            raise NotImplementedError('Log transform not implemented for Dirichlet distribution')
+        
+        from scipy.stats import dirichlet_multinomial
+        return np.sqrt(dirichlet_multinomial.var(var.parameters,1))
+
     # dsa_value should inherit from VectorValuedDistribution
 
     @classmethod
@@ -3154,6 +3296,14 @@ class Variable(
     @property
     def deterministic_value(self) -> Value:
         return self.get_deterministic_value()
+    
+    def get_std(self) -> Value:
+        v = self.distribution.std(self)
+        return v
+    
+    def get_confidence_interval(self, confidence: float = 0.95) -> tuple[Value, Value]:
+        v = self.distribution.interval(self, confidence)
+        return v
 
     def set_distribution(self) -> None:
         pass
@@ -3657,6 +3807,9 @@ class VectorVariable(Variable):
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> VectorParam:
         return cast(VectorParam, super().get_dsa_value(bound, force))
+    
+    def get_psa_value(self) -> VectorParam:
+        return cast(VectorParam, super().get_psa_value())
     
     
 class NumericVectorVariable(VectorVariable):

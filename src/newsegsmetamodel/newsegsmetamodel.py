@@ -45,6 +45,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     _id_prefix = 'metam'
     _last_modified: datetime.datetime = datetime.datetime.now()
     last_dsa_run: float = 0.
+    last_psa_run: float = 0.
 
     def __init__(
         self,
@@ -126,7 +127,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         parameter_index: int,
         vector_location: int,
         value: variable.ScalarParam
-    ) -> tuple[bool, bool, bool, tuple[variable.Param,...]]:
+    ) -> tuple[bool, bool, bool, bool, tuple[variable.Param,...]]:
         """
         Update the addressed variable with the new value.
 
@@ -140,6 +141,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             - bool - The parameter has been set
             - bool - The deterministic value of the Variable has been impacted
             - bool - The DSA value(s) of the Variable has/have been impacted
+            - bool - The PSA values(s) of the Variable has/have been impacted
             - tuple[Param, ...] - The set of parameters now held by the Variable
         """
         varid = section + "." + key + "." + str(subindex)
@@ -147,17 +149,24 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if var is None:
             raise ValueError(f'variable {varid} not found')
         old_value = var.deterministic_value
+        old_std = var.get_std()
         old_dsa_low = var.get_dsa_value('lower', True)
         old_dsa_high = var.get_dsa_value('upper', True)
         is_ok, new_params = var.set_single_parameter(value,parameter_index, vector_location)
         new_value = var.deterministic_value
+        new_std = var.get_std()
 
         dsa_changed = (
             (var.get_dsa_value('lower', True) != old_dsa_low)
             or (var.get_dsa_value('upper', True) != old_dsa_high)
-        )   
+        )
 
-        return is_ok, old_value != new_value, dsa_changed, new_params
+        psa_changed = (
+            old_value != new_value
+            or old_std != new_std
+        )
+
+        return is_ok, old_value != new_value, dsa_changed, psa_changed, new_params
     
     def update_model_from_variable_deterministic(
         self,

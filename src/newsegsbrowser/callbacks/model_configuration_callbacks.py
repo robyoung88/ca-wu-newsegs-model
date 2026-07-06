@@ -160,6 +160,29 @@ def add_model_to_interface_callbacks(app: Dash):
             app
         )
     
+    @app.callback(
+        Output({'type':'psa-input-element', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'className'),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'psa_input_change'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State({'type':'psa-input-element', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'id'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def update_psa_inputs_status(
+        psa_input_change_trigger,
+        selected_configuration,
+        psa_input_element_ids,
+        selected_model,
+    ):
+        logger.info('update_psa_inputs_status triggered.')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_psa_inputs_status'](
+            psa_input_change_trigger,
+            selected_configuration,
+            psa_input_element_ids,
+            app
+        )
+    
     return app
     
 def add_feedback_callbacks(app):
@@ -234,6 +257,29 @@ def add_feedback_callbacks(app):
         logger.info('update_headers_dsa_inputs triggered.')
         return callbacks_map.CALLBACKS_MAP[selected_model]['update_headers_dsa_inputs'](
             dsa_input_change_trigger,
+            selected_configuration,
+            header_ids,
+            app
+        )
+    
+    @app.callback(
+        Output({'type': 'psa-input-header', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'children'),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'psa_input_change'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State({'type':'psa-input-header', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'id'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def update_headers_psa_inputs(
+        psa_input_change_trigger,
+        selected_configuration,
+        header_ids,
+        selected_model
+    ):
+        logger.info('update_headers_psa_inputs triggered.')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['update_headers_psa_inputs'](
+            psa_input_change_trigger,
             selected_configuration,
             header_ids,
             app
@@ -361,7 +407,7 @@ def add_interface_to_model_callbacks(app):
         for prop in trig:
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
-            update_ok, deterministic_changed, dsa_changed, raw_params = selected_mm.update_variable_from_interface(
+            update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = selected_mm.update_variable_from_interface(
                 pid['section'], pid['key'], pid['subindex'], pid['parameter_index'], pid['vector_location'], val
             )
             match pid['type']:
@@ -447,6 +493,15 @@ def add_interface_to_model_callbacks(app):
                     json.dumps(
                         browser.dsa_impacting_interface_action(
                             metamodel_id = selected_mm.id,
+                            **pid
+                        )
+                    )
+                )
+            if psa_changed:
+                prequeue.append(
+                    json.dumps(
+                        browser.psa_impacting_interface_action(
+                            metamodel_id=selected_mm.id,
                             **pid
                         )
                     )
@@ -605,6 +660,67 @@ def add_interface_to_model_callbacks(app):
 
         return tuple(rval)
 
+    @app.callback(
+        Output('prequeue-action-user', 'data', allow_duplicate = True),
+
+        Input({'type': 'toggle-psa-variable', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'value'),
+        
+        State('store-selected-configuration', 'data'),
+        prevent_initial_call = True
+    )
+    def interface_update_psa(
+        toggle_psa_variable,
+        selected_config,
+    ):
+        """
+        Handle a change to DSA-specific interface components.
+        """
+        rval = no_update # prequeue-action-user
+
+        if selected_config is None:
+            return rval
+        
+        selected_config = json.loads(selected_config)
+        mm = cast(NewsegsMetaModel, app.metamodels.get(selected_config.get('metamodel_id')))
+        if mm is None:
+            return rval
+        
+        prequeue_patch = Patch()
+        logger.info('psa input field changed')
+
+        forward_prequeue = False
+
+        trig = ctx.triggered
+        for prop in trig:
+            pid = json.loads(prop['prop_id'].rstrip('.value'))
+            val = prop['value']
+
+            varid = pid['section']+'.'+pid['key']+'.'+str(pid['subindex'])
+            var = mm.variables.get(varid)
+            if var is None:
+                continue
+
+            match pid['type']:
+                case 'toggle-psa-variable':
+                    if val is None:
+                        continue
+                    if not val == var.psa_selected:
+                        var.psa_selected = val
+                        prequeue_patch.append(
+                            json.dumps(
+                                browser.psa_impacting_interface_action(
+                                    metamodel_id = mm.id,
+                                    selected_status_change = True,
+                                    **pid
+                                )
+                            )
+                        )
+                        forward_prequeue = True
+        
+        if forward_prequeue:
+            rval = prequeue_patch
+
+        return rval
     
     def find_matching_actions(
         queue_action_user: list[str],
@@ -904,6 +1020,18 @@ def add_interface_to_model_callbacks(app):
                     # the dispatcher
                     rval[RVAL_INDICES['dispatchitem-action-user']] = dispatch_actions
 
+                case 'psa_impacting_interface_action':
+                    # As per DSA impacting actions, simply dispatch
+                    dispatch_actions = find_matching_actions(
+                        queue_action_user,
+                        action,
+                        i,
+                        'psa_impacting_interface_action'
+                    )
+                    # TODO - add to dispatch list once we've sorted out
+                    # the dispatcher
+                    rval[RVAL_INDICES['dispatchitem-action-user']] = dispatch_actions
+
                 case 'dsa-run-request':
                     mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
                     if mm.model.checked_out or mm.finance.checked_out:
@@ -925,7 +1053,28 @@ def add_interface_to_model_callbacks(app):
                     #rval[RVAL_INDICES['queue-action-user']] = queue_action_user
                     rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
                     return tuple(rval)
-                    
+                
+                case 'psa-run-request':
+                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    if mm.model.checked_out or mm.finance.checked_out:
+                        continue
+
+                    dispatch_actions = find_matching_actions(
+                        queue_action_user,
+                        action,
+                        i,
+                        'psa-run-request'
+                    )
+                    logger.info('dispatching %d psa run requests', len(dispatch_actions))
+
+                    # Requests go straight out to the metamodel process
+                    metamodel_prequeue_patch = Patch()
+                    metamodel_prequeue_patch.append(dispatch_actions[0])
+
+                    rval[RVAL_INDICES['prequeue-metamodel-process']] = metamodel_prequeue_patch
+                    rval[RVAL_INDICES['interval-action-user']] = len(queue_action_user) == 0 # Disable Interval
+                    return tuple(rval)
+
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')
         
@@ -966,6 +1115,5 @@ def add_interface_to_model_callbacks(app):
                     logger.info('adding %s to %s', itm, trig_id)
 
         return tuple(rval)
-
 
     return app
