@@ -673,7 +673,7 @@ def add_interface_to_model_callbacks(app):
         selected_config,
     ):
         """
-        Handle a change to DSA-specific interface components.
+        Handle a change to PSA-specific interface components.
         """
         rval = no_update # prequeue-action-user
 
@@ -747,7 +747,6 @@ def add_interface_to_model_callbacks(app):
 
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
-        #Output('queue-action-user', 'data'),
 
         Output('prequeue-model-run', 'data', allow_duplicate = True),
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
@@ -833,7 +832,6 @@ def add_interface_to_model_callbacks(app):
 
         RVAL_INDICES = {
             'prequeue-action-user': 0,
-            #'queue-action-user': 1,
             'prequeue-model-run': 1,
             'prequeue-finance-run': 2,
             'prequeue-metamodel-process': 3,

@@ -198,8 +198,18 @@ def create_psa_layout(*args, **kwargs):
                 'Cancel PSA',
                 id = {'type': 'metamodel-process-cancel', 'target': 'psa-run-request'},
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
-            )
-            
+            ),
+            html.Progress(
+                id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
+                className='resize-handle resize-handle-progress',
+                style = {'display': 'none'}
+            ),
+            dbc.Tooltip(
+                'PSA Running',
+                id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
+                target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
+            ),
+
         ],
         className = 'drawer-container',
 

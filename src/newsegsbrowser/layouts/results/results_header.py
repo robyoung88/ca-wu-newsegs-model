@@ -15,8 +15,13 @@ def create_results_header(**kwargs):
     return html.Div(
         [
             html.Div(
-                id='resize-handle', 
-                className='resize-handle'
+                id={'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}, 
+                className='resize-handle resize-handle-ok'
+            ),
+            dbc.Tooltip(
+                'Results up-to-date',
+                id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
+                target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
             ),
 
             html.Div(
@@ -106,11 +111,9 @@ def create_results_header(**kwargs):
                             },
                     )
                 ]),
-            id = 'drawer-title',
             className = 'drawer-title'
             ),
         ],
-    id='drawer-header',
     className = 'drawer-header'
     )
 
@@ -118,8 +121,13 @@ def create_results_header_dsa(**kwargs):
     return html.Div(
         [
             html.Div(
-                #id='resize-handle',
-                className = 'resize-handle',
+                id={'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}, 
+                className='resize-handle resize-handle-ok'
+            ),
+            dbc.Tooltip(
+                'Results up-to-date',
+                id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
+                target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
             ),
 
             html.Div(
@@ -160,11 +168,9 @@ def create_results_header_dsa(**kwargs):
                         )
                     ])
                 ]),
-            #id = 'drawer-title',
             className = 'drawer-title',
             )
         ],
-    #id = 'drawer-header'
     className = 'drawer-header',
     )
 
@@ -172,9 +178,16 @@ def create_results_header_psa(**kwargs):
     return html.Div(
         [
             html.Div(
-                className = 'resize-handle',
+                id={'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}, 
+                className='resize-handle resize-handle-ok'
             ),
-
+            
+            dbc.Tooltip(
+                'Results up-to-date',
+                id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
+                target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
+            ),
+            
             html.Div(
                 dbc.Container([
                     dbc.Row([
@@ -189,10 +202,11 @@ def create_results_header_psa(**kwargs):
                             dbc.Button(
                                 'Run PSA',
                                 color = 'primary',
-                                id = {'type': 'psa-run-button', 'page': kwargs.get('page-type', 'None')},
+                                id = {'type': 'psa-run-button', 'page': kwargs.get('page_type', 'None')},
                                 disabled = False,
                                 style = {
                                     'display': 'inline',
+                                    'vertical-align': 'top',
                                 }
                             ),
                             style = {
@@ -213,10 +227,8 @@ def create_results_header_psa(**kwargs):
                         )
                     ])
                 ]),
-            #id = 'drawer-title',
             className = 'drawer-title',
             )
         ],
-    #id = 'drawer-header'
     className = 'drawer-header',
     )

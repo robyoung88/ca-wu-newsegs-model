@@ -80,6 +80,10 @@ def run_psa(
     fnc = mm.finance
 
     results = []
+    n_calcs = samples if not include_deterministic else samples + 1
+    prog_i = 0
+    if progress is not None:
+        progress(prog_i, n_calcs)
 
     if include_deterministic:
         for v in variables:
@@ -93,6 +97,9 @@ def run_psa(
         res['deterministic'] = True
         res['draw'] = 0
         results.append(res)
+        if progress is not None:
+                prog_i += 1
+                progress(prog_i, n_calcs)
     
     if samples <= 0:
         return pd.DataFrame(results)
@@ -120,7 +127,8 @@ def run_psa(
             res['draw'] = i+1
             results.append(res)
             if progress is not None:
-                progress(i+1, samples)
+                prog_i += 1
+                progress(prog_i, n_calcs)
     finally:
         for v in variables:
             v.psa_active = False
