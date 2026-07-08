@@ -22,6 +22,15 @@ PSA_FLOAT_STATISTIC = Literal[
     'net_present_value_discounted'
 ]
 
+PSA_STATISTIC_NAMES = {
+    'total_present_costs_undiscounted': 'Total cost (undisc.)',
+    'total_present_costs_discounted': 'Total cost (disc.)',
+    'total_present_benefits_undiscounted': 'Total benefits (undisc.)',
+    'total_present_benefits_discounted': 'Total benefits (disc.)',
+    'net_present_value_undiscounted': 'NPV (undisc.)',
+    'net_present_value_discounted': 'NPV (disc.)'
+}
+
 def _psa_float_statistic_mapper(
     stat: PSA_FLOAT_STATISTIC,
     mdl: NewsegsModel,
@@ -137,3 +146,59 @@ def run_psa(
     
     results = pd.DataFrame(results)
     return results
+
+def basic_psa_stats(
+    psa_results: pd.DataFrame,
+    statistics: Sequence[PSA_FLOAT_STATISTIC] = get_args(PSA_FLOAT_STATISTIC),
+    quantiles: Sequence[float] = [0.025, 0.975],
+    npv_statistics = [
+        'net_present_value_undiscounted',
+        'net_present_value_discounted'
+    ]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    res_det = (
+        psa_results
+        .query('deterministic == True')
+        .loc[:, statistics]
+        .sum()
+        .to_frame()
+        .rename(columns={0:'Deterministic'})
+        )
+    
+    res_psa_raw = (
+        psa_results
+        .query('deterministic == False')
+        .loc[:, statistics]
+    )
+    res_psa = (
+        res_psa_raw
+        .agg(
+            ['count', 'mean', 'median', 'std']
+        )
+        .transpose()
+        .rename(columns=lambda x: x.title())
+    )
+    res_psa_quants = (
+        res_psa_raw
+        .quantile(quantiles)
+        .transpose()
+        .rename(columns = lambda x: f'{100.*float(x):.1f} pctile'.replace('.','_'))
+    )
+
+    all_res = (
+        res_det
+        .join(res_psa)
+        .join(res_psa_quants)
+    )
+    
+    prob_positive_npv = (
+        res_psa_raw
+        .loc[:, npv_statistics]
+        .gt(0)
+        .mean()
+        .to_frame()
+        .rename(columns={0:'prob_pos_npv'})
+    )
+
+
+    return all_res, prob_positive_npv

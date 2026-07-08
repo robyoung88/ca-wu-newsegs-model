@@ -17,7 +17,9 @@ RESULT_CACHE_PREFIXES = {
     'dsa_results': 'res_dsa_',
     'dsa_table': 'dsa_table_',
     'dsa_label': 'dsa_label_',
-    'psa_results': 'res_psa_'
+    'psa_results': 'res_psa_',
+    'psa_table': 'psa_table_',
+    'psa_prob_positive_npv': 'psa_prob_positive_npv_',
 }
 
 def get_model_result_id(prefix, model_id):

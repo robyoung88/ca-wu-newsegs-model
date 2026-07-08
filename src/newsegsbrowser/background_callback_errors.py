@@ -78,7 +78,9 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
 
 def background_callback_error_handler_factory(target):
     def error_handler(err: Exception):
+        print(err)
         logger.error(str(err))
+        print(err.args[0])
         last_call_ = err.args[0].split('\n')[-1]
         if 'NoSuchProcess' in last_call_:
             set_props('background_callback_error_reporter', {'data': target})

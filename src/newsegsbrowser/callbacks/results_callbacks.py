@@ -358,5 +358,27 @@ def add_result_table_callbacks(app):
             selected_conf,
             app
         )
+    
+    @app.callback(
+        Output({'type': 'result-table-container', 'page': ALL, 'key': 'psa-results-table'}, 'children'),
+
+        Input({'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'}, 'data'),
+        State({'type': 'result-table-container', 'page': ALL, 'key': 'psa-results-table'}, 'id'),
+        State('store-selected-configuration', 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def sync_psa_results_table_to_store(
+        psa_table_trigger,
+        table_ids,
+        selected_conf,
+        selected_model
+    ):
+        return callbacks_map.CALLBACKS_MAP[selected_model]['sync_psa_results_table_to_store'](
+            psa_table_trigger,
+            table_ids,
+            selected_conf,
+            app
+        )
 
     return app

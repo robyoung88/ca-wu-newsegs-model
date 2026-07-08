@@ -233,5 +233,25 @@ def add_postprocess_callbacks(app: Dash):
             dsa_triggers,
             app
         )
+
+    @app.callback(
+        Output({'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'}, 'data'),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'psa-run-postprocess'}, 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True
+    )
+    def postproc_psa(
+        psa_triggers,
+        selected_model
+    ):
+        """
+        Transform the dsa output table into something useful
+        """
+        logger.info('postprocessing dsa results')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_psa'](
+            psa_triggers,
+            app
+        )
     
     return app
