@@ -190,9 +190,9 @@ def add_caching_callbacks(app):
 
         Input({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True,
-        #background = True,
-        #manager = noncaching_background_callback_manager,
-        #on_error = background_callback_error_handler_factory('model-run')
+        background = True,
+        manager = noncaching_background_callback_manager,
+        on_error = background_callback_error_handler_factory('model-run')
     )
     def run_model(model_run_request):
         model_run = json.loads(model_run_request)
@@ -212,9 +212,9 @@ def add_caching_callbacks(app):
 
         Input({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True,
-        #background = True,
-        #manager = noncaching_background_callback_manager,
-        #on_error = background_callback_error_handler_factory('finance-run')
+        background = True,
+        manager = noncaching_background_callback_manager,
+        on_error = background_callback_error_handler_factory('finance-run')
     )
     def run_finance(finance_run_request):
         finance_run = json.loads(finance_run_request)
@@ -269,18 +269,6 @@ def add_caching_callbacks(app):
             Output('background_progress_tracker', 'data')
         ],
         progress_default = '{"value":"0", "max":"1", "message":"running"}',
-        # running = [
-        #     (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
-        #     (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
-        #     (
-        #         Output({'type':'progress_bar','key':ALL}, "style"),
-        #         {"visibility": "visible"},
-        #         {"visibility": "hidden"},
-        #     ),
-        # ],
-        
-        # progress=[Output('background_progress_tracker', 'data')],
-        # progress_default='{"value":"0","max":"1"}',
     )
     def run_metamodel_process(
         set_progress,
@@ -296,8 +284,36 @@ def add_caching_callbacks(app):
                 if os.path.isfile(debug_dsa_run_results_fn):
                     dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
                 else:
+                    t0 = time.time()
+                    def set_progression(value, max):
+                        tx = time.time()
+                        dt = tx - t0
+                        if value != 0:
+                            rate_ = dt / value
+                            expected_ = rate_ * max
+                            remaining_ = expected_ - dt
+                            if remaining_ > 3600:
+                                report_time = time.strftime('%H:%M:%S', time.gmtime(remaining_))
+                            elif remaining_ > 60:
+                                report_time = time.strftime('%M:%S', time.gmtime(remaining_))
+                            else:
+                                report_time = time.strftime('%S seconds', time.gmtime(remaining_))
+                            msg = f'{value} / {max} iterations; {report_time} remaining'
+                        else:
+                            msg = 'DSA running'
+
+                        set_progress(
+                            json.dumps(
+                                dict(
+                                    value = str(value),
+                                    max = str(max),
+                                    message = msg
+                                )
+                            )
+                        )
                     dsa_results = dsa.run_dsa(
-                        mm
+                        mm,
+                        progress = set_progression
                     ).set_index(['variable', 'bound'])
                     dsa_results.to_csv(debug_dsa_run_results_fn)
                 dsa_result_id = postprocess_utils.get_dsa_result_id(
@@ -426,7 +442,6 @@ def add_caching_callbacks(app):
             return [], [], []
         if progress is None:
             return [no_update] * len(progress_ids), [no_update] * len(progress_ids), [no_update] * len(tooltip_ids)
-        print(progress)
         progress = json.loads(progress)
         return (
             [str(progress['value'])] * len(progress_ids), 
@@ -453,7 +468,7 @@ def create_app(external_stylesheets = None) -> Dash:
         __name__,
         #suppress_callback_exceptions = True,
         title = 'NewSEGS Energy Model',
-        update_title = None,
+        update_title = None, # pyright: ignore[reportArgumentType]
         external_stylesheets = external_stylesheets,
         assets_url_path = assets_path,
         routing_callback_inputs = {
