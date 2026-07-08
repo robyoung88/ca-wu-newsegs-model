@@ -3,7 +3,7 @@ import logging
 
 from dash import Dash, no_update
 
-from newsegsbrowser.postprocess import post_dsa_results, postprocess_utils as pp_utils
+from newsegsbrowser.postprocess import post_dsa_results, post_psa_results, postprocess_utils as pp_utils
 from newsegsbrowser.postprocess import post_sprake_storage_results
 from newsegsbrowser.postprocess import post_sprake_net_results
 
@@ -83,7 +83,63 @@ def postproc_dsa(
                 app.results[label_id] = label_table
                 
                 return dsa_triggers
-    else:
-        # A universal trigger has been applied.
-        return NUP
-            
+        else:
+            # A universal trigger has been applied.
+            return NUP
+
+def postproc_psa(
+    psa_triggers,
+    app: Dash
+):
+    NUP = no_update
+
+    for trigger in psa_triggers:
+        if isinstance(trigger, list):
+            for trig_str in trigger:
+                trig = json.loads(trig_str)
+
+                mm_id = trig.get('metamodel_id')
+                table_id = pp_utils.get_psa_result_id(
+                    pp_utils.RESULT_CACHE_PREFIXES['psa_table'],
+                    mm_id
+                )
+                pos_npv_id = pp_utils.get_psa_result_id(
+                    pp_utils.RESULT_CACHE_PREFIXES['psa_prob_positive_npv'],
+                    mm_id
+                )
+
+                logger.info('Getting result table %s', table_id)
+
+                prev_result = app.results.get(table_id, None)
+                prev_npv = app.results.get(pos_npv_id, None)
+                
+                mm = app.metamodels.get(mm_id)
+
+                if (
+                    not prev_result is None 
+                    and getattr(prev_result, '_run_time') == mm.last_psa_run
+                    and not prev_npv is None
+                    and getattr(prev_npv, '_run_time') == mm.last_psa_run
+                ):
+                    return NUP
+
+                logger.info('Cache miss - making psa table %s', table_id)
+
+                data_id = pp_utils.get_psa_result_id(
+                    pp_utils.RESULT_CACHE_PREFIXES['psa_results'],
+                    mm_id
+                )
+                psa_results = app.results.get(data_id, None)
+                if psa_results is None:
+                    raise ValueError(f'PSA results {data_id} not found')
+
+                res_table, prob_pos_npv = post_psa_results.psa_results_to_tables(psa_results)
+                setattr(res_table, '_run_time', mm.last_psa_run)
+                setattr(prob_pos_npv, '_run_time', mm.last_psa_run)
+                app.results[table_id] = res_table
+                app.results[pos_npv_id] = prob_pos_npv
+
+                return psa_triggers
+        else:
+            # A universal trigger has been applied.
+            return NUP

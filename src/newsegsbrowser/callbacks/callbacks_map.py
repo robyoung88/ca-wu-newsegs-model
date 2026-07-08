@@ -25,6 +25,7 @@ SPRAKE_CALLBACKS = {
     'postproc_finance_costs_so': postprocess_callbacks_sprake.postproc_finance_costs_so,
     'postproc_finance_value_so': postprocess_callbacks_sprake.postproc_finance_value_so,
     'postproc_dsa': postprocess_callbacks_generic.postproc_dsa,
+    'postproc_psa': postprocess_callbacks_generic.postproc_psa,
 
     'update_model_result_headers': results_callbacks_sprake.update_model_result_headers,
     'update_finance_result_headers': results_callbacks_sprake.update_finance_result_headers,
@@ -37,6 +38,8 @@ SPRAKE_CALLBACKS = {
 
     'sync_dsa_results_table_to_store': results_callbacks_sprake.sync_dsa_results_table_to_store,
     'sync_dsa_tornado_to_store': results_callbacks_sprake.sync_dsa_tornado_to_store,
+
+    'sync_psa_results_table_to_store': results_callbacks_sprake.sync_psa_results_table_to_store,
 
 }
 

@@ -9,7 +9,7 @@ from newsegsbrowser import icons
 from newsegsbrowser import stats as browserstats
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsbrowser.postprocess.tables import result_tables_sprake
-from newsegssensitivity import common as sensitivity
+from newsegssensitivity import common as sensitivity, psa
 
 
 def _make_generation_result_header(
@@ -568,3 +568,78 @@ def sync_dsa_tornado_to_store(
     plt = browserstats.tornado_plot(tbl, lbl, dsa_statistic)
 
     return [plt]
+
+def sync_psa_results_table_to_store(
+    psa_table_trigger,
+    table_ids,
+    selected_conf,
+    app
+):
+    if len(table_ids) == 0:
+        return
+    elif len(table_ids) > 1:
+        raise ValueError('There are multiple containers for PSA results tables')
+    NUP = [no_update]
+
+    if selected_conf is None:
+        return NUP
+    selected_conf = json.loads(selected_conf)
+
+    tbl_id = postprocess_utils.get_psa_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES['psa_table'],
+        selected_conf.get('metamodel_id')
+    )
+
+    tbl = app.results.get(tbl_id)
+    if tbl is None:
+        return NUP
+    
+    otable = (
+        tbl
+        .rename(psa.PSA_STATISTIC_NAMES)
+        .reset_index(drop=False)
+        .rename(columns={'index':'Statistic'})
+    )
+
+    rval = []
+    
+    formatters = {
+        'Statistic': {"function":  "params.value ? params.value : '-' "},
+    }
+    columnDefs = [
+        {
+            'field': i,
+            "valueFormatter": formatters.get(i, {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "})
+        }
+        for i in otable.columns
+    ]
+
+    tbl1 = dag.AgGrid(
+        rowData = otable.to_dict('records'),
+        columnDefs = columnDefs
+    )
+
+    rval.append(
+        tbl1   
+    )
+
+    npv_id = postprocess_utils.get_psa_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES['psa_prob_positive_npv'],
+        selected_conf.get('metamodel_id')
+    )
+    npv_data = app.results.get(npv_id)
+    if npv_data is None:
+        return NUP
+    
+    pnpv = [
+        html.H2('Probability of positive NPV:'),
+        html.H3(
+            f'Undiscounted: {npv_data.loc['net_present_value_undiscounted','prob_pos_npv']:.1%}'
+        ),
+        html.H3(
+            f'Discounted: {npv_data.loc['net_present_value_discounted','prob_pos_npv']:.1%}'
+        ),
+    ]
+    rval.extend(pnpv)
+
+    return [rval,]
