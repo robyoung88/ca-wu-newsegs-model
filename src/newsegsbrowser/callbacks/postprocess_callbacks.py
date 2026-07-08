@@ -57,11 +57,11 @@ def add_postprocess_callbacks(app: Dash):
                 prequeue_finance_run.append(
                     json.dumps(
                         browser.finance_run_request(
-                            config['metamodel_id'], 
-                            config['finance_id'], 
-                            model_id,
-                            datetime.datetime.now().timestamp() - 100. # Put request into the past as this is an automatic run which should happen immediately
-                        )
+                            metamodel_id = config['metamodel_id'], 
+                            finance_id = config['finance_id'], 
+                            model_id = model_id,
+                            debounce = False
+                        ).as_dict()
                     )
                 )
                 do_update = True

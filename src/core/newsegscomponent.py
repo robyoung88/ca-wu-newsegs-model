@@ -18,6 +18,7 @@ from abc import ABCMeta, abstractmethod
 import copy
 import datetime
 import re
+import time
 from typing import Any, Sequence, Type, override
 import uuid as mod_uuid
 
@@ -135,7 +136,7 @@ class NewsegsComponent(
                 setattr(self, k, v)
     
 class RunnableNewsegsComponent(NewsegsComponent):
-    last_run = datetime.datetime.now()
+    last_run: float = 0.0
 
     @abstractmethod
     def run(self) -> Any:

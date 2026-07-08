@@ -46,12 +46,14 @@ def add_psa_run_callbacks(app: Dash):
             elif id.get('key') in {'return_draws'}:
                 kwargs[id.get('key')] = bool(input_values[idx])
 
-        print(kwargs)
-
         prequeue_patch = Patch()
         prequeue_patch.append(
             json.dumps(
-                browser.psa_run_request(selected_configuration.get('metamodel_id'), **kwargs)
+                browser.psa_run_request(
+                    metamodel_id = selected_configuration.get('metamodel_id'), 
+                    debounce = False,
+                    **kwargs
+                ).as_dict()
             )
         )
 

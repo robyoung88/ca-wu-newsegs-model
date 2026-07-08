@@ -1,4 +1,9 @@
+import inspect
+import time
+
 from collections.abc import Sequence
+from dataclasses import KW_ONLY, dataclass, field
+from dataclasses import asdict as dc_asdict
 from typing import Literal
 from typing import TypeVar
 from typing import overload
@@ -172,66 +177,135 @@ def compose_configuration(
     
     return rval
 
+@dataclass
+class Action:
+    """
+    Class for dispatching actions
+    """
+    
+    _: KW_ONLY
+    type: str
+    time: float = field(default_factory = time.time)
+    debounce: bool = True
+
+    @classmethod
+    def from_dict(cls, env):      
+        return cls(**{
+            k: v for k, v in env.items() 
+            if k in inspect.signature(cls).parameters
+        })
+    
+    def as_dict(self):
+        return dc_asdict(self)
+
+@dataclass
+class VariableAction(Action):
+    metamodel_id: str
+    section: str
+    key: str
+    subindex: int = 0
+    _: KW_ONLY
+    type: str = field(init = False)
+    model_class: Literal['model', 'finance'] = 'model'
+
+@dataclass
+class ModelConfigInterfaceAction(VariableAction):
+    parameter_index: int = 0
+    vector_location: int = 0
+
+    def __post_init__(self):
+        match self.model_class:
+            case 'model':
+                self.type = 'model_config_interface_update'
+            case 'finance':
+                self.type = 'finance_config_interface_update'
+
+@dataclass
+class DSAImpactingInterfaceAction(VariableAction):
+    
+    action_key: str = 'dsa_input_change'
+    bounds_type_change: bool = False
+    selected_status_change: bool = False
+    _: KW_ONLY
+    type: str = 'dsa_impacting_interface_action'
+
+@dataclass
+class PSAImpactingInterfaceAction(VariableAction):
+    
+    action_key: str = 'psa_input_change'
+    selected_status_change: bool = False
+    _: KW_ONLY
+    type: str = 'psa_impacting_interface_action'
+
+@dataclass
+class MetaModelProcessAction(Action):
+    metamodel_id: str = ''
+    type: Literal[ # pyright: ignore[reportIncompatibleVariableOverride]
+        'result_update_request',
+        'dsa_run_request',
+        'psa_run_request'
+    ]
+    action_key: str = field(init = False)
+
+    def __post_init__(self):
+        match self.type:
+            case 'result_update_request':
+                self.action_key = 'result_update'
+            case 'dsa_run_request':
+                self.action_key = 'dsa_run'
+            case 'psa_run_request':
+                self.action_key = 'psa_run'
+            case _:
+                self.action_key = ''
+
+@dataclass
+class ModelRunAction(MetaModelProcessAction):
+    metamodel_id: str = ''
+    model_id: str = ''
+    type: str = 'model_run_request' # pyright: ignore[reportIncompatibleVariableOverride]
+    action_key: str = 'model_run'
+
+    def __post_init__(self):
+        """
+        Override the setting of MetaModelProcessAction action key
+        """
+        return
+
+@dataclass
+class FinanceRunAction(ModelRunAction):
+    type: str = 'finance_run_request'
+    action_key: str = 'finance_run'
+    finance_id: str = ''
+
+@dataclass
+class ResultUpdateAction(MetaModelProcessAction):
+    type: str = 'result_update_request' # pyright: ignore[reportIncompatibleVariableOverride]
+
+@dataclass
+class DSARunAction(MetaModelProcessAction):
+    type: str = 'dsa_run_request' # pyright: ignore[reportIncompatibleVariableOverride]
+
+@dataclass
+class PSARunAction(MetaModelProcessAction):
+    type: str = 'psa_run_request' # pyright: ignore[reportIncompatibleVariableOverride]
+    samples: int = 1000
+    return_draws: bool = False
+    seed: float | None = None
+
 def model_interface_action(
-    metamodel_id,
-    section,
-    key,
-    subindex,
-    parameter_index,
-    vector_location,
-    input_time = None,
     **kwargs
 ):
-    if input_time is None:
-        input_time = datetime.datetime.now()
-
-    if isinstance(input_time, float):
-        ts = input_time
-    else:
-        ts = input_time.timestamp()
-    
-    return {
-        'type': 'model_config_interface_update',
-        'metamodel_id': metamodel_id,
-        'section': section,
-        'key': key,
-        'subindex': subindex,
-        'parameter_index': parameter_index,
-        'vector_location': vector_location,
-        'time': ts,
-    }
+    return ModelConfigInterfaceAction.from_dict(kwargs)
 
 def finance_interface_action(
-    metamodel_id,
-    section,
-    key,
-    subindex,
-    parameter_index,
-    vector_location,
-    input_time = None,
     **kwargs
 ):
-    if input_time is None:
-        input_time = datetime.datetime.now()
-    return {
-        'type': 'finance_config_interface_update',
-        'metamodel_id': metamodel_id,
-        'section': section,
-        'key': key,
-        'subindex': subindex,
-        'parameter_index': parameter_index,
-        'vector_location': vector_location,
-        'time': input_time.timestamp(),
-    }
+    kwargs.update({
+        'model_class': 'finance'
+    })
+    return ModelConfigInterfaceAction.from_dict(kwargs)
 
 def dsa_impacting_interface_action(
-    metamodel_id,
-    section,
-    key,
-    subindex,
-    input_time = None,
-    bounds_type_change = False,
-    selected_status_change = False,
     **kwargs
 ):
     """
@@ -239,140 +313,9 @@ def dsa_impacting_interface_action(
 
     Primary outcome is the update of DSA headers.
     """
-    if input_time is None:
-        input_time = datetime.datetime.now()
-    return {
-        'type': 'dsa_impacting_interface_action',
-        'action_key': 'dsa_input_change',
-        'metamodel_id': metamodel_id,
-        'section': section,
-        'key': key,
-        'subindex': subindex,
-        'bounds_type_change': bounds_type_change,
-        'selected_status_change': selected_status_change,
-        'time': input_time.timestamp(),
-    }
-
-def model_run_interface_action(
-    metamodel_id,
-    model_id,
-    input_time = None
-):
-    if input_time is None:
-        input_time = datetime.datetime.now()
-
-    if isinstance(input_time, float):
-        ts = input_time
-    else:
-        ts = input_time.timestamp()
-
-    return {
-        'type': 'model_run_interface_request',
-        'metamodel_id': metamodel_id,
-        'model_id': model_id,
-        'time': ts
-    }
-
-def result_update_interface_action(
-    metamodel_id,
-    input_time = None
-):
-    if input_time is None:
-        input_time = datetime.datetime.now()
-
-    if isinstance(input_time, float):
-        ts = input_time
-    else:
-        ts = input_time.timestamp()
-
-    return {
-        'type': 'result_update_interface_request',
-        'metamodel_id': metamodel_id,
-        'time': ts
-    }
-
-def model_run_request(
-    metamodel_id,
-    model_id,
-    request_time = None
-):
-    if request_time is None:
-        request_time = datetime.datetime.now()
-
-    if isinstance(request_time, float):
-        ts = request_time
-    else:
-        ts = request_time.timestamp()
-
-    return {
-        'type': 'model_run_request',
-        'metamodel_id': metamodel_id,
-        'model_id': model_id,
-        'time': ts
-    }
-
-def finance_run_request(
-    metamodel_id,
-    finance_id,
-    model_id,
-    request_time = None
-):
-    if request_time is None:
-        request_time = datetime.datetime.now()
-
-    if isinstance(request_time, float):
-        ts = request_time
-    else:
-        ts = request_time.timestamp()
-    
-    return {
-        'type': 'finance_run_request',
-        'metamodel_id': metamodel_id,
-        'finance_id': finance_id,
-        'model_id': model_id,
-        'time': ts
-    }
-
-def metamodel_process_request(
-    metamodel_id,
-    request_type,
-    request_time = None,
-    **kwargs
-):
-    if request_time is None:
-        request_time = datetime.datetime.now()
-
-    if isinstance(request_time, float):
-        ts = request_time
-    else:
-        ts = request_time.timestamp()
-    
-    odict = {
-        'type': request_type,
-        'metamodel_id': metamodel_id,
-        'time': ts
-    }
-    if len(kwargs):
-        odict.update(kwargs)
-    return odict
-
-def dsa_run_request(
-    metamodel_id,
-    request_time = None
-):
-    return metamodel_process_request(
-        metamodel_id,
-        'dsa-run-request',
-        request_time
-    )
+    return DSAImpactingInterfaceAction.from_dict(kwargs)
 
 def psa_impacting_interface_action(
-    metamodel_id,
-    section,
-    key,
-    subindex,
-    input_time = None,
-    selected_status_change = False,
     **kwargs
 ):
     """
@@ -380,31 +323,40 @@ def psa_impacting_interface_action(
 
     Primary outcome is the update of PSA headers.
     """
-    if input_time is None:
-        input_time = datetime.datetime.now()
-    return {
-        'type': 'psa_impacting_interface_action',
-        'action_key': 'psa_input_change',
-        'metamodel_id': metamodel_id,
-        'section': section,
-        'key': key,
-        'subindex': subindex,
-        'selected_status_change': selected_status_change,
-        'time': input_time.timestamp(),
-    }
+    return PSAImpactingInterfaceAction.from_dict(kwargs)
+
+def model_run_interface_action(
+    **kwargs
+):
+    return ModelRunAction.from_dict(kwargs)
+
+def result_update_interface_action(
+    **kwargs
+):
+    return ResultUpdateAction.from_dict(kwargs)
+
+def model_run_request(
+    **kwargs
+):
+    return ModelRunAction.from_dict(kwargs)
+
+def finance_run_request(
+   **kwargs
+):
+    return FinanceRunAction.from_dict(kwargs)
+
+
+def metamodel_process_request(
+    **kwargs
+):
+    return MetaModelProcessAction.from_dict(kwargs)
+
+def dsa_run_request(
+    **kwargs
+):
+    return DSARunAction.from_dict(kwargs)
 
 def psa_run_request(
-    metamodel_id,
-    request_time = None,
-    samples = 1000,
-    return_draws = False,
-    seed = None,
+    **kwargs
 ):
-    return metamodel_process_request(
-        metamodel_id,
-        'psa-run-request',
-        request_time,
-        samples = samples,
-        return_draws = return_draws,
-        seed = seed,
-    )
+    return PSARunAction.from_dict(kwargs)

@@ -139,7 +139,7 @@ def create_psa_layout(*args, **kwargs):
     results_section = [
         html.Div([
             dcc.Loading(([
-                config_dict['layout_results_header'](),
+                config_dict['layout_results_header'](**kwargs),
             
                 html.Div([
                     dbc.Col(
@@ -196,7 +196,7 @@ def create_psa_layout(*args, **kwargs):
 
             dbc.Button(
                 'Cancel PSA',
-                id = {'type': 'metamodel-process-cancel', 'target': 'psa-run-request'},
+                id = {'type': 'metamodel-process-cancel', 'target': 'psa_run_request'},
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
             ),
             html.Progress(

@@ -171,7 +171,7 @@ def create_model_configuration_layout(*args, **kwargs):
     results_section = [
         html.Div([
             dcc.Loading([
-                config_dict['layout_results_header'](),
+                config_dict['layout_results_header'](**kwargs),
                 html.Div([
                     config_dict['layout_configuration_selector'](),
                     dbc.Row(

@@ -190,9 +190,9 @@ def add_caching_callbacks(app):
 
         Input({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True,
-        background = True,
-        manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('model-run')
+        #background = True,
+        #manager = noncaching_background_callback_manager,
+        #on_error = background_callback_error_handler_factory('model-run')
     )
     def run_model(model_run_request):
         model_run = json.loads(model_run_request)
@@ -212,9 +212,9 @@ def add_caching_callbacks(app):
 
         Input({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True,
-        background = True,
-        manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('finance-run')
+        #background = True,
+        #manager = noncaching_background_callback_manager,
+        #on_error = background_callback_error_handler_factory('finance-run')
     )
     def run_finance(finance_run_request):
         finance_run = json.loads(finance_run_request)
@@ -291,7 +291,7 @@ def add_caching_callbacks(app):
         
         # Do the process
         match process_request['type']:
-            case 'dsa-run-request':
+            case 'dsa_run_request':
                 debug_dsa_run_results_fn = os.path.join('.', 'temp_dsa_run_results.csv')
                 if os.path.isfile(debug_dsa_run_results_fn):
                     dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
@@ -310,7 +310,7 @@ def add_caching_callbacks(app):
 
                 # Not convinced this is necessary
                 #mm.dsa_result_id = dsa_result_id
-            case 'psa-run-request':
+            case 'psa_run_request':
                 set_progress(json.dumps(dict(value=str(1),max=str(3),message='searching for results')))
                 debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
                 if os.path.isfile(debug_psa_run_results_fn):
@@ -453,6 +453,7 @@ def create_app(external_stylesheets = None) -> Dash:
         __name__,
         #suppress_callback_exceptions = True,
         title = 'NewSEGS Energy Model',
+        update_title = None,
         external_stylesheets = external_stylesheets,
         assets_url_path = assets_path,
         routing_callback_inputs = {

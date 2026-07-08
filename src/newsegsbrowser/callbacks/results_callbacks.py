@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from dash import ALL, Dash, Input, Output, State, no_update
 
@@ -204,6 +205,109 @@ def add_result_table_callbacks(app):
             store_configurations,
             app
         )
+    
+    # Update indicators above result section.
+    # The finance results tables should be the last thing fired after a model
+    # run, so using that as a trigger to check for status of the models is ok
+    @app.callback(
+        output = dict(
+            result_indicator_values = dict(
+                bars = Output(
+                    {'type': 'resize-handle', 'page': ALL},
+                    'className',
+                    allow_duplicate = True,
+                ),
+                tooltips = Output(
+                    {'type': 'result-tooltip', 'page': ALL},
+                    'children',
+                    allow_duplicate = True,
+                )
+            )
+        ),
+
+        inputs = dict(
+            results_update_trigger = Input(
+                {'type': 'result-statistics', 'supersection': 'finance-results',
+                'key': 'res-finance-so-benefits'},
+                'data'
+            )
+        ),
+
+        state = dict(
+            result_indicator_ids = dict(
+                bars = State(
+                    {'type': 'resize-handle', 'page': ALL},
+                    'id'
+                ),
+                tooltips = State(
+                    {'type': 'result-tooltip', 'page': ALL},
+                    'id'
+                ),
+            ),
+            configurations = State('store-configurations', 'data'),
+        ),
+        prevent_initial_call = True
+    )
+    def post_result_update_result_tooltip_model_conf(
+        results_update_trigger,
+        result_indicator_ids,
+        configurations,
+    ):
+        """
+        Update the model configuration result indicator header to show that the results are synced.
+        """
+        # print ('updating result header indicator')
+        rval: dict[str, Any] = dict(
+            result_indicator_values = dict(
+                bars = [no_update] * len(result_indicator_ids['bars']),
+                tooltips = [no_update] * len(result_indicator_ids['tooltips']),
+            )
+        )
+
+        if (
+            configurations is None 
+            or len(configurations) == 0
+            or results_update_trigger is None
+        ):
+            return rval
+        
+        model_conf_bar_idxs = [
+            i for i, x in enumerate(result_indicator_ids['bars']) 
+            if x['page'] in {'model_configuration'}
+        ]
+        model_conf_tooltip_idxs = [
+            i for i, x in enumerate(result_indicator_ids['tooltips']) 
+            if x['page'] in {'model_configuration'}
+        ]
+
+        if len(model_conf_bar_idxs) == len(model_conf_tooltip_idxs) == 0:
+            return rval
+        
+        n_dirty_models = 0
+        n_dirty_finances = 0
+        for conf in configurations:
+            conf_dict = json.loads(conf)
+            mm = app.metamodels[conf_dict['metamodel_id']]
+            n_dirty_models += int(mm.model.dirty)
+            n_dirty_finances += int(mm.finance.dirty)
+        
+        if n_dirty_models != 0:
+            for idx in model_conf_bar_idxs:
+                rval['result_indicator_values']['bars'][idx] = 'resize-handle resize-handle-warning'
+            for idx in model_conf_tooltip_idxs:
+                rval['result_indicator_values']['tooltips'][idx] = f'{n_dirty_models} models require running'
+        elif n_dirty_finances != 0:
+            for idx in model_conf_bar_idxs:
+                rval['result_indicator_values']['bars'][idx] = 'resize-handle resize-handle-warning'
+            for idx in model_conf_tooltip_idxs:
+                rval['result_indicator_values']['tooltips'][idx] = f'{n_dirty_finances} finances require running'
+        else:
+            for idx in model_conf_bar_idxs:
+                rval['result_indicator_values']['bars'][idx] = 'resize-handle resize-handle-ok'
+            for idx in model_conf_tooltip_idxs:
+                rval['result_indicator_values']['tooltips'][idx] = 'Results updated'
+        
+        return rval
 
     @app.callback(
         Output({'type': 'result-table-container', 'page': ALL, 'key': 'dsa-results-table'}, 'children'),

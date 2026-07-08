@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import copy
 import datetime
+import time
 from typing import cast, override, Any, Mapping, Sequence
 from functools import singledispatchmethod
 from functools import lru_cache
@@ -356,7 +357,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @override
     def run(self):
-        self.last_run = datetime.datetime.now()
+        self.last_run = time.time()
         self._generation_result = self._mod_gen.run(self._run_period)
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)

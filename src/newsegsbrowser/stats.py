@@ -442,9 +442,12 @@ def present_single_stat_per_row(
     variable_mapper: None|Callable|Mapping = None,
     statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER
 ) -> pd.DataFrame:
-    n_configs = len(data_list)
 
+    valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
     src_data = [as_df(x.get(table_name)) for x in data_list if x is not None]
+
+    if len(valid_config_indexes) == 0:
+        return pd.DataFrame()
 
     if isinstance(variable_names, str):
         variable_names = [variable_names]
@@ -470,11 +473,11 @@ def present_single_stat_per_row(
             )
         subtable = (
             subtable
-            .rename(columns = {'value': 'config-'+str(idx+1)})
+            .rename(columns = {'value': 'config-'+str(valid_config_indexes[idx]+1)})
         )
         return subtable
     
-    otbl = pd.concat([extract_from_table(i) for i in range(n_configs)], axis=1)
+    otbl = pd.concat([extract_from_table(i) for i in range(len(valid_config_indexes))], axis=1)
 
     variable_labels = _label_demap(variable_names, variable_mapper)
     statistic_labels = _label_demap(statistic_names, statistic_mapper)
