@@ -1,6 +1,7 @@
 """
 NewSEGS model as a multi-page app.
 """
+import time
 import copy
 import datetime
 import os
@@ -251,35 +252,68 @@ def add_caching_callbacks(app):
                 Output({'type': 'metamodel-process-cancel', 'target': ALL}, 'class_name'), 
                 'background-callback-cancel-button',
                 'background-callback-cancel-button background-callback-cancel-button-hidden'
-            )
+            ),
+            (
+                Output({'type': 'resize-handle', 'page': ALL}, 'style'),
+                {'display': 'none'},
+                {}
+            ),
+            (
+                Output({'type': 'progress-bar', 'page': ALL}, 'style'),
+                {},
+                {'display': 'none'},
+            ),
         ],
         cancel=Input('background_cancel_trigger', "data"),
-        # running = [
-        #     (Output({'type': 'background_callback_run_button', 'key': ALL}, 'disabled'), True, False),
-        #     (Output({'type': 'background_callback_cancel_button', 'key': ALL}, 'disabled'), False, True),
-        #     (
-        #         Output({'type':'progress_bar','key':ALL}, "style"),
-        #         {"visibility": "visible"},
-        #         {"visibility": "hidden"},
-        #     ),
-        # ],
-        
-        # progress=[Output('background_progress_tracker', 'data')],
-        # progress_default='{"value":"0","max":"1"}',
+        progress = [
+            Output('background_progress_tracker', 'data')
+        ],
+        progress_default = '{"value":"0", "max":"1", "message":"running"}',
     )
-    def run_metamodel_process(metamodel_process):
+    def run_metamodel_process(
+        set_progress,
+        metamodel_process
+    ):
         process_request = json.loads(metamodel_process)
         mm = metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
         
         # Do the process
         match process_request['type']:
-            case 'dsa-run-request':
+            case 'dsa_run_request':
                 debug_dsa_run_results_fn = os.path.join('.', 'temp_dsa_run_results.csv')
                 if os.path.isfile(debug_dsa_run_results_fn):
                     dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
                 else:
+                    t0 = time.time()
+                    def set_progression(value, max):
+                        tx = time.time()
+                        dt = tx - t0
+                        if value != 0:
+                            rate_ = dt / value
+                            expected_ = rate_ * max
+                            remaining_ = expected_ - dt
+                            if remaining_ > 3600:
+                                report_time = time.strftime('%H:%M:%S', time.gmtime(remaining_))
+                            elif remaining_ > 60:
+                                report_time = time.strftime('%M:%S', time.gmtime(remaining_))
+                            else:
+                                report_time = time.strftime('%S seconds', time.gmtime(remaining_))
+                            msg = f'{value} / {max} iterations; {report_time} remaining'
+                        else:
+                            msg = 'DSA running'
+
+                        set_progress(
+                            json.dumps(
+                                dict(
+                                    value = str(value),
+                                    max = str(max),
+                                    message = msg
+                                )
+                            )
+                        )
                     dsa_results = dsa.run_dsa(
-                        mm
+                        mm,
+                        progress = set_progression
                     ).set_index(['variable', 'bound'])
                     dsa_results.to_csv(debug_dsa_run_results_fn)
                 dsa_result_id = postprocess_utils.get_dsa_result_id(
@@ -292,23 +326,55 @@ def add_caching_callbacks(app):
 
                 # Not convinced this is necessary
                 #mm.dsa_result_id = dsa_result_id
-            case 'psa-run-request':
+            case 'psa_run_request':
+                set_progress(json.dumps(dict(value=str(1),max=str(3),message='searching for results')))
                 debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
                 if os.path.isfile(debug_psa_run_results_fn):
+                    set_progress(json.dumps(dict(value=str(2),max=str(3),message='loading results')))
                     psa_results = (
                         pd.read_csv(
                             debug_psa_run_results_fn
                         )
                     )
                 else:
+                    t0 = time.time()
+                    def set_progression(value, max):
+                        tx = time.time()
+                        dt = tx - t0
+                        if value != 0:
+                            rate_ = dt / value
+                            expected_ = rate_ * max
+                            remaining_ = expected_ - dt
+                            if remaining_ > 3600:
+                                report_time = time.strftime('%H:%M:%S', time.gmtime(remaining_))
+                            elif remaining_ > 60:
+                                report_time = time.strftime('%M:%S', time.gmtime(remaining_))
+                            else:
+                                report_time = time.strftime('%S seconds', time.gmtime(remaining_))
+                            msg = f'{value} / {max} iterations; {report_time} remaining'
+                        else:
+                            msg = 'PSA running'
+
+                        set_progress(
+                            json.dumps(
+                                dict(
+                                    value = str(value),
+                                    max = str(max),
+                                    message = msg
+                                )
+                            )
+                        )
+                        
                     psa_results = psa.run_psa(
                         mm,
                         samples = process_request.get('samples', 10),
                         return_draws = process_request.get('return_draws', False),
-                        seed = process_request.get('seed', None)
+                        seed = process_request.get('seed', None),
+                        progress = set_progression
                     )
                     psa_results.to_csv(debug_psa_run_results_fn)
 
+                set_progress(json.dumps(dict(value=str(3),max=str(3),message='syncing results')))
                 psa_result_id = postprocess_utils.get_psa_result_id(
                     postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
                     mm.id
@@ -331,29 +397,57 @@ def add_caching_callbacks(app):
 
     @app.callback(
         Output('background_cancel_trigger', 'data'),
+        Output({
+            'type': 'lock', 
+            'target': 'metamodel-process', 
+            'stage': 'dispatch', 
+            'key': 'process-in-use'
+        }, 'data', allow_duplicate = True),
 
         Input({'type': 'metamodel-process-cancel', 'target': ALL}, 'n_clicks'),
+        State({'type': 'background-callback-call', 'target': 'metamodel-process'}, 'data'),
         prevent_initial_call = True
     )
-    def set_cancel_trigger(n_clicks):
+    def set_cancel_trigger(
+        n_clicks,
+        metamodel_process_call
+    ):
         if n_clicks is None:
-            return no_update
+            return no_update, no_update
         logger.info('User has attempted to cancel metamodel process %s', datetime.datetime.now())
-        return time.time_ns()
+        call_ = json.loads(metamodel_process_call)
+        mm = app.metamodels[call_['metamodel_id']]
+        mm.checked_out = False
+        mm.model.checked_out = False
+        mm.finance.checked_out = False
+
+        return time.time_ns(), True
 
     @app.callback(
-        Output({'type':'progress_bar','key':ALL}, "value"), 
-        Output({'type':'progress_bar','key':ALL}, "max"),
+        Output({'type':'progress-bar', 'page': ALL}, "value"), 
+        Output({'type':'progress-bar', 'page': ALL}, "max"),
+        Output({'type': 'progress-tooltip', 'page': ALL}, 'children'), 
 
         Input('background_progress_tracker', 'data'),
-        State({'type':'progress_bar','key':ALL}, "id"),
+        State({'type': 'progress-bar', 'page': ALL}, "id"),
+        State({'type': 'progress-tooltip', 'page': ALL}, "id"),
         prevent_initial_call = True
     )
-    def set_progress_bars(progress, ids):
+    def set_progress_bars(
+        progress, 
+        progress_ids,
+        tooltip_ids,
+        ):
+        if len(progress_ids) == 0 and len(tooltip_ids) == 0:
+            return [], [], []
         if progress is None:
-            return [no_update] * len(ids)
+            return [no_update] * len(progress_ids), [no_update] * len(progress_ids), [no_update] * len(tooltip_ids)
         progress = json.loads(progress)
-        return ([progress['value']] * len(ids), [progress['max']] * len(ids))
+        return (
+            [str(progress['value'])] * len(progress_ids), 
+            [str(progress['max'])] * len(progress_ids),
+            [progress.get('message', no_update)] * len(tooltip_ids),
+        )
     
     return app
 
@@ -374,6 +468,7 @@ def create_app(external_stylesheets = None) -> Dash:
         __name__,
         #suppress_callback_exceptions = True,
         title = 'NewSEGS Energy Model',
+        update_title = None, # pyright: ignore[reportArgumentType]
         external_stylesheets = external_stylesheets,
         assets_url_path = assets_path,
         routing_callback_inputs = {

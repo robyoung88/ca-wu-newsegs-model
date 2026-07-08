@@ -1,7 +1,7 @@
 """
 Functions and classes for performing deterministic sensitivity analysis
 """
-from typing import Any, Literal, Sequence, cast
+from typing import Any, Callable, Literal, Sequence, cast
 from typing import get_args
 
 import pandas as pd
@@ -58,11 +58,20 @@ def _make_dsa_result(
     
 def run_dsa(
     mm: NewsegsMetaModel,
-    statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC)
+    statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC),
+    progress: Callable[[int, int], None] | None = None,
 ) -> pd.DataFrame:
     variables = mm.variables.values()
     mdl = mm.model
     fnc = mm.finance
+
+    n_calcs = 1
+    for v in variables:
+        if v.dsa_possible and v.dsa_selected:
+            n_calcs += 1
+    prog_i = 0
+    if progress is not None:
+        progress(prog_i, n_calcs)
 
     results = []
 
@@ -76,6 +85,9 @@ def run_dsa(
     results.append(
         _make_dsa_result('deterministic', 'central', '-', mdl, fnc, statistics)
     )
+    if progress is not None:
+        prog_i += 1
+        progress(prog_i, n_calcs)
 
     # Other results
     for v in variables:
@@ -99,6 +111,10 @@ def run_dsa(
                 v.dsa_focussed = False
                 v.update_model(mdl)
                 v.update_model(fnc)
+
+            if progress is not None:
+                prog_i += 1
+                progress(prog_i, n_calcs)
 
     for v in variables:
         v.dsa_active = False

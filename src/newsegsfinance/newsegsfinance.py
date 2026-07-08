@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import copy
 import datetime
+import time
 from typing import Any
 import uuid
 import re
@@ -30,7 +31,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
     
     _model: newsegsmodelinterface.NewsegsModelInterface
     
-    last_update = datetime.datetime.now()
+    last_update: float = 0.0
 
     _benefit_discount_rate: float = 0.
     _cost_discount_rate: float = 0.
@@ -503,7 +504,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         if val:
             #print('finance last_update set')
             #print(traceback.print_stack())
-            self.last_update = datetime.datetime.now()
+            self.last_update = time.time()
         self._dirty = val
 
     def __hash__(self):

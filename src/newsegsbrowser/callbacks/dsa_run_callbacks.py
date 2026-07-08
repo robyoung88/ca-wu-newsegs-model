@@ -28,12 +28,17 @@ def add_dsa_run_callbacks(app: Dash):
             return no_update
         selected_configuration = json.loads(selected_configuration)
         
+        request_ = browser.dsa_run_request(
+            metamodel_id = selected_configuration.get('metamodel_id'),
+            debounce = False
+        )
         prequeue_patch = Patch()
         prequeue_patch.append(
             json.dumps(
-                browser.dsa_run_request(selected_configuration.get('metamodel_id'))
+                request_.as_dict()
             )
         )
+        logger.info('Adding dsa request to prequeue-action-user: %s', request_)
 
         return prequeue_patch
     

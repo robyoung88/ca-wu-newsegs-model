@@ -46,6 +46,18 @@
     background: transparent;
 }
 
+.resize-handle-ok {
+    background-color: rgb(130, 253, 69);
+}
+
+.resize-handle-warning {
+    background-color: rgb(243, 178, 72);
+}
+
+.resize-handle-error {
+    background-color: rgb(230, 2, 51);
+}
+
 /* Make dcc.Loading parent transparent to flexbox */
 .drawer-loading-container {
     display: contents;
@@ -70,6 +82,7 @@
 .drawer-title {
     width: 100%;
     padding: 0 12px;
+    margin-top: 12px;
 }
 
 .main-content-pane {
@@ -138,7 +151,7 @@
     }
 
     .resize-handle {
-        display: none;
+        cursor: auto;
     }
 
     .drawer-content {

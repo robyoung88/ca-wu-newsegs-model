@@ -92,7 +92,7 @@ def create_dsa_layout(*args, **kwargs):
     results_section = [
         html.Div([
             dcc.Loading([
-                config_dict['layout_results_header'](),
+                config_dict['layout_results_header'](**kwargs),
             
                 html.Div([
                     dbc.Col(
@@ -145,9 +145,19 @@ def create_dsa_layout(*args, **kwargs):
 
             dbc.Button(
                 'Cancel DSA',
-                id = {'type': 'metamodel-process-cancel', 'target': 'dsa-run-request'},
+                id = {'type': 'metamodel-process-cancel', 'target': 'dsa_run_request'},
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
-            )
+            ),
+            html.Progress(
+                id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
+                className='resize-handle resize-handle-progress',
+                style = {'display': 'none'}
+            ),
+            dbc.Tooltip(
+                'PSA Running',
+                id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
+                target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
+            ),
 
         ],
         className = 'drawer-container',

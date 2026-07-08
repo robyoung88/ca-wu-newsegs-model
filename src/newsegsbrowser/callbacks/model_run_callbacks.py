@@ -7,6 +7,7 @@ Functions:
 import datetime
 import json
 import logging
+import time
 from typing import Any, cast
 
 from dash import ALL, NoUpdate, Patch, ctx, Dash, Input, no_update, Output, State, html
@@ -95,7 +96,7 @@ def add_model_run_callbacks(app: Dash):
                         queue_model_run.pop(i)
             queue_model_run += requests
 
-        nowtime = datetime.datetime.now().timestamp()
+        nowtime = time.time()
         
         #logger.info('%s models are in queue', len(queue_model_run))
         logger.info('current model run queue: %s', queue_model_run)
@@ -121,7 +122,7 @@ def add_model_run_callbacks(app: Dash):
             for i, request in enumerate(queue_model_run):
                 request_l = json.loads(request)
                 logger.info('checking if model %s should be run', request_l['model_id'])
-                if nowtime - request_l['time'] > RUN_DEBOUNCE_SECONDS:
+                if not(request_l['debounce']) or nowtime - request_l['time'] > RUN_DEBOUNCE_SECONDS:
                     mdl = app.models[request_l['model_id']]
                     if not mdl.checked_out:
                         logger.info('checking out model: %s', mdl.id)
@@ -167,7 +168,7 @@ def add_model_run_callbacks(app: Dash):
         """
         NUP = no_update
 
-        logger.info('dispatcher_model_run triggered at %s', datetime.datetime.now())
+        logger.info('dispatcher_model_run triggered at %s with payload %s', datetime.datetime.now(), dispatchitem_model_run)
 
         if dispatchitem_model_run is None:
             return NUP
@@ -307,7 +308,7 @@ def add_finance_run_callbacks(app: Dash):
                         queue_finance_run.pop(i)
             queue_finance_run += requests
         
-        nowtime = datetime.datetime.now().timestamp()
+        nowtime = time.time()
 
         #logger.info('%s finances are in queue', len(queue_finance_run))
         logger.info('current finance run queue: %s', queue_finance_run)
@@ -333,7 +334,7 @@ def add_finance_run_callbacks(app: Dash):
             for i, request in enumerate(queue_finance_run):
                 request_l = json.loads(request)
                 logger.info('checking if finance %s should be run', request_l['finance_id'])
-                if nowtime - request_l['time'] > FINANCE_DEBOUNCE_SECONDS:
+                if not(request_l['debounce']) or nowtime - request_l['time'] > FINANCE_DEBOUNCE_SECONDS:
                     # Cannot run if model is checked out
                     mdl = app.models[request_l['model_id']]
                     fnc = app.finances[request_l['finance_id']]
@@ -542,7 +543,7 @@ def add_finance_run_callbacks(app: Dash):
             for i, request in enumerate(queue_metamodel_process):
                 request_l = json.loads(request)
                 logger.info('checking if metamodel %s should be run', request_l['metamodel_id'])
-                if nowtime - request_l['time'] > METAMODEL_PROCESS_DEBOUNCE_SECONDS:
+                if not(request_l['debounce']) or nowtime - request_l['time'] > METAMODEL_PROCESS_DEBOUNCE_SECONDS:
                     mm_id = request_l['metamodel_id']
                     mm = app.metamodels[mm_id]
                     if not mm.model.checked_out and not mm.finance.checked_out and not mm.checked_out:
@@ -659,13 +660,13 @@ def add_finance_run_callbacks(app: Dash):
         # TODO: Handle failures of process
 
         match process_request['type']:
-            case 'dsa-run-request':
+            case 'dsa_run_request':
                 dsa_result_id = postprocess_utils.get_dsa_result_id(
                     postprocess_utils.RESULT_CACHE_PREFIXES['dsa_results'],
                     mm.id
                 )
                 app.results[dsa_result_id] = app.cache[dsa_result_id]
-            case 'psa-run-request':
+            case 'psa_run_request':
                 psa_result_id = postprocess_utils.get_psa_result_id(
                     postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
                     mm.id
@@ -698,13 +699,13 @@ def add_finance_run_callbacks(app: Dash):
         for process_str in trigger_postprocess_metamodel_process:
             process = json.loads(process_str)
             match process['type']:
-                case 'dsa-run-request':
+                case 'dsa_run_request':
                     for i, trigger_id in enumerate(trigger_ids):
                         if trigger_id['key'] == 'dsa-run-postprocess':
                             if isinstance(rval[i], NoUpdate):
                                 rval[i] = []
                             rval[i].append(process_str)
-                case 'psa-run-request':
+                case 'psa_run_request':
                     for i, trigger_id in enumerate(trigger_ids):
                         if trigger_id['key'] == 'psa-run-postprocess':
                             if isinstance(rval[i], NoUpdate):
@@ -779,13 +780,13 @@ def add_finance_run_callbacks(app: Dash):
                     mdl = app.models.get(config.get('model_id'))
                     if mdl is not None:
                         if mdl.dirty:
-                            
+                            action = browser.model_run_request(
+                                metamodel_id = config.get('metamodel_id'),
+                                model_id = config.get('model_id')
+                            )
                             prequeue.append(
                                 json.dumps(
-                                    browser.model_run_interface_action(
-                                        config.get('metamodel_id'),
-                                        config.get('model_id')
-                                    )
+                                    action.as_dict()
                                 )
                             )
         

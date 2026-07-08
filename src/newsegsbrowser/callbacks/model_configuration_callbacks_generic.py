@@ -75,18 +75,15 @@ def create_psa_input(
         raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
 
 def sync_config(
-    firstload_config_watcher,
-    store_selected_configuration,
-    store_configurations,
-
-    prequeue_lock_ids,
-    prequeue_lock_values,
-
-    input_containers,
+    firstload_config_watchers,
+    selected_configuration,
+    configurations,
+    prequeue_locks,
+    input_container_ids,
     generic_text_ids,
     trigger_ids,
     app,
-
+    
     create_default_model: Callable[[], NewsegsModel],
     create_default_finance: Callable[[], NewsegsFinance],
     create_default_variables: Callable[[], MutableSequence[variable.Variable]],
@@ -99,50 +96,51 @@ def sync_config(
     This is also fired on first load of model page, so is responsible for
     creation of the first metamodel / configuration.
     """
-    NUP = (
-        no_update, # store-selected-configurations
-        no_update, # store-configurations
+    rval: dict[str, Any] = dict(
+        selected_configuration = no_update,
+        configurations = no_update,
 
-        [no_update] * len(input_containers), # input-container children
-        [no_update] * len(generic_text_ids), # Generic text children
-        [no_update] * len(trigger_ids), # trigger data
-        no_update # prequeue-action-user patch
+        input_container_children = [no_update] * len(input_container_ids),
+        generic_text_children = [no_update] * len(generic_text_ids),
+        trigger_values = [no_update] * len(trigger_ids),
+
+        prequeue_action_user = no_update
     )
 
-    if store_selected_configuration is None:
-        if store_configurations is None or len(store_configurations) == 0:
+    if selected_configuration is None:
+        if configurations is None or len(configurations) == 0:
             # On first load, we can generate a random configuration
-            store_configurations = [
+            configurations = [
                 json.dumps(
                     newsegsmetamodel.NewsegsMetaModel.generate_new_config()
                 )
             ]
         
-        store_selected_configuration = json.loads(store_configurations[0])
-        store_selected_configuration['config_index'] = 0
+        selected_configuration = json.loads(configurations[0])
+        selected_configuration['config_index'] = 0
     else:
-        store_selected_configuration = json.loads(store_selected_configuration)
+        selected_configuration = json.loads(selected_configuration)
     
-    logger.info('Selected configuration is: %s', store_selected_configuration)
+    logger.info('Selected configuration is: %s', selected_configuration)
     
-    mdl = app.models.get(store_selected_configuration['model_id'])
+    mdl = app.models.get(selected_configuration['model_id'])
     if mdl is None:
         # TODO: Deal with if the model should exist.
         # Need to recreate it from the local store.
         mdl = create_default_model()
-        mdl.id = store_selected_configuration['model_id']
+        mdl.id = selected_configuration['model_id']
         app.models[mdl.id] = mdl
     
-    fnc = app.finances.get(store_selected_configuration['finance_id'])
+    fnc = app.finances.get(selected_configuration['finance_id'])
     if fnc is None:
         # TODO: Deal with if the finance should exist.
         # Need to recreate it from the local store.
         fnc = create_default_finance()
-        fnc.id = store_selected_configuration['finance_id']
+        fnc.id = selected_configuration['finance_id']
         fnc.set_model(mdl, False)
         app.finances[fnc.id] = fnc
 
-    mm = app.metamodels.get(store_selected_configuration['metamodel_id'])
+    mm = app.metamodels.get(selected_configuration['metamodel_id'])
     if mm is None:
         variables = create_default_variables()
         for v in variables:
@@ -153,14 +151,15 @@ def sync_config(
             fnc,
             variables
         )
-        mm.id = store_selected_configuration['metamodel_id']
+        mm.id = selected_configuration['metamodel_id']
         app.metamodels[mm.id] = mm
 
     inputs = []
     logger.info('Creating inputs for metamodel: %s', mm.id)
-    for ic in input_containers:
+    for ic in input_container_ids:
         cnts = []
         ss = ic.get('supersection')
+
         if ss == 'dsa':
             for var in mm.variables.values():
                 cnts.append(create_dsa_input(var))
@@ -205,25 +204,28 @@ def sync_config(
 
     if mdl.dirty:
         prequeue_patch = Patch()
-        if ok_run_model(prequeue_lock_ids, prequeue_lock_values):
+        if ok_run_model(prequeue_locks['ids'], prequeue_locks['values']):
+            action = browser.model_run_interface_action(metamodel_id = mm.id, model_id = mdl.id)
+            logger.info('Adding model_run_interface_action to prequeue_action_user: %s', action)
             prequeue_patch.append(
-                json.dumps(browser.model_run_interface_action(mm.id, mdl.id))
+                json.dumps(action.as_dict())
             )
     else:
         prequeue_patch = Patch()
+        action = browser.result_update_interface_action(metamodel_id = mm.id, debounce = False)
+        logger.info('Adding result_update_interface_action to prequeue_action_user: %s', action)
         prequeue_patch.append(
-            json.dumps(browser.result_update_interface_action(mm.id))
+            json.dumps(action.as_dict())
         )
 
-    return (
-        json.dumps(store_selected_configuration), # store-selected-configurations
-        store_configurations, # store-configurations
-
-        inputs,  # input-container children
-        text_values, # generic_text children
-        [datetime.datetime.now().timestamp()] * len(trigger_ids), # trigger data
-        prequeue_patch # prequeue-action-user patch
-    ) 
+    rval['selected_configuration'] = json.dumps(selected_configuration)
+    rval['configurations'] = configurations
+    rval['input_container_children'] = inputs
+    rval['generic_text_children'] = text_values
+    rval['trigger_values'] = [datetime.datetime.now().timestamp()] * len(trigger_ids)
+    rval['prequeue_action_user'] = prequeue_patch
+    
+    return rval
 
 def sync_loc_inputs_to_store(selected_configuration, app):
     if selected_configuration is None:
@@ -253,6 +255,9 @@ def update_dsa_boundsinputs(
     ]
 
     if dsa_input_change_trigger is None:
+        return tuple(rval)
+    
+    if len(bounds_container_ids) == 0 and len(dsa_input_element_ids) == 0:
         return tuple(rval)
     
     mm = None
