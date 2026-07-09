@@ -78,15 +78,15 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
 
 def background_callback_error_handler_factory(target):
     def error_handler(err: Exception):
-        print(err)
-        print(err.args)
         logger.error(str(err))
-        
-        last_call_ = err.args[0].split('\n')[-1]
-        if 'NoSuchProcess' in last_call_:
+        if 'PID not found' in str(err):
             set_props('background_callback_error_reporter', {'data': target})
         else:
-            raise(err)
+            last_call_ = err.args[0].split('\n')[-1]
+            if 'NoSuchProcess' in last_call_:
+                set_props('background_callback_error_reporter', {'data': target})
+            else:
+                raise(err)
     return error_handler
 
 def background_callback_error_handler_components():
