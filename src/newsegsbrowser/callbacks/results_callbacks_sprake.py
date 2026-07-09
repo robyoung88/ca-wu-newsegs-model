@@ -596,7 +596,7 @@ def sync_psa_results_table_to_store(
     
     otable = (
         tbl
-        .rename(psa.PSA_STATISTIC_NAMES)
+        .rename(psa.PSA_STATISTIC_LABELS)
         .reset_index(drop=False)
         .rename(columns={'index':'Statistic'})
     )
