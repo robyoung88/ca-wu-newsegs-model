@@ -28,9 +28,10 @@ PSA_FLOAT_STATISTIC = Literal[
 
 PSA_PLOT_TYPES = [
     'Scatter plot',
+    'Cumulative probability'
 ]
 
-PSA_STATISTIC_NAMES = {
+PSA_STATISTIC_LABELS = {
     'total_present_costs_undiscounted': 'Total cost (undisc.)',
     'total_present_costs_discounted': 'Total cost (disc.)',
     'total_present_benefits_undiscounted': 'Total benefits (undisc.)',
@@ -210,10 +211,31 @@ def basic_psa_stats(
 
     return all_res, prob_positive_npv
 
+##### Generic Graph functions #####
+
+class BoundingBox(NamedTuple):
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+
+
+def get_null_psa_data(statistics: Sequence[str]) -> pd.DataFrame:
+    stat_dict = {
+        x: [1, 1] for x in statistics
+    }
+    stat_dict['deterministic'] = [True, False]
+    return pd.DataFrame.from_dict(
+            stat_dict
+        )
+
+##### Scatter ######
+
 class PSAScatterData(NamedTuple):
     scatter_data: pd.DataFrame
     det_point: pd.Series
     ce_proportion: float
+
 
 def psa_scatter_data(
     psa_data: pd.DataFrame,
@@ -225,7 +247,7 @@ def psa_scatter_data(
         .query('deterministic == False')
         .loc[:, [cost_statistic, benefit_statistic]]
         .assign(
-            cost_effective=lambda df: (df[benefit_statistic] > df[cost_statistic]).map({True: 'CE', False: 'Not CE'})
+            cost_effective = lambda df: (df[benefit_statistic] > df[cost_statistic]).map({True: 'CE', False: 'Not CE'})
         )
     )
 
@@ -239,8 +261,6 @@ def psa_scatter_data(
     ce_proportion = scatter_data['cost_effective'].eq('CE').mean()
 
     return PSAScatterData(scatter_data, det_point, ce_proportion)
-
-BoundingBox = namedtuple('BoundingBox', ['xmin', 'ymin', 'xmax', 'ymax'])
 
 def psa_scatter_bounds(scatter_data: pd.DataFrame) -> BoundingBox:
     all_max = float(scatter_data.iloc[:,0:2].max(axis=None)) # pyright: ignore[reportArgumentType]
@@ -273,13 +293,8 @@ def psa_scatter(
     show_proportion_ce: bool = True,
 ):
     if psa_data is None:
-        psa_data = pd.DataFrame.from_dict(
-            {
-                cost_statistic: [1, 1],
-                benefit_statistic: [1, 1],
-                'deterministic': [True, False],
-            }
-        )
+        psa_data = get_null_psa_data([cost_statistic, benefit_statistic])
+
     plot_data = psa_scatter_data(psa_data, cost_statistic, benefit_statistic)
 
     bb = psa_scatter_bounds(plot_data.scatter_data)
@@ -322,13 +337,13 @@ def psa_scatter(
 
     # Formatting - axes
     fig.update_xaxes(
-        title=PSA_STATISTIC_NAMES.get(cost_statistic, cost_statistic),
+        title=PSA_STATISTIC_LABELS.get(cost_statistic, cost_statistic),
         range=[bb.xmin, bb.xmax],
         scaleanchor='y',
         scaleratio=1,
     )
     fig.update_yaxes(
-        title=PSA_STATISTIC_NAMES.get(benefit_statistic, benefit_statistic),
+        title=PSA_STATISTIC_LABELS.get(benefit_statistic, benefit_statistic),
         range=[bb.ymin, bb.ymax],
     )
 
@@ -410,9 +425,9 @@ def psa_scatter_update(
 
     # Axes
     fig_patch['layout']['xaxis']['range'] = [bb.xmin, bb.xmax]
-    fig_patch['layout']['xaxis']['title']['text'] = PSA_STATISTIC_NAMES.get(cost_statistic, cost_statistic)
+    fig_patch['layout']['xaxis']['title']['text'] = PSA_STATISTIC_LABELS.get(cost_statistic, cost_statistic)
     fig_patch['layout']['yaxis']['range'] = [bb.ymin, bb.ymax]
-    fig_patch['layout']['yaxis']['title']['text'] = PSA_STATISTIC_NAMES.get(benefit_statistic, benefit_statistic)
+    fig_patch['layout']['yaxis']['title']['text'] = PSA_STATISTIC_LABELS.get(benefit_statistic, benefit_statistic)
 
     # Annotation
     if show_proportion_ce:
@@ -457,11 +472,216 @@ def psa_scatter_arguments(plot_controls):
             raise ValueError(f'Discounting type not recognised: {discounting}')
     return rval
 
+###### CDF #####
+
+class PSACDFData(NamedTuple):
+    cdf_data: pd.DataFrame
+    det_value: float
+    min: float
+    max: float
+
+
+def psa_cdf_data(
+    psa_data: pd.DataFrame,
+    statistic: str
+) -> PSACDFData:
+    cdf_data = (
+        psa_data
+        .query('deterministic == False')
+        .loc[:, [statistic,]]
+        .sort_values(statistic)
+        .reset_index(drop = True)
+        .assign(
+            cdf = lambda df: df[statistic].index / max(1, df[statistic].count())
+        )
+    )
+
+    det_value = (
+        psa_data
+        .query('deterministic == True')
+        .loc[:, statistic]
+        .iloc[0]
+    )
+
+    return PSACDFData(
+        cdf_data,
+        det_value,
+        cdf_data[statistic].iloc[0],
+        cdf_data[statistic].iloc[-1]
+    )
+
+def psa_cdf_bounds(cdf_data: PSACDFData) -> BoundingBox:
+    min_x = cdf_data.min
+    max_x = cdf_data.max
+    
+    if min_x == max_x:
+        padding = abs(min_x) * 0.1 if min_x != 0 else 1.
+        min_x -= padding
+        max_x += padding
+    
+    span = max_x - min_x
+    padding = max(span * 0.1, abs(max_x) * 0.05, abs(min_x) * 0.05, 1e-8)
+    lower = min_x - padding
+    upper = max_x + padding
+    
+    return BoundingBox(xmin=lower, ymin=0., xmax=upper, ymax=1.)
+
+def psa_cdf(
+    psa_data: pd.DataFrame | None,
+    statistic: str = 'net_present_value_discounted'
+):
+    if psa_data is None:
+        psa_data = get_null_psa_data([statistic,])
+    
+    cdf_data = psa_cdf_data(psa_data, statistic)
+    bb = psa_cdf_bounds(cdf_data)
+
+    fig = px.line(
+        cdf_data.cdf_data,
+        x = statistic,
+        y = 'cdf'
+    )
+
+    fig.add_shape(
+        type = 'line',
+        x0 = cdf_data.det_value,
+        y0 = -0.1,
+        x1 = cdf_data.det_value,
+        y1 = 1.1,
+        line = dict(color='gray', dash='dash'),
+        xref = 'x',
+        yref = 'y',
+    )
+
+    fig.add_annotation(
+        text = f'{cdf_data.min:,.2f}',
+        xref = 'x',
+        yref = 'y',
+        axref = 'x',
+        x = cdf_data.min,
+        ax = cdf_data.min + 0.05 * (bb.xmax-bb.xmin),
+        y = 0.0,
+        showarrow = True,
+        bgcolor='rgba(255, 255, 255, 0.8)',
+        bordercolor='black',
+        borderwidth=1
+    )
+
+    fig.add_annotation(
+        text = f'{cdf_data.max:,.2f}',
+        xref = 'x',
+        yref = 'y',
+        axref = 'x',
+        ayref = 'y',
+        x = cdf_data.max,
+        ax = cdf_data.max - 0.05 * (bb.xmax-bb.xmin),
+        y = 1.,
+        ay = 0.9,
+        showarrow = True,
+        bgcolor='rgba(255, 255, 255, 0.8)',
+        bordercolor='black',
+        borderwidth=1
+    )
+
+    # Formatting - axes
+    fig.update_xaxes(
+        title=PSA_STATISTIC_LABELS.get(statistic, statistic),
+        range=[bb.xmin, bb.xmax],
+    )
+    fig.update_yaxes(
+        title = 'Cumulative probability',
+        range = [bb.ymin, bb.ymax],
+    )
+
+    return fig
+
+def psa_cdf_update(
+    psa_data: pd.DataFrame | None,
+    statistic: str = 'net_present_value_discounted',
+):
+    fig_patch = Patch()
+
+    if psa_data is None:
+        # Clear cdf
+        fig_patch['data'][0]['x'] = []
+        fig_patch['data'][0]['y'] = []
+
+        # Don't touch deterministic reference line
+        
+        # Clear annotations
+        fig_patch['layout']['annotations'][0]['text'] = ''
+        fig_patch['layout']['annotations'][1]['text'] = ''
+
+        return fig_patch
+    
+    cdf_data = psa_cdf_data(psa_data, statistic)
+    bb = psa_cdf_bounds(cdf_data)
+
+    # CDF data
+    fig_patch['data'][0]['x'] = cdf_data.cdf_data.loc[:, statistic]
+    fig_patch['data'][0]['y'] = cdf_data.cdf_data.loc[:, 'cdf']
+
+    # Deterministic reference
+    fig_patch['layout']['shapes'][0].update({
+        'x0': cdf_data.det_value,
+        'x1': cdf_data.det_value
+    })
+
+    # Annotations
+    fig_patch['layout']['annotations'][0].update({
+        'text': f'{cdf_data.min:,.2f}',
+        'x': cdf_data.min,
+        'ax': cdf_data.min + 0.05 * (bb.xmax-bb.xmin), 
+    })
+
+    fig_patch['layout']['annotations'][1].update({
+        'text': f'{cdf_data.max:,.2f}',
+        'x': cdf_data.max,
+        'ax': cdf_data.max - 0.05 * (bb.xmax-bb.xmin), 
+    })
+
+    # Axes
+    fig_patch['layout']['xaxis']['range'] = [bb.xmin, bb.xmax]
+    fig_patch['layout']['xaxis']['title']['text'] = PSA_STATISTIC_LABELS.get(statistic, statistic)
+
+    return fig_patch
+
+def psa_cdf_controls(page: str):
+    return [
+        html.Div(
+            id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-Cumulative probability-ii'},
+            style = {'display': 'none'}
+        ),
+        dcc.Dropdown(
+            options = [
+                {'label': v, 'value': k} for k, v in PSA_STATISTIC_LABELS.items()
+            ],
+            value = list(PSA_STATISTIC_LABELS.keys())[0],
+            id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-statistic-dropdown'},
+            searchable = False,
+            clearable = False
+        ),
+    ]
+
+def psa_cdf_arguments(plot_controls):
+    statistic = 'net_present_value_discounted'
+    for idx, id in enumerate(plot_controls['ids']):
+        if id.get('key') == 'psa-primary-plot-statistic-dropdown':
+            statistic = plot_controls['values'][idx]
+    rval = dict(statistic = statistic)
+    return rval
+
 psa_plots = {
     'Scatter plot': {
         'draw': psa_scatter,
         'update': psa_scatter_update,
         'controls': psa_scatter_controls,
         'arguments': psa_scatter_arguments,
+    },
+    'Cumulative probability': {
+        'draw': psa_cdf,
+        'update': psa_cdf_update,
+        'controls': psa_cdf_controls,
+        'arguments': psa_cdf_arguments,
     }
 }
