@@ -45,11 +45,7 @@ def create_results_header(**kwargs):
                                     }
                                 )
                             ],
-                            style={
-                                'display': 'inline-block',
-                                'width':'33%',
-                                'float': 'left'
-                            }
+                            className = 'results-title-block'
                         ),
                         html.Span([
                             dbc.Button(
@@ -63,7 +59,7 @@ def create_results_header(**kwargs):
                             )
                         ],
                         id = 'config-selector-hdrcontainer',
-                        className = 'configuration-selector-container'
+                        className = 'configuration-selector-hdrcontainer'
                         ),
 
                         html.Span([
@@ -85,15 +81,9 @@ def create_results_header(**kwargs):
                                             id='annual-horizon-toggle'),
                             html.H5('To horizon',style={'display': 'inline-block', 'verticalAlign': 'middle'})
                         ],
-                        style={
-                            'display': 'inline-block',
-                            'width':'33%',
-                            'float': 'right',
-                            "justifyContent": "flex-end",
-                            "alignItems": "center",
-                            'textAlign': 'right'
-                        },
-                        id='annual-horizon-toggle-container'
+                        id = 'annual-horizon-toggle-container',
+                        className = 'annual-horizon-toggle-hdrcontainer'
+
                         ),
                     ]),
                     dbc.Row(

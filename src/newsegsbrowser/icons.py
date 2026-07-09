@@ -74,8 +74,17 @@ DEFAULT_ICONS = {
     'nav-build-arch-config': 'bi bi-houses',
     'autorun-true': 'bi bi-play-circle-fill',
     'autorun-false': 'bi bi-stop-circle',
-
 }
+
+ICON_COLOUR_CLASSES = [
+    'text-primary',
+    'text-success',
+    'text-danger',
+    'text-warning',
+    'text-info',
+    'text-dark',
+    'text-secondary'
+]
 
 @overload
 def get_icon(

@@ -636,6 +636,7 @@ def create_app(external_stylesheets = None) -> Dash:
         #variables = copy.deepcopy(list(ref.variables.values()))
         variables = copy.deepcopy(list(ref.variables.values()))
         dup_mm = NewsegsMetaModel(dup_mdl, dup_fnc, variables)
+        dup_mm.name = ref.name
 
         metamodels[dup_mm.id] = dup_mm
         

@@ -5,7 +5,7 @@ import logging
 from typing import Any, Callable, MutableSequence, cast
 import uuid
 
-from dash import Patch, html, no_update
+from dash import Patch, html, no_update, set_props
 import dash_bootstrap_components as dbc
 
 from newsegsbrowser import icons
@@ -153,6 +153,10 @@ def sync_config(
         )
         mm.id = selected_configuration['metamodel_id']
         app.metamodels[mm.id] = mm
+        # In the instance of creating a metamodel from scratch, need to update 
+        # its name in input fields
+        config_index = selected_configuration.get('config_index', 0)
+        set_props({'type':'config-name-input', 'index': config_index}, {'value': mm.name})
 
     inputs = []
     logger.info('Creating inputs for metamodel: %s', mm.id)

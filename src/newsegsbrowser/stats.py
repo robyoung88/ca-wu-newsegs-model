@@ -399,7 +399,7 @@ def present_single_scalar(
     none_str = '-'
 ) -> pd.DataFrame:
     
-    src_data = [x.get(value_name) for x in data_list]
+    src_data = [x.get(value_name) if x is not None else None for x in data_list]
 
     odata = {f'config-{i+1}': [fmt.format(x)] if x is not None else [none_str] for i,x in enumerate(src_data)}
     odata['variable'] = [variable_label]
@@ -420,8 +420,8 @@ def present_paired_scalars(
     fmt='{:,.2f} ({:,.1%})',
     none_str = '-'
 ) -> pd.DataFrame:
-    src_data_1 = [x.get(value1_name) for x in data_list]
-    src_data_2 = [x.get(value2_name) for x in data_list]
+    src_data_1 = [x.get(value1_name) if x is not None else None for x in data_list]
+    src_data_2 = [x.get(value2_name) if x is not None else None for x in data_list]
     odata = {f'config-{i+1}': [fmt.format(src_data_1[i], src_data_2[i])] if src_data_1[i] is not None else [none_str] for i,_ in enumerate(src_data_1)}
 
     odata['variable'] = [variable_label]
