@@ -380,5 +380,113 @@ def add_result_table_callbacks(app):
             selected_conf,
             app
         )
+    
+    @app.callback(
+        output = {
+            'plot_header' : {
+                'children': Output(
+                    {'type': 'plot-header-container', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'children'
+                )
+            },
+            'plot': {
+                'figures' : Output(
+                    {'type': 'plot', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'figure'
+                )
+            },
+            'plot_container': {
+                'children' : Output(
+                    {'type': 'plot-container', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'children'
+                )
+            }
+        },
+
+        inputs = {
+            'psa_table': {
+                'trigger': Input(
+                    {'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'},
+                    'data'
+                ),
+            },
+            'graph_selection_dropdown': {
+                'values': Input(
+                    {'type': 'psa-graph-selection-dropdown', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'value'
+                ),
+                'ids': State(
+                    {'type': 'psa-graph-selection-dropdown', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'id'
+                )
+            },
+            'plot_controls': {
+                'values': Input(
+                    {'type': 'psa-graph-plot-control', 'page': ALL, 'key': ALL},
+                    'value'
+                ),
+                'ids': State(
+                    {'type': 'psa-graph-plot-control', 'page': ALL, 'key': ALL},
+                    'id'
+                ),
+            }
+        },
+
+        state = {
+            'plot_header': {
+                'ids': State(
+                    {'type': 'plot-header-container', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'id'
+                )
+            },
+            'plot': {
+                'ids' : State(
+                    {'type': 'plot', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'id'
+                )
+            },
+            'plot_container': {
+                'ids' : State(
+                    {'type': 'plot-container', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'id'
+                )
+            },
+            'selected_configuration': {
+                'value': State('store-selected-configuration', 'data')
+            },
+            'selected_model': {
+                'value': State('selected-model', 'data')
+            }
+        },
+
+        prevent_initial_call = True
+    )
+    def sync_psa_primary_plot_to_store(
+        psa_table,
+        graph_selection_dropdown,
+        plot_controls,
+        plot_header,
+        plot,
+        plot_container,
+        selected_configuration,
+        selected_model,
+    ):
+        null_return = dict(
+            plot_header = dict(children = [no_update] * len(plot_header['ids'])),
+            plot = dict(figures = [no_update] * len(plot['ids'])),
+            plot_container = dict(children = [no_update] * len(plot_container['ids'])),
+        )
+
+        return callbacks_map.CALLBACKS_MAP[selected_model['value']]['sync_psa_primary_plot_to_store'](
+            psa_table,
+            graph_selection_dropdown,
+            plot_controls,
+            plot_header,
+            plot,
+            plot_container,
+            selected_configuration,
+            app,
+            null_return,
+        )
 
     return app

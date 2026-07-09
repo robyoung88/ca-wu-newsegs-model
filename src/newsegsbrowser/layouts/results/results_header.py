@@ -215,17 +215,7 @@ def create_results_header_psa(**kwargs):
                             }
                         )
                     ]),
-                    dbc.Row([
-                        dcc.Dropdown(
-                            options = [
-                                {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
-                            ],
-                            value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0], # TODO: make a bespoke list
-                            id = {'type': 'psa-results-statistic-dropdown', 'page': kwargs.get('page-type', 'None')},
-                            searchable = False,
-                            clearable = False,
-                        )
-                    ])
+                    
                 ]),
             className = 'drawer-title',
             )
