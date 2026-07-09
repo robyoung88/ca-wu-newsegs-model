@@ -134,7 +134,7 @@ def create_results_header_dsa(**kwargs):
                             dbc.Button(
                                 'Run DSA',
                                 color = 'primary',
-                                id = {'type': 'dsa-run-button', 'page': kwargs.get('page-type', 'None')},
+                                id = {'type': 'dsa-prerun-button', 'page': kwargs.get('page-type', 'None')},
                                 disabled = False,
                                 style = {
                                     'display': 'inline',

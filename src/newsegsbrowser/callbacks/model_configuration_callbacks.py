@@ -84,6 +84,9 @@ def add_model_to_interface_callbacks(app: Dash):
                 'data', 
                 allow_duplicate = True
             ),
+            config_name_inputs = dict(
+                values = Output({'type':'config-name-input', 'index': ALL}, 'value')
+            ),
 
             prequeue_action_user = Output('prequeue-action-user', 'data', allow_duplicate = True),
         ),
@@ -125,6 +128,11 @@ def add_model_to_interface_callbacks(app: Dash):
                 'id'
             ),
 
+            config_name_inputs = dict(
+                ids = State({'type':'config-name-input', 'index': ALL}, 'id'),
+                values = State({'type':'config-name-input', 'index': ALL}, 'value'),
+            ),
+
             selected_model = State('selected-model', 'data'),
         ),
         prevent_initial_call=True
@@ -137,6 +145,7 @@ def add_model_to_interface_callbacks(app: Dash):
         input_container_ids,
         generic_text_ids,
         trigger_ids,
+        config_name_inputs,
         selected_model,
     ):
         logger.info('sync_config triggered by %s', ctx.triggered_id)
@@ -148,6 +157,7 @@ def add_model_to_interface_callbacks(app: Dash):
             input_container_ids,
             generic_text_ids,
             trigger_ids,
+            config_name_inputs,
             app
         )
     
@@ -168,7 +178,6 @@ def add_model_to_interface_callbacks(app: Dash):
             selected_configuration,
             app
         )
-    
     
     @app.callback(
         Output({'type':'dsa-bounds-inputcontainer', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'children'),

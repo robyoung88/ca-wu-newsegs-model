@@ -246,7 +246,6 @@ sync_config = partial(
     create_default_model = model_creation_sprake.create_default_model,
     create_default_finance = model_creation_sprake.create_default_finance,
     create_default_variables = model_creation_sprake.create_default_variables,
-    model_and_finance_to_interface_function = sprake_model_finance_to_interface_configs,
 )
 
 def _get_val(mm, key) -> int | float:

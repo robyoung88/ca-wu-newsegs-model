@@ -82,13 +82,12 @@ def sync_config(
     input_container_ids,
     generic_text_ids,
     trigger_ids,
+    config_name_inputs,
     app,
     
     create_default_model: Callable[[], NewsegsModel],
     create_default_finance: Callable[[], NewsegsFinance],
     create_default_variables: Callable[[], MutableSequence[variable.Variable]],
-    
-    model_and_finance_to_interface_function
 ):
     """
     Take values from model/finance and push to interface.
@@ -103,6 +102,7 @@ def sync_config(
         input_container_children = [no_update] * len(input_container_ids),
         generic_text_children = [no_update] * len(generic_text_ids),
         trigger_values = [no_update] * len(trigger_ids),
+        config_name_inputs = dict(values=[no_update]*len(config_name_inputs['ids'])),
 
         prequeue_action_user = no_update
     )
@@ -153,10 +153,10 @@ def sync_config(
         )
         mm.id = selected_configuration['metamodel_id']
         app.metamodels[mm.id] = mm
-        # In the instance of creating a metamodel from scratch, need to update 
-        # its name in input fields
-        config_index = selected_configuration.get('config_index', 0)
-        set_props({'type':'config-name-input', 'index': config_index}, {'value': mm.name})
+        for idx, id in enumerate(config_name_inputs['ids']):
+            if id.get('index') == selected_configuration['config_index']:
+                if config_name_inputs['values'][idx] != mm.name:
+                    rval['config_name_inputs']['values'][idx] = mm.name
 
     inputs = []
     logger.info('Creating inputs for metamodel: %s', mm.id)
