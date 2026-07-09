@@ -28,7 +28,8 @@ PSA_FLOAT_STATISTIC = Literal[
 
 PSA_PLOT_TYPES = [
     'Scatter plot',
-    'Cumulative probability'
+    'Cumulative probability',
+    'Convergence'
 ]
 
 PSA_STATISTIC_LABELS = {
@@ -39,6 +40,35 @@ PSA_STATISTIC_LABELS = {
     'net_present_value_undiscounted': 'NPV (undisc.)',
     'net_present_value_discounted': 'NPV (disc.)'
 }
+
+_CONVERGENCE_STATISTICS = Literal[
+    'Mean',
+    'Variance',
+    'Median',
+    'First Decile',
+    'First Quartile',
+    'Third Quartile',
+    'Ninth Decile'
+]
+
+CONVERGENCE_STATISTICS = get_args(_CONVERGENCE_STATISTICS)
+
+def quantile_stderr_cum(
+    x,
+    p: float = 0.5,
+    bw: float | None = None
+):
+    # https://github.com/kbroman/broman/blob/main/R/quantileSE.R
+    from scipy.stats import gaussian_kde
+    quant = np.quantile(x, p)
+    R = np.sqrt(p * (1. - p) / (np.arange(len(x))+1))
+    if bw is None:
+        pdf_ = gaussian_kde(x)
+        f = pdf_.pdf(quant)
+    else:
+        pdf_ = gaussian_kde(x, bw_method = bw)
+        f = pdf_.pdf(quant)
+    return R / f
 
 def _psa_float_statistic_mapper(
     stat: PSA_FLOAT_STATISTIC,
@@ -671,6 +701,319 @@ def psa_cdf_arguments(plot_controls):
     rval = dict(statistic = statistic)
     return rval
 
+##### Convergence #####
+
+class PSAConvergenceData(NamedTuple):
+    stat_data: pd.DataFrame
+    final_stat: float
+
+def psa_convergence_data(
+    psa_data: pd.DataFrame,
+    statistic: str,
+    convergence_statistic: _CONVERGENCE_STATISTICS
+):
+    raw_frame = (
+        psa_data
+        .query('deterministic == False')
+        .loc[:, ['draw', statistic]]
+    )
+
+    match convergence_statistic:
+        case 'Mean':
+            final_stat = raw_frame[statistic].mean()
+            sample_std = raw_frame[statistic].std()
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().mean(),
+                    stderr = lambda df: sample_std / np.sqrt(df['draw'])
+                )
+            )
+        case 'Variance':
+            final_stat = raw_frame[statistic].var()
+            # Assume that we have convergence and Normally distributed so SE can
+            # be estimated using s^2 as sigma^2
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().var(),
+                    stderr = lambda df: np.sqrt((2. * final_stat**2) / df['draw'])
+                )
+            )
+        case 'Median':
+            final_stat = raw_frame[statistic].median()
+            # https://search.r-project.org/CRAN/refmans/wrappedtools/html/se_median.html
+            # https://github.com/abusjahn/wrappedtools/blob/main/R/descriptives.R
+            from scipy.stats import median_abs_deviation
+            mad = median_abs_deviation(raw_frame[statistic])
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().median(),
+                    stderr = lambda df: mad / np.sqrt(df['draw'])
+                )
+            )
+        case 'First Decile':
+            q = 0.1
+            final_stat = raw_frame[statistic].quantile(q)
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().quantile(q),
+                    stderr = lambda df: quantile_stderr_cum(df[statistic], q)
+                )
+            )
+        case 'First Quartile':
+            q = 0.25
+            final_stat = raw_frame[statistic].quantile(q)
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().quantile(q),
+                    stderr = lambda df: quantile_stderr_cum(df[statistic], q)
+                )
+            )
+        case 'Third Quartile':
+            q = 0.75
+            final_stat = raw_frame[statistic].quantile(q)
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().quantile(q),
+                    stderr = lambda df: quantile_stderr_cum(df[statistic], q)
+                )
+            )
+        case 'Ninth Decile':
+            q = 0.9
+            final_stat = raw_frame[statistic].quantile(q)
+            stat_data = (
+                raw_frame
+                .assign(
+                    cumstat = lambda df: df[statistic].expanding().quantile(q),
+                    stderr = lambda df: quantile_stderr_cum(df[statistic], q)
+                )
+            )
+        case _:
+            raise ValueError(f'convergence_statistic not recognised: {convergence_statistic}')
+    
+    stat_data = (
+        stat_data
+        .assign(
+            lower_bound = lambda df: final_stat - 2.0 * df['stderr'],
+            upper_bound = lambda df: final_stat + 2.0 * df['stderr']
+        )
+    )
+
+    return PSAConvergenceData(
+        stat_data,
+        final_stat
+    )
+
+def psa_convergence_bounds(con_data: PSAConvergenceData):
+    min_x = con_data.stat_data['draw'].iloc[0]
+    max_x = con_data.stat_data['draw'].iloc[-1]
+
+    if min_x == max_x:
+        min_x -= 0.25
+        max_x += 0.25
+    
+    span = max_x - min_x
+    padding_x = max(span * 0.1, abs(max_x) * 0.05, abs(min_x) * 0.05, 1e-8)
+    lower_x = min_x - padding_x
+    upper_x = max_x + padding_x
+
+    # drop infinite values when computing y-bounds
+    cum = con_data.stat_data['cumstat']
+    finite_mask = np.isfinite(cum)
+    if finite_mask.any():
+        min_y = cum[finite_mask].min(skipna=True)
+        max_y = cum[finite_mask].max(skipna=True)
+    else:
+        # fallback to original behaviour (will produce nan if all missing)
+        min_y = cum.min(skipna=True)
+        max_y = cum.max(skipna=True)
+
+    if not np.isfinite(min_y):
+        min_y = 0.
+    if not np.isfinite(max_y):
+        max_y = max(min_y, 1.)
+    
+    if min_y == max_y:
+        padding = abs(min_y) * 0.1 if min_y != 0 else 0.25
+        min_y -= padding
+        max_y += padding
+    
+    span = max_y - min_y
+    padding_y = max(span * 0.1, abs(max_y) * 0.05, abs(min_y) * 0.05, 1e-8)
+    lower_y = min_y - padding_y
+    upper_y = max_y + padding_y
+    return BoundingBox(lower_x, lower_y, upper_x, upper_y)
+
+def psa_convergence(
+    psa_data: pd.DataFrame | None,
+    statistic: str = 'total_present_costs_discounted',
+    convergence_statistic: _CONVERGENCE_STATISTICS = 'Mean'
+):
+    if psa_data is None:
+        psa_data = get_null_psa_data([statistic])
+
+    con_data = psa_convergence_data(psa_data, statistic, convergence_statistic)
+    bb = psa_convergence_bounds(con_data)
+
+    fig = px.line(
+        con_data.stat_data,
+        x = 'draw',
+        y = 'cumstat'
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x = [0, con_data.stat_data['draw'].iloc[-1]*1.1],
+            y = [con_data.final_stat, con_data.final_stat],
+            mode = 'lines',
+            line = dict(color='orange', dash='dash'),
+            name = 'Final statistic'
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x = con_data.stat_data['draw'],
+            y = con_data.stat_data['lower_bound'],
+            mode = 'lines',
+            line = dict(color='gray', dash='dash'),
+            name = '2 * estimated SE'
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x = con_data.stat_data['draw'],
+            y = con_data.stat_data['upper_bound'],
+            mode = 'lines',
+            line = dict(color='gray', dash='dash'),
+            name = '2 * estimated SE',
+            showlegend = False
+        )
+    )
+
+    if (con_data.final_stat - bb.ymin) > 0.5 * (bb.ymax - bb.ymin):
+        fig.update_layout(
+            legend=dict(
+                x=0.99,
+                y=0.15,
+                xanchor='right',
+                yanchor='top'
+            )
+        )
+    else:
+        fig.update_layout(
+            legend=dict(
+                x=0.99,
+                y=0.95,
+                xanchor='right',
+                yanchor='top'
+            )
+        )
+
+    # Formatting - axes
+    fig.update_xaxes(
+        title = 'Draw',
+        range=[bb.xmin, bb.xmax],
+    )
+    fig.update_yaxes(
+        title= f'{PSA_STATISTIC_LABELS.get(statistic, statistic)} - {convergence_statistic}',
+        range = [bb.ymin, bb.ymax],
+    )
+
+    return fig
+
+def psa_convergence_update(
+    psa_data: pd.DataFrame | None,
+    statistic: str = 'total_present_costs_discounted',
+    convergence_statistic: _CONVERGENCE_STATISTICS = 'Mean'
+):
+    fig_patch = Patch()
+
+    if psa_data is None:
+        # Clear convergence trace, final value, and bounds
+        for data_idx in range(4):
+            fig_patch['data'][data_idx]['x'] = []
+            fig_patch['data'][data_idx]['y'] = []
+        
+        return fig_patch
+    
+    con_data = psa_convergence_data(psa_data, statistic, convergence_statistic)
+    bb = psa_convergence_bounds(con_data)
+
+    # Convergence
+    data_idx = 0
+    fig_patch['data'][data_idx]['x'] = con_data.stat_data['draw']
+    fig_patch['data'][data_idx]['y'] = con_data.stat_data['cumstat']
+
+    # Final value
+    data_idx += 1
+    fig_patch['data'][data_idx]['x'] = [0, con_data.stat_data['draw'].iloc[-1]*1.1]
+    fig_patch['data'][data_idx]['y'] = [con_data.final_stat, con_data.final_stat]
+
+    # Lower bound
+    data_idx += 1
+    fig_patch['data'][data_idx]['x'] = con_data.stat_data['draw']
+    fig_patch['data'][data_idx]['y'] = con_data.stat_data['lower_bound']
+
+    # Upper bound
+    data_idx += 1
+    fig_patch['data'][data_idx]['x'] = con_data.stat_data['draw']
+    fig_patch['data'][data_idx]['y'] = con_data.stat_data['upper_bound']
+
+    # Axes
+    fig_patch['layout']['xaxis']['range'] = [bb.xmin, bb.xmax]
+    fig_patch['layout']['yaxis']['range'] = [bb.ymin, bb.ymax]
+    fig_patch['layout']['yaxis']['title']['text'] = f'{PSA_STATISTIC_LABELS.get(statistic, statistic)} - {convergence_statistic}'
+
+    # Legend
+    if (con_data.final_stat - bb.ymin) > 0.5 * (bb.ymax - bb.ymin):
+        fig_patch['layout']['legend']['y'] = 0.15
+    else:
+        fig_patch['layout']['legend']['y'] = 0.95
+
+    return fig_patch
+
+def psa_convergence_controls(page: str):
+    return [
+        html.Div(
+            id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-Convergence-ii'},
+            style = {'display': 'none'}
+        ),
+        dcc.Dropdown(
+            options = [
+                {'label': v, 'value': k} for k, v in PSA_STATISTIC_LABELS.items()
+            ],
+            value = list(PSA_STATISTIC_LABELS.keys())[0],
+            id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-statistic-dropdown'},
+            searchable = False,
+            clearable = False
+        ),
+        dcc.Dropdown(
+            options = CONVERGENCE_STATISTICS,
+            value = CONVERGENCE_STATISTICS[0],
+            id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-convergence-statistic-dropdown'},
+            searchable = False,
+            clearable = False
+        ),
+    ]
+
+def psa_convergence_arguments(plot_controls):
+    statistic = 'net_present_value_discounted'
+    convergence_statistic = 'Mean'
+    for idx, id in enumerate(plot_controls['ids']):
+        if id.get('key') == 'psa-primary-plot-statistic-dropdown':
+            statistic = plot_controls['values'][idx]
+        elif id.get('key') == 'psa-primary-plot-convergence-statistic-dropdown':
+            convergence_statistic = plot_controls['values'][idx]
+    rval = dict(statistic = statistic, convergence_statistic = convergence_statistic)
+    return rval
+
 psa_plots = {
     'Scatter plot': {
         'draw': psa_scatter,
@@ -683,5 +1026,11 @@ psa_plots = {
         'update': psa_cdf_update,
         'controls': psa_cdf_controls,
         'arguments': psa_cdf_arguments,
+    },
+    'Convergence': {
+        'draw': psa_convergence,
+        'update': psa_convergence_update,
+        'controls': psa_convergence_controls,
+        'arguments': psa_convergence_arguments,
     }
 }
