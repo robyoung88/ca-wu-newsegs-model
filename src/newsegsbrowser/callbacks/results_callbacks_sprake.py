@@ -643,3 +643,79 @@ def sync_psa_results_table_to_store(
     rval.extend(pnpv)
 
     return [rval,]
+
+def get_psa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
+    df_id = postprocess_utils.get_psa_result_id(
+        postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
+        selected_configuration.get('metamodel_id')
+    )
+    return app.results.get(df_id)
+
+def sync_psa_primary_plot_to_store(
+    psa_table,
+    graph_selection_dropdown,
+    plot_controls,
+    plot_header,
+    plot,
+    plot_container,
+    selected_configuration,
+    app,
+    null_return,
+):
+    rval = null_return
+    if len(plot_container['ids']) == 0 or len(graph_selection_dropdown['values']) == 0:
+        return rval
+    
+    trig = ctx.triggered_id
+    if trig is None:
+        return rval
+    
+    selected_configuration = json.loads(selected_configuration['value'])
+    
+    psa_data = get_psa_raw_data(selected_configuration, app)
+    
+    graph_type = None
+    full_draw = False
+    if trig.get('type') == 'psa-graph-selection-dropdown':
+        # Need to do a full graph refresh
+        full_draw = True
+        trig = ctx.triggered
+        for prop in trig:
+            pid = json.loads(prop['prop_id'].rsplit('.', 1)[0])
+            val = prop['value']
+            if val is None:
+                continue
+            
+            if pid['type'] == 'psa-graph-selection-dropdown':
+                graph_type = val
+                break
+    
+    if graph_type is None:
+        graph_type = graph_selection_dropdown['values'][0]
+    
+    graph_drawn_indicator_key = 'psa-primary-plot-'+graph_type+'-ii'
+    if not full_draw:
+        graph_is_drawn = False
+        for id in plot_controls['ids']:
+            if id.get('key') == graph_drawn_indicator_key:
+                graph_is_drawn = True
+        
+         
+        full_draw = not graph_is_drawn
+    
+    plot_funcs = psa.psa_plots.get(graph_type)
+    if plot_funcs is None:
+        raise ValueError(f'Plot functions not found for graph_type {graph_type}')
+
+    plot_kwargs = plot_funcs['arguments'](plot_controls)
+
+    if full_draw:
+        rval['plot_header']['children'] = [
+            plot_funcs['controls'](x['page']) for x in plot_header['ids']
+        ]
+        rval['plot']['figures'] = [plot_funcs['draw'](psa_data, **plot_kwargs)] * len(plot['ids'])
+
+    else:
+        rval['plot']['figures'] = [plot_funcs['update'](psa_data, **plot_kwargs)] * len(plot['ids'])
+
+    return rval

@@ -10,6 +10,7 @@ from newsegsbrowser.background_callback_errors import background_callback_error_
 from newsegsbrowser.layouts import navigation
 from newsegsbrowser.layouts import common as clayouts
 from newsegsbrowser.layouts.results import results_header
+from newsegssensitivity import psa
 
 def create_psa_header():
     return html.Div([
@@ -155,10 +156,23 @@ def create_psa_layout(*args, **kwargs):
                     html.Hr(),
                     dbc.Col(
                         [
-                            html.H2("Tornado plot"),
+                            html.Div([
+                                dcc.Dropdown(
+                                    options = psa.PSA_PLOT_TYPES,
+                                    value = psa.PSA_PLOT_TYPES[0],
+                                    id = {'type': 'psa-graph-selection-dropdown', 'page': kwargs.get('page-type', 'None'), 'key': 'psa-primary-plot'},
+                                    searchable = False,
+                                    clearable = False,
+                                )
+                            ]),
+                            html.Div(
+                                html.H2(""),
+                                id = {'type': 'plot-header-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-primary-plot'}
+                            ),
+                            
                             html.Div(
                                 dcc.Graph(
-                                    id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-tornado-plot'},
+                                    id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-primary-plot'},
                                     style= {
                                         'height': '590px',
                                         'border': '1px solid #dee2e6',
@@ -167,7 +181,7 @@ def create_psa_layout(*args, **kwargs):
                                     }
                                 ),
                                 style={'display':'block', 'height': '600px'},
-                                id = {'type': 'plot-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-tornado-plot'},
+                                id = {'type': 'plot-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-primary-plot'},
                             )
                         ],
                         width = 12

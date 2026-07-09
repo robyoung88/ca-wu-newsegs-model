@@ -40,6 +40,7 @@ SPRAKE_CALLBACKS = {
     'sync_dsa_tornado_to_store': results_callbacks_sprake.sync_dsa_tornado_to_store,
 
     'sync_psa_results_table_to_store': results_callbacks_sprake.sync_psa_results_table_to_store,
+    'sync_psa_primary_plot_to_store': results_callbacks_sprake.sync_psa_primary_plot_to_store,
 
 }
 
