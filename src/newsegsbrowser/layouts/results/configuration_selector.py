@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
@@ -29,7 +30,10 @@ def create_config_selector_headerbutton(
 def create_single_configuration_selector_row(
     config_index, 
     configurations = None,
-    selected_config = None):
+    selected_config = None,
+    reference_size: int = 30,
+):
+    
     if config_index < 1:
         primary_container = html.H1
         show_remove = False
@@ -37,9 +41,10 @@ def create_single_configuration_selector_row(
         primary_container = html.H2
         show_remove = True
     
-    contents = list(
-        icons.get_icon('config-'+str(config_index+1)),
-    )
+    contents: list[Any] = [icons.get_icon(
+        'config-'+str(config_index+1), 
+        icon_class = icons.ICON_COLOUR_CLASSES[config_index % len(icons.ICON_COLOUR_CLASSES)]
+    ),]
     
     if configurations is None:
         config_name = 'Configuration Name'
@@ -57,16 +62,8 @@ def create_single_configuration_selector_row(
                 debounce = True,
                 type = 'text',
                 id = {'type': 'config-name-input', 'index': config_index},
-                size = '20',
-                style = {
-                    "display": "inline",
-                    "border": "none",
-                    "outline": "none",
-                    "padding": "5px 0",
-                    "height": "auto",
-                    "lineHeight": "1.5",
-                    "background": "transparent" # Blends into page
-                }
+                size = str(reference_size),
+                className = ' configuration-selector-row-name-input'
             )
         )
     else:
@@ -76,20 +73,14 @@ def create_single_configuration_selector_row(
                 debounce = True,
                 type = 'text',
                 id = {'type': 'config-name-input', 'index': config_index},
-                size = '20',
-                style = {
-                    "display": "inline",
-                    "border": "none",
-                    "outline": "none",
-                    "padding": "5px 0",
-                    "height": "auto",
-                    "lineHeight": "1.5",
-                    "background": "transparent" # Blends into page
-                }
+                size = str(reference_size * 1.3),
+                className = 'configuration-selector-row-name-input'
             )
         )
+
+    button_container_children = []
     
-    contents += [
+    button_container_children += [
         dbc.Button(
             html.I(
                 className = icons.get_icon('config-focus', style_name = 'raw'),
@@ -173,7 +164,7 @@ def create_single_configuration_selector_row(
     ]
 
     if show_remove:
-        contents.append(
+        button_container_children.append(
             dbc.Button(
                 html.I(
                     className = icons.get_icon('config-remove', style_name = 'raw'),
@@ -185,6 +176,13 @@ def create_single_configuration_selector_row(
             )
         )
     
+    button_container = html.Div(
+        button_container_children,
+        className = 'configuration-selector-row-button-container'
+    )
+
+    contents.append(button_container)
+    
     return (
         dbc.Row([
             dbc.Col([
@@ -194,6 +192,7 @@ def create_single_configuration_selector_row(
             ])
         ],
         id={'type':'comparator-conf-row', 'index': config_index},
+        class_name = 'configuration-selector-row'
         )
     )
 

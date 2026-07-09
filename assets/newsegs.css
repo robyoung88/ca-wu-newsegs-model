@@ -49,12 +49,40 @@
 
 /* Results header */
 
-.configuration-selector-container {
+.results-title-block {
     width: 33%;
+    float: left;
+}
+
+.configuration-selector-hdrcontainer {
+    width: 25%;
     float: left;
     vertical-align: bottom;
     padding-top: 10px;
 }
+
+.annual-horizon-toggle-hdrcontainer {
+    width: 33%;
+    float: right;
+    justify-content: flex-end;
+    align-items: center;
+    text-align: right;
+}
+
+.configuration-selector-row-button-container {
+    float: right;
+}
+
+.configuration-selector-row-name-input {
+    display: inline;
+    border: none;
+    outline: none;
+    padding: 5px 0;
+    height: auto;
+    line-height: 1.5;
+    background: transparent;
+}
+
 
 /* DSA Configuration */
 

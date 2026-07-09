@@ -12,7 +12,10 @@ def create_tbl_head(n_configs):
                 html.Th(""),
                 html.Th("")
             ] + [
-                html.Th(icons.get_icon(f'config-{x+1}')) for x in range(n_configs)
+                html.Th(icons.get_icon(
+                    f'config-{x+1}',
+                    icon_class = icons.ICON_COLOUR_CLASSES[x % len(icons.ICON_COLOUR_CLASSES)]
+                )) for x in range(n_configs)
             ])
         )
     ]

@@ -35,7 +35,9 @@ def add_configuration_selection_callbacks(app: Dash):
     @app.callback(
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data'),
+        
         Input({'type': 'config-name-input', 'index': ALL}, 'value'),
+        
         State('store-configurations', 'data'),
         State('store-selected-configuration', 'data'),
         prevent_initial_call=True
