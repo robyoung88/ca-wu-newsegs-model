@@ -58,7 +58,8 @@ def create_results_header(**kwargs):
                                 outline = False
                             )
                         ],
-                        id = 'config-selector-hdrcontainer',
+                        id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-header-selector'},
+                        #id = 'config-selector-hdrcontainer',
                         className = 'configuration-selector-hdrcontainer'
                         ),
 
@@ -134,7 +135,7 @@ def create_results_header_dsa(**kwargs):
                             dbc.Button(
                                 'Run DSA',
                                 color = 'primary',
-                                id = {'type': 'dsa-run-button', 'page': kwargs.get('page-type', 'None')},
+                                id = {'type': 'dsa-prerun-button', 'page': kwargs.get('page-type', 'None')},
                                 disabled = False,
                                 style = {
                                     'display': 'inline',
@@ -192,7 +193,7 @@ def create_results_header_psa(**kwargs):
                             dbc.Button(
                                 'Run PSA',
                                 color = 'primary',
-                                id = {'type': 'psa-run-button', 'page': kwargs.get('page_type', 'None')},
+                                id = {'type': 'psa-prerun-button', 'page': kwargs.get('page_type', 'None')},
                                 disabled = False,
                                 style = {
                                     'display': 'inline',

@@ -31,7 +31,7 @@ def create_single_configuration_selector_row(
     config_index, 
     configurations = None,
     selected_config = None,
-    reference_size: int = 30,
+    reference_size: int = 20,
 ):
     
     if config_index < 1:
@@ -200,9 +200,10 @@ def create_configuration_selector():
     return html.Div([
         
         html.Div([        
-            create_single_configuration_selector_row(0),
+            #create_single_configuration_selector_row(0),
         ],
-        id='comparator-selector-container',
+        id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-selector'}
+        #id='comparator-selector-container',
         ),
         dcc.Download(id='download-config-json'),
         dcc.Store(id='n_active_conf', data = '{"n": 1}')

@@ -1,4 +1,5 @@
 from dash import dcc, html
+import dash_bootstrap_components as dbc
 
 def NULL_LAYOUT(*args, **kwargs):
     return html.Span()
@@ -129,10 +130,52 @@ def metamodel_process_components():
 
 def dsa_process_components(**kwargs):
     return [
-        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'dsa_input_change'}, data = [])
+        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'dsa_input_change'}, data = []),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Run DSA?')),
+                dbc.ModalBody('Deterministic Sensitivity Analyses require multiple model runs and can take minutes to hours to complete, dependent on model complexity. Are you ready to continue?'),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'dsa-run-button', 'page': kwargs.get('page_type', 'None')},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-button', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-run-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-run-confirm'},
+            is_open = False
+        )
     ]
 
 def psa_process_components(**kwargs):
     return [
-        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'psa_input_change'}, data = [])
+        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'psa_input_change'}, data = []),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Run PSA?')),
+                dbc.ModalBody('Probabilistic Sensitivity Analyses require a large number of model runs (often > 1000) and can take minutes to hours to complete, dependent on model complexity. Are you ready to continue?'),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'psa-run-button', 'page': kwargs.get('page_type', 'None')},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-button', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-run-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-run-confirm'},
+            is_open = False
+        )
     ]

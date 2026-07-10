@@ -75,6 +75,10 @@ def add_model_to_interface_callbacks(app: Dash):
                 {'type': 'input-container', 'supersection': ALL, 'section': ALL},
                 'children'
             ),
+            metamodel_input_container_children = Output(
+                {'type': 'metamodel-input-container', 'supersection': ALL, 'section': ALL},
+                'children'
+            ),
             generic_text_children = Output(
                 {'type': 'generic_text', 'section': ALL, 'key': ALL},
                 'children'
@@ -83,6 +87,9 @@ def add_model_to_interface_callbacks(app: Dash):
                 {'type': 'trigger', 'page': ALL, 'key': ALL},
                 'data', 
                 allow_duplicate = True
+            ),
+            config_name_inputs = dict(
+                values = Output({'type':'config-name-input', 'index': ALL}, 'value')
             ),
 
             prequeue_action_user = Output('prequeue-action-user', 'data', allow_duplicate = True),
@@ -115,6 +122,11 @@ def add_model_to_interface_callbacks(app: Dash):
                 'id'
             ),
 
+            metamodel_input_container_ids = State(
+                {'type': 'metamodel-input-container', 'supersection': ALL, 'section': ALL},
+                'id'
+            ),
+
             generic_text_ids = State(
                 {'type': 'generic_text', 'section': ALL, 'key': ALL},
                 'id'
@@ -123,6 +135,11 @@ def add_model_to_interface_callbacks(app: Dash):
             trigger_ids = State(
                 {'type': 'trigger', 'page': ALL, 'key': ALL},
                 'id'
+            ),
+
+            config_name_inputs = dict(
+                ids = State({'type':'config-name-input', 'index': ALL}, 'id'),
+                values = State({'type':'config-name-input', 'index': ALL}, 'value'),
             ),
 
             selected_model = State('selected-model', 'data'),
@@ -135,19 +152,36 @@ def add_model_to_interface_callbacks(app: Dash):
         configurations,
         prequeue_locks,
         input_container_ids,
+        metamodel_input_container_ids,
         generic_text_ids,
         trigger_ids,
+        config_name_inputs,
         selected_model,
     ):
         logger.info('sync_config triggered by %s', ctx.triggered_id)
+        null_rval: dict[str, Any] = dict(
+            selected_configuration = no_update,
+            configurations = no_update,
+
+            input_container_children = [no_update] * len(input_container_ids),
+            metamodel_input_container_children = [no_update] * len(metamodel_input_container_ids),
+            generic_text_children = [no_update] * len(generic_text_ids),
+            trigger_values = [no_update] * len(trigger_ids),
+            config_name_inputs = dict(values=[no_update]*len(config_name_inputs['ids'])),
+
+            prequeue_action_user = no_update
+        )
         return callbacks_map.CALLBACKS_MAP[selected_model]['sync_config'](
             firstload_config_watchers,
             selected_configuration,
             configurations,
             prequeue_locks,
             input_container_ids,
+            metamodel_input_container_ids,
             generic_text_ids,
             trigger_ids,
+            config_name_inputs,
+            null_rval,
             app
         )
     
@@ -168,7 +202,6 @@ def add_model_to_interface_callbacks(app: Dash):
             selected_configuration,
             app
         )
-    
     
     @app.callback(
         Output({'type':'dsa-bounds-inputcontainer', 'section': ALL, 'key': ALL, 'subindex': ALL}, 'children'),

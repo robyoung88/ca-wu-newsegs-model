@@ -350,9 +350,9 @@ def present_single_stat(data_list,
     n_configs = len(data_list)
 
     if isinstance(stat_name, str):
-        comp_result = [x.get(stat_name, None) for x in data_list]
+        comp_result = [x.get(stat_name, None) if x is not None else None for x in data_list]
     else:
-        comp_result = [recursive_get(x, stat_name) for x in data_list]
+        comp_result = [recursive_get(x, stat_name) if x is not None else None for x in data_list]
         
     vals = [x.get(stat_value, None) if x is not None else None for x in comp_result]
     
@@ -444,11 +444,11 @@ def present_single_stat_per_row(
 ) -> pd.DataFrame:
 
     valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
-    src_data = [as_df(x.get(table_name)) for x in data_list if x is not None]
-
     if len(valid_config_indexes) == 0:
         return pd.DataFrame()
 
+    src_data = [as_df(x.get(table_name)) for x in data_list if x is not None]
+    
     if isinstance(variable_names, str):
         variable_names = [variable_names]
     if isinstance(statistic_names, str):
@@ -504,10 +504,12 @@ def present_paired_seasonal_stats(
     statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER,
     season_mapper: None|Callable|Mapping = DEFAULT_SEASON_MAPPER,
 ) -> pd.DataFrame:
-    n_configs = len(data_list)
+    valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
+    if len(valid_config_indexes) == 0:
+        return pd.DataFrame()
 
-    src_data1 = [as_df(x.get(table1_name), index_variables=['variable', 'season_index', 'statistic']) for x in data_list]
-    src_data2 = [as_df(x.get(table2_name), index_variables=['variable', 'season_index', 'statistic']) for x in data_list]
+    src_data1 = [as_df(x.get(table1_name), index_variables=['variable', 'season_index', 'statistic']) for x in data_list if x is not None]
+    src_data2 = [as_df(x.get(table2_name), index_variables=['variable', 'season_index', 'statistic']) for x in data_list if x is not None]
 
     if isinstance(variable_names, str):
         variable_names = [variable_names]
@@ -541,11 +543,11 @@ def present_paired_seasonal_stats(
         
         subtable = (
             subtable
-            .rename(columns = {'value': 'config-'+str(idx+1)})
+            .rename(columns = {'value': 'config-'+str(valid_config_indexes[idx]+1)})
         )
         return subtable
     
-    otbl = pd.concat([extract_from_table(i) for i in range(n_configs)], axis=1)
+    otbl = pd.concat([extract_from_table(i) for i in range(len(valid_config_indexes))], axis=1)
 
     variable_labels = _label_demap(variable_names, variable_mapper)
     season_labels = _label_demap(season_indices, season_mapper)
@@ -575,11 +577,13 @@ def present_single_stat_per_row_plus_paired_scalars(
     """
     Used primarily for discounted ratios in the form "val (num%/den%)"
     """
-    n_configs = len(data_list)
+    valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
+    if len(valid_config_indexes) == 0:
+        return pd.DataFrame()
 
-    src_data = [as_df(x.get(table_name)) for x in data_list]
-    scalar_data_1 = [x.get(scalar_value1_name) for x in data_list]
-    scalar_data_2 = [x.get(scalar_value2_name) for x in data_list]
+    src_data = [as_df(x.get(table_name)) for x in data_list if x is not None]
+    scalar_data_1 = [x.get(scalar_value1_name) for x in data_list if x is not None]
+    scalar_data_2 = [x.get(scalar_value2_name) for x in data_list if x is not None]
 
     if isinstance(variable_names, str):
         variable_names = [variable_names]
@@ -607,11 +611,11 @@ def present_single_stat_per_row_plus_paired_scalars(
             )
         subtable = (
             subtable
-            .rename(columns = {'value': 'config-'+str(idx+1)})
+            .rename(columns = {'value': 'config-'+str(valid_config_indexes[idx]+1)})
         )
         return subtable
     
-    otbl = pd.concat([extract_from_table(i) for i in range(n_configs)], axis=1)
+    otbl = pd.concat([extract_from_table(i) for i in range(len(valid_config_indexes))], axis=1)
 
     variable_labels = _label_demap(variable_names, variable_mapper)
     statistic_labels = _label_demap(statistic_names, statistic_mapper)
@@ -640,9 +644,9 @@ def present_stat_description(
     # e.g. if stat_name is annual_production,
     # then comp_result may consist of dicts of {'mean': xxx, 'min': yyy, 'max': zzz}
     if isinstance(stat_name, str):
-        comp_result = [x.get(stat_name, None) for x in data_list]
+        comp_result = [x.get(stat_name, None) if x is not None else None for x in data_list]
     else:
-        comp_result = [recursive_get(x, *stat_name) for x in data_list]
+        comp_result = [recursive_get(x, *stat_name) if x is not None else None for x in data_list]
 
     def get_Tr(idx):
         stat = stat_list[idx]
@@ -680,9 +684,9 @@ def present_stat_description_parallel(
     n_configs = len(data_list)
 
     if isinstance(container_name, str):
-        config_containers = [x.get(container_name, None) for x in data_list]
+        config_containers = [x.get(container_name, None) if x is not None else None for x in data_list]
     else:
-        config_containers = [recursive_get(x, *container_name) for x in data_list]
+        config_containers = [recursive_get(x, *container_name) if x is not None else None for x in data_list]
     
     def get_Tr(idx):
         stat = stat_list[idx]
@@ -714,9 +718,9 @@ def present_stat_description_compound(data_list,
 
     # Grab the computed results for the desired stat
     if isinstance(stat_name, str):
-        comp_result = [x.get(stat_name, None) for x in data_list]
+        comp_result = [x.get(stat_name, None) if x is not None else None for x in data_list]
     else:
-        comp_result = [recursive_get(x, *stat_name) for x in data_list]
+        comp_result = [recursive_get(x, *stat_name) if x is not None else None for x in data_list]
 
     def transform_stats(config_results):
         def trans_stat(idx):
@@ -757,9 +761,9 @@ def present_self_consumption_data(data_list,
 
     # Get the list of tight dictionary representations of dataframes
     if isinstance(table_name, str):
-        dict_data = [x.get(table_name, None) for x in data_list]
+        dict_data = [x.get(table_name, None if x is not None else None) for x in data_list]
     else:
-        dict_data = [recursive_get(x, *table_name) for x in data_list]
+        dict_data = [recursive_get(x, *table_name) if x is not None else None for x in data_list]
 
     def transform_stats(table_data):
         if table_data is None or table_data == {}:
@@ -803,9 +807,9 @@ def present_seasonal_consumption_data(
 
     # Get the list of tight dictionary representations of dataframes
     if isinstance(table_name, str):
-        dict_data = [x.get(table_name, None) for x in data_list]
+        dict_data = [x.get(table_name, None) if x is not None else None for x in data_list]
     else:
-        dict_data = [recursive_get(x, *table_name) for x in data_list]
+        dict_data = [recursive_get(x, *table_name) if x is not None else None for x in data_list]
 
     def transform_stats(table_data):
         if table_data is None or table_data == {}:
@@ -848,9 +852,9 @@ def present_event_and_date(data_list,
     n_configs = len(data_list)
 
     if isinstance(event_name, str):
-        comp_result = [x.get(event_name, None) for x in data_list]
+        comp_result = [x.get(event_name, None) if x is not None else None for x in data_list]
     else:
-        comp_result = [recursive_get(x, event_name) for x in data_list]
+        comp_result = [recursive_get(x, event_name) if x is not None else None for x in data_list]
 
     val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] +
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
@@ -891,9 +895,9 @@ def present_event_and_daterange(data_list,
     n_configs = len(data_list)
 
     if isinstance(event_name, str):
-        comp_result = [x.get(event_name, None) for x in data_list]
+        comp_result = [x.get(event_name, None) if x is not None else None for x in data_list]
     else:
-        comp_result = [recursive_get(x, event_name) for x in data_list]
+        comp_result = [recursive_get(x, event_name) if x is not None else None for x in data_list]
 
     val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] + 
         [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
