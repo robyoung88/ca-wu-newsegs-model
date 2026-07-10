@@ -92,12 +92,12 @@ div:has(> .upload-button) {
     display: inline-block;
 }
 
-.psa-results-header-title-container {
+.results-header-title-container {
     float: left;
     width: 75%;
 }
 
-.psa-results-header-button-container {
+.results-header-button-container {
     width: 25%;
     float: right;
 }

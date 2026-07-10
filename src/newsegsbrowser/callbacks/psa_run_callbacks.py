@@ -160,74 +160,19 @@ def add_psa_run_callbacks(app: Dash):
                     ['contents-option', 'format-option']
                 )
                 selected_configuration = json.loads(selected_configuration)
-                psa_data = postprocess_utils.get_psa_raw_data(selected_configuration, app)
-                if psa_data is None:
-                    # TODO: raise dbc.Toast warning and close modal
-                    return rval
-                mm = app.metamodels.get(selected_configuration['metamodel_id'])
+
+                to_export = browser.export_results(
+                    'psa',
+                    selected_configuration,
+                    app,
+                    opts.get('contents-option', 'result'),
+                    opts.get('format-option', 'csv')
+                )
                 
-                odict = None
-                match opts.get('contents-option', 'result'):
-                    case 'result':
-                        match opts.get('format-option', 'csv'):
-                            case 'csv':
-                                fn = pathvalidate.sanitize_filename(f'{mm.name}-psa-results.csv')
-                                odict = dcc.send_data_frame(psa_data.to_csv, fn)
-                            case 'xlsx':
-                                fn = pathvalidate.sanitize_filename(f'{mm.name}-psa-results.xlsx')
-                                odict = dcc.send_data_frame(
-                                    psa_data.to_excel,
-                                    fn,
-                                    sheet_name = 'PSA results'
-                                )
-                            case _:
-                                raise ValueError(f'Format not recognised - {opts.get('format-option')}')
-                    case 'result_and_config':
-                        fn = pathvalidate.sanitize_filename(f'{mm.name}-psa-results.zip')
-                        format_option = opts.get('format-option', 'csv')
-                        match format_option:
-                            case 'csv':
-                                result_filename = pathvalidate.sanitize_filename(f'{mm.name}-psa-results.csv')
-                                results_mode = 'w+'
-                            case 'xlsx':
-                                result_filename = pathvalidate.sanitize_filename(f'{mm.name}-psa-results.xlsx')
-                                results_mode = 'w+b'
-                            case _:
-                                raise ValueError(f'Format not recognised - {format_option}')
-
-                        with tempfile.TemporaryFile(mode=results_mode, suffix=result_filename) as resultsfile:
-                            if format_option == 'csv':
-                                psa_data.to_csv(resultsfile)
-                            else:
-                                psa_data.to_excel(resultsfile)
-                            resultsfile.seek(0)
-                            with tempfile.TemporaryFile(mode='w+', suffix='.json') as configfile:
-                                json.dump(
-                                    metamodel_to_dict(mm),
-                                    configfile,
-                                    cls=jsonfuncs.NumpyEncoder,
-                                    sort_keys=False, indent=4
-                                )
-                                configfile.seek(0)
-                                with io.BytesIO() as zip_buffer:
-                                    with zipfile.ZipFile(zip_buffer, mode='w', compression = zipfile.ZIP_DEFLATED) as ziparchive:
-                                        ziparchive.writestr(result_filename, resultsfile.read())
-                                        ziparchive.writestr(
-                                            pathvalidate.sanitize_filename(
-                                                f'{mm.name}-psa-config.json'
-                                            ),
-                                            configfile.read()
-                                        )
-                                    zip_buffer.seek(0)
-                                    odict = dcc.send_bytes(
-                                        lambda buffer: buffer.write(zip_buffer.getvalue()),
-                                        filename=fn
-                                    )
-
-                if odict is not None:
+                if to_export is not None:
                     for idx, id in enumerate(download['ids']):
                         if id['page'] == page:
-                            rval['download']['datas'][idx] = odict
+                            rval['download']['datas'][idx] = to_export
             case _:
                 rval['modal']['is_opens'] = [False] * n_modals
         return rval

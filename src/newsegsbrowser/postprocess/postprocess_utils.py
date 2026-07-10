@@ -138,6 +138,13 @@ def generic_finance_postprocess(
 
     return finance_run_0
 
+def get_dsa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
+    df_id = get_dsa_result_id(
+        RESULT_CACHE_PREFIXES['dsa_results'],
+        selected_configuration.get('metamodel_id')
+    )
+    return app.results.get(df_id)    
+
 def get_psa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
     df_id = get_psa_result_id(
         RESULT_CACHE_PREFIXES['psa_results'],

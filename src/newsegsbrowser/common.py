@@ -1,4 +1,7 @@
 import inspect
+import io
+import json
+import tempfile
 import time
 
 from collections.abc import Sequence
@@ -11,15 +14,21 @@ from typing import Optional
 from typing import List
 import datetime
 import uuid
+import zipfile
 
-from dash import html
+from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
+import pathvalidate
 from useful_types import SequenceNotStr
 
+from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
+from newsegsbrowser.postprocess import postprocess_utils
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 
 from newsegsbrowser.icons import get_icon
+from util import jsonfuncs
 
 def create_numeric_card_input(
     icon_name: str | SequenceNotStr[str],
@@ -373,3 +382,86 @@ def get_options(
         if id.get('page') and id.get('key') in keys:
             odict[id['key']] = val
     return odict
+
+def export_results(
+    result_type: Literal['dsa','psa'],
+    selected_configuration: dict[str, Any],
+    app: Dash,
+    contents_option: str = 'result',
+    format_option: str = 'csv',
+):
+    match result_type:
+        case 'dsa':
+            result_data = postprocess_utils.get_dsa_raw_data(selected_configuration, app)
+        case 'psa':
+            result_data = postprocess_utils.get_psa_raw_data(selected_configuration, app)
+        case _:
+            raise ValueError(f'result_type not recognised: {result_type}')
+    if result_data is None:
+        return None
+    
+    mm = app.metamodels.get(selected_configuration['metamodel_id'])
+    file_name_stub =f'{mm.name}-{result_type}-results'
+    match contents_option:
+        case 'result':
+            out_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.{format_option}')
+        case 'result_and_config':
+            out_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.zip')
+        case _:
+            raise ValueError(f'contents_option not recognised: {contents_option}')
+    
+    match contents_option:
+        case 'result':
+            match format_option:
+                case 'csv':
+                    return dcc.send_data_frame(result_data.to_csv, out_fn)
+                case 'xlsx':
+                    return dcc.send_data_frame(
+                        result_data.to_excel,
+                        out_fn,
+                        sheet_name = f'{result_type} results'
+                    )
+                case _:
+                    raise ValueError(f'format_option not recognised: {format_option}')
+        case 'result_and_config':
+            result_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.{format_option}')
+            match format_option:
+                case 'csv':
+                    results_mode = 'w+b'
+                case 'xlsx':
+                    results_mode = 'w+b'
+                case _:
+                    raise ValueError(f'format_option not recognised: {format_option}')
+            
+            with tempfile.TemporaryFile(mode = results_mode, suffix = result_fn) as resultsfile:
+                match format_option:
+                    case 'csv':
+                        result_data.to_csv(resultsfile)
+                    case 'xlsx':
+                        result_data.to_excel(resultsfile, sheet_name = f'{result_type} results')
+                resultsfile.seek(0)
+
+                with tempfile.TemporaryFile(mode = 'w+', suffix = '.json') as configfile:
+                    json.dump(
+                        metamodel_to_dict(mm),
+                        configfile,
+                        cls = jsonfuncs.NumpyEncoder,
+                        sort_keys = False, indent = 4
+                    )
+                    configfile.seek(0)
+
+                    with io.BytesIO() as zip_buffer:
+                        with zipfile.ZipFile(zip_buffer, mode = 'w', compression = zipfile.ZIP_DEFLATED) as ziparchive:
+                            ziparchive.writestr(result_fn, resultsfile.read())
+                            ziparchive.writestr(
+                                pathvalidate.sanitize_filename(
+                                    f'{mm.name}-config.json'
+                                ),
+                                configfile.read()
+                            )
+                        zip_buffer.seek(0)
+                        return dcc.send_bytes(
+                            lambda buffer: buffer.write(zip_buffer.getvalue()),
+                            filename = out_fn
+                        )
+

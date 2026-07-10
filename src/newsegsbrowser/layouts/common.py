@@ -151,7 +151,48 @@ def dsa_process_components(**kwargs):
             ],
             id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-run-confirm'},
             is_open = False
-        )
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Download DSA results')),
+                dbc.ModalBody([
+                    html.H3('Download contents:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Results only', 'value': 'result'},
+                            {'label': 'Results and model configuration', 'value': 'result_and_config'}
+                        ],
+                        'result',
+                        id = {'type': 'dsa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'contents-option'}
+                    ),
+                    html.H3('Result format:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Comma separated variables (.csv)', 'value': 'csv'},
+                            {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
+                        ],
+                        'csv',
+                        id = {'type': 'dsa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'format-option'}
+                    )
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-download-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-download-confirm'},
+            is_open = False
+        ),
+        dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'})
     ]
 
 def psa_process_components(**kwargs):
