@@ -193,7 +193,7 @@ def create_results_header_psa(**kwargs):
                             dbc.Button(
                                 'Run PSA',
                                 color = 'primary',
-                                id = {'type': 'psa-run-button', 'page': kwargs.get('page_type', 'None')},
+                                id = {'type': 'psa-prerun-button', 'page': kwargs.get('page_type', 'None')},
                                 disabled = False,
                                 style = {
                                     'display': 'inline',

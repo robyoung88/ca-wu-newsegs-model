@@ -156,5 +156,26 @@ def dsa_process_components(**kwargs):
 
 def psa_process_components(**kwargs):
     return [
-        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'psa_input_change'}, data = [])
+        dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'psa_input_change'}, data = []),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Run PSA?')),
+                dbc.ModalBody('Probabilistic Sensitivity Analyses require a large number of model runs (often > 1000) and can take minutes to hours to complete, dependent on model complexity. Are you ready to continue?'),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'psa-run-button', 'page': kwargs.get('page_type', 'None')},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-button', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-run-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-run-confirm'},
+            is_open = False
+        )
     ]
