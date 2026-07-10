@@ -33,9 +33,6 @@ def add_configuration_selection_callbacks(app: Dash):
 
     # RENAME
     @app.callback(
-        Output('store-configurations', 'data', allow_duplicate = True),
-        Output('store-selected-configuration', 'data'),
-        
         Input({'type': 'config-name-input', 'index': ALL}, 'value'),
         
         State('store-configurations', 'data'),
@@ -43,7 +40,7 @@ def add_configuration_selection_callbacks(app: Dash):
         prevent_initial_call=True
     )
     def rename_config(config_name, configurations, selected_config):
-        NUP = no_update
+        NUP = None#no_update
         trig = ctx.triggered_id
         if trig is None:
             return NUP
@@ -63,26 +60,13 @@ def add_configuration_selection_callbacks(app: Dash):
             raise ValueError(f'selected metamodel cannot be located: {w_conf['metamodel_id']}')
 
         mm_working.name = config_name[trigger_index]
-        configurations[trigger_index] = json.dumps(mm_working.to_config())
-
-        selected_config = json.loads(selected_config)
-        if selected_config['config_index'] == trigger_index:
-            selected_config = mm_working.to_config()
-            selected_config['config_index'] = trigger_index
-            rval = (configurations, json.dumps(selected_config))
-        else:
-            rval = (configurations, no_update)
+        # Do not update configurations to prevent a circular callback - rely on sync_config to
+        # do the work and beware accessing names directly from configurations
         
-        return rval
+        return None
     
     # DUPLICATE
     @app.callback(
-        Output('comparator-selector-container', 'children', allow_duplicate = True),
-        Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
-        
-        Output({'type': 'config-focus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
-        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
-
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data', allow_duplicate = True),
         
@@ -90,17 +74,12 @@ def add_configuration_selection_callbacks(app: Dash):
         State('store-configurations', 'data'),
         State('store-selected-configuration', 'data'),
 
-        State({'type': 'config-focus-btn', 'index': ALL}, 'id'),
-        State({'type': 'config-hdrfocus-btn', 'index': ALL}, 'id'),
-
         prevent_initial_call=True
     )
     def add_duplicate_config(
         n_clicks, 
         configurations,
         selected_config,
-        focus_btn_ids,
-        header_focus_btn_ids
     ):
         # Add the selector as the penultimate row
         if configurations is None:
@@ -109,15 +88,9 @@ def add_configuration_selection_callbacks(app: Dash):
         n_conf = len(configurations)
 
         NUP = (
-            no_update, 
-            no_update, 
-            [no_update] * len(focus_btn_ids), 
-            [no_update] * len(header_focus_btn_ids), 
             no_update,
             no_update,
         )
-        
-        update_outlines = [True] * n_conf
 
         trig = ctx.triggered_id
         if trig is None or n_clicks is None:
@@ -140,9 +113,6 @@ def add_configuration_selection_callbacks(app: Dash):
 
             # Make the copy
             ref_config = json.loads(configurations[trigger_index])
-            #mm = app.metamodels.get(ref_config['metamodel_id'])
-            #if mm is None:
-            #    raise ValueError(f'selected metamodel cannot be located: {ref_config['metamodel_id']}')
             
             mm_dup = cast(NewsegsMetaModel, app.duplicate_metamodel(ref_config['metamodel_id']))
             mdl = mm_dup.model
@@ -177,42 +147,14 @@ def add_configuration_selection_callbacks(app: Dash):
 
         else:
             return NUP
-        
-        # Now for all the UI stuff
-
-        patched_comparator_selector = Patch()
-        patched_comparator_selector.append(
-            configuration_selector.create_single_configuration_selector_row(
-                n_conf-1,
-                configurations,
-                selected_config
-            )
-        )
-
-        patched_header_comparator_selector = Patch()
-        patched_header_comparator_selector.append(
-            configuration_selector.create_config_selector_headerbutton(
-                n_conf-1, 
-                selected_config
-            )
-        )
 
         return (
-            patched_comparator_selector,
-            patched_header_comparator_selector,
-
-            update_outlines,
-            update_outlines,
-
             configurations,
             json.dumps(selected_config),
         )  
     
     # REMOVE
     @app.callback(
-        Output('comparator-selector-container', 'children', allow_duplicate = True),
-        Output('config-selector-hdrcontainer', 'children', allow_duplicate = True),
-        
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data', allow_duplicate = True),
 
@@ -230,8 +172,6 @@ def add_configuration_selection_callbacks(app: Dash):
         ids
     ):
         NUP = (
-            no_update, 
-            no_update, 
             no_update, 
             no_update
         )
@@ -292,15 +232,7 @@ def add_configuration_selection_callbacks(app: Dash):
         # Always safe to drop the metamodel, just don't necessarily remove the children
         app.remove_metamodel(dropped['metamodel_id'], False)
 
-        n_conf = len(configurations)
-
-        contents = [configuration_selector.create_single_configuration_selector_row(i, configurations, selected_config) for i in range(n_conf)]
-        hdr_contents = [configuration_selector.create_config_selector_headerbutton(i, selected_config) for i in range(n_conf)]
-
         return (
-            contents,
-            hdr_contents,
-
             configurations,
             json.dumps(selected_config)
         )
@@ -411,9 +343,6 @@ def add_configuration_selection_callbacks(app: Dash):
 
     # UPLOAD CONFIG
     @app.callback(
-        Output('comparator-selector-container', 'children', allow_duplicate = True),
-        Output({'type': 'config-hdrfocus-btn', 'index': ALL}, 'outline', allow_duplicate = True),
-
         Output('store-configurations', 'data', allow_duplicate = True),
         Output('store-selected-configuration', 'data', allow_duplicate = True),
         
@@ -424,8 +353,10 @@ def add_configuration_selection_callbacks(app: Dash):
     def upload_config_json(config_jsons, configurations):
         if configurations is None:
             raise PreventUpdate()
-        n_conf = len(configurations)
-        NUP = (no_update, [no_update] * n_conf, no_update, no_update)
+        NUP = (
+            no_update, 
+            no_update
+        )
 
         trig = ctx.triggered_id
         if trig is None:
@@ -470,17 +401,8 @@ def add_configuration_selection_callbacks(app: Dash):
         selected_config = working_mm.to_config()
         configurations[trigger_index]  = json.dumps(selected_config)
         selected_config['config_index'] = trigger_index
-        
-        contents = [
-            configuration_selector.create_single_configuration_selector_row(
-                i, configurations, selected_config
-            ) 
-            for i in range(n_conf)
-        ]
 
         return (
-            contents,
-            [False if i == (trigger_index) else True for i in range(n_conf)],
             configurations,
             json.dumps(selected_config)
         )

@@ -5,7 +5,7 @@ import logging
 from typing import Any, Callable, MutableSequence, cast
 import uuid
 
-from dash import Patch, html, no_update, set_props
+from dash import Dash, Patch, html, no_update, set_props
 import dash_bootstrap_components as dbc
 
 from newsegsbrowser import icons
@@ -13,8 +13,10 @@ import newsegsbrowser.common as browser
 from newsegsbrowser import variable_dash_component as var_dc
 from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 
+from newsegsbrowser.layouts.results import configuration_selector
 from newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodel.newsegsmodel import NewsegsModel
+from newsegsmetamodel import NewsegsMetaModel
 from newsegsvariable import variable
 import newsegsmetamodel
 
@@ -74,67 +76,25 @@ def create_psa_input(
     else:
         raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
 
-def sync_config(
-    firstload_config_watchers,
-    selected_configuration,
-    configurations,
-    prequeue_locks,
-    input_container_ids,
-    generic_text_ids,
-    trigger_ids,
-    config_name_inputs,
-    app,
-    
+def get_or_create_metamodel_components(
+    selected_configuration: dict[str, Any],
+
     create_default_model: Callable[[], NewsegsModel],
     create_default_finance: Callable[[], NewsegsFinance],
     create_default_variables: Callable[[], MutableSequence[variable.Variable]],
-):
-    """
-    Take values from model/finance and push to interface.
 
-    This is also fired on first load of model page, so is responsible for
-    creation of the first metamodel / configuration.
-    """
-    rval: dict[str, Any] = dict(
-        selected_configuration = no_update,
-        configurations = no_update,
-
-        input_container_children = [no_update] * len(input_container_ids),
-        generic_text_children = [no_update] * len(generic_text_ids),
-        trigger_values = [no_update] * len(trigger_ids),
-        config_name_inputs = dict(values=[no_update]*len(config_name_inputs['ids'])),
-
-        prequeue_action_user = no_update
-    )
-
-    if selected_configuration is None:
-        if configurations is None or len(configurations) == 0:
-            # On first load, we can generate a random configuration
-            configurations = [
-                json.dumps(
-                    newsegsmetamodel.NewsegsMetaModel.generate_new_config()
-                )
-            ]
-        
-        selected_configuration = json.loads(configurations[0])
-        selected_configuration['config_index'] = 0
-    else:
-        selected_configuration = json.loads(selected_configuration)
-    
-    logger.info('Selected configuration is: %s', selected_configuration)
-    
+    app: Dash
+) -> NewsegsMetaModel:
     mdl = app.models.get(selected_configuration['model_id'])
     if mdl is None:
-        # TODO: Deal with if the model should exist.
-        # Need to recreate it from the local store.
+        # TODO: Deal with if the model should exist - need to recreate it from the local store.
         mdl = create_default_model()
         mdl.id = selected_configuration['model_id']
         app.models[mdl.id] = mdl
     
     fnc = app.finances.get(selected_configuration['finance_id'])
     if fnc is None:
-        # TODO: Deal with if the finance should exist.
-        # Need to recreate it from the local store.
+        # TODO: Deal with if the finance should exist - need to recreate it from the local store.
         fnc = create_default_finance()
         fnc.id = selected_configuration['finance_id']
         fnc.set_model(mdl, False)
@@ -153,13 +113,17 @@ def sync_config(
         )
         mm.id = selected_configuration['metamodel_id']
         app.metamodels[mm.id] = mm
-        for idx, id in enumerate(config_name_inputs['ids']):
-            if id.get('index') == selected_configuration['config_index']:
-                if config_name_inputs['values'][idx] != mm.name:
-                    rval['config_name_inputs']['values'][idx] = mm.name
+    
+    return mm
 
+def create_inputs_for_metamodel(
+    mm: NewsegsMetaModel,
+
+    input_container_ids: list[dict[str, Any]]
+) -> list[Any]:
     inputs = []
     logger.info('Creating inputs for metamodel: %s', mm.id)
+
     for ic in input_container_ids:
         cnts = []
         ss = ic.get('supersection')
@@ -195,7 +159,39 @@ def sync_config(
                         )
                     )
         inputs.append(cnts)
+    return inputs
 
+def create_inputs_for_metamodel_list(
+    selected_configuration: dict[str, Any],
+    configurations: list[str],
+    metamodel_input_container_ids: list[dict[str, Any]]
+) -> list[Any]:
+    inputs = []
+    for ic in metamodel_input_container_ids:
+        contents = []
+        ss = ic.get('supersection')
+        sec = ic.get('section')
+        if ss == 'configurations':
+            if sec == 'configuration-selector':
+                contents += [
+                    configuration_selector.create_single_configuration_selector_row(
+                        i, configurations, selected_configuration
+                    ) for i in range(len(configurations))
+                ]
+            elif sec == 'configuration-header-selector':
+                contents += [
+                    configuration_selector.create_config_selector_headerbutton(
+                        i, selected_configuration
+                    ) for i in range(len(configurations))
+                ]
+        inputs.append(contents)
+    return inputs
+
+def create_text_field_values(
+    mm: NewsegsMetaModel,
+
+    generic_text_ids: list[dict[str, Any]],
+) -> list[Any]:
     text_values = []
     for text_id in generic_text_ids:
         match text_id.get('key'):
@@ -205,11 +201,81 @@ def sync_config(
                 text_values.append(mm.name)
             case _:
                 text_values.append(no_update)
+    return text_values
 
-    if mdl.dirty:
+def sync_configuration_names(
+    configurations: list[str],
+    app: Dash
+) -> None:
+    for idx, config in enumerate(configurations):
+        config_dict = json.loads(config)
+        mm = app.metamodels.get(config_dict.get('metamodel_id'))
+        if mm is not None and mm.name != config_dict['name']:
+            config_dict['name'] = mm.name
+            configurations[idx] = json.dumps(config_dict)
+
+def sync_config(
+    firstload_config_watchers,
+    selected_configuration,
+    configurations,
+    prequeue_locks,
+    input_container_ids,
+    metamodel_input_container_ids,
+    generic_text_ids,
+    trigger_ids,
+    config_name_inputs,
+    rval,
+    app,
+    
+    create_default_model: Callable[[], NewsegsModel],
+    create_default_finance: Callable[[], NewsegsFinance],
+    create_default_variables: Callable[[], MutableSequence[variable.Variable]],
+):
+    """
+    Take values from model/finance and push to interface.
+
+    This is also fired on first load of model page, so is responsible for
+    creation of the first metamodel / configuration.
+    """
+
+    if selected_configuration is None:
+        if configurations is None or len(configurations) == 0:
+            # On first load, we can generate a random configuration
+            configurations = [json.dumps(NewsegsMetaModel.generate_new_config()),]
+        
+        selected_configuration = json.loads(configurations[0])
+        selected_configuration['config_index'] = 0
+    else:
+        selected_configuration = json.loads(selected_configuration)
+    
+    logger.info('Selected configuration is: %s', selected_configuration)
+    
+    mm = get_or_create_metamodel_components(
+        selected_configuration, create_default_model, create_default_finance,
+        create_default_variables, app
+    )
+
+    # The inputs for the selected metamodel only (includes headers)
+    inputs = create_inputs_for_metamodel(mm, input_container_ids)
+
+    # The text outputs for the selected metamodel only
+    text_values = create_text_field_values(mm, generic_text_ids)
+
+    # Inputs for any configuration (i.e. names)
+    # In order to prevent a circular callback, renaming the metamodels does not
+    # update the name in either configurations or selected configuration; however,
+    # this does mean that the names stored there do go out of date.
+    sync_configuration_names(configurations, app)
+    selected_configuration['name'] = mm.name
+    
+    metamodel_inputs = create_inputs_for_metamodel_list(
+        selected_configuration, configurations, metamodel_input_container_ids
+    )
+
+    if mm.model.dirty:
         prequeue_patch = Patch()
         if ok_run_model(prequeue_locks['ids'], prequeue_locks['values']):
-            action = browser.model_run_interface_action(metamodel_id = mm.id, model_id = mdl.id)
+            action = browser.model_run_interface_action(metamodel_id = mm.id, model_id = mm.model.id)
             logger.info('Adding model_run_interface_action to prequeue_action_user: %s', action)
             prequeue_patch.append(
                 json.dumps(action.as_dict())
@@ -225,6 +291,7 @@ def sync_config(
     rval['selected_configuration'] = json.dumps(selected_configuration)
     rval['configurations'] = configurations
     rval['input_container_children'] = inputs
+    rval['metamodel_input_container_children'] = metamodel_inputs
     rval['generic_text_children'] = text_values
     rval['trigger_values'] = [datetime.datetime.now().timestamp()] * len(trigger_ids)
     rval['prequeue_action_user'] = prequeue_patch

@@ -58,7 +58,8 @@ def create_results_header(**kwargs):
                                 outline = False
                             )
                         ],
-                        id = 'config-selector-hdrcontainer',
+                        id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-header-selector'},
+                        #id = 'config-selector-hdrcontainer',
                         className = 'configuration-selector-hdrcontainer'
                         ),
 
