@@ -81,7 +81,8 @@
 
 .drawer-title {
     width: 100%;
-    padding: 0 12px;
+    padding-right: 0px;
+    padding-left: 0px;
     margin-top: 12px;
 }
 

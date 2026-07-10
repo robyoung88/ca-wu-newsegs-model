@@ -644,13 +644,6 @@ def sync_psa_results_table_to_store(
 
     return [rval,]
 
-def get_psa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
-    df_id = postprocess_utils.get_psa_result_id(
-        postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
-        selected_configuration.get('metamodel_id')
-    )
-    return app.results.get(df_id)
-
 def sync_psa_primary_plot_to_store(
     psa_table,
     graph_selection_dropdown,
@@ -672,7 +665,7 @@ def sync_psa_primary_plot_to_store(
     
     selected_configuration = json.loads(selected_configuration['value'])
     
-    psa_data = get_psa_raw_data(selected_configuration, app)
+    psa_data = postprocess_utils.get_psa_raw_data(selected_configuration, app)
     
     graph_type = None
     full_draw = False

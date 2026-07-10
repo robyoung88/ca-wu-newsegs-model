@@ -3,6 +3,7 @@ import json
 import logging
 
 from dash import no_update
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -136,3 +137,10 @@ def generic_finance_postprocess(
     app.results[result_id] = postproc_results
 
     return finance_run_0
+
+def get_psa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
+    df_id = get_psa_result_id(
+        RESULT_CACHE_PREFIXES['psa_results'],
+        selected_configuration.get('metamodel_id')
+    )
+    return app.results.get(df_id)

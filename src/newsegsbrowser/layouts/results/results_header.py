@@ -153,7 +153,7 @@ def create_results_header_dsa(**kwargs):
                                 {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
                             ],
                             value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
-                            id = {'type': 'dsa-results-statistic-dropdown', 'page': kwargs.get('page-type', 'None')},
+                            id = {'type': 'dsa-results-statistic-dropdown', 'page': kwargs.get('page_type', 'None')},
                             searchable = False,
                             clearable = False,
                         )
@@ -166,6 +166,43 @@ def create_results_header_dsa(**kwargs):
     )
 
 def create_results_header_psa(**kwargs):
+    button_container_children = [
+        dbc.Button(
+            'Run PSA',
+            color = 'primary',
+            id = {'type': 'psa-prerun-button', 'page': kwargs.get('page_type', 'None')},
+            disabled = False,
+        ),
+        dbc.Button(
+            html.I(
+                className = icons.get_icon('results-download', style_name = 'raw'),
+                style = {'display': 'inline'}
+            ),
+            color = 'secondary',
+            id = {'type': 'results-predownload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+            outline = True,
+            title = 'Download PSA results',
+        ),
+        dcc.Upload(
+            dbc.Button(
+                html.I(
+                    className = icons.get_icon('config-upload', style_name = 'raw'),
+                    style = {'display': 'inline'}       
+                ),
+            
+                color = 'secondary',
+                id = {'type': 'results-upload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+                outline = True,
+                title = 'Upload previous PSA results',
+            ),
+            id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+            multiple = False,
+            enable_folder_selection = False,
+            accept = '.csv',
+            className = 'upload-button',
+        )
+    ]
+
     return html.Div(
         [
             html.Div(
@@ -179,35 +216,23 @@ def create_results_header_psa(**kwargs):
                 target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
             ),
             
-            html.Div(
-                dbc.Container([
-                    dbc.Row([
-                        html.H1(
-                            [icons.get_icon('results'), 'PSA Results'],
-                            style = {
-                                'float': 'left',
-                                'width':'75%'
-                            }
-                        ),
-                        html.Span(
-                            dbc.Button(
-                                'Run PSA',
-                                color = 'primary',
-                                id = {'type': 'psa-prerun-button', 'page': kwargs.get('page_type', 'None')},
-                                disabled = False,
-                                style = {
-                                    'display': 'inline',
-                                    'vertical-align': 'top',
-                                }
+            html.Div([
+                #dbc.Container([
+                    #dbc.Row([
+                        html.Div(
+                            html.H1(
+                                [icons.get_icon('results'), 'PSA Results']
                             ),
-                            style = {
-                                'float': 'right',
-                                'width': '25%'
-                            }
+                            className = 'psa-results-header-title-container'
+                        ),
+                        html.Div(
+                            button_container_children,
+                            className = 'psa-results-header-button-container'
                         )
-                    ]),
+                    #]),
                     
-                ]),
+                #]),
+            ],
             className = 'drawer-title',
             )
         ],

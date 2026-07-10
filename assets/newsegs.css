@@ -71,6 +71,7 @@
 
 .configuration-selector-row-button-container {
     float: right;
+    padding: 0px;
 }
 
 .configuration-selector-row-name-input {
@@ -83,6 +84,23 @@
     background: transparent;
 }
 
+.upload-button {
+    display: inline-block;
+}
+
+div:has(> .upload-button) {
+    display: inline-block;
+}
+
+.psa-results-header-title-container {
+    float: left;
+    width: 75%;
+}
+
+.psa-results-header-button-container {
+    width: 25%;
+    float: right;
+}
 
 /* DSA Configuration */
 

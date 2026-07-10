@@ -4,7 +4,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from dataclasses import asdict as dc_asdict
-from typing import Literal
+from typing import Any, Literal
 from typing import TypeVar
 from typing import overload
 from typing import Optional
@@ -360,3 +360,16 @@ def psa_run_request(
     **kwargs
 ):
     return PSARunAction.from_dict(kwargs)
+
+##### Callback helpers #####
+def get_options(
+    option_ids: list[dict[str, str]],
+    option_values: list[Any],
+    page: str,
+    keys: list[str]
+) -> dict[str, Any]:
+    odict = {}
+    for id, val in zip(option_ids, option_values):
+        if id.get('page') and id.get('key') in keys:
+            odict[id['key']] = val
+    return odict
