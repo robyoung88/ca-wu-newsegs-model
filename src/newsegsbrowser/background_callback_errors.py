@@ -37,6 +37,7 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
 
         if error_target is None:
             return tuple(rval)
+        logger.info('Handling background callback error from target %s', error_target)
         
         err_call = None
         err_idx = None
@@ -78,7 +79,7 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
 
 def background_callback_error_handler_factory(target):
     def error_handler(err: Exception):
-        logger.error(str(err))
+        logger.error('%s from %s', str(err), target)
         if 'PID not found' in str(err):
             set_props('background_callback_error_reporter', {'data': target})
         else:

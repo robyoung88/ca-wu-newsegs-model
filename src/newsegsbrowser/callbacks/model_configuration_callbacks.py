@@ -622,25 +622,24 @@ def add_interface_to_model_callbacks(app):
                                 rval['config_inputs']['model']['values'][i] = new_val
                     
                     if deterministic_changed:
+                        
                         model_changed = True
-                        action = browser.model_interface_action(
+                        action = browser.metamodel_variable_sync_action(
                             metamodel_id = selected_mm.id,
                             debounce = False,
                             **actargs
                         )
+                        # action = browser.model_interface_action(
+                        #     metamodel_id = selected_mm.id,
+                        #     debounce = False,
+                        #     **actargs
+                        # )
                         prequeue.append(
                             json.dumps(
                                 action.as_dict()
                             )
                         )
-                        # prequeue.append(
-                        #     json.dumps(
-                        #         browser.model_interface_action(
-                        #             metamodel_id = selected_mm.id,
-                        #             **pid
-                        #         )
-                        #     )
-                        # )
+                        
 
                         # Trigger a change on all pages
                         rval['config_triggers']['model']['values'] = (
@@ -680,7 +679,12 @@ def add_interface_to_model_callbacks(app):
                         # finance
                         if not hasattr(selected_mm.model, '_cs_result'):
                             
-                            action = browser.model_interface_action(
+                            # action = browser.model_interface_action(
+                            #     metamodel_id = selected_mm.id,
+                            #     debounce = False,
+                            #     **actargs
+                            # )
+                            action = browser.metamodel_variable_sync_action(
                                 metamodel_id = selected_mm.id,
                                 debounce = False,
                                 **actargs
@@ -690,14 +694,7 @@ def add_interface_to_model_callbacks(app):
                                     action.as_dict()
                                 )
                             )
-                            # prequeue.append(
-                            #     json.dumps(
-                            #         browser.model_interface_action(
-                            #             metamodel_id = selected_mm.id,
-                            #             **pid
-                            #         )
-                            #     )
-                            # )
+                            
                         else:
                             action = browser.finance_interface_action(
                                 metamodel_id = selected_mm.id,
@@ -709,14 +706,6 @@ def add_interface_to_model_callbacks(app):
                                     action.as_dict()
                                 )
                             )
-                            # prequeue.append(
-                            #     json.dumps(
-                            #         browser.finance_interface_action(
-                            #                 metamodel_id = selected_mm.id,
-                            #                 **pid
-                            #             )
-                            #     )
-                            # )
                         
                         rval['config_triggers']['finance']['values'] = (
                             [datetime.datetime.now().timestamp()] 
@@ -1129,7 +1118,7 @@ def add_interface_to_model_callbacks(app):
             action = prequeue_action_user
             
             if isinstance(action, list):
-                logger.info('handling %d user actions', len(action))
+                logger.info('handling %d user actions: %s', len(action), action)
                 queue_action_user += action
             else:
                 logger.info('handling single user action')
@@ -1163,7 +1152,52 @@ def add_interface_to_model_callbacks(app):
             action = json.loads(action_json)
             logger.info('queueman_action_user processing action: %s', action)
             match action['type']:
+                case 'metamodel_variable_sync_action':
+                    if not(action['debounce']) or (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
+                        mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                        logger.info('Checking if model %s is checked out: %s', mm.model.id, mm.model.checked_out)
+                        logger.info('Checking if finance %s is checked out: %s', mm.finance.id, mm.finance.checked_out)
+                        if not mm.model.checked_out and not mm.finance.checked_out:
+                            # NB - this function has side effect of popping matches from queue_action_user
+                            dispatch_actions = find_matching_actions(
+                                queue_action_user,
+                                action,
+                                i,
+                                'metamodel_variable_sync_action'
+                            )
+
+                            # Only need to run from the first to ensure we get them all
+                            models_affected = mm.sync_model_with_changed_variables_deterministic()
+                            if 'model' in models_affected:
+                                # Model will be dirty. If ok to, add to queue.
+                                if ok_run_model(prequeue_lock_ids, prequeue_lock_values):
+                                    r_model_run_request = browser.model_run_request(
+                                        metamodel_id = mm.id, 
+                                        model_id = mm.model.id
+                                    )
+                                    model_prequeue_patch = Patch()
+                                    model_prequeue_patch.append(json.dumps(r_model_run_request.as_dict()))
+
+                                    logger.info('queueman_action_user adding a model run request for %s', mm.model.id)
+                                    rval['prequeue_model_run'] = model_prequeue_patch
+                            elif 'finance' in models_affected:
+                                if ok_run_finance(prequeue_lock_ids, prequeue_lock_values):
+                                    r_finance_run_request = browser.finance_run_request(
+                                        metamodel_id = mm.id,
+                                        finance_id = mm.finance.id, 
+                                        model_id = mm.model.id
+                                    )
+                                    finance_prequeue_patch = Patch()
+                                    finance_prequeue_patch.append(json.dumps(r_finance_run_request.as_dict()))
+
+                                    logger.info('queueman_action_user adding a finance run request for %s', mm.finance.id)
+                                    rval['prequeue_finance_run'] = finance_prequeue_patch
+                            
+                            rval['interval_action_user'] = len(queue_action_user) == 0
+                            return rval
+
                 case 'model_config_interface_update':
+                    logger.warning('model_config_interface_update - deprecated')
                     if not(action['debounce']) or (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
                         mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if model %s is checked out: %s', mm.model.id, mm.model.checked_out)
@@ -1212,6 +1246,7 @@ def add_interface_to_model_callbacks(app):
                             return rval
 
                 case 'finance_config_interface_update':
+                    logger.warning('finance_config_interface_update - deprecated')
                     if not(action['debounce']) or (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
                         mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if finance %s is checked out: %s', mm.finance.id, mm.finance.checked_out)

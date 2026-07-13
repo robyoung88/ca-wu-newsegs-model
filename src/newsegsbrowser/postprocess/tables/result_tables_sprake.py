@@ -895,8 +895,9 @@ def create_so_value_results(econ_data=None, annual=True):
             simple_stats,
             compound_stats
         ])
-        .iloc[[0,3,1,4,2],:]
     )
+    if len(out_table) >= 5:
+        out_table = out_table.iloc[[0,3,1,4,2],:]
 
     out_table.index.names = [None, None]
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2"></i>' for x in out_table.columns]

@@ -123,7 +123,7 @@ def serve_layout():
         html.Div(id = 'page-content'),
         dcc.Store(id = 'selected-model', data = 'sprake'),
         dcc.Store(id = 'store-selected-configuration'),
-        dcc.Store(id = 'store-configurations')
+        dcc.Store(id = 'store-configurations', data = []),
     ])
 
 def add_display_callbacks(app: Dash) -> Dash:
@@ -136,23 +136,38 @@ def add_display_callbacks(app: Dash) -> Dash:
         Output('page-content', 'children'),
         Input('url', 'pathname'),
         State('selected-model', 'data'),
-        State('store-selected-configuration', 'data')
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data')
     )
-    def display_page(pathname, selected_model, selected_conf):
-        print(selected_conf)
-        print(pathname)
+    def display_page(pathname, selected_model, selected_conf, configurations):
+        
+        current_page = app.sts.get('current_page')
+
+        if current_page is not None and current_page == pathname:
+            return no_update
+        
+        app.sts['current_page'] = pathname
 
         if pathname == '/' or pathname == '/model_selection':
             return model_selection_layout.model_selection_layout
         
         splitname = str(pathname).lstrip('/').split("/")
         selected_model = splitname[0]
-        print(selected_model)
+        
         if not selected_model in ['sprake','localised']:
             return model_selection_layout.model_selection_layout
         
         pagename = '/'.join(splitname[1:])
-        print(pagename)
+        
+        # As we are changing page, we will naturally lose any of our background callbacks
+        # Therefore, make sure that all models in all configs are unlocked.
+        for config_j in configurations:
+            mm = app.metamodels.get(json.loads(config_j).get('metamodel_id'))
+            if mm is not None:
+                mm.model.checked_out = False
+                mm.finance.checked_out = False
+
+
         if pagename == 'landing':
             return template_landing_layout.create_landing_layout(
                 **layout_registry.get_landing_layout_config(
@@ -316,12 +331,7 @@ def add_caching_callbacks(app):
                         progress = set_progression
                     ).set_index(['variable', 'bound'])
                     dsa_results.to_csv(debug_dsa_run_results_fn)
-                dsa_result_id = postprocess_utils.get_dsa_result_id(
-                    postprocess_utils.RESULT_CACHE_PREFIXES['dsa_results'],
-                    mm.id
-                )
-                mm.last_dsa_run = datetime.datetime.now().timestamp()
-                setattr(dsa_results, '_run_time', mm.last_dsa_run)
+                dsa_result_id = postprocess_utils.assign_dsa_results(mm, dsa_results)
                 cache[dsa_result_id] = dsa_results
 
                 # Not convinced this is necessary
@@ -375,13 +385,7 @@ def add_caching_callbacks(app):
                     psa_results.to_csv(debug_psa_run_results_fn)
 
                 set_progress(json.dumps(dict(value=str(3),max=str(3),message='syncing results')))
-                psa_result_id = postprocess_utils.get_psa_result_id(
-                    postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
-                    mm.id
-                )
-
-                mm.last_psa_run = datetime.datetime.now().timestamp()
-                setattr(psa_results, '_run_time', mm.last_psa_run)
+                psa_result_id = postprocess_utils.assign_psa_results(mm, psa_results)
                 cache[psa_result_id] = psa_results
 
         metamodels[mm.id] = mm

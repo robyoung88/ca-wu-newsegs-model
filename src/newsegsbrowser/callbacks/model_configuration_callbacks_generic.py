@@ -207,6 +207,9 @@ def sync_configuration_names(
     configurations: list[str],
     app: Dash
 ) -> None:
+    """
+    Update configuration list with the present name of their metamodels
+    """
     for idx, config in enumerate(configurations):
         config_dict = json.loads(config)
         mm = app.metamodels.get(config_dict.get('metamodel_id'))
@@ -272,21 +275,24 @@ def sync_config(
         selected_configuration, configurations, metamodel_input_container_ids
     )
 
-    if mm.model.dirty:
+    if len(mm.require_sync) > 0:
+        # First, need to get the model synced up with its own variables. Then run model if we can.
+        prequeue_patch = Patch()
+        action = browser.metamodel_variable_sync_action(metamodel_id = mm.id)
+        logger.info('Adding metamodel_variable_sync_action to prequeue_action_user: %s', action)
+        prequeue_patch.append(json.dumps(action.as_dict()))
+
+    elif mm.model.dirty:
         prequeue_patch = Patch()
         if ok_run_model(prequeue_locks['ids'], prequeue_locks['values']):
             action = browser.model_run_interface_action(metamodel_id = mm.id, model_id = mm.model.id)
             logger.info('Adding model_run_interface_action to prequeue_action_user: %s', action)
-            prequeue_patch.append(
-                json.dumps(action.as_dict())
-            )
+            prequeue_patch.append(json.dumps(action.as_dict()))
     else:
         prequeue_patch = Patch()
         action = browser.result_update_interface_action(metamodel_id = mm.id, debounce = False)
         logger.info('Adding result_update_interface_action to prequeue_action_user: %s', action)
-        prequeue_patch.append(
-            json.dumps(action.as_dict())
-        )
+        prequeue_patch.append(json.dumps(action.as_dict()))
 
     rval['selected_configuration'] = json.dumps(selected_configuration)
     rval['configurations'] = configurations

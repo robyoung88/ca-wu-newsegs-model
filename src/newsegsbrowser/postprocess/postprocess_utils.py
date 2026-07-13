@@ -1,9 +1,13 @@
 import copy
 import json
 import logging
+import time
+from typing import Any
 
 from dash import no_update
 import pandas as pd
+
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,42 @@ def get_model_result_list(prefix, configs, app):
 
 def get_finance_result_list(prefix, configs, app):
     return [app.results.get(get_finance_result_id(prefix, json.loads(x)['finance_id'], json.loads(x)['model_id'])) for x in configs]
+
+def assign_dsa_results(
+    mm: NewsegsMetaModel,
+    results: pd.DataFrame,
+    run_time: float | None = None,
+) -> str:
+    """
+    Add or assign the appropriate attributes to match up dsa results to metamodels
+
+    Returns the result_id for caching
+    """
+    if run_time is None:
+        run_time = time.time()
+    result_id = get_dsa_result_id(RESULT_CACHE_PREFIXES['dsa_results'], mm.id)
+
+    mm.last_dsa_run = run_time
+    setattr(results, '_run_time', run_time)
+    return result_id
+
+def assign_psa_results(
+    mm: NewsegsMetaModel,
+    results: pd.DataFrame,
+    run_time: float | None = None,
+) -> str:
+    """
+    Add or assign the appropriate attributes to match up psa results to metamodels
+
+    Returns the result_id for caching
+    """
+    if run_time is None:
+        run_time = time.time()
+    result_id = get_psa_result_id(RESULT_CACHE_PREFIXES['psa_results'], mm.id)
+
+    mm.last_psa_run = run_time
+    setattr(results, '_run_time', run_time)
+    return result_id
 
 def generic_model_postprocess(
     model_run,
@@ -138,16 +178,35 @@ def generic_finance_postprocess(
 
     return finance_run_0
 
-def get_dsa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
+def get_dsa_raw_data(
+    metamodel: str | dict[str, str] | NewsegsMetaModel,
+    app
+) -> pd.DataFrame | None:
+    if isinstance(metamodel, NewsegsMetaModel):
+        mm_id = metamodel.id
+    elif isinstance(metamodel, dict):
+        mm_id = metamodel['metamodel_id']
+    else:
+        mm_id = metamodel
     df_id = get_dsa_result_id(
         RESULT_CACHE_PREFIXES['dsa_results'],
-        selected_configuration.get('metamodel_id')
+        mm_id
     )
     return app.results.get(df_id)    
 
-def get_psa_raw_data(selected_configuration, app) -> pd.DataFrame | None:
+def get_psa_raw_data(
+        metamodel: str | dict[str, str] | NewsegsMetaModel,
+        app
+    ) -> pd.DataFrame | None:
+    if isinstance(metamodel, NewsegsMetaModel):
+        mm_id = metamodel.id
+    elif isinstance(metamodel, dict):
+        mm_id = metamodel['metamodel_id']
+    else:
+        mm_id = metamodel
     df_id = get_psa_result_id(
         RESULT_CACHE_PREFIXES['psa_results'],
-        selected_configuration.get('metamodel_id')
+        mm_id
     )
+    logger.info('finding result %s', df_id)
     return app.results.get(df_id)

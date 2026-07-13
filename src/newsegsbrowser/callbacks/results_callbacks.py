@@ -1,9 +1,12 @@
 import json
+import logging
 from typing import Any
 
-from dash import ALL, Dash, Input, Output, State, no_update
+from dash import ALL, Dash, Input, Output, State, no_update, ctx
 
 from newsegsbrowser.callbacks import callbacks_map
+
+logger = logging.getLogger(__name__)
 
 def add_result_header_callbacks(app: Dash):
 
@@ -374,6 +377,7 @@ def add_result_table_callbacks(app):
         selected_conf,
         selected_model
     ):
+        logger.info('sync_psa_results_table_to_store triggered by %s', ctx.triggered_id)
         return callbacks_map.CALLBACKS_MAP[selected_model]['sync_psa_results_table_to_store'](
             psa_table_trigger,
             table_ids,

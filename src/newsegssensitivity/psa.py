@@ -89,7 +89,7 @@ def _psa_float_statistic_mapper(
     
     raise ValueError(f'stat {stat} is not known as a PSA statistic')
 
-def _make_psa_result(
+def make_psa_result(
     mm: NewsegsMetaModel,
     mdl: NewsegsModel,
     fnc: NewsegsFinance,
@@ -141,7 +141,7 @@ def run_psa(
         mdl.run()
         fnc.run()
 
-        res = _make_psa_result(mm, mdl, fnc, statistics, return_draws)
+        res = make_psa_result(mm, mdl, fnc, statistics, return_draws)
         res['deterministic'] = True
         res['draw'] = 0
         results.append(res)
@@ -170,7 +170,7 @@ def run_psa(
             mdl.run()
             fnc.run()
 
-            res = _make_psa_result(mm, mdl, fnc, statistics, return_draws)
+            res = make_psa_result(mm, mdl, fnc, statistics, return_draws)
             res['deterministic'] = False
             res['draw'] = i+1
             results.append(res)
@@ -182,6 +182,8 @@ def run_psa(
             v.psa_active = False
             v.update_model(mdl)
             v.update_model(fnc)
+            mdl.run()
+            fnc.run()
     
     results = pd.DataFrame(results)
     return results
@@ -279,6 +281,9 @@ def psa_scatter_data(
         .assign(
             cost_effective = lambda df: (df[benefit_statistic] > df[cost_statistic]).map({True: 'CE', False: 'Not CE'})
         )
+        .assign(
+            cost_effective = lambda df: pd.Categorical(df['cost_effective'], categories=['CE', 'Not CE'], ordered = True)
+        )
     )
 
     det_point = (
@@ -330,15 +335,47 @@ def psa_scatter(
     bb = psa_scatter_bounds(plot_data.scatter_data)
 
     # First draw - the scatter
+    firstdraw_data = pd.DataFrame.from_dict(
+        {
+            cost_statistic: [1., 1.],
+            benefit_statistic: [0.5, 1.],
+            'cost_effective' : pd.Categorical(
+                ['Not CE', 'CE'],
+                categories=['CE', 'Not CE'],
+                ordered = True
+            )
+        }
+    )
+    
     fig = px.scatter(
-        plot_data.scatter_data,
+        firstdraw_data,
         x=cost_statistic,
         y=benefit_statistic,
         color='cost_effective',
         color_discrete_map={'CE': 'green', 'Not CE': 'red'},
+        category_orders = {'cost_effective': ['CE', 'Not CE']},
         labels={'cost_effective': 'Cost effective?'} ,
         opacity=point_alpha
     )
+
+    scatterdata = plot_data.scatter_data.set_index('cost_effective')
+    # Scatter not CE
+    draw_index = 0
+    if 'CE' in scatterdata.index:
+        fig.data[draw_index]['x'] = pd.Series(scatterdata.loc['CE', cost_statistic])
+        fig.data[draw_index]['y'] = pd.Series(scatterdata.loc['CE', benefit_statistic])
+    else:
+        fig.data[draw_index]['x'] = []
+        fig.data[draw_index]['y'] = []
+
+    # Scatter CE
+    draw_index += 1
+    if 'Not CE' in scatterdata.index:
+        fig.data[draw_index]['x'] = pd.Series(scatterdata.loc['Not CE', cost_statistic])
+        fig.data[draw_index]['y'] = pd.Series(scatterdata.loc['Not CE', benefit_statistic])
+    else:
+        fig.data[draw_index]['x'] = []
+        fig.data[draw_index]['y'] = []
 
     # Second draw - the reference line
     # NB - xmin should equal ymin of bb, but just in case:
@@ -353,7 +390,7 @@ def psa_scatter(
         yref='y'
     )
 
-    # Third draw - the DSA point
+    # Third draw - the Deterministic point
     fig.add_trace(
         go.Scatter(
             x=[plot_data.det_point[cost_statistic]],
@@ -428,20 +465,28 @@ def psa_scatter_update(
     bb = psa_scatter_bounds(plot_data.scatter_data)
 
     scatterdata = plot_data.scatter_data.set_index('cost_effective')
-    # Scatter not CE
-    draw_index = 0
-    fig_patch['data'][draw_index]['x'] = scatterdata.loc['Not CE', cost_statistic]
-    fig_patch['data'][draw_index]['y'] = scatterdata.loc['Not CE', benefit_statistic]
-
     # Scatter CE
+    draw_index = 0
+    if 'CE' in scatterdata.index:
+        fig_patch['data'][draw_index]['x'] = pd.Series(scatterdata.loc['CE', cost_statistic])
+        fig_patch['data'][draw_index]['y'] = pd.Series(scatterdata.loc['CE', benefit_statistic])
+    else:
+        fig_patch['data'][draw_index]['x'] = []
+        fig_patch['data'][draw_index]['y'] = []
+
+    # Scatter noot CE
     draw_index += 1
-    fig_patch['data'][draw_index]['x'] = scatterdata.loc['CE', cost_statistic]
-    fig_patch['data'][draw_index]['y'] = scatterdata.loc['CE', benefit_statistic]
+    if 'Not CE' in scatterdata.index:
+        fig_patch['data'][draw_index]['x'] = pd.Series(scatterdata.loc['Not CE', cost_statistic])
+        fig_patch['data'][draw_index]['y'] = pd.Series(scatterdata.loc['Not CE', benefit_statistic])
+    else:
+        fig_patch['data'][draw_index]['x'] = []
+        fig_patch['data'][draw_index]['y'] = []
 
     # Deterministic
     draw_index += 1
-    fig_patch['data'][draw_index]['x'] = plot_data.det_point[cost_statistic]
-    fig_patch['data'][draw_index]['y'] = plot_data.det_point[benefit_statistic]
+    fig_patch['data'][draw_index]['x'] = pd.Series(plot_data.det_point[cost_statistic])
+    fig_patch['data'][draw_index]['y'] = pd.Series(plot_data.det_point[benefit_statistic])
 
     # Reference line
     fig_patch['layout']['shapes'][0].update(

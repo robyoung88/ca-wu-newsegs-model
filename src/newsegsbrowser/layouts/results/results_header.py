@@ -59,7 +59,6 @@ def create_results_header(**kwargs):
                             )
                         ],
                         id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-header-selector'},
-                        #id = 'config-selector-hdrcontainer',
                         className = 'configuration-selector-hdrcontainer'
                         ),
 
@@ -141,7 +140,7 @@ def create_results_header_dsa(**kwargs):
             id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
             multiple = False,
             enable_folder_selection = False,
-            accept = '.csv',
+            accept = '.csv,.xlsx,.zip',
             className = 'upload-button',
         )
     ]
@@ -212,7 +211,7 @@ def create_results_header_psa(**kwargs):
             dbc.Button(
                 html.I(
                     className = icons.get_icon('config-upload', style_name = 'raw'),
-                    style = {'display': 'inline'}       
+                    style = {'display': 'inline'}
                 ),
             
                 color = 'secondary',
@@ -223,7 +222,7 @@ def create_results_header_psa(**kwargs):
             id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
             multiple = False,
             enable_folder_selection = False,
-            accept = '.csv',
+            accept = '.csv,.xlsx,.zip',
             className = 'upload-button',
         )
     ]

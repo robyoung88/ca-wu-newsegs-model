@@ -3001,7 +3001,6 @@ def update_model_with_value(
     last_dict[model_parameter] = value
     model.update(update_dict)
 
-
 class Variable(
     newsegscomponent.NewsegsComponent
 ):

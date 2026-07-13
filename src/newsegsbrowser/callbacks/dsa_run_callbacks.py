@@ -1,15 +1,18 @@
 """
 Callbacks for handling DSA runs
 """
+import base64
 import io
 import json
 import logging
+import os
 import tempfile
 from typing import Any
 import zipfile
 
 from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
 import dash_ag_grid as dag
+import pandas as pd
 import pathvalidate
 
 from newsegsbrowser import common as browser
@@ -178,6 +181,152 @@ def add_dsa_run_callbacks(app: Dash):
                 rval['modal']['is_opens'] = [False] * n_modals
         return rval
     
+    @app.callback(
+        output = dict(
+            configurations = Output('store-configurations', 'data', allow_duplicate = True),
+            selected_configuration = Output('store-selected-configuration', 'data', allow_duplicate = True),
+
+            triggers = dict(values = Output({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'data', allow_duplicate = True))
+        ),
+        inputs = dict(
+            uploads = dict(
+                datas = Input({'type': 'results-upload', 'page': ALL, 'key': 'dsa'}, 'contents'),
+                filenames = Input({'type': 'results-upload', 'page': ALL, 'key': 'dsa'}, 'filename'),
+                ids = State({'type': 'results-upload', 'page': ALL, 'key': 'dsa'}, 'id')
+            )
+        ),
+        state = dict(
+            triggers = dict(ids = State({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'id')),
+            configurations = State('store-configurations', 'data'),
+            selected_configuration = State('store-selected-configuration', 'data'),
+        ),
+        prevent_initial_call = True
+    )
+    def upload_psa_results(
+        uploads,
+        triggers,
+        configurations,
+        selected_configuration
+    ):
+        rval: dict[str, Any] = dict(
+            configurations = no_update,
+            selected_configuration = no_update,
+            triggers = dict(values = [no_update] * len(triggers['ids']))
+        )
+
+        trig = ctx.triggered_id
+        if trig is None:
+            return rval
+        
+        page = trig.get('page')
+        
+        raw_data = None
+        raw_filename = None
+        for idx, id in enumerate(uploads['ids']):
+            if id['page'] == trig['page'] and id['key'] == trig['key']:
+                if uploads['datas'][idx] is None:
+                    return rval
+                raw_data = uploads['datas'][idx]
+                raw_filename = uploads['filenames'][idx]
+                break
+        if raw_data is None:
+            return rval
+        
+        ctype, cstr = raw_data.split(',')
+        decoded = base64.b64decode(cstr)
+        split_fn = str(raw_filename).rsplit('.', 1)
+        if len(split_fn) == 2:
+            file_ext = split_fn[1]
+        else:
+            file_ext = 'csv'
+        
+        result_df = None
+        selected_configuration = json.loads(selected_configuration)
+        try:
+            match file_ext:
+                case 'csv':
+                    result_df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+                case 'xlsx':
+                    result_df = pd.read_excel(io.BytesIO(decoded))
+                case 'zip':
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        with zipfile.ZipFile(io.BytesIO(decoded), 'r') as zip_ref:
+                            zip_ref.extractall(temp_dir)
+                        
+                        results_file = None
+                        for root, dirs, files in os.walk(temp_dir):
+                            for file in files:
+                                if file.endswith('dsa-results.csv') or file.endswith('dsa-results.xlsx'):
+                                    results_file = os.path.join(root, file)
+                                    break
+                        if results_file is None:
+                            return rval
+                        
+                        new_mm = None
+                        for root, dirs, files in os.walk(temp_dir):
+                            for file in files:
+                                if file.endswith('.json'):
+                                    json_file = os.path.join(root, file)
+                                    try:
+                                        with open(json_file, 'r') as f:
+                                            cfg = json.load(f)
+                                            new_mm = browser.metamodel_from_configuration_file(
+                                                cfg,
+                                                selected_configuration,
+                                                configurations,
+                                                app,
+                                                overwrite_selected_config = False
+                                            )
+                                            if new_mm is not None:
+                                                break
+                                    except ValueError as e:
+                                        logger.error(str(e))
+                                        continue
+                        
+                        if new_mm:
+                            selected_configuration = new_mm.to_config()
+                            selected_configuration['config_index'] = len(configurations) - 1
+                            
+                            rval['configurations'] = configurations
+                            rval['selected_configuration'] = json.dumps(selected_configuration) # pyright: ignore[reportArgumentType]
+                        
+                        split_results_fn = str(results_file).rsplit('.', 1)
+                        if len(split_results_fn) == 2:
+                            result_file_ext = split_results_fn[1]
+                        else:
+                            result_file_ext = 'csv'
+                        match result_file_ext:
+                            case 'csv':
+                                result_df = pd.read_csv(results_file)
+                            case 'xlsx':
+                                result_df = pd.read_excel(results_file)
+        except Exception as e:
+            logger.error(e)
+            return rval
+        
+        if result_df is None:
+            # Should never be reached
+            logger.error('No results in archive, but initial results file check has passed')
+            return rval
+        
+        # Set the result_df as appropriate for a psa result and trigger post-processing
+        result_df = result_df.set_index(['variable', 'bound'])
+        mm = app.metamodels[selected_configuration['metamodel_id']]
+        result_id = postprocess_utils.assign_dsa_results(mm, result_df)
+        logger.info('Results %s created', result_id)
+        app.results[result_id] = result_df
+
+        for idx, id in enumerate(triggers['ids']):
+            if id.get('page') == page:
+                rval['triggers']['values'][idx] = [json.dumps(
+                    browser.dsa_run_request(
+                        metamodel_id = mm.id,
+                        debounce = False,
+                    ).as_dict()
+                )]
+
+        return rval
+
     @app.callback(
         Output('prequeue-action-user', 'data', allow_duplicate = True),
         

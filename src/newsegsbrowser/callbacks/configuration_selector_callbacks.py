@@ -1,6 +1,7 @@
 import base64
 import copy
 import json
+import logging
 from typing import cast, Any
 
 from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
@@ -13,6 +14,8 @@ from newsegsbrowser.layouts.results import configuration_selector
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
+
+logger = logging.getLogger(__name__)
 
 def metamodel_to_dict(mm: NewsegsMetaModel) -> dict[str, Any]:
     """
@@ -113,38 +116,27 @@ def add_configuration_selection_callbacks(app: Dash):
 
             # Make the copy
             ref_config = json.loads(configurations[trigger_index])
+
+            try:
+                mm_dup = browser.duplicate_metamodel(
+                    ref_config['metamodel_id'],
+                    configurations,
+                    app
+                )
+            except (TypeError, ValueError) as e:
+                logger.error(str(e))
+                return NUP
             
-            mm_dup = cast(NewsegsMetaModel, app.duplicate_metamodel(ref_config['metamodel_id']))
-            mdl = mm_dup.model
-            fnc = mm_dup.finance
-
-            mm_dup.name = mm_dup.name + " Copy"
-            new_config = mm_dup.to_config()
-
-            configurations.append(json.dumps(new_config))
+            new_selected_config = None
+            for idx, jconf in enumerate(configurations):
+                conf = json.loads(jconf)
+                if conf.get('metamodel_id') == mm_dup.id:
+                    new_selected_config = conf
+                    new_selected_config['config_index'] = idx
+                    break
             
-            selected_config = new_config.copy()
-            selected_config['config_index'] = len(configurations) - 1
-
-            # Let's copy over the results
-            mdl_ref = app.models.get(ref_config['model_id'])
-            if hasattr(mdl_ref, '_generation_result'):
-                mdl._generation_result = copy.copy(mdl_ref._generation_result) # pyright: ignore[reportAttributeAccessIssue]
-                mdl.generation._dirty = False
-            if hasattr(mdl_ref, '_grid_result'):
-                mdl._grid_result = copy.copy(mdl_ref._grid_result) # pyright: ignore[reportAttributeAccessIssue]
-                mdl.grid._dirty = False
-            if hasattr(mdl_ref, '_cs_result')    :
-                mdl._cs_result = copy.copy(mdl_ref._cs_result) # pyright: ignore[reportAttributeAccessIssue]
-                mdl.consumption_storage._dirty = False
-            mdl._dirty = False
-            
-            # Because of the different uuid, the caches will not recognise this model,
-            # or its finance, but just for info:
-            print(f'model is duplicated from {mdl_ref.id} to {mdl.id} and dirty is {mdl.dirty}')
-
-            fnc._dirty = False
-
+            if new_selected_config is not None:
+                selected_config = new_selected_config
         else:
             return NUP
 
@@ -213,24 +205,7 @@ def add_configuration_selection_callbacks(app: Dash):
             selected_config = json.loads(configurations[trigger_index-1])
             selected_config['config_index'] = trigger_index - 1
         
-        safe_drop = True
-        for conf in configurations:
-            if json.loads(conf)['model_id'] == dropped['model_id']:
-                safe_drop = False
-        
-        if safe_drop:
-            app.remove_model(dropped['model_id'])
-        
-        safe_drop = True
-        for conf in configurations:
-            if json.loads(conf)['finance_id'] == dropped['finance_id']:
-                safe_drop = False
-        
-        if safe_drop:
-            app.remove_finance(dropped['finance_id'])
-
-        # Always safe to drop the metamodel, just don't necessarily remove the children
-        app.remove_metamodel(dropped['metamodel_id'], False)
+        browser.safe_remove_metamodel(dropped['metamodel_id'], configurations, app)
 
         return (
             configurations,
@@ -375,28 +350,30 @@ def add_configuration_selection_callbacks(app: Dash):
         
         working_conf = json.loads(configurations[trigger_index])
 
-        working_mm = app.metamodel.get(working_conf['metamodel_id'])
-        mdl = working_mm.model
-        fnc = working_mm.finance
-
         cfg = config_jsons[trigger_index]
         ctype, cstr = cfg.split(',')
         cfg = json.loads(base64.b64decode(cstr))
 
-        mm_id = working_mm.id
-        mdl_id = mdl.id
-        fnc_id = fnc.id
-        working_mm.update(cfg['metamodel'])
-        mdl.update(cfg['model'])
-        fnc.update(cfg['finance'])
-        
-        # Caution - this will invalidate the results
-        working_mm.id = mm_id
-        mdl.id = mdl_id
-        fnc.id = fnc_id
-        fnc.set_model(mdl)
-        working_mm.model = mdl
-        working_mm.finance = fnc
+        try:
+            working_mm = browser.metamodel_from_configuration_file(
+                cfg,
+                app.metamodel.get(working_conf['metamodel_id']),
+                configurations,
+                app,
+                overwrite_selected_config = True
+            )
+        except Exception as e:
+            logger.error(e)
+            return (
+                configurations,
+                no_update
+            )
+      
+        if working_mm is None:
+            return (
+                configurations,
+                no_update
+            )
         
         selected_config = working_mm.to_config()
         configurations[trigger_index]  = json.dumps(selected_config)
