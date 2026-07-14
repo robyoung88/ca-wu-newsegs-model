@@ -27,27 +27,30 @@ def create_results_header(**kwargs):
             html.Div(
                 dbc.Container([
                     dbc.Row([
-                        html.H1(
-                            [
-                                icons.get_icon('results'), 
-                                'Results',
-                                dbc.Button(
-                                    html.I(
-                                        className = icons.get_icon(autorun_icon, style_name = 'raw'),
-                                        style={'display': 'inline'}
-                                    ),
-                                    color = 'primary' if autorun else 'secondary',
-                                    id = {'type': 'autorun-btn', 'page': kwargs.get('page_type', 'None')},
-                                    outline = not(autorun),
-                                    style = {
-                                        'margin-left': '5px',
-                                        'border-radius': '50%',
-                                    }
-                                )
-                            ],
+                        html.Div(
+                            html.H1(
+                                [
+                                    icons.get_icon('results'), 
+                                    'Results',
+                                    dbc.Button(
+                                        html.I(
+                                            className = icons.get_icon(autorun_icon, style_name = 'raw'),
+                                            style={'display': 'inline'}
+                                        ),
+                                        color = 'primary' if autorun else 'secondary',
+                                        id = {'type': 'autorun-btn', 'page': kwargs.get('page_type', 'None')},
+                                        outline = not(autorun),
+                                        style = {
+                                            'margin-left': '5px',
+                                            'border-radius': '50%',
+                                        }
+                                    )
+                                ],
+                                
+                            ),
                             className = 'results-title-block'
                         ),
-                        html.Span([
+                        html.Div([
                             dbc.Button(
                                 html.I(
                                     className = icons.get_icon('config-1', style_name = 'raw'),
@@ -62,7 +65,7 @@ def create_results_header(**kwargs):
                         className = 'configuration-selector-hdrcontainer'
                         ),
 
-                        html.Span([
+                        html.Div([
                             dbc.Button(
                                 html.I(
                                     className = icons.get_icon('show-graph', style_name = 'raw'),
@@ -113,6 +116,7 @@ def create_results_header_dsa(**kwargs):
             'Run DSA',
             color = 'primary',
             id = {'type': 'dsa-prerun-button', 'page': kwargs.get('page_type', 'None')},
+            title = 'Start DSA run',
             disabled = False,
         ),
         dbc.Button(
