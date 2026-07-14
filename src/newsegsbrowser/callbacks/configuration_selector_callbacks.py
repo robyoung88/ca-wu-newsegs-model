@@ -117,6 +117,8 @@ def add_configuration_selection_callbacks(app: Dash):
             # Make the copy
             ref_config = json.loads(configurations[trigger_index])
 
+            mm = app.metamodels.get(ref_config['metamodel_id'])
+
             try:
                 mm_dup = browser.duplicate_metamodel(
                     ref_config['metamodel_id'],

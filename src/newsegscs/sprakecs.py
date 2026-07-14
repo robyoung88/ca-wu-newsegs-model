@@ -222,7 +222,7 @@ class SprakeCS(NewsegsCS):
     
     # Copy constructor is registered underneath class definition for late-bind.
 
-    @__init__.register(AnyNumber)
+    @__init__.register(AnyNumber) # pyright: ignore[reportCallIssue]
     def _from_AnyNumber(
         self,
         n_units: AnyNumber,

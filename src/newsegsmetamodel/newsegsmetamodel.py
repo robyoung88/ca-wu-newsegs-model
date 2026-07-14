@@ -235,6 +235,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
                 affected_models.add(self.update_model_from_variable_deterministic(varid))
             except ValueError as e:
                 logger.error(e)
+
         if 'model' in affected_models:
             self.model._dirty = True
         if 'finance' in affected_models:

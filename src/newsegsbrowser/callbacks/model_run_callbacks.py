@@ -125,9 +125,19 @@ def add_model_run_callbacks(app: Dash):
                 if not(request_l['debounce']) or nowtime - request_l['time'] > RUN_DEBOUNCE_SECONDS:
                     mdl = app.models[request_l['model_id']]
                     if not mdl.checked_out:
+                        dispatch_request = queue_model_run.pop(i)
+                        dr_dict = json.loads(dispatch_request)
+                        if not dr_dict.get('force') and not mdl.dirty:
+                            logger.info('Removing from model run queue: %s - model is clean', dispatch_request)
+                            return (
+                                no_update,
+                                [],
+                                len(queue_model_run) == 0,
+                                True,
+                            )
+                        
                         logger.info('checking out model: %s', mdl.id)
                         mdl.checked_out = True
-                        dispatch_request = queue_model_run.pop(i)
                         logger.info('model run dispatched: %s, %s', dispatch_request, datetime.datetime.now())
                         app.sts[app_dispatch_key] = dispatch_request
                         return (
@@ -339,9 +349,20 @@ def add_finance_run_callbacks(app: Dash):
                     mdl = app.models[request_l['model_id']]
                     fnc = app.finances[request_l['finance_id']]
                     if not mdl.checked_out and not fnc.checked_out:
+                        dispatch_request = queue_finance_run.pop(i)
+                        dr_dict = json.loads(dispatch_request)
+                        if not dr_dict.get('force') and not fnc.dirty:
+                            logger.info('Removing from finance run queue: %s - finance is clean', dispatch_request)
+                            return (
+                                [],
+                                no_update,
+                                len(queue_finance_run) == 0,
+                                True,
+                            )
+
                         logger.info('checking out finance: %s', fnc.id)
                         fnc.checked_out = True
-                        dispatch_request = queue_finance_run.pop(i)
+                        
                         logger.info('finance run dispatched: %s, %s', dispatch_request, datetime.datetime.now())
                         app.sts[app_dispatch_key] = dispatch_request
                         return (

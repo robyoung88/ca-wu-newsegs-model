@@ -39,7 +39,7 @@ def _dsa_float_statistic_mapper(
     
     raise ValueError(f'stat {stat} is not known as a DSA statistic')
 
-def _make_dsa_result(
+def make_dsa_result(
     variable_changed: str,
     dsa_bound: str,
     variable_value: str,
@@ -83,7 +83,7 @@ def run_dsa(
     mdl.run()
     fnc.run()
     results.append(
-        _make_dsa_result('deterministic', 'central', '-', mdl, fnc, statistics)
+        make_dsa_result('deterministic', 'central', '-', mdl, fnc, statistics)
     )
     if progress is not None:
         prog_i += 1
@@ -105,7 +105,7 @@ def run_dsa(
                     mdl.run()
                     fnc.run()
                     results.append(
-                        _make_dsa_result(v.name, bound, str(v.get_dsa_value(bound)), mdl, fnc, statistics)
+                        make_dsa_result(v.name, bound, str(v.get_dsa_value(bound)), mdl, fnc, statistics)
                     )
             finally:
                 v.dsa_focussed = False

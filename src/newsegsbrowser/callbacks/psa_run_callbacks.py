@@ -345,6 +345,7 @@ def add_psa_run_callbacks(app: Dash):
         
         if selected_configuration is None:
             return no_update
+        logger.info('a psa-run-button has been hit - n_clicks is %s', n_clicks)
         
         selected_configuration = json.loads(selected_configuration)
 

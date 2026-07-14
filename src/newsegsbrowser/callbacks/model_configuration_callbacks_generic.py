@@ -279,7 +279,7 @@ def sync_config(
         # First, need to get the model synced up with its own variables. Then run model if we can.
         prequeue_patch = Patch()
         action = browser.metamodel_variable_sync_action(metamodel_id = mm.id)
-        logger.info('Adding metamodel_variable_sync_action to prequeue_action_user: %s', action)
+        logger.info('Adding metamodel_variable_sync_action to prequeue_action_user: %s - %s', action, mm.require_sync)
         prequeue_patch.append(json.dumps(action.as_dict()))
 
     elif mm.model.dirty:

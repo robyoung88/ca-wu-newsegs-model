@@ -622,6 +622,7 @@ def add_interface_to_model_callbacks(app):
                                 rval['config_inputs']['model']['values'][i] = new_val
                     
                     if deterministic_changed:
+                        print(f'CHANGED - {pid['section']}.{pid['key']}.{pid['subindex']} value - {val}')
                         
                         model_changed = True
                         action = browser.metamodel_variable_sync_action(
@@ -674,6 +675,7 @@ def add_interface_to_model_callbacks(app):
                                 rval['config_inputs']['finance']['values'][i] = new_val
 
                     if deterministic_changed:
+                        print(f'CHANGED - {pid['section']}.{pid['key']}.{pid['subindex']} value - {val}')
                         # Need to check if model results are available
                         # If not, add a model run and allow that to trigger
                         # finance

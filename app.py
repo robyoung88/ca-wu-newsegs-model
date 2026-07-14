@@ -631,16 +631,12 @@ def create_app(external_stylesheets = None) -> Dash:
             raise ValueError(f'NewsegsMetaModel not found: {metamodel_id}')
         
         dup_mdl = duplicate_model(ref.model_id)
-        #models[dup_mdl.id] = dup_mdl
 
         dup_fnc = duplicate_finance(ref.finance_id, dup_mdl.id)
-        #dup_fnc.set_model(dup_mdl)
-        #finances[dup_fnc.id] = dup_fnc
-
-        #variables = copy.deepcopy(list(ref.variables.values()))
         variables = copy.deepcopy(list(ref.variables.values()))
         dup_mm = NewsegsMetaModel(dup_mdl, dup_fnc, variables)
         dup_mm.name = ref.name
+        dup_mm.require_sync = copy.copy(ref.require_sync)
 
         metamodels[dup_mm.id] = dup_mm
         

@@ -192,6 +192,7 @@ def get_dsa_raw_data(
         RESULT_CACHE_PREFIXES['dsa_results'],
         mm_id
     )
+    logger.info('finding result %s', df_id)
     return app.results.get(df_id)    
 
 def get_psa_raw_data(

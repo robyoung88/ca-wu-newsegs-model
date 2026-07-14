@@ -30,6 +30,7 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
         call_data,
         return_ids,
     ):
+        logger.info('Handling background callback error from target %s', error_target)
         rval: list[Any] = [
             [no_update] * len(call_ids),
             [no_update]* len(return_ids)
@@ -37,7 +38,7 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
 
         if error_target is None:
             return tuple(rval)
-        logger.info('Handling background callback error from target %s', error_target)
+        
         
         err_call = None
         err_idx = None

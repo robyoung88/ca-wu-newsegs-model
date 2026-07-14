@@ -269,6 +269,8 @@ class MetaModelProcessAction(Action):
         'psa_run_request'
     ]
     action_key: str = field(init = False)
+    _: KW_ONLY
+    force: bool = False
 
     def __post_init__(self):
         match self.type:
