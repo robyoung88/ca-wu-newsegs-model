@@ -50,27 +50,34 @@
 /* Results header */
 
 .results-title-block {
-    width: 33%;
-    float: left;
+    flex: 0 1 auto;
+    padding-right: 10px;
+    float: 'left';
+    width: 280px;
 }
 
 .configuration-selector-hdrcontainer {
-    width: 25%;
-    float: left;
-    vertical-align: bottom;
-    padding-top: 10px;
+    flex: 1 1 auto;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    width: 10%;
 }
 
 .annual-horizon-toggle-hdrcontainer {
-    width: 33%;
-    float: right;
+    flex: 0 1 auto;
+    padding-left: 10px;
+    padding-right: 22px;
+    display: inline-flex;
     justify-content: flex-end;
     align-items: center;
-    text-align: right;
+    width: 380px;
 }
 
 .configuration-selector-row-button-container {
     float: right;
+    padding: 0px;
 }
 
 .configuration-selector-row-name-input {
@@ -83,6 +90,23 @@
     background: transparent;
 }
 
+.upload-button {
+    display: inline-block;
+}
+
+div:has(> .upload-button) {
+    display: inline-block;
+}
+
+.results-header-title-container {
+    float: left;
+    width: 75%;
+}
+
+.results-header-button-container {
+    width: 25%;
+    float: right;
+}
 
 /* DSA Configuration */
 

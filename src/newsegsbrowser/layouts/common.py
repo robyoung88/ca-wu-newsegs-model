@@ -18,7 +18,7 @@ def post_page_load_components(model_type, page_type):
         })
     ]
 
-def user_action_components():
+def user_action_components(**kwargs):
     return [
         # A queue of actions performed by the user
         # Generally will hold changes to model and finance configurations
@@ -33,6 +33,59 @@ def user_action_components():
         # An Interval element is necessary to trigger the queue until
         # it is cleared
         dcc.Interval(id = 'interval-action-user', interval = 1000, disabled = True),
+
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Download deterministic results')),
+                dbc.ModalBody([
+                    html.H3('Download contents:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Results only', 'value': 'result'},
+                            {'label': 'Results and model configuration', 'value': 'result_and_config'}
+                        ],
+                        'result',
+                        id = {'type': 'det-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'contents-option'}
+                    ),
+                    html.H3('Result format:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Comma separated variables (.csv)', 'value': 'csv'},
+                            {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
+                        ],
+                        'csv',
+                        id = {'type': 'det-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'format-option'}
+                    )
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'det'},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'det-download-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'det-download-confirm'},
+            is_open = False
+        ),
+        dbc.Toast(
+            ['No results available for selected model'],
+            id = {'type': 'result-download-feedback-toast', 'page': kwargs.get('page_type', 'None'), 'key': 'det'},
+            header = 'Result download error',
+            icon = 'warning',
+            dismissable = True,
+            is_open = False,
+            duration = 5000,
+            style={"position": "fixed", "top": 66, "right": 10, "width": 350},
+        ),
+        dcc.Store(id = {'type': 'result-download-information', 'page': kwargs.get('page_type', 'None'), 'key': 'det'}),
+        dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'det'})
     ]
 
 def model_run_components(**kwargs):
@@ -151,7 +204,48 @@ def dsa_process_components(**kwargs):
             ],
             id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-run-confirm'},
             is_open = False
-        )
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Download DSA results')),
+                dbc.ModalBody([
+                    html.H3('Download contents:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Results only', 'value': 'result'},
+                            {'label': 'Results and model configuration', 'value': 'result_and_config'}
+                        ],
+                        'result',
+                        id = {'type': 'dsa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'contents-option'}
+                    ),
+                    html.H3('Result format:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Comma separated variables (.csv)', 'value': 'csv'},
+                            {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
+                        ],
+                        'csv',
+                        id = {'type': 'dsa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'format-option'}
+                    )
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-download-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-download-confirm'},
+            is_open = False
+        ),
+        dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'})
     ]
 
 def psa_process_components(**kwargs):
@@ -177,5 +271,46 @@ def psa_process_components(**kwargs):
             ],
             id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-run-confirm'},
             is_open = False
-        )
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle('Download PSA results')),
+                dbc.ModalBody([
+                    html.H3('Download contents:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Results only', 'value': 'result'},
+                            {'label': 'Results and model configuration', 'value': 'result_and_config'}
+                        ],
+                        'result',
+                        id = {'type': 'psa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'contents-option'}
+                    ),
+                    html.H3('Result format:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Comma separated variables (.csv)', 'value': 'csv'},
+                            {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
+                        ],
+                        'csv',
+                        id = {'type': 'psa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'format-option'}
+                    )
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        'OK',
+                        id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+                        n_clicks = 0
+                    ),
+                    dbc.Button(
+                        'Cancel', 
+                        id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-download-confirm'},
+                        className = 'ms-auto',
+                        n_clicks = 0
+                    )
+                ]),
+            ],
+            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-download-confirm'},
+            is_open = False
+        ),
+        dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'})
     ]

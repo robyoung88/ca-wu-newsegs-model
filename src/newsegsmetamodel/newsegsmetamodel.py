@@ -27,12 +27,15 @@ to a sample across all enabled PSA variables.
 """
 from collections import OrderedDict
 import datetime
-from typing import Any, Mapping, MutableSequence, Sequence
+import logging
+from typing import Any, Mapping, MutableSequence, Sequence, override
 
-from core import newsegscomponent
+from core import newsegscomponent, serialisation
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsvariable import variable
+
+logger = logging.getLogger(__name__)
 
 class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
 
@@ -57,6 +60,10 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         self.model = model
         self.finance = finance
         self.variables = variables
+        self.require_sync = {x for x in self.variables.keys()}
+        """
+        A set of variables that have been updated and have not yet been synchronised with model/finance
+        """
     
     @property
     def model(self) -> newsegsmodel.NewsegsModel:
@@ -182,20 +189,32 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         else:
             psa_changed = False
 
-        return is_ok, old_value != new_value, dsa_changed, psa_changed, new_params
+        det_changed = old_value != new_value
+
+        if det_changed:
+            self.require_sync.add(varid)
+
+        return is_ok, det_changed, dsa_changed, psa_changed, new_params
     
     def update_model_from_variable_deterministic(
         self,
         section: str,
-        key: str,
-        subindex: int
-    ):
+        key: str | None = None,
+        subindex: int | None = None,
+    ) -> str:
         """
         Update the attached model with the deterministic value of the addressed variable
 
         Variable address is {section}.{key}.{subindex} in the .variables OrderedDict
         """
-        varid = section + "." + key + "." + str(subindex)
+        if key is None and subindex is None:
+            varid = section
+        else:
+            if key is None:
+                key = ''
+            if subindex is None:
+                subindex = 0
+            varid = section + "." + key + "." + str(subindex)
         
         var = self.variables.get(varid)
         if var is None:
@@ -204,7 +223,25 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             var.update_model(self.finance)
         else:
             var.update_model(self.model)
+        return var.configuration_type
+    
+    def sync_model_with_changed_variables_deterministic(
+        self
+    ) -> set[str]:
+        affected_models = set()
+        while len(self.require_sync) > 0:
+            varid = self.require_sync.pop()
+            try:
+                affected_models.add(self.update_model_from_variable_deterministic(varid))
+            except ValueError as e:
+                logger.error(e)
 
+        if 'model' in affected_models:
+            self.model._dirty = True
+        if 'finance' in affected_models:
+            self.finance._dirty= True
+            
+        return affected_models
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
@@ -243,5 +280,12 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             'finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
             'last_modified': datetime.datetime.now().isoformat()
         }
+    
+    @override
+    def update(self, config: dict[str, Any] | type[serialisation.T]):
+        super().update(config)
+        # When coming from json, sets are as list, so will need reassigning
+        if not isinstance(self.require_sync, set):
+            self.require_sync = set(self.require_sync)
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + ('_model', '_finance')

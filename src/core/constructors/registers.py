@@ -19,7 +19,8 @@ CONSTRUCTOR_CLASS = Literal[
     'Timestamp',
     'Timedelta',
     'datetime',
-    'PVLib'
+    'PVLib',
+    'Variable',
 ]
 
 class NakedConstructor:
@@ -179,7 +180,7 @@ def get_pvlib_register():
             
     return LOCATION_CONSTRUCTORS
 
-def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, object]:
+def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, object] | dict[str, NakedConstructor]:
     """
     A dictionary of classes indexed by name for construction
     """
@@ -204,5 +205,7 @@ def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, object]:
             return get_datetime_register()
         case 'PVLib':
             return get_pvlib_register()
+        case 'Variable':
+            return get_newsegscomponent_register()
         case _:
             raise ValueError(f'constructor_class not recognised: {constructor_class}')

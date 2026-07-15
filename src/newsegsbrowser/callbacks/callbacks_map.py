@@ -26,6 +26,8 @@ SPRAKE_CALLBACKS = {
     'postproc_finance_value_so': postprocess_callbacks_sprake.postproc_finance_value_so,
     'postproc_dsa': postprocess_callbacks_generic.postproc_dsa,
     'postproc_psa': postprocess_callbacks_generic.postproc_psa,
+    'feedback_dsa_status': postprocess_callbacks_generic.feedback_dsa_status,
+    'feedback_psa_status': postprocess_callbacks_generic.feedback_psa_status,
 
     'update_model_result_headers': results_callbacks_sprake.update_model_result_headers,
     'update_finance_result_headers': results_callbacks_sprake.update_finance_result_headers,

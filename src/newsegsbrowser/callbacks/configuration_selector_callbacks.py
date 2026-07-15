@@ -1,6 +1,7 @@
 import base64
 import copy
 import json
+import logging
 from typing import cast, Any
 
 from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
@@ -9,10 +10,9 @@ import pathvalidate
 
 from util import jsonfuncs
 from newsegsbrowser import common as browser
-from newsegsbrowser.layouts.results import configuration_selector
-from newsegsmodel import newsegsmodel
-from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
+
+logger = logging.getLogger(__name__)
 
 def metamodel_to_dict(mm: NewsegsMetaModel) -> dict[str, Any]:
     """
@@ -113,38 +113,29 @@ def add_configuration_selection_callbacks(app: Dash):
 
             # Make the copy
             ref_config = json.loads(configurations[trigger_index])
+
+            mm = app.metamodels.get(ref_config['metamodel_id'])
+
+            try:
+                mm_dup = browser.duplicate_metamodel(
+                    ref_config['metamodel_id'],
+                    configurations,
+                    app
+                )
+            except (TypeError, ValueError) as e:
+                logger.error(str(e))
+                return NUP
             
-            mm_dup = cast(NewsegsMetaModel, app.duplicate_metamodel(ref_config['metamodel_id']))
-            mdl = mm_dup.model
-            fnc = mm_dup.finance
-
-            mm_dup.name = mm_dup.name + " Copy"
-            new_config = mm_dup.to_config()
-
-            configurations.append(json.dumps(new_config))
+            new_selected_config = None
+            for idx, jconf in enumerate(configurations):
+                conf = json.loads(jconf)
+                if conf.get('metamodel_id') == mm_dup.id:
+                    new_selected_config = conf
+                    new_selected_config['config_index'] = idx
+                    break
             
-            selected_config = new_config.copy()
-            selected_config['config_index'] = len(configurations) - 1
-
-            # Let's copy over the results
-            mdl_ref = app.models.get(ref_config['model_id'])
-            if hasattr(mdl_ref, '_generation_result'):
-                mdl._generation_result = copy.copy(mdl_ref._generation_result) # pyright: ignore[reportAttributeAccessIssue]
-                mdl.generation._dirty = False
-            if hasattr(mdl_ref, '_grid_result'):
-                mdl._grid_result = copy.copy(mdl_ref._grid_result) # pyright: ignore[reportAttributeAccessIssue]
-                mdl.grid._dirty = False
-            if hasattr(mdl_ref, '_cs_result')    :
-                mdl._cs_result = copy.copy(mdl_ref._cs_result) # pyright: ignore[reportAttributeAccessIssue]
-                mdl.consumption_storage._dirty = False
-            mdl._dirty = False
-            
-            # Because of the different uuid, the caches will not recognise this model,
-            # or its finance, but just for info:
-            print(f'model is duplicated from {mdl_ref.id} to {mdl.id} and dirty is {mdl.dirty}')
-
-            fnc._dirty = False
-
+            if new_selected_config is not None:
+                selected_config = new_selected_config
         else:
             return NUP
 
@@ -213,24 +204,7 @@ def add_configuration_selection_callbacks(app: Dash):
             selected_config = json.loads(configurations[trigger_index-1])
             selected_config['config_index'] = trigger_index - 1
         
-        safe_drop = True
-        for conf in configurations:
-            if json.loads(conf)['model_id'] == dropped['model_id']:
-                safe_drop = False
-        
-        if safe_drop:
-            app.remove_model(dropped['model_id'])
-        
-        safe_drop = True
-        for conf in configurations:
-            if json.loads(conf)['finance_id'] == dropped['finance_id']:
-                safe_drop = False
-        
-        if safe_drop:
-            app.remove_finance(dropped['finance_id'])
-
-        # Always safe to drop the metamodel, just don't necessarily remove the children
-        app.remove_metamodel(dropped['metamodel_id'], False)
+        browser.safe_remove_metamodel(dropped['metamodel_id'], configurations, app)
 
         return (
             configurations,
@@ -330,10 +304,10 @@ def add_configuration_selection_callbacks(app: Dash):
 
         config = json.loads(configurations[trigger_index])
 
-        mm = app.models.get(config['metamodel_id'])
+        mm = app.metamodels.get(config['metamodel_id'])
         odict = metamodel_to_dict(mm)
 
-        fn = odict.get('config_name','model_configuration') + ".json"
+        fn = odict.get('config_name','metamodel_configuration') + ".json"
         fn = pathvalidate.sanitize_filename(fn)
         
         return dict(
@@ -375,28 +349,30 @@ def add_configuration_selection_callbacks(app: Dash):
         
         working_conf = json.loads(configurations[trigger_index])
 
-        working_mm = app.metamodel.get(working_conf['metamodel_id'])
-        mdl = working_mm.model
-        fnc = working_mm.finance
-
         cfg = config_jsons[trigger_index]
         ctype, cstr = cfg.split(',')
         cfg = json.loads(base64.b64decode(cstr))
 
-        mm_id = working_mm.id
-        mdl_id = mdl.id
-        fnc_id = fnc.id
-        working_mm.update(cfg['metamodel'])
-        mdl.update(cfg['model'])
-        fnc.update(cfg['finance'])
-        
-        # Caution - this will invalidate the results
-        working_mm.id = mm_id
-        mdl.id = mdl_id
-        fnc.id = fnc_id
-        fnc.set_model(mdl)
-        working_mm.model = mdl
-        working_mm.finance = fnc
+        try:
+            working_mm = browser.metamodel_from_configuration_file(
+                cfg,
+                working_conf,
+                configurations,
+                app,
+                overwrite_selected_config = True
+            )
+        except Exception as e:
+            logger.error(e)
+            return (
+                configurations,
+                no_update
+            )
+      
+        if working_mm is None:
+            return (
+                configurations,
+                no_update
+            )
         
         selected_config = working_mm.to_config()
         configurations[trigger_index]  = json.dumps(selected_config)
@@ -406,5 +382,195 @@ def add_configuration_selection_callbacks(app: Dash):
             configurations,
             json.dumps(selected_config)
         )
+    
+    # DOWNLOAD RESULTS
+    @app.callback(
+        output = {
+            'modal': {
+                'is_opens': Output(
+                    {'type': 'modal-confirm', 'page': ALL, 'key':'det-download-confirm'},
+                    'is_open'
+                )
+            },
+            'download': {
+                'datas': Output(
+                    {'type': 'results-download-component', 'page': ALL, 'key': 'det'},
+                    'data'
+                )
+            },
+            'toast': {
+                'children': Output(
+                    {'type': 'result-download-feedback-toast', 'page': ALL, 'key': 'det'},
+                    'children'
+                ),
+                'is_opens': Output(
+                    {'type': 'result-download-feedback-toast', 'page': ALL, 'key': 'det'},
+                    'is_open'
+                ),
+            },
+            'information': {
+                'values': Output(
+                    {'type': 'result-download-information', 'page': ALL, 'key': 'det'},
+                    'data'
+                ),
+            }
+        },
+        inputs = {
+            'results_download_button': {
+                'n_clicks': Input({'type': 'results-download-btn', 'page': ALL, 'key': 'det'}, 'n_clicks'),
+            },
+            'modal_close_button': {
+                'n_clicks': Input(
+                    {'type': 'modal-close-btn', 'page': ALL, 'key': 'det-download-confirm'},
+                    'n_clicks'
+                )
+                
+            },
+            'results_predownload_button': {
+                'n_clicks': Input({'type': 'results-predownload-btn', 'page': 'model_configuration', 'key': ALL}, 'n_clicks'),
+            },
+        },
+        state = {
+            'modal': {
+                'ids': State(
+                    {'type': 'modal-confirm', 'page': ALL, 'key':'det-download-confirm'},
+                    'id'
+                )
+            },
+            'options': {
+                'values': State(
+                    {'type': 'det-result-download-option', 'page': ALL, 'key': ALL},
+                    'value'
+                ),
+                'ids': State(
+                    {'type': 'det-result-download-option', 'page': ALL, 'key': ALL},
+                    'id'
+                )
+            },
+            'download': {
+                'ids': State(
+                    {'type': 'results-download-component', 'page': ALL, 'key': 'det'},
+                    'id'
+                )
+            },
+            'toast': {
+                'ids':  State(
+                    {'type': 'result-download-feedback-toast', 'page': ALL, 'key': 'det'},
+                    'id'
+                ),
+            },
+            'information': {
+                'values': State(
+                    {'type': 'result-download-information', 'page': ALL, 'key': 'det'},
+                    'data'
+                ),
+                'ids': State(
+                    {'type': 'result-download-information', 'page': ALL, 'key': 'det'},
+                    'id'
+                ),
+            },
+            'configurations': State('store-configurations', 'data'),
+        },
+        prevent_initial_call = True
+    )
+    def confirm_det_results_download(
+        results_download_button,
+        modal_close_button,
+        results_predownload_button,
+        modal,
+        options,
+        download,
+        toast,
+        information,
+        configurations,
+    ):
+        
+        n_modals = len(modal['ids'])
+        n_downloads = len(download['ids'])
+        n_toast = len(toast['ids'])
+        n_information = len(information['ids'])
+        rval: dict[str, Any] = dict(
+            modal = dict(is_opens = [no_update] * n_modals),
+            download = dict(datas = [no_update] * n_downloads),
+            toast = dict(
+                children = [no_update] * n_toast,
+                is_opens = [no_update] * n_toast
+            ),
+            information = dict(
+                values = [no_update] * n_information
+            )
+        )
+
+        trig_id = ctx.triggered_id
+        
+        if trig_id is None:
+            return rval
+        trig_val = ctx.triggered
+        if len(trig_val) > 1 or trig_val[0].get('value') is None:
+            return rval
+        
+        match trig_id.get('type'):
+            case 'results-predownload-btn':
+                config_index_str = trig_id.get('key')
+                rval['modal']['is_opens'] = [True] * n_modals
+                rval['information']['values'] = [config_index_str] * n_information
+                return rval
+            case 'results-download-btn':
+                rval['modal']['is_opens'] = [False] * n_modals
+                if n_information == 0:
+                    rval['toast']['children'] = ['Unable to determine configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                config_index_str = information['values'][0]
+                if config_index_str is None:
+                    rval['toast']['children'] = ['Unable to determine configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                config_index = int(str(config_index_str).lstrip('config-'))-1
+                if config_index >= len(configurations):
+                    rval['toast']['children'] = ['Configuration index out of range'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                config = json.loads(configurations[config_index])
+                mm = app.metamodels.get(config.get('metamodel_id'))
+                if mm is None:
+                    rval['toast']['children'] = ['Could not retrieve metamodel'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                if mm.model.dirty or mm.finance.dirty:
+                    rval['toast']['children'] = ['Deterministic results not run for current configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                page = trig_id.get('page')
+                
+                opts = browser.get_options(
+                    options['ids'],
+                    options['values'],
+                    page,
+                    ['contents-option', 'format-option']
+                )
+                
+                to_export = browser.export_results(
+                    'det',
+                    config,
+                    app,
+                    opts.get('contents-option', 'result'),
+                    opts.get('format-option', 'csv')
+                )
+
+                if to_export is None:
+                    rval['toast']['children'] = ['Deterministic results not available for current configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                for idx, id in enumerate(download['ids']):
+                    if id['page'] == page:
+                        rval['download']['datas'][idx] = to_export
+            case _:
+                rval['modal']['is_opens'] = [False] * n_modals
+        return rval
 
     return app

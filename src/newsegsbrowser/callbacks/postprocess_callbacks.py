@@ -218,11 +218,15 @@ def add_postprocess_callbacks(app: Dash):
         Output({'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, 'data'),
 
         Input({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
     def postproc_dsa(
         dsa_triggers,
+        selected_configuration,
+        configurations,
         selected_model
     ):
         """
@@ -231,6 +235,39 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing dsa results')
         return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_dsa'](
             dsa_triggers,
+            selected_configuration,
+            configurations,
+            app
+        )
+    
+    @app.callback(
+        Output({'type': 'resize-handle', 'page': ALL}, 'className', allow_duplicate = True),
+        Output({'type': 'result-tooltip', 'page': ALL}, 'children', allow_duplicate = True),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'data'),
+        
+        State({'type': 'resize-handle', 'page': ALL}, 'id'),
+        State({'type': 'result-tooltip', 'page': ALL}, 'id'),
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True      
+    )
+    def feedback_dsa_status(
+        dsa_triggers,
+        resize_handle_ids,
+        result_tooltip_ids,
+        selected_configuration,
+        configurations,
+        selected_model
+    ):
+        logger.info('setting feedback for dsa status')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['feedback_dsa_status'](
+            dsa_triggers,
+            resize_handle_ids,
+            result_tooltip_ids,
+            selected_configuration,
+            configurations,
             app
         )
 
@@ -238,19 +275,56 @@ def add_postprocess_callbacks(app: Dash):
         Output({'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'}, 'data'),
 
         Input({'type': 'trigger', 'page': ALL, 'key': 'psa-run-postprocess'}, 'data'),
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
     def postproc_psa(
         psa_triggers,
+        selected_configuration,
+        configurations,
         selected_model
     ):
         """
         Transform the dsa output table into something useful
         """
-        logger.info('postprocessing dsa results')
+        logger.info('postprocessing psa results')
         return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_psa'](
             psa_triggers,
+            selected_configuration,
+            configurations,
+            app
+        )
+    
+    @app.callback(
+        Output({'type': 'resize-handle', 'page': ALL}, 'className', allow_duplicate = True),
+        Output({'type': 'result-tooltip', 'page': ALL}, 'children', allow_duplicate = True),
+
+        Input({'type': 'trigger', 'page': ALL, 'key': 'psa-run-postprocess'}, 'data'),
+        
+        State({'type': 'resize-handle', 'page': ALL}, 'id'),
+        State({'type': 'result-tooltip', 'page': ALL}, 'id'),
+        State('store-selected-configuration', 'data'),
+        State('store-configurations', 'data'),
+        State('selected-model', 'data'),
+        prevent_initial_call = True      
+    )
+    def feedback_psa_status(
+        psa_triggers,
+        resize_handle_ids,
+        result_tooltip_ids,
+        selected_configuration,
+        configurations,
+        selected_model
+    ):
+        logger.info('setting feedback for psa status')
+        return callbacks_map.CALLBACKS_MAP[selected_model]['feedback_psa_status'](
+            psa_triggers,
+            resize_handle_ids,
+            result_tooltip_ids,
+            selected_configuration,
+            configurations,
             app
         )
     

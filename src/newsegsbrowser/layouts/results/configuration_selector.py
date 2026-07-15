@@ -91,6 +91,7 @@ def create_single_configuration_selector_row(
             outline = not(is_selected),
             title = 'Focus configuration',
         ),
+
         # temporarily disabling save until we get the database back-end
         #dbc.Button(
         #    html.I(
@@ -102,6 +103,7 @@ def create_single_configuration_selector_row(
         #    outline=True,
         #    title = 'Save configuration',
         #),
+
         dbc.Button(
             html.I(
                 className = icons.get_icon('config-duplicate', style_name = 'raw'),
@@ -112,6 +114,7 @@ def create_single_configuration_selector_row(
             outline=True,
             title = 'Duplicate configuration'
         ),
+
         dbc.Button(
             html.I(
                 className = icons.get_icon('config-download', style_name = 'raw'),
@@ -122,42 +125,36 @@ def create_single_configuration_selector_row(
             outline = True,
             title = 'Download configuration as json'
         ),
-        html.Span(
-            html.Span(
-                dcc.Upload(
-                    dbc.Button(
-                        html.I(
-                            className = icons.get_icon('config-upload', style_name = 'raw'),
-                            style = {'display': 'inline'}
-                        ),
-                        color='secondary',
-                        id = {'type': 'config-upload-btn', 'index': config_index},
-                        outline = True,
-                        title = 'Overwrite configuration with uploaded json',
-                        #style = {
-                        #    'margin-top': '10px'
-                        #}
-                    ),
-                    id = {'type': 'config-upload', 'index': config_index},
-                    multiple = False,
-                    enable_folder_selection = False,
-                    accept = '.json',
-                ),
-                style = {
-                    'display': 'inline',
-                    'float': 'left'
-                },
-            ),
-            style = {'display': 'inline-block', 'vertical-align': 'top',},
-        ),
+
         
+        dcc.Upload(
+            dbc.Button(
+                html.I(
+                    className = icons.get_icon('config-upload', style_name = 'raw'),
+                    style = {'display': 'inline'}
+                ),
+                color='secondary',
+                id = {'type': 'config-upload-btn', 'index': config_index},
+                outline = True,
+                title = 'Overwrite configuration with uploaded json',
+                #style = {
+                #    'margin-top': '10px'
+                #}
+            ),
+            id = {'type': 'config-upload', 'index': config_index},
+            multiple = False,
+            enable_folder_selection = False,
+            accept = '.json',
+            className = 'upload-button'
+        ),
+            
         dbc.Button(
             html.I(
                 className = icons.get_icon('results-download', style_name = 'raw'),
                 style = {'display': 'inline'}
             ),
             color='secondary',
-            id = {'type': 'results-download-btn', 'index': config_index},
+            id = {'type': 'results-predownload-btn', 'page': 'model_configuration', 'key':  f'config-{config_index+1}'},
             outline = True,
             title = 'Download results as spreadsheet'
         ),
@@ -199,11 +196,9 @@ def create_single_configuration_selector_row(
 def create_configuration_selector():
     return html.Div([
         
-        html.Div([        
-            #create_single_configuration_selector_row(0),
-        ],
-        id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-selector'}
-        #id='comparator-selector-container',
+        html.Div(
+            [],
+            id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-selector'}
         ),
         dcc.Download(id='download-config-json'),
         dcc.Store(id='n_active_conf', data = '{"n": 1}')

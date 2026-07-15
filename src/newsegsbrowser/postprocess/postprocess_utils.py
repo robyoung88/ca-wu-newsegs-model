@@ -1,8 +1,13 @@
 import copy
 import json
 import logging
+import time
+from typing import Any, cast
 
 from dash import no_update
+import pandas as pd
+
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +44,42 @@ def get_model_result_list(prefix, configs, app):
 
 def get_finance_result_list(prefix, configs, app):
     return [app.results.get(get_finance_result_id(prefix, json.loads(x)['finance_id'], json.loads(x)['model_id'])) for x in configs]
+
+def assign_dsa_results(
+    mm: NewsegsMetaModel,
+    results: pd.DataFrame,
+    run_time: float | None = None,
+) -> str:
+    """
+    Add or assign the appropriate attributes to match up dsa results to metamodels
+
+    Returns the result_id for caching
+    """
+    if run_time is None:
+        run_time = time.time()
+    result_id = get_dsa_result_id(RESULT_CACHE_PREFIXES['dsa_results'], mm.id)
+
+    mm.last_dsa_run = run_time
+    setattr(results, '_run_time', run_time)
+    return result_id
+
+def assign_psa_results(
+    mm: NewsegsMetaModel,
+    results: pd.DataFrame,
+    run_time: float | None = None,
+) -> str:
+    """
+    Add or assign the appropriate attributes to match up psa results to metamodels
+
+    Returns the result_id for caching
+    """
+    if run_time is None:
+        run_time = time.time()
+    result_id = get_psa_result_id(RESULT_CACHE_PREFIXES['psa_results'], mm.id)
+
+    mm.last_psa_run = run_time
+    setattr(results, '_run_time', run_time)
+    return result_id
 
 def generic_model_postprocess(
     model_run,
@@ -136,3 +177,77 @@ def generic_finance_postprocess(
     app.results[result_id] = postproc_results
 
     return finance_run_0
+
+def get_det_raw_data(
+    metamodel: str | dict[str, str] | NewsegsMetaModel,
+    app
+) -> pd.DataFrame | None:
+    if isinstance(metamodel, str):
+        metamodel = cast(NewsegsMetaModel, app.metamodels.get(metamodel))
+    elif isinstance(metamodel, dict):
+        metamodel = cast(NewsegsMetaModel, app.metamodels.get(metamodel.get('metamodel_id')))
+
+    if metamodel is None:
+        raise ValueError(f'metamodel not found')
+    
+    try:
+        gen_res = metamodel.model.get_generation_result()
+        grid_res = metamodel.model.get_grid_result()
+        cs_res = metamodel.model.get_consumption_storage_result()
+    except AttributeError:
+        return None
+    
+    all_frames = [
+        gen_res.meters_to_pandas(),
+        gen_res.dsm_to_pandas(),
+        grid_res.meters_to_pandas(),
+        grid_res.dsm_to_pandas(),
+        cs_res.meters_to_pandas(),
+        cs_res.dsm_to_pandas()
+    ]
+
+    all_frames = [x for x in all_frames if not x.empty]
+    if not len(all_frames):
+        return None
+    elif len(all_frames) == 1:
+        return all_frames[0]
+    else:
+        odf = all_frames[0]
+        for j in range(1, len(all_frames)):
+            odf = odf.join(all_frames[j])
+
+    return odf
+
+def get_dsa_raw_data(
+    metamodel: str | dict[str, str] | NewsegsMetaModel,
+    app
+) -> pd.DataFrame | None:
+    if isinstance(metamodel, NewsegsMetaModel):
+        mm_id = metamodel.id
+    elif isinstance(metamodel, dict):
+        mm_id = metamodel['metamodel_id']
+    else:
+        mm_id = metamodel
+    df_id = get_dsa_result_id(
+        RESULT_CACHE_PREFIXES['dsa_results'],
+        mm_id
+    )
+    logger.info('finding result %s', df_id)
+    return app.results.get(df_id)    
+
+def get_psa_raw_data(
+        metamodel: str | dict[str, str] | NewsegsMetaModel,
+        app
+    ) -> pd.DataFrame | None:
+    if isinstance(metamodel, NewsegsMetaModel):
+        mm_id = metamodel.id
+    elif isinstance(metamodel, dict):
+        mm_id = metamodel['metamodel_id']
+    else:
+        mm_id = metamodel
+    df_id = get_psa_result_id(
+        RESULT_CACHE_PREFIXES['psa_results'],
+        mm_id
+    )
+    logger.info('finding result %s', df_id)
+    return app.results.get(df_id)
