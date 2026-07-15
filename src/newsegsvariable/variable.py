@@ -221,8 +221,9 @@ class VectorParameterisation(Parameterisation):
 class Distribution(metaclass = Singleton):
     distribution : VARIABLE_DISTRIBUTION
     parameterisations: Sequence[Parameterisation]
-    dsa_possible: bool
-    psa_possible: bool
+    dsa_possible: bool = False
+    psa_possible: bool = False
+    optim_possible: bool = False
     permitted_dsa_bounds: tuple[DSA_BOUNDS_TYPE,...] = (
         'absolute',
         'relative',
@@ -447,6 +448,7 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
         'offset',
         'interval'
     )
+    optim_possible = True
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
@@ -3071,6 +3073,21 @@ class Variable(
     Variable must also be psa_possible and psa_selectable.
     """
 
+    optim_selectable: bool = False
+    """
+    Can the variable be varied as part of system optimisation?
+
+    (Current implementations will vary the first parameter of scalar variables in optimisation)
+    """
+    optim_selected: bool = False
+    """
+    Is the variable selected for variation in optimisation?
+    """
+    _optim_show: bool = False
+    """
+    Is the variable to be shown in the opimisation configuration container?
+    """
+
     variable_type: VARIABLE_TYPE = 'scalar'
     _label: str | None = None
 
@@ -3137,6 +3154,9 @@ class Variable(
         interface_max: float | None = None,
         interface_step: float | None = None,
         formatter_dp: int | None = None,
+        optim_selectable: bool = False,
+        optim_selected: bool = False,
+        optim_show: bool = False
     ):
         super().__init__()
         self.name = name
@@ -3219,6 +3239,10 @@ class Variable(
         self.psa_selected = psa_selected
         self.psa_active = psa_active
         self._psa_show = psa_show
+
+        self.optim_selectable = optim_selectable
+        self.optim_selected = optim_selected
+        self._optim_show = optim_show
 
         self.configuration_show = configuration_show
         self.interface_min = interface_min
@@ -3316,6 +3340,10 @@ class Variable(
         return self.distribution.psa_possible
     
     @property
+    def optim_possible(self) -> bool:
+        return self.distribution.optim_possible
+    
+    @property
     def dsa_show(self) -> bool:
         """
         True if an input field should be created on the DSA page.
@@ -3342,6 +3370,20 @@ class Variable(
     @psa_show.setter
     def psa_show(self, show: bool) -> None:
         self._psa_show = show
+
+    @property
+    def optim_show(self) -> bool:
+        """
+        True if an input field should be created in the optim configuration container
+
+        NB - even if `.optim_show` is set `True`, cannot return `True` if not
+        `.optim_possible` or not `.optim_selectable`
+        """
+        return self._optim_show and self.optim_possible and self.optim_selectable
+    
+    @optim_show.setter
+    def optim_show(self, show: bool) -> None:
+        self._optim_show = show
     
     def get_indexed_parameterisations(self):
         return [
@@ -3585,6 +3627,9 @@ class Variable(
         )
 
 def _recover_variable(name, dist):
+    """
+    When restoring variable from a reduced form, use this simple two-parameter constructor
+    """
     return Variable(name, distribution = dist) # pyright: ignore[reportAbstractUsage]
 
 class ScalarVariable(Variable):
