@@ -154,7 +154,7 @@ def create_single_configuration_selector_row(
                 style = {'display': 'inline'}
             ),
             color='secondary',
-            id = {'type': 'results-download-btn', 'index': config_index},
+            id = {'type': 'results-predownload-btn', 'page': 'model_configuration', 'key':  f'config-{config_index+1}'},
             outline = True,
             title = 'Download results as spreadsheet'
         ),

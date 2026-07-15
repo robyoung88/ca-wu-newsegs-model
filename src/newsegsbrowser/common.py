@@ -403,7 +403,7 @@ def get_options(
     return odict
 
 def export_results(
-    result_type: Literal['dsa','psa'],
+    result_type: Literal['dsa','psa','det'],
     selected_configuration: dict[str, Any],
     app: Dash,
     contents_option: str = 'result',
@@ -414,10 +414,19 @@ def export_results(
             result_data = postprocess_utils.get_dsa_raw_data(selected_configuration, app)
         case 'psa':
             result_data = postprocess_utils.get_psa_raw_data(selected_configuration, app)
+        case 'det':
+            result_data = postprocess_utils.get_det_raw_data(selected_configuration, app)
         case _:
             raise ValueError(f'result_type not recognised: {result_type}')
     if result_data is None:
         return None
+    
+    def _strip_index_tz(df):
+        index = df.index
+        if getattr(index, 'tz', None) is not None:
+            df = df.copy()
+            df.index = index.tz_localize(None)
+        return df
     
     mm = app.metamodels.get(selected_configuration['metamodel_id'])
     file_name_stub =f'{mm.name}-{result_type}-results'
@@ -435,8 +444,9 @@ def export_results(
                 case 'csv':
                     return dcc.send_data_frame(result_data.to_csv, out_fn)
                 case 'xlsx':
+                    result_data_for_export = _strip_index_tz(result_data)
                     return dcc.send_data_frame(
-                        result_data.to_excel,
+                        result_data_for_export.to_excel,
                         out_fn,
                         sheet_name = f'{result_type} results'
                     )
@@ -457,7 +467,8 @@ def export_results(
                     case 'csv':
                         result_data.to_csv(resultsfile)
                     case 'xlsx':
-                        result_data.to_excel(resultsfile, sheet_name = f'{result_type} results')
+                        result_data_for_export = _strip_index_tz(result_data)
+                        result_data_for_export.to_excel(resultsfile, sheet_name = f'{result_type} results')
                 resultsfile.seek(0)
 
                 with tempfile.TemporaryFile(mode = 'w+', suffix = '.json') as configfile:
@@ -659,7 +670,7 @@ def metamodel_from_configuration_file(
         fnc.set_model(mdl)
         working_mm.model = mdl
         working_mm.finance = fnc
-        logger.info('metamodel loaded: %s', working_mm.id)
+        logger.info('metamodel loaded: %s, %s', working_mm.name, working_mm.id)
 
     except Exception as e:
         if not overwrite_selected_config:

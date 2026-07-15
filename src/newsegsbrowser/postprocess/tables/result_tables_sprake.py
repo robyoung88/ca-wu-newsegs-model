@@ -899,7 +899,7 @@ def create_so_value_results(econ_data=None, annual=True):
     if len(out_table) >= 5:
         out_table = out_table.iloc[[0,3,1,4,2],:]
 
-    out_table.index.names = [None, None]
+    out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
     return Purify(html = browser.unescape_html_icons(out_table.to_html(classes='table', border=False)))

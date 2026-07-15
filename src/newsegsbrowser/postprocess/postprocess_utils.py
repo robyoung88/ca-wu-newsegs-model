@@ -2,7 +2,7 @@ import copy
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
 from dash import no_update
 import pandas as pd
@@ -177,6 +177,46 @@ def generic_finance_postprocess(
     app.results[result_id] = postproc_results
 
     return finance_run_0
+
+def get_det_raw_data(
+    metamodel: str | dict[str, str] | NewsegsMetaModel,
+    app
+) -> pd.DataFrame | None:
+    if isinstance(metamodel, str):
+        metamodel = cast(NewsegsMetaModel, app.metamodels.get(metamodel))
+    elif isinstance(metamodel, dict):
+        metamodel = cast(NewsegsMetaModel, app.metamodels.get(metamodel.get('metamodel_id')))
+
+    if metamodel is None:
+        raise ValueError(f'metamodel not found')
+    
+    try:
+        gen_res = metamodel.model.get_generation_result()
+        grid_res = metamodel.model.get_grid_result()
+        cs_res = metamodel.model.get_consumption_storage_result()
+    except AttributeError:
+        return None
+    
+    all_frames = [
+        gen_res.meters_to_pandas(),
+        gen_res.dsm_to_pandas(),
+        grid_res.meters_to_pandas(),
+        grid_res.dsm_to_pandas(),
+        cs_res.meters_to_pandas(),
+        cs_res.dsm_to_pandas()
+    ]
+
+    all_frames = [x for x in all_frames if not x.empty]
+    if not len(all_frames):
+        return None
+    elif len(all_frames) == 1:
+        return all_frames[0]
+    else:
+        odf = all_frames[0]
+        for j in range(1, len(all_frames)):
+            odf = odf.join(all_frames[j])
+
+    return odf
 
 def get_dsa_raw_data(
     metamodel: str | dict[str, str] | NewsegsMetaModel,

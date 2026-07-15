@@ -85,19 +85,26 @@ class NewsegsModuleResult(metaclass = ABCMeta):
         )
 
 @lru_cache
-def defer_meters_to_pandas(res: NewsegsModuleResult):
+def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
+    data = res.meters.T
+    if len(data) == 0:
+        return pd.DataFrame()
+    
     datetime = res.get_timespan().to_pandas()
     return pd.DataFrame(
-        data = res.meters.T,
+        data = data,
         index = datetime,
         columns = res.get_meter_names() # pyright: ignore[reportArgumentType]
     ) # type: ignore
 
 @lru_cache
-def defer_dsm_to_pandas(res: NewsegsModuleResult):
+def defer_dsm_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
+    data = res.dsm.T
+    if len(data) == 0:
+        return pd.DataFrame()
     datetime = res.get_timespan().to_pandas()
     return pd.DataFrame(
-        data = res.dsm.T,
+        data = data,
         index = datetime,
         columns = res.get_dsm_names() # pyright: ignore[reportArgumentType]
     ) # type: ignore

@@ -165,7 +165,6 @@ def create_dsa_layout(*args, **kwargs):
         ),
 
         html.Div(
-            #id = 'post-drawer-attach',
             id = {'type':'post-drawer-attach', 'page': kwargs.get('page_type', 'None')},
             style = {'display': 'none'}
         ),

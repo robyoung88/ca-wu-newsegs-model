@@ -10,9 +10,6 @@ import pathvalidate
 
 from util import jsonfuncs
 from newsegsbrowser import common as browser
-from newsegsbrowser.layouts.results import configuration_selector
-from newsegsmodel import newsegsmodel
-from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
 
 logger = logging.getLogger(__name__)
@@ -307,10 +304,10 @@ def add_configuration_selection_callbacks(app: Dash):
 
         config = json.loads(configurations[trigger_index])
 
-        mm = app.models.get(config['metamodel_id'])
+        mm = app.metamodels.get(config['metamodel_id'])
         odict = metamodel_to_dict(mm)
 
-        fn = odict.get('config_name','model_configuration') + ".json"
+        fn = odict.get('config_name','metamodel_configuration') + ".json"
         fn = pathvalidate.sanitize_filename(fn)
         
         return dict(
@@ -359,7 +356,7 @@ def add_configuration_selection_callbacks(app: Dash):
         try:
             working_mm = browser.metamodel_from_configuration_file(
                 cfg,
-                app.metamodel.get(working_conf['metamodel_id']),
+                working_conf,
                 configurations,
                 app,
                 overwrite_selected_config = True
@@ -385,5 +382,195 @@ def add_configuration_selection_callbacks(app: Dash):
             configurations,
             json.dumps(selected_config)
         )
+    
+    # DOWNLOAD RESULTS
+    @app.callback(
+        output = {
+            'modal': {
+                'is_opens': Output(
+                    {'type': 'modal-confirm', 'page': ALL, 'key':'det-download-confirm'},
+                    'is_open'
+                )
+            },
+            'download': {
+                'datas': Output(
+                    {'type': 'results-download-component', 'page': ALL, 'key': 'det'},
+                    'data'
+                )
+            },
+            'toast': {
+                'children': Output(
+                    {'type': 'result-download-feedback-toast', 'page': ALL, 'key': 'det'},
+                    'children'
+                ),
+                'is_opens': Output(
+                    {'type': 'result-download-feedback-toast', 'page': ALL, 'key': 'det'},
+                    'is_open'
+                ),
+            },
+            'information': {
+                'values': Output(
+                    {'type': 'result-download-information', 'page': ALL, 'key': 'det'},
+                    'data'
+                ),
+            }
+        },
+        inputs = {
+            'results_download_button': {
+                'n_clicks': Input({'type': 'results-download-btn', 'page': ALL, 'key': 'det'}, 'n_clicks'),
+            },
+            'modal_close_button': {
+                'n_clicks': Input(
+                    {'type': 'modal-close-btn', 'page': ALL, 'key': 'det-download-confirm'},
+                    'n_clicks'
+                )
+                
+            },
+            'results_predownload_button': {
+                'n_clicks': Input({'type': 'results-predownload-btn', 'page': 'model_configuration', 'key': ALL}, 'n_clicks'),
+            },
+        },
+        state = {
+            'modal': {
+                'ids': State(
+                    {'type': 'modal-confirm', 'page': ALL, 'key':'det-download-confirm'},
+                    'id'
+                )
+            },
+            'options': {
+                'values': State(
+                    {'type': 'det-result-download-option', 'page': ALL, 'key': ALL},
+                    'value'
+                ),
+                'ids': State(
+                    {'type': 'det-result-download-option', 'page': ALL, 'key': ALL},
+                    'id'
+                )
+            },
+            'download': {
+                'ids': State(
+                    {'type': 'results-download-component', 'page': ALL, 'key': 'det'},
+                    'id'
+                )
+            },
+            'toast': {
+                'ids':  State(
+                    {'type': 'result-download-feedback-toast', 'page': ALL, 'key': 'det'},
+                    'id'
+                ),
+            },
+            'information': {
+                'values': State(
+                    {'type': 'result-download-information', 'page': ALL, 'key': 'det'},
+                    'data'
+                ),
+                'ids': State(
+                    {'type': 'result-download-information', 'page': ALL, 'key': 'det'},
+                    'id'
+                ),
+            },
+            'configurations': State('store-configurations', 'data'),
+        },
+        prevent_initial_call = True
+    )
+    def confirm_det_results_download(
+        results_download_button,
+        modal_close_button,
+        results_predownload_button,
+        modal,
+        options,
+        download,
+        toast,
+        information,
+        configurations,
+    ):
+        
+        n_modals = len(modal['ids'])
+        n_downloads = len(download['ids'])
+        n_toast = len(toast['ids'])
+        n_information = len(information['ids'])
+        rval: dict[str, Any] = dict(
+            modal = dict(is_opens = [no_update] * n_modals),
+            download = dict(datas = [no_update] * n_downloads),
+            toast = dict(
+                children = [no_update] * n_toast,
+                is_opens = [no_update] * n_toast
+            ),
+            information = dict(
+                values = [no_update] * n_information
+            )
+        )
+
+        trig_id = ctx.triggered_id
+        
+        if trig_id is None:
+            return rval
+        trig_val = ctx.triggered
+        if len(trig_val) > 1 or trig_val[0].get('value') is None:
+            return rval
+        
+        match trig_id.get('type'):
+            case 'results-predownload-btn':
+                config_index_str = trig_id.get('key')
+                rval['modal']['is_opens'] = [True] * n_modals
+                rval['information']['values'] = [config_index_str] * n_information
+                return rval
+            case 'results-download-btn':
+                rval['modal']['is_opens'] = [False] * n_modals
+                if n_information == 0:
+                    rval['toast']['children'] = ['Unable to determine configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                config_index_str = information['values'][0]
+                if config_index_str is None:
+                    rval['toast']['children'] = ['Unable to determine configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                config_index = int(str(config_index_str).lstrip('config-'))-1
+                if config_index >= len(configurations):
+                    rval['toast']['children'] = ['Configuration index out of range'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                config = json.loads(configurations[config_index])
+                mm = app.metamodels.get(config.get('metamodel_id'))
+                if mm is None:
+                    rval['toast']['children'] = ['Could not retrieve metamodel'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                if mm.model.dirty or mm.finance.dirty:
+                    rval['toast']['children'] = ['Deterministic results not run for current configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                page = trig_id.get('page')
+                
+                opts = browser.get_options(
+                    options['ids'],
+                    options['values'],
+                    page,
+                    ['contents-option', 'format-option']
+                )
+                
+                to_export = browser.export_results(
+                    'det',
+                    config,
+                    app,
+                    opts.get('contents-option', 'result'),
+                    opts.get('format-option', 'csv')
+                )
+
+                if to_export is None:
+                    rval['toast']['children'] = ['Deterministic results not available for current configuration'] * n_toast
+                    rval['toast']['is_opens'] = [True] * n_toast
+                    return rval
+                
+                for idx, id in enumerate(download['ids']):
+                    if id['page'] == page:
+                        rval['download']['datas'][idx] = to_export
+            case _:
+                rval['modal']['is_opens'] = [False] * n_modals
+        return rval
 
     return app

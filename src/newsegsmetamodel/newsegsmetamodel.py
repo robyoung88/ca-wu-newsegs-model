@@ -28,9 +28,9 @@ to a sample across all enabled PSA variables.
 from collections import OrderedDict
 import datetime
 import logging
-from typing import Any, Mapping, MutableSequence, Sequence
+from typing import Any, Mapping, MutableSequence, Sequence, override
 
-from core import newsegscomponent
+from core import newsegscomponent, serialisation
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsvariable import variable
@@ -280,5 +280,12 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             'finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
             'last_modified': datetime.datetime.now().isoformat()
         }
+    
+    @override
+    def update(self, config: dict[str, Any] | type[serialisation.T]):
+        super().update(config)
+        # When coming from json, sets are as list, so will need reassigning
+        if not isinstance(self.require_sync, set):
+            self.require_sync = set(self.require_sync)
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + ('_model', '_finance')

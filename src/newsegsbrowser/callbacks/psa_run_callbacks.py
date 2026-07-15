@@ -128,7 +128,8 @@ def add_psa_run_callbacks(app: Dash):
                 )
             },
             'selected_configuration': State('store-selected-configuration', 'data'),
-        }
+        },
+        prevent_initial_call = True
     )
     def confirm_psa_results_download(
         results_download_button,

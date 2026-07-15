@@ -47,6 +47,8 @@ class SerialiseToDictMixin:
                 return [self._represent(x) for x in value]
             elif isinstance(value, dict):
                 return {self._represent(k): self._represent(v) for k, v in value.items()}
+            elif isinstance(value, set):
+                return [self._represent(x) for x in value]
             elif isinstance(value, pd.Timestamp):
                 return timestamp_to_dict(value)
             elif isinstance(value, pd.Timedelta):
