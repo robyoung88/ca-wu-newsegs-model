@@ -1,8 +1,8 @@
 [
     {
-        "class": "ConstantVariable",
+        "class": "NumericConstantVariable",
         "constructor_class": "Variable",
-        "uuid": "77b96d6e-ba84-4f30-8c49-2ea837ae60ea",
+        "uuid": "6d2bb355-0574-4612-823e-c875dcee8360",
         "_name": "Wind capacity",
         "unit": "kW",
         "icon_name": "gen-wind",
@@ -44,9 +44,9 @@
         "interface_step": 5.0
     },
     {
-        "class": "ConstantVariable",
+        "class": "NumericConstantVariable",
         "constructor_class": "Variable",
-        "uuid": "319856c8-e4f7-4841-b588-54d3eb16fe04",
+        "uuid": "3c27a1df-cccd-402d-853f-cbd4149a6dde",
         "_name": "Solar PV capacity",
         "unit": "kWp",
         "icon_name": "gen-pv",
@@ -88,9 +88,9 @@
         "interface_step": 5.0
     },
     {
-        "class": "ConstantVariable",
+        "class": "NumericConstantVariable",
         "constructor_class": "Variable",
-        "uuid": "0cd26bd3-01b9-44ac-b036-4b15a2d9bcf4",
+        "uuid": "1d367688-c3a4-4452-860d-672c823f1305",
         "_name": "Storage capacity",
         "unit": "kWh",
         "icon_name": "storage",
@@ -134,7 +134,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
-        "uuid": "2f7437a5-1cdb-4e8f-a91d-a0f8e698bb78",
+        "uuid": "49b56e7f-3a4b-4fd9-8b22-6681c3d52e7c",
         "_name": "Storage round trip efficiency",
         "unit": "",
         "icon_name": "storage-rte",
@@ -179,9 +179,9 @@
         "formatter_dp": 3
     },
     {
-        "class": "ConstantVariable",
+        "class": "NumericConstantVariable",
         "constructor_class": "Variable",
-        "uuid": "d403f2ab-e682-457c-a186-e0c089a812b8",
+        "uuid": "8a4c7e2d-bd6b-482f-983a-f31268540e46",
         "_name": "No. of households",
         "unit": "N",
         "icon_name": "consumption-building-nunits",
@@ -225,7 +225,7 @@
     {
         "class": "NormalVariable",
         "constructor_class": "Variable",
-        "uuid": "c29eebae-5542-4883-9d1a-39d8fb6dad77",
+        "uuid": "a442be3b-4be2-4b67-90ed-7b44dca31e23",
         "_name": "HLP",
         "unit": "W/m\u00b2/K",
         "icon_name": "consumption-building-hlp",
@@ -272,7 +272,7 @@
     {
         "class": "NormalVariable",
         "constructor_class": "Variable",
-        "uuid": "5bfa325a-ae6c-4f3a-a87b-89583cbc1731",
+        "uuid": "95613482-20a8-4fd1-be08-ab002aa639f8",
         "_name": "Mean GFA",
         "unit": "m\u00b2/household",
         "icon_name": "consumption-building-gfa",
@@ -318,7 +318,7 @@
     {
         "class": "NormalVariable",
         "constructor_class": "Variable",
-        "uuid": "404d1780-68bc-4624-8ae9-ab49e64de241",
+        "uuid": "c97974f7-784d-4d6a-bad6-29cdb6914d37",
         "_name": "Reference hot water demand",
         "unit": "kWh/day",
         "icon_name": "consumption-building-dhw-ref",
@@ -365,7 +365,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
-        "uuid": "7f749fd1-37f3-4463-8636-4a3a35569264",
+        "uuid": "23a828ec-e7b0-4af4-9bbb-36994f83a64f",
         "_name": "Seasonal variation",
         "unit": "factor",
         "icon_name": "consumption-building-dhw-var",
@@ -412,7 +412,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
-        "uuid": "36e1e5e9-6a5d-4c1b-ad8c-d3538638684f",
+        "uuid": "9b192aad-7dd4-4017-b268-4c6edfe4910a",
         "_name": "High-efficiency appliances consumption reduction",
         "unit": "factor",
         "icon_name": "consumption-direct-appliance-reduction",
@@ -459,7 +459,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "f8195c35-91d8-493c-b8de-330003bbc210",
+        "uuid": "f01a3268-ebef-434c-adfc-fe1496535ca5",
         "_name": "Residential charging per EV",
         "unit": "kWh/yr",
         "icon_name": "consumption-direct-ev-anncharge",
@@ -506,7 +506,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "dd8b6d22-b4cf-4976-adcf-989ef9b924dc",
+        "uuid": "eaa1af78-7808-4ca2-b048-8f9a77a11bc4",
         "_name": "EVs per household",
         "unit": "N",
         "icon_name": "consumption-direct-ev-nperunit",
@@ -551,9 +551,9 @@
         "formatter_dp": 2
     },
     {
-        "class": "ConstantVariable",
+        "class": "NumericConstantVariable",
         "constructor_class": "Variable",
-        "uuid": "dd5f2faa-4457-4299-a4b9-3f41cd1051d6",
+        "uuid": "967bdc39-49bd-498b-95e8-d15ef33bf8b1",
         "_name": "Model time horizon",
         "unit": "years",
         "icon_name": "model-settings-time-horizon",
@@ -598,7 +598,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "76d6b134-ecdd-427a-b183-4dcdf53fa117",
+        "uuid": "41541c89-cdc9-418d-9354-bc1bb7d25498",
         "_name": "Wind Capex",
         "unit": "\u00a3/kW",
         "icon_name": [
@@ -648,7 +648,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "4d78724a-59cd-48ec-82b8-7a3f9ff67020",
+        "uuid": "31d8258f-c11e-4e87-8ca9-43756589776e",
         "_name": "Wind Ongoing",
         "unit": "\u00a3/kW/yr",
         "icon_name": [
@@ -697,7 +697,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "1babf168-3932-4b69-b410-e5545ef44b71",
+        "uuid": "d942851d-0482-491f-bbd0-3a9f891604f0",
         "_name": "Solar PV Capex",
         "unit": "\u00a3/kWp",
         "icon_name": [
@@ -747,7 +747,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "68dcf2e4-06dc-4023-91dd-ffd46d5b276a",
+        "uuid": "ef276125-2696-40f0-b921-fba2f7309eba",
         "_name": "Solar PV Ongoing",
         "unit": "\u00a3/kWp/yr",
         "icon_name": [
@@ -796,7 +796,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "b5fb58da-6472-413e-af5c-f6af04ab9c32",
+        "uuid": "9d5d1a5d-5e0f-4ed9-bf5e-77fe3fff96c4",
         "_name": "BESS Capex",
         "unit": "\u00a3/kWh",
         "icon_name": [
@@ -845,7 +845,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "2c387ae8-7d91-4033-9fea-9c3185dd87ae",
+        "uuid": "6c1ee379-a38d-459b-a5bf-d5de3f8c2118",
         "_name": "BESS Ongoing",
         "unit": "\u00a3/kWh",
         "icon_name": [
@@ -894,7 +894,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "9a40ed67-4460-40f0-873b-a614491e393e",
+        "uuid": "954e9285-9291-47be-b4a6-958ae6cf2a4c",
         "_name": "Resident standing charge",
         "unit": "\u00a3/household/day",
         "icon_name": "cost-residents-standing",
@@ -941,7 +941,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "7b52e91a-b21a-4404-9f48-1fcc53af1f1a",
+        "uuid": "6d67bbb5-f0e4-4d56-aacd-7862d8698c14",
         "_name": "Resident per unit charge",
         "unit": "\u00a3/kWh",
         "icon_name": "cost-residents-perunit",
@@ -988,7 +988,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "e4a31de5-25a3-41ad-be8d-c2f3e659da26",
+        "uuid": "357ae3a8-85ec-4d23-97f9-d07147f98513",
         "_name": "Grid export - mean per unit",
         "unit": "\u00a3/kWh",
         "icon_name": "cost-export",
@@ -1035,7 +1035,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "250ef778-5165-4fb4-b660-537b5cd9983c",
+        "uuid": "b60daf9c-4cea-4814-a371-4b8705ae7339",
         "_name": "Fixed costs for backup",
         "unit": "\u00a3/site/day",
         "icon_name": "cost-import-fixed",
@@ -1082,7 +1082,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
-        "uuid": "231d1dfa-987a-4088-9c81-4991036a6154",
+        "uuid": "cc2bdbaa-6405-4163-a736-19e2bc793f89",
         "_name": "Per-unit costs for backup",
         "unit": "\u00a3/kWh",
         "icon_name": "cost-import-perunit",
@@ -1129,7 +1129,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
-        "uuid": "ab9fe6e1-b16a-4cdb-b729-8985ea468c86",
+        "uuid": "164f2033-9c08-44bc-9135-3f7d61f8e3dd",
         "_name": "Benefit discount rate",
         "unit": "factor",
         "icon_name": "finance-settings-benefit-discount",
@@ -1176,7 +1176,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
-        "uuid": "3e92f423-3872-49ec-97f4-1b12fb55f144",
+        "uuid": "d03e5fd1-fb66-446b-babb-bd96c807d405",
         "_name": "Cost discount rate",
         "unit": "factor",
         "icon_name": "finance-settings-cost-discount",

@@ -59,6 +59,38 @@ def create_dsa_configuration_editor():
         )
     ])
 
+def create_optim_configuration_editor_header(**kwargs):
+    button_container_children = [
+        dbc.Button(
+            'Optimise',
+            color = 'primary',
+            id = {'type': 'optim-prerun-button', 'page': kwargs.get('page_type', 'None')},
+            title = 'Start optimisation',
+            disabled = False
+        )
+    ]
+
+    return dbc.Row([
+        html.Div(
+            html.H2('Optimisation Configuration'),
+            className = 'configuration-header-title-container'
+        ),
+        html.Div(
+            button_container_children,
+            className = 'configuration-header-button-container'
+        )
+    ],
+    class_name = 'configuration-header'
+    )
+
+def create_optim_configuration_editor(**kwargs):
+    return dbc.Col([
+        create_optim_configuration_editor_header(**kwargs),
+        html.Div(
+            id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
+        )
+    ])
+
 DEFAULT_LAYOUT_DSA = {
     'layout_navigation': navigation.create_navigator_buttons_default,
     'width_navigation': 1,
@@ -88,6 +120,8 @@ def create_dsa_layout(*args, **kwargs):
     ])
 
     dsa_config = create_dsa_configuration_editor()
+
+    optim_config = create_optim_configuration_editor(**kwargs)
 
     results_section = [
         html.Div([
@@ -177,6 +211,10 @@ def create_dsa_layout(*args, **kwargs):
                 html.Hr(),
                 dbc.Row(
                     dsa_config
+                ),
+                html.Hr(),
+                dbc.Row(
+                    optim_config
                 ),
                 html.Hr()
             ] 

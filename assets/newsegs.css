@@ -98,6 +98,16 @@ div:has(> .upload-button) {
     display: inline-block;
 }
 
+.configuration-header-title-container {
+    float: left;
+    width: 75%;
+}
+
+.configuration-header-button-container {
+    width: 25%;
+    float: right;
+}
+
 .results-header-title-container {
     float: left;
     width: 75%;
@@ -220,7 +230,6 @@ div.psa-input-single-value-block > .psa-toggle {
     filter: brightness(5);
 }
 
-
 .distribution-label {
     display: inline-table !important;
     margin-top: 1px;
@@ -239,7 +248,88 @@ div.psa-input-single-value-block > .psa-toggle {
     font-weight: bold;
 }
 
-.deselected .psa-configuration-summary {
+/* Optim Configuration */
+div.optim-input-single-value-block {
+    display: block;
+    width: fit-content;
+    margin: 4px 2px 4px 2px;
+}
+
+div.optim-input-single-value-block > details {
+    display: inline-block;
+    width: auto;
+    align-content: center;
+}
+
+
+div.optim-input-single-value-block > details > div {
+    align-content: center;
+}
+
+div.optim-input-single-value-block > details > div div {
+    display: inline-flex;
+    align-content: center;
+    /*width: fit-content;*/
+    margin: 5px 2px 5px 2px;
+}
+
+div.optim-input-single-value-block > details .input-group {
+    width: fit-content;
+}
+
+div.optim-input-single-value-block > .optim-toggle {
+    display: inline-flex;
+    width: fit-content;
+    vertical-align: top;
+    margin-right: 10px;
+}
+
+div.optim-input-single-value-block span {
+    display: inline-flex;
+}
+
+.optim-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+
+.optim-toggle-row .optim-opt-toggle {
+    display: inline-block;
+    margin-bottom: 15px;
+    margin-top: -0px;
+    margin-right: 12px;
+    padding-top: 0px;
+}
+
+.optim-configuration-summary {
+    display: inline-flex;
+}
+
+.optim-configuration-summary > h4 {
+    display: inline;
+}
+
+.optim-configuration-summaryinfo {
+    display: inline-flex;
+    text-align: center;
+    align-items: baseline;
+    vertical-align: baseline;
+    margin-left: 10px;
+    font-size: 1.5rem;
+}
+
+.optim-configuration-summaryinfo > span {
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.optim-configuration-summaryinfo-optim-live-values {
+    font-size: 0.8em;
+}
+
+.deselected .optim-configuration-summary {
     filter: brightness(5);
 }
 
