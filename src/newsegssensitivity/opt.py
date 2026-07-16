@@ -16,20 +16,20 @@ from newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsvariable import variable
 
 _OPTIM_TARGET_STATISTIC = Literal[
-    'net_present_value_undiscounted',
     'net_present_value_discounted',
+    'net_present_value_undiscounted',
 ]
 
 OPTIM_TARGET_STATISTICS = get_args(_OPTIM_TARGET_STATISTIC)
 
 _MAXIMISE_OPTIM_TARGET_STATISTICS = [
-    'net_present_value_undiscounted',
     'net_present_value_discounted',
+    'net_present_value_undiscounted',
 ]
 
 OPTIM_TARGET_STATISTIC_LABELS = {
-    'net_present_value_undiscounted': 'NPV (undisc.)',
-    'net_present_value_discounted': 'NPV (disc.)'
+    'net_present_value_undiscounted': 'NPV (undiscounted)',
+    'net_present_value_discounted': 'NPV (discounted)'
 }
 
 """
@@ -74,14 +74,22 @@ def run_optimisation(
     progress: Callable[[int, int], None] | None = None,
     method: str = 'Nelder-Mead'
 ):
+     # Ensure models are up-to-date
+    mm.sync_model_with_changed_variables_deterministic()
+
     do_bound = False
     for var in variables:
         if var.bounded:
             do_bound = True
             break
     
-    transforms = [np.log if x.positive else lambda v: v for x in variables]
-    inv_transforms = [np.exp if x.positive else lambda v: v for x in variables]
+    if do_bound:
+        # Don't bother with log transform as we have a cliff-edge anyway
+        transforms = [lambda v: v for x in variables]
+        inv_transforms = [lambda v: v for x in variables]
+    else:
+        transforms = [np.log if x.positive else lambda v: v for x in variables]
+        inv_transforms = [np.exp if x.positive else lambda v: v for x in variables]
 
     x0 = np.asarray(
         [
@@ -122,9 +130,11 @@ def evaluate_statistic_across_margin(
     upper: float,
     resolution: int    
 ) -> pd.DataFrame:
-    var_backup = copy.copy(mm.variables[varid])
+    # Ensure models are up-to-date
+    mm.sync_model_with_changed_variables_deterministic()
+
+    var_backup = copy.deepcopy(mm.variables[varid])
     par0 = list(mm.variables[varid].parameters)
-    print(par0)
 
     param_range = np.linspace(lower, upper, resolution + 1, dtype = np.float64)
     
@@ -142,14 +152,20 @@ def evaluate_statistic_across_margin(
     oarray = np.asarray(map(statfunc, param_range))
     #oarray = np.apply_along_axis(statfunc, 0, param_range)
     
-    mm.variables[varid] = var_backup
-    mm.model.run()
-    mm.finance.run()
-
-    return pd.DataFrame({
+    # Caution! map appears to be lazy, and if we don't use oarray until after we reset
+    # the metamodel variables, it will run the map THEN and leave the metamodel
+    # with the end of the range set.
+    odf = pd.DataFrame({
         varid: param_range,
         stat: oarray,
     })
+
+    mm.variables[varid] = var_backup
+    mm.update_model_from_variable_deterministic(varid)
+    mm.model.run()
+    mm.finance.run()
+
+    return odf
 
 def statistic_across_margin_plot(
     plot_data,

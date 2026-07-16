@@ -435,12 +435,22 @@ class SprakeCS(NewsegsCS):
         
         cons_arr[2,:] = sprake_spaceheat_consumption(spaceheat_datetimes, **shp)
 
+        stor_arr = np.empty(len(datetimes), dtype=np.float64)
+        # Generation
+        if self.model is None:
+            raise ValueError("Storage requires a model to serve generation")
+        
+        gen_res = self.model.get_generation_result().meters.sum(axis=0)
+
+        assert len(gen_res) == len(stor_arr), 'Generation is returning a different length time series to CS'
+
+        # Under the Sprake model, Storage is only charged by overgeneration, and is discharged by undergeneration
+        overproduction = gen_res - np.sum(cons_arr, axis=0)
+
         storage_cap = self._storage_params.get('storage_capacity', 0.0)
         if storage_cap > 0.0:
             storage_rte = self._storage_params.get('storage_rte', 1.0)
 
-            stor_arr = np.empty(len(datetimes), dtype=np.float64)
-            
             stor_imp = np.zeros_like(stor_arr)
             stor_exp = np.zeros_like(stor_arr)
             stor_loss = np.zeros_like(stor_arr)
@@ -449,17 +459,6 @@ class SprakeCS(NewsegsCS):
 
             # Initial storage is half capacity
             stor_arr[0] = storage_cap / 2
-
-            # Generation
-            if self.model is None:
-                raise ValueError("Storage requires a model to serve generation")
-            
-            gen_res = self.model.get_generation_result().meters.sum(axis=0)
-
-            assert len(gen_res) == len(stor_arr), 'Generation is returning a different length time series to CS'
-
-            # Under the Sprake model, Storage is only charged by overgeneration, and is discharged by undergeneration
-            overproduction = gen_res - np.sum(cons_arr, axis=0)
 
             # No real option but to iterate this; for performance, this could be compiled
             for i in np.arange(1,len(gen_res)):
@@ -491,8 +490,9 @@ class SprakeCS(NewsegsCS):
             stor_imp = np.zeros_like(stor_arr)
             stor_exp = np.zeros_like(stor_arr)
             stor_loss = np.zeros_like(stor_arr)
-            grid_imp = np.zeros_like(stor_arr)
-            grid_exp = np.zeros_like(stor_arr)
+            
+            grid_imp = -1. * np.clip(overproduction,a_min = None, a_max = 0)
+            grid_exp = np.clip(overproduction, a_min = 0, a_max = None)
         
         self.dirty = False
 

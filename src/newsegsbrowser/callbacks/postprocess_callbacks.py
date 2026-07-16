@@ -55,12 +55,6 @@ def add_postprocess_callbacks(app: Dash):
                 mm = app.metamodels.get(config['metamodel_id'])
                 logger.info('metamodel %s uses model that has been run; finance %s added to run list', mm.id, mm.finance.id)
 
-                print (f'queuing finance {mm.finance.id} for run after model {mm.model.id}')
-                print (f'finance {mm.finance.id} dirty is {mm.finance.dirty}, model {mm.model.id} dirty is {mm.model.dirty}')
-                print (f'finance {mm.finance.id} last_run is {mm.finance.last_run}, model {mm.model.id} last_run is {mm.model.last_run}')
-                print (f'finance {mm.finance.id} model is {mm.finance.model.id}')
-                print (f'finance {mm.model} model is {mm.finance.model}')
-
                 prequeue_finance_run.append(
                     json.dumps(
                         browser.finance_run_request(

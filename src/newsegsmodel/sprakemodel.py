@@ -364,7 +364,6 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._dirty = False
         
         self._last_hash = hash((self.id, str(self.last_run)))
-        print (f'model {self.id} is run and dirty is {self.dirty} and last_run is {self.last_run}')
         return self._last_hash
     
     @override

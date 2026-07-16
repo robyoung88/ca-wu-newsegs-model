@@ -100,12 +100,7 @@ def add_opt_run_callbacks(app: Dash):
         store,
         selected_configuration
     ):
-        print(ctx.triggered_id)
-        # print(ctx.triggered)
-        # print(ctx.triggered_prop_ids)
-        # print(lower_bound)
-        # print(upper_bound)
-        # print(resolution)
+        # print(ctx.triggered_id)
 
         n_figures = len(plot['ids'])
         n_stores = len(store['datas'])

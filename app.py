@@ -146,7 +146,7 @@ def add_display_callbacks(app: Dash) -> Dash:
         if current_page is not None and current_page == pathname:
             return no_update
         
-        app.sts['current_page'] = pathname
+        app.sts['current_page'] = pathname        
 
         if pathname == '/' or pathname == '/model_selection':
             return model_selection_layout.model_selection_layout
@@ -166,7 +166,8 @@ def add_display_callbacks(app: Dash) -> Dash:
             if mm is not None:
                 mm.model.checked_out = False
                 mm.finance.checked_out = False
-
+        # Also set the number of background processes to 0
+        app.sts['n_bgp'] = 0
 
         if pagename == 'landing':
             return template_landing_layout.create_landing_layout(

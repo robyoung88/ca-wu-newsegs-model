@@ -234,9 +234,7 @@ def add_model_run_callbacks(app: Dash):
         logging.info('resyncing model after run completed: %s', model_run)
         
         # Sync with background cache
-        print(f'before: {app.models[model_id].dirty}, {app.models[model_id].last_run}')
         app.models[model_id] = app.model_from_cache(model_id)
-        print(f'after: {app.models[model_id].dirty}, {app.models[model_id].last_run}')
         logger.info('checking in model after resync - %s', model_id)
         # The synced model should have checked_out = False
         if app.models[model_id].checked_out:
