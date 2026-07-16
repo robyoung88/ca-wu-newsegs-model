@@ -735,8 +735,8 @@ def create_psa_input_scalar_gamma(
 
 def compose_optim_input(
     header,
-    positive_toggle,
-    bounded_toggle,
+    #positive_toggle,
+    #bounded_toggle,
     bound_inputs,
     var
 ):
@@ -791,9 +791,9 @@ def compose_optim_input(
                 id = header_id
             ),
             html.Div((
-                [positive_toggle]
-                +[bounded_toggle]
-                + [html.Span(bound_inputs, id = bounds_id)]
+                #[positive_toggle]
+                #+[bounded_toggle]
+                [html.Span(bound_inputs, id = bounds_id)]
             ))
         ])
     ],
@@ -801,7 +801,7 @@ def compose_optim_input(
     id = overall_id
     )
 
-def create_optim_header(var: variable.Variable, refvar: variable.Variable | None = None):
+def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.NumericScalarVariable | None = None):
     if var.distribution.distribution == 'constant':
         fmt = _autoformat
     else:
@@ -819,21 +819,58 @@ def create_optim_header(var: variable.Variable, refvar: variable.Variable | None
     if refvar is not None:
         content = [
             html.Span([
-                fmt(refvar.get_deterministic_value()),
+                fmt(refvar.get_deterministic_value()), # pyright: ignore[reportArgumentType]
                 ' -> ',
-                fmt(var.get_deterministic_value()),
+                browser.create_numeric_input_compound_key(
+                    f'input-{var.configuration_type}-config',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    parameter_index = 0,
+                    value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                    placeholder = var.name
+                ),
+                #fmt(var.get_deterministic_value()),
             ])
         ]
     else:
         content = [
             html.Span(
-                fmt(var.get_deterministic_value()),
+                browser.create_numeric_input_compound_key(
+                    f'input-{var.configuration_type}-config',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    parameter_index = 0,
+                    value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                    placeholder = var.name
+                )
+                #fmt(var.get_deterministic_value()),
             )
         ]
 
+    button_container_children = [
+        dbc.Button(
+            'Plot',
+            color = 'primary',
+            id = {'type': 'optim-marginal-plot-button', 'section': section, 'key': var.interface_key, 'subindex': var.interface_subindex},
+            title = 'Plot marginal statistic',
+            disabled = False
+        )
+    ]
+
     return [
-        html.H4(label),
-        html.Div(content, className = 'optim-configuration-summaryinfo')
+        html.Div(
+            [
+                html.H4(label),
+                html.Div(content, className = 'optim-configuration-summaryinfo')        
+            ],
+            className = 'configuration-header-title-container'
+        ),
+        html.Div(
+            button_container_children,
+            className = 'configuration-header-button-container'
+        )
     ]
 
 def create_positive_toggle(var):
@@ -884,7 +921,7 @@ def create_bounded_toggle(var):
         className = 'optim-toggle-row',
     )
 
-def create_optim_bound_inputs(var):
+def create_optim_bound_inputs(var: variable.ScalarVariable):
     return [
         dbc.InputGroup([
             dbc.InputGroupText('Lower bound:'),
@@ -893,7 +930,7 @@ def create_optim_bound_inputs(var):
                     var.interface_key,
                     section = var.interface_section,
                     subindex = var.interface_subindex,
-                    value = None
+                    value = var.interface_min,
                 )
         ]),
         dbc.InputGroup([
@@ -903,7 +940,18 @@ def create_optim_bound_inputs(var):
                     var.interface_key,
                     section = var.interface_section,
                     subindex = var.interface_subindex,
-                    value = None
+                    value = var.interface_max
+                )
+        ]),
+        dbc.InputGroup([
+            dbc.InputGroupText('N plot:'),
+            browser.create_numeric_input_compound_key(
+                    'input-optim-plotintervals',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    value = 10,
+                    step = 1
                 )
         ])
     ]
@@ -913,8 +961,8 @@ def create_optim_input(
 ):
     return compose_optim_input(
         create_optim_header(var),
-        create_positive_toggle(var),
-        create_bounded_toggle(var),
+        #create_positive_toggle(var),
+        #create_bounded_toggle(var),
         create_optim_bound_inputs(var),
         var
     )

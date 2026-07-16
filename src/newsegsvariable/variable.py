@@ -955,17 +955,17 @@ class NumericConstantParameterisationDefault(
     @classmethod
     def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarNumParam]:
         if len(args):
-            raise TypeError('Constant variable can only accept single value - use constant_vector')
+            raise TypeError('Constant variable can only accept single value - use constant_vector for %s', args)
         if isinstance(value, str):
             raise ValueError('Numeric Constant variable can only accept numeric types - use constant')
         elif isinstance(value, Sequence):
             if len(value) > 1:
-                raise ValueError('Constant variable can only accept single value - use constant_vector')
+                raise ValueError('Constant variable can only accept single value - use constant_vector for %s', value)
             return (float(value[0]), )
         elif isinstance(value, np.ndarray):
             flat = value.flatten()
             if len(flat) > 1:
-                raise ValueError('Constant variable can only accept single value - use constant_vector')
+                raise ValueError('Constant variable can only accept single value - use constant_vector for %s', value)
             return (flat[0], )
         else:
             return (value, )

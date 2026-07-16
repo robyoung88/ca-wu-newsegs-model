@@ -86,6 +86,8 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if not isinstance(mdl, newsegsmodel.NewsegsModel):
             raise TypeError(f'model_provider did not provide a NewsegsModel for key {self.model_id} - {type(mdl)} returned instead')
         self.model = mdl
+        if self.finance is not None:
+            self.finance.set_model(self.model)
     
     @property
     def finance(self) -> newsegsfinance.NewsegsFinance:
@@ -108,6 +110,8 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if not isinstance(fnc, newsegsfinance.NewsegsFinance):
             raise TypeError(f'finance_provider did not provide a NewsegsFinance for key {self.finance_id} - {type(fnc)} returned instead')
         self.finance = fnc
+        if self.model is not None:
+            self.finance.set_model(self.model)
 
     @property
     def variables(self) -> OrderedDict[str, variable.Variable]:

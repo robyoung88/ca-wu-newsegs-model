@@ -160,6 +160,7 @@ def add_model_run_callbacks(app: Dash):
     
     @app.callback(
         Output({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
         
         Input('dispatchitem-model-run', 'data'),
         prevent_initial_call = True,
@@ -176,7 +177,7 @@ def add_model_run_callbacks(app: Dash):
         checked-out list, and the trigger for the background model run can be 
         fired.
         """
-        NUP = no_update
+        NUP = no_update, no_update
 
         logger.info('dispatcher_model_run triggered at %s with payload %s', datetime.datetime.now(), dispatchitem_model_run)
 
@@ -200,7 +201,10 @@ def add_model_run_callbacks(app: Dash):
 
         logging.info('model dispatched to run: %s', model_run)
 
-        return dispatchitem_model_run
+        n_bgp = app.sts.get('n_bgp', 0)
+        app.sts['n_bgp'] = n_bgp + 1
+
+        return dispatchitem_model_run, False
         
     
     # The actual run has to go in the main app.py to prevent issues with the bcm accessing cache
@@ -213,6 +217,7 @@ def add_model_run_callbacks(app: Dash):
             'stage': 'dispatch', 
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input({'type': 'background-callback-return', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True
@@ -229,7 +234,9 @@ def add_model_run_callbacks(app: Dash):
         logging.info('resyncing model after run completed: %s', model_run)
         
         # Sync with background cache
+        print(f'before: {app.models[model_id].dirty}, {app.models[model_id].last_run}')
         app.models[model_id] = app.model_from_cache(model_id)
+        print(f'after: {app.models[model_id].dirty}, {app.models[model_id].last_run}')
         logger.info('checking in model after resync - %s', model_id)
         # The synced model should have checked_out = False
         if app.models[model_id].checked_out:
@@ -244,9 +251,13 @@ def add_model_run_callbacks(app: Dash):
 
         logging.info('model run resync completed: %s', model_run)
 
+        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
+        app.sts['n_bgp'] = n_bgp
+        
         return (
             trigger_post_model_run,
             True,
+            n_bgp == 0
         )
 
     return app
@@ -385,6 +396,7 @@ def add_finance_run_callbacks(app: Dash):
     
     @app.callback(
         Output({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input('dispatchitem-finance-run', 'data'),
         prevent_initial_call = True,
@@ -401,7 +413,7 @@ def add_finance_run_callbacks(app: Dash):
         by adding it to the checked-out list, and the trigger of the background
         finance run can be fired.
         """
-        NUP = no_update
+        NUP = no_update, no_update
 
         logger.info('dispatcher_finance_run triggered at %s', datetime.datetime.now())
 
@@ -426,7 +438,10 @@ def add_finance_run_callbacks(app: Dash):
         
         logging.info('finance dispatched to run: %s', finance_run)
 
-        return dispatchitem_finance_run
+        n_bgp = app.sts.get('n_bgp', 0)
+        app.sts['n_bgp'] = n_bgp + 1
+
+        return dispatchitem_finance_run, False
     
     # The actual run has to go in the main app.py to prevent issues with the bcm accessing cache
 
@@ -438,6 +453,7 @@ def add_finance_run_callbacks(app: Dash):
             'stage': 'dispatch', 
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input({'type': 'background-callback-return', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True
@@ -475,9 +491,13 @@ def add_finance_run_callbacks(app: Dash):
 
         logging.info('finance run resync completed: %s', finance_run)
 
+        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
+        app.sts['n_bgp'] = n_bgp
+
         return (
             trigger_post_finance_run,
             True,
+            n_bgp == 0
         )
 
     # handling of arbitrary metamodel processes, assumed to take place in a background
@@ -598,6 +618,7 @@ def add_finance_run_callbacks(app: Dash):
 
     @app.callback(
         Output({'type': 'background-callback-call', 'target': 'metamodel-process'}, 'data'),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input('dispatchitem-metamodel-process', 'data'),
         prevent_initial_call = True,
@@ -608,7 +629,7 @@ def add_finance_run_callbacks(app: Dash):
         """
         Handle a metamodel process request
         """
-        NUP =  no_update
+        NUP =  no_update, no_update
 
         logger.info('dispatcher_metamodel_process triggered at %s', datetime.datetime.now())
 
@@ -640,7 +661,10 @@ def add_finance_run_callbacks(app: Dash):
 
         logger.info('metamodel dispatched to process: %s', metamodel_process)
 
-        return dispatchitem_metamodel_process
+        n_bgp = app.sts.get('n_bgp', 0)
+        app.sts['n_bgp'] = n_bgp + 1
+
+        return dispatchitem_metamodel_process, False
     
     # See app.py for the run logic
 
@@ -652,6 +676,7 @@ def add_finance_run_callbacks(app: Dash):
             'stage': 'dispatch', 
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input({'type': 'background-callback-return', 'target': 'metamodel-process'}, 'data'),
         prevent_initial_call = True
@@ -694,9 +719,13 @@ def add_finance_run_callbacks(app: Dash):
                 )
                 app.results[psa_result_id] = app.cache[psa_result_id]
         
+        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
+        app.sts['n_bgp'] = n_bgp
+
         return (
             trigger_post_metamodel_process,
             True,
+            n_bgp == 0
         )
     
     @app.callback(

@@ -624,7 +624,7 @@ def create_net_results(net_data=None, annual=True):
         )
 
     out_table = meter_stats
-    out_table.index.names = [None, None]
+    out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
     return Purify(html = browser.unescape_html_icons(out_table.to_html(classes='table', border=False)))
@@ -695,7 +695,7 @@ def create_seasonal_net_results(net_data=None, annual=True):
         export_stats,
         import_stats
     ])
-    out_table.index.names = [None, None, None]
+    out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
     return Purify(html = browser.unescape_html_icons(out_table.to_html(classes='table', border=False)))
@@ -762,7 +762,7 @@ def create_so_benefits_results(econ_data=None, annual=True):
         total_benefits_discounted
     ])
 
-    out_table.index.names = [None, None]
+    out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
     return Purify(html = browser.unescape_html_icons(out_table.to_html(classes='table', border=False)))
@@ -848,7 +848,7 @@ def create_so_costs_results(econ_data=None, annual=True):
         total_costs_discounted,
     ])
 
-    out_table.index.names = [None, None]
+    out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
     return Purify(html = browser.unescape_html_icons(out_table.to_html(classes='table', border=False)))

@@ -47,6 +47,12 @@
     flex: 1 1 0%;
 }
 
+/* Input fields */
+input.dynamic-step-field {
+    float: right;
+    width: 100px;
+}
+
 /* Results header */
 
 .results-title-block {
@@ -98,9 +104,26 @@ div:has(> .upload-button) {
     display: inline-block;
 }
 
-.configuration-header-title-container {
+.optim-configuration-summary {
+    width: 100%;
+    display: block;
+}
+
+div.configuration-header-title-container {
     float: left;
     width: 75%;
+}
+
+.configuration-header-title-container div {
+    display: inline-flex;
+}
+
+.configuration-header-title-container h4 {
+    display: inline-flex;
+}
+
+div.optim-configuration-summaryinfo {
+    display: inline-flex;
 }
 
 .configuration-header-button-container {

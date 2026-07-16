@@ -82,6 +82,7 @@
         "dsa_selected": true,
         "psa_selectable": false,
         "psa_selected": false,
+        "interface_min": 0,
         "interface_max": 10000,
         "interface_step": 5.0,
         "optim_selectable": true,

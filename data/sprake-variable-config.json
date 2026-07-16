@@ -127,7 +127,7 @@
         "optim_selected": true,
         "_optim_show": true,
         "configuration_show": true,
-        "interface_min": null,
+        "interface_min": 0,
         "interface_max": 10000,
         "interface_step": 5.0
     },

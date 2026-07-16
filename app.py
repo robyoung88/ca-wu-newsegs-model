@@ -41,7 +41,7 @@ from newsegsbrowser.layouts import template_model_configuration_layout
 from newsegsbrowser.layouts import template_dsa_configuration_layout
 from newsegsbrowser.layouts import layout_registry
 
-from newsegsbrowser.callbacks import model_selection_callbacks, psa_run_callbacks
+from newsegsbrowser.callbacks import model_selection_callbacks, opt_run_callbacks, psa_run_callbacks
 from newsegsbrowser.callbacks import model_configuration_callbacks
 from newsegsbrowser.callbacks import model_run_callbacks
 from newsegsbrowser.callbacks import postprocess_callbacks
@@ -207,7 +207,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('model-run')
+        on_error = background_callback_error_handler_factory('model-run', app)
     )
     def run_model(model_run_request):
         model_run = json.loads(model_run_request)
@@ -229,7 +229,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('finance-run')
+        on_error = background_callback_error_handler_factory('finance-run', app)
     )
     def run_finance(finance_run_request):
         finance_run = json.loads(finance_run_request)
@@ -261,7 +261,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('metamodel-process'),
+        on_error = background_callback_error_handler_factory('metamodel-process', app),
         running = [
             (
                 Output({'type': 'metamodel-process-cancel', 'target': ALL}, 'class_name'), 
@@ -701,6 +701,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = configuration_selector_callbacks.add_configuration_selection_callbacks(app)
     app = dsa_run_callbacks.add_dsa_run_callbacks(app)
     app = psa_run_callbacks.add_psa_run_callbacks(app)
+    app = opt_run_callbacks.add_opt_run_callbacks(app)
     app = add_site_selector_callbacks(app)
     app = add_background_callback_error_dispatch(app)
 

@@ -12,6 +12,7 @@ from newsegsbrowser.layouts import navigation
 from newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsbrowser.layouts import common as clayouts
 from newsegsbrowser import variable_dash_component as var_dc
+from newsegssensitivity import opt
 from newsegsvariable import variable
 
 from newsegsbrowser.layouts.results import results_header
@@ -86,9 +87,40 @@ def create_optim_configuration_editor_header(**kwargs):
 def create_optim_configuration_editor(**kwargs):
     return dbc.Col([
         create_optim_configuration_editor_header(**kwargs),
-        html.Div(
-            id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
+        dcc.Loading(
+            [
+                dbc.Row([
+                    html.H4('Optimisation statistic:'),
+                    dcc.Dropdown(
+                        options = [{'value': x, 'label': opt.OPTIM_TARGET_STATISTIC_LABELS[x]} for x in opt.OPTIM_TARGET_STATISTICS],
+                        value = opt.OPTIM_TARGET_STATISTICS[0],
+                        searchable = False,
+                        multi = False,
+                        clearable = False,
+                        id = {'type': 'dropdown-opt-statistic', 'page': kwargs.get('page_type', 'None'), 'key': 'opt-marginal-statistic'}
+                    ),
+                ]),
+                dbc.Row([
+                    dcc.Graph(
+                        id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'opt-marginal-statistic'},
+                        style= {
+                            'height': '590px',
+                            'border': '1px solid #dee2e6',
+                            'borderRadius': '0.5rem',
+                            'backgroundColor': 'transparent'
+                        }
+                    )
+                ]),
+                html.Div(
+                    id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
+                ),
+                dcc.Store(
+                    id = {'type': 'store-optim-marginal-statistic-plot', 'page': kwargs.get('page_type', 'None')},
+                    data = None,
+                )
+            ]
         )
+        
     ])
 
 DEFAULT_LAYOUT_DSA = {
@@ -230,7 +262,6 @@ def create_dsa_layout(*args, **kwargs):
                 kwargs.get('page_type')
                 )
             ),
-            
             
             id = 'main-content-pane',
             className = 'main-content-pane',

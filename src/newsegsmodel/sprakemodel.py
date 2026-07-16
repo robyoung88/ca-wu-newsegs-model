@@ -357,13 +357,14 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @override
     def run(self):
-        self.last_run = time.time()
+        super().run()
         self._generation_result = self._mod_gen.run(self._run_period)
         self._grid_result = self._mod_grid.run(self._run_period)
         self._cs_result = self._mod_cs.run(self._run_period)
         self._dirty = False
         
         self._last_hash = hash((self.id, str(self.last_run)))
+        print (f'model {self.id} is run and dirty is {self.dirty} and last_run is {self.last_run}')
         return self._last_hash
     
     @override
@@ -372,10 +373,6 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         odict['local_environment_server'] = str(self._local_environment_server)
         odict['wider_environment_server'] = str(self._wider_environment_server)
-
-        #odict['mod_gen'] = self._mod_gen.to_dict()
-        #odict['mod_grid'] = self._mod_grid.to_dict()
-        #odict['mod_cs'] = self._mod_cs.to_dict()
 
         return odict
     
@@ -410,28 +407,6 @@ class SprakeModel(newsegsmodel.NewsegsModel):
             inst._wider_environment_server = get_sprake_wider_env_server()
         
         return inst
-
-    
-    # @classmethod
-    # def from_dict(cls, config: dict) -> SprakeModel:
-    #     from newsegsgeneration import constructors as genmodconstructors
-    #     from newsegsgrid import constructors as gridmodconstructors
-    #     from newsegscs import constructors as csmodconstructors
-
-    #     config = copy.copy(config)
-    #     config.pop('class', None)
-
-    #     model_version = config.pop('model_version', None)
-    #     if model_version != cls._model_version:
-    #         raise ValueError('Config has inconsistent model version: %s vs %s', model_version, cls._model_version)
-        
-    #     config['mod_gen'] = genmodconstructors.generation_module_from_dict(config['mod_gen'])
-    #     config['mod_grid'] = gridmodconstructors.grid_module_from_dict(config['mod_grid'])
-    #     config['mod_cs'] = csmodconstructors.cs_module_from_dict(config['mod_cs'])
-
-    #     mod_gen = config.pop('mod_gen')
-
-    #     return cls(mod_gen, **config)
 
 SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_attributes) + (
     '_local_environment_server',

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 import copy
-import datetime
 import re
 import time
 from typing import Any, Sequence, Type, override
@@ -138,7 +137,6 @@ class NewsegsComponent(
 class RunnableNewsegsComponent(NewsegsComponent):
     last_run: float = 0.0
 
-    @abstractmethod
     def run(self) -> Any:
         """
         Compute all submodules given current configuration
@@ -147,3 +145,5 @@ class RunnableNewsegsComponent(NewsegsComponent):
 
         Returns a hash representing the model and datetime of run completion.
         """
+        self.last_run = time.time()
+        return hash(self)

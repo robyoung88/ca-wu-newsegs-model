@@ -95,12 +95,12 @@ def create_numeric_input_compound_key(
         min = min,
         max = max,
         step = 'any',
-        style = {
-            'display':'inline-block',
-            'float':'right',
-            'width':'30%'
-        },
-        className = cn
+        # style = {
+        #     'display':'inline-block',
+        #     'float':'right',
+        #     'width':'30%'
+        # },
+        className = cn,
     )
 
 def create_numeric_card_input_compound_key(
@@ -401,6 +401,21 @@ def get_options(
         if id.get('page') and id.get('key') in keys:
             odict[id['key']] = val
     return odict
+
+def get_variable_keyed_data(
+    section: str,
+    key: str,
+    subindex: int,
+    ids,
+    values
+):
+    for id, val in zip(ids, values):
+        if (
+            id.get('section') == section
+            and id.get('key') == key
+            and id.get('subindex') == subindex
+        ):
+            return val
 
 def export_results(
     result_type: Literal['dsa','psa','det'],

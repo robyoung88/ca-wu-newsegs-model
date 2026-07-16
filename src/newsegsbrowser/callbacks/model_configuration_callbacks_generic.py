@@ -85,9 +85,6 @@ def create_psa_input(
 def create_optim_input(
     var: variable.Variable
 ):
-    print(var.name)
-    print(var.optim_show)
-
     if not var.optim_show:
         return None
     var = cast(variable.NumericScalarVariable, var)

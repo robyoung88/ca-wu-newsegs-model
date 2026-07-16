@@ -69,16 +69,6 @@ class NewsegsModel(
         return self.version
 
     @abstractmethod
-    def run(self) -> int:
-        """
-        Compute all submodules given current configuration
-
-        Results are accessed via the model properties.
-
-        Returns a hash representing the model and datetime of run completion.
-        """
-
-    @abstractmethod
     def set_run_period(self, timespan:TimeSpan):
         """
         Define the timespan of simulation
