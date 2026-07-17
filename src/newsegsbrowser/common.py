@@ -9,7 +9,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from dataclasses import asdict as dc_asdict
-from typing import Any, Literal, cast
+from typing import Any, Callable, Literal, cast
 from typing import TypeVar
 from typing import overload
 from typing import Optional
@@ -30,6 +30,7 @@ from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 
 from newsegsbrowser.icons import get_icon
+from newsegssensitivity import optim
 from util import jsonfuncs
 
 logger = logging.getLogger(__name__)
@@ -266,7 +267,8 @@ class MetaModelProcessAction(Action):
     type: Literal[ # pyright: ignore[reportIncompatibleVariableOverride]
         'result_update_request',
         'dsa_run_request',
-        'psa_run_request'
+        'psa_run_request',
+        'optim_run_request',
     ]
     action_key: str = field(init = False)
     _: KW_ONLY
@@ -280,6 +282,8 @@ class MetaModelProcessAction(Action):
                 self.action_key = 'dsa_run'
             case 'psa_run_request':
                 self.action_key = 'psa_run'
+            case 'optim_run_request':
+                self.action_key = 'optim_run'
             case _:
                 self.action_key = ''
 
@@ -316,6 +320,14 @@ class PSARunAction(MetaModelProcessAction):
     samples: int = 1000
     return_draws: bool = False
     seed: float | None = None
+
+@dataclass
+class OptimRunAction(MetaModelProcessAction):
+    type: str = 'optim_run_request' # pyright: ignore[reportIncompatibleVariableOverride]
+    variables: list[optim.OptimVariable] = field(default_factory = list)
+    target: str = 'net_present_value_discounted'
+    method: str = 'Nelder-Mead'
+    metamodel_dup: str = ''
 
 def metamodel_variable_sync_action(**kwargs):
     return MetaModelVariableSyncAction.from_dict(kwargs)
@@ -388,6 +400,11 @@ def psa_run_request(
     **kwargs
 ):
     return PSARunAction.from_dict(kwargs)
+
+def optim_run_request(
+    **kwargs
+):
+    return OptimRunAction.from_dict(kwargs)
 
 ##### Callback helpers #####
 def get_options(
@@ -546,6 +563,39 @@ def safe_remove_metamodel(
     # Always safe to drop the metamodel, just don't necessarily remove the children
     app.remove_metamodel(mm.id, False)
     return
+
+def set_progression_factory(
+    set_progress: Callable[[str], None],
+    default_message: str = ''
+) -> Callable[[int,int], None]:
+    t0 = time.time()
+    def set_progression(value: int, max: int) -> None:
+        tx = time.time()
+        dt = tx - t0
+        if value != 0:
+            rate_ = dt / value
+            expected_ = rate_ * max
+            remaining_ = expected_ - dt
+            if remaining_ > 3600:
+                report_time = time.strftime('%H:%M:%S', time.gmtime(remaining_))
+            elif remaining_ > 60:
+                report_time = time.strftime('%M:%S', time.gmtime(remaining_))
+            else:
+                report_time = time.strftime('%S seconds', time.gmtime(remaining_))
+            msg = f'{value} / {max} iterations; {report_time} remaining'
+        else:
+            msg = default_message
+
+        set_progress(
+            json.dumps(
+                dict(
+                    value = str(value),
+                    max = str(max),
+                    message = msg
+                )
+            )
+        )
+    return set_progression
 
 MODEL_RESULT_ATTRIBUTES = [
     {

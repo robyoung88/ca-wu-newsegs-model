@@ -126,19 +126,21 @@ div.optim-configuration-summaryinfo {
     display: inline-flex;
 }
 
-.configuration-header-button-container {
+div.configuration-header-button-container {
     width: 25%;
     float: right;
+    text-align: right;
 }
 
-.results-header-title-container {
+div.results-header-title-container {
     float: left;
-    width: 75%;
+    width: 66%;
 }
 
-.results-header-button-container {
-    width: 25%;
+div.results-header-button-container {
+    width: 33%;
     float: right;
+    text-align: right;
 }
 
 /* DSA Configuration */
@@ -273,17 +275,21 @@ div.psa-input-single-value-block > .psa-toggle {
 
 /* Optim Configuration */
 div.optim-input-single-value-block {
-    display: block;
-    width: fit-content;
+    display: flex;
+    flex-grow: 1;
     margin: 4px 2px 4px 2px;
+    padding: 2px 24px 2px 2px;
+}
+
+div.optim-input-single-value-block > div.optim-toggle {
+    display: inline-flex;
 }
 
 div.optim-input-single-value-block > details {
     display: inline-block;
-    width: auto;
     align-content: center;
+    flex-grow: 1;
 }
-
 
 div.optim-input-single-value-block > details > div {
     align-content: center;
@@ -326,15 +332,16 @@ div.optim-input-single-value-block span {
     padding-top: 0px;
 }
 
-.optim-configuration-summary {
+summary.optim-configuration-summary {
     display: inline-flex;
+    width: 100%;
 }
 
-.optim-configuration-summary > h4 {
+summary.optim-configuration-summary > h4 {
     display: inline;
 }
 
-.optim-configuration-summaryinfo {
+div.optim-configuration-summaryinfo {
     display: inline-flex;
     text-align: center;
     align-items: baseline;
@@ -343,16 +350,16 @@ div.optim-input-single-value-block span {
     font-size: 1.5rem;
 }
 
-.optim-configuration-summaryinfo > span {
+div.optim-configuration-summaryinfo > span {
     margin-left: 5px;
     margin-right: 5px;
 }
 
-.optim-configuration-summaryinfo-optim-live-values {
+div.optim-configuration-summaryinfo-optim-live-values {
     font-size: 0.8em;
 }
 
-.deselected .optim-configuration-summary {
+.deselected div.optim-configuration-summary {
     filter: brightness(5);
 }
 

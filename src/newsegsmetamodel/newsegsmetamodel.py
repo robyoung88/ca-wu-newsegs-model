@@ -86,8 +86,11 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if not isinstance(mdl, newsegsmodel.NewsegsModel):
             raise TypeError(f'model_provider did not provide a NewsegsModel for key {self.model_id} - {type(mdl)} returned instead')
         self.model = mdl
-        if self.finance is not None:
-            self.finance.set_model(self.model)
+        try:
+            if self.finance is not None:
+                self.finance.set_model(self.model)
+        except AttributeError:
+            pass
     
     @property
     def finance(self) -> newsegsfinance.NewsegsFinance:

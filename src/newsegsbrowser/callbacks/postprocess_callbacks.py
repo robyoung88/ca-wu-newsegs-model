@@ -288,7 +288,7 @@ def add_postprocess_callbacks(app: Dash):
         selected_model
     ):
         """
-        Transform the dsa output table into something useful
+        Transform the psa output table into something useful
         """
         logger.info('postprocessing psa results')
         return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_psa'](

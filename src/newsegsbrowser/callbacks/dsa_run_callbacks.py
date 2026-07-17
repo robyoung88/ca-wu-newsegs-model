@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import tempfile
-from typing import Any
+from typing import Any, Mapping, MutableMapping
 import zipfile
 
 from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
@@ -18,6 +18,8 @@ import pathvalidate
 from newsegsbrowser import common as browser
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegssensitivity import dsa
 from util import jsonfuncs
 
 logger = logging.getLogger(__name__)
@@ -55,7 +57,8 @@ def add_dsa_run_callbacks(app: Dash):
                     'id'
                 )
             }
-        }
+        },
+        prevent_initial_call = True
     )
     def confirm_dsa_run(
         dsa_run_button,
@@ -357,3 +360,22 @@ def add_dsa_run_callbacks(app: Dash):
         return prequeue_patch
     
     return app
+
+def dsa_metamodel_process(
+    set_progress,
+    process_request: dict[str, Any],
+    mm: NewsegsMetaModel,
+    cache: MutableMapping[str, Any]
+):
+    debug_dsa_run_results_fn = os.path.join('.', 'temp_dsa_run_results.csv')
+    if os.path.isfile(debug_dsa_run_results_fn):
+        dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
+    else:
+        set_progression = browser.set_progression_factory(set_progress, 'DSA running')
+        dsa_results = dsa.run_dsa(
+            mm,
+            progress = set_progression
+        ).set_index(['variable', 'bound'])
+        dsa_results.to_csv(debug_dsa_run_results_fn)
+    dsa_result_id = postprocess_utils.assign_dsa_results(mm, dsa_results)
+    cache[dsa_result_id] = dsa_results

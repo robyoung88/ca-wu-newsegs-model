@@ -8,7 +8,7 @@ import logging
 import os
 import tempfile
 import zipfile
-from typing import Any
+from typing import Any, MutableMapping
 
 from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
 import pandas as pd
@@ -18,6 +18,8 @@ import pathvalidate
 from newsegsbrowser import common as browser
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegssensitivity import psa
 from util import jsonfuncs
 
 logger = logging.getLogger(__name__)
@@ -374,3 +376,33 @@ def add_psa_run_callbacks(app: Dash):
         return prequeue_patch
 
     return app
+
+def psa_metamodel_process(
+    set_progress,
+    process_request: dict[str, Any],
+    mm: NewsegsMetaModel,
+    cache: MutableMapping[str, Any]
+):
+    set_progress(json.dumps(dict(value=str(1),max=str(3),message='searching for results')))
+    debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
+    if os.path.isfile(debug_psa_run_results_fn):
+        set_progress(json.dumps(dict(value=str(2),max=str(3),message='loading results')))
+        psa_results = (
+            pd.read_csv(
+                debug_psa_run_results_fn
+            )
+        )
+    else:
+        set_progression = browser.set_progression_factory(set_progress, 'PSA running')
+        psa_results = psa.run_psa(
+            mm,
+            samples = process_request.get('samples', 10),
+            return_draws = process_request.get('return_draws', False),
+            seed = process_request.get('seed', None),
+            progress = set_progression
+        )
+        psa_results.to_csv(debug_psa_run_results_fn)
+
+    set_progress(json.dumps(dict(value=str(3),max=str(3),message='syncing results')))
+    psa_result_id = postprocess_utils.assign_psa_results(mm, psa_results)
+    cache[psa_result_id] = psa_results

@@ -32,6 +32,16 @@ OPTIM_TARGET_STATISTIC_LABELS = {
     'net_present_value_discounted': 'NPV (discounted)'
 }
 
+_OPTIMISATION_METHODS = Literal[
+    'Nelder-Mead',
+    'L-BFGS-B',
+    'TNC',
+    'SLSQP',
+    'Powell'
+]
+
+OPTIMISATION_METHODS = get_args(_OPTIMISATION_METHODS)
+
 """
 Statistics in this list will be inverted for minimization
 """

@@ -19,6 +19,7 @@ from newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsbrowser.postprocess import postprocess_utils
+from newsegssensitivity import optim
 
 logger = logging.getLogger(__name__)
 
@@ -647,6 +648,18 @@ def add_finance_run_callbacks(app: Dash):
         mm.model.checked_out = False
         logger.info('checking in finance prior to dispatch %s', mm.finance.id)
         mm.finance.checked_out = False
+
+        if metamodel_process['type'] == 'optim_run_request':
+            # Special case - use a copy of the metamodel, not the metamodel itself
+            mm_dup = app.duplicate_metamodel(metamodel_process['metamodel_id'])
+            
+            # Perform a switcheroo with the metamodels in the config
+            metamodel_process['metamodel_dup'] = metamodel_process['metamodel_id']
+            metamodel_process['metamodel_id'] = mm_dup.id
+            dispatchitem_metamodel_process = json.dumps(metamodel_process)
+
+            mm = mm_dup
+
         app.metamodel_to_cache(metamodel_process['metamodel_id'])
         app.model_to_cache(mm.model.id)
         app.finance_to_cache(mm.finance.id)
@@ -716,6 +729,12 @@ def add_finance_run_callbacks(app: Dash):
                     mm.id
                 )
                 app.results[psa_result_id] = app.cache[psa_result_id]
+            case 'optim_run_request':
+                optim_result_id = postprocess_utils.get_optim_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES['optim_results'],
+                    mm.id
+                )
+                app.results[optim_result_id] = app.cache[optim_result_id]
         
         n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
         app.sts['n_bgp'] = n_bgp
@@ -756,6 +775,12 @@ def add_finance_run_callbacks(app: Dash):
                 case 'psa_run_request':
                     for i, trigger_id in enumerate(trigger_ids):
                         if trigger_id['key'] == 'psa-run-postprocess':
+                            if isinstance(rval[i], NoUpdate):
+                                rval[i] = []
+                            rval[i].append(process_str)
+                case 'optim_run_request':
+                    for i, trigger_id in enumerate(trigger_ids):
+                        if trigger_id['key'] == 'optim-run-postprocess':
                             if isinstance(rval[i], NoUpdate):
                                 rval[i] = []
                             rval[i].append(process_str)
