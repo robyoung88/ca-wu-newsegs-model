@@ -1863,6 +1863,43 @@ class TestVariableCopy(unittest.TestCase):
             5
         )
 
+class TestVariableReset(unittest.TestCase):
+    """
+    Check the reset behaviour of variables
+    """
+
+    def test_scalar_reset(self):
+        create_var = partial(
+            variable.Variable,
+            'Spam',
+            distribution = 'normal'
+        )
+
+        var = create_var(parameters = (5, 2))
+        self.assertListEqual(
+            list(var.parameters),
+            [5, 2]
+        )
+
+        var.set_parameters(10, 3)
+        self.assertListEqual(
+            list(var.parameters),
+            [10, 3]
+        )
+
+        var.reset_parameters()
+        self.assertListEqual(
+            list(var.parameters),
+            [5, 2]
+        )
+
+        var.set_parameters(10, 3)
+        var.reset_parameters(0)
+        self.assertListEqual(
+            list(var.parameters),
+            [5, 3]
+        )
+
 class TestVariableValidation(unittest.TestCase):
     """
     Ensure that Variables handle creation and sampling correctly
