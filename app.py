@@ -7,7 +7,7 @@ import datetime
 import os
 import time
 import logging
-from typing import Literal, cast, MutableMapping
+from typing import Callable, Literal, cast, MutableMapping
 
 from dash import ALL, Dash, dcc, html, Input, Output, State, callback, no_update
 import dash_bootstrap_components as dbc
@@ -41,7 +41,7 @@ from newsegsbrowser.layouts import template_model_configuration_layout
 from newsegsbrowser.layouts import template_dsa_configuration_layout
 from newsegsbrowser.layouts import layout_registry
 
-from newsegsbrowser.callbacks import model_selection_callbacks, psa_run_callbacks
+from newsegsbrowser.callbacks import model_selection_callbacks, optim_run_callbacks, psa_run_callbacks
 from newsegsbrowser.callbacks import model_configuration_callbacks
 from newsegsbrowser.callbacks import model_run_callbacks
 from newsegsbrowser.callbacks import postprocess_callbacks
@@ -146,7 +146,7 @@ def add_display_callbacks(app: Dash) -> Dash:
         if current_page is not None and current_page == pathname:
             return no_update
         
-        app.sts['current_page'] = pathname
+        app.sts['current_page'] = pathname        
 
         if pathname == '/' or pathname == '/model_selection':
             return model_selection_layout.model_selection_layout
@@ -166,7 +166,8 @@ def add_display_callbacks(app: Dash) -> Dash:
             if mm is not None:
                 mm.model.checked_out = False
                 mm.finance.checked_out = False
-
+        # Also set the number of background processes to 0
+        app.sts['n_bgp'] = 0
 
         if pagename == 'landing':
             return template_landing_layout.create_landing_layout(
@@ -207,7 +208,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('model-run')
+        on_error = background_callback_error_handler_factory('model-run', app)
     )
     def run_model(model_run_request):
         model_run = json.loads(model_run_request)
@@ -229,7 +230,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('finance-run')
+        on_error = background_callback_error_handler_factory('finance-run', app)
     )
     def run_finance(finance_run_request):
         finance_run = json.loads(finance_run_request)
@@ -261,7 +262,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('metamodel-process'),
+        on_error = background_callback_error_handler_factory('metamodel-process', app),
         running = [
             (
                 Output({'type': 'metamodel-process-cancel', 'target': ALL}, 'class_name'), 
@@ -295,98 +296,17 @@ def add_caching_callbacks(app):
         # Do the process
         match process_request['type']:
             case 'dsa_run_request':
-                debug_dsa_run_results_fn = os.path.join('.', 'temp_dsa_run_results.csv')
-                if os.path.isfile(debug_dsa_run_results_fn):
-                    dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
-                else:
-                    t0 = time.time()
-                    def set_progression(value, max):
-                        tx = time.time()
-                        dt = tx - t0
-                        if value != 0:
-                            rate_ = dt / value
-                            expected_ = rate_ * max
-                            remaining_ = expected_ - dt
-                            if remaining_ > 3600:
-                                report_time = time.strftime('%H:%M:%S', time.gmtime(remaining_))
-                            elif remaining_ > 60:
-                                report_time = time.strftime('%M:%S', time.gmtime(remaining_))
-                            else:
-                                report_time = time.strftime('%S seconds', time.gmtime(remaining_))
-                            msg = f'{value} / {max} iterations; {report_time} remaining'
-                        else:
-                            msg = 'DSA running'
-
-                        set_progress(
-                            json.dumps(
-                                dict(
-                                    value = str(value),
-                                    max = str(max),
-                                    message = msg
-                                )
-                            )
-                        )
-                    dsa_results = dsa.run_dsa(
-                        mm,
-                        progress = set_progression
-                    ).set_index(['variable', 'bound'])
-                    dsa_results.to_csv(debug_dsa_run_results_fn)
-                dsa_result_id = postprocess_utils.assign_dsa_results(mm, dsa_results)
-                cache[dsa_result_id] = dsa_results
-
-                # Not convinced this is necessary
-                #mm.dsa_result_id = dsa_result_id
+                dsa_run_callbacks.dsa_metamodel_process(
+                    set_progress, process_request, mm, cache # pyright: ignore[reportArgumentType]
+                )
             case 'psa_run_request':
-                set_progress(json.dumps(dict(value=str(1),max=str(3),message='searching for results')))
-                debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
-                if os.path.isfile(debug_psa_run_results_fn):
-                    set_progress(json.dumps(dict(value=str(2),max=str(3),message='loading results')))
-                    psa_results = (
-                        pd.read_csv(
-                            debug_psa_run_results_fn
-                        )
-                    )
-                else:
-                    t0 = time.time()
-                    def set_progression(value, max):
-                        tx = time.time()
-                        dt = tx - t0
-                        if value != 0:
-                            rate_ = dt / value
-                            expected_ = rate_ * max
-                            remaining_ = expected_ - dt
-                            if remaining_ > 3600:
-                                report_time = time.strftime('%H:%M:%S', time.gmtime(remaining_))
-                            elif remaining_ > 60:
-                                report_time = time.strftime('%M:%S', time.gmtime(remaining_))
-                            else:
-                                report_time = time.strftime('%S seconds', time.gmtime(remaining_))
-                            msg = f'{value} / {max} iterations; {report_time} remaining'
-                        else:
-                            msg = 'PSA running'
-
-                        set_progress(
-                            json.dumps(
-                                dict(
-                                    value = str(value),
-                                    max = str(max),
-                                    message = msg
-                                )
-                            )
-                        )
-                        
-                    psa_results = psa.run_psa(
-                        mm,
-                        samples = process_request.get('samples', 10),
-                        return_draws = process_request.get('return_draws', False),
-                        seed = process_request.get('seed', None),
-                        progress = set_progression
-                    )
-                    psa_results.to_csv(debug_psa_run_results_fn)
-
-                set_progress(json.dumps(dict(value=str(3),max=str(3),message='syncing results')))
-                psa_result_id = postprocess_utils.assign_psa_results(mm, psa_results)
-                cache[psa_result_id] = psa_results
+                psa_run_callbacks.psa_metamodel_process(
+                    set_progress, process_request, mm, cache # pyright: ignore[reportArgumentType]
+                    ) 
+            case 'optim_run_request':
+                optim_run_callbacks.optim_metamodel_process(
+                    set_progress, process_request, mm, cache # pyright: ignore[reportArgumentType]
+                )
 
         metamodels[mm.id] = mm
         models[mm.model.id] = mm.model
@@ -701,6 +621,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = configuration_selector_callbacks.add_configuration_selection_callbacks(app)
     app = dsa_run_callbacks.add_dsa_run_callbacks(app)
     app = psa_run_callbacks.add_psa_run_callbacks(app)
+    app = optim_run_callbacks.add_optim_run_callbacks(app)
     app = add_site_selector_callbacks(app)
     app = add_background_callback_error_dispatch(app)
 

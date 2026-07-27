@@ -19,6 +19,7 @@ from newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsbrowser.postprocess import postprocess_utils
+from newsegssensitivity import optim
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +161,7 @@ def add_model_run_callbacks(app: Dash):
     
     @app.callback(
         Output({'type': 'background-callback-call', 'target': 'model-run'}, 'data'),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
         
         Input('dispatchitem-model-run', 'data'),
         prevent_initial_call = True,
@@ -176,7 +178,7 @@ def add_model_run_callbacks(app: Dash):
         checked-out list, and the trigger for the background model run can be 
         fired.
         """
-        NUP = no_update
+        NUP = no_update, no_update
 
         logger.info('dispatcher_model_run triggered at %s with payload %s', datetime.datetime.now(), dispatchitem_model_run)
 
@@ -200,7 +202,10 @@ def add_model_run_callbacks(app: Dash):
 
         logging.info('model dispatched to run: %s', model_run)
 
-        return dispatchitem_model_run
+        n_bgp = app.sts.get('n_bgp', 0)
+        app.sts['n_bgp'] = n_bgp + 1
+
+        return dispatchitem_model_run, False
         
     
     # The actual run has to go in the main app.py to prevent issues with the bcm accessing cache
@@ -213,6 +218,7 @@ def add_model_run_callbacks(app: Dash):
             'stage': 'dispatch', 
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input({'type': 'background-callback-return', 'target': 'model-run'}, 'data'),
         prevent_initial_call = True
@@ -244,9 +250,13 @@ def add_model_run_callbacks(app: Dash):
 
         logging.info('model run resync completed: %s', model_run)
 
+        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
+        app.sts['n_bgp'] = n_bgp
+        
         return (
             trigger_post_model_run,
             True,
+            n_bgp == 0
         )
 
     return app
@@ -385,6 +395,7 @@ def add_finance_run_callbacks(app: Dash):
     
     @app.callback(
         Output({'type': 'background-callback-call', 'target': 'finance-run'}, 'data'),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input('dispatchitem-finance-run', 'data'),
         prevent_initial_call = True,
@@ -401,7 +412,7 @@ def add_finance_run_callbacks(app: Dash):
         by adding it to the checked-out list, and the trigger of the background
         finance run can be fired.
         """
-        NUP = no_update
+        NUP = no_update, no_update
 
         logger.info('dispatcher_finance_run triggered at %s', datetime.datetime.now())
 
@@ -426,7 +437,10 @@ def add_finance_run_callbacks(app: Dash):
         
         logging.info('finance dispatched to run: %s', finance_run)
 
-        return dispatchitem_finance_run
+        n_bgp = app.sts.get('n_bgp', 0)
+        app.sts['n_bgp'] = n_bgp + 1
+
+        return dispatchitem_finance_run, False
     
     # The actual run has to go in the main app.py to prevent issues with the bcm accessing cache
 
@@ -438,6 +452,7 @@ def add_finance_run_callbacks(app: Dash):
             'stage': 'dispatch', 
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input({'type': 'background-callback-return', 'target': 'finance-run'}, 'data'),
         prevent_initial_call = True
@@ -475,9 +490,13 @@ def add_finance_run_callbacks(app: Dash):
 
         logging.info('finance run resync completed: %s', finance_run)
 
+        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
+        app.sts['n_bgp'] = n_bgp
+
         return (
             trigger_post_finance_run,
             True,
+            n_bgp == 0
         )
 
     # handling of arbitrary metamodel processes, assumed to take place in a background
@@ -598,6 +617,7 @@ def add_finance_run_callbacks(app: Dash):
 
     @app.callback(
         Output({'type': 'background-callback-call', 'target': 'metamodel-process'}, 'data'),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input('dispatchitem-metamodel-process', 'data'),
         prevent_initial_call = True,
@@ -608,7 +628,7 @@ def add_finance_run_callbacks(app: Dash):
         """
         Handle a metamodel process request
         """
-        NUP =  no_update
+        NUP =  no_update, no_update
 
         logger.info('dispatcher_metamodel_process triggered at %s', datetime.datetime.now())
 
@@ -628,6 +648,18 @@ def add_finance_run_callbacks(app: Dash):
         mm.model.checked_out = False
         logger.info('checking in finance prior to dispatch %s', mm.finance.id)
         mm.finance.checked_out = False
+
+        if metamodel_process['type'] == 'optim_run_request':
+            # Special case - use a copy of the metamodel, not the metamodel itself
+            mm_dup = app.duplicate_metamodel(metamodel_process['metamodel_id'])
+            
+            # Perform a switcheroo with the metamodels in the config
+            metamodel_process['metamodel_dup'] = metamodel_process['metamodel_id']
+            metamodel_process['metamodel_id'] = mm_dup.id
+            dispatchitem_metamodel_process = json.dumps(metamodel_process)
+
+            mm = mm_dup
+
         app.metamodel_to_cache(metamodel_process['metamodel_id'])
         app.model_to_cache(mm.model.id)
         app.finance_to_cache(mm.finance.id)
@@ -640,7 +672,10 @@ def add_finance_run_callbacks(app: Dash):
 
         logger.info('metamodel dispatched to process: %s', metamodel_process)
 
-        return dispatchitem_metamodel_process
+        n_bgp = app.sts.get('n_bgp', 0)
+        app.sts['n_bgp'] = n_bgp + 1
+
+        return dispatchitem_metamodel_process, False
     
     # See app.py for the run logic
 
@@ -652,6 +687,7 @@ def add_finance_run_callbacks(app: Dash):
             'stage': 'dispatch', 
             'key': 'process-in-use'
         }, 'data', allow_duplicate = True),
+        Output('background_process_heartbeat', 'disabled', allow_duplicate = True),
 
         Input({'type': 'background-callback-return', 'target': 'metamodel-process'}, 'data'),
         prevent_initial_call = True
@@ -693,10 +729,20 @@ def add_finance_run_callbacks(app: Dash):
                     mm.id
                 )
                 app.results[psa_result_id] = app.cache[psa_result_id]
+            case 'optim_run_request':
+                optim_result_id = postprocess_utils.get_optim_result_id(
+                    postprocess_utils.RESULT_CACHE_PREFIXES['optim_results'],
+                    mm.id
+                )
+                app.results[optim_result_id] = app.cache[optim_result_id]
         
+        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
+        app.sts['n_bgp'] = n_bgp
+
         return (
             trigger_post_metamodel_process,
             True,
+            n_bgp == 0
         )
     
     @app.callback(
@@ -718,6 +764,7 @@ def add_finance_run_callbacks(app: Dash):
             trigger_postprocess_metamodel_process = [trigger_postprocess_metamodel_process]
         
         for process_str in trigger_postprocess_metamodel_process:
+            logger.info('dispatching for postprocess: %s', process_str)
             process = json.loads(process_str)
             match process['type']:
                 case 'dsa_run_request':
@@ -729,6 +776,12 @@ def add_finance_run_callbacks(app: Dash):
                 case 'psa_run_request':
                     for i, trigger_id in enumerate(trigger_ids):
                         if trigger_id['key'] == 'psa-run-postprocess':
+                            if isinstance(rval[i], NoUpdate):
+                                rval[i] = []
+                            rval[i].append(process_str)
+                case 'optim_run_request':
+                    for i, trigger_id in enumerate(trigger_ids):
+                        if trigger_id['key'] == 'optim-run-postprocess':
                             if isinstance(rval[i], NoUpdate):
                                 rval[i] = []
                             rval[i].append(process_str)

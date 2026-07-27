@@ -47,6 +47,12 @@
     flex: 1 1 0%;
 }
 
+/* Input fields */
+input.dynamic-step-field {
+    float: right;
+    width: 100px;
+}
+
 /* Results header */
 
 .results-title-block {
@@ -98,14 +104,43 @@ div:has(> .upload-button) {
     display: inline-block;
 }
 
-.results-header-title-container {
+.optim-configuration-summary {
+    width: 100%;
+    display: block;
+}
+
+div.configuration-header-title-container {
     float: left;
     width: 75%;
 }
 
-.results-header-button-container {
+.configuration-header-title-container div {
+    display: inline-flex;
+}
+
+.configuration-header-title-container h4 {
+    display: inline-flex;
+}
+
+div.optim-configuration-summaryinfo {
+    display: inline-flex;
+}
+
+div.configuration-header-button-container {
     width: 25%;
     float: right;
+    text-align: right;
+}
+
+div.results-header-title-container {
+    float: left;
+    width: 66%;
+}
+
+div.results-header-button-container {
+    width: 33%;
+    float: right;
+    text-align: right;
 }
 
 /* DSA Configuration */
@@ -220,7 +255,6 @@ div.psa-input-single-value-block > .psa-toggle {
     filter: brightness(5);
 }
 
-
 .distribution-label {
     display: inline-table !important;
     margin-top: 1px;
@@ -239,7 +273,93 @@ div.psa-input-single-value-block > .psa-toggle {
     font-weight: bold;
 }
 
-.deselected .psa-configuration-summary {
+/* Optim Configuration */
+div.optim-input-single-value-block {
+    display: flex;
+    flex-grow: 1;
+    margin: 4px 2px 4px 2px;
+    padding: 2px 24px 2px 2px;
+}
+
+div.optim-input-single-value-block > div.optim-toggle {
+    display: inline-flex;
+}
+
+div.optim-input-single-value-block > details {
+    display: inline-block;
+    align-content: center;
+    flex-grow: 1;
+}
+
+div.optim-input-single-value-block > details > div {
+    align-content: center;
+}
+
+div.optim-input-single-value-block > details > div div {
+    display: inline-flex;
+    align-content: center;
+    /*width: fit-content;*/
+    margin: 5px 2px 5px 2px;
+}
+
+div.optim-input-single-value-block > details .input-group {
+    width: fit-content;
+}
+
+div.optim-input-single-value-block > .optim-toggle {
+    display: inline-flex;
+    width: fit-content;
+    vertical-align: top;
+    margin-right: 10px;
+}
+
+div.optim-input-single-value-block span {
+    display: inline-flex;
+}
+
+.optim-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+
+.optim-toggle-row .optim-opt-toggle {
+    display: inline-block;
+    margin-bottom: 15px;
+    margin-top: -0px;
+    margin-right: 12px;
+    padding-top: 0px;
+}
+
+summary.optim-configuration-summary {
+    display: inline-flex;
+    width: 100%;
+}
+
+summary.optim-configuration-summary > h4 {
+    display: inline;
+}
+
+div.optim-configuration-summaryinfo {
+    display: inline-flex;
+    text-align: center;
+    align-items: baseline;
+    vertical-align: baseline;
+    margin-left: 10px;
+    font-size: 1.5rem;
+}
+
+div.optim-configuration-summaryinfo > span {
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+div.optim-configuration-summaryinfo-optim-live-values {
+    font-size: 0.8em;
+}
+
+.deselected div.optim-configuration-summary {
     filter: brightness(5);
 }
 

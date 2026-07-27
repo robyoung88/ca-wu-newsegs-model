@@ -14,7 +14,7 @@ def add_postprocess_callbacks(app: Dash):
     @app.callback(
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
 
-        Input({'type': 'background-callback-return', 'target': 'model-run'}, 'data'),
+        Input('trigger-postprocess-model-run', 'data'),
         State('prequeue-finance-run', 'data'),
         State('store-configurations', 'data'),
         prevent_initial_call = True
@@ -54,6 +54,7 @@ def add_postprocess_callbacks(app: Dash):
             if config['model_id'] == model_id:
                 mm = app.metamodels.get(config['metamodel_id'])
                 logger.info('metamodel %s uses model that has been run; finance %s added to run list', mm.id, mm.finance.id)
+
                 prequeue_finance_run.append(
                     json.dumps(
                         browser.finance_run_request(
@@ -287,7 +288,7 @@ def add_postprocess_callbacks(app: Dash):
         selected_model
     ):
         """
-        Transform the dsa output table into something useful
+        Transform the psa output table into something useful
         """
         logger.info('postprocessing psa results')
         return callbacks_map.CALLBACKS_MAP[selected_model]['postproc_psa'](

@@ -31,6 +31,9 @@ def create_dsa_input(
         case 'constant':
             is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_constant
+        case 'numeric_constant':
+            is_scalar = True
+            creation_func = var_dc.create_dsa_input_scalar_constant
         case 'normal':
             is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_normal
@@ -58,6 +61,9 @@ def create_psa_input(
         case 'constant':
             is_scalar = True
             creation_func = var_dc.create_psa_input_scalar_constant
+        case 'numeric_constant':
+            is_scalar = True
+            creation_func = var_dc.create_psa_input_scalar_constant
         case 'normal':
             is_scalar = True
             creation_func = var_dc.create_psa_input_scalar_normal
@@ -75,6 +81,14 @@ def create_psa_input(
         return creation_func(var)
     else:
         raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+    
+def create_optim_input(
+    var: variable.Variable
+):
+    if not var.optim_show:
+        return None
+    var = cast(variable.NumericScalarVariable, var)
+    return var_dc.create_optim_input(var)
 
 def get_or_create_metamodel_components(
     selected_configuration: dict[str, Any],
@@ -134,7 +148,9 @@ def create_inputs_for_metamodel(
         elif ss == 'psa':
             for var in mm.variables.values():
                 cnts.append(create_psa_input(var))
-                
+        elif ss == 'optim':
+            for var in mm.variables.values():
+                cnts.append(create_optim_input(var))                
         else:
             section = ic.get('section')
             for var in mm.variables.values():

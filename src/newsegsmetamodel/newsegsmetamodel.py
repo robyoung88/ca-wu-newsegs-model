@@ -49,6 +49,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     _last_modified: datetime.datetime = datetime.datetime.now()
     last_dsa_run: float = 0.
     last_psa_run: float = 0.
+    last_optim_run: float = 0.
 
     def __init__(
         self,
@@ -60,7 +61,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         self.model = model
         self.finance = finance
         self.variables = variables
-        self.require_sync = {x for x in self.variables.keys()}
+        self.require_sync = {x for x in self.variables.keys()} # pyright: ignore[reportAttributeAccessIssue]
         """
         A set of variables that have been updated and have not yet been synchronised with model/finance
         """
@@ -86,6 +87,11 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if not isinstance(mdl, newsegsmodel.NewsegsModel):
             raise TypeError(f'model_provider did not provide a NewsegsModel for key {self.model_id} - {type(mdl)} returned instead')
         self.model = mdl
+        try:
+            if self.finance is not None:
+                self.finance.set_model(self.model)
+        except AttributeError:
+            pass
     
     @property
     def finance(self) -> newsegsfinance.NewsegsFinance:
@@ -108,6 +114,8 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         if not isinstance(fnc, newsegsfinance.NewsegsFinance):
             raise TypeError(f'finance_provider did not provide a NewsegsFinance for key {self.finance_id} - {type(fnc)} returned instead')
         self.finance = fnc
+        if self.model is not None:
+            self.finance.set_model(self.model, dirty = False)
 
     @property
     def variables(self) -> OrderedDict[str, variable.Variable]:

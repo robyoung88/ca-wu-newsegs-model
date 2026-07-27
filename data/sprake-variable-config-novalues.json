@@ -8,7 +8,7 @@
         "model_parameter": "wind_capacity",
         "interface_section": "gen_input",
         "interface_key": "wind_capacity",
-        "distribution": "constant",
+        "distribution": "numeric_constant",
         "transform": "identity",
         "value_name": "Value",
         "parameterisation_index": 0,
@@ -24,7 +24,10 @@
         "psa_selected": false,
         "interface_min": 0,
         "interface_max": 10000,
-        "interface_step": 5.0
+        "interface_step": 5.0,
+        "optim_selectable": true,
+        "optim_selected": true,
+        "optim_show": true
     },
     {
         "name": "Solar PV capacity",
@@ -35,7 +38,7 @@
         "model_parameter": "pv_capacity",
         "interface_section": "gen_input",
         "interface_key": "pv_capacity",
-        "distribution": "constant",
+        "distribution": "numeric_constant",
         "transform": "identity",
         "parameterisation_index": 0,
         "value_name": "Value",
@@ -51,7 +54,10 @@
         "psa_selected": false,
         "interface_min": 0,
         "interface_max": 10000,
-        "interface_step": 5.0
+        "interface_step": 5.0,
+        "optim_selectable": true,
+        "optim_selected": true,
+        "optim_show": true
     },
     {   
         "name": "Storage capacity",
@@ -62,7 +68,7 @@
         "model_parameter": "storage_capacity",
         "interface_section": "stor_input",
         "interface_key": "storage_capacity",
-        "distribution": "constant",
+        "distribution": "numeric_constant",
         "transform": "identity",
         "parameterisation_index": 0,
         "value_name": "Value",
@@ -76,8 +82,12 @@
         "dsa_selected": true,
         "psa_selectable": false,
         "psa_selected": false,
+        "interface_min": 0,
         "interface_max": 10000,
-        "interface_step": 5.0
+        "interface_step": 5.0,
+        "optim_selectable": true,
+        "optim_selected": true,
+        "optim_show": true
     },
     {
         "name": "Storage round trip efficiency",
@@ -113,7 +123,7 @@
         "model_parameter": "n_units",
         "interface_section": "bc_input",
         "interface_key": "n_units",
-        "distribution": "constant",
+        "distribution": "numeric_constant",
         "transform": "identity",
         "parameterisation_index": 0,
         "value_name": "Value",
@@ -313,7 +323,7 @@
         "model_parameter": "horizon",
         "interface_section": "mc_input",
         "interface_key": "horizon",
-        "distribution": "constant",
+        "distribution": "numeric_constant",
         "transform": "identity",
         "parameterisation_index": 0,
         "value_name": "Value",

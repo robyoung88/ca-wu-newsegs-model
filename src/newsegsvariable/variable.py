@@ -43,6 +43,7 @@ PARAMETER_TYPE = Literal[
 
 VARIABLE_DISTRIBUTION = Literal[
     'constant',
+    'numeric_constant',
     'binomial', # i.e. 0/1 for N trials (use 1 trial for bernoulli)
     'normal',
     'beta',
@@ -54,6 +55,7 @@ VARIABLE_DISTRIBUTION = Literal[
 
 SCALAR_DISTRIBUTIONS = [
     'constant',
+    'numeric_constant',
     'binomial',
     'normal',
     'beta',
@@ -221,8 +223,9 @@ class VectorParameterisation(Parameterisation):
 class Distribution(metaclass = Singleton):
     distribution : VARIABLE_DISTRIBUTION
     parameterisations: Sequence[Parameterisation]
-    dsa_possible: bool
-    psa_possible: bool
+    dsa_possible: bool = False
+    psa_possible: bool = False
+    optim_possible: bool = False
     permitted_dsa_bounds: tuple[DSA_BOUNDS_TYPE,...] = (
         'absolute',
         'relative',
@@ -447,6 +450,7 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
         'offset',
         'interval'
     )
+    optim_possible = True
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
@@ -909,6 +913,145 @@ class ConstantDistribution(ScalarValuedDistribution):
     def dsa_auto_values(cls, var: Variable) -> tuple[ScalarParam, ScalarParam]:
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
+        match var.dsa_bounds_type:
+            case 'relative':
+                return (1, 1)
+            case 'offset':
+                return (0, 0)
+            case 'absolute':
+                return (var.deterministic_value, var.deterministic_value)
+            case _:
+                raise ValueError(f'Unknown bounds_type: {var.dsa_bounds_type}')
+            
+
+class _NumericConstantParameterisation(Parameterisation):
+    
+    @classmethod
+    @abstractmethod
+    def generator(cls, *args, **kwargs) -> tuple[ScalarNumParam]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[Param, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param, ...],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam], tuple[ScalarNumParam]]:
+        ...
+
+
+class NumericConstantParameterisationDefault(
+    _NumericConstantParameterisation
+):
+    names = ('value', )
+    types = ('scalar', )
+    defaults = (1., )
+    
+    @classmethod
+    def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarNumParam]:
+        if len(args):
+            raise TypeError('Constant variable can only accept single value - use constant_vector for %s', args)
+        if isinstance(value, str):
+            raise ValueError('Numeric Constant variable can only accept numeric types - use constant')
+        elif isinstance(value, Sequence):
+            if len(value) > 1:
+                raise ValueError('Constant variable can only accept single value - use constant_vector for %s', value)
+            return (float(value[0]), )
+        elif isinstance(value, np.ndarray):
+            flat = value.flatten()
+            if len(flat) > 1:
+                raise ValueError('Constant variable can only accept single value - use constant_vector for %s', value)
+            return (flat[0], )
+        else:
+            return (value, )
+    
+    @override
+    @classmethod
+    def partial_generator(
+        cls,
+        parameter: tuple[ScalarParam, ...],
+        parameter_index: tuple[int, ...],
+        current_params: tuple[Param],
+        *args,
+        autoscale: bool = True,
+        **kwargs
+    ) -> tuple[tuple[ScalarNumParam], tuple[ScalarNumParam]]:
+        # As there is only a single parameter, there is no difference between setting a single parameter and all
+        raw_par = (parameter[0],)
+        if isinstance(raw_par[0], str) or (isinstance(raw_par[0], Sequence) or isinstance(raw_par[0], np.ndarray)):
+            raise TypeError(f'parameter expected to be of numeric scalar type, is {type(parameter)}')
+
+        return raw_par, cls.generator(parameter[0]) # pyright: ignore[reportReturnType]
+
+
+class NumericConstantDistribution(NumericScalarValuedDistribution):
+    distribution = 'numeric_constant'
+    parameterisations = [
+        NumericConstantParameterisationDefault(),
+    ]
+    dsa_possible = True
+    psa_possible = False
+
+    @classmethod
+    def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        if not isinstance(var, NumericConstantVariable):
+            raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
+        if len(parameters) > 1 or len(parameters) < 1:
+            raise TypeError(f'NumericConstantDistribution expects single scalar parameter, got {len(parameters)}')
+        
+        p0 = parameters[0]
+
+        if isinstance(p0, str):
+            raise TypeError(f'NumericConstantDistribution expects numeric parameter, got {type(p0)}')
+        elif isinstance(p0, Sequence):
+            if len(p0) == 0:
+                raise ValueError('No parameter provided')
+            elif len(p0) > 1:
+                raise ValueError('Too many parameters. For a constant vector, set the variable_type to "vector" and then use a "constant_vector" distribution')
+            if isinstance(p0[0], str):
+                if not (var.transform[0] == 'identity'):
+                    raise ValueError('constant value must have identity transform if it is a string')
+
+    @classmethod
+    def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        if not isinstance(var, NumericConstantVariable):
+            raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
+        
+        match var.transform[0]:
+            case 'identity':
+                return var.parameters[0]
+            case 'ln':
+                try:
+                    return np.exp(var.parameters[0])
+                except TypeError:
+                    raise TypeError(f'parameters[0] cannot have ln transform applied - is {type(var.parameters[0])}')
+            case _:
+                raise ValueError(f'Unknown transform: {var.transform[0]}')
+    
+    @classmethod
+    def std(cls, var: Variable) -> ScalarNumParam:
+        return 0
+    
+    @classmethod
+    def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        return(cls.deterministic_value(var), cls.deterministic_value(var))
+
+    @classmethod
+    def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarNumParam:
+        if not isinstance(var, NumericConstantVariable):
+            raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
+        
+        return var.deterministic_value
+    
+    @classmethod
+    def dsa_auto_values(cls, var: Variable, interval: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        if not isinstance(var, NumericConstantVariable):
+            raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
         match var.dsa_bounds_type:
             case 'relative':
                 return (1, 1)
@@ -3071,6 +3214,21 @@ class Variable(
     Variable must also be psa_possible and psa_selectable.
     """
 
+    optim_selectable: bool = False
+    """
+    Can the variable be varied as part of system optimisation?
+
+    (Current implementations will vary the first parameter of scalar variables in optimisation)
+    """
+    optim_selected: bool = False
+    """
+    Is the variable selected for variation in optimisation?
+    """
+    _optim_show: bool = False
+    """
+    Is the variable to be shown in the opimisation configuration container?
+    """
+
     variable_type: VARIABLE_TYPE = 'scalar'
     _label: str | None = None
 
@@ -3087,6 +3245,7 @@ class Variable(
     ):
         subclasses = {
             'constant': ConstantVariable,
+            'numeric_constant': NumericConstantVariable,
             'binomial': BinomialVariable,
             'normal': NormalVariable,
             'beta': BetaVariable,
@@ -3137,6 +3296,9 @@ class Variable(
         interface_max: float | None = None,
         interface_step: float | None = None,
         formatter_dp: int | None = None,
+        optim_selectable: bool = False,
+        optim_selected: bool = False,
+        optim_show: bool = False
     ):
         super().__init__()
         self.name = name
@@ -3219,6 +3381,10 @@ class Variable(
         self.psa_selected = psa_selected
         self.psa_active = psa_active
         self._psa_show = psa_show
+
+        self.optim_selectable = optim_selectable
+        self.optim_selected = optim_selected
+        self._optim_show = optim_show
 
         self.configuration_show = configuration_show
         self.interface_min = interface_min
@@ -3316,6 +3482,10 @@ class Variable(
         return self.distribution.psa_possible
     
     @property
+    def optim_possible(self) -> bool:
+        return self.distribution.optim_possible
+    
+    @property
     def dsa_show(self) -> bool:
         """
         True if an input field should be created on the DSA page.
@@ -3342,6 +3512,20 @@ class Variable(
     @psa_show.setter
     def psa_show(self, show: bool) -> None:
         self._psa_show = show
+
+    @property
+    def optim_show(self) -> bool:
+        """
+        True if an input field should be created in the optim configuration container
+
+        NB - even if `.optim_show` is set `True`, cannot return `True` if not
+        `.optim_possible` or not `.optim_selectable`
+        """
+        return self._optim_show and self.optim_possible and self.optim_selectable
+    
+    @optim_show.setter
+    def optim_show(self, show: bool) -> None:
+        self._optim_show = show
     
     def get_indexed_parameterisations(self):
         return [
@@ -3585,6 +3769,9 @@ class Variable(
         )
 
 def _recover_variable(name, dist):
+    """
+    When restoring variable from a reduced form, use this simple two-parameter constructor
+    """
     return Variable(name, distribution = dist) # pyright: ignore[reportAbstractUsage]
 
 class ScalarVariable(Variable):
@@ -3910,6 +4097,48 @@ class ConstantVariable(ScalarVariable):
             # As the constant distribution has only a single parameterisation, we should never get here
             raise NotImplementedError('Setting of raw parameters from alternative parameterisations not implemented for constant variables')
 
+
+class NumericConstantVariable(NumericScalarVariable):
+    distribution = NumericConstantDistribution()
+    _parameters : tuple[ScalarNumParam]
+
+    @property
+    def parameters(self) -> tuple[ScalarNumParam]:
+        return self._parameters
+    
+    def synchronise_from_model(
+        self, 
+        model: ModelType
+    ) -> None:
+        if not self.is_model_type(model):
+            return
+        
+        model_val = get_value_from_model(model, self.model_section, self.model_parameter)
+        
+        if model_val == self.deterministic_value:
+            # No update
+            return
+
+        current_p_index = self.parameterisation_index
+        try:
+            new_p_index = self.find_parameterisation(lambda x: 'value' in x.names)
+        except ValueError:
+            raise ValueError(f'Cannot synchronise parameter {self.name} from model - no mean parameterisation')
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = new_p_index
+        
+        if not isinstance(model_val, str) and isinstance(model_val, Sequence):
+            raise TypeError(f'model_val cannot be synchronised to variable, is type {type(model_val)}')
+        
+        self.set_parameters(model_val)
+
+        if not (current_p_index == new_p_index):
+            self.parameterisation_index = current_p_index
+            # As the constant distribution has only a single parameterisation, we should never get here
+            raise NotImplementedError('Setting of raw parameters from alternative parameterisations not implemented for numeric constant variables')
+        
+
 class BinomialVariable(TwoParamNumericScalarVariable):
     distribution = BinomialDistribution()
 
@@ -4221,6 +4450,7 @@ class DirichletVariable(NumericVectorVariable):
 
 VARIABLE_CONSTRUCTORS = {
     'ConstantVariable': partial(Variable, distribution = 'constant'),
+    'NumericConstantVariable': partial(Variable, distribution = 'numeric_constant'),
     'BinomialVariable': partial(Variable, distribution = 'binomial'),
     'NormalVariable': partial(Variable, distribution = 'normal'),
     'BetaVariable': partial(Variable, distribution = 'beta'),

@@ -732,3 +732,237 @@ def create_psa_input_scalar_gamma(
     var: variable.NumericScalarVariable,
 ):
     return create_psa_input_twoparam(var)
+
+def compose_optim_input(
+    header,
+    #positive_toggle,
+    #bounded_toggle,
+    bound_inputs,
+    var
+):
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+
+    toggle_id = {
+        'type': 'toggle-optim-variable',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    header_id = {
+        'type': 'optim-input-header',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    bounds_id = {
+        'type': 'optim-bounds-inputcontainer',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    if var.optim_selected:
+        cn = 'optim-input-single-value-block'
+    else:
+        cn = 'optim-input-single-value-block deselected'
+
+    overall_id = {
+        'type': 'optim-input-element',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+
+    return html.Div([
+        daq.ToggleSwitch(
+            className = 'optim-toggle',
+            size = 30,
+            value = var.optim_selected,
+            id = toggle_id,
+        ),
+        html.Details([
+            html.Summary(
+                header,
+                className = 'optim-configuration-summary',
+                id = header_id
+            ),
+            html.Div((
+                #[positive_toggle]
+                #+[bounded_toggle]
+                [html.Span(bound_inputs, id = bounds_id)]
+            ))
+        ])
+    ],
+    className= cn,
+    id = overall_id
+    )
+
+def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.NumericScalarVariable | None = None):
+    if var.distribution.distribution == 'constant':
+        fmt = _autoformat
+    else:
+        fmt = var.value_formatter
+
+    if var.unit == '':
+        label = var.label
+    else:
+        label = f'{var.label} ({var.unit})'
+
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+
+    if refvar is not None:
+        content = [
+            html.Span([
+                fmt(refvar.get_deterministic_value()), # pyright: ignore[reportArgumentType]
+                ' -> ',
+                browser.create_numeric_input_compound_key(
+                    f'input-{var.configuration_type}-config',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    parameter_index = 0,
+                    value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                    placeholder = var.name
+                ),
+                #fmt(var.get_deterministic_value()),
+            ])
+        ]
+    else:
+        content = [
+            html.Span(
+                browser.create_numeric_input_compound_key(
+                    f'input-{var.configuration_type}-config',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    parameter_index = 0,
+                    value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                    placeholder = var.name
+                )
+                #fmt(var.get_deterministic_value()),
+            )
+        ]
+
+    button_container_children = [
+        dbc.Button(
+            'Plot',
+            color = 'primary',
+            id = {'type': 'optim-marginal-plot-button', 'section': section, 'key': var.interface_key, 'subindex': var.interface_subindex},
+            title = 'Plot marginal statistic',
+            disabled = False
+        )
+    ]
+
+    return [
+        html.Div(
+            [
+                html.H4(label),
+                html.Div(content, className = 'optim-configuration-summaryinfo')        
+            ],
+            className = 'configuration-header-title-container'
+        ),
+        html.Div(
+            button_container_children,
+            className = 'configuration-header-button-container'
+        )
+    ]
+
+def create_positive_toggle(var):
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+
+    id = {
+        'type': 'toggle-optim-variable-positive',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+    return html.Span(
+        [
+            'Positive:',
+            daq.ToggleSwitch(
+                className = 'optim-opt-toggle',
+                size = 25,
+                value = False,
+                id = id,
+            )
+        ],
+        className = 'optim-toggle-row',
+    )
+
+def create_bounded_toggle(var):
+    section = var.interface_section
+    if section is None:
+        section = 'None'
+
+    id = {
+        'type': 'toggle-optim-variable-bounded',
+        'section': section,
+        'key': var.interface_key,
+        'subindex': var.interface_subindex
+    }
+    return html.Span(
+        [
+            'Bounded:',
+            daq.ToggleSwitch(
+                className = 'optim-opt-toggle',
+                size = 25,
+                value = False,
+                id = id,
+            )
+        ],
+        className = 'optim-toggle-row',
+    )
+
+def create_optim_bound_inputs(var: variable.ScalarVariable):
+    return [
+        dbc.InputGroup([
+            dbc.InputGroupText('Lower bound:'),
+            browser.create_numeric_input_compound_key(
+                    'input-optimbound-lower',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    value = var.interface_min,
+                )
+        ]),
+        dbc.InputGroup([
+            dbc.InputGroupText('Upper bound:'),
+            browser.create_numeric_input_compound_key(
+                    'input-optimbound-upper',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    value = var.interface_max
+                )
+        ]),
+        dbc.InputGroup([
+            dbc.InputGroupText('N plot:'),
+            browser.create_numeric_input_compound_key(
+                    'input-optim-plotintervals',
+                    var.interface_key,
+                    section = var.interface_section,
+                    subindex = var.interface_subindex,
+                    value = 10,
+                    step = 1
+                )
+        ])
+    ]
+
+def create_optim_input(
+    var: variable.NumericScalarVariable,
+):
+    return compose_optim_input(
+        create_optim_header(var),
+        #create_positive_toggle(var),
+        #create_bounded_toggle(var),
+        create_optim_bound_inputs(var),
+        var
+    )

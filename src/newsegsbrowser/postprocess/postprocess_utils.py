@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from dash import no_update
 import pandas as pd
+import scipy.optimize as sci_opt
 
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
@@ -25,6 +26,7 @@ RESULT_CACHE_PREFIXES = {
     'psa_results': 'res_psa_',
     'psa_table': 'psa_table_',
     'psa_prob_positive_npv': 'psa_prob_positive_npv_',
+    'optim_results': 'res_optim_',
 }
 
 def get_model_result_id(prefix, model_id):
@@ -37,6 +39,9 @@ def get_dsa_result_id(prefix: str, metamodel_id: str) -> str:
     return prefix + metamodel_id
 
 def get_psa_result_id(prefix: str, metamodel_id: str) -> str:
+    return prefix + metamodel_id
+
+def get_optim_result_id(prefix: str, metamodel_id: str) -> str:
     return prefix + metamodel_id
 
 def get_model_result_list(prefix, configs, app):
@@ -78,6 +83,24 @@ def assign_psa_results(
     result_id = get_psa_result_id(RESULT_CACHE_PREFIXES['psa_results'], mm.id)
 
     mm.last_psa_run = run_time
+    setattr(results, '_run_time', run_time)
+    return result_id
+
+def assign_optim_results(
+    mm: NewsegsMetaModel,
+    results: sci_opt._optimize.OptimizeResult,
+    run_time: float | None = None,
+):
+    """
+    Set the metamodel.last_optim_run (time) and ._run_time attribute on the results object.
+
+    Return the result id.
+    """
+    if run_time is None:
+        run_time = time.time()
+    result_id = get_optim_result_id(RESULT_CACHE_PREFIXES['optim_results'], mm.id)
+
+    mm.last_optim_run = run_time
     setattr(results, '_run_time', run_time)
     return result_id
 

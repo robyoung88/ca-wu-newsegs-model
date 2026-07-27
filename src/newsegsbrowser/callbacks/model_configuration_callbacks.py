@@ -1444,6 +1444,26 @@ def add_interface_to_model_callbacks(app):
                     rval['prequeue_metamodel_process'] = metamodel_prequeue_patch
                     rval['interval_action_user'] = len(queue_action_user) == 0
                     return rval
+                
+                case 'optim_run_request':
+                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    if mm.model.checked_out or mm.finance.checked_out:
+                        continue
+                    dispatch_actions = find_matching_actions(
+                        queue_action_user,
+                        action,
+                        i,
+                        'optim_run_request'
+                    )
+                    logger.info('dispatching %d optim run requests', len(dispatch_actions))
+
+                    # Requests go straight out to the metamodel process
+                    metamodel_prequeue_patch = Patch()
+                    metamodel_prequeue_patch.append(dispatch_actions[0])
+
+                    rval['prequeue_metamodel_process'] = metamodel_prequeue_patch
+                    rval['interval_action_user'] = len(queue_action_user) == 0
+                    return rval
 
                 case _:
                     raise ValueError(f'action type not recognised: {action['type']}')

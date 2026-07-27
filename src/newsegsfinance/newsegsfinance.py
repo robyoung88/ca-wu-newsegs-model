@@ -49,6 +49,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         """
         Perform any expensive computation required to "un-dirty" the finance
         """
+        super().run()
         self._dirty = False
         return hash(self)
 
@@ -496,7 +497,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         """
         Has the model configuration changed since last run?
         """
-        return self._dirty
+        return self._dirty or self.last_run < self.model.last_run
 
     @dirty.setter
     def dirty(self, val: bool) -> None:

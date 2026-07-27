@@ -497,7 +497,7 @@ for _key in SprakeFinance._default_unit_costs.keys():
 def _deferred_get_empty_df(fnc: SprakeFinance):
     if fnc._model is None:
         return pd.DataFrame()
-    
+    #
     csr = fnc._model.get_consumption_storage_result()
     if csr is None:
         return pd.DataFrame()
@@ -584,7 +584,7 @@ def _deferred_get_ev_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
         shift=1
     )
 
-@lru_cache
+#@lru_cache
 def _deferred_get_export_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     consumption = fnc._get_grid_export()
     if len(consumption) == 0:
