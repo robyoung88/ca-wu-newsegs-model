@@ -11,6 +11,7 @@ import pathvalidate
 from util import jsonfuncs
 from newsegsbrowser import common as browser
 from newsegsmetamodel import NewsegsMetaModel
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ def metamodel_to_dict(mm: NewsegsMetaModel) -> dict[str, Any]:
     }
     return odict
 
-def add_configuration_selection_callbacks(app: Dash):
+def add_configuration_selection_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     """
     Make the buttons on the configuration selector live.
     """
@@ -55,7 +56,7 @@ def add_configuration_selection_callbacks(app: Dash):
             return NUP
         
         w_conf = json.loads(configurations[trigger_index])
-        mm_working = cast(NewsegsMetaModel, app.metamodels.get(w_conf['metamodel_id']))
+        mm_working = cast(NewsegsMetaModel, acm.metamodels.get(w_conf['metamodel_id']))
         if mm_working is None:
             raise ValueError(f'selected metamodel cannot be located: {w_conf['metamodel_id']}')
 
@@ -114,13 +115,13 @@ def add_configuration_selection_callbacks(app: Dash):
             # Make the copy
             ref_config = json.loads(configurations[trigger_index])
 
-            mm = app.metamodels.get(ref_config['metamodel_id'])
+            mm = acm.metamodels.get(ref_config['metamodel_id'])
 
             try:
                 mm_dup = browser.duplicate_metamodel(
                     ref_config['metamodel_id'],
                     configurations,
-                    app
+                    acm
                 )
             except (TypeError, ValueError) as e:
                 logger.error(str(e))
@@ -204,7 +205,7 @@ def add_configuration_selection_callbacks(app: Dash):
             selected_config = json.loads(configurations[trigger_index-1])
             selected_config['config_index'] = trigger_index - 1
         
-        browser.safe_remove_metamodel(dropped['metamodel_id'], configurations, app)
+        browser.safe_remove_metamodel(dropped['metamodel_id'], configurations, acm)
 
         return (
             configurations,
@@ -304,7 +305,7 @@ def add_configuration_selection_callbacks(app: Dash):
 
         config = json.loads(configurations[trigger_index])
 
-        mm = app.metamodels.get(config['metamodel_id'])
+        mm = acm.metamodels[config['metamodel_id']]
         odict = metamodel_to_dict(mm)
 
         fn = odict.get('config_name','metamodel_configuration') + ".json"
@@ -358,7 +359,7 @@ def add_configuration_selection_callbacks(app: Dash):
                 cfg,
                 working_conf,
                 configurations,
-                app,
+                acm,
                 overwrite_selected_config = True
             )
         except Exception as e:
@@ -533,7 +534,7 @@ def add_configuration_selection_callbacks(app: Dash):
                     return rval
                 
                 config = json.loads(configurations[config_index])
-                mm = app.metamodels.get(config.get('metamodel_id'))
+                mm = acm.metamodels.get(config.get('metamodel_id'))
                 if mm is None:
                     rval['toast']['children'] = ['Could not retrieve metamodel'] * n_toast
                     rval['toast']['is_opens'] = [True] * n_toast
@@ -556,7 +557,7 @@ def add_configuration_selection_callbacks(app: Dash):
                 to_export = browser.export_results(
                     'det',
                     config,
-                    app,
+                    acm,
                     opts.get('contents-option', 'result'),
                     opts.get('format-option', 'csv')
                 )

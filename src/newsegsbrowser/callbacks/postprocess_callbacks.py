@@ -5,11 +5,12 @@ import logging
 from dash import ALL, Dash, Input, no_update, Output, State
 
 from newsegsbrowser import common as browser
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.callbacks import callbacks_map
 
 logger = logging.getLogger(__name__)
 
-def add_postprocess_callbacks(app: Dash):
+def add_postprocess_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
 
     @app.callback(
         Output('prequeue-finance-run', 'data', allow_duplicate = True),
@@ -52,7 +53,7 @@ def add_postprocess_callbacks(app: Dash):
         for s_config in store_configurations:
             config = json.loads(s_config)
             if config['model_id'] == model_id:
-                mm = app.metamodels.get(config['metamodel_id'])
+                mm = acm.metamodels[config['metamodel_id']]
                 logger.info('metamodel %s uses model that has been run; finance %s added to run list', mm.id, mm.finance.id)
 
                 prequeue_finance_run.append(
@@ -92,7 +93,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing generation')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_gen'](
             model_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -112,7 +113,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing storage')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_stor'](
             model_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -132,7 +133,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing consumption')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_cons'](
             model_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -152,7 +153,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing net energy')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_model_net'](
             model_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -172,7 +173,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing financial benefits')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_benefits_so'](
             finance_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -192,7 +193,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing financial costs')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_costs_so'](
             finance_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -212,7 +213,7 @@ def add_postprocess_callbacks(app: Dash):
         logger.info('postprocessing financial value')
         return [callbacks_map.CALLBACKS_MAP[selected_model]['postproc_finance_value_so'](
             finance_run_json,
-            app
+            acm
         )]
     
     @app.callback(
@@ -238,7 +239,7 @@ def add_postprocess_callbacks(app: Dash):
             dsa_triggers,
             selected_configuration,
             configurations,
-            app
+            acm
         )
     
     @app.callback(
@@ -269,7 +270,7 @@ def add_postprocess_callbacks(app: Dash):
             result_tooltip_ids,
             selected_configuration,
             configurations,
-            app
+            acm
         )
 
     @app.callback(
@@ -295,7 +296,7 @@ def add_postprocess_callbacks(app: Dash):
             psa_triggers,
             selected_configuration,
             configurations,
-            app
+            acm
         )
     
     @app.callback(
@@ -326,7 +327,7 @@ def add_postprocess_callbacks(app: Dash):
             result_tooltip_ids,
             selected_configuration,
             configurations,
-            app
+            acm
         )
     
     return app

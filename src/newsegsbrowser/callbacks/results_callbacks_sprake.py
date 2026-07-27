@@ -7,6 +7,7 @@ import dash_ag_grid as dag
 
 from newsegsbrowser import icons
 from newsegsbrowser import stats as browserstats
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsbrowser.postprocess.tables import result_tables_sprake
 from newsegssensitivity import common as sensitivity, psa
@@ -140,13 +141,13 @@ def _make_model_result_header(
     result_type,
     model_id,
     ann_hori_toggle: bool,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     res_id = postprocess_utils.get_model_result_id(
         postprocess_utils.RESULT_CACHE_PREFIXES[result_type],
         model_id
     )
-    res = app.results.get(res_id)
+    res = acm.results.get(res_id)
     if res is None:
         return None
     return _MODEL_RESULT_HEADER_MAP[result_type](res, ann_hori_toggle)
@@ -157,7 +158,7 @@ def update_model_result_headers(
     selected_config,
     result_trigger_ids,
     result_header_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = [no_update] * len(result_header_ids)
 
@@ -177,22 +178,22 @@ def update_model_result_headers(
             case 'gen-ressmry':
                 if any(x['key'] == 'res-gen' for x in update_triggers):
                     hdr = _make_model_result_header(
-                        'generation', model_id, ann_hori_toggle, app
+                        'generation', model_id, ann_hori_toggle, acm
                     )        
             case 'stor-ressmry':
                 if any(x['key'] == 'res-stor' for x in update_triggers):
                     hdr = _make_model_result_header(
-                        'storage', model_id, ann_hori_toggle, app
+                        'storage', model_id, ann_hori_toggle, acm
                     )
             case 'cons-ressmry':
                 if any(x['key'] == 'res-cons' for x in update_triggers):
                     hdr = _make_model_result_header(
-                        'consumption', model_id, ann_hori_toggle, app
+                        'consumption', model_id, ann_hori_toggle, acm
                     )
             case 'net-ressmry':
                 if any(x['key'] == 'res-net' for x in update_triggers):
                     hdr = _make_model_result_header(
-                        'net_energy', model_id, ann_hori_toggle, app
+                        'net_energy', model_id, ann_hori_toggle, acm
                     )
         if hdr:
             rval[i] = hdr
@@ -234,7 +235,7 @@ def update_finance_result_headers(
     selected_config,
     result_trigger_ids,
     result_header_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = [no_update] * len(result_header_ids)
 
@@ -258,7 +259,7 @@ def update_finance_result_headers(
                     'res-finance-so-costs',
                     'res-finance-so-value'
                 ) for x in update_triggers):
-                    res_benefits = app.results.get(
+                    res_benefits = acm.results.get(
                         postprocess_utils.get_finance_result_id(
                             postprocess_utils.RESULT_CACHE_PREFIXES['finance_benefits_so'], 
                             finance_id, 
@@ -268,7 +269,7 @@ def update_finance_result_headers(
                     if not res_benefits:
                         continue
                     
-                    res_costs = app.results.get(
+                    res_costs = acm.results.get(
                         postprocess_utils.get_finance_result_id(
                             postprocess_utils.RESULT_CACHE_PREFIXES['finance_costs_so'],
                             finance_id,
@@ -278,7 +279,7 @@ def update_finance_result_headers(
                     if not res_costs:
                         continue
                     
-                    res_value = app.results.get(
+                    res_value = acm.results.get(
                         postprocess_utils.get_finance_result_id(
                             postprocess_utils.RESULT_CACHE_PREFIXES['finance_value_so'],
                             finance_id,
@@ -302,7 +303,7 @@ def sync_gen_results_table_to_store(
     ann_hori_toggle,
     table_ids,
     store_configurations,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = [no_update] * len(table_ids)
 
@@ -312,7 +313,7 @@ def sync_gen_results_table_to_store(
     res = postprocess_utils.get_model_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['generation'], 
         store_configurations,
-        app
+        acm
     )
 
     wind_results = result_tables_sprake.create_wind_results(res, not(ann_hori_toggle))
@@ -336,7 +337,8 @@ def sync_stor_results_table_to_store(
     ann_hori_toggle,
     table_ids,
     store_configurations,
-    app
+    acm: NewsegsBrowserCacheManager
+
 ):
     NUP = [no_update] * len(table_ids)
 
@@ -346,7 +348,7 @@ def sync_stor_results_table_to_store(
     res = postprocess_utils.get_model_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['storage'],
         store_configurations,
-        app
+        acm
     )
 
     stor_results = result_tables_sprake.create_stor_results(res, not(ann_hori_toggle))
@@ -365,7 +367,8 @@ def sync_cons_results_table_to_store(
     ann_hori_toggle,
     table_ids,
     store_configurations,
-    app
+    acm: NewsegsBrowserCacheManager
+
 ):
     NUP = [no_update] * len(table_ids)
 
@@ -375,7 +378,7 @@ def sync_cons_results_table_to_store(
     res = postprocess_utils.get_model_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['consumption'],
         store_configurations,
-        app
+        acm
     )
 
     cons_results = result_tables_sprake.create_cons_results(res, not(ann_hori_toggle))
@@ -396,7 +399,7 @@ def sync_net_results_table_to_store(
     ann_hori_toggle,
     table_ids,
     store_configurations,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = [no_update] * len(table_ids)
 
@@ -407,7 +410,7 @@ def sync_net_results_table_to_store(
     res = postprocess_utils.get_model_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['net_energy'],
         store_configurations,
-        app
+        acm
     )
 
     net_results = result_tables_sprake.create_net_results(res, not(ann_hori_toggle))
@@ -428,7 +431,7 @@ def sync_fnc_so_table_to_store(
     ann_hori_toggle,
     table_ids,
     store_configurations,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = [no_update] * len(table_ids)
 
@@ -438,17 +441,17 @@ def sync_fnc_so_table_to_store(
     benefits = postprocess_utils.get_finance_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['finance_benefits_so'],
         store_configurations,
-        app
+        acm
     )
     costs = postprocess_utils.get_finance_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['finance_costs_so'],
         store_configurations,
-        app
+        acm
     )
     value = postprocess_utils.get_finance_result_list(
         postprocess_utils.RESULT_CACHE_PREFIXES['finance_value_so'],
         store_configurations,
-        app
+        acm
     )
 
     benefits_results = result_tables_sprake.create_so_benefits_results(benefits, not(ann_hori_toggle))
@@ -472,7 +475,7 @@ def sync_dsa_results_table_to_store(
     dsa_statistic_dropdown_values,
     table_ids,
     selected_conf,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     if len(table_ids) == 0:
         return
@@ -496,7 +499,7 @@ def sync_dsa_results_table_to_store(
         selected_conf.get('metamodel_id')
     )
 
-    tbl = app.results.get(tbl_id)
+    tbl = acm.results.get(tbl_id)
     if tbl is None:
         return NUP
 
@@ -532,7 +535,7 @@ def sync_dsa_tornado_to_store(
     dsa_statistic_dropdown_values,
     plot_container_ids,
     selected_conf,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     if len(plot_container_ids) == 0:
         return
@@ -555,12 +558,12 @@ def sync_dsa_tornado_to_store(
         postprocess_utils.RESULT_CACHE_PREFIXES['dsa_table'],
         selected_conf.get('metamodel_id')
     )
-    tbl = app.results.get(tbl_id)
+    tbl = acm.results.get(tbl_id)
     lbl_id = postprocess_utils.get_dsa_result_id(
         postprocess_utils.RESULT_CACHE_PREFIXES['dsa_label'],
         selected_conf.get('metamodel_id')
     )
-    lbl = app.results.get(lbl_id)
+    lbl = acm.results.get(lbl_id)
 
     if tbl is None or lbl is None:
         return NUP
@@ -573,7 +576,7 @@ def sync_psa_results_table_to_store(
     psa_table_trigger,
     table_ids,
     selected_conf,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     if len(table_ids) == 0:
         return
@@ -590,7 +593,7 @@ def sync_psa_results_table_to_store(
         selected_conf.get('metamodel_id')
     )
 
-    tbl = app.results.get(tbl_id)
+    tbl = acm.results.get(tbl_id)
     if tbl is None:
         return NUP
     
@@ -627,7 +630,7 @@ def sync_psa_results_table_to_store(
         postprocess_utils.RESULT_CACHE_PREFIXES['psa_prob_positive_npv'],
         selected_conf.get('metamodel_id')
     )
-    npv_data = app.results.get(npv_id)
+    npv_data = acm.results.get(npv_id)
     if npv_data is None:
         return NUP
     
@@ -652,7 +655,7 @@ def sync_psa_primary_plot_to_store(
     plot,
     plot_container,
     selected_configuration,
-    app,
+    acm: NewsegsBrowserCacheManager,
     null_return,
 ):
     rval = null_return
@@ -665,7 +668,7 @@ def sync_psa_primary_plot_to_store(
     
     selected_configuration = json.loads(selected_configuration['value'])
     
-    psa_data = postprocess_utils.get_psa_raw_data(selected_configuration, app)
+    psa_data = postprocess_utils.get_psa_raw_data(selected_configuration, acm)
     
     graph_type = None
     full_draw = False

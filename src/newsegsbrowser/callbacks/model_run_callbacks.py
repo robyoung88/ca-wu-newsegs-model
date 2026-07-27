@@ -13,6 +13,7 @@ from typing import Any, cast
 from dash import ALL, NoUpdate, Patch, ctx, Dash, Input, no_update, Output, State, html
 
 from newsegsbrowser import icons
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 import newsegsbrowser.common as browser
 from newsegsbrowser.callbacks.locks import ok_run_model
 from newsegsfinance.newsegsfinance import NewsegsFinance
@@ -27,7 +28,7 @@ RUN_DEBOUNCE_SECONDS = 1.0
 FINANCE_DEBOUNCE_SECONDS = 0.5
 METAMODEL_PROCESS_DEBOUNCE_SECONDS = 1.0
 
-def add_model_run_callbacks(app: Dash):
+def add_model_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
     """
     Callbacks which handle model running
     """
@@ -75,10 +76,10 @@ def add_model_run_callbacks(app: Dash):
         # interval-model-run, this can result in the State of queue-model-run
         # being stale. This being the case, we will actually use
         # the short-term-store (sts) of the app for our queue
-        queue_model_run = app.sts.get('queue-model-run')
+        queue_model_run = acm.sts.get('queue-model-run')
         if queue_model_run is None:
-            app.sts['queue-model-run'] = []
-            queue_model_run = app.sts.get('queue-model-run')
+            acm.sts['queue-model-run'] = []
+            queue_model_run = acm.sts['queue-model-run']
 
         if ctx.triggered_id == 'prequeue-model-run':
             requests = prequeue_model_run
@@ -103,7 +104,7 @@ def add_model_run_callbacks(app: Dash):
         logger.info('current model run queue: %s', queue_model_run)
 
         app_dispatch_key = 'dispatchitem-model-run'
-        app_dispatch = app.sts.get(app_dispatch_key)
+        app_dispatch = acm.sts.get(app_dispatch_key)
         if app_dispatch is not None and app_dispatch != dispatch_status:
             logger.info('Early exit from model queue manager to avoid overwriting dispatch item')
             return (
@@ -124,7 +125,7 @@ def add_model_run_callbacks(app: Dash):
                 request_l = json.loads(request)
                 logger.info('checking if model %s should be run', request_l['model_id'])
                 if not(request_l['debounce']) or nowtime - request_l['time'] > RUN_DEBOUNCE_SECONDS:
-                    mdl = app.models[request_l['model_id']]
+                    mdl = acm.models[request_l['model_id']]
                     if not mdl.checked_out:
                         dispatch_request = queue_model_run.pop(i)
                         dr_dict = json.loads(dispatch_request)
@@ -140,7 +141,7 @@ def add_model_run_callbacks(app: Dash):
                         logger.info('checking out model: %s', mdl.id)
                         mdl.checked_out = True
                         logger.info('model run dispatched: %s, %s', dispatch_request, datetime.datetime.now())
-                        app.sts[app_dispatch_key] = dispatch_request
+                        acm.sts[app_dispatch_key] = dispatch_request
                         return (
                             dispatch_request,
                             [], # consume prequeue
@@ -192,18 +193,18 @@ def add_model_run_callbacks(app: Dash):
 
         logger.info('model to dispatch is %s', model_run['model_id'])
 
-        mdl = cast(NewsegsModel, app.models[model_run['model_id']])
+        mdl = cast(NewsegsModel, acm.models[model_run['model_id']])
         
         logger.info('checking in model before dispatch: %s, %s', mdl.id, datetime.datetime.now())
         mdl.checked_out = False
-        app.model_to_cache(model_run['model_id'])
+        acm.model_to_cache(model_run['model_id'])
         logger.info('checking out model after dispatch: %s, %s', mdl.id, datetime.datetime.now())
         mdl.checked_out = True
 
         logging.info('model dispatched to run: %s', model_run)
 
-        n_bgp = app.sts.get('n_bgp', 0)
-        app.sts['n_bgp'] = n_bgp + 1
+        n_bgp = acm.sts.get('n_bgp', 0)
+        acm.sts['n_bgp'] = n_bgp + 1
 
         return dispatchitem_model_run, False
         
@@ -235,23 +236,23 @@ def add_model_run_callbacks(app: Dash):
         logging.info('resyncing model after run completed: %s', model_run)
         
         # Sync with background cache
-        app.models[model_id] = app.model_from_cache(model_id)
+        acm.models[model_id] = acm.model_from_cache(model_id)
         logger.info('checking in model after resync - %s', model_id)
         # The synced model should have checked_out = False
-        if app.models[model_id].checked_out:
+        if acm.models[model_id].checked_out:
             logger.error('model should not be checked out: %s', model_id)
             raise ValueError(f'model should not be checked out: {model_id}')
         
         # Reattach to metamodel
-        mm = cast(NewsegsMetaModel, app.metamodels.get(model_run['metamodel_id']))
-        mm.reattach_model(app.models)
+        mm = cast(NewsegsMetaModel, acm.metamodels.get(model_run['metamodel_id']))
+        mm.reattach_model(acm.models)
 
         # TODO: Handle failures of model run
 
         logging.info('model run resync completed: %s', model_run)
 
-        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
-        app.sts['n_bgp'] = n_bgp
+        n_bgp = max(0, acm.sts.get('n_bgp', 0) - 1)
+        acm.sts['n_bgp'] = n_bgp
         
         return (
             trigger_post_model_run,
@@ -261,7 +262,7 @@ def add_model_run_callbacks(app: Dash):
 
     return app
 
-def add_finance_run_callbacks(app: Dash):
+def add_finance_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
     """
     Callbacks which handle finance running
     """
@@ -305,10 +306,10 @@ def add_finance_run_callbacks(app: Dash):
 
         logger.info('processing finance queue, triggered by %s, %s', ctx.triggered_id, datetime.datetime.now())
         
-        queue_finance_run = app.sts.get('queue-finance-run')
+        queue_finance_run = acm.sts.get('queue-finance-run')
         if queue_finance_run is None:
-            app.sts['queue-finance-run'] = []
-            queue_finance_run = app.sts.get('queue-finance-run')
+            acm.sts['queue-finance-run'] = []
+            queue_finance_run = acm.sts['queue-finance-run']
 
         if ctx.triggered_id == 'prequeue-finance-run':
             requests = prequeue_finance_run
@@ -334,7 +335,7 @@ def add_finance_run_callbacks(app: Dash):
         logger.info('current finance run queue: %s', queue_finance_run)
 
         app_dispatch_key = 'dispatchitem-finance-run'
-        app_dispatch = app.sts.get(app_dispatch_key)
+        app_dispatch = acm.sts.get(app_dispatch_key)
         if app_dispatch is not None and app_dispatch != dispatch_status:
             logger.info('Early exit from finance queue manager to avoid overwriting dispatch item')
             return (
@@ -356,8 +357,8 @@ def add_finance_run_callbacks(app: Dash):
                 logger.info('checking if finance %s should be run', request_l['finance_id'])
                 if not(request_l['debounce']) or nowtime - request_l['time'] > FINANCE_DEBOUNCE_SECONDS:
                     # Cannot run if model is checked out
-                    mdl = app.models[request_l['model_id']]
-                    fnc = app.finances[request_l['finance_id']]
+                    mdl = acm.models[request_l['model_id']]
+                    fnc = acm.finances[request_l['finance_id']]
                     if not mdl.checked_out and not fnc.checked_out:
                         dispatch_request = queue_finance_run.pop(i)
                         dr_dict = json.loads(dispatch_request)
@@ -374,7 +375,7 @@ def add_finance_run_callbacks(app: Dash):
                         fnc.checked_out = True
                         
                         logger.info('finance run dispatched: %s, %s', dispatch_request, datetime.datetime.now())
-                        app.sts[app_dispatch_key] = dispatch_request
+                        acm.sts[app_dispatch_key] = dispatch_request
                         return (
                             [], # consume prequeue
                             dispatch_request,
@@ -425,20 +426,20 @@ def add_finance_run_callbacks(app: Dash):
         finance_run = json.loads(dispatchitem_finance_run)
         
         # Model is synced to cache so finance can pick up, but no need to lock
-        app.model_to_cache(finance_run['model_id'])
+        acm.model_to_cache(finance_run['model_id'])
 
-        fnc = cast(NewsegsFinance, app.finances[finance_run['finance_id']])
+        fnc = cast(NewsegsFinance, acm.finances[finance_run['finance_id']])
 
         logger.info('checking in finance before dispatch: %s', finance_run['finance_id'])
         fnc.checked_out = False
-        app.finance_to_cache(finance_run['finance_id'])
+        acm.finance_to_cache(finance_run['finance_id'])
         logger.info('checking out finance after dispatch: %s', finance_run['finance_id'])
         fnc.checked_out = True
         
         logging.info('finance dispatched to run: %s', finance_run)
 
-        n_bgp = app.sts.get('n_bgp', 0)
-        app.sts['n_bgp'] = n_bgp + 1
+        n_bgp = acm.sts.get('n_bgp', 0)
+        acm.sts['n_bgp'] = n_bgp + 1
 
         return dispatchitem_finance_run, False
     
@@ -469,29 +470,29 @@ def add_finance_run_callbacks(app: Dash):
         logging.info('resyncing finance after run completed: %s', finance_run)
 
         # Sync with background cache
-        app.finances[finance_id] = app.finance_from_cache(finance_id)
+        acm.finances[finance_id] = acm.finance_from_cache(finance_id)
         logger.info('checking in finance after resync - %s', finance_id)
         # The synced finance should have checked_out = False
-        if app.finances[finance_id].checked_out:
+        if acm.finances[finance_id].checked_out:
             logger.error('finance should not be checked out: %s', finance_id)
             raise ValueError(f'finance should not be checked out: {finance_id}')
         
         # Ensure model is correct
         # However, do not go through the standard accessor
         # to avoid dirtying the finance
-        app.finances[finance_id].set_model(
-            app.models.get(finance_run['model_id']), 
+        acm.finances[finance_id].set_model(
+            acm.models[finance_run['model_id']], 
             False
         )
-        mm = cast(NewsegsMetaModel, app.metamodels.get(finance_run['metamodel_id']))
-        mm.reattach_finance(app.finances)
+        mm = cast(NewsegsMetaModel, acm.metamodels.get(finance_run['metamodel_id']))
+        mm.reattach_finance(acm.finances)
 
         # TODO: Handle failures of finance run
 
         logging.info('finance run resync completed: %s', finance_run)
 
-        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
-        app.sts['n_bgp'] = n_bgp
+        n_bgp = max(0, acm.sts.get('n_bgp', 0) - 1)
+        acm.sts['n_bgp'] = n_bgp
 
         return (
             trigger_post_finance_run,
@@ -532,10 +533,10 @@ def add_finance_run_callbacks(app: Dash):
         
         logger.info('processing metamodel queue, triggered by %s', ctx.triggered_id)
 
-        queue_metamodel_process = app.sts.get('queue-metamodel-process')
+        queue_metamodel_process = acm.sts.get('queue-metamodel-process')
         if queue_metamodel_process is None:
-            app.sts['queue-metamodel-process'] = []
-            queue_metamodel_process = app.sts.get('queue-metamodel-process')
+            acm.sts['queue-metamodel-process'] = []
+            queue_metamodel_process = acm.sts['queue-metamodel-process']
 
         if ctx.triggered_id == 'prequeue-metamodel-process':
             requests = prequeue_metamodel_process
@@ -563,7 +564,7 @@ def add_finance_run_callbacks(app: Dash):
         logger.info('%s processes are in queue', len(queue_metamodel_process))
 
         app_dispatch_key = 'dispatchitem-metamodel-process'
-        app_dispatch = app.sts.get(app_dispatch_key)
+        app_dispatch = acm.sts.get(app_dispatch_key)
         if app_dispatch is not None and app_dispatch != dispatch_status:
             logger.info('Early exit from metamodel queue manager to avoid overwriting dispatch item')
             return (
@@ -585,7 +586,7 @@ def add_finance_run_callbacks(app: Dash):
                 logger.info('checking if metamodel %s should be run', request_l['metamodel_id'])
                 if not(request_l['debounce']) or nowtime - request_l['time'] > METAMODEL_PROCESS_DEBOUNCE_SECONDS:
                     mm_id = request_l['metamodel_id']
-                    mm = app.metamodels[mm_id]
+                    mm = acm.metamodels[mm_id]
                     if not mm.model.checked_out and not mm.finance.checked_out and not mm.checked_out:
                         # Check out before starting the callback chain
                         logger.info('checking out model %s', mm.model.id)
@@ -596,7 +597,7 @@ def add_finance_run_callbacks(app: Dash):
                         mm.checked_out = True
                         dispatch_request = queue_metamodel_process.pop(i)
                         logger.info('metamodel process dispatched: %s', dispatch_request)
-                        app.sts[app_dispatch_key] = dispatch_request
+                        acm.sts[app_dispatch_key] = dispatch_request
                         return (
                             dispatch_request,
                             [], # consume prequeue
@@ -640,7 +641,7 @@ def add_finance_run_callbacks(app: Dash):
         
         metamodel_process = json.loads(dispatchitem_metamodel_process)
         
-        mm = cast(NewsegsMetaModel, app.metamodels[metamodel_process['metamodel_id']])
+        mm = cast(NewsegsMetaModel, acm.metamodels[metamodel_process['metamodel_id']])
         
         logger.info('checking in metamodel prior to dispatch %s', mm.id)
         mm.checked_out = False
@@ -651,7 +652,7 @@ def add_finance_run_callbacks(app: Dash):
 
         if metamodel_process['type'] == 'optim_run_request':
             # Special case - use a copy of the metamodel, not the metamodel itself
-            mm_dup = app.duplicate_metamodel(metamodel_process['metamodel_id'])
+            mm_dup = acm.duplicate_metamodel(metamodel_process['metamodel_id'])
             
             # Perform a switcheroo with the metamodels in the config
             metamodel_process['metamodel_dup'] = metamodel_process['metamodel_id']
@@ -660,9 +661,9 @@ def add_finance_run_callbacks(app: Dash):
 
             mm = mm_dup
 
-        app.metamodel_to_cache(metamodel_process['metamodel_id'])
-        app.model_to_cache(mm.model.id)
-        app.finance_to_cache(mm.finance.id)
+        acm.metamodel_to_cache(metamodel_process['metamodel_id'])
+        acm.model_to_cache(mm.model.id)
+        acm.finance_to_cache(mm.finance.id)
         mm.checked_out = True
         logger.info('checking out metamodel after dispatch %s', mm.id)
         mm.model.checked_out = True
@@ -672,8 +673,8 @@ def add_finance_run_callbacks(app: Dash):
 
         logger.info('metamodel dispatched to process: %s', metamodel_process)
 
-        n_bgp = app.sts.get('n_bgp', 0)
-        app.sts['n_bgp'] = n_bgp + 1
+        n_bgp = acm.sts.get('n_bgp', 0)
+        acm.sts['n_bgp'] = n_bgp + 1
 
         return dispatchitem_metamodel_process, False
     
@@ -696,20 +697,20 @@ def add_finance_run_callbacks(app: Dash):
         trigger_post_metamodel_process,
     ):
         process_request = json.loads(trigger_post_metamodel_process)
-        mm = app.metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
-        app.metamodels[mm.id] = mm
-        app.models[mm.model.id] = mm.model
-        app.finances[mm.finance.id] = mm.finance
+        mm = acm.metamodel_from_cache(process_request.get('metamodel_id'), 'cache')
+        acm.metamodels[mm.id] = mm
+        acm.models[mm.model.id] = mm.model
+        acm.finances[mm.finance.id] = mm.finance
 
         logger.info('checking in metamodel after process complete %s', mm.id)
         logger.info('checking in model after process complete %s', mm.model.id)
         logger.info('checking in finance after process complete %s', mm.finance.id)
 
-        if app.metamodels[mm.id].checked_out:
+        if acm.metamodels[mm.id].checked_out:
             raise ValueError(f'metamodel should not be checked out: {mm.id}')
-        if app.models[mm.model.id].checked_out:
+        if acm.models[mm.model.id].checked_out:
             raise ValueError(f'model should not be checked out: {mm.model.id}')
-        if app.finances[mm.finance.id].checked_out:
+        if acm.finances[mm.finance.id].checked_out:
             raise ValueError(f'finance should not be checked out: {mm.finance.id}')
 
         logging.info('resyncing metamodel after process completed: %s', process_request)
@@ -722,22 +723,22 @@ def add_finance_run_callbacks(app: Dash):
                     postprocess_utils.RESULT_CACHE_PREFIXES['dsa_results'],
                     mm.id
                 )
-                app.results[dsa_result_id] = app.cache[dsa_result_id]
+                acm.results[dsa_result_id] = acm.cache[dsa_result_id]
             case 'psa_run_request':
                 psa_result_id = postprocess_utils.get_psa_result_id(
                     postprocess_utils.RESULT_CACHE_PREFIXES['psa_results'],
                     mm.id
                 )
-                app.results[psa_result_id] = app.cache[psa_result_id]
+                acm.results[psa_result_id] = acm.cache[psa_result_id]
             case 'optim_run_request':
                 optim_result_id = postprocess_utils.get_optim_result_id(
                     postprocess_utils.RESULT_CACHE_PREFIXES['optim_results'],
                     mm.id
                 )
-                app.results[optim_result_id] = app.cache[optim_result_id]
+                acm.results[optim_result_id] = acm.cache[optim_result_id]
         
-        n_bgp = max(0, app.sts.get('n_bgp', 0) - 1)
-        app.sts['n_bgp'] = n_bgp
+        n_bgp = max(0, acm.sts.get('n_bgp', 0) - 1)
+        acm.sts['n_bgp'] = n_bgp
 
         return (
             trigger_post_metamodel_process,
@@ -851,7 +852,7 @@ def add_finance_run_callbacks(app: Dash):
                 prequeue = Patch()
                 for config in configurations:
                     config = json.loads(config)
-                    mdl = app.models.get(config.get('model_id'))
+                    mdl = acm.models.get(config.get('model_id'))
                     if mdl is not None:
                         if mdl.dirty:
                             action = browser.model_run_request(

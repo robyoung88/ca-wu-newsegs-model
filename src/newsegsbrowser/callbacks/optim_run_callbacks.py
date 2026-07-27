@@ -9,13 +9,14 @@ from typing import Any, MutableMapping, cast
 from dash import ALL, Dash, Input, Output, Patch, State, ctx, no_update
 
 from newsegsbrowser import common as browser
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegssensitivity import optim
 
 logger = logging.getLogger(__name__)
 
-def add_optim_run_callbacks(app: Dash):
+def add_optim_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         output = {
             'plot': {
@@ -133,7 +134,7 @@ def add_optim_run_callbacks(app: Dash):
             return rval
 
         selected_configuration = json.loads(selected_configuration)
-        mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+        mm = acm.metamodels[selected_configuration.get('metamodel_id')]
 
         match trig_id.get('type'):
             case 'optim-marginal-plot-button':
@@ -466,19 +467,19 @@ def add_optim_run_callbacks(app: Dash):
                 val = val[0]
 
         process_request = json.loads(val)
-        mm = cast(NewsegsMetaModel, app.metamodels.get(process_request.get('metamodel_id')))
+        mm = cast(NewsegsMetaModel, acm.metamodels.get(process_request.get('metamodel_id')))
         if mm is None:
             logger.warning('Unable to recover metamodel after optimisation: %s', process_request.get('metamodel_id'))
             return rval
         result_id = postprocess_utils.get_optim_result_id(postprocess_utils.RESULT_CACHE_PREFIXES['optim_results'], mm.id)
         logger.info('Recovering result: %s', result_id)
 
-        opt = app.results.get(result_id)
+        opt = acm.results.get(result_id)
         if opt is None:
             logger.warning('Unable to recover optimisation result: %s', result_id)
             rval['toast']['is_opens'] = [True] * n_toast
             rval['toast']['children'] = ['Optimisation has not returned a result'] * n_toast
-            app.remove_metamodel(mm.id, True)
+            acm.remove_metamodel(mm.id, True)
             return rval
         
         if opt.success:
@@ -500,7 +501,7 @@ def add_optim_run_callbacks(app: Dash):
 
             rval['toast']['is_opens'] = [True] * n_toast
             rval['toast']['children'] = [msg] * n_toast
-            app.remove_metamodel(mm.id, True)
+            acm.remove_metamodel(mm.id, True)
 
         return rval
         
