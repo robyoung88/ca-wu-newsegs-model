@@ -435,9 +435,8 @@ def create_app(external_stylesheets = None) -> Dash:
         logger = logger
     )
 
-    app = add_display_callbacks(app, acm)
-
     # Can't late bind callbacks - do it now
+    app = add_display_callbacks(app, acm)
     app = model_selection_callbacks.assign_callbacks(app, acm)
     app = model_configuration_callbacks.add_initial_callbacks(app, acm)
     app = model_configuration_callbacks.add_model_to_interface_callbacks(app, acm)
@@ -455,7 +454,6 @@ def create_app(external_stylesheets = None) -> Dash:
     app = optim_run_callbacks.add_optim_run_callbacks(app, acm)
     app = add_site_selector_callbacks(app, acm)
     app = add_background_callback_error_dispatch(app, acm)
-
     app = add_caching_callbacks(app, acm)
 
     return app

@@ -74,6 +74,7 @@ DEFAULT_ICONS = {
     'nav-build-arch-config': 'bi bi-houses',
     'autorun-true': 'bi bi-play-circle-fill',
     'autorun-false': 'bi bi-stop-circle',
+    'value-reset': 'bi bi-arrow-clockwise',
 }
 
 ICON_COLOUR_CLASSES = [

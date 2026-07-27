@@ -25,6 +25,7 @@ import pathvalidate
 from useful_types import SequenceNotStr
 
 # from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager # Need __future__ for typing to avoid circular
+from newsegsbrowser import icons
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -98,12 +99,36 @@ def create_numeric_input_compound_key(
         min = min,
         max = max,
         step = 'any',
-        # style = {
-        #     'display':'inline-block',
-        #     'float':'right',
-        #     'width':'30%'
-        # },
         className = cn,
+    )
+
+def create_value_reset_button(
+    key,
+    section,
+    subindex,
+    parameter_index,
+    vector_location
+):
+    if section is None:
+        section = 'None'
+    button_id = {
+        'type': 'value-reset-button',
+        'key': key,
+        'section': section,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
+    }
+    return dbc.Button(
+        html.I(
+            className = icons.get_icon('value-reset', style_name = 'raw'),
+            style = {'display': 'inline'}
+        ),
+        color = 'light',
+        id = button_id,
+        title = 'Reset to default',
+        outline = False,
+        size = 'sm'
     )
 
 def create_numeric_card_input_compound_key(
@@ -119,9 +144,13 @@ def create_numeric_card_input_compound_key(
     value: int | float | None = None,
     min: int | float | None = 0.0,
     max: int | float | None = None,
-    step: int | float  = 1
+    step: int | float  = 1,
+    reset_button = True
 ):  
     return html.Div([
+        create_value_reset_button(
+            key, section, subindex, parameter_index, vector_location
+        ) if reset_button else None,
         html.H5(
             [
                 get_icon(icon_name, None, 'default'),
@@ -141,7 +170,8 @@ def create_numeric_card_input_compound_key(
             min,
             max,
             step
-        )
+        ),
+        
     ])
 
 def unescape_html_icons(html_text):
