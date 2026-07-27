@@ -764,6 +764,7 @@ def add_finance_run_callbacks(app: Dash):
             trigger_postprocess_metamodel_process = [trigger_postprocess_metamodel_process]
         
         for process_str in trigger_postprocess_metamodel_process:
+            logger.info('dispatching for postprocess: %s', process_str)
             process = json.loads(process_str)
             match process['type']:
                 case 'dsa_run_request':

@@ -4,7 +4,7 @@ Callbacks for handling optimisation requests
 
 import json
 import logging
-from typing import Any, MutableMapping
+from typing import Any, MutableMapping, cast
 
 from dash import ALL, Dash, Input, Output, Patch, State, ctx, no_update
 
@@ -395,22 +395,114 @@ def add_optim_run_callbacks(app: Dash):
         logger.info('patching metamodel process prequeue with %s', request.as_dict())
         return rval
     
+    
     @app.callback(
-        output = dict(),
+        output = dict(
+            toast = dict(
+                is_opens = Output(
+                    {'type': 'feedback-toast', 'page': ALL, 'key': 'optim'}, 
+                    'is_open', allow_duplicate = True
+                ),
+                children = Output(
+                    {'type': 'feedback-toast', 'page': ALL, 'key': 'optim'}, 
+                    'children', allow_duplicate = True
+                )
+            ),
+            selected_configuration = Output('store-selected-configuration', 'data', allow_duplicate = True),
+            configurations = Output('store-configurations', 'data', allow_duplicate = True),
+        ),
         inputs = dict(
             trigger = dict(
                 values = Input({'type': 'trigger', 'page': ALL, 'key': 'optim-run-postprocess'}, 'data'),
-                ids = Input({'type': 'trigger', 'page': ALL, 'key': 'optim-run-postprocess'}, 'id'))
+                ids = State({'type': 'trigger', 'page': ALL, 'key': 'optim-run-postprocess'}, 'id'))
         ),
-        state = dict()
+        state = dict(
+            toast = dict(
+                ids = State(
+                    {'type': 'feedback-toast', 'page': ALL, 'key': 'optim'}, 
+                    'id'
+                )
+            ),
+            configurations = State('store-configurations', 'data')
+        ),
+        prevent_initial_call = True,
     )
     def handle_opt_complete(
-        trigger
+        trigger,
+        toast,
+        configurations,
     ):
-        ...
-        #TODO: Get the opt as a result. If successful, add the metamodel to configurations and make it selected.
-        # If not, safe remove the metamodel and children, and pop the toast with a message including the opt string
+        n_toast = len(toast['ids'])
+        rval: dict[str, Any] = dict(
+            toast = dict(
+                is_opens = [no_update] * n_toast,
+                children = [no_update] * n_toast,
+            ),
+            selected_configuration = no_update,
+            configurations = no_update
+        )
         
+        trig_id = ctx.triggered_id
+        if trig_id is None:
+            return rval
+        
+        val = None
+        for prop in ctx.triggered:
+            pid = json.loads(prop['prop_id'].rsplit('.', 1)[0])
+            if pid == trig_id:
+                val = prop['value']
+                break
+        
+        if val is None or isinstance(val, float):
+            return rval
+        
+        if isinstance(val, list):
+            if len(val) > 1:
+                logger.error('Handling > 1 optimisation result, trimming to last')
+                val = val[-1]
+            elif len(val) == 0:
+                return rval
+            else:
+                val = val[0]
+
+        process_request = json.loads(val)
+        mm = cast(NewsegsMetaModel, app.metamodels.get(process_request.get('metamodel_id')))
+        if mm is None:
+            logger.warning('Unable to recover metamodel after optimisation: %s', process_request.get('metamodel_id'))
+            return rval
+        result_id = postprocess_utils.get_optim_result_id(postprocess_utils.RESULT_CACHE_PREFIXES['optim_results'], mm.id)
+        logger.info('Recovering result: %s', result_id)
+
+        opt = app.results.get(result_id)
+        if opt is None:
+            logger.warning('Unable to recover optimisation result: %s', result_id)
+            rval['toast']['is_opens'] = [True] * n_toast
+            rval['toast']['children'] = ['Optimisation has not returned a result'] * n_toast
+            app.remove_metamodel(mm.id, True)
+            return rval
+        
+        if opt.success:
+            rval['toast']['is_opens'] = [True] * n_toast
+            rval['toast']['children'] = ['Optimisation was successful'] * n_toast
+
+            # Add the metamodel to the config list and set it as the active configuration
+            mm.name = mm.name + " - Opt"
+            mm_dict = mm.to_config()
+            configurations.append(json.dumps(mm_dict))
+            rval['configurations'] = configurations
+
+            mm_dict['config_index'] = len(configurations) - 1
+            rval['selected_configuration'] = json.dumps(mm_dict)
+        else:
+            msg = f'Optimisation was not a success: {opt.message}' + \
+                '\n Try again with a different method, variables or bounds.' + \
+                str(opt)
+
+            rval['toast']['is_opens'] = [True] * n_toast
+            rval['toast']['children'] = [msg] * n_toast
+            app.remove_metamodel(mm.id, True)
+
+        return rval
         
     return app
 
@@ -420,7 +512,7 @@ def optim_metamodel_process(
     mm: NewsegsMetaModel,
     cache: MutableMapping[str, Any]
 ):
-    vars = [optim.OptimVariable(*x) for x in process_request['variables']]
+    vars = [optim.OptimVariable(**x) for x in process_request['variables']]
     opt = optim.run_optimisation(
         mm,
         vars,

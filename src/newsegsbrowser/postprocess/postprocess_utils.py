@@ -91,11 +91,16 @@ def assign_optim_results(
     results: sci_opt._optimize.OptimizeResult,
     run_time: float | None = None,
 ):
+    """
+    Set the metamodel.last_optim_run (time) and ._run_time attribute on the results object.
+
+    Return the result id.
+    """
     if run_time is None:
         run_time = time.time()
     result_id = get_optim_result_id(RESULT_CACHE_PREFIXES['optim_results'], mm.id)
 
-    mm.last_psa_run = run_time
+    mm.last_optim_run = run_time
     setattr(results, '_run_time', run_time)
     return result_id
 
