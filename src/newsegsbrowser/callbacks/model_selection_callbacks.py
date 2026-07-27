@@ -3,8 +3,9 @@ import json
 from dash import Dash, Input, Output, ALL, ctx, no_update
 
 from newsegsbrowser import variable_dash_component as var_dc
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 
-def assign_callbacks(app: Dash):
+def assign_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
 
     @app.callback(
         Output('url', 'pathname'),

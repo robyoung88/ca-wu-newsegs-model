@@ -5,7 +5,9 @@ import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
-def add_result_timeseries_callbacks(app: Dash):
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
+
+def add_result_timeseries_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
 
     @app.callback(
         Output('timeseries-graph-container', 'style'),
@@ -60,7 +62,7 @@ def add_result_timeseries_callbacks(app: Dash):
             model_id = json.loads(store_selected_configuration).get('model_id')
             if model_id is None:
                 return NUP
-            mdl = app.models.get(model_id)
+            mdl = acm.models[model_id]
         elif ctx.triggered_id == 'trigger-postprocess-model-run':
             active_model_id = json.loads(store_selected_configuration).get('model_id')
             model_run = model_run_json
@@ -82,7 +84,7 @@ def add_result_timeseries_callbacks(app: Dash):
             
             if not do_continue:
                 return NUP
-            mdl = app.models.get(active_model_id)
+            mdl = acm.models[active_model_id]
         else:
             return NUP
 

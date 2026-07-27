@@ -1,12 +1,12 @@
 """
 NewSEGS model as a multi-page app.
 """
-import time
 import copy
 import datetime
+import json
+import logging
 import os
 import time
-import logging
 from typing import Callable, Literal, cast, MutableMapping
 
 from dash import ALL, Dash, dcc, html, Input, Output, State, callback, no_update
@@ -14,7 +14,6 @@ import dash_bootstrap_components as dbc
 # At the moment, use a diskcache cache for transferring models 
 # regardless of background callback manager
 import diskcache
-import pandas as pd
 
 # For local testing
 import sys
@@ -32,8 +31,8 @@ from config import settings
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
 from newsegsmetamodel import NewsegsMetaModel
-from newsegssensitivity import dsa
-from newsegssensitivity import psa
+
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 
 from newsegsbrowser.layouts import model_selection_layout, template_psa_configuration_layout
 from newsegsbrowser.layouts import template_landing_layout
@@ -126,11 +125,12 @@ def serve_layout():
         dcc.Store(id = 'store-configurations', data = []),
     ])
 
-def add_display_callbacks(app: Dash) -> Dash:
+def add_display_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     """
     Attach callbacks for multi-page handling to app
     """
-    app = app
+    #app = app
+    #acm = acm
 
     @app.callback(
         Output('page-content', 'children'),
@@ -141,12 +141,12 @@ def add_display_callbacks(app: Dash) -> Dash:
     )
     def display_page(pathname, selected_model, selected_conf, configurations):
         
-        current_page = app.sts.get('current_page')
+        current_page = acm.sts.get('current_page')
 
         if current_page is not None and current_page == pathname:
             return no_update
         
-        app.sts['current_page'] = pathname        
+        acm.sts['current_page'] = pathname        
 
         if pathname == '/' or pathname == '/model_selection':
             return model_selection_layout.model_selection_layout
@@ -162,12 +162,12 @@ def add_display_callbacks(app: Dash) -> Dash:
         # As we are changing page, we will naturally lose any of our background callbacks
         # Therefore, make sure that all models in all configs are unlocked.
         for config_j in configurations:
-            mm = app.metamodels.get(json.loads(config_j).get('metamodel_id'))
+            mm = acm.metamodels.get(json.loads(config_j).get('metamodel_id'))
             if mm is not None:
                 mm.model.checked_out = False
                 mm.finance.checked_out = False
         # Also set the number of background processes to 0
-        app.sts['n_bgp'] = 0
+        acm.sts['n_bgp'] = 0
 
         if pagename == 'landing':
             return template_landing_layout.create_landing_layout(
@@ -198,9 +198,9 @@ def add_display_callbacks(app: Dash) -> Dash:
             return '404'
     
     return app
-import json
 
-def add_caching_callbacks(app):
+
+def add_caching_callbacks(app, acm: NewsegsBrowserCacheManager):
     @app.callback(
         Output({'type': 'background-callback-return', 'target': 'model-run'}, 'data', allow_duplicate = True),
 
@@ -208,7 +208,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('model-run', app)
+        on_error = background_callback_error_handler_factory('model-run', app, acm)
     )
     def run_model(model_run_request):
         model_run = json.loads(model_run_request)
@@ -230,7 +230,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('finance-run', app)
+        on_error = background_callback_error_handler_factory('finance-run', app, acm)
     )
     def run_finance(finance_run_request):
         finance_run = json.loads(finance_run_request)
@@ -262,7 +262,7 @@ def add_caching_callbacks(app):
         prevent_initial_call = True,
         background = True,
         manager = noncaching_background_callback_manager,
-        on_error = background_callback_error_handler_factory('metamodel-process', app),
+        on_error = background_callback_error_handler_factory('metamodel-process', app, acm),
         running = [
             (
                 Output({'type': 'metamodel-process-cancel', 'target': ALL}, 'class_name'), 
@@ -340,7 +340,7 @@ def add_caching_callbacks(app):
             return no_update, no_update
         logger.info('User has attempted to cancel metamodel process %s', datetime.datetime.now())
         call_ = json.loads(metamodel_process_call)
-        mm = app.metamodels[call_['metamodel_id']]
+        mm = acm.metamodels[call_['metamodel_id']]
         mm.checked_out = False
         mm.model.checked_out = False
         mm.finance.checked_out = False
@@ -429,203 +429,34 @@ def create_app(external_stylesheets = None) -> Dash:
 
     ])
 
-    # TODO: Extend the app class to create these attributes
-    app.models = models # pyright: ignore[reportAttributeAccessIssue]
-    app.finances = finances # pyright: ignore[reportAttributeAccessIssue]
-    app.results = results # pyright: ignore[reportAttributeAccessIssue]
-    app.metamodels = metamodels # pyright: ignore[reportAttributeAccessIssue]
-    app.estimated_energy_balance = energy_balance_estimation.EstimatedEnergyBalance() # pyright: ignore[reportAttributeAccessIssue]
-    app.cache = cache # pyright: ignore[reportAttributeAccessIssue]
-    app.noncaching_background_callback_manager = noncaching_background_callback_manager # pyright: ignore[reportAttributeAccessIssue]
+    acm = NewsegsBrowserCacheManager(
+        cache,
+        noncaching_background_callback_manager,
+        logger = logger
+    )
 
-    def model_to_cache(model_id):
-        mdl = models.get(model_id)
-        logger.info('writing model %s to cache, %s', model_id, datetime.datetime.now())
-        if mdl:
-            cache[model_id] = mdl
-        logger.info('writing model %s to cache was successful, %s', model_id, datetime.datetime.now())
-    
-    def model_from_cache(model_id) -> newsegsmodel.NewsegsModel:
-        logger.info('retrieving model %s from cache', model_id)
-        mdl = cache.get(model_id)
-        if not isinstance(mdl, newsegsmodel.NewsegsModel):
-            raise TypeError(f'{model_id} retrieved from cache is of type {type(mdl)}')
-        logger.info('retrieving model %s was successful', model_id)
-        return mdl
-    
-    app.model_to_cache = model_to_cache # pyright: ignore[reportAttributeAccessIssue]
-    app.model_from_cache = model_from_cache # pyright: ignore[reportAttributeAccessIssue]
-
-    def finance_to_cache(finance_id):
-        fnc = finances.get(finance_id)
-        logger.info('writing finance %s to cache', finance_id)
-        if fnc:
-            cache[finance_id] = fnc
-        logger.info('writing finance %s to cache was successful', finance_id)
-    
-    def finance_from_cache(finance_id) -> newsegsfinance.NewsegsFinance:
-        logger.info('retrieving finance %s from cache', finance_id)
-        fnc = cache.get(finance_id)
-        if not isinstance(fnc, newsegsfinance.NewsegsFinance):
-            raise TypeError(f'{finance_id} retrieved from cache is of type {type(fnc)}')
-        logger.info('retrieving finance %s was successful', finance_id)
-        return fnc
-    
-    app.finance_to_cache = finance_to_cache # pyright: ignore[reportAttributeAccessIssue]
-    app.finance_from_cache = finance_from_cache # pyright: ignore[reportAttributeAccessIssue]
-    
-    app.metamodel_to_cache = metamodel_to_cache  # pyright: ignore[reportAttributeAccessIssue]
-    app.metamodel_from_cache = metamodel_from_cache # pyright: ignore[reportAttributeAccessIssue]
-    
-    def duplicate_model(model_id: str) -> newsegsmodel.NewsegsModel:
-        ref = models.get(model_id, None)
-        if ref is None:
-            raise ValueError(f'NewsegsModel not found: {model_id}')
-        mdl = type(ref)(ref)
-        models[mdl.id] = mdl
-        new_model_id = mdl.id
-        mdl.last_run = ref.last_run
-        mdl._last_hash = hash((mdl.id, str(mdl.last_run)))
-        # Copy over any results
-        for res_class in ['generation', 'storage', 'consumption', 'net_energy']:
-            ref_id = postprocess_utils.get_model_result_id(
-                postprocess_utils.RESULT_CACHE_PREFIXES[res_class],
-                model_id)
-            new_id = postprocess_utils.get_model_result_id(
-                postprocess_utils.RESULT_CACHE_PREFIXES[res_class],
-                new_model_id
-            )
-            res = results.get(ref_id)
-            if res is not None:
-                results[new_id] = copy.copy(res)
-                results[new_id]['run_hash'] = hash(mdl)
-
-        return mdl
-    
-    def duplicate_finance(
-            finance_id: str, 
-            model_id: str|None = None
-        ) -> newsegsfinance.NewsegsFinance:
-        ref = finances.get(finance_id, None)
-        if ref is None:
-            raise ValueError(f'NewsegsFinance not found: {finance_id}')
-        
-        fnc = type(ref)(ref)
-
-        try:
-            ref_model_id = ref.model.id
-        except AttributeError:
-            ref_model_id = None
-        if not model_id:
-            model_id = ref_model_id
-        
-        if model_id is not None:
-            mdl = models.get(model_id, None)
-            if mdl is not None:
-                fnc.model = mdl
-        finances[fnc.id] = fnc
-        
-        # Copy over any results
-        if ref_model_id is not None:
-            for res_class in ['finance_benefits_so', 'finance_costs_so', 'finance_value_so']:
-                ref_id = postprocess_utils.get_finance_result_id(
-                    postprocess_utils.RESULT_CACHE_PREFIXES[res_class], 
-                    ref.id, 
-                    ref_model_id
-                )
-                new_id = postprocess_utils.get_finance_result_id(
-                    postprocess_utils.RESULT_CACHE_PREFIXES[res_class], 
-                    fnc.id,
-                    model_id
-                )
-                res = results.get(ref_id)
-                if res is not None:
-                    results[new_id] = copy.copy(res)
-                    results[new_id]['run_hash'] = hash(fnc) + hash(fnc.model)
-            
-        return fnc
-    
-    def duplicate_metamodel(metamodel_id: str):
-        ref = metamodels.get(metamodel_id, None)
-        if ref is None:
-            raise ValueError(f'NewsegsMetaModel not found: {metamodel_id}')
-        
-        dup_mdl = duplicate_model(ref.model_id)
-
-        dup_fnc = duplicate_finance(ref.finance_id, dup_mdl.id)
-        variables = copy.deepcopy(list(ref.variables.values()))
-        dup_mm = NewsegsMetaModel(dup_mdl, dup_fnc, variables)
-        dup_mm.name = ref.name
-        dup_mm.require_sync = copy.copy(ref.require_sync)
-
-        metamodels[dup_mm.id] = dup_mm
-        
-        return dup_mm
-
-    app.duplicate_model = duplicate_model # pyright: ignore[reportAttributeAccessIssue]
-    app.duplicate_finance = duplicate_finance # pyright: ignore[reportAttributeAccessIssue]
-    app.duplicate_metamodel = duplicate_metamodel # pyright: ignore[reportAttributeAccessIssue]
-
-    def remove_model(model_id):
-        cache.delete(model_id)
-        res_remove = []
-        for k in results.keys():
-            if model_id in k:
-                res_remove.append(k)
-        if res_remove:
-            for k in res_remove:
-                results.pop(k)
-        return models.pop(model_id, None)
-    
-    def remove_finance(finance_id):
-        cache.delete(finance_id)
-        res_remove = []
-        for k in results.keys():
-            if finance_id in k:
-                res_remove.append(k)
-        if res_remove:
-            for k in res_remove:
-                results.pop(k)
-        return finances.pop(finance_id, None)
-    
-    def remove_metamodel(metamodel_id: str, remove_children: bool = True):
-        if remove_children:
-            mm = metamodels.get(metamodel_id)
-            if mm:
-                remove_model(mm.model_id)
-                remove_finance(mm.finance_id)
-        cache.delete(metamodel_id)
-        return metamodels.pop(metamodel_id)
-    
-    app.remove_model = remove_model # pyright: ignore[reportAttributeAccessIssue]
-    app.remove_finance = remove_finance # pyright: ignore[reportAttributeAccessIssue]
-    app.remove_metamodel = remove_metamodel # pyright: ignore[reportAttributeAccessIssue]
-
-    # Short-term stor
-    app.sts = {} # pyright: ignore[reportAttributeAccessIssue]
-
-    app = add_display_callbacks(app)
+    app = add_display_callbacks(app, acm)
 
     # Can't late bind callbacks - do it now
-    app = model_selection_callbacks.assign_callbacks(app)
-    app = model_configuration_callbacks.add_initial_callbacks(app)
-    app = model_configuration_callbacks.add_model_to_interface_callbacks(app)
-    app = model_configuration_callbacks.add_feedback_callbacks(app)
-    app = model_configuration_callbacks.add_interface_to_model_callbacks(app)
-    app = model_run_callbacks.add_model_run_callbacks(app)
-    app = model_run_callbacks.add_finance_run_callbacks(app)
-    app = postprocess_callbacks.add_postprocess_callbacks(app)
-    app = results_callbacks.add_result_header_callbacks(app)
-    app = results_callbacks.add_result_table_callbacks(app)
-    app = timeseries_callbacks.add_result_timeseries_callbacks(app)
-    app = configuration_selector_callbacks.add_configuration_selection_callbacks(app)
-    app = dsa_run_callbacks.add_dsa_run_callbacks(app)
-    app = psa_run_callbacks.add_psa_run_callbacks(app)
-    app = optim_run_callbacks.add_optim_run_callbacks(app)
-    app = add_site_selector_callbacks(app)
-    app = add_background_callback_error_dispatch(app)
+    app = model_selection_callbacks.assign_callbacks(app, acm)
+    app = model_configuration_callbacks.add_initial_callbacks(app, acm)
+    app = model_configuration_callbacks.add_model_to_interface_callbacks(app, acm)
+    app = model_configuration_callbacks.add_feedback_callbacks(app, acm)
+    app = model_configuration_callbacks.add_interface_to_model_callbacks(app, acm)
+    app = model_run_callbacks.add_model_run_callbacks(app, acm)
+    app = model_run_callbacks.add_finance_run_callbacks(app, acm)
+    app = postprocess_callbacks.add_postprocess_callbacks(app, acm)
+    app = results_callbacks.add_result_header_callbacks(app, acm)
+    app = results_callbacks.add_result_table_callbacks(app, acm)
+    app = timeseries_callbacks.add_result_timeseries_callbacks(app, acm)
+    app = configuration_selector_callbacks.add_configuration_selection_callbacks(app, acm)
+    app = dsa_run_callbacks.add_dsa_run_callbacks(app, acm)
+    app = psa_run_callbacks.add_psa_run_callbacks(app, acm)
+    app = optim_run_callbacks.add_optim_run_callbacks(app, acm)
+    app = add_site_selector_callbacks(app, acm)
+    app = add_background_callback_error_dispatch(app, acm)
 
-    app = add_caching_callbacks(app)
+    app = add_caching_callbacks(app, acm)
 
     return app
 

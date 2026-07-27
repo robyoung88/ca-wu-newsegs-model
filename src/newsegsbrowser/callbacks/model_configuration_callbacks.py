@@ -19,6 +19,7 @@ import numpy as np
 from useful_types import SequenceNotStr
 
 from newsegsbrowser import common as browser
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.callbacks import callbacks_map
 from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 SYNC_DEBOUNCE_SECONDS = 0.1
 
-def add_initial_callbacks(app: Dash):
+def add_initial_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
     """
     Functions which are triggered immediately after page load.
     """
@@ -58,7 +59,7 @@ def add_initial_callbacks(app: Dash):
     
     return app
 
-def add_model_to_interface_callbacks(app: Dash):
+def add_model_to_interface_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
     """
     Callbacks for passing model configuration data to the interface
     """
@@ -182,7 +183,7 @@ def add_model_to_interface_callbacks(app: Dash):
             trigger_ids,
             config_name_inputs,
             null_rval,
-            app
+            acm
         )
     
     # Updates to inputs based on config
@@ -200,7 +201,7 @@ def add_model_to_interface_callbacks(app: Dash):
         logger.info('sync_loc_inputs_to_store triggered by %s', ctx.triggered_id)
         return callbacks_map.CALLBACKS_MAP[selected_model]['sync_loc_inputs_to_store'](
             selected_configuration,
-            app
+            acm
         )
     
     @app.callback(
@@ -227,7 +228,7 @@ def add_model_to_interface_callbacks(app: Dash):
             selected_configuration,
             bounds_container_ids,
             dsa_input_element_ids,
-            app
+            acm
         )
     
     @app.callback(
@@ -250,12 +251,12 @@ def add_model_to_interface_callbacks(app: Dash):
             psa_input_change_trigger,
             selected_configuration,
             psa_input_element_ids,
-            app
+            acm
         )
     
     return app
     
-def add_feedback_callbacks(app):
+def add_feedback_callbacks(app, acm: NewsegsBrowserCacheManager):
     """
     Callbacks for updating feedback elements given current configuration
     """
@@ -280,7 +281,7 @@ def add_feedback_callbacks(app):
             model_config_trigger,
             selected_configuration,
             header_ids,
-            app
+            acm
         )
     
     # Trigger on both model and finance config updates
@@ -306,7 +307,7 @@ def add_feedback_callbacks(app):
             finance_config_trigger,
             selected_configuration,
             header_ids,
-            app
+            acm
         )
     
     @app.callback(
@@ -329,7 +330,7 @@ def add_feedback_callbacks(app):
             dsa_input_change_trigger,
             selected_configuration,
             header_ids,
-            app
+            acm
         )
     
     @app.callback(
@@ -352,7 +353,7 @@ def add_feedback_callbacks(app):
             psa_input_change_trigger,
             selected_configuration,
             header_ids,
-            app
+            acm
         )
     
     @app.callback(
@@ -375,14 +376,13 @@ def add_feedback_callbacks(app):
             model_config_trigger,
             selected_configuration,
             figure_ids,
-            app
+            acm
         )
 
     return app
 
 
-
-def add_interface_to_model_callbacks(app):
+def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
     """
     Callbacks for when a user changes a model or finance config input.
     """
@@ -573,7 +573,7 @@ def add_interface_to_model_callbacks(app):
         selected_mm = selected_configuration.get('metamodel_id')
         if selected_mm is None:
             return rval
-        selected_mm = cast(NewsegsMetaModel, app.metamodels.get(selected_mm))
+        selected_mm = cast(NewsegsMetaModel, acm.metamodels.get(selected_mm))
         if selected_mm is None:
             return rval
 
@@ -630,18 +630,12 @@ def add_interface_to_model_callbacks(app):
                             debounce = False,
                             **actargs
                         )
-                        # action = browser.model_interface_action(
-                        #     metamodel_id = selected_mm.id,
-                        #     debounce = False,
-                        #     **actargs
-                        # )
                         prequeue.append(
                             json.dumps(
                                 action.as_dict()
                             )
                         )
-                        
-
+                    
                         # Trigger a change on all pages
                         rval['config_triggers']['model']['values'] = (
                             [datetime.datetime.now().timestamp()] 
@@ -681,11 +675,6 @@ def add_interface_to_model_callbacks(app):
                         # finance
                         if not hasattr(selected_mm.model, '_cs_result'):
                             
-                            # action = browser.model_interface_action(
-                            #     metamodel_id = selected_mm.id,
-                            #     debounce = False,
-                            #     **actargs
-                            # )
                             action = browser.metamodel_variable_sync_action(
                                 metamodel_id = selected_mm.id,
                                 debounce = False,
@@ -822,7 +811,7 @@ def add_interface_to_model_callbacks(app):
         if selected_config is None:
             return tuple(rval)
         selected_config = json.loads(selected_config)
-        mm = cast(NewsegsMetaModel, app.metamodels.get(selected_config.get('metamodel_id')))
+        mm = cast(NewsegsMetaModel, acm.metamodels.get(selected_config.get('metamodel_id')))
         if mm is None:
             return tuple(rval)
         
@@ -946,7 +935,7 @@ def add_interface_to_model_callbacks(app):
             return rval
         
         selected_config = json.loads(selected_config)
-        mm = cast(NewsegsMetaModel, app.metamodels.get(selected_config.get('metamodel_id')))
+        mm = cast(NewsegsMetaModel, acm.metamodels.get(selected_config.get('metamodel_id')))
         if mm is None:
             return rval
         
@@ -1111,10 +1100,10 @@ def add_interface_to_model_callbacks(app):
             interval_action_user = no_update
         )
 
-        queue_action_user = app.sts.get('queue-action-user')
+        queue_action_user = acm.sts.get('queue-action-user')
         if queue_action_user is None:
-            app.sts['queue-action-user'] = []
-            queue_action_user = app.sts.get('queue-action-user')
+            acm.sts['queue-action-user'] = []
+            queue_action_user = acm.sts['queue-action-user']
 
         if ctx.triggered_id == 'prequeue-action-user':
             action = prequeue_action_user
@@ -1132,10 +1121,10 @@ def add_interface_to_model_callbacks(app):
         nowtime = time.time()
 
         # The actual dispatch queue is held in the sts to prevent overwrites
-        dispatched_action_user = app.sts.get('dispatched-action-user')
+        dispatched_action_user = acm.sts.get('dispatched-action-user')
         if dispatched_action_user is None:
-            app.sts['dispatched-action-user'] = []
-            dispatched_action_user = app.sts.get('dispatched-action-user')
+            acm.sts['dispatched-action-user'] = []
+            dispatched_action_user = acm.sts['dispatched-action-user']
 
         # If the user action queue hasn't been handled, let's just trigger it again and wait until it is
         if len(dispatched_action_user) != 0:
@@ -1143,11 +1132,10 @@ def add_interface_to_model_callbacks(app):
             rval['interval_action_user'] = len(queue_action_user) == 0 
             return rval
 
-
         # As there are multiple exits from this function, it is not as trivial to ensure that
         # we avoid overwriting a dispatch. 
         # May need to re-write the flow again.
-        #app_dispatch = app.sts.get('dispatchitem-action-user')
+        #acm_dispatch = acm.sts.get('dispatchitem-action-user')
 
         # Loop through action queue
         for i, action_json in enumerate(queue_action_user):
@@ -1156,7 +1144,7 @@ def add_interface_to_model_callbacks(app):
             match action['type']:
                 case 'metamodel_variable_sync_action':
                     if not(action['debounce']) or (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
-                        mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                        mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if model %s is checked out: %s', mm.model.id, mm.model.checked_out)
                         logger.info('Checking if finance %s is checked out: %s', mm.finance.id, mm.finance.checked_out)
                         if not mm.model.checked_out and not mm.finance.checked_out:
@@ -1201,7 +1189,7 @@ def add_interface_to_model_callbacks(app):
                 case 'model_config_interface_update':
                     logger.warning('model_config_interface_update - deprecated')
                     if not(action['debounce']) or (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
-                        mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                        mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if model %s is checked out: %s', mm.model.id, mm.model.checked_out)
                         if not mm.model.checked_out:
                             # Have a positive dispatch - find other appropriate actions
@@ -1250,7 +1238,7 @@ def add_interface_to_model_callbacks(app):
                 case 'finance_config_interface_update':
                     logger.warning('finance_config_interface_update - deprecated')
                     if not(action['debounce']) or (nowtime - action['time']) > SYNC_DEBOUNCE_SECONDS:
-                        mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                        mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                         logger.info('Checking if finance %s is checked out: %s', mm.finance.id, mm.finance.checked_out)
                         if not mm.finance.checked_out:
 
@@ -1298,7 +1286,7 @@ def add_interface_to_model_callbacks(app):
                         
                 case 'model_run_request':
                     # No debounce on a model run request
-                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                     if mm is None:
                         raise ValueError(f'metamodel {action['metamodel_id']} could not be recovered.')
                     if not mm.model.checked_out:
@@ -1328,7 +1316,7 @@ def add_interface_to_model_callbacks(app):
                         return rval
                 
                 case 'result_update_request':
-                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                     if mm is None:
                         raise ValueError(f'metamodel {action['metamodel_id']} could not be recovered.')
                     if not mm.model.checked_out and not mm.finance.checked_out:
@@ -1404,7 +1392,7 @@ def add_interface_to_model_callbacks(app):
                     return rval
 
                 case 'dsa_run_request':
-                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                     if mm.model.checked_out or mm.finance.checked_out:
                         continue
 
@@ -1425,7 +1413,7 @@ def add_interface_to_model_callbacks(app):
                     return rval
                 
                 case 'psa_run_request':
-                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                     if mm.model.checked_out or mm.finance.checked_out:
                         continue
 
@@ -1446,7 +1434,7 @@ def add_interface_to_model_callbacks(app):
                     return rval
                 
                 case 'optim_run_request':
-                    mm = cast(NewsegsMetaModel, app.metamodels.get(action['metamodel_id']))
+                    mm = cast(NewsegsMetaModel, acm.metamodels.get(action['metamodel_id']))
                     if mm.model.checked_out or mm.finance.checked_out:
                         continue
                     dispatch_actions = find_matching_actions(
@@ -1501,10 +1489,10 @@ def add_interface_to_model_callbacks(app):
         rval: NoUpdate|list[Any] = [no_update] * len(trigger_ids)
 
         # The actual dispatch queue is held in the sts to prevent overwrites
-        dispatched_action_user = app.sts.get('dispatched-action-user')
+        dispatched_action_user = acm.sts.get('dispatched-action-user')
         if dispatched_action_user is None:
-            app.sts['dispatched-action-user'] = []
-            dispatched_action_user = app.sts.get('dispatched-action-user')
+            acm.sts['dispatched-action-user'] = []
+            dispatched_action_user = acm.sts['dispatched-action-user']
 
         for i, trig_id in enumerate(trigger_ids):
             for itm in dispatched_action_user:

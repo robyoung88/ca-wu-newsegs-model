@@ -16,6 +16,7 @@ import pandas as pd
 import pathvalidate
 
 from newsegsbrowser import common as browser
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -24,7 +25,7 @@ from util import jsonfuncs
 
 logger = logging.getLogger(__name__)
 
-def add_dsa_run_callbacks(app: Dash):
+def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
 
     @app.callback(
         output = {
@@ -314,10 +315,10 @@ def add_dsa_run_callbacks(app: Dash):
         
         # Set the result_df as appropriate for a psa result and trigger post-processing
         result_df = result_df.set_index(['variable', 'bound'])
-        mm = app.metamodels[selected_configuration['metamodel_id']]
+        mm = acm.metamodels[str(selected_configuration.get('metamodel_id'))]
         result_id = postprocess_utils.assign_dsa_results(mm, result_df)
         logger.info('Results %s created', result_id)
-        app.results[result_id] = result_df
+        acm.results[result_id] = result_df
 
         for idx, id in enumerate(triggers['ids']):
             if id.get('page') == page:

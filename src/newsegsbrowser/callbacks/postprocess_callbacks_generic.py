@@ -4,6 +4,7 @@ from typing import Any, get_args
 
 from dash import Dash, no_update, ctx
 
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.postprocess import post_dsa_results, post_psa_results, postprocess_utils as pp_utils
 from newsegsbrowser.postprocess import post_sprake_storage_results
 from newsegsbrowser.postprocess import post_sprake_net_results
@@ -13,29 +14,29 @@ logger = logging.getLogger(__name__)
 
 def postproc_model_stor(
     model_run_json: list | str,
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ):
     return pp_utils.generic_model_postprocess(
         model_run_json,
         post_sprake_storage_results.stor_results_to_interface_sprake,
         pp_utils.RESULT_CACHE_PREFIXES['storage'],
-        app
+        acm
     )
 
 def postproc_model_net(
     model_run_json: list | str,
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ):
     return pp_utils.generic_model_postprocess(
         model_run_json,
         post_sprake_net_results.net_results_to_interface_sprake,
         pp_utils.RESULT_CACHE_PREFIXES['net_energy'],
-        app
+        acm
     )
 
 def _postprocess_dsa_single_mm(
     metamodel_id: str,
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ) -> bool:
     """
     Checks if a postprocessed data set exists for the dsa for a metamodel.
@@ -55,9 +56,9 @@ def _postprocess_dsa_single_mm(
 
     logger.info('Getting result table %s and %s', table_id, label_id)
 
-    prev_result = app.results.get(table_id)
-    prev_labels = app.results.get(label_id)
-    mm = app.metamodels.get(metamodel_id)
+    prev_result = acm.results.get(table_id)
+    prev_labels = acm.results.get(label_id)
+    mm = acm.metamodels[metamodel_id]
     if (
         not prev_result is None 
         and getattr(prev_result, '_run_time') == mm.last_dsa_run
@@ -67,15 +68,15 @@ def _postprocess_dsa_single_mm(
         return False
     logger.info('Cache miss - making dsa tables %s and %s', table_id, label_id)
 
-    dsa_results = pp_utils.get_dsa_raw_data(metamodel_id, app)
+    dsa_results = pp_utils.get_dsa_raw_data(metamodel_id, acm)
     if dsa_results is None:
         raise ValueError(f'DSA results for {metamodel_id} not found')
     
     res_table, label_table = post_dsa_results.dsa_results_to_tables(dsa_results)
     setattr(res_table, '_run_time', mm.last_dsa_run)
     setattr(label_table, '_run_time', mm.last_dsa_run)
-    app.results[table_id] = res_table
-    app.results[label_id] = label_table
+    acm.results[table_id] = res_table
+    acm.results[label_id] = label_table
     
     return True
 
@@ -83,7 +84,7 @@ def postproc_dsa(
     dsa_triggers,
     selected_configuration,
     configurations,
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = no_update
     logger.info('postproc_dsa triggered by %s', dsa_triggers)
@@ -102,7 +103,7 @@ def postproc_dsa(
                     continue
                 processed_list.append(mm_id)
                 try:
-                    results_updated = _postprocess_dsa_single_mm(mm_id, app)
+                    results_updated = _postprocess_dsa_single_mm(mm_id, acm)
                 except ValueError as e:
                     logger.error(e)
                     continue
@@ -118,7 +119,7 @@ def postproc_dsa(
                     continue
                 processed_list.append(mm_id)
                 try:
-                    results_updated = _postprocess_dsa_single_mm(mm_id, app)
+                    results_updated = _postprocess_dsa_single_mm(mm_id, acm)
                 except ValueError as e:
                     logger.error(e)
                     continue
@@ -167,17 +168,17 @@ def feedback_dsa_status(
     result_tooltip_ids,
     selected_configuration,
     configurations,
-    app,
+    acm: NewsegsBrowserCacheManager
 ):
     rval = [
         [no_update] * len(resize_handle_ids),
         [no_update] * len(result_tooltip_ids)
     ]
     selected_configuration = json.loads(selected_configuration)
-    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+    mm = acm.metamodels[selected_configuration.get('metamodel_id')]
 
     try:
-        dsa_results = pp_utils.get_dsa_raw_data(mm, app)
+        dsa_results = pp_utils.get_dsa_raw_data(mm, acm)
     except Exception as e:
         _set_dsa_feedback_status(
             'error',
@@ -238,7 +239,7 @@ def feedback_dsa_status(
 
 def _postprocess_psa_single_mm(
     metamodel_id: str,
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ) -> bool:
     """
     Checks if a postprocessed data set exists for the psa for a metamodel.
@@ -258,9 +259,9 @@ def _postprocess_psa_single_mm(
 
     logger.info('Getting result table %s and %s', table_id, pos_npv_id)
 
-    prev_result = app.results.get(table_id, None)
-    prev_npv = app.results.get(pos_npv_id, None)
-    mm = app.metamodels.get(metamodel_id)
+    prev_result = acm.results.get(table_id, None)
+    prev_npv = acm.results.get(pos_npv_id, None)
+    mm = acm.metamodels[metamodel_id]
     if (
         not prev_result is None 
         and getattr(prev_result, '_run_time') == mm.last_psa_run
@@ -270,15 +271,15 @@ def _postprocess_psa_single_mm(
         return False
     logger.info('Cache miss - making psa tables %s and %s', table_id, pos_npv_id)
     
-    psa_results = pp_utils.get_psa_raw_data(metamodel_id, app)
+    psa_results = pp_utils.get_psa_raw_data(metamodel_id, acm)
     if psa_results is None:
         raise ValueError(f'PSA results for {metamodel_id} not found')
     
     res_table, prob_pos_npv = post_psa_results.psa_results_to_tables(psa_results)
     setattr(res_table, '_run_time', mm.last_psa_run)
     setattr(prob_pos_npv, '_run_time', mm.last_psa_run)
-    app.results[table_id] = res_table
-    app.results[pos_npv_id] = prob_pos_npv
+    acm.results[table_id] = res_table
+    acm.results[pos_npv_id] = prob_pos_npv
     
     return True
 
@@ -286,7 +287,7 @@ def postproc_psa(
     psa_triggers,
     selected_configuration,
     configurations,
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ):
     
     NUP = no_update
@@ -305,7 +306,7 @@ def postproc_psa(
                     continue
                 processed_list.append(mm_id)
                 try:
-                    results_updated = _postprocess_psa_single_mm(mm_id, app)
+                    results_updated = _postprocess_psa_single_mm(mm_id, acm)
                 except ValueError as e:
                     logger.error(e)
                     continue
@@ -321,7 +322,7 @@ def postproc_psa(
                     continue
                 processed_list.append(mm_id)
                 try:
-                    results_updated = _postprocess_psa_single_mm(mm_id, app)
+                    results_updated = _postprocess_psa_single_mm(mm_id, acm)
                 except ValueError as e:
                     logger.error(e)
                     continue
@@ -370,7 +371,7 @@ def feedback_psa_status(
     result_tooltip_ids,
     selected_configuration,
     configurations,
-    app,
+    acm: NewsegsBrowserCacheManager,
 ):
     rval = [
         [no_update] * len(resize_handle_ids),
@@ -378,7 +379,7 @@ def feedback_psa_status(
     ]
 
     selected_configuration = json.loads(selected_configuration)
-    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+    mm = acm.metamodels[selected_configuration.get('metamodel_id')]
     try:
         det_res = psa.make_psa_result(mm, mm.model, mm.finance, statistics = get_args(psa.PSA_FLOAT_STATISTIC), return_draws = False)
     except:
@@ -389,7 +390,7 @@ def feedback_psa_status(
         )
         return tuple(rval)
     try:
-        psa_results = pp_utils.get_psa_raw_data(mm, app)
+        psa_results = pp_utils.get_psa_raw_data(mm, acm)
     except:
         _set_psa_feedback_status(
             'error',

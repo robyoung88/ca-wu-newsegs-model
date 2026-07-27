@@ -16,6 +16,7 @@ import plotly.express as px
 from core import location
 from newsegsbrowser import icons
 from newsegsbrowser import common as browser
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 import newsegsbrowser.callbacks.model_configuration_callbacks_generic as generic_callbacks
 from newsegsbrowser.callbacks import model_creation_sprake
 
@@ -356,16 +357,16 @@ def update_headers_model_config(
     model_config_trigger,
     selected_configuration,
     header_ids,
-    app,
+    acm: NewsegsBrowserCacheManager
 ):
     olist: list[Any] = [no_update] * len(header_ids)
 
     mm_id = json.loads(selected_configuration).get('metamodel_id')
-    mm = app.metamodels.get(mm_id)
+    mm = acm.metamodels.get(mm_id)
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
 
-    eb = _update_estimated_energy_balance(mm, app.estimated_energy_balance)
+    eb = _update_estimated_energy_balance(mm, acm.estimated_energy_balance)
 
     for i, id in enumerate(header_ids):
         match id['key']:
@@ -540,16 +541,16 @@ def update_headers_finance_config(
     finance_config_trigger,
     selected_configuration,
     header_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     olist: list[Any] = [no_update] * len(header_ids)
 
     mm_id = json.loads(selected_configuration).get('metamodel_id')
-    mm = app.metamodels.get(mm_id)
+    mm = acm.metamodels.get(mm_id)
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
     
-    eb = _update_estimated_energy_balance(mm, app.estimated_energy_balance)
+    eb = _update_estimated_energy_balance(mm, acm.estimated_energy_balance)
 
     for i, id in enumerate(header_ids):
         match id['key']:
@@ -592,16 +593,16 @@ def update_feedback_graphs(
     model_config_trigger,
     selected_configuration,
     figure_ids,
-    app,
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = [no_update] * len(figure_ids)
 
     mm_id = json.loads(selected_configuration).get('metamodel_id')
-    mm = app.metamodels.get(mm_id)
+    mm = acm.metamodels.get(mm_id)
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
     
-    eb = _update_estimated_energy_balance(mm, app.estimated_energy_balance)
+    eb = _update_estimated_energy_balance(mm, acm.estimated_energy_balance)
     df = eb.estimated_annual_energy_balance
 
     fig_ann = _feedback_graph_bar(df, y = 'type')
@@ -632,7 +633,7 @@ def update_feedback_graphs(
 def dispatcher_action_user(
     dispatchitem_action_user,
     store_selected_configuration,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     NUP = (
         no_update, # prequeue-model-run
@@ -725,7 +726,7 @@ def dispatcher_action_user(
     mdl_run_list = []
     for model_id in mdl_change_list:
         mdl_conf = store_model_interface_configurations.get(model_id, {})
-        mdl = app.models.get(model_id)
+        mdl = acm.models.get(model_id)
         dirty = sync_interface_config_to_model(mdl_conf, mdl)
         if dirty:
             mdl_run_list.append(model_id)
@@ -750,7 +751,7 @@ def dispatcher_action_user(
     fnc_run_list = []
     for finance_id in fnc_change_list:
         fnc_conf = store_finance_interface_configurations.get(finance_id, {})
-        fnc = app.finances.get(finance_id)
+        fnc = acm.finances.get(finance_id)
         dirty = sync_interface_config_to_finance(fnc_conf, fnc)
         if dirty and fnc.model is not None:
             # Need to store both the finance id and its associated model id,
@@ -774,7 +775,7 @@ def dispatcher_action_user(
                 json.dumps(
                     browser.finance_run_request(
                         finance_id,
-                        app.finances.get(finance_id).model.id # pyright: ignore[reportOptionalMemberAccess]
+                        acm.finances.get(finance_id).model.id # pyright: ignore[reportOptionalMemberAccess]
                     ) 
                 ) for finance_id in fnc_change_list
             ]

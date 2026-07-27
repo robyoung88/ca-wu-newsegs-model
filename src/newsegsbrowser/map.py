@@ -1,10 +1,11 @@
 import json
 from pyproj import Transformer
-from dash import html, dcc, Input, Output, State, ALL, no_update
+from dash import Dash, html, dcc, Input, Output, State, ALL, no_update
 import dash_leaflet as dl
 import dash_bootstrap_components as dbc
 
 from core import location as modlocation
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.common import get_icon
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
@@ -116,7 +117,7 @@ def create_site_selector_map(map_id='sitemap',
     )
     return elements
 
-def add_latlon_sync_callbacks(app):
+def add_latlon_sync_callbacks(app, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
         
@@ -166,7 +167,7 @@ def add_latlon_sync_callbacks(app):
         newloc = modlocation.Location(lat, lon, name = name)
 
         selected_config = json.loads(selected_config)
-        mdl = app.models.get(selected_config['model_id'])
+        mdl = acm.models[selected_config['model_id']]
 
         if not(newloc == mdl.location):
             mdl.location = newloc
@@ -177,7 +178,7 @@ def add_latlon_sync_callbacks(app):
 
     return app
 
-def add_map_click_callback(app):
+def add_map_click_callback(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output('potential-site-location', 'data'),
 
@@ -201,7 +202,7 @@ def add_map_click_callback(app):
             return json.dumps({'lat':0,'lon':0, 'name': current_name})
     return app
 
-def add_potential_site_change_callback(app):
+def add_potential_site_change_callback(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output('site-confirm-container', 'children',allow_duplicate=True),
 
@@ -235,7 +236,7 @@ def add_potential_site_change_callback(app):
                              )]
     return app
 
-def add_confirm_site_change_btn_callback(app):
+def add_confirm_site_change_btn_callback(app, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
 
@@ -249,7 +250,7 @@ def add_confirm_site_change_btn_callback(app):
         return json_latlon
     return app
 
-def add_remove_confirm_popup(app):
+def add_remove_confirm_popup(app, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output('site-confirm-container', 'children'),
 
@@ -261,7 +262,7 @@ def add_remove_confirm_popup(app):
         return []
     return app
 
-def add_site_change_callback(app):
+def add_site_change_callback(app, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output('site-marker-container', 'children'),
         Output('site-osgb-easting-text', 'children'),
@@ -284,15 +285,15 @@ def add_site_change_callback(app):
                           f"{float(northing):,.0f}")
     return app
 
-def add_site_selector_callbacks(app):
-    app = add_map_click_callback(app)
-    app = add_latlon_sync_callbacks(app)
-    app = add_potential_site_change_callback(app)
+def add_site_selector_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
+    app = add_map_click_callback(app, acm)
+    app = add_latlon_sync_callbacks(app, acm)
+    app = add_potential_site_change_callback(app, acm)
     app.config.suppress_callback_exceptions = True
-    app = add_confirm_site_change_btn_callback(app)
+    app = add_confirm_site_change_btn_callback(app, acm)
     app.config.suppress_callback_exceptions = False
 
-    app = add_remove_confirm_popup(app)
-    app = add_site_change_callback(app)
+    app = add_remove_confirm_popup(app, acm)
+    app = add_site_change_callback(app, acm)
     
     return app

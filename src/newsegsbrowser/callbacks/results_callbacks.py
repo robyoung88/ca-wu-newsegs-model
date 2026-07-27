@@ -4,11 +4,12 @@ from typing import Any
 
 from dash import ALL, Dash, Input, Output, State, no_update, ctx
 
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.callbacks import callbacks_map
 
 logger = logging.getLogger(__name__)
 
-def add_result_header_callbacks(app: Dash):
+def add_result_header_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
 
     @app.callback(
         Output({'type': 'result-header', 'section': ALL, 'key': ALL}, 'children', allow_duplicate = True),
@@ -35,7 +36,7 @@ def add_result_header_callbacks(app: Dash):
             selected_config,
             result_trigger_ids,
             result_header_ids,
-            app
+            acm
         )
     
     @app.callback(
@@ -63,12 +64,12 @@ def add_result_header_callbacks(app: Dash):
             selected_config,
             result_trigger_ids,
             result_header_ids,
-            app
+            acm
         )
     
     return app
     
-def add_result_table_callbacks(app):
+def add_result_table_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     """
     Functions to synchronise the results table with model/finance results.
     """
@@ -95,7 +96,7 @@ def add_result_table_callbacks(app):
             ann_hori_toggle,
             table_ids,
             store_configurations,
-            app
+            acm
         )
     
     @app.callback(
@@ -120,7 +121,7 @@ def add_result_table_callbacks(app):
             ann_hori_toggle,
             table_ids,
             store_configurations,
-            app
+            acm
         )
     
     @app.callback(
@@ -145,7 +146,7 @@ def add_result_table_callbacks(app):
             ann_hori_toggle,
             table_ids,
             store_configurations,
-            app
+            acm
         )
 
     @app.callback(
@@ -170,7 +171,7 @@ def add_result_table_callbacks(app):
             ann_hori_toggle,
             table_ids,
             store_configurations,
-            app
+            acm
         )
     
     @app.callback(
@@ -206,7 +207,7 @@ def add_result_table_callbacks(app):
             ann_hori_toggle,
             table_ids,
             store_configurations,
-            app
+            acm
         )
     
     # Update indicators above result section.
@@ -290,7 +291,7 @@ def add_result_table_callbacks(app):
         n_dirty_finances = 0
         for conf in configurations:
             conf_dict = json.loads(conf)
-            mm = app.metamodels[conf_dict['metamodel_id']]
+            mm = acm.metamodels[conf_dict['metamodel_id']]
             n_dirty_models += int(mm.model.dirty)
             n_dirty_finances += int(mm.finance.dirty)
         
@@ -334,7 +335,7 @@ def add_result_table_callbacks(app):
             dsa_statistic_dropdown_values,
             table_ids,
             selected_conf,
-            app
+            acm
         )
     
     @app.callback(
@@ -359,7 +360,7 @@ def add_result_table_callbacks(app):
             dsa_statistic_dropdown_values,
             plot_ids,
             selected_conf,
-            app
+            acm
         )
     
     @app.callback(
@@ -382,7 +383,7 @@ def add_result_table_callbacks(app):
             psa_table_trigger,
             table_ids,
             selected_conf,
-            app
+            acm
         )
     
     @app.callback(
@@ -489,7 +490,7 @@ def add_result_table_callbacks(app):
             plot,
             plot_container,
             selected_configuration,
-            app,
+            acm,
             null_return,
         )
 

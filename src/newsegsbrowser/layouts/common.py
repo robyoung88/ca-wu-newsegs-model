@@ -314,3 +314,4 @@ def psa_process_components(**kwargs):
         ),
         dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'})
     ]
+

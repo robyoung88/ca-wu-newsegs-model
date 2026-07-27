@@ -9,6 +9,7 @@ from dash import Dash, Patch, html, no_update, set_props
 import dash_bootstrap_components as dbc
 
 from newsegsbrowser import icons
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 import newsegsbrowser.common as browser
 from newsegsbrowser import variable_dash_component as var_dc
 from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
@@ -97,24 +98,24 @@ def get_or_create_metamodel_components(
     create_default_finance: Callable[[], NewsegsFinance],
     create_default_variables: Callable[[], MutableSequence[variable.Variable]],
 
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ) -> NewsegsMetaModel:
-    mdl = app.models.get(selected_configuration['model_id'])
+    mdl = acm.models.get(selected_configuration['model_id'])
     if mdl is None:
         # TODO: Deal with if the model should exist - need to recreate it from the local store.
         mdl = create_default_model()
         mdl.id = selected_configuration['model_id']
-        app.models[mdl.id] = mdl
+        acm.models[mdl.id] = mdl
     
-    fnc = app.finances.get(selected_configuration['finance_id'])
+    fnc = acm.finances.get(selected_configuration['finance_id'])
     if fnc is None:
         # TODO: Deal with if the finance should exist - need to recreate it from the local store.
         fnc = create_default_finance()
         fnc.id = selected_configuration['finance_id']
         fnc.set_model(mdl, False)
-        app.finances[fnc.id] = fnc
+        acm.finances[fnc.id] = fnc
 
-    mm = app.metamodels.get(selected_configuration['metamodel_id'])
+    mm = acm.metamodels.get(selected_configuration['metamodel_id'])
     if mm is None:
         variables = create_default_variables()
         for v in variables:
@@ -126,7 +127,7 @@ def get_or_create_metamodel_components(
             variables
         )
         mm.id = selected_configuration['metamodel_id']
-        app.metamodels[mm.id] = mm
+        acm.metamodels[mm.id] = mm
     
     return mm
 
@@ -221,14 +222,14 @@ def create_text_field_values(
 
 def sync_configuration_names(
     configurations: list[str],
-    app: Dash
+    acm: NewsegsBrowserCacheManager
 ) -> None:
     """
     Update configuration list with the present name of their metamodels
     """
     for idx, config in enumerate(configurations):
         config_dict = json.loads(config)
-        mm = app.metamodels.get(config_dict.get('metamodel_id'))
+        mm = acm.metamodels.get(config_dict.get('metamodel_id'))
         if mm is not None and mm.name != config_dict['name']:
             config_dict['name'] = mm.name
             configurations[idx] = json.dumps(config_dict)
@@ -244,7 +245,7 @@ def sync_config(
     trigger_ids,
     config_name_inputs,
     rval,
-    app,
+    acm: NewsegsBrowserCacheManager,
     
     create_default_model: Callable[[], NewsegsModel],
     create_default_finance: Callable[[], NewsegsFinance],
@@ -271,7 +272,7 @@ def sync_config(
     
     mm = get_or_create_metamodel_components(
         selected_configuration, create_default_model, create_default_finance,
-        create_default_variables, app
+        create_default_variables, acm
     )
 
     # The inputs for the selected metamodel only (includes headers)
@@ -284,7 +285,7 @@ def sync_config(
     # In order to prevent a circular callback, renaming the metamodels does not
     # update the name in either configurations or selected configuration; however,
     # this does mean that the names stored there do go out of date.
-    sync_configuration_names(configurations, app)
+    sync_configuration_names(configurations, acm)
     selected_configuration['name'] = mm.name
     
     metamodel_inputs = create_inputs_for_metamodel_list(
@@ -320,11 +321,11 @@ def sync_config(
     
     return rval
 
-def sync_loc_inputs_to_store(selected_configuration, app):
+def sync_loc_inputs_to_store(selected_configuration, acm: NewsegsBrowserCacheManager):
     if selected_configuration is None:
         return no_update
     selected_configuration = json.loads(selected_configuration)
-    mdl = app.models.get(selected_configuration['model_id'])
+    mdl = acm.models.get(selected_configuration['model_id'])
     if mdl is None:
         return no_update
     
@@ -340,7 +341,7 @@ def update_dsa_boundsinputs(
     selected_configuration,
     bounds_container_ids,
     dsa_input_element_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     rval: MutableSequence[list[Any]] = [
         [no_update] * len(bounds_container_ids),
@@ -367,17 +368,19 @@ def update_dsa_boundsinputs(
                         for i, bnd_id in enumerate(bounds_container_ids):
                             if bnd_id['section'] == dic_l['section'] and bnd_id['key'] == dic_l['key'] and bnd_id['subindex'] == dic_l['subindex']:
                                 if mm is None:
-                                    mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                    mm = acm.metamodels[dic_l.get('metamodel_id')]
                                 varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
                                 var = mm.variables.get(varid)
                                 if var is not None:
+                                    if not isinstance(var, variable.NumericScalarVariable):
+                                        raise TypeError('Cannot yet handle variables that are not numeric scalar')
                                     rval[0][i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
                 elif dic_l.get('selected_status_change'):
                     if dic_l.get('metamodel_id') == selected_configuration.get('metamodel_id'):
                         for i, el_id in enumerate(dsa_input_element_ids):
                             if el_id['section'] == dic_l['section'] and el_id['key'] == dic_l['key'] and el_id['subindex'] == dic_l['subindex']:
                                 if mm is None:
-                                    mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                    mm = acm.metamodels[dic_l.get('metamodel_id')]
                                 varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
                                 var = mm.variables.get(varid)
                                 if var is not None:
@@ -389,11 +392,13 @@ def update_dsa_boundsinputs(
 
         else: # Force update all bounds
             if mm is None:
-                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                    mm = acm.metamodels[selected_configuration['metamodel_id']]
             for i, hdr_id in enumerate(bounds_container_ids):
                 varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
                 var = mm.variables.get(varid)
                 if var is not None:
+                    if not isinstance(var, variable.NumericScalarVariable):
+                        raise TypeError('Cannot yet handle variables that are not numeric scalar')
                     rval[0][i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
             for i, el_id in enumerate(dsa_input_element_ids):
                 varid =  el_id['section']+'.'+el_id['key']+'.'+str(el_id['subindex'])
@@ -411,7 +416,7 @@ def update_headers_dsa_inputs(
     dsa_input_change_trigger,
     selected_configuration,
     header_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     rval: list[Any] = [no_update] * len(header_ids)
     if len(header_ids) == 0:
@@ -432,18 +437,22 @@ def update_headers_dsa_inputs(
                     for i, hdr_id in enumerate(header_ids):
                         if hdr_id['section'] == dic_l['section'] and hdr_id['key'] == dic_l['key'] and hdr_id['subindex'] == dic_l['subindex']:
                             if mm is None:
-                                mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                mm = acm.metamodels[dic_l.get('metamodel_id')]
                             varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
                             var = mm.variables.get(varid)
                             if var is not None:
+                                if not isinstance(var, variable.NumericScalarVariable):
+                                    raise TypeError('Cannot yet handle variables that are not numeric scalar')
                                 rval[i] = var_dc.create_dsa_header(var)
         else: # Force update all headers
             for i, hdr_id in enumerate(header_ids):
                 if mm is None:
-                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                    mm = acm.metamodels[selected_configuration.get('metamodel_id')]
                 varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
                 var = mm.variables.get(varid)
                 if var is not None:
+                    if not isinstance(var, variable.NumericScalarVariable):
+                        raise TypeError('Cannot yet handle variables that are not numeric scalar')
                     rval[i] = var_dc.create_dsa_header(var)
     
     return rval
@@ -452,7 +461,7 @@ def update_headers_psa_inputs(
     psa_input_change_trigger,
     selected_configuration,
     header_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     rval: list[Any] = [no_update] * len(header_ids)
     if len(header_ids) == 0:
@@ -473,18 +482,22 @@ def update_headers_psa_inputs(
                     for i, hdr_id in enumerate(header_ids):
                         if hdr_id['section'] == dic_l['section'] and hdr_id['key'] == dic_l['key'] and hdr_id['subindex'] == dic_l['subindex']:
                             if mm is None:
-                                mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                mm = acm.metamodels[dic_l.get('metamodel_id')]
                             varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
                             var = mm.variables.get(varid)
                             if var is not None:
+                                if not isinstance(var, variable.NumericScalarVariable):
+                                    raise TypeError('Cannot yet handle variables that are not numeric scalar')
                                 rval[i] = var_dc.create_psa_header(var)
         else: # Force update all headers
             for i, hdr_id in enumerate(header_ids):
                 if mm is None:
-                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                    mm = acm.metamodels[selected_configuration.get('metamodel_id')]
                 varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
                 var = mm.variables.get(varid)
                 if var is not None:
+                    if not isinstance(var, variable.NumericScalarVariable):
+                            raise TypeError('Cannot yet handle variables that are not numeric scalar')
                     rval[i] = var_dc.create_psa_header(var)
     
     return rval
@@ -493,7 +506,7 @@ def update_psa_inputs_status(
     psa_input_change_trigger,
     selected_configuration,
     psa_input_element_ids,
-    app
+    acm: NewsegsBrowserCacheManager
 ):
     if len(psa_input_element_ids) == 0:
         return []
@@ -516,7 +529,7 @@ def update_psa_inputs_status(
                         for i, el_id in enumerate(psa_input_element_ids):
                             if el_id['section'] == dic_l['section'] and el_id['key'] == dic_l['key'] and el_id['subindex'] == dic_l['subindex']:
                                 if mm is None:
-                                    mm = app.metamodels.get(dic_l.get('metamodel_id'))
+                                    mm = acm.metamodels[dic_l.get('metamodel_id')]
                                 varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
                                 var = mm.variables.get(varid)
                                 if var is not None:
@@ -528,7 +541,7 @@ def update_psa_inputs_status(
 
         else: # Force update all bounds
             if mm is None:
-                    mm = app.metamodels.get(selected_configuration.get('metamodel_id'))
+                    mm = acm.metamodels[selected_configuration.get('metamodel_id')]
            
             for i, el_id in enumerate(psa_input_element_ids):
                 varid =  el_id['section']+'.'+el_id['key']+'.'+str(el_id['subindex'])

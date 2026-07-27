@@ -9,21 +9,23 @@ from typing import Any
 
 from dash import ALL, dcc, Dash, Input, Output, State, no_update, set_props
 
+from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
+
 logger = logging.getLogger(__name__)
 
 MAX_BACKGROUND_REPEATS = defaultdict(lambda: 5)
 
-def _get_last_error_list(app: Dash):
+def _get_last_error_list(app: Dash, acm: NewsegsBrowserCacheManager) -> list:
     """
     Safely retrieve the last error list from the short term store
     """
-    errs = app.sts.get('last_error')
+    errs = acm.sts.get('last_error')
     if errs is None:
         errs = []
-        app.sts['last_error'] = errs
+        acm.sts['last_error'] = errs
     return errs
 
-def add_background_callback_error_dispatch(app: Dash) -> Dash:
+def add_background_callback_error_dispatch(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
     @app.callback(
         Output({'type': 'background-callback-call', 'target': ALL}, 'data', allow_duplicate = True),
         Output({'type': 'background-callback-return', 'target': ALL}, 'data', allow_duplicate = True),
@@ -46,7 +48,7 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
             [no_update] * len(call_ids),
             [no_update]* len(return_ids)
         ]
-        errs = _get_last_error_list(app)
+        errs = _get_last_error_list(app, acm)
 
         if len(errs) == 0:
             return tuple(rval)
@@ -69,11 +71,11 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
             store_call_id = 'last_bcerr_'+str(error_target)
             store_count_id = 'n_bcerr_'+str(error_target)
 
-            last_err = app.sts.get(store_call_id)
+            last_err = acm.sts.get(store_call_id)
             n_repeats = 0
             if last_err is not None:
                 if err_call == last_err:
-                    n_repeats = app.sts.get(store_count_id, 0)
+                    n_repeats = acm.sts.get(store_count_id, 0)
             
             n_repeats += 1
             if n_repeats > MAX_BACKGROUND_REPEATS[str(error_target)]:
@@ -85,8 +87,8 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
                     if id.get('target') == error_target:
                         rval[1][idx] = err_call
             else:
-                app.sts[store_call_id] = err_call
-                app.sts[store_count_id] = n_repeats
+                acm.sts[store_call_id] = err_call
+                acm.sts[store_count_id] = n_repeats
                 rval[0][err_idx] = err_call
         
         errs.clear()
@@ -95,18 +97,18 @@ def add_background_callback_error_dispatch(app: Dash) -> Dash:
     
     return app
 
-def background_callback_error_handler_factory(target, app):
+def background_callback_error_handler_factory(target, app: Dash, acm: NewsegsBrowserCacheManager):
     def error_handler(err: Exception):
         logger.error('%s from %s', str(err), target)
         if 'PID not found' in str(err):
             logger.info('appending error after PID not found')
-            errs = _get_last_error_list(app)
+            errs = _get_last_error_list(app, acm)
             errs.append(dict(time = time.time(), target = target, err = str(err)))
         else:
             last_call_ = err.args[0].split('\n')[-1]
             if 'NoSuchProcess' in last_call_:
                 logger.info('appending error after NoSuchProcess')
-                errs = _get_last_error_list(app)
+                errs = _get_last_error_list(app, acm)
                 errs.append(dict(time = time.time(), target = target, err = str(err)))
             else:
                 raise(err)

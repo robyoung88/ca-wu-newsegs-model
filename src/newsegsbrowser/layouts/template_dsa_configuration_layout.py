@@ -302,7 +302,7 @@ def create_dsa_layout(*args, **kwargs):
                 style = {'display': 'none'}
             ),
             dbc.Tooltip(
-                'PSA Running',
+                'DSA Running',
                 id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
             ),

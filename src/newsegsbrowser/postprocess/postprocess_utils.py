@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import json
 import logging
@@ -44,11 +46,11 @@ def get_psa_result_id(prefix: str, metamodel_id: str) -> str:
 def get_optim_result_id(prefix: str, metamodel_id: str) -> str:
     return prefix + metamodel_id
 
-def get_model_result_list(prefix, configs, app):
-    return [app.results.get(get_model_result_id(prefix, json.loads(x)['model_id'])) for x in configs]
+def get_model_result_list(prefix, configs, acm: NewsegsBrowserCacheManager): # pyright: ignore[reportUndefinedVariable]
+    return [acm.results.get(get_model_result_id(prefix, json.loads(x)['model_id'])) for x in configs]
 
-def get_finance_result_list(prefix, configs, app):
-    return [app.results.get(get_finance_result_id(prefix, json.loads(x)['finance_id'], json.loads(x)['model_id'])) for x in configs]
+def get_finance_result_list(prefix, configs, acm: NewsegsBrowserCacheManager): # pyright: ignore[reportUndefinedVariable]
+    return [acm.results.get(get_finance_result_id(prefix, json.loads(x)['finance_id'], json.loads(x)['model_id'])) for x in configs]
 
 def assign_dsa_results(
     mm: NewsegsMetaModel,
@@ -108,7 +110,7 @@ def generic_model_postprocess(
     model_run,
     postprocess_function,
     result_id_prefix,
-    app
+    acm: NewsegsBrowserCacheManager # pyright: ignore[reportUndefinedVariable]
 ):
     """
     Run a postprocess function on a model and store in the results cache.
@@ -128,12 +130,12 @@ def generic_model_postprocess(
                 x, 
                 postprocess_function, 
                 result_id_prefix, 
-                app
+                acm
             ) for x in model_run
         ]
 
     model_id = model_run['model_id']
-    mdl = app.models.get(model_id)
+    mdl = acm.models.get(model_id)
     if mdl is None:
         return NUP
     
@@ -141,7 +143,7 @@ def generic_model_postprocess(
     run_hash = hash(mdl)
     result_id = get_model_result_id(result_id_prefix, model_id)
     logger.info('Getting result %s', result_id)
-    prev_result = app.results.get(result_id, None)
+    prev_result = acm.results.get(result_id, None)
     if not prev_result is None and prev_result['run_hash'] == run_hash:
         return NUP
     
@@ -149,7 +151,7 @@ def generic_model_postprocess(
     
     postproc_results = postprocess_function(mdl)
     postproc_results['run_hash'] = run_hash
-    app.results[result_id] = postproc_results
+    acm.results[result_id] = postproc_results
 
     return model_run_0
 
@@ -157,7 +159,7 @@ def generic_finance_postprocess(
     finance_run,
     postprocess_function,
     result_id_prefix,
-    app
+    acm: NewsegsBrowserCacheManager # pyright: ignore[reportUndefinedVariable]
 ):
     NUP = no_update
     if finance_run is None:
@@ -169,12 +171,12 @@ def generic_finance_postprocess(
         finance_run = json.loads(finance_run)
     
     if isinstance(finance_run, list):
-        return [generic_finance_postprocess(x, postprocess_function, result_id_prefix, app) for x in finance_run]
+        return [generic_finance_postprocess(x, postprocess_function, result_id_prefix, acm) for x in finance_run]
     
     model_id = finance_run['model_id']
     finance_id = finance_run['finance_id']
-    mdl = app.models.get(model_id)
-    fnc = app.finances.get(finance_id)
+    mdl = acm.models.get(model_id)
+    fnc = acm.finances.get(finance_id)
 
     if mdl is None or fnc is None:
         logger.warning('model (%s) or finance (%s) not found for postprocess %s', type(mdl), type(fnc), finance_run)
@@ -183,7 +185,7 @@ def generic_finance_postprocess(
     run_hash = hash(mdl) + hash(fnc)
     result_id = get_finance_result_id(result_id_prefix, finance_id, model_id)
     logger.info('Getting result %s', result_id)
-    prev_result = app.results.get(result_id, None)
+    prev_result = acm.results.get(result_id, None)
     if not prev_result is None and prev_result['run_hash'] == run_hash:
         return NUP
     
@@ -197,18 +199,18 @@ def generic_finance_postprocess(
         return NUP
 
     postproc_results['run_hash'] = run_hash
-    app.results[result_id] = postproc_results
+    acm.results[result_id] = postproc_results
 
     return finance_run_0
 
 def get_det_raw_data(
     metamodel: str | dict[str, str] | NewsegsMetaModel,
-    app
+    acm: NewsegsBrowserCacheManager # pyright: ignore[reportUndefinedVariable]
 ) -> pd.DataFrame | None:
     if isinstance(metamodel, str):
-        metamodel = cast(NewsegsMetaModel, app.metamodels.get(metamodel))
+        metamodel = cast(NewsegsMetaModel, acm.metamodels.get(metamodel))
     elif isinstance(metamodel, dict):
-        metamodel = cast(NewsegsMetaModel, app.metamodels.get(metamodel.get('metamodel_id')))
+        metamodel = cast(NewsegsMetaModel, acm.metamodels.get(metamodel.get('metamodel_id')))
 
     if metamodel is None:
         raise ValueError(f'metamodel not found')
@@ -243,7 +245,7 @@ def get_det_raw_data(
 
 def get_dsa_raw_data(
     metamodel: str | dict[str, str] | NewsegsMetaModel,
-    app
+    acm: NewsegsBrowserCacheManager # pyright: ignore[reportUndefinedVariable]
 ) -> pd.DataFrame | None:
     if isinstance(metamodel, NewsegsMetaModel):
         mm_id = metamodel.id
@@ -256,12 +258,12 @@ def get_dsa_raw_data(
         mm_id
     )
     logger.info('finding result %s', df_id)
-    return app.results.get(df_id)    
+    return acm.results.get(df_id)    
 
 def get_psa_raw_data(
-        metamodel: str | dict[str, str] | NewsegsMetaModel,
-        app
-    ) -> pd.DataFrame | None:
+    metamodel: str | dict[str, str] | NewsegsMetaModel,
+    acm: NewsegsBrowserCacheManager # pyright: ignore[reportUndefinedVariable]
+) -> pd.DataFrame | None:
     if isinstance(metamodel, NewsegsMetaModel):
         mm_id = metamodel.id
     elif isinstance(metamodel, dict):
@@ -273,4 +275,4 @@ def get_psa_raw_data(
         mm_id
     )
     logger.info('finding result %s', df_id)
-    return app.results.get(df_id)
+    return acm.results.get(df_id)

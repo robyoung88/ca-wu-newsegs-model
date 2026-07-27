@@ -1,3 +1,4 @@
+from __future__ import annotations
 import copy
 import inspect
 import io
@@ -23,6 +24,7 @@ import dash_bootstrap_components as dbc
 import pathvalidate
 from useful_types import SequenceNotStr
 
+# from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager # Need __future__ for typing to avoid circular
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -437,17 +439,17 @@ def get_variable_keyed_data(
 def export_results(
     result_type: Literal['dsa','psa','det'],
     selected_configuration: dict[str, Any],
-    app: Dash,
+    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
     contents_option: str = 'result',
     format_option: str = 'csv',
 ):
     match result_type:
         case 'dsa':
-            result_data = postprocess_utils.get_dsa_raw_data(selected_configuration, app)
+            result_data = postprocess_utils.get_dsa_raw_data(selected_configuration, acm)
         case 'psa':
-            result_data = postprocess_utils.get_psa_raw_data(selected_configuration, app)
+            result_data = postprocess_utils.get_psa_raw_data(selected_configuration, acm)
         case 'det':
-            result_data = postprocess_utils.get_det_raw_data(selected_configuration, app)
+            result_data = postprocess_utils.get_det_raw_data(selected_configuration, acm)
         case _:
             raise ValueError(f'result_type not recognised: {result_type}')
     if result_data is None:
@@ -460,7 +462,7 @@ def export_results(
             df.index = index.tz_localize(None)
         return df
     
-    mm = app.metamodels.get(selected_configuration['metamodel_id'])
+    mm = acm.metamodels[selected_configuration['metamodel_id']]
     file_name_stub =f'{mm.name}-{result_type}-results'
     match contents_option:
         case 'result':
@@ -530,38 +532,38 @@ def export_results(
 def safe_remove_finance(
     finance_id: str,
     configurations: list[str],
-    app: Dash,
+    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
 ):
     has_finance = [x for x in configurations if json.loads(x)['finance_id'] == finance_id]
     if len(has_finance) == 0:
-        app.remove_finance(finance_id)
+        acm.remove_finance(finance_id)
 
 def safe_remove_model(
     model_id: str,
     configurations: list[str],
-    app: Dash,
+    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
 ):
     has_model = [x for x in configurations if json.loads(x)['finance_id'] == model_id]
     if len(has_model) == 0:
-        app.remove_model(model_id)
+        acm.remove_model(model_id)
 
 def safe_remove_metamodel(
     metamodel_id: str,
     configurations: list[str],
-    app: Dash,
+    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
 ):
     """
     Remove a metamodel, its associated model and finance, and results, from app.
 
     configurations should already have the metamodel removed.
     """
-    mm = app.metamodels.get(metamodel_id)
+    mm = acm.metamodels.get(metamodel_id)
     if mm is None:
         return
-    safe_remove_finance(mm.finance.id, configurations, app)
-    safe_remove_model(mm.model.id, configurations, app)
+    safe_remove_finance(mm.finance.id, configurations, acm)
+    safe_remove_model(mm.model.id, configurations, acm)
     # Always safe to drop the metamodel, just don't necessarily remove the children
-    app.remove_metamodel(mm.id, False)
+    acm.remove_metamodel(mm.id, False)
     return
 
 def set_progression_factory(
@@ -647,14 +649,14 @@ def copy_result_attributes(
 def duplicate_metamodel(
    metamodel_id: str,
    configurations: list[str],
-   app: Dash, 
+   acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
    copy_results = True,
 ) -> NewsegsMetaModel:
-    mm_ref = app.metamodels.get(metamodel_id)
+    mm_ref = acm.metamodels.get(metamodel_id)
     if mm_ref is None:
         raise ValueError(f'Reference metamodel not found: {metamodel_id}')
     
-    mm_dup = cast(NewsegsMetaModel, app.duplicate_metamodel(metamodel_id))
+    mm_dup = cast(NewsegsMetaModel, acm.duplicate_metamodel(metamodel_id))
     mm_dup.name += ' Copy'
 
     new_config = mm_dup.to_config()
@@ -686,7 +688,7 @@ def metamodel_from_configuration_file(
     cfg: dict[str, Any],
     selected_configuration: dict[str, Any],
     configurations: list[str],
-    app: Dash,
+    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
     overwrite_selected_config = False,
 ) -> NewsegsMetaModel | None:
     """
@@ -705,14 +707,14 @@ def metamodel_from_configuration_file(
             working_mm = duplicate_metamodel(
                 selected_configuration['metamodel_id'],
                 configurations,
-                app,
+                acm,
                 copy_results = False
             )
         except (TypeError, ValueError) as e:
             logger.error(str(e))
             return None
     else:
-        working_mm = app.metamodels.get(selected_configuration['metamodel_id'])
+        working_mm = acm.metamodels[selected_configuration['metamodel_id']]
     
     try:
         # Store ids prior to update so we can ensure they are reset
@@ -742,7 +744,7 @@ def metamodel_from_configuration_file(
             safe_remove_metamodel(
                 working_mm.id,
                 configurations,
-                app
+                acm
             )
         raise e
     
