@@ -37,6 +37,28 @@ from newsegsvariable import variable
 
 logger = logging.getLogger(__name__)
 
+def make_varid(
+    *args,
+    key: str,
+    section: str|None = None,
+    subindex: int|str = 0,
+    **kwargs
+) -> str:
+    """
+    Create a string id for a variable based on interface parameters
+
+    Args:
+        key (str): Interface key
+        section (str | None, optional): Interface section. Defaults to None.
+        subindex (int | str): Variable subindex
+
+    Returns:
+        str: Concatenation of section, key and subindex
+    """
+    if section is None:
+        section = 'None'
+    return f'{section}.{key}.{subindex}'
+
 class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
 
     model_id: str
@@ -159,7 +181,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             - bool - The PSA values(s) of the Variable has/have been impacted
             - tuple[Param, ...] - The set of parameters now held by the Variable
         """
-        varid = section + "." + key + "." + str(subindex)
+        varid = make_varid(key = key, section = section, subindex = subindex)
         var = self.variables.get(varid)
         if var is None:
             raise ValueError(f'variable {varid} not found')
@@ -222,7 +244,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
                 key = ''
             if subindex is None:
                 subindex = 0
-            varid = section + "." + key + "." + str(subindex)
+            varid = make_varid(key = key, section = section, subindex = subindex)
         
         var = self.variables.get(varid)
         if var is None:

@@ -1,6 +1,7 @@
 """
 Unit tests for core/generation/generators
 """
+from typing import cast
 import unittest
 import json
 
@@ -103,7 +104,10 @@ class TestPowerPlantHomogeneousWind(unittest.TestCase):
         self.assertNotEqual(pp.turbine.location, pp2.turbine.location)
 
         d1 = pp2.to_dict()
-        pp3 = generators.generator_from_dict(d1)
+        pp3 = cast(
+            generators.PowerPlantHomogeneousWind, 
+            generators.generator_from_dict(d1)
+        )
         self.assertEqual(pp2.location, pp3.location)
         self.assertEqual(pp2.turbine.location, pp3.turbine.location)
 
@@ -184,7 +188,10 @@ class TestPowerPlantHomogeneousPV(unittest.TestCase):
         self.assertNotEqual(pp.pv_array.location, pp2.pv_array.location)
 
         d1 = pp2.to_dict()
-        pp3 = generators.generator_from_dict(d1)
+        pp3 = cast(
+            generators.PowerPlantHomogeneousPV,
+            generators.generator_from_dict(d1)
+        )
         self.assertEqual(pp2.location, pp3.location)
         self.assertEqual(pp2.pv_array.location, pp3.pv_array.location)
 

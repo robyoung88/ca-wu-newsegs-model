@@ -11,7 +11,7 @@ from dash import ALL, Dash, Input, Output, Patch, State, ctx, no_update
 from newsegsbrowser import common as browser
 from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.postprocess import postprocess_utils
-from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
 from newsegssensitivity import optim
 
 logger = logging.getLogger(__name__)
@@ -138,7 +138,7 @@ def add_optim_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
 
         match trig_id.get('type'):
             case 'optim-marginal-plot-button':
-                varid = f'{trig_id['section']}.{trig_id['key']}.{trig_id['subindex']}'
+                varid = make_varid(**trig_id)
                 rval['store']['datas'] = [varid] * len(store['datas'])
                 
                 stat = statistic_dropdown['values'][0]
@@ -349,7 +349,7 @@ def add_optim_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
         for idx, include_ in enumerate(toggle['values']):
             if include_:
                 id = toggle['ids'][idx]
-                varid = f'{id['section']}.{id['key']}.{id['subindex']}'
+                varid = make_varid(**id)
                 if not varid in vars.keys():
                     lower = browser.get_variable_keyed_data(
                         id['section'],id['key'], id['subindex'],

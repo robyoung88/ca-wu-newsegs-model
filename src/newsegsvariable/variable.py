@@ -3600,10 +3600,10 @@ class Variable(
         """
         Set the current parameters as defaults
         """
-        if isinstance(self.parameters, str) or not isinstance(self.parameters, Sequence):
-            self._set_default_parameters(self.parameters)
+        if isinstance(self._raw_parameters, str) or not isinstance(self._raw_parameters, Sequence):
+            self._set_default_parameters(self._raw_parameters)
         else:
-            self._set_default_parameters(*self.parameters)
+            self._set_default_parameters(*self._raw_parameters)
 
     @property
     def n_values(self) -> int:

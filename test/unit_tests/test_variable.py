@@ -1900,6 +1900,20 @@ class TestVariableReset(unittest.TestCase):
             [5, 3]
         )
 
+        var.set_parameters(7, 5)
+        var.replace_default_parameters()
+        var.set_parameters(10, 3)
+        self.assertListEqual(
+            list(var.parameters),
+            [10, 3]
+        )
+        var.reset_parameters()
+        self.assertListEqual(
+            list(var.parameters),
+            [7, 5]
+        )   
+
+
 class TestVariableValidation(unittest.TestCase):
     """
     Ensure that Variables handle creation and sampling correctly

@@ -7,6 +7,7 @@ Functions:
 - add_interface_to_model_callbacks
 """
 
+import copy
 import datetime
 import json
 import logging
@@ -22,7 +23,7 @@ from newsegsbrowser import common as browser
 from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsbrowser.callbacks import callbacks_map
 from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
-from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
 
 logger = logging.getLogger(__name__)
 
@@ -407,14 +408,14 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
                     invalids = Output(
                         {'type': 'input-model-config', 'section': ALL, 'key': ALL, 
                         'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
-                        'invalid'
+                        'invalid', allow_duplicate = True
                     ),
                 ),
                 finance = dict(
                     values = Output(
                         {'type': 'input-finance-config', 'section': ALL, 'key': ALL, 
                         'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
-                        'value'
+                        'value', allow_duplicate = True
                     ),
                     invalids = Output(
                         {'type': 'input-finance-config', 'section': ALL, 'key': ALL, 
@@ -825,7 +826,7 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
 
-            varid = pid['section']+'.'+pid['key']+'.'+str(pid['subindex'])
+            varid = make_varid(**pid)
             var = mm.variables.get(varid)
             if var is None:
                 continue
@@ -949,7 +950,7 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
             pid = json.loads(prop['prop_id'].rstrip('.value'))
             val = prop['value']
 
-            varid = pid['section']+'.'+pid['key']+'.'+str(pid['subindex'])
+            varid = make_varid(**pid)
             var = mm.variables.get(varid)
             if var is None:
                 continue
@@ -979,6 +980,116 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
         
         if forward_prequeue:
             rval = prequeue_patch
+
+        return rval
+
+    #### Reset parameters #####
+    @app.callback(
+        output = dict(
+            config_inputs = dict(
+                model = dict(
+                    values = Output(
+                        {'type': 'input-model-config', 'section': ALL, 'key': ALL, 
+                        'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                        'value', allow_duplicate = True
+                    ),
+                ),
+                finance = dict(
+                    values = Output(
+                        {'type': 'input-finance-config', 'section': ALL, 'key': ALL, 
+                        'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                        'value', allow_duplicate = True
+                    ),
+                )
+            ),
+        ),
+
+        inputs = dict(
+            reset_button = dict(
+                n_clicks = Input(
+                    {'type': 'value-reset-button', 'section': ALL, 'key': ALL, 
+                    'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                    'n_clicks'
+                ),
+                ids = State(
+                    {'type': 'value-reset-button', 'section': ALL, 'key': ALL, 
+                    'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                    'id'
+                )
+            )
+        ),
+
+        state = dict(
+            config_inputs = dict(
+                model = dict(
+                    ids = State(
+                        {'type': 'input-model-config', 'section': ALL, 'key': ALL, 
+                        'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                        'id'
+                    ),
+                ),
+                finance = dict(
+                    ids = State(
+                        {'type': 'input-finance-config', 'section': ALL, 'key': ALL, 
+                        'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                        'id'
+                    ),
+                )
+            ),
+            selected_configuration = State('store-selected-configuration', 'data'),
+        ),
+
+        prevent_initial_call = True
+    )
+    def reset_parameter(
+        reset_button,
+        config_inputs,
+        selected_configuration
+    ):
+        rval = dict(
+            config_inputs = dict(
+                model = dict(
+                    values = [no_update] * len(config_inputs['model']['ids'])
+                ),
+                finance = dict(
+                    values = [no_update] * len(config_inputs['finance']['ids'])
+                ),
+            )
+        )
+        val = browser.get_triggered_value()
+        if val is None:
+            return rval
+
+        tid = cast(dict[str,Any], ctx.triggered_id)
+        logger.info('resetting variable to default: %s', tid)
+
+        mm = acm.metamodels.get(json.loads(selected_configuration).get('metamodel_id'))
+        if mm is None:
+            return rval
+        varid = make_varid(**tid)
+        var = mm.variables.get(varid)
+        if var is None:
+            return rval
+
+        reset_value = var._default_parameters[tid.get('parameter_index', 0)]
+        model_search_id = copy.copy(tid)
+        model_search_id.update({'type': 'input-model-config'})
+        finance_search_id = copy.copy(tid)
+        finance_search_id.update({'type': 'input-finance-config'})
+        did_update = (
+            browser.update_return_list(
+                model_search_id, reset_value, 
+                config_inputs['model']['ids'], rval['config_inputs']['model']['values']
+            ) or browser.update_return_list(
+                finance_search_id, reset_value, 
+                config_inputs['finance']['ids'], rval['config_inputs']['finance']['values']
+            )
+        )
+
+        if not did_update:
+            # We're assuming that an interface update will fire around to updating the metamodel
+            # If there is no update, we must update the metamodel ourselves
+            var.reset_parameters(tid.get('parameter_index', 0))
 
         return rval
     
@@ -1210,7 +1321,7 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
                             synced = []
                             for action in dispatch_actions:
                                 action = json.loads(action)
-                                varid = action['section'] + "." + action['key'] + "." + str(action['subindex'])
+                                varid = make_varid(**action)
                                 if varid not in synced:
                                     mm.update_model_from_variable_deterministic(
                                         action['section'],
@@ -1258,7 +1369,7 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
                             synced = []
                             for action in dispatch_actions:
                                 action = json.loads(action)
-                                varid = action['section'] + "." + action['key'] + "." + str(action['subindex'])
+                                varid = make_varid(**action)
                                 if varid not in synced:
                                     mm.update_model_from_variable_deterministic(
                                         action['section'],
