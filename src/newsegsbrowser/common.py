@@ -7,31 +7,27 @@ import logging
 import tempfile
 import time
 
-from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from dataclasses import asdict as dc_asdict
 from typing import Any, Callable, Literal, cast
-from typing import TypeVar
-from typing import overload
-from typing import Optional
-from typing import List
-import datetime
 import uuid
 import zipfile
 
-from dash import Dash, html, dcc
+from dash import ctx, html, dcc
 import dash_bootstrap_components as dbc
+from dash_bootstrap_components._components.Input import Input as dbc_Input # Bit of a faff to get around the pyright behaviour https://github.com/microsoft/pyright/issues/3131
+from dash_bootstrap_components._components.Button import Button as dbc_Button
 import pathvalidate
 from useful_types import SequenceNotStr
 
 # from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager # Need __future__ for typing to avoid circular
+from newsegsbrowser import icons
+from newsegsbrowser.icons import get_icon
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
-
-from newsegsbrowser.icons import get_icon
 from newsegssensitivity import optim
 from util import jsonfuncs
 
@@ -48,15 +44,17 @@ def create_numeric_card_input(
             html.Span(label+":", className='mr-3')
         ],
         style={'display':'inline'}),
-        dbc.Input(id=input_id,
-                  type='number',
-                  placeholder=0.0,
-                  debounce=True,
-                  style={
-                    'display':'inline-block',
-                    'float':'right',
-                    'width':'30%'
-                  })
+        dbc_Input(
+            id = input_id,
+            type = 'number',
+            placeholder = 0.0,
+            debounce = True,
+            style = {
+            'display': 'inline-block',
+            'float': 'right',
+            'width': '30%'
+            }
+        )
     ])
 
 def create_numeric_input_compound_key(
@@ -89,7 +87,7 @@ def create_numeric_input_compound_key(
     else:
         cn = f'dynamic-step-field step-val-{step:f}'
     
-    return dbc.Input(
+    return dbc_Input(
         id = input_id,
         type = 'number',
         value = value,
@@ -98,12 +96,66 @@ def create_numeric_input_compound_key(
         min = min,
         max = max,
         step = 'any',
-        # style = {
-        #     'display':'inline-block',
-        #     'float':'right',
-        #     'width':'30%'
-        # },
         className = cn,
+    )
+
+def create_value_reset_button(
+    key,
+    section,
+    subindex,
+    parameter_index,
+    vector_location
+):
+    if section is None:
+        section = 'None'
+    button_id = {
+        'type': 'value-reset-button',
+        'key': key,
+        'section': section,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
+    }
+    return dbc_Button(
+        html.I(
+            className = icons.get_icon('value-reset', style_name = 'raw'),
+            style = {'display': 'inline'}
+        ),
+        color = 'light',
+        id = button_id,
+        title = 'Reset to default',
+        outline = False,
+        size = 'sm'
+    )
+
+def create_value_set_default_button(
+    key,
+    section,
+    subindex,
+    parameter_index,
+    vector_location
+):
+    if section is None:
+        section = 'None'
+    button_id = {
+        'type': 'value-set-default-button',
+        'key': key,
+        'section': section,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
+    }
+    return dbc_Button(
+        html.I(
+            className = icons.get_icon('value-set-default', style_name = 'raw'),
+            style = {'display': 'inline'}
+        ),
+        color = 'light',
+        id = button_id,
+        title = 'Set default to current value',
+        outline = False,
+        size = 'sm',
+        class_name = 'set-default',
     )
 
 def create_numeric_card_input_compound_key(
@@ -119,9 +171,26 @@ def create_numeric_card_input_compound_key(
     value: int | float | None = None,
     min: int | float | None = 0.0,
     max: int | float | None = None,
-    step: int | float  = 1
+    step: int | float  = 1,
+    reset_button = True
 ):  
-    return html.Div([
+    button_elements = []
+    if reset_button:
+        button_elements = [
+            html.Details([
+                html.Summary(),
+                html.Div([
+                    create_value_reset_button(
+                        key, section, subindex, parameter_index, vector_location
+                    ),
+                    create_value_set_default_button(
+                        key, section, subindex, parameter_index, vector_location
+                    ),
+                ])
+            ])
+        ]
+    return html.Div(
+        button_elements + [
         html.H5(
             [
                 get_icon(icon_name, None, 'default'),
@@ -141,8 +210,10 @@ def create_numeric_card_input_compound_key(
             min,
             max,
             step
-        )
-    ])
+        ),
+        ],
+        className = 'numeric-card-input'
+    )
 
 def unescape_html_icons(html_text):
     return (
@@ -192,6 +263,8 @@ def compose_configuration(
     rval['id'] = 'c-' + rval['uuid']
     
     return rval
+
+# region -- Actions --
 
 @dataclass
 class Action:
@@ -408,16 +481,33 @@ def optim_run_request(
 ):
     return OptimRunAction.from_dict(kwargs)
 
-##### Callback helpers #####
+# endregion
+
+# region -- Callback helpers --
+
 def get_options(
     option_ids: list[dict[str, str]],
     option_values: list[Any],
     page: str,
     keys: list[str]
 ) -> dict[str, Any]:
+    """
+    Get matched values from paired lists of id dictionaries and values.
+
+    Matches on keys 'page' (always) and 'key' (as member of key list).
+
+    Args:
+        option_ids (list[dict[str, str]]): List of dictionaries containing 'page' and 'key' keys with string values.
+        option_values (list[Any]): List of equal length to option_ids containing the matched option values.
+        page (str): Value required for 'page' in `option_ids`.
+        keys (list[str]): Strings to be found in 'key' key within `option_ids`. Form the keys of the returned dict.
+
+    Returns:
+        dict[str, Any]: key:value pairs for any of the keys found in the `option_ids` list on the correct page.
+    """
     odict = {}
     for id, val in zip(option_ids, option_values):
-        if id.get('page') and id.get('key') in keys:
+        if id.get('page') == page and id.get('key') in keys:
             odict[id['key']] = val
     return odict
 
@@ -425,9 +515,22 @@ def get_variable_keyed_data(
     section: str,
     key: str,
     subindex: int,
-    ids,
-    values
-):
+    ids: list[dict[str, str|int]],
+    values: list[Any]
+) -> Any:
+    """
+    Get value from paired list of id dictionaries and values where section, key and subindex match
+
+    Args:
+        section (str): Interface section
+        key (str): Interface key
+        subindex (int): Interface subindex
+        ids (list[dict[str, str|int]]): List of dictionaries containing 'section', 'key' and 'subindex' keys
+        values (list[Any]): List of equal length to `ids` containing the matched option values.
+
+    Returns:
+        Any: Value at index of first match of section, key, subindex in `ids` or None
+    """
     for id, val in zip(ids, values):
         if (
             id.get('section') == section
@@ -435,6 +538,54 @@ def get_variable_keyed_data(
             and id.get('subindex') == subindex
         ):
             return val
+    return None
+
+def get_triggered_value() -> Any:
+    """
+    In the context of a Dash callback, return the value of the prop that triggered the callback.
+
+    Returns `None` if triggered on creation.
+    Returns:
+        Any: The value of the prop that triggered the callback.
+    """
+    trig_id = ctx.triggered_id
+    if trig_id is None:
+        return None
+
+    val = None
+    for prop in ctx.triggered:
+        pid = json.loads(prop['prop_id'].rsplit('.',1)[0])
+        if pid == trig_id:
+            val = prop['value']
+            break
+    return val
+
+def update_return_list(
+    update_id: dict[str, Any],
+    update_value: Any,
+    ids: list[dict[str, Any]],
+    values: list[Any]
+) -> bool:
+    """
+    Search `ids` list of dicts for a match with `update_id`, and set matching indices in `values` with `update_value`
+
+    Args:
+        update_id (dict[str, Any]): Search dictionary value (all keys and values must match)
+        update_value (Any): Value to apply to matched indices in `values` list
+        ids (list[dict[str, Any]]): List of id dictionaries to search
+        values (list[Any]): List of values to update
+
+    Returns:
+        bool: `True` if at least one value has been updated, `False` otherwise
+    """
+    updated = False
+    for idx, id in enumerate(ids):
+        if id == update_id:
+            values[idx] = update_value
+            updated = True
+    return updated
+    
+# region -- Exporting --
 
 def export_results(
     result_type: Literal['dsa','psa','det'],
@@ -528,16 +679,9 @@ def export_results(
                             lambda buffer: buffer.write(zip_buffer.getvalue()),
                             filename = out_fn
                         )
-                    
-def safe_remove_finance(
-    finance_id: str,
-    configurations: list[str],
-    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
-):
-    has_finance = [x for x in configurations if json.loads(x)['finance_id'] == finance_id]
-    if len(has_finance) == 0:
-        acm.remove_finance(finance_id)
 
+# region -- Removing models --
+                    
 def safe_remove_model(
     model_id: str,
     configurations: list[str],
@@ -546,6 +690,15 @@ def safe_remove_model(
     has_model = [x for x in configurations if json.loads(x)['finance_id'] == model_id]
     if len(has_model) == 0:
         acm.remove_model(model_id)
+
+def safe_remove_finance(
+    finance_id: str,
+    configurations: list[str],
+    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
+):
+    has_finance = [x for x in configurations if json.loads(x)['finance_id'] == finance_id]
+    if len(has_finance) == 0:
+        acm.remove_finance(finance_id)
 
 def safe_remove_metamodel(
     metamodel_id: str,
@@ -565,6 +718,8 @@ def safe_remove_metamodel(
     # Always safe to drop the metamodel, just don't necessarily remove the children
     acm.remove_metamodel(mm.id, False)
     return
+
+# region -- Progress bars --
 
 def set_progression_factory(
     set_progress: Callable[[str], None],
@@ -598,6 +753,8 @@ def set_progression_factory(
             )
         )
     return set_progression
+
+# region -- Metamodel creation --
 
 MODEL_RESULT_ATTRIBUTES = [
     {

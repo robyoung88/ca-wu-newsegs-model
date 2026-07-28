@@ -8,18 +8,19 @@ dependencies:
   - dash-daq
   - dash-extensions
   - dash-leaflet
+  - dash-mantine-components
   - dynaconf
   - holidays
   - ipykernel
-  - ipython=9.7.0
-  - jupyter=1.1.1
+  - ipython
+  - jupyter
   - matplotlib
   - netcdf4
-  - numpy=2.4.3
+  - numpy
   - openpyxl
-  - pandas=2.3.3
+  - pandas
   - pathvalidate
-  - pip=26.0.1
+  - pip
   - pvlib
   - pyarrow
   - pyproj
@@ -30,5 +31,7 @@ dependencies:
   - sf-hamilton
   - xarray
   - pip:
+    - dash-ag-grid
     - diskcache
+    - useful-types
 prefix: C:\Users\YoungR2\AppData\Local\anaconda3\envs\ca-wu-newsegs-mod

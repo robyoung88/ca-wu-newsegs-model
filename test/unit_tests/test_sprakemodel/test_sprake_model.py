@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import numpy.testing
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from config import settings

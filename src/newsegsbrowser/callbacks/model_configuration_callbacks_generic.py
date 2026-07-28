@@ -16,6 +16,7 @@ from newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 
 from newsegsbrowser.layouts.results import configuration_selector
 from newsegsfinance.newsegsfinance import NewsegsFinance
+from newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsmetamodel import NewsegsMetaModel
 from newsegsvariable import variable
@@ -369,7 +370,7 @@ def update_dsa_boundsinputs(
                             if bnd_id['section'] == dic_l['section'] and bnd_id['key'] == dic_l['key'] and bnd_id['subindex'] == dic_l['subindex']:
                                 if mm is None:
                                     mm = acm.metamodels[dic_l.get('metamodel_id')]
-                                varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                                varid =  make_varid(**dic_l)
                                 var = mm.variables.get(varid)
                                 if var is not None:
                                     if not isinstance(var, variable.NumericScalarVariable):
@@ -381,7 +382,7 @@ def update_dsa_boundsinputs(
                             if el_id['section'] == dic_l['section'] and el_id['key'] == dic_l['key'] and el_id['subindex'] == dic_l['subindex']:
                                 if mm is None:
                                     mm = acm.metamodels[dic_l.get('metamodel_id')]
-                                varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                                varid =  make_varid(**dic_l)
                                 var = mm.variables.get(varid)
                                 if var is not None:
                                     if var.dsa_selected:
@@ -394,14 +395,14 @@ def update_dsa_boundsinputs(
             if mm is None:
                     mm = acm.metamodels[selected_configuration['metamodel_id']]
             for i, hdr_id in enumerate(bounds_container_ids):
-                varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
+                varid =  make_varid(**hdr_id)
                 var = mm.variables.get(varid)
                 if var is not None:
                     if not isinstance(var, variable.NumericScalarVariable):
                         raise TypeError('Cannot yet handle variables that are not numeric scalar')
                     rval[0][i] = var_dc.create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
             for i, el_id in enumerate(dsa_input_element_ids):
-                varid =  el_id['section']+'.'+el_id['key']+'.'+str(el_id['subindex'])
+                varid =  make_varid(**el_id)
                 var = mm.variables.get(varid)
                 if var is not None:
                     if var.dsa_selected:
@@ -438,7 +439,7 @@ def update_headers_dsa_inputs(
                         if hdr_id['section'] == dic_l['section'] and hdr_id['key'] == dic_l['key'] and hdr_id['subindex'] == dic_l['subindex']:
                             if mm is None:
                                 mm = acm.metamodels[dic_l.get('metamodel_id')]
-                            varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                            varid =  make_varid(**dic_l)
                             var = mm.variables.get(varid)
                             if var is not None:
                                 if not isinstance(var, variable.NumericScalarVariable):
@@ -448,7 +449,7 @@ def update_headers_dsa_inputs(
             for i, hdr_id in enumerate(header_ids):
                 if mm is None:
                     mm = acm.metamodels[selected_configuration.get('metamodel_id')]
-                varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
+                varid =  make_varid(**hdr_id)
                 var = mm.variables.get(varid)
                 if var is not None:
                     if not isinstance(var, variable.NumericScalarVariable):
@@ -483,7 +484,7 @@ def update_headers_psa_inputs(
                         if hdr_id['section'] == dic_l['section'] and hdr_id['key'] == dic_l['key'] and hdr_id['subindex'] == dic_l['subindex']:
                             if mm is None:
                                 mm = acm.metamodels[dic_l.get('metamodel_id')]
-                            varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                            varid =  make_varid(**dic_l)
                             var = mm.variables.get(varid)
                             if var is not None:
                                 if not isinstance(var, variable.NumericScalarVariable):
@@ -493,7 +494,7 @@ def update_headers_psa_inputs(
             for i, hdr_id in enumerate(header_ids):
                 if mm is None:
                     mm = acm.metamodels[selected_configuration.get('metamodel_id')]
-                varid =  hdr_id['section']+'.'+hdr_id['key']+'.'+str(hdr_id['subindex'])
+                varid =  make_varid(**hdr_id)
                 var = mm.variables.get(varid)
                 if var is not None:
                     if not isinstance(var, variable.NumericScalarVariable):
@@ -530,7 +531,7 @@ def update_psa_inputs_status(
                             if el_id['section'] == dic_l['section'] and el_id['key'] == dic_l['key'] and el_id['subindex'] == dic_l['subindex']:
                                 if mm is None:
                                     mm = acm.metamodels[dic_l.get('metamodel_id')]
-                                varid =  dic_l['section']+'.'+dic_l['key']+'.'+str(dic_l['subindex'])
+                                varid =  make_varid(**dic_l)
                                 var = mm.variables.get(varid)
                                 if var is not None:
                                     if var.psa_selected:
@@ -544,7 +545,7 @@ def update_psa_inputs_status(
                     mm = acm.metamodels[selected_configuration.get('metamodel_id')]
            
             for i, el_id in enumerate(psa_input_element_ids):
-                varid =  el_id['section']+'.'+el_id['key']+'.'+str(el_id['subindex'])
+                varid =  make_varid(**el_id)
                 var = mm.variables.get(varid)
                 if var is not None:
                     if var.psa_selected:

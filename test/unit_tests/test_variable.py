@@ -15,7 +15,7 @@ from scipy.stats import gamma as gamma_dist
 from scipy.stats import beta as beta_dist
 import scipy.integrate as integrate
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from newsegsvariable import variable
@@ -1823,7 +1823,7 @@ class TestVariableSerialisation(unittest.TestCase):
         vars = self.load_sprake_variables()
         
         vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
-        self.assertEqual(vbl.distribution.distribution, 'constant')
+        self.assertEqual(vbl.distribution.distribution, 'numeric_constant')
         self.assertEqual(vbl.name, 'Storage capacity')
         
         self.assertTupleEqual(vbl._raw_parameters, (4000,))
@@ -1862,6 +1862,57 @@ class TestVariableCopy(unittest.TestCase):
             varlist[0].deterministic_value,
             5
         )
+
+class TestVariableReset(unittest.TestCase):
+    """
+    Check the reset behaviour of variables
+    """
+
+    def test_scalar_reset(self):
+        create_var = partial(
+            variable.Variable,
+            'Spam',
+            distribution = 'normal'
+        )
+
+        var = create_var(parameters = (5, 2))
+        self.assertListEqual(
+            list(var.parameters),
+            [5, 2]
+        )
+
+        var.set_parameters(10, 3)
+        self.assertListEqual(
+            list(var.parameters),
+            [10, 3]
+        )
+
+        var.reset_parameters()
+        self.assertListEqual(
+            list(var.parameters),
+            [5, 2]
+        )
+
+        var.set_parameters(10, 3)
+        var.reset_parameters(0)
+        self.assertListEqual(
+            list(var.parameters),
+            [5, 3]
+        )
+
+        var.set_parameters(7, 5)
+        var.replace_default_parameters()
+        var.set_parameters(10, 3)
+        self.assertListEqual(
+            list(var.parameters),
+            [10, 3]
+        )
+        var.reset_parameters()
+        self.assertListEqual(
+            list(var.parameters),
+            [7, 5]
+        )   
+
 
 class TestVariableValidation(unittest.TestCase):
     """

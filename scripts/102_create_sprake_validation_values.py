@@ -30,8 +30,11 @@ if __name__ == '__main__':
     for var in variables:
         if var.is_model_type(mdl):
             var.synchronise_from_model(mdl)
+            var.replace_default_parameters()
         elif var.is_model_type(fnc):
             var.synchronise_from_model(fnc)
+            var.replace_default_parameters()
+            
 
     # Update variances etc here
     # It will be easier to work with an ordered dictionary

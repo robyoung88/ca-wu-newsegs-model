@@ -4,7 +4,7 @@ Unit tests for newsegssensitivity/psa
 import json
 import unittest
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from newsegsmodel import SprakeModel

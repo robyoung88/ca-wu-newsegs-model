@@ -3278,6 +3278,7 @@ class Variable(
         transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM] = 'identity',
         parameterisation_index: int | None = None,
         parameters: ParamList | None = None,
+        default_parameters: ParamList | None = None,
         value_name: Sequence[str]| None = None,
         configuration_show: bool = True,
         dsa_show: bool = False,
@@ -3344,12 +3345,20 @@ class Variable(
         self.dsa_bounds_type = dsa_bounds_type
 
         if parameters is None:
-            self.set_default_parameters()
+            self._set_initial_parameters()
         else:
             if isinstance(parameters, str) or not isinstance(parameters, Sequence):
                 self.set_parameters(parameters)
             else:
                 self.set_parameters(*parameters)
+
+        if default_parameters is None:
+            self.replace_default_parameters()
+        else:
+            if isinstance(default_parameters, str) or not isinstance(default_parameters, Sequence):
+                self._set_default_parameters(default_parameters)
+            else:
+                self._set_default_parameters(*default_parameters)
 
         # If we have vector transformation, now we need to set it (again) to obey the number of values
         self.set_transform(transform)
@@ -3558,13 +3567,43 @@ class Variable(
             raise ValueError('Parameterisation not found')
         return i
     
-    def set_default_parameters(self):
+    def _set_initial_parameters(self):
         parameterisation = self.distribution.parameterisations[self.parameterisation_index]
         defaults = parameterisation.defaults
         if isinstance(defaults, str) or not isinstance(defaults, Sequence):
             self.set_parameters(defaults)
         else:
             self.set_parameters(*defaults)
+    
+    def _set_default_parameters(self, *parameters: Param):
+        """
+        Set the default parameters
+
+        Parameters must be in native format.
+        Generally used to store the present values of the parameters.
+        """
+        self.distribution.parameter_validation(self, *parameters)
+        self._default_parameters = parameters
+
+    def reset_parameters(self, parameter_index: int | None = None):
+        if parameter_index is None:
+            self.set_parameters(*self._default_parameters)
+        else:
+            p0 = list(copy.copy(self._parameters))
+            if parameter_index >= 0 and parameter_index <= len(p0):
+                p0[parameter_index] = self._default_parameters[parameter_index]
+            elif parameter_index < 0 and -parameter_index < len(p0):
+                p0[parameter_index] = self._default_parameters[parameter_index]
+            self.set_parameters(*p0)
+
+    def replace_default_parameters(self):
+        """
+        Set the current parameters as defaults
+        """
+        if isinstance(self._raw_parameters, str) or not isinstance(self._raw_parameters, Sequence):
+            self._set_default_parameters(self._raw_parameters)
+        else:
+            self._set_default_parameters(*self._raw_parameters)
 
     @property
     def n_values(self) -> int:

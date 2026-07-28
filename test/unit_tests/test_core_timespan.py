@@ -8,7 +8,7 @@ import pandas as pd
 import numpy.testing
 
 # Ensure we can find modules
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan, timespan_from_dict

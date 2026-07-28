@@ -3,7 +3,7 @@ Unit tests for constructor registry
 """
 import unittest
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from core.constructors import registers
@@ -14,7 +14,7 @@ class TestRegisters(unittest.TestCase):
         compreg = registers.get_newsegscomponent_register()
         self.assertEqual(
             len(compreg),
-            1+1+8
+            1+1+9
         )
     
     def test_environment_register(self):

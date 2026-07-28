@@ -6,7 +6,7 @@ import unittest
 import json
 
 # Ensure we can find modules
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from core import location

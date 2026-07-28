@@ -53,6 +53,25 @@ input.dynamic-step-field {
     width: 100px;
 }
 
+div.numeric-card-input details {
+    display: inline-flex;
+}
+
+div.numeric-card-input details summary {
+    color: #cccccc;    
+}
+
+button.btn.set-default {
+    transition: background-color 3.0s ease, color 3.0s ease;
+}
+
+button.btn.set-default:active {
+    background-color: #888888 !important;
+    color: #ddd !important;
+    border-color: #ddd !important;
+    transition: none;
+}
+
 /* Results header */
 
 .results-title-block {
