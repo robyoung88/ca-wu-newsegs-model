@@ -5,7 +5,7 @@ Unit tests for newsegsmetamodel using Sprake settings
 import unittest
 
 import newsegsmetamodel
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from newsegsmodel import sprakemodel

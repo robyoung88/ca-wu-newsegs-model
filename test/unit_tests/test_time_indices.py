@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import numpy.testing
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from core.timespan import month_index

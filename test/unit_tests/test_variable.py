@@ -15,7 +15,7 @@ from scipy.stats import gamma as gamma_dist
 from scipy.stats import beta as beta_dist
 import scipy.integrate as integrate
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from newsegsvariable import variable
@@ -1823,7 +1823,7 @@ class TestVariableSerialisation(unittest.TestCase):
         vars = self.load_sprake_variables()
         
         vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
-        self.assertEqual(vbl.distribution.distribution, 'constant')
+        self.assertEqual(vbl.distribution.distribution, 'numeric_constant')
         self.assertEqual(vbl.name, 'Storage capacity')
         
         self.assertTupleEqual(vbl._raw_parameters, (4000,))

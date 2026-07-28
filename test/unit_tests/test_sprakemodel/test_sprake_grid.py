@@ -4,7 +4,7 @@ Unit tests for newsegsgrid/sprakegrid
 import unittest
 import json
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from newsegsgrid import sprakegrid

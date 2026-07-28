@@ -7,7 +7,7 @@ import json
 from typing import cast
 import unittest
 
-from unit_tests.common import setup_test_env
+from test.unit_tests.common import setup_test_env
 setup_test_env()
 
 from util import jsonfuncs
