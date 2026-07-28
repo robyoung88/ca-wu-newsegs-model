@@ -1078,6 +1078,53 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
             var.reset_parameters(tid.get('parameter_index', 0))
 
         return rval
+
+    #### Set default #####
+    @app.callback(
+        inputs = dict(
+            set_default_button = dict(
+                n_clicks = Input(
+                    {'type': 'value-set-default-button', 'section': ALL, 'key': ALL, 
+                    'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                    'n_clicks'
+                ),
+                ids = State(
+                    {'type': 'value-set-default-button', 'section': ALL, 'key': ALL, 
+                    'subindex': ALL, 'parameter_index': ALL, 'vector_location': ALL},
+                    'id'
+                )
+            )
+        ),
+
+        state = dict(
+            selected_configuration = State('store-selected-configuration', 'data'),
+        ),
+
+        prevent_initial_call = True
+    )
+    def set_default(
+        set_default_button,
+        selected_configuration
+    ):
+        rval = None
+        val = browser.get_triggered_value()
+        if val is None:
+            return rval
+
+        tid = cast(dict[str,Any], ctx.triggered_id)
+        
+        mm = acm.metamodels.get(json.loads(selected_configuration).get('metamodel_id'))
+        if mm is None:
+            return rval
+        varid = make_varid(**tid)
+        var = mm.variables.get(varid)
+        if var is None:
+            return rval
+
+        logger.info('setting new default: %s', tid)
+        var.replace_default_parameters()
+
+        return rval
     
     def find_matching_actions(
         queue_action_user: list[str],

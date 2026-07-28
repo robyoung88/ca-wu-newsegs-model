@@ -7,32 +7,27 @@ import logging
 import tempfile
 import time
 
-from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from dataclasses import asdict as dc_asdict
 from typing import Any, Callable, Literal, cast
-from typing import TypeVar
-from typing import overload
-from typing import Optional
-from typing import List
-import datetime
 import uuid
 import zipfile
 
-from dash import Dash, ctx, html, dcc
+from dash import ctx, html, dcc
 import dash_bootstrap_components as dbc
+from dash_bootstrap_components._components.Input import Input as dbc_Input # Bit of a faff to get around the pyright behaviour https://github.com/microsoft/pyright/issues/3131
+from dash_bootstrap_components._components.Button import Button as dbc_Button
 import pathvalidate
 from useful_types import SequenceNotStr
 
 # from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager # Need __future__ for typing to avoid circular
 from newsegsbrowser import icons
+from newsegsbrowser.icons import get_icon
 from newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsbrowser.postprocess import postprocess_utils
 from newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodel import newsegsmodel
 from newsegsfinance import newsegsfinance
-
-from newsegsbrowser.icons import get_icon
 from newsegssensitivity import optim
 from util import jsonfuncs
 
@@ -49,15 +44,17 @@ def create_numeric_card_input(
             html.Span(label+":", className='mr-3')
         ],
         style={'display':'inline'}),
-        dbc.Input(id=input_id,
-                  type='number',
-                  placeholder=0.0,
-                  debounce=True,
-                  style={
-                    'display':'inline-block',
-                    'float':'right',
-                    'width':'30%'
-                  })
+        dbc_Input(
+            id = input_id,
+            type = 'number',
+            placeholder = 0.0,
+            debounce = True,
+            style = {
+            'display': 'inline-block',
+            'float': 'right',
+            'width': '30%'
+            }
+        )
     ])
 
 def create_numeric_input_compound_key(
@@ -90,7 +87,7 @@ def create_numeric_input_compound_key(
     else:
         cn = f'dynamic-step-field step-val-{step:f}'
     
-    return dbc.Input(
+    return dbc_Input(
         id = input_id,
         type = 'number',
         value = value,
@@ -119,7 +116,7 @@ def create_value_reset_button(
         'parameter_index': parameter_index,
         'vector_location': vector_location,
     }
-    return dbc.Button(
+    return dbc_Button(
         html.I(
             className = icons.get_icon('value-reset', style_name = 'raw'),
             style = {'display': 'inline'}
@@ -129,6 +126,36 @@ def create_value_reset_button(
         title = 'Reset to default',
         outline = False,
         size = 'sm'
+    )
+
+def create_value_set_default_button(
+    key,
+    section,
+    subindex,
+    parameter_index,
+    vector_location
+):
+    if section is None:
+        section = 'None'
+    button_id = {
+        'type': 'value-set-default-button',
+        'key': key,
+        'section': section,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
+    }
+    return dbc_Button(
+        html.I(
+            className = icons.get_icon('value-set-default', style_name = 'raw'),
+            style = {'display': 'inline'}
+        ),
+        color = 'light',
+        id = button_id,
+        title = 'Set default to current value',
+        outline = False,
+        size = 'sm',
+        class_name = 'set-default',
     )
 
 def create_numeric_card_input_compound_key(
@@ -147,10 +174,23 @@ def create_numeric_card_input_compound_key(
     step: int | float  = 1,
     reset_button = True
 ):  
-    return html.Div([
-        create_value_reset_button(
-            key, section, subindex, parameter_index, vector_location
-        ) if reset_button else None,
+    button_elements = []
+    if reset_button:
+        button_elements = [
+            html.Details([
+                html.Summary(),
+                html.Div([
+                    create_value_reset_button(
+                        key, section, subindex, parameter_index, vector_location
+                    ),
+                    create_value_set_default_button(
+                        key, section, subindex, parameter_index, vector_location
+                    ),
+                ])
+            ])
+        ]
+    return html.Div(
+        button_elements + [
         html.H5(
             [
                 get_icon(icon_name, None, 'default'),
@@ -171,8 +211,9 @@ def create_numeric_card_input_compound_key(
             max,
             step
         ),
-        
-    ])
+        ],
+        className = 'numeric-card-input'
+    )
 
 def unescape_html_icons(html_text):
     return (
