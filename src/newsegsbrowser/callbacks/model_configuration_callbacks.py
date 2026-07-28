@@ -674,30 +674,16 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
                         # Need to check if model results are available
                         # If not, add a model run and allow that to trigger
                         # finance
-                        if not hasattr(selected_mm.model, '_cs_result'):
-                            
-                            action = browser.metamodel_variable_sync_action(
-                                metamodel_id = selected_mm.id,
-                                debounce = False,
-                                **actargs
+                        action = browser.metamodel_variable_sync_action(
+                            metamodel_id = selected_mm.id,
+                            debounce = False,
+                            **actargs
+                        )
+                        prequeue.append(
+                            json.dumps(
+                                action.as_dict()
                             )
-                            prequeue.append(
-                                json.dumps(
-                                    action.as_dict()
-                                )
-                            )
-                            
-                        else:
-                            action = browser.finance_interface_action(
-                                metamodel_id = selected_mm.id,
-                                debounce = False,
-                                **actargs
-                            )
-                            prequeue.append(
-                                json.dumps(
-                                    action.as_dict()
-                                )
-                            )
+                        )
                         
                         rval['config_triggers']['finance']['values'] = (
                             [datetime.datetime.now().timestamp()] 
