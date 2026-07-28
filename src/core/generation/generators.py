@@ -1199,7 +1199,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
         if self._mc.results.ac is None:
             raise ValueError('Model chain results have not been assigned')
-        generation = np.asarray(self._mc.results.ac.values).reshape((1,-1))
+        generation = np.asarray(self._mc.results.ac.values, copy = True).reshape((1,-1))
         
         # No energy in first pseudo-timestep
         generation[:,0] = 0.0
