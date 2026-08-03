@@ -5,18 +5,15 @@ Ways of defining and comparing blocks of time.
 from __future__ import annotations
 
 import copy
-from typing import Any, Mapping, Sequence, Type
+from typing import Any, Type
 
 from functools import singledispatchmethod
-import operator
 from typing import TypeAlias, overload, override
 import numpy as np
 import pandas as pd
 import datetime
 from datetime import timedelta, tzinfo
-import zoneinfo
 import pytz
-import dateutil
 from pandas.core.tools.datetimes import DatetimeScalar
 import numpy.typing as npt
 
@@ -46,21 +43,6 @@ PEAK_PERIODS = [
 
 TimedeltaScalar: TypeAlias = timedelta|np.timedelta64|str|int|float
 TimeZoneScalar: TypeAlias = str|tzinfo
-
-# def timestamp_to_dict(ts: pd.Timestamp) -> Mapping:
-#     return {
-#         'class': 'Timestamp',
-#         'constructor_class': 'Timestamp',
-#         'ts_input' : str(ts),
-#         'tz': str(ts.tz)
-#     }
-
-# def timedelta_to_dict(td: pd.Timedelta) -> Mapping:
-#     return{
-#         'class': 'Timedelta',
-#         'constructor_class': 'Timedelta',
-#         'value': str(td)
-#     }
 
 class TimeSpan(SerialiseToDictMixin):
     _tz = 'utc'

@@ -23,7 +23,15 @@ from util import classfuncs
 
 class NewsegsModule(newsegscomponent.NewsegsComponent):
     """
-    Basic abstract class serving module results
+    Abstract base class for modules that run within a Newsegs model.
+
+    Subclasses should implement the abstract run() method to perform a
+    computation over a given TimeSpan and return a NewsegsModuleResult.
+
+    This class provides common plumbing including tracking the associated
+    NewsegsModelInterface instance, a "dirty" flag that indicates whether
+    the module configuration has changed since the last run, and recording
+    the last run time.
     """
 
     # Override of SerialiseToDictMixin _constructor_class

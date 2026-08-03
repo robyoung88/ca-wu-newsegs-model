@@ -29,7 +29,7 @@ def create_dsa_header():
                         html.Span(id = {'type': 'generic_text', 'section': 'any', 'key': 'site-name'}),
                     ]
                 )
-            )
+            ) # pyright: ignore[reportCallIssue]
         ]),
         dbc.Row([
             dbc.Col([
@@ -39,7 +39,7 @@ def create_dsa_header():
                         html.Span(id = {'type': 'generic_text', 'section': 'any', 'key': 'configuration-name'})
                     ]
                 )
-            ])
+            ]) # pyright: ignore[reportCallIssue]
         ])
     ])
 
@@ -57,7 +57,7 @@ def create_dsa_configuration_editor():
         html.Div(
             id = {'type': 'input-container', 'supersection': 'dsa', 'section': 'dsa'}
         )
-    ])
+    ]) # pyright: ignore[reportCallIssue]
 
 def create_optim_configuration_editor_header(**kwargs):
     button_container_children = [
@@ -67,7 +67,7 @@ def create_optim_configuration_editor_header(**kwargs):
             id = {'type': 'optim-prerun-btn', 'page': kwargs.get('page_type', 'None')},
             title = 'Start optimisation',
             disabled = False
-        )
+        ) # pyright: ignore[reportCallIssue]
     ]
 
     return dbc.Row([
@@ -81,7 +81,7 @@ def create_optim_configuration_editor_header(**kwargs):
         )
     ],
     class_name = 'configuration-header'
-    )
+    ) # pyright: ignore[reportCallIssue]
 
 def create_optim_configuration_editor(**kwargs):
     return dbc.Col([
@@ -98,7 +98,7 @@ def create_optim_configuration_editor(**kwargs):
                         clearable = False,
                         id = {'type': 'optim-run-option', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-marginal-statistic'}
                     ),
-                ]),
+                ]), # pyright: ignore[reportCallIssue]
                 
                 dbc.Row([
                     dcc.Graph(
@@ -110,17 +110,17 @@ def create_optim_configuration_editor(**kwargs):
                             'backgroundColor': 'transparent'
                         }
                     )
-                ]),
+                ]), # pyright: ignore[reportCallIssue]
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
-                ),
+                ), # pyright: ignore[reportCallIssue]
                 dcc.Store(
                     id = {'type': 'store-optim-marginal-statistic-plot', 'page': kwargs.get('page_type', 'None')},
                     data = None,
                 ),
                 dbc.Modal(
                     [
-                        dbc.ModalHeader(dbc.ModalTitle('Start system optimisation')),
+                        dbc.ModalHeader(dbc.ModalTitle('Start system optimisation')), # pyright: ignore[reportCallIssue]
                         dbc.ModalBody([
                             html.H3('Automatically optimise system size'),
                             html.P((
@@ -170,19 +170,19 @@ def create_optim_configuration_editor(**kwargs):
                                 id = {'type': 'optim-run-option', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-method'},
                                 persistence = True
                             ),
-                        ]),
+                        ]), # pyright: ignore[reportCallIssue]
                         dbc.ModalFooter([
                             dbc.Button(
                                 'OK',
                                 id = {'type': 'optim-run-btn', 'page': kwargs.get('page_type', 'None')},
                                 n_clicks = 0
-                            ),
+                            ), # pyright: ignore[reportCallIssue]
                             dbc.Button(
                                 'Cancel',
                                 id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-run-confirm'},
                                 className = 'ms-auto',
                                 n_clicks = 0
-                            )
+                            ) # pyright: ignore[reportCallIssue]
                         ])
                     ],
                     id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'optim-run-confirm'},
@@ -198,12 +198,12 @@ def create_optim_configuration_editor(**kwargs):
                     is_open = False,
                     duration = 5000,
                     style = {'position': 'fixed', 'top': 66, 'right': 10, 'width': 350},
-                ),
+                ), # pyright: ignore[reportCallIssue]
                 dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-run-postprocess'}, data = []),
             ]
         )
         
-    ])
+    ]) # pyright: ignore[reportCallIssue]
 
 DEFAULT_LAYOUT_DSA = {
     'layout_navigation': navigation.create_navigator_buttons_default,
@@ -226,11 +226,11 @@ def create_dsa_layout(*args, **kwargs):
             ),
             class_name = 'newsegs-navbar-vertical collapsed',
             width = config_dict['width_navigation'],
-        ),
+        ), # pyright: ignore[reportCallIssue]
         dbc.Col(
             config_dict['layout_head'](),
             width = config_dict['width_head']
-        )
+        ) # pyright: ignore[reportCallIssue]
     ])
 
     dsa_config = create_dsa_configuration_editor()
@@ -252,7 +252,7 @@ def create_dsa_layout(*args, **kwargs):
                             )
                         ],
                         width = 12
-                    ),
+                    ), # pyright: ignore[reportCallIssue]
                     html.Hr(),
                     dbc.Col(
                         [
@@ -272,7 +272,7 @@ def create_dsa_layout(*args, **kwargs):
                             )
                         ],
                         width = 12
-                    ),
+                    ), # pyright: ignore[reportCallIssue]
                     dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-run-postprocess'}, data = []),
                     dcc.Store(id={'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, data = []),
                 ],
@@ -295,7 +295,7 @@ def create_dsa_layout(*args, **kwargs):
                 'Cancel DSA',
                 id = {'type': 'metamodel-process-cancel', 'target': 'dsa_run_request'},
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
-            ),
+            ), # pyright: ignore[reportCallIssue]
             html.Progress(
                 id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
                 className='resize-handle resize-handle-progress',
@@ -305,7 +305,7 @@ def create_dsa_layout(*args, **kwargs):
                 'DSA Running',
                 id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
-            ),
+            ), # pyright: ignore[reportCallIssue]
 
         ],
         className = 'drawer-container',
@@ -325,11 +325,11 @@ def create_dsa_layout(*args, **kwargs):
                 html.Hr(),
                 dbc.Row(
                     dsa_config
-                ),
+                ), # pyright: ignore[reportCallIssue]
                 html.Hr(),
                 dbc.Row(
                     optim_config
-                ),
+                ), # pyright: ignore[reportCallIssue]
                 html.Hr()
             ] 
             + results_section

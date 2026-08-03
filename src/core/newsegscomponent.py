@@ -30,9 +30,10 @@ class NewsegsComponent(
     metaclass = ABCMeta
 ):
     """
-    Abstract base class of a NewSEGS model component
-
-    Strictly, has no abstract members but bear with me.
+    Base class of a NewSEGS (meta)model component.
+    
+    Provides common functionality for model components including unique identification,
+    serialization/deserialization, and configuration synchronization checks.
     """
     
     _name: str = 'Model component'

@@ -1,5 +1,8 @@
 """
-Interface for module results
+Module defining abstract base class for newsegs module results and helper functions.
+
+NewsegsModuleResult encapsulates meter and DSM result arrays together with run metadata.
+Helper utilities include pandas conversion and filtering by meter name/type.
 """
 from __future__ import annotations
 
@@ -13,9 +16,25 @@ import pandas as pd
 
 from core.timespan import RegTimeSpan
 
+__all__ = [
+    "NewsegsModuleResult",
+    "defer_meters_to_pandas",
+    "defer_dsm_to_pandas",
+    "filter_meters",
+    "filter_meter_indices",
+]
+
 class NewsegsModuleResult(metaclass = ABCMeta):
     """
     Abstract class holding module results
+    
+    Attributes:
+        run_module_uuid: Unique identifier for the module run
+        last_run: Timestamp of the last module execution
+    
+    Args:
+        run_module_id: String identifier for the module run
+        last_run: Datetime of when the module was last executed
     """
     run_module_uuid = 1
     last_run = datetime.datetime.now()

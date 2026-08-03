@@ -19,7 +19,7 @@ def _deferred_constructor_update_from_dict(
     return from_dict
 
 def find_constructor(
-    constructor_class: registers.CONSTRUCTOR_CLASS,
+    constructor_class: str,
     classname: str
 ) -> Callable[[dict[str, Any]], object]:
     reg = registers.get_register(constructor_class)
