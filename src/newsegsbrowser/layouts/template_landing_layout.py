@@ -3,7 +3,6 @@ Create a landing layout for an app.
 """
 from dash import dcc, html
 import dash_bootstrap_components as dbc
-from dash_extensions import Mermaid
 
 from newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsbrowser.layouts import navigation
@@ -45,16 +44,27 @@ def create_landing_layout(*args, **kwargs):
 
     body = dbc.Col([
         dcc.Markdown(config_dict['body_text']),
-        Mermaid(chart = config_dict['model_diagram']),
     ],
     width = config_dict['width_body']
     ) # pyright: ignore[reportCallIssue]
     
     assumptions = dbc.Col([
-        dcc.Markdown(config_dict['assumptions_text']),
-        
-        f'The model type is {config_dict["model_type"]}',
-        #dcc.Store(id = 'store-selected-configuration'),
+        dbc.Row(html.H4('Model block diagram')), # pyright: ignore[reportCallIssue]
+        dbc.Row(
+        # Make the image fill the column width responsively but not expand beyond it
+            html.Img(
+                src=config_dict['model_diagram'],
+                style={
+                    'width': '100%',
+                    'height': 'auto',
+                    'objectFit': 'contain',
+                    'display': 'block'
+                }
+            ),
+        ), # pyright: ignore[reportCallIssue]
+        dbc.Row(
+            dcc.Markdown(config_dict['assumptions_text']),
+        ), # pyright: ignore[reportCallIssue]
     ]) # pyright: ignore[reportCallIssue]
 
     return html.Div(

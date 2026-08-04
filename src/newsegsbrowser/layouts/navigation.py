@@ -80,10 +80,19 @@ def create_nav_psa(selected_model: str):
     )
 
 def create_navigator_buttons_default(selected_model: str = 'sprake'):
-    return [
-        create_nav_landing(selected_model),
-        create_nav_system_config(selected_model),
-        create_nav_buildings(selected_model),
-        create_nav_dsa(selected_model),
-        create_nav_psa(selected_model),
-    ]
+    match selected_model:
+        case 'sprake':
+            return [
+                    create_nav_landing(selected_model),
+                    create_nav_system_config(selected_model),
+                    create_nav_dsa(selected_model),
+                    create_nav_psa(selected_model),
+                ]
+        case _:
+            return [
+                create_nav_landing(selected_model),
+                create_nav_system_config(selected_model),
+                create_nav_buildings(selected_model),
+                create_nav_dsa(selected_model),
+                create_nav_psa(selected_model),
+            ]
