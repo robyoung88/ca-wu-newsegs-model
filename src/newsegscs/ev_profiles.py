@@ -1,4 +1,4 @@
-# Helper functions for aligning timeseries with EV charging profile data
+"""Helper functions for aligning timeseries with EV charging profile data."""
 
 import os
 from functools import lru_cache

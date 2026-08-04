@@ -47,6 +47,19 @@ def make_dsa_result(
     fnc: NewsegsFinance,
     statistics: Sequence[DSA_FLOAT_STATISTIC]
 ) -> dict[str, Any]:
+    """_summary_
+
+    Args:
+        variable_changed (str): _description_
+        dsa_bound (str): _description_
+        variable_value (str): _description_
+        mdl (NewsegsModel): _description_
+        fnc (NewsegsFinance): _description_
+        statistics (Sequence[DSA_FLOAT_STATISTIC]): _description_
+
+    Returns:
+        dict[str, Any]: _description_
+    """
     res: dict[str, Any] = {
         'variable': variable_changed,
         'bound': dsa_bound,
@@ -61,6 +74,16 @@ def run_dsa(
     statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC),
     progress: Callable[[int, int], None] | None = None,
 ) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        mm (NewsegsMetaModel): _description_
+        statistics (Sequence[DSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(DSA_FLOAT_STATISTIC).
+        progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     variables = mm.variables.values()
     mdl = mm.model
     fnc = mm.finance

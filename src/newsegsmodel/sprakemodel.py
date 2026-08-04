@@ -123,6 +123,7 @@ def get_sprake_wider_env_server():
     return DummyWiderEnv()
 
 class SprakeModel(newsegsmodel.NewsegsModel):
+    """Implementation of the model of Dr David Sprake as a NewsegsModel."""
     _name = 'Sprake Model'
     _version = '0.0.1'
 

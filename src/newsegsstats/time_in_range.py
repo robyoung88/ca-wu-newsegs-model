@@ -84,6 +84,18 @@ def continuous_time_in_range(
     include_lower: bool = True,
     include_upper: bool = False
 ) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        timeseries (pd.Series): _description_
+        minimum (float): _description_
+        maximum (float): _description_
+        include_lower (bool, optional): _description_. Defaults to True.
+        include_upper (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
 
     kwargs = locals()
     intervals = in_range_intervals_unclosed(**kwargs)
@@ -134,6 +146,18 @@ def max_continuous_time_in_range(
     include_lower: bool = True,
     include_upper: bool = False
 ) -> dict:
+    """_summary_
+
+    Args:
+        timeseries (pd.Series): _description_
+        minimum (float): _description_
+        maximum (float): _description_
+        include_lower (bool, optional): _description_. Defaults to True.
+        include_upper (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        dict: _description_
+    """
 
     kwargs = locals()
     intervals = in_range_intervals_unclosed(**kwargs)

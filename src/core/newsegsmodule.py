@@ -1,3 +1,6 @@
+"""
+Abstract base class for NewsegsResult-returning NewsegsComponents within a NewsegsModel
+"""
 from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod

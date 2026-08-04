@@ -1,4 +1,8 @@
-from core.timespan.timespan import *
+"""
+Ways of defining and comparing blocks of time.
+"""
+from .timespan import *
+
 __all__ = [
     'SECONDS_IN_DAY',
     'SECONDS_TO_HOURS',
@@ -8,8 +12,6 @@ __all__ = [
     'PEAK_PERIODS',
     'TimedeltaScalar',
     'TimeZoneScalar',
-    #'timestamp_to_dict',
-    #'timedelta_to_dict',
     'delta_days',
     'year_index',
     'season_index',

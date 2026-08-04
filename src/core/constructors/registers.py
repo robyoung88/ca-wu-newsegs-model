@@ -9,20 +9,6 @@ import inspect
 from types import ModuleType
 from typing import Any, Callable, Literal
 
-# CONSTRUCTOR_CLASS = Literal[
-#     'NewsegsComponent',
-#     'NewsegsModule',
-#     'Environment',
-#     'Generator',
-#     'Location',
-#     'Timespan',
-#     'Timestamp',
-#     'Timedelta',
-#     'datetime',
-#     'PVLib',
-#     'Variable',
-# ]
-
 class NakedConstructor:
     def from_dict(self, config: dict[str, Any]) -> object:
         ...
@@ -56,17 +42,21 @@ def get_subclasses_in_module(
 CONSTRUCTOR_CLASS_REGISTER: dict[str, Callable[[], dict[str, object] | dict[str, NakedConstructor]]] = {}
 
 def register_constructor_class(cc_name: str):
-    """Add a constructor class registry function to CONSTRUCTOR_CLASS_REGISTER
+    """Add a constructor class registry function to `CONSTRUCTOR_CLASS_REGISTER`
 
-    Necessary to use constructors.find_constructor for a new constructor_class
+    Registration is necessary to use [core.find_constructor][] for a new constructor_class
     
     The decorated function should take no arguments, and return a dictionary
     of constructors for classes which implement a `.from_dict` constructor
     class method.
 
     A typical pattern for creating an appropriate dictionary is to use the following
-    pattern::
+    pattern:
 
+    Example:
+        ```python
+        from core import register_constructor_class
+        
         @register_constructor_class('my_constructor_class')
         def get_mcc_constructors():
             import my_constructor_class_module
@@ -84,6 +74,7 @@ def register_constructor_class(cc_name: str):
                     )
                 )
             return constructors
+        ```
     
     Args:
         cc_name (str): name used as _constructor_class in a SerialiseToDictMixin

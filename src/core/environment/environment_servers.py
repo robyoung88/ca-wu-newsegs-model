@@ -1,6 +1,6 @@
+"""Abstract base classes for environmental data providers."""
 from abc import ABCMeta, abstractmethod
 from typing import Any, Literal, Union, Sequence, SupportsFloat, overload
-import re
 
 import numpy as np
 import numpy.typing as npt

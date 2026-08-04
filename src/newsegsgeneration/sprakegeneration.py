@@ -1,3 +1,4 @@
+"""Provides implementation of NewsegsGeneration for Sprake Model."""
 from __future__ import annotations
 
 import os
@@ -10,12 +11,8 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from core.environmentserverinterface import EnvironmentServerInterface
-from core.location.location import RaisedLocation
 from core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsgeneration.newsegsgeneration import NewsegsGeneration
-from util import classfuncs
-from core import newsegsmodule
+from .newsegsgeneration import NewsegsGeneration
 from core import location
 from core import generation
 from core import timespan as modtimespan
@@ -82,6 +79,7 @@ def get_sprake_ned100():
     return turbine
 
 class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
+    """Container for results of SprakeGeneration Module"""
     def __init__(
         self,
         *args,
@@ -136,6 +134,7 @@ class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
 
 
 class SprakeGeneration(NewsegsGeneration):
+    """Implementation of NewsegsGeneration for Sprake Model."""
 
     _name = "Sprake Generation Module"
         

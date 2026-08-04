@@ -1,5 +1,5 @@
 """
-Lookups for creating class instances from dictionaries (e.g. from JSON)
+Lookups for creating class instances from dictionaries (e.g. from JSON).
 """
 import functools
 from typing import Any, Callable
@@ -9,8 +9,17 @@ from core.constructors import registers
 def _deferred_constructor_update_from_dict(
     constructor_func: functools.partial
 ) -> Callable[[dict[str, Any]], object]:
-    """
-    NB
+    """Wrap a deferred constructor so it can be invoked with a dictionary.
+
+    The wrapped constructor is expected to accept a placeholder argument
+    and return an object with an `update` method. The returned callable
+    creates the object and applies the configuration dictionary to it.
+
+    Args:
+        constructor_func: A partially applied constructor function.
+
+    Returns:
+        A callable that accepts a dictionary and returns an instantiated object.
     """
     def from_dict(config: dict[str, Any]):
         var = constructor_func('Placeholder')
@@ -22,6 +31,25 @@ def find_constructor(
     constructor_class: str,
     classname: str
 ) -> Callable[[dict[str, Any]], object]:
+    """
+    Retrieve a constructor callable from the registry.
+
+    Looks up the registry associated with `constructor_class` and then the
+    registered constructor for `classname`. If the constructor is a
+    functools.partial, a deferred dictionary-based constructor is returned.
+    Otherwise, the registered class must implement a `from_dict` classmethod.
+
+    Args:
+        constructor_class: Name of the constructor registry.
+        classname: Name of the registered constructor.
+
+    Returns:
+        A callable that accepts a dictionary and returns an instantiated object.
+
+    Raises:
+        ValueError: If the classname is not found in the constructor register.
+        AttributeError: If the registered constructor does not implement `from_dict`.
+    """
     reg = registers.get_register(constructor_class)
 
     constr = reg.get(classname, None)

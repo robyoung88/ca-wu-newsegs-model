@@ -60,6 +60,7 @@ def make_varid(
     return f'{section}.{key}.{subindex}'
 
 class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
+    """A container and controller for models and variables."""
 
     model_id: str
     finance_id: str
@@ -90,6 +91,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     
     @property
     def model(self) -> newsegsmodel.NewsegsModel:
+        """NewsegsModel: The associated Energy Model."""
         return self._model
     
     @model.setter
@@ -97,9 +99,19 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         self._model = model
         self.model_id = model.id
 
-    def reattach_model(self, model_provider: Mapping[str, newsegsmodel.NewsegsModel]) -> None:
-        """
-        After reconstruction of the metamodel, reattach the associated instance of NewsegsModel
+    def reattach_model(
+        self,
+        model_provider: Mapping[str, newsegsmodel.NewsegsModel]
+    ) -> None:
+        """Reattach the associated NewsegsModel instance after metamodel reconstruction.
+        
+        Args:
+            model_provider: Mapping of model IDs to NewsegsModel instances.
+            
+        Raises:
+            AttributeError: If the MetaModel has no associated model ID.
+            ValueError: If model_provider cannot provide the model.
+            TypeError: If the provided object is not a NewsegsModel.
         """
         if not hasattr(self, 'model_id') or self.model_id == '':
             raise AttributeError('this MetaModel has no associated model to reattach.')
@@ -117,6 +129,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     
     @property
     def finance(self) -> newsegsfinance.NewsegsFinance:
+        """NewsegsFinance: The associated Finance Model."""
         return self._finance
     
     @finance.setter
@@ -125,8 +138,15 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         self.finance_id = finance.id
 
     def reattach_finance(self, finance_provider: Mapping[str, newsegsfinance.NewsegsFinance]) -> None:
-        """
-        After reconstruction of the metamodel, reattach the associated instance of NewsegsModel
+        """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
+        
+        Args:
+            finance_provider: Mapping of finance IDs to NewsegsFinance instances.
+            
+        Raises:
+            AttributeError: If the MetaModel has no associated finance ID.
+            ValueError: If finance_provider cannot provide the finance.
+            TypeError: If the provided object is not a NewsegsFinance.
         """
         if not hasattr(self, 'finance_id') or self.finance_id == '':
             raise AttributeError('this MetaModel has no associated finance to reattach.')
@@ -141,6 +161,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
 
     @property
     def variables(self) -> OrderedDict[str, variable.Variable]:
+        """An OrderedDict mapping variable UIDs to Variable instances."""
         return self._variables
     
     @variables.setter
@@ -173,6 +194,14 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         parameter index is updated with the scalar value; if the parameter is
         an array type, it is addressed by its location in the flattened array
         using the vector_location.
+
+        Args:
+            section: Interface section.
+            key: Variable specifier.
+            subindex: Index of multiple instances of specified Variable.
+            parameter_index: Index of metaparameter within Variable to update.
+            vector_location: Index of scalar metaparameter within flattened array of array-type parameter.
+            value: Value with which to update metaparameter.
 
         Returns:
             - bool - The parameter has been set

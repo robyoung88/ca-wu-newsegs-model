@@ -1,4 +1,4 @@
-# Wrap New European Wind Atlas API calls
+"""Provides wrappers for New European Wind Atlas API calls."""
 from config import settings
 import requests
 import tempfile
@@ -23,7 +23,18 @@ def get_newa_micro_point(lat, lon, height=50.0,
                                     'rix',
                                     'elevation'],
                          as_nc=False):
-    """New European Wind Atlas micro-scale statistics for a single point"""
+    """New European Wind Atlas micro-scale statistics for a single point.
+
+    Args:
+        lat: Latitude of the point.
+        lon: Longitude of the point.
+        height: Height above ground in meters.
+        variables: List of micro-scale variables to retrieve.
+        as_nc: If True, return the NetCDF response object.
+
+    Returns:
+        The API response parsed as an xarray Dataset or raw NetCDF content.
+    """
     entry_point = settings.get('NEWAEntryPoint')
 
     # For this entry point, the variables require no translation
@@ -94,7 +105,23 @@ def get_newa_meso_point(lat, lon, height=50.0,
                                    'lu_index', # Land use index
                                    'landmask'], # Landmask (0=sea, 1=land)
                         as_nc=False):
-    """New European Wind Atlas meso-scale statistics for a single point"""
+    """Get New European Wind Atlas (NEWA) meso-scale statistics for a single point.
+
+    Args:
+        lat (float): Latitude of the point.
+        lon (float): Longitude of the point.
+        height (float, optional): Height above ground (m). Defaults to 50.0.
+        variables (list[str], optional): Variables to request. Variables in
+            the meso statistics set (e.g. 'power_density', 'wind_speed') are
+            expanded to their mean/std/min/max forms. Single-value variables
+            (e.g. 'elevation') are passed through. Defaults to a preset list.
+        as_nc (bool, optional): If True, return raw NetCDF content. Defaults to False.
+
+    Returns:
+        pandas.DataFrame or xarray.Dataset or bytes: Depending on response and
+            the as_nc flag, returns a pandas DataFrame (default), an xarray
+            Dataset, or raw NetCDF bytes.
+    """
     entry_point = settings.get('NEWAMesoEntryPoint')
 
     # For this entry point, variables in _MESO_VARS_STAT require translation to mean, std, min, max

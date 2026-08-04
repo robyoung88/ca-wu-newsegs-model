@@ -1,4 +1,4 @@
-# Abstract base class for NewSEGS Consumption and Storage module
+"""Provides abstract base class for NewSEGS Consumption and Storage Module."""
 
 from abc import abstractmethod
 
@@ -9,6 +9,7 @@ from core import newsegsmodule
 from core.newsegsmoduleresult import NewsegsModuleResult, filter_meters
 
 class NewsegsCS(newsegsmodule.NewsegsModule):
+    """Abstract base class for NewSEGS Consumption and Storage Module."""
     @property
     @abstractmethod
     def location(self) -> modlocation.Location:
@@ -18,6 +19,9 @@ class NewsegsCS(newsegsmodule.NewsegsModule):
         May or may not relate to the local environment of any of the
         storage units or consumers, but should give an
         indication of the consumption-storage location.
+
+        Returns:
+            modlocation.Location: Generalised location for the module.
         """
     
     @location.setter

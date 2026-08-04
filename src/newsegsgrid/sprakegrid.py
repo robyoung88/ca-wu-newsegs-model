@@ -1,3 +1,4 @@
+"""Provides implementation of NewsegsGrid for Sprake Model."""
 from __future__ import annotations
 import copy
 from collections.abc import Mapping
@@ -17,6 +18,7 @@ from core import timespan as modtimespan
 from newsegsmodel import newsegsmodel
 
 class SprakeGridResult(NewsegsModuleResult):
+    """Container for results of SprakeGrid Module."""
     def __init__(
         self,
         *args,
@@ -70,6 +72,7 @@ class SprakeGridResult(NewsegsModuleResult):
 
 
 class SprakeGrid(NewsegsGrid):
+    """Implementation of NewsegsGrid for Sprake Model."""
 
     _name = "Sprake Grid Module"
 
