@@ -1,4 +1,4 @@
-# Abstract base class for NewSEGS financial calculations
+"""Provides abstract base class for NewSEGS financial calculations"""
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
@@ -16,7 +16,7 @@ from core import newsegsmodelinterface
 
 class NewsegsFinance(NewsegsFinanceInterface):
     """
-    Abstract base class of NewSEGS finance model
+    Abstract base class of NewSEGS Finance model.
 
     Uses the results timeseries of a NewsegsModel instance in combination with
     configuration variables to calculate costs and benefits associated with

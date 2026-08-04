@@ -1,4 +1,4 @@
-# Abstract base class for NewSEGS Generation module
+"""Provides abstract base class for NewSEGS Generation Module."""
 
 from abc import abstractmethod
 from typing import Sequence
@@ -11,15 +11,18 @@ from core.newsegsmoduleresult import filter_meters
 from core import location as modlocation
 
 class NewsegsGeneration(NewsegsModule):
+    """Abstract base class for NewSEGS Generation Module."""
     
     @property
     @abstractmethod
     def location(self) -> modlocation.Location | Sequence[modlocation.Location]:
-        """
-        Read back the location of the generators / power plants.
+        """Read back the location of the generators / power plants.
 
         Generally, the location will itself be an attribute of the generator
         and so cannot be accessed until a generator is assigned.
+
+        Returns:
+            Location or sequence of locations of the generators / power plants.
         """
     
     @location.setter
@@ -30,10 +33,15 @@ class NewsegsGeneration(NewsegsModule):
 def get_generation_meters(
     gen_results: NewsegsModuleResult
 ) -> pd.DataFrame:
-    """
-    Extract generation meters from a generation module results.
+    """Extract generation meters from a generation module results.
 
-    Also augments with total generation export.
+    Also augments the returned data with total generation export.
+
+    Args:
+        gen_results: Results from a generation module.
+
+    Returns:
+        Data frame containing generation meter values and a total export column.
     """
     gen_meters = filter_meters(gen_results, 'export')
     gen_data = (

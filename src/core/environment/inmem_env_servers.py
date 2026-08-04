@@ -1,3 +1,4 @@
+"""Implementations of NewsegsLocalEnvironment and NewsegsWiderEnvironment holding static data."""
 from __future__ import annotations
 from typing import Any, Sequence, cast, overload, override
 
@@ -24,6 +25,21 @@ def _get_true_datetimes_srs(
     return srs['timespan'].to_pandas()[idx]
 
 class InMemoryLocalEnv(NewsegsLocalEnvironment):
+    """In-memory implementation of local environment data.
+    
+    Holds static timeseries data for wind speeds, solar flux, external temperature,
+    and solar flux on plane. Provides accessor methods to retrieve data for specified
+    locations and timespans.
+    
+    Attributes:
+        _version: Version identifier for the environment.
+        _name: Human-readable name of the environment.
+        _wind_series: Dictionary mapping heights to wind speed timeseries data.
+        _horizontal_solar_flux_series: Dictionary storing horizontal solar flux data.
+        _external_temperature_series: Dictionary storing external temperature data.
+        _solar_flux_on_plane_series: Nested dictionary storing solar flux on plane data
+            by azimuth and pitch.
+    """
     _version = '0.0.1'
     _name = 'Local environment'
 
@@ -49,15 +65,20 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     #    for k in self._solar_flux_on_plane_series.keys():
     #        for j in self._solar_flux_on_plane_series[k].keys():
     #            self._solar_flux_on_plane_series[j][k].timestep = timestep
-
     
-
     def set_wind_speed(
         self,
-        wind_speeds:npt.ArrayLike,
-        location:RaisedLocation,
-        timespan:OffsetRegTimeSpan
+        wind_speeds: npt.ArrayLike,
+        location: RaisedLocation,
+        timespan: OffsetRegTimeSpan
     ):
+        """Set wind speed series data for a location.
+
+        Args:
+            wind_speeds: Timeseries of wind speeds (m/s).
+            location: Raised location for which the timeseries applies.
+            timespan: Timespan corresponding to the timeseries.
+        """
         height = location.height_agl
         self._wind_series[height] = {
             'timespan': timespan,
@@ -65,11 +86,18 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         }
 
     def access_wind_series(
-            self,
-            location: RaisedLocation
-        ) -> dict[str, Any] | None:
-        """
-        Providing an accessor just in case we need to tweak the timespan offsets after the fact
+        self,
+        location: RaisedLocation
+    ) -> dict[str, Any] | None:
+        """Access wind series data for a given location.
+        
+        Provides an accessor in case we need to tweak the timespan offsets after the fact.
+        
+        Args:
+            location: The raised location for which to access wind series data.
+            
+        Returns:
+            A dictionary containing wind series data, or None if not available.
         """
         height = location.height_agl
         return self._wind_series.get(height, None)
@@ -104,13 +132,33 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         location:AspectLocation,
         timespan:OffsetRegTimeSpan
     ):
+        """Set the horizontal solar flux (W/m²) time series.
+
+        NB: Only a single timeseries will be stored and will be returned
+        for all locations.
+
+        Args:
+            horizontal_solar_flux (npt.ArrayLike): Timeseries of horizontal solar flux (W/m²).
+            location (AspectLocation): Location - not used.
+            timespan (OffsetRegTimeSpan): Timespan for which the timeseries applies.
+        """
         # Only store a single series for horizontal solar flux
         self._horizontal_solar_flux_series[None] = {
             'timespan': timespan,
             'timeseries': horizontal_solar_flux
         }
 
-    def access_horizontal_solar_flux_series(self,location:Location):
+    def access_horizontal_solar_flux_series(self, location: Location) -> dict[str, Any]:
+        """Access horizontal solar flux data for a given location.
+        
+        Provides an accessor in case we need to tweak the timespan offsets after the fact.
+        
+        Args:
+            location: Unused.
+            
+        Returns:
+            A dictionary containing horizontal solar flux data, or None if not available.
+        """
         return self._horizontal_solar_flux_series[None]
     
     @override
@@ -286,18 +334,7 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
     def __str__(self) -> str:
         return super().__str__() + "; name: " + self._name
-
-    #def __getstate__(self):
-    #    """
-    #    Return the state for pickling.
-    #    """
-    #    odict = super().__getstate__()
-
-
-    #def __setstate__(self, state):
-
-
-
+    
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
     _version = '0.0.1'

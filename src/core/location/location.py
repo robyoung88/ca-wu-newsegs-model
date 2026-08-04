@@ -54,10 +54,34 @@ class Location(serialisation.SerialiseToDictMixin):
         lon: Real | None,
         name: str| None = None,
     ) -> None:
+        """Initialise a Location instance.
+
+        This method uses singledispatch and so requires an unnamed first
+        argument which is not `None`. Concrete overloads are:
+
+        - __init__(self, lat: Real, lon: Real, name: str | None = None)
+            Construct from explicit latitude and longitude real numeric values.
+        
+        - __init__(self, other: Location)
+            Construct as a copy from an existing Location instance.
+
+        A TypeError is raised if an unsupported first argument is provided.
+
+        For initiation without a first argument, use `Location.from_none()`
+
+        Args:
+            lat (float | int): Latitude in decimal degrees.
+            lon (float | int): Longitude in decimal degrees.
+            name (str): Optional name for location
+
+            other (Location): Reference Location
+
+        Raises:
+            TypeError: If first argument is not a Real numeric value or a 
+                        Location
+
         """
-        Default assumes we have None
-        """
-        raise ValueError('`lat` must be a latitude or location, is %s', lat)
+        raise TypeError('`lat` must be a latitude or location, is %s', lat)
     
     # Copy constructor is registered underneath class definition for late-bind.
 
@@ -83,6 +107,7 @@ class Location(serialisation.SerialiseToDictMixin):
 
     @property
     def lat(self) -> float:
+        """float: Latitude of Location (decimal degrees)."""
         return self._lat
     
     @lat.setter
@@ -91,6 +116,7 @@ class Location(serialisation.SerialiseToDictMixin):
 
     @property
     def lon(self) -> float:
+        """float: Longitude of Location (decimal degrees)."""
         return self._lon
     
     @lon.setter
@@ -98,10 +124,16 @@ class Location(serialisation.SerialiseToDictMixin):
         self._lon = float(lon)
 
     @property
-    def latlon(self) :
+    def latlon(self) -> tuple[float, float]:
+        """tuple[float, float]: (latitude, longitude) of Location."""
         return (self._lat, self._lon)
     
     def get_latlon(self) -> tuple[float, float]:
+        """The (latitude, longitude) co-ordinates of the Location
+
+        Returns:
+            tuple[float, float]: (latitude, longitude) in decimal degrees.
+        """
         return (self._lat, self._lon)
 
     @latlon.setter
@@ -110,37 +142,65 @@ class Location(serialisation.SerialiseToDictMixin):
         self._lon = float(latlon[1])
     
     def set_latlon(
-            self, 
-            lat: Real | tuple[Real, Real], 
-            lon: Real | None = None
-        ):
+        self, 
+        lat: Real | tuple[Real, Real], 
+        lon: Real | None = None
+    ):
+        """Set the latitude and longitude of the site.
+
+        If the first argument is a tuple, then it will be assumed to contain 
+        the latitude at index 0 and longitude at index 1. Otherwise, `lon` must
+        not be `None`.
+        Args:
+            lat (Real | tuple[Real, Real]): Latitude or tuple of (latitude, longitude) (decimal degrees).
+            lon (Real | None, optional): Longitude (decimal degrees), if first argument not a tuple. Defaults to None.
+
+        Raises:
+            TypeError: If `lon` is `None` but `lat` is not a tuple.
+        """
         if isinstance(lat, tuple):
             self._lat = float(lat[0])
             self._lon = float(lat[1])
         else:
             if lon is None:
-                raise ValueError('If not setting latlon via a tuple, `lon` must be provided')
+                raise TypeError('If not setting latlon via a tuple, `lon` must be provided')
             self._lat = float(lat)
             self._lon = float(lon)
 
     @property
     def crs(self) -> str:
+        """str: The coordinate reference system in use."""
         return self._crs
 
     @property
     def name(self) -> str:
+        """str: The name of the Location."""
         return self._name
 
     @name.setter
     def name(self, name: str) -> None:
         self._name = name    
 
-    def get_osgb(self) -> tuple:
+    def get_osgb(self) -> tuple[float, float]:
+        """Location as OSGB36 co-ordinates
+
+        Returns:
+            tuple[float, float]: (eastings, northings) of OSGB co-ordinates (m).
+        """
         trans_togb = Transformer.from_crs(self.crs, "EPSG:27700")
         return trans_togb.transform(self.lat, self.lon)
 
     @classmethod
     def from_lat_lon(cls, lat: Real, lon: Real) -> Location:
+        """Construct Location from latitude and longitude pair.
+
+        Args:
+            lat (Real): Latitude of Location (decimal degrees)
+            lon (Real): Longitude of Location (decimal degrees)
+
+        Returns:
+            Location: Instance storing location information with default name.
+        """
         o = cls.from_none()
         o.lat = lat
         o.lon = lon
@@ -148,6 +208,15 @@ class Location(serialisation.SerialiseToDictMixin):
     
     @classmethod
     def from_tuple(cls, inputs: tuple[Real, Real]) -> Location:
+        """Construct Location from (latitude, longitude) tuple.
+
+
+        Args:
+            inputs (tuple[Real, Real]): (latitude, longitude) (decimal degrees)
+
+        Returns:
+            Location: Instance storing location information with default name.
+        """
         o = cls.from_none()
         o.lat, o.lon = inputs
         return o
@@ -158,9 +227,49 @@ class Location(serialisation.SerialiseToDictMixin):
         easting: Real, 
         northing: Real
     ) -> Location:
+        """Construct Location from easting and northing OSGB36 pair.
+
+        Args:
+            easting (Real): OSGB36 easting (m)
+            northing (Real): OSGB36 northing (m)
+
+        Returns:
+            Location: Instance storing location information with default name.
+        """
         trans_tolatlon = Transformer.from_crs("EPSG:27700", cls._crs)
         coord = trans_tolatlon.transform(easting, northing)
         return cls.from_lat_lon(coord[0], coord[1])
+
+    @classmethod
+    def from_characteristics(
+        cls: Type[T],
+        lat: Real,
+        lon: Real,
+        crs: str = 'EPSG:4326',
+        name: str | None = None,
+    ) -> T:
+        """Construct Location from explicit characteristics
+
+        Args:
+            lat (Real): Latitude of Location (decimal degrees)
+            lon (Real): _Longitude of Location (decimal degrees)
+            crs (_type_, optional): Coordinate reference system. Defaults to 'EPSG:4326'.
+            name (str | None, optional): Name of Location. Defaults to None.
+
+        Returns:
+            T: Location instance.
+        """
+
+        o = cls.from_none() # pyright: ignore[reportAttributeAccessIssue]
+        
+        o._crs = crs
+        o.lat = lat
+        o.lon = lon
+
+        if name:
+            o.name = name
+
+        return o
     
     def __add__(self, other: tuple[int|float, int|float]):
         """
@@ -202,41 +311,6 @@ class Location(serialisation.SerialiseToDictMixin):
             +")"
         )
 
-    @classmethod
-    def from_characteristics(
-        cls: Type[T],
-        lat: Real,
-        lon: Real,
-        crs: str = 'EPSG:4326',
-        name: str | None = None,
-    ) -> T:
-
-        o = cls.from_none() # pyright: ignore[reportAttributeAccessIssue]
-        
-        o._crs = crs
-        o.lat = lat
-        o.lon = lon
-
-        if name:
-            o.name = name
-
-        return o
-
-    #def to_dict(self) -> dict:
-    #    odict = {
-    #        'class': classfuncs.get_class(self),
-    #        'name': self._name,
-    #        'lat': self._lat,
-    #        'lon': self._lon,
-    #        'crs': self._crs
-    #    }
-    #    return odict
-
-    #@classmethod
-    #def from_dict(cls, input: dict[str, Any]) -> Location:
-    #    input.pop('class', None)
-    #    return cls.from_characteristics(**input)
-
 # Location copy constructor
 @Location.__init__.register(Location) # pyright: ignore[reportFunctionMemberAccess]
 def Location_from_other(self, other: Location):
@@ -250,6 +324,13 @@ def Location_from_other(self, other: Location):
     self._crs = other._crs
 
 class RaisedLocation(Location):
+    """A geographic location with an above-ground level height component.
+    
+    Extends Location to include height_agl (height above ground level).
+    Useful for representing locations with elevation data, such as wind turbines
+    or sensor mounting heights.
+    """
+    
     _height = 0.
 
     @singledispatchmethod
@@ -260,8 +341,27 @@ class RaisedLocation(Location):
         height_agl: Real | None = None,
         name: str | None = None
     ) -> None:
-        """
-        Default assumes we have None
+        """Initialise a RaisedLocation instance.
+        
+        This method uses singledispatch and so requires an unnamed first
+        argument which is not `None`. Concrete overloads are:
+
+        - __init__(self, lat: Real, lon: Real, height_agl: Real = 0., name: str | None = None)
+            Construct from explicit latitude, longitude and height values.
+        
+        - __init__(self, other: Location)
+            Construct from an existing Location instance.
+
+        A ValueError is raised if an unsupported first argument is provided.
+
+        Args:
+            lat (Real | Location): Latitude in decimal degrees or a Location instance.
+            lon (Real | None): Longitude in decimal degrees.
+            height_agl (Real | None): Height above ground level in meters.
+            name (str | None): Optional name for location.
+
+        Raises:
+            ValueError: If first argument is not a Real numeric value or a Location.
         """
         raise ValueError('First value must be a latitude or location, is %s', lat)
     
@@ -274,6 +374,14 @@ class RaisedLocation(Location):
         height_agl: Real = 0.,
         name: str | None = None
     ) -> None:
+        """Construct from explicit latitude, longitude and height values.
+        
+        Args:
+            lat (Real): Latitude in decimal degrees.
+            lon (Real): Longitude in decimal degrees.
+            height_agl (Real): Height above ground level in meters. Defaults to 0.
+            name (str | None): Optional name for location.
+        """
         super().__init__(lat, lon, name = name)
         self._height = float(height_agl)
     
@@ -291,7 +399,17 @@ class RaisedLocation(Location):
         lat: Real, 
         lon: Real,
         height_agl: Real
-    ):
+    ) -> RaisedLocation:
+        """Construct RaisedLocation from latitude, longitude and height.
+        
+        Args:
+            lat (Real): Latitude in decimal degrees.
+            lon (Real): Longitude in decimal degrees.
+            height_agl (Real): Height above ground level in meters.
+
+        Returns:
+            RaisedLocation: Instance with specified coordinates and height.
+        """
         o = cls(lat, lon, height_agl)
         return o
 
@@ -299,7 +417,16 @@ class RaisedLocation(Location):
     def from_tuple(
         cls, 
         inputs: tuple[Real, Real] | tuple[Real, Real, Real]
-    ):
+    ) -> RaisedLocation:
+        """Construct RaisedLocation from tuple of coordinates.
+        
+        Args:
+            inputs (tuple[Real, Real] | tuple[Real, Real, Real]): 
+                Either (latitude, longitude) or (latitude, longitude, height_agl).
+
+        Returns:
+            RaisedLocation: Instance with coordinates from tuple.
+        """
         o = cls(*inputs)
         return o
     
@@ -338,7 +465,16 @@ class RaisedLocation(Location):
         height_agl: Real,
         **kwargs
     ) -> T:
+        """Construct RaisedLocation from detailed characteristics.
+        
+        Args:
+            *args: Positional arguments passed to parent Location.from_characteristics.
+            height_agl (Real): Height above ground level in meters.
+            **kwargs: Keyword arguments passed to parent Location.from_characteristics.
 
+        Returns:
+            T: RaisedLocation instance with specified characteristics.
+        """
         o = super().from_characteristics(*args, **kwargs)
         o.height_agl = height_agl
         
@@ -355,8 +491,13 @@ def RaiseLocation_from_other(
     self,
     other: Location
 ) -> None:
-    """
-    Initialise a RaisedLocation using another Location
+    """Initialise a RaisedLocation from another Location.
+    
+    If the source Location is a RaisedLocation, its height_agl is copied.
+    Otherwise, height_agl defaults to 0.
+    
+    Args:
+        other (Location): Source Location to copy from.
     """
     latlon = other.latlon
     self.set_latlon(latlon)
@@ -365,6 +506,12 @@ def RaiseLocation_from_other(
     self._name = other.name
 
 class AspectLocation(RaisedLocation):
+    """A geographic location with height, azimuth and pitch components.
+    
+    Extends RaisedLocation to include azimuth (compass direction) and pitch
+    (tilt angle) properties. Useful for representing oriented objects like
+    solar panels, wind turbines, or antennas.
+    """
     _azimuth = 180.
     _pitch = 90.
     
@@ -378,8 +525,29 @@ class AspectLocation(RaisedLocation):
         pitch: Real | None = None,
         name: str | None = None,
     ) -> None:
-        """
-        Default assumes we have None
+        """Initialise an AspectLocation instance.
+        
+        This method uses singledispatch and so requires an unnamed first
+        argument which is not `None`. Concrete overloads are:
+
+        - __init__(self, lat: Real, lon: Real, height_agl: Real = 0., azimuth: Real = 180., pitch: Real = 90., name: str | None = None)
+            Construct from explicit latitude, longitude, height, azimuth and pitch.
+        
+        - __init__(self, other: Location)
+            Construct from an existing Location instance.
+
+        A ValueError is raised if an unsupported first argument is provided.
+
+        Args:
+            lat (Real | Location): Latitude in decimal degrees or a Location instance.
+            lon (Real | None): Longitude in decimal degrees.
+            height_agl (Real | None): Height above ground level in meters.
+            azimuth (Real | None): Azimuth angle in degrees (0-360).
+            pitch (Real | None): Pitch angle in degrees.
+            name (str | None): Optional name for location.
+
+        Raises:
+            ValueError: If first argument is not a Real numeric value or a Location.
         """
         raise ValueError('First value must be a latitude or location, is %s', lat)
     
@@ -394,6 +562,16 @@ class AspectLocation(RaisedLocation):
         pitch: Real = 90.,
         name: str | None = None,
     ) -> None:
+        """Construct from explicit latitude, longitude, height, azimuth and pitch.
+        
+        Args:
+            lat (Real): Latitude in decimal degrees.
+            lon (Real): Longitude in decimal degrees.
+            height_agl (Real): Height above ground level in meters. Defaults to 0.
+            azimuth (Real): Azimuth angle in degrees (0-360). Defaults to 180.
+            pitch (Real): Pitch angle in degrees. Defaults to 90.
+            name (str | None): Optional name for location.
+        """
         super().__init__(lat, lon, height_agl = height_agl, name = name)
         self.azimuth = float(azimuth)
         self.pitch = float(pitch)
@@ -423,21 +601,39 @@ class AspectLocation(RaisedLocation):
         azimuth: Real,
         pitch: Real
     ) -> AspectLocation:
+        """Construct AspectLocation from latitude, longitude, height, azimuth and pitch.
+        
+        Args:
+            lat (Real): Latitude in decimal degrees.
+            lon (Real): Longitude in decimal degrees.
+            height_agl (Real): Height above ground level in meters.
+            azimuth (Real): Azimuth angle in degrees (0-360).
+            pitch (Real): Pitch angle in degrees.
+
+        Returns:
+            AspectLocation: Instance with specified location and orientation.
+        """
         o = cls(lat, lon, height_agl, azimuth, pitch)
         return o
 
     @classmethod
     def from_tuple(
         cls, 
-        inputs: tuple[Real, Real] | tuple[Real, Real, Real] | tuple[Real, Real, Real, Real, Real]):
-        """
-            Tuple should consist of
+        inputs: tuple[Real, Real] | tuple[Real, Real, Real] | tuple[Real, Real, Real, Real, Real]
+    ) -> AspectLocation:
+        """Construct AspectLocation from tuple of values.
+        
+        Args:
+            inputs (tuple[Real, Real] | tuple[Real, Real, Real] | tuple[Real, Real, Real, Real, Real]):
+                Tuple consisting of:
+                - latitude
+                - longitude
+                - height_agl (optional)
+                - azimuth (optional)
+                - pitch (optional)
 
-            - latitude
-            - longitude
-            - height agl
-            - azimuth
-            - pitch
+        Returns:
+            AspectLocation: Instance with values from tuple.
         """
         o = cls(*inputs)
         return o
@@ -465,7 +661,17 @@ class AspectLocation(RaisedLocation):
         pitch: Real,
         **kwargs,
     ) -> T:
+        """Construct AspectLocation from detailed characteristics.
         
+        Args:
+            *args: Positional arguments passed to parent RaisedLocation.from_characteristics.
+            azimuth (Real): Azimuth angle in degrees (0-360).
+            pitch (Real): Pitch angle in degrees.
+            **kwargs: Keyword arguments passed to parent RaisedLocation.from_characteristics.
+
+        Returns:
+            T: AspectLocation instance with specified characteristics.
+        """
         o = super().from_characteristics(*args, **kwargs)
         o.azimuth = azimuth
         o.pitch = pitch
@@ -484,8 +690,14 @@ def AspectLocation_from_other(
     self,
     other: Location
 ) -> None:
-    """
-    Initialise an AspectLocation using another Location
+    """Initialise an AspectLocation from another Location.
+    
+    If the source Location is a RaisedLocation, its height_agl is copied.
+    If the source Location is an AspectLocation, its azimuth and pitch are copied.
+    Otherwise, height_agl defaults to 0 and azimuth/pitch use class defaults.
+    
+    Args:
+        other (Location): Source Location to copy from.
     """
     latlon = other.latlon
     self.set_latlon(latlon)
@@ -502,7 +714,19 @@ _LOCATION_CONSTRUCTORS = {
     'AspectLocation': AspectLocation
 }
 
-def location_from_dict(input: dict[str, Any]):
+def location_from_dict(input: dict[str, Any]) -> Location:
+    """Create a Location instance from its dictionary representation.
+    
+    Args:
+        input (dict[str, Any]): Dictionary with 'class' key and location properties.
+                               Expected from Location.to_dict() method.
+
+    Returns:
+        Location: Appropriate Location subclass instance.
+
+    Raises:
+        ValueError: If 'class' key specifies an unknown location class.
+    """
     input = copy.copy(input)
     classname = input.pop('class')
     constructor = _LOCATION_CONSTRUCTORS.get(classname, None)
@@ -514,10 +738,12 @@ class PVLibLocation(
     serialisation.SerialiseToDictMixin,
     pvlib.location.Location
 ):
+    """Extends `pvlib.location.Location` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'
 
 class PVLibPVSystem(
     serialisation.SerialiseToDictMixin,
     pvlib.pvsystem.PVSystem
 ):
+    """Extends `pvlib.pvsystem.PVSystem` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'

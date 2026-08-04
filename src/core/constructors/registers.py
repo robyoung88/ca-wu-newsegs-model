@@ -7,21 +7,7 @@ occur at runtime.
 """
 import inspect
 from types import ModuleType
-from typing import Any, Literal
-
-CONSTRUCTOR_CLASS = Literal[
-    'NewsegsComponent',
-    'NewsegsModule',
-    'Environment',
-    'Generator',
-    'Location',
-    'Timespan',
-    'Timestamp',
-    'Timedelta',
-    'datetime',
-    'PVLib',
-    'Variable',
-]
+from typing import Any, Callable, Literal
 
 class NakedConstructor:
     def from_dict(self, config: dict[str, Any]) -> object:
@@ -31,6 +17,17 @@ def get_subclasses_in_module(
     pymod: ModuleType,
     parentclass: type
 ) -> dict[str, type]:
+    """Get all children of a parent class in a module.
+
+    Args:
+        pymod (ModuleType): Module to search through
+        parentclass (type): class to filter for in module
+
+    Returns:
+        dict[str, type]: Dictionary keyed by class names, with values set
+            to the class definition; use of a `.from_dict(dict)` classmethod
+            on these classes should result in an instance of the class.
+    """
     odict = {}
     for objname in pymod.__all__:
         obj = getattr(pymod, objname)
@@ -42,6 +39,52 @@ def get_subclasses_in_module(
                 continue
     return odict
 
+CONSTRUCTOR_CLASS_REGISTER: dict[str, Callable[[], dict[str, object] | dict[str, NakedConstructor]]] = {}
+
+def register_constructor_class(cc_name: str):
+    """Add a constructor class registry function to `CONSTRUCTOR_CLASS_REGISTER`
+
+    Registration is necessary to use [core.find_constructor][] for a new constructor_class
+    
+    The decorated function should take no arguments, and return a dictionary
+    of constructors for classes which implement a `.from_dict` constructor
+    class method.
+
+    A typical pattern for creating an appropriate dictionary is to use the following
+    pattern:
+
+    Example:
+        ```python
+        from core import register_constructor_class
+        
+        @register_constructor_class('my_constructor_class')
+        def get_mcc_constructors():
+            import my_constructor_class_module
+            import also_implements_my_constructor_class_mod
+
+            mods = [
+                my_constructor_class_mod, 
+                also_implements_my_constructor_class_mod
+            ]
+            constructors = {}
+            for pymod in mods:
+                constructors.update(
+                    get_subclasses_in_module(
+                        pymod, my_constructor_class_mod.MyConstructorClass
+                    )
+                )
+            return constructors
+        ```
+    
+    Args:
+        cc_name (str): name used as _constructor_class in a SerialiseToDictMixin
+    """
+    def decorated(func):
+        CONSTRUCTOR_CLASS_REGISTER[cc_name] = func
+        return func
+    return decorated
+
+@register_constructor_class('NewsegsComponent')
 def get_newsegscomponent_register():
     """
     Non-NewsegsModule classes that are NewsegsComponents
@@ -63,6 +106,7 @@ def get_newsegscomponent_register():
     
     return COMPONENT_CONSTRUCTORS
 
+@register_constructor_class('NewsegsModule')
 def get_newsegsmodule_register():
     """
     NewsegsModule classes
@@ -82,6 +126,7 @@ def get_newsegsmodule_register():
     
     return MODULE_CONSTRUCTORS
 
+@register_constructor_class('Generator')
 def get_generator_register():
     from core import generation
     
@@ -93,6 +138,7 @@ def get_generator_register():
     
     return GENERATOR_CONSTRUCTORS
 
+@register_constructor_class('Environment')
 def get_environment_register():
     from core import environment
 
@@ -108,6 +154,7 @@ def get_environment_register():
     
     return ENVIRONMENT_CONSTRUCTORS
 
+@register_constructor_class('Location')
 def get_location_register():
     from core import location
 
@@ -117,6 +164,7 @@ def get_location_register():
             
     return LOCATION_CONSTRUCTORS
 
+@register_constructor_class('TimeSpan')
 def get_timespan_register():
     from core import timespan
 
@@ -126,6 +174,7 @@ def get_timespan_register():
             
     return TIMESPAN_CONSTRUCTORS
 
+@register_constructor_class('Timestamp')
 def get_timestamp_register():
     import pandas as pd
     def timestamp_from_dict(config: dict[str, Any]) -> pd.Timestamp:
@@ -141,6 +190,7 @@ def get_timestamp_register():
         'Timestamp': retobj
     }
 
+@register_constructor_class('Timedelta')
 def get_timedelta_register():
     import pandas as pd
 
@@ -156,6 +206,7 @@ def get_timedelta_register():
         'Timedelta': retobj
     }
 
+@register_constructor_class('datetime')
 def get_datetime_register():
     import datetime
 
@@ -171,6 +222,7 @@ def get_datetime_register():
         'datetime': retobj
     }
 
+@register_constructor_class('PVLib')
 def get_pvlib_register():
     from core import location
 
@@ -180,32 +232,41 @@ def get_pvlib_register():
             
     return LOCATION_CONSTRUCTORS
 
-def get_register(constructor_class: CONSTRUCTOR_CLASS) -> dict[str, object] | dict[str, NakedConstructor]:
+@register_constructor_class('Variable')
+def get_variable_register():
+    return CONSTRUCTOR_CLASS_REGISTER['NewsegsComponent']()
+
+def get_register(constructor_class: str) -> dict[str, object] | dict[str, NakedConstructor]:
     """
     A dictionary of classes indexed by name for construction
     """
-    match constructor_class:
-        case 'NewsegsComponent':
-            return get_newsegscomponent_register()
-        case 'NewsegsModule':
-            return get_newsegsmodule_register()
-        case 'Environment':
-            return get_environment_register()
-        case 'Generator':
-            return get_generator_register()
-        case 'Location':
-            return get_location_register()
-        case 'TimeSpan':
-            return get_timespan_register()
-        case 'Timestamp':
-            return get_timestamp_register()
-        case 'Timedelta':
-            return get_timedelta_register()
-        case 'datetime':
-            return get_datetime_register()
-        case 'PVLib':
-            return get_pvlib_register()
-        case 'Variable':
-            return get_newsegscomponent_register()
-        case _:
-            raise ValueError(f'constructor_class not recognised: {constructor_class}')
+    reg = CONSTRUCTOR_CLASS_REGISTER.get(constructor_class, None)
+    if reg is None:
+        raise ValueError(f'constructor_class not recognised: {constructor_class}; available values are {CONSTRUCTOR_CLASS_REGISTER.keys()}')
+
+    return reg()
+    # match constructor_class:
+    #     case 'NewsegsComponent':
+    #         return get_newsegscomponent_register()
+    #     case 'NewsegsModule':
+    #         return get_newsegsmodule_register()
+    #     case 'Environment':
+    #         return get_environment_register()
+    #     case 'Generator':
+    #         return get_generator_register()
+    #     case 'Location':
+    #         return get_location_register()
+    #     case 'TimeSpan':
+    #         return get_timespan_register()
+    #     case 'Timestamp':
+    #         return get_timestamp_register()
+    #     case 'Timedelta':
+    #         return get_timedelta_register()
+    #     case 'datetime':
+    #         return get_datetime_register()
+    #     case 'PVLib':
+    #         return get_pvlib_register()
+    #     case 'Variable':
+    #         return get_newsegscomponent_register()
+    #     case _:
+    #         raise ValueError(f'constructor_class not recognised: {constructor_class}')

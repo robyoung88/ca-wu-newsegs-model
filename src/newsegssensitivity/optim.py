@@ -70,6 +70,8 @@ def _optim_float_statistic_mapper(
 
 @dataclass
 class OptimVariable:
+    """_summary_
+    """
     varid: str
     positive: bool = False
     bounded: bool = True
@@ -84,6 +86,15 @@ def run_optimisation(
     progress: Callable[[int, int], None] | None = None,
     method: str = 'Nelder-Mead'
 ):
+    """_summary_
+
+    Args:
+        mm (NewsegsMetaModel): _description_
+        variables (Sequence[OptimVariable]): _description_
+        target (_OPTIM_TARGET_STATISTIC, optional): _description_. Defaults to 'net_present_value_discounted'.
+        progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
+        method (str, optional): _description_. Defaults to 'Nelder-Mead'.
+    """
      # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
 
@@ -140,6 +151,19 @@ def evaluate_statistic_across_margin(
     upper: float,
     resolution: int    
 ) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        mm (NewsegsMetaModel): _description_
+        varid (str): _description_
+        stat (str): _description_
+        lower (float): _description_
+        upper (float): _description_
+        resolution (int): _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
 
@@ -181,6 +205,15 @@ def statistic_across_margin_plot(
     plot_data,
     mm: NewsegsMetaModel
 ):
+    """_summary_
+
+    Args:
+        plot_data (_type_): _description_
+        mm (NewsegsMetaModel): _description_
+
+    Returns:
+        _type_: _description_
+    """
     fig = px.line(
         plot_data,
         x = plot_data.columns[0],

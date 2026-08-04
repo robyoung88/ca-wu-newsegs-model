@@ -101,18 +101,18 @@ def get_sprake_environment_server():
     pv_ts.set_offset(pv_ts.start, pv_ts.start)
 
     server.set_horizontal_solar_flux(
-        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].to_numpy()),
+        np.append(pv_data['poa_global'].values[0], pv_data['poa_global'].to_numpy()),  # type: ignore
         pvloc,
         pv_ts)
     
     server.set_wind_speed(
-        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].to_numpy()),
+        np.append(pv_data['wind_speed'].values[0], pv_data['wind_speed'].to_numpy()), # type: ignore
         pvloc,
         pv_ts
     )
 
     server.set_external_temperature(
-        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].to_numpy()),
+        np.append(pv_data['temp_air'].values[0], pv_data['temp_air'].to_numpy()), # type: ignore
         pvloc,
         pv_ts
     )
@@ -123,6 +123,7 @@ def get_sprake_wider_env_server():
     return DummyWiderEnv()
 
 class SprakeModel(newsegsmodel.NewsegsModel):
+    """Implementation of the model of Dr David Sprake as a NewsegsModel."""
     _name = 'Sprake Model'
     _version = '0.0.1'
 

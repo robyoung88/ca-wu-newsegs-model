@@ -1,4 +1,4 @@
-# Helper functions for aligning timeseries with elexon profile data
+"""Helper functions for aligning timeseries with elexon profile data."""
 
 import os
 import datetime

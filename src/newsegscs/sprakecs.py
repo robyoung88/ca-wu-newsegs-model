@@ -1,3 +1,4 @@
+"""Provides implementation of NewsegsCS for Sprake Model."""
 from __future__ import annotations
 import datetime
 import os
@@ -24,6 +25,7 @@ from newsegsvariable.variable import ScalarNumParam
 AnyNumber = Union[ScalarNumParam]#, Number]
 
 class SprakeCSResult(NewsegsModuleResult):
+    """Constainer for results of SprakeCS Module."""
     def __init__(
         self,
         *args,
@@ -199,6 +201,7 @@ def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_ho
 
 
 class SprakeCS(NewsegsCS):
+    """Implementation of NewsegsCS for Sprake Model."""
 
     _name = "Sprake Consumption and Storage Module"
     _n_units = 100

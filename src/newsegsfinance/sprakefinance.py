@@ -1,3 +1,4 @@
+"""Provides implementation of NewsegsFinance for Sprake Model."""
 from __future__ import annotations
 import copy
 from typing import override, Mapping
@@ -25,6 +26,7 @@ from newsegsstats import core as stats_core
 HOURS_IN_YEAR = 8760.0
 
 class SprakeFinance(newsegsfinance.NewsegsFinance):
+    """Implementation of NewsegsFinance for Sprake Model."""
     _name = 'Sprake Finance Module'
 
     _default_unit_costs = {

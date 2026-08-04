@@ -26,6 +26,14 @@ def self_consume(generation: npt.NDArray,
     )
 
 def as_list(varlist: str|MutableSequence[str]|None) -> list[str]:
+    """_summary_
+
+    Args:
+        varlist (str | MutableSequence[str] | None): _description_
+
+    Returns:
+        list[str]: _description_
+    """
     if varlist is None:
         return []
     if isinstance(varlist, str):
@@ -37,6 +45,16 @@ def selfcons_summary(
     unit_grouping_variables: str | MutableSequence[str] | None = None,
     agg_grouping_variables: str | MutableSequence[str] | None = None
 ):
+    """_summary_
+
+    Args:
+        df (pd.DataFrame): _description_
+        unit_grouping_variables (str | MutableSequence[str] | None, optional): _description_. Defaults to None.
+        agg_grouping_variables (str | MutableSequence[str] | None, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
     unit_grouping_variables = as_list(unit_grouping_variables)
     agg_grouping_variables = as_list(agg_grouping_variables)
 

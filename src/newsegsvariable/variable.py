@@ -1,3 +1,4 @@
+"""Provides Variable."""
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -3663,7 +3664,7 @@ class Variable(
         self,
         rng: np.random.Generator,
         retries: int = 1
-        ) -> Param:
+        ) -> Value:
         if (
             self.distribution.psa_possible
             and self.psa_selectable

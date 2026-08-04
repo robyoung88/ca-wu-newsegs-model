@@ -1,0 +1,47 @@
+site_name: NewSEGS Energy Modelling Software
+site_description: Documentation supporting NewSEGS Energy Modelling software.
+
+theme:
+  name: material
+  palette:
+    scheme: light
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_root_heading: true
+            show_source: true
+            docstring_style: google
+            members_order: __all__
+            summary:
+              attributes: true
+              modules: true
+              classes: true
+              functions: true
+
+nav:
+  - Home: index.md
+  - Core components: core.md
+  - Metamodel: newsegsmetamodel.md
+  - Model: newsegsmodel.md
+  - Modules: newsegsmodules.md
+  - Finance: newsegsfinance.md
+  - Variable: newsegsvariable.md
+  - Statistics and Sensitivity: newsegsstats.md
+  - App: newsegsbrowser.md
+  - NEWA: newa.md
+  - ADMD: admd.md
+  - Utilities: util.md

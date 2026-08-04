@@ -1,6 +1,6 @@
+"""Abstract base classes for environmental data providers."""
 from abc import ABCMeta, abstractmethod
 from typing import Any, Literal, Union, Sequence, SupportsFloat, overload
-import re
 
 import numpy as np
 import numpy.typing as npt
@@ -211,18 +211,6 @@ class NewsegsLocalEnvironment(
                 as list if location provided as a `Sequence`.
         """
         ...
-    
-    #def __getstate__(self):
-    #    """
-    #    Return the state for pickling.
-    #    
-    #    May be overwritten to provide state as other than a dict; for now, it
-    #    makes sense to.
-    #    """
-    #    odict = {
-    #        'name': self._name
-    #    }
-    #    return odict
 
     def __str__(self) -> str:
         """String representation of this instance."""

@@ -25,12 +25,16 @@ PSA_FLOAT_STATISTIC = Literal[
     'net_present_value_undiscounted',
     'net_present_value_discounted'
 ]
+"""_summary_
+"""
 
 PSA_PLOT_TYPES = [
     'Scatter plot',
     'Cumulative probability',
     'Convergence'
 ]
+"""_summary_
+"""
 
 PSA_STATISTIC_LABELS = {
     'total_present_costs_undiscounted': 'Total cost (undisc.)',
@@ -40,6 +44,8 @@ PSA_STATISTIC_LABELS = {
     'net_present_value_undiscounted': 'NPV (undisc.)',
     'net_present_value_discounted': 'NPV (disc.)'
 }
+"""_summary_
+"""
 
 _CONVERGENCE_STATISTICS = Literal[
     'Mean',
@@ -52,12 +58,24 @@ _CONVERGENCE_STATISTICS = Literal[
 ]
 
 CONVERGENCE_STATISTICS = get_args(_CONVERGENCE_STATISTICS)
+"""_summary_
+"""
 
 def quantile_stderr_cum(
     x,
     p: float = 0.5,
     bw: float | None = None
 ):
+    """_summary_
+
+    Args:
+        x (_type_): _description_
+        p (float, optional): _description_. Defaults to 0.5.
+        bw (float | None, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
     # https://github.com/kbroman/broman/blob/main/R/quantileSE.R
     from scipy.stats import gaussian_kde
     quant = np.quantile(x, p)
@@ -96,6 +114,21 @@ def make_psa_result(
     statistics: Sequence[PSA_FLOAT_STATISTIC],
     return_draws: bool = False,
 ):
+    """_summary_
+
+    Args:
+        mm (NewsegsMetaModel): _description_
+        mdl (NewsegsModel): _description_
+        fnc (NewsegsFinance): _description_
+        statistics (Sequence[PSA_FLOAT_STATISTIC]): _description_
+        return_draws (bool, optional): _description_. Defaults to False.
+
+    Raises:
+        TypeError: _description_
+
+    Returns:
+        _type_: _description_
+    """
     res: dict[str, Any] = {}
     if return_draws:
         for var in mm.variables.values():
@@ -123,6 +156,21 @@ def run_psa(
     progress: Callable[[int, int], None] | None = None,
     include_deterministic: bool = True,
 ) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        mm (NewsegsMetaModel): _description_
+        statistics (Sequence[PSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(PSA_FLOAT_STATISTIC).
+        samples (int, optional): _description_. Defaults to 100.
+        seed (int | None, optional): _description_. Defaults to None.
+        rng (np.random.Generator | None, optional): _description_. Defaults to None.
+        return_draws (bool, optional): _description_. Defaults to False.
+        progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
+        include_deterministic (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     variables = mm.variables.values()
     mdl = mm.model
     fnc = mm.finance
@@ -197,6 +245,17 @@ def basic_psa_stats(
         'net_present_value_discounted'
     ]
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """_summary_
+
+    Args:
+        psa_results (pd.DataFrame): _description_
+        statistics (Sequence[PSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(PSA_FLOAT_STATISTIC).
+        quantiles (Sequence[float], optional): _description_. Defaults to [0.025, 0.975].
+        npv_statistics (list, optional): _description_. Defaults to [ 'net_present_value_undiscounted', 'net_present_value_discounted' ].
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: _description_
+    """
     res_det = (
         psa_results
         .query('deterministic == True')
@@ -246,6 +305,7 @@ def basic_psa_stats(
 ##### Generic Graph functions #####
 
 class BoundingBox(NamedTuple):
+    """"""
     xmin: float
     ymin: float
     xmax: float
@@ -253,6 +313,14 @@ class BoundingBox(NamedTuple):
 
 
 def get_null_psa_data(statistics: Sequence[str]) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        statistics (Sequence[str]): _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     stat_dict = {
         x: [1, 1] for x in statistics
     }
@@ -264,6 +332,11 @@ def get_null_psa_data(statistics: Sequence[str]) -> pd.DataFrame:
 ##### Scatter ######
 
 class PSAScatterData(NamedTuple):
+    """_summary_
+
+    Args:
+        NamedTuple (_type_): _description_
+    """
     scatter_data: pd.DataFrame
     det_point: pd.Series
     ce_proportion: float
@@ -274,6 +347,16 @@ def psa_scatter_data(
     cost_statistic: str = 'total_present_costs_discounted',
     benefit_statistic: str = 'total_present_benefits_discounted'
 ) -> PSAScatterData:
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame): _description_
+        cost_statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
+        benefit_statistic (str, optional): _description_. Defaults to 'total_present_benefits_discounted'.
+
+    Returns:
+        PSAScatterData: _description_
+    """
     scatter_data = (
         psa_data
         .query('deterministic == False')
@@ -298,6 +381,14 @@ def psa_scatter_data(
     return PSAScatterData(scatter_data, det_point, ce_proportion)
 
 def psa_scatter_bounds(scatter_data: pd.DataFrame) -> BoundingBox:
+    """_summary_
+
+    Args:
+        scatter_data (pd.DataFrame): _description_
+
+    Returns:
+        BoundingBox: _description_
+    """
     all_max = float(scatter_data.iloc[:,0:2].max(axis=None)) # pyright: ignore[reportArgumentType]
     all_min = float(scatter_data.iloc[:,0:2].min(axis=None)) # pyright: ignore[reportArgumentType]
 
@@ -327,6 +418,18 @@ def psa_scatter(
     point_alpha: float = 0.2,
     show_proportion_ce: bool = True,
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame | None): _description_
+        cost_statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
+        benefit_statistic (str, optional): _description_. Defaults to 'total_present_benefits_discounted'.
+        point_alpha (float, optional): _description_. Defaults to 0.2.
+        show_proportion_ce (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        _type_: _description_
+    """
     if psa_data is None:
         psa_data = get_null_psa_data([cost_statistic, benefit_statistic])
 
@@ -436,6 +539,17 @@ def psa_scatter_update(
     benefit_statistic: str = 'total_present_benefits_discounted',
     show_proportion_ce: bool = True
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame | None): _description_
+        cost_statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
+        benefit_statistic (str, optional): _description_. Defaults to 'total_present_benefits_discounted'.
+        show_proportion_ce (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        _type_: _description_
+    """
     fig_patch = Patch()
 
     if psa_data is None:
@@ -511,6 +625,14 @@ def psa_scatter_update(
     return fig_patch
 
 def psa_scatter_controls(page: str):
+    """_summary_
+
+    Args:
+        page (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return [
         html.Div(
             id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-Scatter plot-ii'},
@@ -529,6 +651,17 @@ def psa_scatter_controls(page: str):
     ]
 
 def psa_scatter_arguments(plot_controls):
+    """_summary_
+
+    Args:
+        plot_controls (_type_): _description_
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        _type_: _description_
+    """
     discounting = 'discounted'
     for idx, id in enumerate(plot_controls['ids']):
         if id.get('key') == 'psa-primary-plot-discount-dropdown':
@@ -550,6 +683,11 @@ def psa_scatter_arguments(plot_controls):
 ###### CDF #####
 
 class PSACDFData(NamedTuple):
+    """_summary_
+
+    Args:
+        NamedTuple (_type_): _description_
+    """
     cdf_data: pd.DataFrame
     det_value: float
     min: float
@@ -560,6 +698,15 @@ def psa_cdf_data(
     psa_data: pd.DataFrame,
     statistic: str
 ) -> PSACDFData:
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame): _description_
+        statistic (str): _description_
+
+    Returns:
+        PSACDFData: _description_
+    """
     cdf_data = (
         psa_data
         .query('deterministic == False')
@@ -586,6 +733,14 @@ def psa_cdf_data(
     )
 
 def psa_cdf_bounds(cdf_data: PSACDFData) -> BoundingBox:
+    """_summary_
+
+    Args:
+        cdf_data (PSACDFData): _description_
+
+    Returns:
+        BoundingBox: _description_
+    """
     min_x = cdf_data.min
     max_x = cdf_data.max
     
@@ -605,6 +760,15 @@ def psa_cdf(
     psa_data: pd.DataFrame | None,
     statistic: str = 'net_present_value_discounted'
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame | None): _description_
+        statistic (str, optional): _description_. Defaults to 'net_present_value_discounted'.
+
+    Returns:
+        _type_: _description_
+    """
     if psa_data is None:
         psa_data = get_null_psa_data([statistic,])
     
@@ -674,6 +838,15 @@ def psa_cdf_update(
     psa_data: pd.DataFrame | None,
     statistic: str = 'net_present_value_discounted',
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame | None): _description_
+        statistic (str, optional): _description_. Defaults to 'net_present_value_discounted'.
+
+    Returns:
+        _type_: _description_
+    """
     fig_patch = Patch()
 
     if psa_data is None:
@@ -722,6 +895,14 @@ def psa_cdf_update(
     return fig_patch
 
 def psa_cdf_controls(page: str):
+    """_summary_
+
+    Args:
+        page (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return [
         html.Div(
             id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-Cumulative probability-ii'},
@@ -739,6 +920,14 @@ def psa_cdf_controls(page: str):
     ]
 
 def psa_cdf_arguments(plot_controls):
+    """_summary_
+
+    Args:
+        plot_controls (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     statistic = 'net_present_value_discounted'
     for idx, id in enumerate(plot_controls['ids']):
         if id.get('key') == 'psa-primary-plot-statistic-dropdown':
@@ -749,6 +938,11 @@ def psa_cdf_arguments(plot_controls):
 ##### Convergence #####
 
 class PSAConvergenceData(NamedTuple):
+    """_summary_
+
+    Args:
+        NamedTuple (_type_): _description_
+    """
     stat_data: pd.DataFrame
     final_stat: float
 
@@ -757,6 +951,19 @@ def psa_convergence_data(
     statistic: str,
     convergence_statistic: _CONVERGENCE_STATISTICS
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame): _description_
+        statistic (str): _description_
+        convergence_statistic (_CONVERGENCE_STATISTICS): _description_
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        _type_: _description_
+    """
     raw_frame = (
         psa_data
         .query('deterministic == False')
@@ -855,6 +1062,14 @@ def psa_convergence_data(
     )
 
 def psa_convergence_bounds(con_data: PSAConvergenceData):
+    """_summary_
+
+    Args:
+        con_data (PSAConvergenceData): _description_
+
+    Returns:
+        _type_: _description_
+    """
     min_x = con_data.stat_data['draw'].iloc[0]
     max_x = con_data.stat_data['draw'].iloc[-1]
 
@@ -899,6 +1114,16 @@ def psa_convergence(
     statistic: str = 'total_present_costs_discounted',
     convergence_statistic: _CONVERGENCE_STATISTICS = 'Mean'
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame | None): _description_
+        statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
+        convergence_statistic (_CONVERGENCE_STATISTICS, optional): _description_. Defaults to 'Mean'.
+
+    Returns:
+        _type_: _description_
+    """
     if psa_data is None:
         psa_data = get_null_psa_data([statistic])
 
@@ -978,6 +1203,16 @@ def psa_convergence_update(
     statistic: str = 'total_present_costs_discounted',
     convergence_statistic: _CONVERGENCE_STATISTICS = 'Mean'
 ):
+    """_summary_
+
+    Args:
+        psa_data (pd.DataFrame | None): _description_
+        statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
+        convergence_statistic (_CONVERGENCE_STATISTICS, optional): _description_. Defaults to 'Mean'.
+
+    Returns:
+        _type_: _description_
+    """
     fig_patch = Patch()
 
     if psa_data is None:
@@ -1025,6 +1260,14 @@ def psa_convergence_update(
     return fig_patch
 
 def psa_convergence_controls(page: str):
+    """_summary_
+
+    Args:
+        page (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return [
         html.Div(
             id = {'type': 'psa-graph-plot-control', 'page': page, 'key': 'psa-primary-plot-Convergence-ii'},
@@ -1049,6 +1292,14 @@ def psa_convergence_controls(page: str):
     ]
 
 def psa_convergence_arguments(plot_controls):
+    """_summary_
+
+    Args:
+        plot_controls (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     statistic = 'net_present_value_discounted'
     convergence_statistic = 'Mean'
     for idx, id in enumerate(plot_controls['ids']):

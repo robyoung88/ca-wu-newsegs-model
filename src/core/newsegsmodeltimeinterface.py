@@ -8,6 +8,9 @@ from abc import ABCMeta, abstractmethod
 from core.timespan.timespan import TimedeltaScalar
 
 class NewsegsModelTimeInterface(metaclass = ABCMeta):
+    """
+    Interface for serving discrete time modelling information.
+    """
     @abstractmethod
     def get_default_timestep(self) -> TimedeltaScalar:
         """
@@ -15,6 +18,10 @@ class NewsegsModelTimeInterface(metaclass = ABCMeta):
 
         It is not necessary that all modules operate in discrete time, but in all cases
         it is likely that at least some will (i.e. `grid` will naturally operate with respect to
-        market closure times). This method is provided for convenience when sychronising
-        such modules
+        market closure times). This method is provided for convenience when synchronising
+        such modules.
+
+        Returns:
+            TimedeltaScalar: The default timestep for discrete time simulations.
         """
+    
