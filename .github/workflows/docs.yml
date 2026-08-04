@@ -1,0 +1,31 @@
+YAML
+
+name: publish documentation
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      -uses: actions/checkout@4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install .
+          pip install mkdocs mkdocs-material "mkdocstrings[python]"
+
+      - name: Deploy to GitHub Pages
+        run: mkdocs gh-deploy --force
