@@ -3583,7 +3583,6 @@ class Variable(
         Parameters must be in native format.
         Generally used to store the present values of the parameters.
         """
-        self.distribution.parameter_validation(self, *parameters)
         self._default_parameters = parameters
 
     def reset_parameters(self, parameter_index: int | None = None):
