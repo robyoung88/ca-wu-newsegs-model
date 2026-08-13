@@ -11,9 +11,9 @@ import numpy.testing
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from core import location
-from core.generation import generators
-from util import jsonfuncs
+from newsegsmodelframework.core import location
+from newsegsmodelframework.core.generation import generators
+from newsegsmodelframework.util import jsonfuncs
 
 class TestWindTurbineElecGenerator(unittest.TestCase):
 

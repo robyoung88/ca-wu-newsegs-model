@@ -6,6 +6,8 @@ settings = Dynaconf(
     envvar_prefix=False,
     ignore_unknown_envvars=True,
     settings_files=['settings.toml', '.secrets.toml'],
+    root_path = 'src',
+    load_dotenv = True,
     environments=True
 )
 

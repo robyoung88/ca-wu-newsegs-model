@@ -6,7 +6,7 @@ import unittest
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from core.constructors import registers
+from newsegsmodelframework.core.constructors import registers
 
 class TestRegisters(unittest.TestCase):
 

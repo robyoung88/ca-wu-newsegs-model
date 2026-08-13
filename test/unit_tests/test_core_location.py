@@ -9,7 +9,7 @@ import json
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from core import location
+from newsegsmodelframework.core import location
 
 class TestLocationEqualities(unittest.TestCase):
 

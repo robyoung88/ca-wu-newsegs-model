@@ -7,11 +7,11 @@ import unittest
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from newsegsmodel import SprakeModel
-from newsegsfinance import SprakeFinance
-from newsegsvariable import variable
-from newsegsmetamodel import NewsegsMetaModel
-from newsegssensitivity import dsa
+from newsegsmodelframework.newsegsmodel import SprakeModel
+from newsegsmodelframework.newsegsfinance import SprakeFinance
+from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegssensitivity import dsa
 
 class TestDSA(unittest.TestCase):
     """

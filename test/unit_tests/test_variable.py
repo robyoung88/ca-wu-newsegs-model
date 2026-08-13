@@ -18,9 +18,9 @@ import scipy.integrate as integrate
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from newsegsvariable import variable
-from newsegsmodel import sprakemodel
-from newsegsfinance import sprakefinance
+from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsmodel import sprakemodel
+from newsegsmodelframework.newsegsfinance import sprakefinance
 
 class TestParameterisations(unittest.TestCase):
 

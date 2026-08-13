@@ -6,7 +6,7 @@ import unittest
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from core.serialisation import SerialiseToDictMixin
+from newsegsmodelframework.core.serialisation import SerialiseToDictMixin
 
 class TestRegistryExample(unittest.TestCase):
     def test_example_code(self):
@@ -20,7 +20,7 @@ class TestRegistryExample(unittest.TestCase):
             def __eq__(self, other):
                 return self.param == other.param
 
-        from core.constructors.registers import register_constructor_class
+        from newsegsmodelframework.core.constructors.registers import register_constructor_class
         @register_constructor_class('MetaA')
         def meta_a_constructors():
             return {'A': A}
@@ -28,7 +28,7 @@ class TestRegistryExample(unittest.TestCase):
         foo = A(5)
         foodict = foo.to_dict()
 
-        from core import find_constructor
+        from newsegsmodelframework.core import find_constructor
         bar = find_constructor(foodict['constructor_class'], foodict['class'])(foodict)
 
         self.assertEqual(type(foo), type(bar))

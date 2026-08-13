@@ -2,8 +2,14 @@
 # Ignore dynaconf secret files
 .secrets.*
 
-# Ignore .pyc files
-/**/*.pyc
+# Environments
+.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
 
 **_files/*
 temp_*.py

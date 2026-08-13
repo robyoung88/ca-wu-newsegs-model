@@ -6,7 +6,7 @@ import pandas as pd
 from common import setup_script_env
 setup_script_env()
 
-from newsegscs import elexon_profiles
+from newsegsmodelframework.newsegscs import elexon_profiles
 
 START_DT = pd.Timestamp('2005-01-01T00:00:00', tz='utc')
 END_DT = pd.Timestamp('2015-01-01T00:00:00', tz='utc')

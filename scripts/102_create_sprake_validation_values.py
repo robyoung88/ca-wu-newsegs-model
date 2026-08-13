@@ -8,11 +8,11 @@ import json
 from common import setup_script_env
 setup_script_env()
 
-from util import jsonfuncs
+from newsegsmodelframework.util import jsonfuncs
 
-from newsegsmodel import sprakemodel
-from newsegsfinance import sprakefinance
-from newsegsvariable import variable
+from newsegsmodelframework.newsegsmodel import sprakemodel
+from newsegsmodelframework.newsegsfinance import sprakefinance
+from newsegsmodelframework.newsegsvariable import variable
 
 if __name__ == '__main__':
     with open('data/sprakemodel-validation-config.json', 'r') as f:

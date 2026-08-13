@@ -10,7 +10,7 @@ from scipy.stats import dirichlet
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from newsegsstats.dirichlet import fit_dirichlet
+from newsegsmodelframework.newsegsstats.dirichlet import fit_dirichlet
 
 class TestDirichletFitting(unittest.TestCase):
     """
