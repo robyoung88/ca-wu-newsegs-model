@@ -7,8 +7,8 @@ import json
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from newsegsgrid import sprakegrid
-from newsegsgrid import constructors as gridconstructors
+from newsegsmodelframework.newsegsgrid import sprakegrid
+from newsegsmodelframework.newsegsgrid import constructors as gridconstructors
 
 class TestSprakeGridConfigEqualities(unittest.TestCase):
 

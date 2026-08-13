@@ -5,9 +5,9 @@ import json
 
 from common import setup_script_env
 setup_script_env()
-from util import jsonfuncs
+from newsegsmodelframework.util import jsonfuncs
 
-from newsegsfinance import sprakefinance
+from newsegsmodelframework.newsegsfinance import sprakefinance
 
 if __name__ == '__main__':
     fnc = sprakefinance.SprakeFinance.from_none()

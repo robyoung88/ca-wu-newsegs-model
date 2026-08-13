@@ -5,9 +5,9 @@ import json
 
 from common import setup_script_env
 setup_script_env()
-from util import jsonfuncs
+from newsegsmodelframework.util import jsonfuncs
 
-from newsegsmodel import sprakemodel
+from newsegsmodelframework.newsegsmodel import sprakemodel
 
 if __name__ == '__main__':
     mdl = sprakemodel.SprakeModel.from_none()

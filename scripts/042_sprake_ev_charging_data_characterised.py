@@ -8,7 +8,7 @@ import pandas as pd
 from common import setup_script_env
 setup_script_env()
 
-from newsegscs import ev_profiles
+from newsegsmodelframework.newsegscs import ev_profiles
 
 from config import settings
 lookup_dir = settings.get('SprakeDataLoc')

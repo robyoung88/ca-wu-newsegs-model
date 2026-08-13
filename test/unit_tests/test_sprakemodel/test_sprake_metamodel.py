@@ -4,12 +4,12 @@ Unit tests for newsegsmetamodel using Sprake settings
 
 import unittest
 
-import newsegsmetamodel
+import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from newsegsmodel import sprakemodel
-from newsegsfinance import sprakefinance
+from newsegsmodelframework.newsegsmodel import sprakemodel
+from newsegsmodelframework.newsegsfinance import sprakefinance
 
 class TestMetaModelSprake(unittest.TestCase):
     def test_name(self):

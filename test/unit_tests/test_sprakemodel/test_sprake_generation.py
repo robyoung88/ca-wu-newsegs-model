@@ -10,11 +10,11 @@ import unittest
 from test.unit_tests.common import setup_test_env
 setup_test_env()
 
-from util import jsonfuncs
-from core import location
-from newsegsgeneration import sprakegeneration
-from newsegsmodel import sprakemodel # Needed for e.g. the wind turbine
-from newsegsgeneration import constructors as genconstructors
+from newsegsmodelframework.util import jsonfuncs
+from newsegsmodelframework.core import location
+from newsegsmodelframework.newsegsgeneration import sprakegeneration
+from newsegsmodelframework.newsegsmodel import sprakemodel # Needed for e.g. the wind turbine
+from newsegsmodelframework.newsegsgeneration import constructors as genconstructors
 
 class TestSprakeGenerationConfigEqualities(unittest.TestCase):
 
