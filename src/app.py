@@ -16,15 +16,13 @@ import dash_bootstrap_components as dbc
 import diskcache
 
 # For local testing
-import sys
-
-curdir = os.path.dirname(__file__)
-src_path = os.path.join(
-    curdir,
-    'src'
-)
-sys.path.append(src_path)
-
+#import sys
+#curdir = os.path.dirname(__file__)
+#src_path = os.path.join(
+#    curdir,
+#    'src'
+#)
+#sys.path.append(src_path)
 
 from config import settings
 
@@ -387,14 +385,14 @@ def create_app(external_stylesheets = None) -> Dash:
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
     
-    assets_path = '/assets'
+    #assets_path = 'src/assets'
     app = Dash(
         __name__,
         #suppress_callback_exceptions = True,
         title = 'NewSEGS Energy Model',
         update_title = None, # pyright: ignore[reportArgumentType]
         external_stylesheets = external_stylesheets,
-        assets_url_path = assets_path,
+        #assets_url_path = assets_path,
         routing_callback_inputs = {
             'selected-model': Input('selected-model', 'data'),
             'store-selected-configuration': Input('store-selected-configuration', 'data'),

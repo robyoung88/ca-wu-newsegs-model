@@ -11,7 +11,7 @@ from newsegsmodelframework.newsegsmetamodel import newsegsmetamodel
 from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.newsegsbrowser import ROOTDIR
-_CONST_FILE = os.path.join(ROOTDIR, 'constants', 'model_constants.json')
+_CONST_FILE = os.path.join(ROOTDIR, 'newsegsmodelframework', 'constants', 'model_constants.json')
 with open(_CONST_FILE, 'r') as f:
     MODEL_CONSTANTS = json.load(f)
 
