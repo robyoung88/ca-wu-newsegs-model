@@ -10,11 +10,11 @@ config:
 erDiagram
     PROJECT ||--o{ PROJECT_METAMODEL : "contains"
     PROJECT_METAMODEL }o--|| METAMODEL : "belongs to"
-    METAMODEL ||--|| MODEL_CONFIG : contains
-    METAMODEL ||--|| FINANCE_CONFIG : contains
-    METAMODEL ||--o{ RESULT : contains
-    MODEL_CONFIG ||--o{ MODULE_CONFIG : contains
-    FINANCE_CONFIG ||--|| MODULE_CONFIG : contains
+    METAMODEL ||--|| EM_CONFIG : contains
+    METAMODEL ||--|| FM_CONFIG : contains
+    MODULE_CONFIG ||--o{ RESULT : has
+    EM_CONFIG ||--o{ MODULE_CONFIG : contains
+    FM_CONFIG ||--|| MODULE_CONFIG : contains
     
     PROJECT {
         int project_id PK
@@ -37,7 +37,7 @@ erDiagram
         float lon
         float n_units
     }
-    MODEL_CONFIG {
+    EM_CONFIG {
         int model_config_id PK
         str model_class
         int grid_config_id
@@ -46,7 +46,7 @@ erDiagram
         str label
         bool retain
     }
-    FINANCE_CONFIG {
+    FM_CONFIG {
         int finance_config_id PK
         str finance_class
         int financedata_config_id
@@ -58,6 +58,7 @@ erDiagram
         int module_config_id PK
         str module_type
         str module_class
+        str module_version
         str config_payload
         int revision
         int last_result_id
@@ -111,7 +112,8 @@ erDiagram
     RUN {
         int run_id PK
         int project_id FK
-        int request_id
+        str request_id
+        str request_type
         str request_payload
         str status
         datetime last_updated

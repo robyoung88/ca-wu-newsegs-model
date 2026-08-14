@@ -1,0 +1,378 @@
+"""Provides table definitions for application"""
+
+import sqlalchemy as sa
+
+def clone_columns_except_pk(table: sa.Table):
+    """Clones all columns from an existing table excluding primary keys and foreign keys."""
+    cloned = []
+    for col in table.columns:
+        if not col.primary_key and not col.foreign_keys:
+            cloned.append(
+                sa.Column(
+                    col.name,
+                    col.type,
+                    nullable=col.nullable,
+                    default=col.default,
+                    server_default=col.server_default,
+                )
+            )
+    return cloned
+
+
+metadata = sa.MetaData()
+
+
+# -----------------------------------------------------------------------------
+# Snapshots
+# -----------------------------------------------------------------------------
+
+snapshots = sa.Table(
+    'snapshots',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id')),
+    sa.Column('label', sa.String, nullable = False),
+    sa.Column('timestamp', sa.DateTime, nullable = False, default = sa.func.current_timestamp())
+)
+
+
+# -----------------------------------------------------------------------------
+# Variable Configurations
+# -----------------------------------------------------------------------------
+def get_variable_config_shared_columns():
+    """Shared column definitions for live and snapshot variable configs."""
+    return [
+        sa.Column('module_type', sa.String),
+        sa.Column('payload', sa.String),
+        sa.Column('label', sa.String, nullable = True),
+        sa.Column('retain', sa.Boolean, default = False),
+    ]
+
+variable_configs = sa.Table(
+    'variable_configs',
+    metadata,
+    sa.Column('variable_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('module_type', sa.String),
+    sa.Column('payload', sa.String),
+    sa.Column('label', sa.String, nullable = True),
+    sa.Column('retain', sa.Boolean, default = False),
+)
+
+snapshot_variable_configs = sa.Table(
+    'snapshot_variable_configs',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('variable_config_id', sa.Integer, primary_key = True),
+    *clone_columns_except_pk(variable_configs)
+)
+
+
+# -----------------------------------------------------------------------------
+# Module Configurations
+# -----------------------------------------------------------------------------
+
+module_configs = sa.Table(
+    'module_configs',
+    metadata,
+    sa.Column('module_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('module_type', sa.String),
+    sa.Column('module_class', sa.String),
+    sa.Column('module_version', sa.String),
+    sa.Column('config_payload', sa.String),
+    sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('last_result_id', sa.Integer, nullable = True),
+    sa.Column('label', sa.String, nullable = True),
+    sa.Column('retain', sa.Boolean, default = False),
+)
+
+snapshot_module_configs = sa.Table(
+    'snapshot_module_configs',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('module_config_id', sa.Integer, primary_key = True),
+    *clone_columns_except_pk(module_configs)
+)
+
+# -----------------------------------------------------------------------------
+# Module Variables (Junction Tables)
+# -----------------------------------------------------------------------------
+
+module_variables = sa.Table(
+    'module_variables',
+    metadata,
+    sa.Column('module_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id'), primary_key = True),
+    sa.Column('variable_config_id', sa.Integer, sa.ForeignKey('variable_configs.variable_config_id'), primary_key = True)
+)
+
+snapshot_module_variables = sa.Table(
+    'snapshot_module_variables',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('module_config_id', sa.Integer, primary_key = True),
+    sa.Column('variable_config_id', sa.Integer, primary_key = True),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'module_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'variable_config_id'],
+        ['snapshot_variable_configs.snapshot_id', 'snapshot_variable_configs.variable_config_id']
+    )
+)
+
+
+# -----------------------------------------------------------------------------
+# Results
+# -----------------------------------------------------------------------------
+
+class ResultsMixin:
+    """Shared column definitions for live and snapshot results"""
+    run_id = sa.Column('run_id', sa.Integer) # No need to put a FK constraint on this, is for convenience only
+    module_type = sa.Column('module_type', sa.String),
+    module_class = sa.Column('module_class', sa.String),
+    module_version = sa.Column('module_version', sa.String),
+    revision = sa.Column('revision', sa.Integer, default = 0),
+    result_type = sa.Column('result_type', sa.String, nullable = False),
+    result_file = sa.Column('result_file', sa.String)
+    retain = sa.Column('retain', sa.Boolean, default = False)
+
+results = sa.Table(
+    'results',
+    metadata,
+    sa.Column('result_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('module_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('run_id', sa.Integer), # No need to put a FK constraint on this, is for convenience only
+    sa.Column('module_type', sa.String),
+    sa.Column('module_class', sa.String),
+    sa.Column('module_version', sa.String),
+    sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('result_type', sa.String, nullable = False),
+    sa.Column('result_file', sa.String),
+    sa.Column('retain', sa.Boolean, default = False),
+)
+
+snapshot_results = sa.Table(
+    'snapshot_results',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('result_id', sa.Integer, primary_key = True),
+    sa.Column('module_config_id', sa.Integer),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'module_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    *clone_columns_except_pk(results)
+)
+
+
+# -----------------------------------------------------------------------------
+# Energy Models (EM)
+# -----------------------------------------------------------------------------
+
+em_configs = sa.Table(
+    'em_configs',
+    metadata,
+    sa.Column('em_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('grid_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('generation_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('cs_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('model_class', sa.String),
+    sa.Column('model_version', sa.String),
+    sa.Column('config_payload', sa.String),
+    sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('label', sa.String, nullable = True),
+    sa.Column('retain', sa.Boolean, default = False),
+)
+
+snapshot_em_configs = sa.Table(
+    'snapshot_em_configs',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('em_config_id', sa.Integer, primary_key = True),
+    sa.Column('grid_config_id', sa.Integer),
+    sa.Column('generation_config_id', sa.Integer),
+    sa.Column('cs_config_id', sa.Integer),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'grid_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'generation_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'cs_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    *clone_columns_except_pk(em_configs),
+)
+
+
+# -----------------------------------------------------------------------------
+# Finance Models (FM)
+# -----------------------------------------------------------------------------
+
+class FMConfigMixin:
+    """Shared column definitions for live and snapshot finance model configs"""
+    model_class = sa.Column('model_class', sa.String)
+    model_version = sa.Column('model_version', sa.String)
+    config_payload = sa.Column('config_payload', sa.String)
+    revision = sa.Column('revision', sa.Integer, default = 0)
+    label = sa.Column('label', sa.String, nullable = True)
+    retain = sa.Column('retain', sa.Boolean, default = False)
+
+fm_configs = sa.Table(
+    'fm_configs',
+    metadata,
+    sa.Column('fm_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('financedata_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('model_class', sa.String),
+    sa.Column('model_version', sa.String),
+    sa.Column('config_payload', sa.String),
+    sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('label', sa.String, nullable = True),
+    sa.Column('retain', sa.Boolean, default = False),
+)
+
+snapshot_fm_configs = sa.Table(
+    'snapshot_fm_configs',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('fm_config_id', sa.Integer, primary_key = True),
+    sa.Column('financedata_config_id', sa.Integer),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'financedata_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    *clone_columns_except_pk(fm_configs),
+)
+
+
+# -----------------------------------------------------------------------------
+# Metamodels
+# -----------------------------------------------------------------------------
+
+class MetamodelsMixin:
+    """Shared column definitions for live and snapshot metamodels."""
+    revision = sa.Column('revision', sa.Integer, default = 0)
+    label = sa.Column('label', sa.String, nullable = True)
+    retain = sa.Column('retain', sa.Boolean, default = False)
+    lat = sa.Column('lat', sa.Float, default = 53.0)
+    lon = sa.Column('lon', sa.Float, default = -3.0)
+    n_units = sa.Column('n_units', sa.Float, default = 100.0)
+
+metamodels = sa.Table(
+    'metamodels',
+    metadata,
+    sa.Column('metamodel_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('em_config_id', sa.Integer, sa.ForeignKey('em_configs.em_config_id')),
+    sa.Column('fm_config_id', sa.Integer, sa.ForeignKey('fm_configs.fm_config_id')),
+    sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('label', sa.String, nullable = True),
+    sa.Column('retain', sa.Boolean, default = False),
+    sa.Column('lat', sa.Float, default = 53.0),
+    sa.Column('lon', sa.Float, default = -3.0),
+    sa.Column('n_units', sa.Float, default = 100.0)
+)
+
+snapshot_metamodels = sa.Table(
+    'snapshot_metamodels',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('metamodel_id', sa.Integer, primary_key = True),
+    sa.Column('em_config_id', sa.Integer),
+    sa.Column('fm_config_id', sa.Integer),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'em_config_id'],
+        ['snapshot_em_configs.snapshot_id', 'snapshot_em_configs.em_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'fm_config_id'],
+        ['snapshot_fm_configs.snapshot_id', 'snapshot_fm_configs.fm_config_id']
+    ),
+    *clone_columns_except_pk(metamodels)
+)
+
+
+# -----------------------------------------------------------------------------
+# Projects
+# -----------------------------------------------------------------------------
+
+class ProjectMixin:
+    """Shared column definitions for live and snapshot projects."""
+    model_type = sa.Column('model_type', sa.String, nullable = False)
+    model_version = sa.Column('model_version', sa.String, nullable = False)
+
+    # TODO: Implement these groups
+    #read_group_id = sa.Column('read_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
+    #write_group_id = sa.Column('write_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
+    
+    label = sa.Column('label', sa.String, nullable = True),
+    retain = sa.Column('retain', sa.Boolean, default = False)
+
+projects = sa.Table(
+    'projects',
+    metadata,
+    sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('dsa_module_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('psa_module_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('model_type', sa.String, nullable = False),
+    sa.Column('model_version', sa.String, nullable = False),
+
+    # TODO: Implement these groups
+    #sa.Column('read_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
+    #sa.Column('write_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
+    
+    sa.Column('label', sa.String, nullable = True),
+    sa.Column('retain', sa.Boolean, default = False),
+)
+
+snapshot_projects = sa.Table(
+    'snapshot_projects',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('dsa_module_config_id', sa.Integer),
+    sa.Column('psa_module_config_id', sa.Integer),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'dsa_module_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'psa_module_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    *clone_columns_except_pk(projects)
+)
+
+
+# -----------------------------------------------------------------------------
+# Runs
+# -----------------------------------------------------------------------------
+
+runs = sa.Table(
+    'runs',
+    metadata,
+    sa.Column('run_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id'), nullable = False),
+    sa.Column('request_id', sa.String),
+    sa.Column('request_type', sa.String),
+    sa.Column('request_payload', sa.String),
+    sa.Column('status', sa.String),
+    sa.Column('last_updated', sa.DateTime, default = sa.func.current_timestamp()),
+    sa.Column('progress', sa.Float, default = 0.0),
+    sa.Column('progress_message', sa.String, nullable = True),
+    sa.Column('cancel_requested', sa.Boolean, default = False),
+)
+
+
+# -----------------------------------------------------------------------------
+# Sessions
+# -----------------------------------------------------------------------------
+
+sessions = sa.Table(
+    'sessions',
+    metadata,
+    sa.Column('session_id', sa.String, primary_key = True),
+    sa.Column('active_project_id', sa.Integer, sa.ForeignKey('projects.project_id')),
+)
