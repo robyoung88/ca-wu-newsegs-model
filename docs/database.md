@@ -8,52 +8,27 @@ config:
   layout: elk
 ---
 erDiagram
-    PROJECT ||--o{ PROJECT_METAMODEL : "contains"
-    PROJECT_METAMODEL }o--|| METAMODEL : "belongs to"
-    METAMODEL ||--|| EM_CONFIG : contains
-    METAMODEL ||--|| FM_CONFIG : contains
-    MODULE_CONFIG ||--o{ RESULT : has
-    EM_CONFIG ||--o{ MODULE_CONFIG : contains
-    FM_CONFIG ||--|| MODULE_CONFIG : contains
-    
-    PROJECT {
-        int project_id PK
-        int read_group_id FK
-        int write_group_id FK
+    SNAPSHOT {
+        int snapshot_id PK
+        int project_id FK
+        str label
+        DateTime timestamp
+    }
+
+    VARIABLE_CONFIG {
+        int variable_config_id PK
+        str module_type
+        str payload
         str label
         bool retain
     }
-    PROJECT_METAMODEL {
-        int project_id PK, FK
-        int metamodel_id PK, FK
+
+    SNAPSHOT_VARIABLE_CONFIG {
+        int snapshot_id PK, FK
+        int variable_config_id PK
+        etc etc
     }
-    METAMODEL {
-        int metamodel_id PK
-        int model_config_id
-        int finance_config_id
-        str label
-        bool retain
-        float lat
-        float lon
-        float n_units
-    }
-    EM_CONFIG {
-        int model_config_id PK
-        str model_class
-        int grid_config_id
-        int generation_config_id
-        int cs_config_id
-        str label
-        bool retain
-    }
-    FM_CONFIG {
-        int finance_config_id PK
-        str finance_class
-        int financedata_config_id
-        str label
-        bool retain
-    }
-    
+
     MODULE_CONFIG {
         int module_config_id PK
         str module_type
@@ -65,19 +40,206 @@ erDiagram
         str label
         bool retain
     }
-    VARIABLE_CONFIG {
-        int variable_config_id PK
-        str module_type
-        str payload
-        str label
-        bool retain
+
+    SNAPSHOT_MODULE_CONFIG {
+        int snapshot_id PK, FK
+        int module_config_id PK
+        etc etc
     }
-    MODULE_VARIABLES {
+
+    MODULE_VARIABLE {
         int module_config_id PK, FK
         int variable_config_id PK, FK
     }
-    MODULE_CONFIG ||--o{ MODULE_VARIABLES : "has variables"
-    VARIABLE_CONFIG ||--o{ MODULE_VARIABLES : "informs"
+
+    SNAPSHOT_MODULE_VARIABLE {
+        int snapshot_id PK, FK
+        int module_config_id PK, FK
+        int variable_config_id PK, FK
+    }
+
+    VARIABLE_CONFIG ||--o{ MODULE_VARIABLE : "informs modules"
+    MODULE_CONFIG ||--o{ MODULE_VARIABLE : "has variables"
+
+    SNAPSHOT_VARIABLE_CONFIG ||--o{ SNAPSHOT_MODULE_VARIABLE : "informs modules where (snapshot_id, variable_config_id)"
+    SNAPSHOT_MODULE_CONFIG ||--o{ SNAPSHOT_MODULE_VARIABLE : "has variables where (snapshot_id, module_config_id)"
+    
+    RESULT {
+        int result_id PK
+        int module_config_id FK
+        int run_id
+        str module_type
+        str module_class
+        str module_version
+        int module_config_revision
+        str result_type
+        str result_file
+        bool retain
+    }
+
+    SNAPSHOT_RESULT {
+        int snapshot_id PK, FK
+        int result_id PK
+        int module_config_id FK
+        etc etc
+    }
+
+    MODULE_CONFIG ||--o{ RESULT : "has"
+    
+    SNAPSHOT_MODULE_CONFIG ||--o{ SNAPSHOT_RESULT : "has where (snapshot_id, module_config_id)"
+
+
+    EM_CONFIG {
+        int em_config_id PK
+        int grid_config_id FK
+        int generation_config_id FK
+        int cs_config_id FK
+        int table_config_id FK
+        str model_class
+        str model_version
+        str config_payload
+        int revision
+        str label
+        bool retain
+    }
+
+    SNAPSHOT_EM_CONFIG {
+        int snapshot_id PK, FK
+        int em_config_id PK
+        int grid_config_id FK
+        int generation_config_id FK
+        int cs_config_id FK
+        int table_config_id FK
+        etc etc
+    }
+
+    EM_CONFIG ||--|{ MODULE_CONFIG : "has"
+
+    SNAPSHOT_EM_CONFIG ||--|{ SNAPSHOT_MODULE_CONFIG : "has where (snapshot_id, module_config_id)"
+
+
+    FM_CONFIG {
+        int fm_config_id PK
+        int financedata_config_id FK
+        int table_config_id FK
+        str model_class
+        str model_version
+        str config_payload
+        int revision
+        str label
+        bool retain
+    }
+
+    SNAPSHOT_FM_CONFIG {
+        int snapshot_id PK, FK
+        int fm_config PK
+        int financedata_config_id FK
+        int table_config_id FK
+        etc etc
+    }
+
+    FM_CONFIG ||--|{ MODULE_CONFIG : "has"
+
+    SNAPSHOT_FM_CONFIG ||--|{ SNAPSHOT_MODULE_CONFIG : "has where (snapshot_id, module_config_id)"
+
+
+    METAMODEL {
+        int metamodel_id PK
+        int em_config_id FK
+        int fm_config_id FK
+        int table_config_id FK
+        int revision
+        str label
+        bool retain
+        float lat
+        float lon
+        float n_units
+    }
+
+    SNAPSHOT_METAMODEL {
+        int snapshot_id PK, FK
+        int metamodel_id PK
+        int em_config_id FK
+        int fm_config_id FK
+        int table_config_id FK
+        etc etc
+    }
+
+    METAMODEL ||--|| EM_CONFIG : "has"
+    METAMODEL ||--|| FM_CONFIG : "has"
+    METAMODEL ||--|| MODULE_CONFIG : "has"
+
+    SNAPSHOT_METAMODEL ||--|| SNAPSHOT_EM_CONFIG : "has where (snapshot_id, em_config_id)"
+    SNAPSHOT_METAMODEL ||--|| SNAPSHOT_FM_CONFIG : "has where (snapshot_id, fm_config_id)"
+    SNAPSHOT_METAMODEL ||--|| SNAPSHOT_MODULE_CONFIG : "has where (snapshot_id, module_config_id)"
+
+    PROJECT {
+        int project_id PK
+        int read_group_id FK
+        int write_group_id FK
+        int dsa_module_config_id FK
+        int psa_module_config_id FK
+        int table_config_id FK
+        str model_type
+        str model_version
+        str label
+        bool retain
+    }
+
+    SNAPSHOT_PROJECT {
+        int snapshot_id PK, FK
+        int project_id PK
+        int dsa_module_config_id FK
+        int psa_module_config_id FK
+        int table_config_id FK
+        etc etc
+    }
+
+    PROJECT ||--|{ MODULE_CONFIG : "has"
+
+    SNAPSHOT_PROJECT ||--|{ SNAPSHOT_MODULE_CONFIG : "has where (snapshot_id, module_config_id)"
+
+    SNAPSHOT ||--|| SNAPSHOT_PROJECT : "has"
+
+
+    PROJECT_METAMODEL {
+        int project_id PK, FK
+        int metamodel_id PK, FK
+    }
+
+    SNAPSHOT_PROJECT_METAMODEL {
+        int snapshot_id PK, FK
+        int project_id PK
+        int metamodel_id PK
+    }
+
+
+    PROJECT ||--o{ PROJECT_METAMODEL : "contains"
+    PROJECT_METAMODEL }o--|| METAMODEL : "belongs to"
+
+    SNAPSHOT_PROJECT ||--o{ SNAPSHOT_PROJECT_METAMODEL : "contains where (snapshot_id, project_id)"
+    SNAPSHOT_PROJECT_METAMODEL }o--|| SNAPSHOT_METAMODEL : "belongs to where (snapshot_id, metamodel_id)"
+
+    PROJECT ||--o{ SNAPSHOT : "generates"
+    
+    
+    RUN {
+        int run_id PK
+        int project_id FK
+        str request_id
+        str request_type
+        str request_payload
+        str status
+        datetime last_updated
+        float progress
+        str progress_message
+        bool cancel_requested
+    }
+
+    RUN ||--o{ RESULT : "produces"
+    PROJECT ||--o{ RUN : "requests"
+
+
     
     DEFAULT_MODULE_CONFIG {
         int default_module_config_id
@@ -108,28 +270,5 @@ erDiagram
     GROUP ||--o{ MEMBERSHIP : "has members"
     GROUP ||--o{ PROJECT : "grants read access"
     GROUP ||--o{ PROJECT : "grants write access"
-
-    RUN {
-        int run_id PK
-        int project_id FK
-        str request_id
-        str request_type
-        str request_payload
-        str status
-        datetime last_updated
-        float progress
-        str progress_message
-        bool cancel_requested
-    }
-    RESULT {
-        int result_id PK
-        int run_id FK
-        int module_config_id
-        int revision
-        str result_type
-        str result_file
-    }
-    RUN ||--o{ RESULT : "produces"
-    PROJECT ||--o{ RUN : "requests"
 
 ```

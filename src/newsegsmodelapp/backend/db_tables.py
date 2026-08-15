@@ -39,14 +39,6 @@ snapshots = sa.Table(
 # -----------------------------------------------------------------------------
 # Variable Configurations
 # -----------------------------------------------------------------------------
-def get_variable_config_shared_columns():
-    """Shared column definitions for live and snapshot variable configs."""
-    return [
-        sa.Column('module_type', sa.String),
-        sa.Column('payload', sa.String),
-        sa.Column('label', sa.String, nullable = True),
-        sa.Column('retain', sa.Boolean, default = False),
-    ]
 
 variable_configs = sa.Table(
     'variable_configs',
@@ -125,17 +117,6 @@ snapshot_module_variables = sa.Table(
 # Results
 # -----------------------------------------------------------------------------
 
-class ResultsMixin:
-    """Shared column definitions for live and snapshot results"""
-    run_id = sa.Column('run_id', sa.Integer) # No need to put a FK constraint on this, is for convenience only
-    module_type = sa.Column('module_type', sa.String),
-    module_class = sa.Column('module_class', sa.String),
-    module_version = sa.Column('module_version', sa.String),
-    revision = sa.Column('revision', sa.Integer, default = 0),
-    result_type = sa.Column('result_type', sa.String, nullable = False),
-    result_file = sa.Column('result_file', sa.String)
-    retain = sa.Column('retain', sa.Boolean, default = False)
-
 results = sa.Table(
     'results',
     metadata,
@@ -145,7 +126,7 @@ results = sa.Table(
     sa.Column('module_type', sa.String),
     sa.Column('module_class', sa.String),
     sa.Column('module_version', sa.String),
-    sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('module_config_revision', sa.Integer, default = 0),
     sa.Column('result_type', sa.String, nullable = False),
     sa.Column('result_file', sa.String),
     sa.Column('retain', sa.Boolean, default = False),
@@ -176,6 +157,7 @@ em_configs = sa.Table(
     sa.Column('grid_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('generation_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('cs_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('table_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('model_class', sa.String),
     sa.Column('model_version', sa.String),
     sa.Column('config_payload', sa.String),
@@ -192,6 +174,7 @@ snapshot_em_configs = sa.Table(
     sa.Column('grid_config_id', sa.Integer),
     sa.Column('generation_config_id', sa.Integer),
     sa.Column('cs_config_id', sa.Integer),
+    sa.Column('table_config_id', sa.Integer),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'grid_config_id'],
         ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
@@ -204,6 +187,10 @@ snapshot_em_configs = sa.Table(
         ['snapshot_id', 'cs_config_id'],
         ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
     ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'table_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
     *clone_columns_except_pk(em_configs),
 )
 
@@ -212,20 +199,12 @@ snapshot_em_configs = sa.Table(
 # Finance Models (FM)
 # -----------------------------------------------------------------------------
 
-class FMConfigMixin:
-    """Shared column definitions for live and snapshot finance model configs"""
-    model_class = sa.Column('model_class', sa.String)
-    model_version = sa.Column('model_version', sa.String)
-    config_payload = sa.Column('config_payload', sa.String)
-    revision = sa.Column('revision', sa.Integer, default = 0)
-    label = sa.Column('label', sa.String, nullable = True)
-    retain = sa.Column('retain', sa.Boolean, default = False)
-
 fm_configs = sa.Table(
     'fm_configs',
     metadata,
     sa.Column('fm_config_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('financedata_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('table_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('model_class', sa.String),
     sa.Column('model_version', sa.String),
     sa.Column('config_payload', sa.String),
@@ -240,8 +219,13 @@ snapshot_fm_configs = sa.Table(
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
     sa.Column('fm_config_id', sa.Integer, primary_key = True),
     sa.Column('financedata_config_id', sa.Integer),
+    sa.Column('table_config_id', sa.Integer),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'financedata_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'table_config_id'],
         ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
     ),
     *clone_columns_except_pk(fm_configs),
@@ -252,21 +236,13 @@ snapshot_fm_configs = sa.Table(
 # Metamodels
 # -----------------------------------------------------------------------------
 
-class MetamodelsMixin:
-    """Shared column definitions for live and snapshot metamodels."""
-    revision = sa.Column('revision', sa.Integer, default = 0)
-    label = sa.Column('label', sa.String, nullable = True)
-    retain = sa.Column('retain', sa.Boolean, default = False)
-    lat = sa.Column('lat', sa.Float, default = 53.0)
-    lon = sa.Column('lon', sa.Float, default = -3.0)
-    n_units = sa.Column('n_units', sa.Float, default = 100.0)
-
 metamodels = sa.Table(
     'metamodels',
     metadata,
     sa.Column('metamodel_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('em_config_id', sa.Integer, sa.ForeignKey('em_configs.em_config_id')),
     sa.Column('fm_config_id', sa.Integer, sa.ForeignKey('fm_configs.fm_config_id')),
+    sa.Column('table_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
@@ -282,6 +258,7 @@ snapshot_metamodels = sa.Table(
     sa.Column('metamodel_id', sa.Integer, primary_key = True),
     sa.Column('em_config_id', sa.Integer),
     sa.Column('fm_config_id', sa.Integer),
+    sa.Column('table_config_id', sa.Integer),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'em_config_id'],
         ['snapshot_em_configs.snapshot_id', 'snapshot_em_configs.em_config_id']
@@ -289,6 +266,10 @@ snapshot_metamodels = sa.Table(
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'fm_config_id'],
         ['snapshot_fm_configs.snapshot_id', 'snapshot_fm_configs.fm_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'table_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
     ),
     *clone_columns_except_pk(metamodels)
 )
@@ -298,24 +279,13 @@ snapshot_metamodels = sa.Table(
 # Projects
 # -----------------------------------------------------------------------------
 
-class ProjectMixin:
-    """Shared column definitions for live and snapshot projects."""
-    model_type = sa.Column('model_type', sa.String, nullable = False)
-    model_version = sa.Column('model_version', sa.String, nullable = False)
-
-    # TODO: Implement these groups
-    #read_group_id = sa.Column('read_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
-    #write_group_id = sa.Column('write_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
-    
-    label = sa.Column('label', sa.String, nullable = True),
-    retain = sa.Column('retain', sa.Boolean, default = False)
-
 projects = sa.Table(
     'projects',
     metadata,
     sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('dsa_module_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('psa_module_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
+    sa.Column('table_config_id', sa.Integer, sa.ForeignKey('module_configs.module_config_id')),
     sa.Column('model_type', sa.String, nullable = False),
     sa.Column('model_version', sa.String, nullable = False),
 
@@ -334,6 +304,7 @@ snapshot_projects = sa.Table(
     sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('dsa_module_config_id', sa.Integer),
     sa.Column('psa_module_config_id', sa.Integer),
+    sa.Column('table_config_id', sa.Integer),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'dsa_module_config_id'],
         ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
@@ -342,7 +313,39 @@ snapshot_projects = sa.Table(
         ['snapshot_id', 'psa_module_config_id'],
         ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
     ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'table_config_id'],
+        ['snapshot_module_configs.snapshot_id', 'snapshot_module_configs.module_config_id']
+    ),
     *clone_columns_except_pk(projects)
+)
+
+
+# -----------------------------------------------------------------------------
+# Project Metamodels (Junction Tables)
+# -----------------------------------------------------------------------------
+
+project_metamodels = sa.Table(
+    'project_metamodels',
+    metadata,
+    sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id'), primary_key = True),
+    sa.Column('metamodel_id', sa.Integer, sa.ForeignKey('metamodels.metamodel_id'), primary_key = True)
+)
+
+snapshot_project_metamodels = sa.Table(
+    'snapshot_project_metamodels',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('project_id', sa.Integer, primary_key = True),
+    sa.Column('metamodel_id', sa.Integer, primary_key = True),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'project_id'],
+        ['snapshot_projects.snapshot_id', 'snapshot_projects.project_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'metamodel_id'],
+        ['snapshot_metamodels.snapshot_id', 'snapshot_metamodels.metamodel_id']
+    )
 )
 
 
