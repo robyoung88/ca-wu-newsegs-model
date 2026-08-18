@@ -183,7 +183,7 @@ def generic_restore_snapshot(
     engine: sa.Engine,
     metadata: sa.MetaData,
     snapshot_id: int
-) -> dict[str, int]:
+) -> dict[str, dict[Any, Any]]:
     """
     Introspects snapshot tables, recreates nested entity structures inside active tables
     and dynamically re-maps foreign key references for all nested dependencies.
@@ -194,7 +194,7 @@ def generic_restore_snapshot(
     with engine.begin() as conn:
         for table in metadata.sorted_tables:
             # Skip non-target tables
-            if table.name.startswith('snapshot_') or table.name in ('snapshots', 'projects', 'users'):
+            if table.name.startswith('snapshot_') or table.name in ('snapshots', 'users', 'sessions', 'groups'):
                 continue
 
             snap_table_name = f'snapshot_{table.name}'
@@ -230,10 +230,19 @@ def generic_restore_snapshot(
                 if is_single_autoincrement_pk:
                     old_pk_val = record.pop(pk_cols[0], None)
                     res = conn.execute(table.insert().values(**record))
+                    if res is None or res.inserted_primary_key is None:
+                        raise ValueError(f'Restore failed - {table.name} could not insert record {record}')
                     new_pk_val = res.inserted_primary_key[0]
                     # Map old primary key to new primary key for child references
                     id_map[(table.name, old_pk_val)] = new_pk_val
                 else:
                     # Junction table or fixed key insertion
                     conn.execute(table.insert().values(**record))
-    return id_map
+
+        # Remap the dictionary to a more useful lookup form
+        id_remap = {
+            k[0]: {} for k in id_map.keys()
+        }
+        for k, v in id_map.items():
+            id_remap[k[0]].update({k[1]: v})
+    return id_remap

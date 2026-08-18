@@ -5,6 +5,7 @@ import os
 import unittest
 
 import pandas as pd
+import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from config import settings
@@ -31,7 +32,7 @@ class TestDatabaseStart(unittest.TestCase):
         sheet_names = xl_file.sheet_names
 
         # Create a mapping of sheet names (case-insensitive) for quick lookup
-        sheet_name_map = {name.lower(): name for name in sheet_names}
+        sheet_name_map = {str(name).lower(): name for name in sheet_names}
 
         # Insert data from matching sheets into corresponding tables
         with db.get_engine().connect() as conn:
@@ -166,6 +167,129 @@ class TestDatabaseStart(unittest.TestCase):
                 .where(tbls.snapshot_results.c.snapshot_id == snapshot_id)
             )
             self.assertEqual(len(result.fetchall()), 4)
+
+        # Restore the snapshot
+        new_ids = db_snapshot.generic_restore_snapshot(
+            db.get_engine(),
+            tbls.metadata,
+            snapshot_id
+        )
+
+        new_project_id = list(new_ids['projects'].values())[0]
+
+        with db.get_engine().connect() as conn:
+            r0 = conn.execute(
+                tbls.projects.select()
+                .where(tbls.projects.c.project_id == project_id)
+            ).fetchall()
+            r1 = conn.execute(
+                tbls.projects.select()
+                .where(tbls.projects.c.project_id == new_project_id)
+            ).fetchall()
+            for row0, row1 in zip(r0, r1):
+                for colname in ('model_type', 'model_version', 'label'):
+                    self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+
+            for module_name in ('table_config_id', 'dsa_module_config_id', 'psa_module_config_id'):
+                col = tbls.projects.columns[module_name]
+                r0 = conn.execute(
+                    tbls.module_configs.select()
+                    .where(
+                        tbls.module_configs.c.module_config_id.in_(
+                            sa.select(col)
+                            .where(tbls.projects.c.project_id == project_id)
+                        )
+                    )
+                ).fetchall()
+                r1 = conn.execute(
+                    tbls.module_configs.select()
+                    .where(
+                        tbls.module_configs.c.module_config_id.in_(
+                            sa.select(col)
+                            .where(tbls.projects.c.project_id == new_project_id)
+                        )
+                    )
+                ).fetchall()
+                for row0, row1 in zip(r0, r1):
+                    for colname in ('module_type', 'module_class', 'module_version', 'config_payload', 'revision', 'last_result_id', 'label'):
+                        self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+
+            metamodel_ids_0 = conn.execute(
+                sa.select(tbls.project_metamodels.c.metamodel_id)
+                .where(tbls.project_metamodels.c.project_id == project_id)
+            ).fetchall()
+
+            metamodel_ids_1 = conn.execute(
+                sa.select(tbls.project_metamodels.c.metamodel_id)
+                .where(tbls.project_metamodels.c.project_id == new_project_id)
+            ).fetchall()
+
+            r0 = conn.execute(
+                tbls.metamodels.select()
+                .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_0]))
+            ).fetchall()
+            r1 = conn.execute(
+                tbls.metamodels.select()
+                .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_1]))
+            ).fetchall()
+            for row0, row1 in zip(r0, r1):
+                for colname in ('revision', 'label', 'lat', 'lon', 'n_units'):
+                    self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+
+            em_config_ids_0 = [
+                x[0] for x in 
+                conn.execute(
+                    sa.select(tbls.metamodels.c.em_config_id)
+                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_0]))
+                ).fetchall()
+            ]
+            em_config_ids_1 = [
+                x[0] for x in 
+                conn.execute(
+                    sa.select(tbls.metamodels.c.em_config_id)
+                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_1]))
+                ).fetchall()
+            ]
+
+            r0 = conn.execute(
+                tbls.em_configs.select()
+                .where(tbls.em_configs.c.em_config_id.in_(em_config_ids_0))
+            ).fetchall()
+            r1 = conn.execute(
+                tbls.em_configs.select()
+                .where(tbls.em_configs.c.em_config_id.in_(em_config_ids_1))
+            ).fetchall()
+            for row0, row1 in zip(r0, r1):
+                for colname in ('model_class', 'model_version', 'config_payload', 'revision', 'label'):
+                    self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+
+            fm_config_ids_0 = [
+                x[0] for x in 
+                conn.execute(
+                    sa.select(tbls.metamodels.c.fm_config_id)
+                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_0]))
+                ).fetchall()
+            ]
+            fm_config_ids_1 = [
+                x[0] for x in 
+                conn.execute(
+                    sa.select(tbls.metamodels.c.fm_config_id)
+                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_1]))
+                ).fetchall()
+            ]
+
+            r0 = conn.execute(
+                tbls.fm_configs.select()
+                .where(tbls.fm_configs.c.fm_config_id.in_(fm_config_ids_0))
+            ).fetchall()
+            r1 = conn.execute(
+                tbls.fm_configs.select()
+                .where(tbls.fm_configs.c.fm_config_id.in_(fm_config_ids_1))
+            ).fetchall()
+            for row0, row1 in zip(r0, r1):
+                for colname in ('model_class', 'model_version', 'config_payload', 'revision', 'label'):
+                    self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+
 
 
         
