@@ -5,7 +5,9 @@ import copy
 import datetime
 import json
 import logging
+import logging.config
 import os
+import sys
 import time
 from typing import Callable, Literal, cast, MutableMapping
 
@@ -55,7 +57,47 @@ from newsegsmodelapp.newsegsbrowser.background_callback_errors import add_backgr
 
 from newsegsmodelapp.newsegsbrowser import energy_balance_estimation
 
-logger = logging.getLogger(__name__)
+# -----------------------------------------------
+# Set up logging
+# -----------------------------------------------
+LOGGING_CONFIG = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+        },
+        'json': { # Useful for production log aggregation (Datadog/ELK)
+            'format': '{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}',
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'default'
+        },
+    },
+    'root': {
+        'level': 'INFO',
+        'handlers': ['console'],
+    },
+    'loggers': {
+        # Silence chatty external libraries
+        'sqlalchemy.engine': {
+            'level': 'WARNING',
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'alembic': {
+            'level': 'INFO',
+            'handlers': ['console'],
+            'propagate': False,
+        },
+    },
+}
+logging.config.dictConfig(LOGGING_CONFIG)
+logger = logging.getLogger()
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
@@ -114,7 +156,6 @@ def serve_layout():
     """
     
     """
-
     return html.Div([
         dcc.Location(id = 'url', refresh = 'callback-nav'),
         html.Div(id = 'page-content'),

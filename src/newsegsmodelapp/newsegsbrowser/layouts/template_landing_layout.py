@@ -5,7 +5,7 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
-from newsegsmodelapp.newsegsbrowser.layouts import navigation
+from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts
 
 def create_landing_header(**kwargs):

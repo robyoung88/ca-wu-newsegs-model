@@ -67,6 +67,7 @@ DEFAULT_ICONS = {
     'config-upload': 'bi bi-box-arrow-in-up',
     'results-download': 'bi bi-table',
     'show-graph': 'bi bi-graph-up',
+    'nav-options': 'bi bi-list',
     'nav-landing': 'bi bi-card-text',
     'nav-system-config': 'bi bi-sliders2-vertical',
     'nav-dsa-config': 'bi bi-tornado',

@@ -31,7 +31,7 @@ def get_model_configuration_layout_config(model_type):
         'model_type': model_type,
         'selected_model': model_type,
         'page_type': 'model_configuration',
-        'autorun_model': True,
+        'autorun_model': False,
     }
 
 def get_dsa_layout_config(model_type):

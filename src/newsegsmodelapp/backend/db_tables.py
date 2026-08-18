@@ -301,7 +301,7 @@ snapshot_projects = sa.Table(
     'snapshot_projects',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('project_id', sa.Integer, primary_key = True),
     sa.Column('dsa_module_config_id', sa.Integer),
     sa.Column('psa_module_config_id', sa.Integer),
     sa.Column('table_config_id', sa.Integer),

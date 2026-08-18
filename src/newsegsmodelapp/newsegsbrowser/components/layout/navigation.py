@@ -8,11 +8,29 @@ from functools import partial
 
 from newsegsmodelapp.newsegsbrowser import icons
 
-create_navbutton = partial(
+create_optionsbutton = partial(
     dbc.Button,
+    color = 'info',
+    class_name = 'newsegs-options-button btn-block',
+)
+
+create_navbutton = partial(
+    dbc.Button, # pyright: ignore[reportArgumentType]
     color = 'secondary',
     class_name = 'newsegs-nav-button btn-block',    
 )
+
+def create_nav_options(selected_model: str):
+    return create_optionsbutton(
+        [
+            html.I(
+                className = icons.get_icon('nav-options', style_name = 'raw'),
+                style = {'display': 'inline'}
+            ),
+        ],
+        id = {'type': 'btn-options', 'label': 'options'},
+        title = 'Options',
+    )
 
 def create_nav_landing(selected_model: str):
     return create_navbutton(
@@ -83,13 +101,15 @@ def create_navigator_buttons_default(selected_model: str = 'sprake'):
     match selected_model:
         case 'sprake':
             return [
-                    create_nav_landing(selected_model),
-                    create_nav_system_config(selected_model),
-                    create_nav_dsa(selected_model),
-                    create_nav_psa(selected_model),
-                ]
+                create_nav_options(selected_model),
+                create_nav_landing(selected_model),
+                create_nav_system_config(selected_model),
+                create_nav_dsa(selected_model),
+                create_nav_psa(selected_model),
+            ]
         case _:
             return [
+                create_nav_options(selected_model),
                 create_nav_landing(selected_model),
                 create_nav_system_config(selected_model),
                 create_nav_buildings(selected_model),

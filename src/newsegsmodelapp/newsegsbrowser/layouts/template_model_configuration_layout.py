@@ -8,7 +8,8 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
-from newsegsmodelapp.newsegsbrowser.layouts import navigation
+from newsegsmodelapp.newsegsbrowser.components import project_selector
+from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import maps
 from newsegsmodelapp.newsegsbrowser.layouts.feedback import indicative_net_energy
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
@@ -35,6 +36,8 @@ from newsegsmodelapp.newsegsbrowser.layouts.results import net_energy_results_sp
 from newsegsmodelapp.newsegsbrowser.layouts.results import economic_results_so_sprake
 
 DEFAULT_LAYOUT_CONFIGURATION = {
+    'layout_top': project_selector.create_project_selector_block,
+    'width_top': 12,
     'layout_navigation': navigation.create_navigator_buttons_default,
     'width_navigation': 1,
     'layout_map': maps.create_site_selector_map,
@@ -90,18 +93,23 @@ def create_model_configuration_layout(*args, **kwargs):
     
     header = [dbc.Row([
         dbc.Col(
+            config_dict['layout_top'](**kwargs),
+            width = config_dict['width_top'],
+            class_name = 'page-top',
+        ), # pyright: ignore[reportCallIssue]
+        dbc.Col(
             html.Div(
                 config_dict['layout_navigation'](config_dict.get('selected_model')),
             ),
             class_name = 'newsegs-navbar-vertical collapsed',
             width = config_dict['width_navigation'],
             
-        ),
+        ), # pyright: ignore[reportCallIssue]
         dbc.Col(
             config_dict['layout_map'](),
             width = config_dict['width_map']
-        )
-    ])]
+        ) # pyright: ignore[reportCallIssue]
+    ])] # pyright: ignore[reportCallIssue]
 
     model_input_sections = []
     for sec in [

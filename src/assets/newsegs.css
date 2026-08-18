@@ -1,9 +1,29 @@
+.page-top .dash-input-container{
+    display: inline-flex;
+    border-style: none;
+    background: transparent;
+    min-width: 400px;
+    width: auto;
+    font-size: 1.3rem;
+}
+
+.page-top .accordion-button{
+    padding: 10px;
+}
+
 .newsegs-nav-button {
     width: 48px;
     margin: 2px 5px 2px 5px;
 }
 
-.newsegs-navbar-vertical .newsegs-nav-button {
+.newsegs-options-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin: 2px 5px 2px 5px;
+}
+
+.newsegs-navbar-vertical .btn-block {
     display: block;
 }
 

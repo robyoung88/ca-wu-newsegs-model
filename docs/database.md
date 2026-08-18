@@ -47,6 +47,16 @@ erDiagram
         etc etc
     }
 
+    DEFAULT_MODULE_CONFIG {
+        int default_module_config_id
+        str module_type
+        str module_class
+        str module_verson
+        str config_payload
+        str label
+        bool retain
+    }
+
     MODULE_VARIABLE {
         int module_config_id PK, FK
         int variable_config_id PK, FK
@@ -60,6 +70,7 @@ erDiagram
 
     VARIABLE_CONFIG ||--o{ MODULE_VARIABLE : "informs modules"
     MODULE_CONFIG ||--o{ MODULE_VARIABLE : "has variables"
+    DEFAULT_MODULE_CONFIG }|--o| MODULE_CONFIG : "may overwrite where (module_type, module_class) and compatible module_version"
 
     SNAPSHOT_VARIABLE_CONFIG ||--o{ SNAPSHOT_MODULE_VARIABLE : "informs modules where (snapshot_id, variable_config_id)"
     SNAPSHOT_MODULE_CONFIG ||--o{ SNAPSHOT_MODULE_VARIABLE : "has variables where (snapshot_id, module_config_id)"
@@ -239,16 +250,6 @@ erDiagram
     RUN ||--o{ RESULT : "produces"
     PROJECT ||--o{ RUN : "requests"
 
-
-    
-    DEFAULT_MODULE_CONFIG {
-        int default_module_config_id
-        str module_type
-        str module_class
-        str config_payload
-        str label
-        bool retain
-    }
 
     USER {
         int user_id PK

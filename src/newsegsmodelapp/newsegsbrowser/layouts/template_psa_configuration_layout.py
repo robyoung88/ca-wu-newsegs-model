@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
-from newsegsmodelapp.newsegsbrowser.layouts import navigation
+from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts
 from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
 from newsegsmodelframework.newsegssensitivity import psa
