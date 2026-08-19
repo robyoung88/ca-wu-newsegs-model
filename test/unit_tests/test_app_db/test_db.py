@@ -15,7 +15,7 @@ class TestDatabaseStart(unittest.TestCase):
     def setUpClass(cls):
         os.environ['DYNACONF_DB_PATH'] = ':memory:'
         from newsegsmodelapp.backend import db
-        from newsegsmodelapp.backend import db_tables as tbls
+        from newsegsmodelapp.backend.db import tables as tbls
         metadata = tbls.metadata
         sorted_tables = metadata.sorted_tables
 
@@ -64,10 +64,10 @@ class TestDatabaseStart(unittest.TestCase):
             'snapshots',
             'variable_configs',
             'snapshot_variable_configs',
-            'module_configs',
-            'snapshot_module_configs',
-            'module_variables',
-            'snapshot_module_variables',
+            'component_configs',
+            'snapshot_component_configs',
+            'component_variables',
+            'snapshot_component_variables',
             'results',
             'snapshot_results',
             'em_configs',
@@ -98,8 +98,8 @@ class TestDatabaseStart(unittest.TestCase):
 
     def test_snapshot_logic(self):
         from newsegsmodelapp.backend import db
-        from newsegsmodelapp.backend import db_tables as tbls
-        from newsegsmodelapp.backend import db_snapshot
+        from newsegsmodelapp.backend.db import tables as tbls
+        from newsegsmodelapp.backend.db import db_snapshot
 
         project_id = 1
 
@@ -145,8 +145,8 @@ class TestDatabaseStart(unittest.TestCase):
             self.assertEqual(len(result.fetchall()), 1)
 
             result = conn.execute(
-                tbls.snapshot_module_configs.select()
-                .where(tbls.snapshot_module_configs.c.snapshot_id == snapshot_id)
+                tbls.snapshot_component_configs.select()
+                .where(tbls.snapshot_component_configs.c.snapshot_id == snapshot_id)
             )
             self.assertEqual(len(result.fetchall()), 10)
 
@@ -157,8 +157,8 @@ class TestDatabaseStart(unittest.TestCase):
             self.assertEqual(len(result.fetchall()), 8)
 
             result = conn.execute(
-                tbls.snapshot_module_variables.select()
-                .where(tbls.snapshot_module_variables.c.snapshot_id == snapshot_id)
+                tbls.snapshot_component_variables.select()
+                .where(tbls.snapshot_component_variables.c.snapshot_id == snapshot_id)
             )
             self.assertEqual(len(result.fetchall()), 8)
 
@@ -190,28 +190,28 @@ class TestDatabaseStart(unittest.TestCase):
                 for colname in ('model_type', 'model_version', 'label'):
                     self.assertEqual(row0._mapping[colname], row1._mapping[colname])
 
-            for module_name in ('table_config_id', 'dsa_module_config_id', 'psa_module_config_id'):
+            for module_name in ('table_config_id', 'dsa_component_config_id', 'psa_component_config_id'):
                 col = tbls.projects.columns[module_name]
                 r0 = conn.execute(
-                    tbls.module_configs.select()
+                    tbls.component_configs.select()
                     .where(
-                        tbls.module_configs.c.module_config_id.in_(
+                        tbls.component_configs.c.component_config_id.in_(
                             sa.select(col)
                             .where(tbls.projects.c.project_id == project_id)
                         )
                     )
                 ).fetchall()
                 r1 = conn.execute(
-                    tbls.module_configs.select()
+                    tbls.component_configs.select()
                     .where(
-                        tbls.module_configs.c.module_config_id.in_(
+                        tbls.component_configs.c.component_config_id.in_(
                             sa.select(col)
                             .where(tbls.projects.c.project_id == new_project_id)
                         )
                     )
                 ).fetchall()
                 for row0, row1 in zip(r0, r1):
-                    for colname in ('module_type', 'module_class', 'module_version', 'config_payload', 'revision', 'last_result_id', 'label'):
+                    for colname in ('component_type', 'component_class', 'component_version', 'config_payload', 'revision', 'last_result_id', 'label'):
                         self.assertEqual(row0._mapping[colname], row1._mapping[colname])
 
             metamodel_ids_0 = conn.execute(

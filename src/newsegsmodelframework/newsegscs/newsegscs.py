@@ -10,6 +10,8 @@ from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult, 
 
 class NewsegsCS(newsegsmodule.NewsegsModule):
     """Abstract base class for NewSEGS Consumption and Storage Module."""
+    module_type = 'cs'
+
     @property
     @abstractmethod
     def location(self) -> modlocation.Location:

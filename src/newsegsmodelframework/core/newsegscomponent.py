@@ -39,6 +39,7 @@ class NewsegsComponent(
     _name: str = 'Model component'
     _version: str = '0.0.1'
     _id_prefix: str = 'cmp'
+    _revision: int = 0
 
     uuid: str = '1'
 
@@ -134,6 +135,10 @@ class NewsegsComponent(
                 getattr(prop, 'fset')(self, v)
             except AttributeError:
                 setattr(self, k, v)
+
+    @property 
+    def revision(self) -> int:
+        return self._revision
     
 class RunnableNewsegsComponent(NewsegsComponent):
     last_run: float = 0.0

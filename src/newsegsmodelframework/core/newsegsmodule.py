@@ -39,6 +39,7 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
 
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsModule'
+    module_type = 'abstract'
 
     _dirty = True
     _model: NewsegsModelInterface
