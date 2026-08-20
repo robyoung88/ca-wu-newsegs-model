@@ -12,7 +12,7 @@ from newsegsmodelframework.core import location as modlocation
 
 class NewsegsGeneration(NewsegsModule):
     """Abstract base class for NewSEGS Generation Module."""
-    module_type = 'generation'
+    component_type = 'generation'
     
     @property
     @abstractmethod

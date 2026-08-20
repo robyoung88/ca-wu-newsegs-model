@@ -23,6 +23,12 @@ from newsegsmodelframework.util import classfuncs
 
 from newsegsmodelframework.core import newsegsmodelinterface
 
+class NewsegsModelData(newsegscomponent.NewsegsComponent):
+    """
+    Holds data relating to the model configuration
+    """
+    component_type = 'energy_model'
+
 class NewsegsModel(
     newsegsmodelinterface.NewsegsModelInterface
 ):
@@ -57,12 +63,43 @@ class NewsegsModel(
     _version = '0.0.1'
     _id_prefix = 'm'
 
+    _model_data: NewsegsModelData
+    _table_config: newsegscomponent.TableConfigNewsegsComponent
+
     _last_hash = 1
 
     checked_out: bool = False
 
     def __init__(self, *args, **kwargs):
+        if 'model_data' in kwargs:
+            self.model_data = kwargs['model_data']
+        else:
+            self.model_data = NewsegsModelData()
+
+        if 'table_config' in kwargs:
+            self.table_config = kwargs['table_config']
+        else:
+            self.table_config = newsegscomponent.TableConfigNewsegsComponent()
+        
         super().__init__(self, *args, **kwargs)
+
+    @property
+    def model_data(self) -> NewsegsModelData:
+        return self._model_data
+
+    @model_data.setter
+    def model_data(self, model_data: NewsegsModelData):
+        if hasattr(self, '_model_data'):
+            self._dirty = True
+        self._model_data = model_data
+
+    @property
+    def table_config(self) -> newsegscomponent.TableConfigNewsegsComponent:
+        return self._table_config
+
+    @table_config.setter
+    def table_config(self, table_config: newsegscomponent.TableConfigNewsegsComponent):
+        self._table_config = table_config
 
     @property
     def model_version(self) -> str:

@@ -44,6 +44,7 @@ variable_configs = sa.Table(
     'variable_configs',
     metadata,
     sa.Column('variable_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
     sa.Column('component_type', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('label', sa.String, nullable = True),
@@ -67,6 +68,7 @@ component_configs = sa.Table(
     'component_configs',
     metadata,
     sa.Column('component_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
     sa.Column('component_type', sa.String),
     sa.Column('component_class', sa.String),
     sa.Column('component_version', sa.String),
@@ -154,9 +156,11 @@ em_configs = sa.Table(
     'em_configs',
     metadata,
     sa.Column('em_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
     sa.Column('grid_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('generation_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('cs_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
+    sa.Column('modeldata_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('table_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('model_class', sa.String),
     sa.Column('model_version', sa.String),
@@ -174,6 +178,7 @@ snapshot_em_configs = sa.Table(
     sa.Column('grid_config_id', sa.Integer),
     sa.Column('generation_config_id', sa.Integer),
     sa.Column('cs_config_id', sa.Integer),
+    sa.Column('modeldata_config_id', sa.Integer),
     sa.Column('table_config_id', sa.Integer),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'grid_config_id'],
@@ -185,6 +190,10 @@ snapshot_em_configs = sa.Table(
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'cs_config_id'],
+        ['snapshot_component_configs.snapshot_id', 'snapshot_component_configs.component_config_id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'modeldata_config_id'],
         ['snapshot_component_configs.snapshot_id', 'snapshot_component_configs.component_config_id']
     ),
     sa.ForeignKeyConstraint(
@@ -203,6 +212,7 @@ fm_configs = sa.Table(
     'fm_configs',
     metadata,
     sa.Column('fm_config_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
     sa.Column('financedata_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('table_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('model_class', sa.String),
@@ -240,6 +250,7 @@ metamodels = sa.Table(
     'metamodels',
     metadata,
     sa.Column('metamodel_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
     sa.Column('em_config_id', sa.Integer, sa.ForeignKey('em_configs.em_config_id')),
     sa.Column('fm_config_id', sa.Integer, sa.ForeignKey('fm_configs.fm_config_id')),
     sa.Column('table_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
@@ -283,6 +294,7 @@ projects = sa.Table(
     'projects',
     metadata,
     sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
     sa.Column('dsa_component_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('psa_component_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),
     sa.Column('table_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id')),

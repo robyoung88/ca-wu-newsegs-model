@@ -11,8 +11,16 @@ import re
 
 import pandas as pd
 
+from newsegsmodelframework.core import NewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core import newsegsmodelinterface
+
+class NewsegsFinanceData(NewsegsComponent):
+    """
+    Holds data relating to the finance configuration and provides a reference for results.
+    """
+    component_type = 'finance_model'
 
 class NewsegsFinance(NewsegsFinanceInterface):
     """
@@ -28,6 +36,9 @@ class NewsegsFinance(NewsegsFinanceInterface):
     _name = 'NewSEGS Finance'
     _finance_version = '0.0.1'
     _id_prefix = 'f'
+
+    _finance_data: NewsegsFinanceData
+    _table_config: TableConfigNewsegsComponent
     
     _model: newsegsmodelinterface.NewsegsModelInterface
     
@@ -39,7 +50,34 @@ class NewsegsFinance(NewsegsFinanceInterface):
     checked_out: bool = False
 
     def __init__(self, *args, **kwargs):
+        if 'finance_data' in kwargs:
+            self.finance_data = kwargs['finance_data']
+        else:
+            self.finance_data = NewsegsFinanceData()
+
+        if 'table_config' in kwargs:
+            self.table_config = kwargs['table_config']
+        else:
+            self.table_config = TableConfigNewsegsComponent()
+        
         super().__init__(self, *args, **kwargs)
+
+    @property
+    def finance_data(self) -> NewsegsFinanceData:
+        return self._finance_data
+
+    @finance_data.setter
+    def finance_data(self, finance_data: NewsegsFinanceData):
+        self.dirty = True
+        self._finance_data = finance_data
+
+    @property
+    def table_config(self) -> TableConfigNewsegsComponent:
+        return self._table_config
+
+    @table_config.setter
+    def table_config(self, table_config: TableConfigNewsegsComponent):
+        self._table_config = table_config
     
     @property
     def finance_version(self) -> str:

@@ -10,7 +10,7 @@ from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult, 
 
 class NewsegsCS(newsegsmodule.NewsegsModule):
     """Abstract base class for NewSEGS Consumption and Storage Module."""
-    module_type = 'cs'
+    component_type = 'cs'
 
     @property
     @abstractmethod

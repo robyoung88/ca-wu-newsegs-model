@@ -75,13 +75,22 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     last_psa_run: float = 0.
     last_optim_run: float = 0.
 
+    _table_config: newsegscomponent.TableConfigNewsegsComponent
+
     def __init__(
         self,
         model: newsegsmodel.NewsegsModel,
         finance: newsegsfinance.NewsegsFinance,
         variables: MutableSequence[variable.Variable] = [],
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(**kwargs)
+
+        if 'table_config' in kwargs:
+            self.table_config = kwargs['table_config']
+        else:
+            self.table_config = newsegscomponent.TableConfigNewsegsComponent()
+        
         self.model = model
         self.finance = finance
         self.variables = variables
@@ -89,6 +98,14 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         """
         A set of variables that have been updated and have not yet been synchronised with model/finance
         """
+
+    @property
+    def table_config(self) -> newsegscomponent.TableConfigNewsegsComponent:
+        return self._table_config
+
+    @table_config.setter
+    def table_config(self, table_config: newsegscomponent.TableConfigNewsegsComponent):
+        self._table_config = table_config
     
     @property
     def model(self) -> newsegsmodel.NewsegsModel:
@@ -176,7 +193,6 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
                     self._variables[id] = var
             else:
                 self._variables[uid] = var
-
 
     def update_variable_from_interface(
         self,

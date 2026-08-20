@@ -25,6 +25,8 @@ from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import find_constructor
 from newsegsmodelframework.util import classfuncs
 
+__all__ = ['NewsegsComponent', 'RunnableNewsegsComponent', 'TableConfigNewsegsComponent']
+
 class NewsegsComponent(
     serialisation.SerialiseToDictMixin,
     metaclass = ABCMeta
@@ -42,6 +44,7 @@ class NewsegsComponent(
     _revision: int = 0
 
     uuid: str = '1'
+    component_type = 'abstract'
 
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsComponent'
@@ -140,6 +143,7 @@ class NewsegsComponent(
     def revision(self) -> int:
         return self._revision
     
+
 class RunnableNewsegsComponent(NewsegsComponent):
     last_run: float = 0.0
 
@@ -153,3 +157,8 @@ class RunnableNewsegsComponent(NewsegsComponent):
         """
         self.last_run = time.time()
         return hash(self)
+
+
+class TableConfigNewsegsComponent(NewsegsComponent):
+    """A reference config object to anchor table results."""
+    component_type = 'table'

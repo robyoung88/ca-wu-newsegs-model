@@ -1,0 +1,1 @@
+from .newsegsproject import NewsegsProject

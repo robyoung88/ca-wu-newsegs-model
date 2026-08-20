@@ -4,7 +4,7 @@ from dash_iconify import DashIconify
 import sqlalchemy as sa
 
 from newsegsmodelapp.backend import db
-from newsegsmodelapp.backend import db_tables as tbls
+from newsegsmodelapp.backend.db import db_tables as tbls
 
 
 # -----------------------------------------------------------------------------
