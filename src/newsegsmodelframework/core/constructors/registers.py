@@ -93,9 +93,10 @@ def get_newsegscomponent_register():
     import newsegsmodelframework.newsegsmodel as newsegsmodel
     import newsegsmodelframework.newsegsfinance as newsegsfinance
     import newsegsmodelframework.newsegsvariable as newsegsvariable
+    import newsegsmodelframework.newsegssensitivity as newsegssensitivity
     
     COMPONENT_CONSTRUCTORS = {}
-    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent]:
+    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent, newsegssensitivity]:
         COMPONENT_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.NewsegsComponent)
         )

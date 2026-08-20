@@ -321,4 +321,10 @@ class TestDatabaseStart(unittest.TestCase):
             self.assertEqual(len(result.fetchall()),1)
 
 
+        # Also test load
+        with db.get_engine().connect() as conn:
+            proj_dup = db.load_project(project_id, conn)
+            self.assertEqual(proj.id, proj_dup.id)
+            self.assertEqual(proj.metamodels[0].id, proj_dup.metamodels[0].id)
+            self.assertEqual(len(proj.metamodels[0].variables), len(proj_dup.metamodels[0].variables))
         
