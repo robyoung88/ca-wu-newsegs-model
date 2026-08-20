@@ -212,7 +212,7 @@ def _get_all_component_ids(
     proj: NewsegsProject
 ):
     rval = [
-        proj.dsa_config._component_config_id,
+        proj.dsa_config._component_config_id, # pyright: ignore[reportAttributeAccessIssue]
         proj.psa_config._component_config_id, # pyright: ignore[reportAttributeAccessIssue]
         proj.table_config._component_config_id, # pyright: ignore[reportAttributeAccessIssue]
     ]
@@ -422,14 +422,14 @@ def save_energy_model(
         if existing is not None:
             model_data.pop('em_config_id')
             encon.execute(
-                tbls.fm_configs.update()
+                tbls.em_configs.update()
                 .where(tbls.em_configs.c.em_config_id == em_config_id)
                 .values(**model_data)
             )
             return em_config_id
 
     result = encon.execute(
-        tbls.fm_configs.insert()
+        tbls.em_configs.insert()
         .values(**model_data)
     )
     if not result or not result.inserted_primary_key:

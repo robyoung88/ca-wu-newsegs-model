@@ -290,6 +290,35 @@ class TestDatabaseStart(unittest.TestCase):
                 for colname in ('model_class', 'model_version', 'config_payload', 'revision', 'label'):
                     self.assertEqual(row0._mapping[colname], row1._mapping[colname])
 
+    def test_project_save(self):
+        from newsegsmodelapp.backend import db
+        from newsegsmodelapp.backend.db import tables as tbls
+
+        from newsegsmodelframework.newsegsmodel import sprakemodel
+        from newsegsmodelframework.newsegsfinance import sprakefinance
+        import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
+        import newsegsmodelframework.newsegsproject as newsegsproject
+
+        mdl = sprakemodel.SprakeModel.from_none()
+        fnc = sprakefinance.SprakeFinance.from_none()
+        fnc.set_model(mdl)
+
+        mm = newsegsmetamodel.NewsegsMetaModel(mdl, fnc)
+
+        proj = newsegsproject.NewsegsProject([mm], 'sprake', mdl.version)
+
+        with db.get_engine().begin() as conn:
+            project_id = db.save_project(proj, conn)
+
+        self.assertIsInstance(project_id, int)
+        self.assertNotEqual(project_id, 1)
+
+        with db.get_engine().connect() as conn:
+            result = conn.execute(
+                sa.select(tbls.projects.c.project_id)
+                .where(tbls.projects.c.project_id == project_id)
+            )
+            self.assertEqual(len(result.fetchall()),1)
 
 
         
