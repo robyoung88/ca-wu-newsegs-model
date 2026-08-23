@@ -2,21 +2,55 @@
 Classes and functions to enable automatic tracking of changes in members
 """
 from dataclasses import dataclass, fields
-from typing import Any, Iterable, Optional, SupportsIndex, Type, TypeVar, dataclass_transform
+from typing import Any, Collection, Iterable, Optional, SupportsIndex, Type, TypeVar, dataclass_transform
 
 class RevisionNotifierMixin:
     """Handles part-child notifications and revision counts"""
-    def __init__(self, parent: Optional['RevisionNotifierMixin'] = None):
-        self._parent = parent
+    def __init__(
+        self, 
+        children: Optional[Collection['RevisionNotifierMixin']] = None
+    ):
+        self._last_syncronised = 0
         self._revision = 0
+        if children:
+            self._children = [x for x in children]
+        else:
+            self._children = []
 
-    def _set_parent(self, parent: Optional['RevisionNotifierMixin']):
-        self._parent = parent
+    def _add_child(self, child: 'RevisionNotifierMixin'):
+        if child is self:
+            raise ValueError('Circular reference - cannot add self as child.')
+        self._children.append(child)
+
+    def _remove_child(self, child: 'RevisionNotifierMixin'):
+        # Don't use remove, need to check for instance equality
+        for idx, inlist in enumerate(self._children):
+            if inlist is child:
+                self._children.pop(idx)
+                return
 
     def _notify_change(self):
         self._revision += 1
-        if self._parent is not None:
-            self._parent._notify_change()
+
+    def _syncronise(self):
+        """Use after saving status (to database)"""
+        self._last_syncronised = self._revision
+
+    def _chain_syncronise(self):
+        self._syncronise()
+        for child in self._children:
+            child._chain_syncronise()
+
+    @property
+    def modified(self) -> bool:
+        return self._last_syncronised != self._revision
+
+    @property
+    def chain_modified(self) -> bool:
+        return (
+            self.modified 
+            or any((child.chain_modified for child in self._children))
+        )
 
     @property
     def revision(self) -> int:
@@ -24,9 +58,9 @@ class RevisionNotifierMixin:
 
 
 def _wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
-    """Wraps mutable structures or assigns parents to child objects."""
+    """Wraps mutable structures or assigns children to parent objects."""
     if isinstance(val, RevisionNotifierMixin):
-        val._set_parent(parent)
+        parent._add_child(val)
         return val
     elif isinstance(val, list) and not isinstance(val, ObservableList):
         return ObservableList(val, parent = parent)
@@ -39,14 +73,18 @@ class ObservableList(list, RevisionNotifierMixin):
     """List wrapper that triggers revision increment on mutation."""
 
     def __init__(self, iterable = (), parent: Optional[RevisionNotifierMixin] = None):
-        RevisionNotifierMixin.__init__(self, parent)
+        RevisionNotifierMixin.__init__(self)
         wrapped = [_wrap_value(item, self) for item in iterable]
         super().__init__(wrapped)
+        if parent:
+            parent._add_child(self)
 
     def __setitem__(self, index, value):
         old_val = super().__getitem__(index)
         new_val = _wrap_value(value, self)
         if old_val != new_val:
+            if isinstance(old_val, RevisionNotifierMixin):
+                self._remove_child(old_val)
             super().__setitem__(index, new_val)
             self._notify_change()
 
@@ -67,15 +105,29 @@ class ObservableList(list, RevisionNotifierMixin):
     def pop(self, index: SupportsIndex = -1):
         item = super().pop(index)
         self._notify_change()
+        if isinstance(item, RevisionNotifierMixin):
+            self._remove_child(item)
         return item
 
     def remove(self, value):
+        try:
+            idx = self.index(value)
+            item = self[idx]
+        except ValueError:
+            # Let the standard error be raised
+            super().remove(value)
+            return
+
+        if isinstance(item, RevisionNotifierMixin):
+            self._remove_child(item)
+        
         super().remove(value)
         self._notify_change()
 
     def clear(self):
         if len(self) > 0:
             super().clear()
+            self._children = []
             self._notify_change()
 
 
@@ -88,10 +140,12 @@ class ObservableDict(dict, RevisionNotifierMixin):
         parent: Optional[RevisionNotifierMixin] = None,
         **kwargs
     ):
-        RevisionNotifierMixin.__init__(self, parent)
+        RevisionNotifierMixin.__init__(self)
         initial = dict(mapping, **kwargs)
         wrapped = {k: _wrap_value(v, self) for k, v in initial.items()}
         super().__init__(wrapped)
+        if parent:
+            parent._add_child(self)
 
     def __setitem__(self, key: Any, value: Any) -> None:
         exists = key in self
@@ -101,8 +155,19 @@ class ObservableDict(dict, RevisionNotifierMixin):
         if not exists or old_val != new_val:
             super().__setitem__(key, new_val)
             self._notify_change()
-
+            if (
+                old_val is not None
+                and isinstance(old_val, RevisionNotifierMixin)
+            ):
+                self._remove_child(old_val)
+            
     def __delitem__(self, key):
+        old_val = self.get(key)
+        if (
+            old_val is not None
+            and isinstance(old_val, RevisionNotifierMixin)
+        ):
+            self._remove_child(old_val)
         super().__delitem__(key)
         self._notify_change()
 
@@ -112,75 +177,37 @@ class ObservableDict(dict, RevisionNotifierMixin):
         for k, v in other.items():
             wrapped_v = _wrap_value(v, self)
             if k not in self or self[k] != wrapped_v:
+                old_val = self.get(k)
+                if (
+                    old_val is not None
+                    and isinstance(old_val, RevisionNotifierMixin)
+                ):
+                    self._remove_child(old_val)
                 super().__setitem__(k, wrapped_v)
                 changed = True
         if changed:
             self._notify_change()
-
+    
     def pop(self, key, *args):
         if key in self:
             item = super().pop(key)
             self._notify_change()
+            if isinstance(item, RevisionNotifierMixin):
+                self._remove_child(item)
             return item
         return super().pop(key, *args)
 
     def clear(self):
         if len(self) > 0:
             super().clear()
+            self._children = []
             self._notify_change()
 
-
-# class DataWithRevision(RevisionNotifierMixin):
-#     """Base class/decorator target for reactive dataclasses."""
-#     def __init_subclass__(cls, **kwargs) -> None:
-#         super().__init_subclass__(**kwargs)
-
-#         # Intercept original generated __init__
-#         orig_init = cls.__init__
-#         def __init__(self, *args, **kwargs):
-#             # Initialise revision state BEFORE dataclass assigns attributes
-#             RevisionNotifierMixin.__init__(self)
-#             # Run standard dataclass field assignments
-#             orig_init(self, *args, **kwargs)
-#             # Wrap initial fields
-#             for f in fields(self):
-#                 val = getattr(self, f.name)
-#                 object.__setattr__(self, f.name, _wrap_value(val, self))
-
-#         cls.__init__ = __init__
-
-#     #def __init__(self, parent: Optional[RevisionNotifierMixin] = None):
-#     #    super().__init__(parent)
-
-#     #def __post_init__(self):
-#     #    # Convert initial plain lists/dicts/children to observable variants
-#     #    for f in fields(self): # pyright: ignore[reportArgumentType]
-#     #        val  = getattr(self, f.name)
-#     #        wrapped = _wrap_value(val, self)
-#     #        super().__setattr__(f.name, wrapped)
-
-#     def __setattr__(self, name: str, value: Any) -> None:
-#         # Allow internal private attribute assignment without triggering checks
-#         if name.startswith('_'): # or not '_revision' in self.__dict__: # A per-set check, replaced with the init_subclass
-#             super().__setattr__(name, value)
-#             return
-
-#         has_old = hasattr(self, name)
-#         old_val = getattr(self, name, None)
-#         new_val = _wrap_value(value, self)
-
-#         # Reassignment without equality triggers a revision increment
-#         if not has_old or old_val != new_val:
-#             # Clear parent link from removed child
-#             if isinstance(old_val, RevisionNotifierMixin):
-#                 old_val._set_parent(None)
-
-#             super().__setattr__(name, new_val)
-#             self._notify_change()
 
 class DataWithRevision(RevisionNotifierMixin):
     """Base class for all revision-tracked dataclasses."""
     pass
+
 
 T = TypeVar('T')
 
@@ -221,7 +248,7 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
 
         if not has_old or old_val != new_val:
             if isinstance(old_val, RevisionNotifierMixin):
-                old_val._set_parent(None)
+                self._remove_child(old_val)
 
             object.__setattr__(self, name, new_val)
             self._notify_change()
