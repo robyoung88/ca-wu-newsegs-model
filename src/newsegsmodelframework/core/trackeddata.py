@@ -66,6 +66,10 @@ def _wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
         return ObservableList(val, parent = parent)
     elif isinstance(val, dict) and not isinstance(val, ObservableDict):
         return ObservableDict(val, parent = parent)
+    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierMixin):
+        for x in val:
+            if isinstance(x, RevisionNotifierMixin):
+                parent._add_child(x)
     return val
 
 
@@ -85,6 +89,10 @@ class ObservableList(list, RevisionNotifierMixin):
         if old_val != new_val:
             if isinstance(old_val, RevisionNotifierMixin):
                 self._remove_child(old_val)
+            elif isinstance(old_val, Iterable):
+                for x in old_val:
+                    if isinstance(x, RevisionNotifierMixin):
+                        self._remove_child(x)
             super().__setitem__(index, new_val)
             self._notify_change()
 

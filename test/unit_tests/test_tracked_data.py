@@ -12,7 +12,7 @@ class Node(DataWithRevision):
     val: int
     tags: list
     meta: dict
-    immut: tuple[int, ...]
+    immut: tuple['int | Node' , ...]
     child: Optional['Node'] = None
 
 class TestRevisionIncrements(unittest.TestCase):
@@ -74,5 +74,20 @@ class TestRevisionIncrements(unittest.TestCase):
 
         subchild.immut = (10,)
         self.assertTrue(parent.chain_modified)
+
+        # Remove subchild
+        child.meta.pop('c')
+        self.assertTrue(parent.chain_modified)
+        parent._chain_syncronise()
+        self.assertFalse(parent.chain_modified)
+        self.assertTrue(subchild.chain_modified)
+
+        # subchild as immutable
+        child.immut = (subchild,)
+        self.assertTrue(parent.chain_modified)
+        parent._chain_syncronise()
+        self.assertFalse(parent.chain_modified)
+        self.assertFalse(subchild.chain_modified)
+
 
     #def test_chained_increments(self):
