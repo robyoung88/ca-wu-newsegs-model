@@ -1,7 +1,7 @@
 """
 Unit tests for newsegsmodelframework/core/trackeddata.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional
 import unittest
 
@@ -15,23 +15,28 @@ class Node(DataWithRevision):
     immut: tuple['int | Node' , ...]
     child: Optional['Node'] = None
 
+def create_parent_and_child() -> tuple[Node, Node]:
+    child = Node(
+        val = 2, 
+        tags = ['spam', 'eggs'], 
+        meta = {'a': 4, 'b': 8},
+        immut = (1, 2, 3)
+    )
+
+    parent = Node(
+        val = 20,
+        tags = ['ni', 'ni'],
+        meta = {'a': 40, 'b': 80},
+        immut = (4, 5, 6),
+        child = child
+    )
+
+    return parent, child
+
 class TestRevisionIncrements(unittest.TestCase):
 
     def test_parent_and_child(self):
-        child = Node(
-            val = 2, 
-            tags = ['spam', 'eggs'], 
-            meta = {'a': 4, 'b': 8},
-            immut = (1, 2, 3)
-        )
-
-        parent = Node(
-            val = 20,
-            tags = ['ni', 'ni'],
-            meta = {'a': 40, 'b': 80},
-            immut = (4, 5, 6),
-            child = child
-        )
+        parent, child = create_parent_and_child()
 
         self.assertEqual(child.revision, 0)
         self.assertEqual(parent.revision, 0)
@@ -88,6 +93,12 @@ class TestRevisionIncrements(unittest.TestCase):
         parent._chain_syncronise()
         self.assertFalse(parent.chain_modified)
         self.assertFalse(subchild.chain_modified)
+
+    def test_serialisation(self):
+        parent, child = create_parent_and_child()
+        d1 = parent.to_dict()
+        print(d1)
+
 
 
     #def test_chained_increments(self):

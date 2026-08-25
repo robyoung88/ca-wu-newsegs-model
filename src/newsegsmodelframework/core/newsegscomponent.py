@@ -18,14 +18,54 @@ from abc import ABCMeta, abstractmethod
 import copy
 import re
 import time
-from typing import Any, Sequence, Type, override
+from typing import Any, Optional, Sequence, Type, override
 import uuid as mod_uuid
 
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import find_constructor
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.util import classfuncs
 
-__all__ = ['NewsegsComponent', 'RunnableNewsegsComponent', 'TableConfigNewsegsComponent']
+__all__ = [
+    'NewsegsComponent', 'RunnableNewsegsComponent', 'TableConfigNewsegsComponent',
+    'DataWithRevision', 'NoConfig',
+]
+
+class ComponentProperty:
+    """Descriptor for attributes which are Components"""
+
+    def __init__(self, default: Any = None):
+        self.default = default
+        self.name = ""
+        self.id = ""
+
+    def __set_name__(self, owner: type, name: str):
+        self.name = f'_{name}' # Name as stored on object instance
+        self.id = f'_{name}_id'
+
+    def __get__(self, instance: Optional['NewsegsComponent'], owner: type) -> Any:
+        if instance is None:
+            return self
+        return getattr(instance, self.name, None)
+
+    def __set__(self, instance: 'NewsegsComponent', value: 'NewsegsComponent'):
+        old_val = getattr(instance, self.name, None)
+
+        if old_val is not None and old_val is not value:
+            instance._config._remove_child(old_val)
+        
+        instance._config._add_child(value._config)
+        instance._config._notify_change()
+
+        setattr(instance, self.name, value)
+        setattr(instance, self.id, value.id)
+
+
+@revision_dataclass
+class NoConfig(DataWithRevision):
+    """A placeholder configuration object"""
+    pass
+
 
 class NewsegsComponent(
     serialisation.SerialiseToDictMixin,
@@ -48,6 +88,8 @@ class NewsegsComponent(
 
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsComponent'
+
+    _config: DataWithRevision
     
     @classmethod
     def _make_id_regex(cls):
@@ -57,8 +99,38 @@ class NewsegsComponent(
     def generate_new_id(cls) -> str:
         return cls._id_prefix + '-' + str(mod_uuid.uuid4())
 
-    def __init__(self, *args, **kwargs):
+    def _generate_config(self, *args, **kwargs) -> DataWithRevision:
+        """Return an implementation of DataWithRevision in order to set _config"""
+        return NoConfig(*args, **kwargs)
+
+    def __init__(self, *args, name: Optional[str] = None, **kwargs):
         self.uuid = str(mod_uuid.uuid4())
+        if name is not None:
+            self.name = name
+        self._config = self._generate_config(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        # Called ONLY when 'name' is not found on the Component instance or class
+        config = self.__dict__.get('_config')
+        if config is not None and hasattr(config, name):
+            return getattr(config, name)
+
+        raise AttributeError(f'"{type(self).__name__}" object has no attribute "{name}"')
+
+    def __setattr__(self, name: str, value: Any):
+        # Bypass custom logic for internal private attributes or initial _config setup
+        if name == '_config' or name.startswith('_'):
+            super().__setattr__(name, value)
+            return
+
+        config = getattr(self, '_config', None)
+        # If attribute belongs to _config dataclass, set it on _config
+        if config is not None and hasattr(config, name):
+            setattr(config, name, value)
+            return
+
+        # Default to setting attribute directly on Component instance
+        super().__setattr__(name, value)
         
     @property
     def name(self) -> str:
@@ -83,6 +155,10 @@ class NewsegsComponent(
             raise ValueError(f'id: {id} is not a valid {type(self)} identifier')
         uid = uid.group(1)
         self.uuid = uid
+
+    @property
+    def config(self) -> DataWithRevision:
+        return self._config
 
     @override
     def update(self, config: dict[str, Any] | type[serialisation.T]):
@@ -141,7 +217,21 @@ class NewsegsComponent(
 
     @property 
     def revision(self) -> int:
-        return self._revision
+        return self._config.revision
+
+    @property
+    def modified(self) -> bool:
+        return self._config.modified
+
+    @property
+    def chain_modified(self) -> bool:
+        return self._config.chain_modified
+
+    def syncronise(self):
+        self._config._syncronise()
+
+    def chain_syncronise(self):
+        self._config._chain_syncronise()
     
 
 class RunnableNewsegsComponent(NewsegsComponent):

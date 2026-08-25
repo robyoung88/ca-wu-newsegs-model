@@ -1,8 +1,10 @@
 """
 Classes and functions to enable automatic tracking of changes in members
 """
-from dataclasses import dataclass, fields
-from typing import Any, Collection, Iterable, Optional, SupportsIndex, Type, TypeVar, dataclass_transform
+from dataclasses import dataclass, fields, asdict
+from typing import Any, Collection, Iterable, Optional, SupportsIndex, Type, TypeVar, dataclass_transform, override
+
+from newsegsmodelframework.core import serialisation
 
 class RevisionNotifierMixin:
     """Handles part-child notifications and revision counts"""
@@ -211,13 +213,20 @@ class ObservableDict(dict, RevisionNotifierMixin):
             self._children = []
             self._notify_change()
 
-
-class DataWithRevision(RevisionNotifierMixin):
-    """Base class for all revision-tracked dataclasses."""
-    pass
-
-
 T = TypeVar('T')
+
+class DataWithRevision(RevisionNotifierMixin, serialisation.SerialiseToDictMixin):
+    """Base class for all revision-tracked dataclasses."""
+    _constructor_class = 'DataWithRevision'
+    _excluded_attributes = ('_children', )
+
+    @classmethod
+    @override
+    def from_dict(cls: type[T], config: dict[str, Any]) -> T:
+        inst = super().from_dict(config)
+        inst._children = []
+        return inst
+
 
 @dataclass_transform()
 def revision_dataclass(cls: Type[T]) -> Type[T]:
