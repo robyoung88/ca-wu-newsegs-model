@@ -1,24 +1,23 @@
 from __future__ import annotations
+from dataclasses import asdict, field
 import os
 import copy
-import datetime
-import time
-from typing import cast, override, Any, Mapping, Sequence
+from typing import cast, override, Any
 from functools import singledispatchmethod
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
 
 from newsegsmodelframework.core.environment.dummy_env_servers import DummyWiderEnv
 from newsegsmodelframework.core.location.location import RaisedLocation
+from newsegsmodelframework.core.newsegscomponent import ComponentProperty
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.core.generation import generators
 from newsegsmodelframework.core.environment import environment_servers
 from newsegsmodelframework.core.environment import inmem_env_servers
 from newsegsmodelframework.core.timespan.timespan import SECONDS_TO_DAYS
+from newsegsmodelframework.core.trackeddata import revision_dataclass
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsgeneration import newsegsgeneration
 from newsegsmodelframework.newsegsgrid import newsegsgrid
@@ -30,9 +29,17 @@ from newsegsmodelframework.newsegscs import sprakecs
 from config import settings
 lookup_dir = settings.get('SprakeDataLoc')
 
-# TODO: Fix that changing this prevents construction. Hub height must be somewhere fixed at 10m before location is set.
-
 _DEFAULT_TS = pd.Timedelta(hours=1)
+_DEFAULT_TIMESPAN = modtimespan.RegTimeSpan(
+    pd.Timestamp('2005-01-01T00:00:00', tz='utc'),
+    pd.Timestamp('2015-01-01T00:00:00', tz='utc'),
+)
+_DEFAULT_TIMESPAN.timestep = _DEFAULT_TS
+
+_DEFAULT_LOCATION = modlocation.Location(
+    settings.get('SprakeValidationLat'),
+    settings.get('SprakeValidationLon')
+)
 
 def get_sprake_environment_server():
     server = inmem_env_servers.InMemoryLocalEnv()
@@ -85,12 +92,6 @@ def get_sprake_environment_server():
         height_agl = 2
     )
     
-    #solar_data = pd.read_excel(os.path.join(lookup_dir,
-    #                                        'solar_resource.xlsx'),
-    #                           sheet_name='global_horizontal_radiation',
-    #                           header=0)
-    #solarloc = AspectLocation()
-    
     # The PV time series holds mean values at half past the hour.
     # Need to extend back one (first obs carried back)
     pv_ts = modtimespan.OffsetRegTimeSpan(
@@ -122,44 +123,67 @@ def get_sprake_environment_server():
 def get_sprake_wider_env_server():
     return DummyWiderEnv()
 
+@revision_dataclass
+class SprakeModelConfig(newsegsmodel.NewsegsModelConfig):
+    timestep: pd.Timedelta = pd.Timedelta(_DEFAULT_TS)
+    run_period: modtimespan.TimeSpan = field(default_factory = lambda: copy.copy(_DEFAULT_TIMESPAN))
+
+
+def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
+    return int(round((timespan.end - timespan.start).total_seconds() * SECONDS_TO_DAYS / 365.25))
+
+
 class SprakeModel(newsegsmodel.NewsegsModel):
     """Implementation of the model of Dr David Sprake as a NewsegsModel."""
-    _name = 'Sprake Model'
+    _name = 'Sprake Energy Model'
     _version = '0.0.1'
+
+    generation = newsegsmodel.NewsegsModelProperty(
+        default = sprakegeneration.SprakeGeneration, 
+        oftype = sprakegeneration.SprakeGeneration
+    ) # pyright: ignore[reportAssignmentType]
+
+    grid = newsegsmodel.NewsegsModelProperty(
+        default = sprakegrid.SprakeGrid,
+        oftype = sprakegrid.SprakeGrid
+    ) # pyright: ignore[reportAssignmentType]
+
+    consumption_storage = newsegsmodel.NewsegsModelProperty(
+        default = sprakecs.SprakeCS,
+        oftype = sprakecs.SprakeCS
+    ) # pyright: ignore[reportAssignmentType]
 
     _generation_result: sprakegeneration.SprakeGenerationResult
     _grid_result: sprakegrid.SprakeGridResult
     _cs_result: sprakecs.SprakeCSResult
 
+    def _generate_config(self, *args, **kwargs) -> SprakeModelConfig:
+        return SprakeModelConfig(*args, **kwargs)
+
     @singledispatchmethod
     def __init__(
         self,
-        mod_gen: str | SprakeModel | newsegsgeneration.NewsegsGeneration,
-        mod_grid: newsegsgrid.NewsegsGrid | None = None,
-        mod_cs: newsegscs.NewsegsCS | None = None,
-        local_environment_server: environment_servers.NewsegsLocalEnvironment | None = None,
-        timestep: modtimespan.TimedeltaScalar | None = None,
-        run_period: modtimespan.TimeSpan | None = None,
-        name: str | None = None,
+        dispatch_arg: str | SprakeModel | newsegsgeneration.NewsegsGeneration,
+        *args,
+        **kwargs,
     ) -> None:
-        raise ValueError('First argument must be string or SprakeModel or NewsegsGeneration, is %s', type(mod_gen))
+        raise ValueError('First argument must be string or SprakeModel or NewsegsGeneration, is %s', type(dispatch_arg))
     
     # Copy constructor is registered underneath class definition for late-bind
     
     @__init__.register(newsegsgeneration.NewsegsGeneration)
     def _from_NewsegsGeneration(
         self,
-        mod_gen: newsegsgeneration.NewsegsGeneration,
-        mod_grid: newsegsgrid.NewsegsGrid | None = None,
-        mod_cs: newsegscs.NewsegsCS | None = None,
-        local_environment_server: environment_servers.NewsegsLocalEnvironment | str| None = None,
+        generation: newsegsgeneration.NewsegsGeneration,
+        *args, 
+        grid: newsegsgrid.NewsegsGrid | None = None,
+        consumption_storage: newsegscs.NewsegsCS | None = None,
+        local_environment_server: environment_servers.NewsegsLocalEnvironment | str | None = None,
         wider_environment_server: environment_servers.NewsegsWiderEnvironment | str | None = None,
-        timestep: modtimespan.TimedeltaScalar | None = None,
-        run_period: modtimespan.TimeSpan | None = None,
         loc: modlocation.Location | None = None,
-        name: str | None = None,
+        **kwargs,
     ) -> None:
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         if local_environment_server:
             if isinstance(local_environment_server, str):
@@ -183,80 +207,60 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         else:
             self._wider_environment_server = get_sprake_wider_env_server()
 
-        if not isinstance(mod_gen, sprakegeneration.SprakeGeneration):
-            raise TypeError(f'mod_gen must be of type SprakeGeneration, is {type(mod_gen)}')
-        self.generation = mod_gen
+        if not isinstance(generation, sprakegeneration.SprakeGeneration):
+            raise TypeError(f'"generation" must be of type SprakeGeneration, is {type(generation)}')
+        self.generation = generation # pyright: ignore[reportIncompatibleMethodOverride]
 
-        if mod_grid:
-            if not isinstance(mod_grid, sprakegrid.SprakeGrid):
-                raise TypeError(f'mod_grid must be of type SprakeGrid, is {type(mod_grid)}')
-            self.grid = mod_grid
+        if grid:
+            if not isinstance(grid, sprakegrid.SprakeGrid):
+                raise TypeError(f'"grid2 must be of type SprakeGrid, is {type(grid)}')
+            self.grid = grid
         else:
-            self.grid = sprakegrid.SprakeGrid.from_none()
+            self.grid = sprakegrid.SprakeGrid.from_none() # pyright: ignore[reportIncompatibleMethodOverride]
         
-        if mod_cs:
-            if not isinstance(mod_cs, sprakecs.SprakeCS):
-                raise TypeError(f'mod_cs must be of type SprakeCS, is {type(mod_cs)}')
-            self.consumption_storage = mod_cs
+        if consumption_storage:
+            if not isinstance(consumption_storage, sprakecs.SprakeCS):
+                raise TypeError(f'"consumption_storage" must be of type SprakeCS, is {type(consumption_storage)}')
+            self.consumption_storage = consumption_storage
         else:
-            self.consumption_storage = sprakecs.SprakeCS.from_none()
-
-        if timestep:
-            self._default_timestep = pd.Timedelta(timestep)
-        else:
-            self._default_timestep = _DEFAULT_TS
-        
-        if run_period:
-            self.set_run_period(modtimespan.RegTimeSpan(run_period))
-        else:
-            self.set_run_period(modtimespan.RegTimeSpan(
-                pd.Timestamp('2005-01-01T00:00:00', tz='utc'),
-                pd.Timestamp('2015-01-01T00:00:00', tz='utc')
-                        ))
-        self._run_period.timestep = self._default_timestep
+            self.consumption_storage = sprakecs.SprakeCS.from_none() # pyright: ignore[reportIncompatibleMethodOverride]
 
         if loc:
-            self._mod_cs.location = loc
-
-        if name is not None:
-            self.name = name
-
-        self._dirty = True
+            self.consumption_storage.location = loc
 
     @__init__.register(str)
     def _from_str(
         self,
-        name: str
+        name: str,
+        *args,
+        **kwargs,
     ) -> None:
 
         mod_gen = sprakegeneration.SprakeGeneration(sprakegeneration.get_sprake_ned100())
-        mod_gen.set_location(
-            modlocation.Location(
-                settings.get('SprakeValidationLat'),
-                settings.get('SprakeValidationLon')
-            )
-        )
+        mod_gen.set_location(copy.copy(_DEFAULT_LOCATION))
         cast(RaisedLocation, mod_gen.generator.generators[1].location).height_agl = 2.
 
         # Re-dispatch to SprakeGeneration singledispatchmethod
-        self.__init__(mod_gen, name = name)
+        self.__init__(mod_gen, name = name, *args, **kwargs)
     
     # We can do the from_none using the _from_str init
     @classmethod
     def from_none(cls):
-        return cls('Sprake Model')
+        return cls('Sprake Energy Model')
 
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
-        self._run_period = modtimespan.RegTimeSpan(timespan)
-        self._run_period.timestep = self._default_timestep
-        self._horizon = int(round((self._run_period.end - self._run_period.start).total_seconds() * SECONDS_TO_DAYS / 365.25))
-        self._dirty = True
-
+        new_timespan = modtimespan.RegTimeSpan(timespan)
+        new_timespan.timestep = self.timestep
+        new_horizon = _timespan_to_horizon_years(new_timespan)
+        self.run_period = new_timespan
+        self._horizon = new_horizon
+        
     def get_run_period(self) -> modtimespan.TimeSpan:
-        return self._run_period
+        return self.run_period
     
     @property
     def horizon(self) -> int:
+        """Time horizon in years."""
         return self._horizon
     
     @horizon.setter
@@ -268,42 +272,9 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         while ts.end.day != ts.start.day:
             ts.end = ts.end + pd.Timedelta(1, unit='d')
         ts.timestep = self._default_timestep
-        self._run_period = ts
+
+        self.run_period = ts
         self._horizon = new_horizon
-        self._dirty = True
-
-    @property
-    def generation(self) -> sprakegeneration.SprakeGeneration:
-        return self._mod_gen
-    
-    @generation.setter
-    def generation(self, generation_module: newsegsgeneration.NewsegsGeneration):
-        if not isinstance(generation_module, sprakegeneration.SprakeGeneration):
-            raise TypeError(f'Sprake model only compatible with SprakeGeneration - {type(generation_module)} provided')
-        self._mod_gen = generation_module
-        self._mod_gen.model = self
-
-    @property
-    def grid(self) -> sprakegrid.SprakeGrid:
-        return self._mod_grid
-
-    @grid.setter
-    def grid(self, grid_module: newsegsgrid.NewsegsGrid):
-        if not isinstance(grid_module, sprakegrid.SprakeGrid):
-            raise TypeError(f'Sprake model only compatible with SprakeGrid - {type(grid_module)} provided')
-        self._mod_grid = grid_module
-        self._mod_grid.model = self
-
-    @property
-    def consumption_storage(self) -> sprakecs.SprakeCS:
-        return cast(sprakecs.SprakeCS, self._mod_cs)
-
-    @consumption_storage.setter
-    def consumption_storage(self, cs_module: newsegscs.NewsegsCS):
-        if not isinstance(cs_module, sprakecs.SprakeCS):
-            raise TypeError(f'Sprake model only compatible with SprakeCS - {type(cs_module)} provided')
-        self._mod_cs = cs_module
-        self._mod_cs.model = self
 
     @property
     def local_env(self) -> environment_servers.NewsegsLocalEnvironment:
@@ -328,12 +299,12 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._wider_environment_server = wider_env_server
 
     def get_default_timestep(self) -> pd.Timedelta:
-        return self._default_timestep
+        return self.timestep
 
     @property
     @override
     def location(self) -> modlocation.Location:
-        return self._mod_cs.location
+        return self.consumption_storage.location
     
     @location.setter
     @override
@@ -342,7 +313,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         The location has no impact on the Sprake model; store with the 
         consumption-storage module.
         """
-        self._mod_cs.location = loc
+        self.consumption_storage.location = loc
 
     def get_generation_result(self) -> NewsegsModuleResult:
         return self._generation_result
@@ -359,10 +330,19 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     @override
     def run(self):
         super().run()
-        self._generation_result = self._mod_gen.run(self._run_period)
-        self._grid_result = self._mod_grid.run(self._run_period)
-        self._cs_result = self._mod_cs.run(self._run_period)
-        self._dirty = False
+        self._generation_result = cast(
+            sprakegeneration.SprakeGenerationResult,
+            self.generation.run(self.run_period)
+        )
+        self._grid_result = cast(
+            sprakegrid.SprakeGridResult,
+            self.grid.run(self.run_period)
+        )
+
+        self._cs_result = cast(
+            sprakecs.SprakeCSResult,
+            self.consumption_storage.run(self.run_period)
+        )
         
         self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
@@ -423,10 +403,9 @@ def _SprakeModel_from_other(
     self.local_env = other.local_env
     self.wider_env = other.wider_env
 
+    for k in asdict(other._config).keys(): # pyright: ignore[reportArgumentType]
+        setattr(self, k, copy.copy(getattr(other, k)))
+
     self.generation = copy.deepcopy(other.generation)
     self.grid = copy.deepcopy(other.grid)
     self.consumption_storage = copy.deepcopy(other.consumption_storage)
-
-    self._default_timestep = other.get_default_timestep()
-    self.set_run_period(other.get_run_period())
-    self._dirty = True

@@ -1,26 +1,27 @@
 """Provides abstract base class for NewSEGS financial calculations"""
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
-import copy
-import datetime
-import time
-from typing import Any
-import uuid
-import re
+from abc import abstractmethod
+from typing import Optional
 
 import pandas as pd
 
 from newsegsmodelframework.core import NewsegsComponent
-from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import ComponentProperty, TableConfigNewsegsComponent
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core import newsegsmodelinterface
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 
 class NewsegsFinanceData(NewsegsComponent):
     """
     Holds data relating to the finance configuration and provides a reference for results.
     """
     component_type = 'finance_model'
+
+@revision_dataclass
+class NewsegsFinanceConfig(DataWithRevision):
+    benefit_discount_rate: float = 0.
+    cost_discount_rate: float = 0.
 
 class NewsegsFinance(NewsegsFinanceInterface):
     """
@@ -31,53 +32,36 @@ class NewsegsFinance(NewsegsFinanceInterface):
     energy generation, sales, and imports.
     """
 
-    _dirty = True
-
-    _name = 'NewSEGS Finance'
+    _name = 'NewSEGS Finance Model'
     _finance_version = '0.0.1'
     _id_prefix = 'f'
 
-    _finance_data: NewsegsFinanceData
-    _table_config: TableConfigNewsegsComponent
-    
-    _model: newsegsmodelinterface.NewsegsModelInterface
+    finance_data = ComponentProperty(default = NewsegsFinanceData)
+    table_config = ComponentProperty(default = TableConfigNewsegsComponent)
+
+    model = ComponentProperty(default = newsegsmodelinterface.NewsegsModelInterface)
     
     last_update: float = 0.0
 
-    _benefit_discount_rate: float = 0.
-    _cost_discount_rate: float = 0.
-
     checked_out: bool = False
 
-    def __init__(self, *args, **kwargs):
-        if 'finance_data' in kwargs:
-            self.finance_data = kwargs['finance_data']
-        else:
-            self.finance_data = NewsegsFinanceData()
+    def _generate_config(self, *args, **kwargs) -> DataWithRevision:
+        return NewsegsFinanceConfig(*args, **kwargs)
 
-        if 'table_config' in kwargs:
-            self.table_config = kwargs['table_config']
-        else:
-            self.table_config = TableConfigNewsegsComponent()
-        
-        super().__init__(self, *args, **kwargs)
+    def __init__(
+            self, 
+            *args,
+            model: Optional[newsegsmodelinterface.NewsegsModelInterface] = None,
+            finance_data: Optional['NewsegsFinanceData'] = None,
+            table_config: Optional['TableConfigNewsegsComponent'] = None,
+            **kwargs):
+        super().__init__(*args, **kwargs)
 
-    @property
-    def finance_data(self) -> NewsegsFinanceData:
-        return self._finance_data
+        if model is not None:
+            self.set_model(model)
 
-    @finance_data.setter
-    def finance_data(self, finance_data: NewsegsFinanceData):
-        self.dirty = True
-        self._finance_data = finance_data
-
-    @property
-    def table_config(self) -> TableConfigNewsegsComponent:
-        return self._table_config
-
-    @table_config.setter
-    def table_config(self, table_config: TableConfigNewsegsComponent):
-        self._table_config = table_config
+        self.finance_data = finance_data or NewsegsFinanceData()
+        self.table_config = table_config or TableConfigNewsegsComponent()
     
     @property
     def finance_version(self) -> str:
@@ -88,7 +72,6 @@ class NewsegsFinance(NewsegsFinanceInterface):
         Perform any expensive computation required to "un-dirty" the finance
         """
         super().run()
-        self._dirty = False
         return hash(self)
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
@@ -97,37 +80,10 @@ class NewsegsFinance(NewsegsFinanceInterface):
         mdl: newsegsmodelinterface.NewsegsModelInterface,
         dirty: bool = True
     ) -> None:
-        self._model = mdl
-        self.dirty = self.dirty or dirty
-    
-    @property
-    def model(self) -> newsegsmodelinterface.NewsegsModelInterface:
-        if not hasattr(self, '_model'):
-            raise AttributeError('model has not yet been set')
-        return self._model
-    
-    @model.setter
-    def model(self, mdl: newsegsmodelinterface.NewsegsModelInterface) -> None:
-        self.set_model(mdl)
-
-    # Discount rates
-    @property
-    def benefit_discount_rate(self) -> float:
-        return self._benefit_discount_rate
-
-    @benefit_discount_rate.setter
-    def benefit_discount_rate(self, v: float) -> None:
-        self.dirty = self.dirty or not(self._benefit_discount_rate == v)
-        self._benefit_discount_rate = v
-
-    @property
-    def cost_discount_rate(self) -> float:
-        return self._cost_discount_rate
-    
-    @cost_discount_rate.setter
-    def cost_discount_rate(self, v:float) -> None:
-        self.dirty = self.dirty or not(self._cost_discount_rate == v)
-        self._cost_discount_rate = v
+        last_revision = self.revision
+        self.model = mdl
+        if not dirty:
+            self._config._revision = last_revision
     
     def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
         """
@@ -153,8 +109,8 @@ class NewsegsFinance(NewsegsFinanceInterface):
             argnames = ['benefit_discount_rate', 'cost_discount_rate']
             argdict = dict(zip(argnames, drs))
             argdict.update(kwdrs)
-            self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate)
-            self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate)
+            self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate) or 0.0
+            self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate) or 0.0
     
     # Benefits
     @property
@@ -529,22 +485,6 @@ class NewsegsFinance(NewsegsFinanceInterface):
     @abstractmethod
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
         ...
-
-    @property
-    def dirty(self) -> bool:
-        """
-        Has the model configuration changed since last run?
-        """
-        return self._dirty or self.last_run < self.model.last_run
-
-    @dirty.setter
-    def dirty(self, val: bool) -> None:
-        #import traceback
-        if val:
-            #print('finance last_update set')
-            #print(traceback.print_stack())
-            self.last_update = time.time()
-        self._dirty = val
 
     def __hash__(self):
         mdl = self.model

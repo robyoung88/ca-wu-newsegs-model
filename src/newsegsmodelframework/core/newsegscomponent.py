@@ -34,10 +34,11 @@ __all__ = [
 class ComponentProperty:
     """Descriptor for attributes which are Components"""
 
-    def __init__(self, default: Any = None):
+    def __init__(self, default: Any = None, oftype: Optional[type | tuple[type, ...]] = None):
         self.default = default
         self.name = ""
         self.id = ""
+        self.oftype = oftype
 
     def __set_name__(self, owner: type, name: str):
         self.name = f'_{name}' # Name as stored on object instance
@@ -49,6 +50,9 @@ class ComponentProperty:
         return getattr(instance, self.name, None)
 
     def __set__(self, instance: 'NewsegsComponent', value: 'NewsegsComponent'):
+        if self.oftype:
+            if not isinstance(value, self.oftype):
+                raise TypeError(f'"{self.name}" is expected as one of {self.oftype}, is {type(value)}')
         old_val = getattr(instance, self.name, None)
 
         if old_val is not None and old_val is not value:
@@ -232,6 +236,10 @@ class NewsegsComponent(
 
     def chain_syncronise(self):
         self._config._chain_syncronise()
+
+    @property
+    def dirty(self):
+        return self.chain_modified
     
 
 class RunnableNewsegsComponent(NewsegsComponent):

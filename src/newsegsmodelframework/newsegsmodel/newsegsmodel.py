@@ -3,31 +3,41 @@ Abstract base class for NewSEGS model
 """
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
-import copy
-from typing import Any, Type, override
-import re
-import datetime
-import uuid
+from abc import abstractmethod
+from typing import Any, Optional, override
 
 from newsegsmodelframework.core import newsegscomponent
-from newsegsmodelframework.core import environmentserverinterface
-from newsegsmodelframework.core import resultsserverinterface
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.core import TimeSpan, TimedeltaScalar
+from newsegsmodelframework.core import TimeSpan
+from newsegsmodelframework.core.newsegsmodule import NewsegsModule
 from newsegsmodelframework.core.serialisation import T
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from newsegsmodelframework.newsegsgrid import NewsegsGrid
 from newsegsmodelframework.newsegscs import NewsegsCS
-from newsegsmodelframework.util import classfuncs
 
 from newsegsmodelframework.core import newsegsmodelinterface
+
+class NewsegsModelProperty(newsegscomponent.ComponentProperty):
+    @override
+    def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'):
+        if not isinstance(instance, NewsegsModel):
+            raise TypeError(f'Property accessing {self.name} should only be applied to a NewsegsModel, is attribute of {type(instance)}')
+        if not isinstance(value, NewsegsModule):
+            raise TypeError(f'Property assigned to {self.name} should be a NewsegsModule, is {type(value)}')
+        super().__set__(instance, value)
+        getattr(instance, self.name).model = instance
+
 
 class NewsegsModelData(newsegscomponent.NewsegsComponent):
     """
     Holds data relating to the model configuration
     """
     component_type = 'energy_model'
+
+@revision_dataclass
+class NewsegsModelConfig(DataWithRevision):
+    ...
 
 class NewsegsModel(
     newsegsmodelinterface.NewsegsModelInterface
@@ -56,57 +66,40 @@ class NewsegsModel(
     When restoring state from dictionary, then the configuration of the submodules should be
     passed down
     """
-
-    _dirty = False
     
-    _name = 'NewSEGS Model'
+    _name = 'NewSEGS Energy Model'
     _version = '0.0.1'
     _id_prefix = 'm'
 
-    _model_data: NewsegsModelData
-    _table_config: newsegscomponent.TableConfigNewsegsComponent
+    model_data = newsegscomponent.ComponentProperty(default = NewsegsModelData)
+    table_config = newsegscomponent.ComponentProperty(default = newsegscomponent.TableConfigNewsegsComponent)
 
     _last_hash = 1
 
     checked_out: bool = False
+    
 
-    def __init__(self, *args, **kwargs):
-        if 'model_data' in kwargs:
-            self.model_data = kwargs['model_data']
-        else:
-            self.model_data = NewsegsModelData()
+    def _generate_config(self, *args, **kwargs) -> NewsegsModelConfig:
+        return NewsegsModelConfig(*args, **kwargs)
 
-        if 'table_config' in kwargs:
-            self.table_config = kwargs['table_config']
-        else:
-            self.table_config = newsegscomponent.TableConfigNewsegsComponent()
-        
-        super().__init__(self, *args, **kwargs)
+    def __init__(
+        self,
+        *args,
+        model_data: Optional[NewsegsModelData] = None,
+        table_config: Optional[newsegscomponent.TableConfigNewsegsComponent] = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
 
-    @property
-    def model_data(self) -> NewsegsModelData:
-        return self._model_data
-
-    @model_data.setter
-    def model_data(self, model_data: NewsegsModelData):
-        if hasattr(self, '_model_data'):
-            self._dirty = True
-        self._model_data = model_data
-
-    @property
-    def table_config(self) -> newsegscomponent.TableConfigNewsegsComponent:
-        return self._table_config
-
-    @table_config.setter
-    def table_config(self, table_config: newsegscomponent.TableConfigNewsegsComponent):
-        self._table_config = table_config
-
+        self.model_data = model_data or NewsegsModelData()
+        self.table_config = table_config or newsegscomponent.TableConfigNewsegsComponent()
+            
     @property
     def model_version(self) -> str:
         return self.version
 
     @abstractmethod
-    def set_run_period(self, timespan:TimeSpan):
+    def set_run_period(self, timespan: TimeSpan):
         """
         Define the timespan of simulation
         """
@@ -280,18 +273,6 @@ class NewsegsModel(
     @abstractmethod
     def location(self, loc: modlocation.Location) -> None:
         ...
-
-    @property
-    def dirty(self) -> bool:
-        """
-        Is the model aware of config changes since last run?
-        """
-        return (
-            self.generation.dirty or
-            self.grid.dirty or
-            self.consumption_storage.dirty or
-            self._dirty
-        )
     
     @override
     def update(self, config: dict[str, Any] | type[T]):
@@ -299,19 +280,19 @@ class NewsegsModel(
             super().update(config)
             return
         
-        for mod_name in ('mod_gen', '_mod_gen'):
+        for mod_name in ('mod_gen', '_mod_gen', 'generation'):
             generation = config.pop(mod_name, None)
             if generation:
                 self.update_generation(generation)
                 break
 
-        for mod_name in ('mod_grid', '_mod_grid'):
+        for mod_name in ('mod_grid', '_mod_grid', 'grid'):
             grid = config.pop(mod_name, None)
             if grid:
                 self.update_grid(grid)
                 break
         
-        for mod_name in ('mod_cs', '_mod_cs'):
+        for mod_name in ('mod_cs', '_mod_cs', 'consumption_storage'):
             cs = config.pop(mod_name, None)
             if cs:
                 self.update_consumption_storage(cs)

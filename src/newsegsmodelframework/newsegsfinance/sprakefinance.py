@@ -1,7 +1,7 @@
 """Provides implementation of NewsegsFinance for Sprake Model."""
 from __future__ import annotations
-import copy
-from typing import override, Mapping
+from dataclasses import asdict
+from typing import Any, cast, override, Mapping
 from numbers import Number
 from functools import singledispatchmethod
 from functools import lru_cache
@@ -10,43 +10,50 @@ import numpy as np
 import pandas as pd
 
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.util import classfuncs
 from newsegsmodelframework.core.timespan import delta_days
 from newsegsmodelframework.core.newsegsmoduleresult import filter_meter_indices
+from newsegsmodelframework.core.trackeddata import revision_dataclass
 from newsegsmodelframework.newsegsfinance import newsegsfinance
-from newsegsmodelframework.newsegsfinance import common as common_finance
-from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsmodel import SprakeModel
 
 from newsegsmodelframework.newsegsfinance import apply_discount_factor, sum_all_to_horizon
-#from newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsstats import core as stats_core
 
 # Not strictly true, but good enough for finance.
 HOURS_IN_YEAR = 8760.0
 
+@revision_dataclass
+class SprakeFinanceConfig(newsegsfinance.NewsegsFinanceConfig):
+    wind_capex_per_kw: float = 1500.0
+    wind_om_per_kw_year: float = 46.0
+
+    pv_capex_per_kw: float = 1000.0
+    pv_om_per_kw_year: float = 10.5
+    
+    bess_capex_per_kwh: float = 191.772
+    bess_om_per_kwh_year: float = 16.719
+    
+    resident_sc_per_unit_day: float = 0.0
+    resident_var_per_unit: float = 0.35
+    
+    grid_export_var_per_unit: float = 0.1
+            
+    grid_import_sc_per_day: float = 0.0
+    grid_import_var_per_unit: float = 0.35
+
+
+_DEFAULT_UNIT_COSTS = SprakeFinanceConfig()
+
+def _clean_unit_cost_dict(costs: dict[str, Any]) -> None:
+    """Removes (in-place) non-unit-cost values from finance config dictionary"""
+    costs.pop('benefit_discount_rate', None)
+    costs.pop('cost_discount_rate', None)
+    return
+
+
 class SprakeFinance(newsegsfinance.NewsegsFinance):
     """Implementation of NewsegsFinance for Sprake Model."""
-    _name = 'Sprake Finance Module'
-
-    _default_unit_costs = {
-        'wind_capex_per_kw': 1500.0,
-        'wind_om_per_kw_year': 46.0,
-
-        'pv_capex_per_kw': 1000.0,
-        'pv_om_per_kw_year': 10.5,
-
-        'bess_capex_per_kwh': 191.772,
-        'bess_om_per_kwh_year': 16.719,
-
-        'resident_sc_per_unit_day': 0.0,
-        'resident_var_per_unit': 0.35,
-
-        'grid_export_var_per_unit': 0.1,
-        
-        'grid_import_sc_per_day': 0.0,
-        'grid_import_var_per_unit': 0.35
-    }
+    _name = 'Sprake Finance Model'
 
     _meter_names = {
         'resident_consumption': ('appliance_import', 'dhw_import', 'spaceheat_import'),
@@ -56,18 +63,17 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         'grid_import': ('grid_import')
     }
 
-    _model: SprakeModel # pyright: ignore[reportIncompatibleVariableOverride]
+    def _generate_config(self, *args, **kwargs) -> newsegsfinance.DataWithRevision:
+        return SprakeFinanceConfig(*args, **kwargs)
 
     @singledispatchmethod
     def __init__(
         self,
-        unit_costs: Mapping | float|int | SprakeFinance,
-        benefit_discount_rate: float|int | None = None,
-        cost_discount_rate: float|int | None = None,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        dispatch_arg: Mapping | float|int | SprakeFinance,
+        *args,
+        **kwargs,
     ) -> None:
-        raise ValueError('First argument must be a Mapping, a Number, or a SprakeFinance, is %s', type(unit_costs))
+        raise ValueError('First argument must be a Mapping, a Number, or a SprakeFinance, is %s', type(dispatch_arg))
     
     # Copy constructor is registered underneath class definition for late-bind
 
@@ -75,43 +81,30 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     def _from_number(
         self,
         benefit_discount_rate: float|int,
-        cost_discount_rate: float|int = 0.0,
+        *args,
         horizon: int = -1,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        **kwargs
     ) -> None:
-        super().__init__()
-        self._unit_costs = type(self)._default_unit_costs.copy()
-
-        self.benefit_discount_rate = benefit_discount_rate
-        self.cost_discount_rate = cost_discount_rate
+        super().__init__(
+            *args,
+            benefit_discount_rate = benefit_discount_rate,
+            **kwargs
+        )
 
         self.horizon = horizon
 
-        if name is not None:
-            self.name = name
-        
-        if model is not None:
-            self.set_model(model)
-
-        self.dirty = True
-    
     @__init__.register(dict)
     def _from_dict(
         self,
         unit_costs: Mapping,
-        benefit_discount_rate: float|int = 0.0,
-        cost_discount_rate: float|int = 0.0,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None,
+        *args,
+        horizon: int = -1,
+        **kwargs
     ) -> None:
-        a = locals()
-        del a['self']
-        del a['unit_costs']
-        del a['benefit_discount_rate']
-
-        self.__init__(benefit_discount_rate, **a)
+        super().__init__(*args, **kwargs)
+        
         self.set_unit_costs_from_dict(unit_costs)
+        self.horizon = horizon
     
     @classmethod
     def from_none(cls):
@@ -123,10 +116,12 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
         Check `SprakeFinance.get_default_unit_costs()` for expected values
         """
-        v0 = copy.copy(self._unit_costs)
-        self._unit_costs.update(input_dict)
-        self.dirty = self.dirty or (v0 != self._unit_costs)
-    
+        for k, v in input_dict.items():
+            if not hasattr(SprakeFinanceConfig, k):
+                raise AttributeError(f'Unit cost not known: {k}; Available values are {list(SprakeFinanceConfig.__dict__.keys())}')
+
+            setattr(self, k, v)
+        
     @override
     def set_model(
         self, 
@@ -135,32 +130,34 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     ) -> None:
         if not isinstance(mdl, SprakeModel):
             raise TypeError(f'SprakeFinance only compatible with SprakeModel, {type(mdl)} provided')
-        self._model: SprakeModel = mdl # pyright: ignore[reportIncompatibleVariableOverride]
-        self.dirty = self.dirty or dirty
+        return super().set_model(mdl, dirty)
     
     @property
+    @override
     def model(self) -> SprakeModel:
-        if not hasattr(self, '_model'):
-            raise AttributeError('model has not yet been set')
-        return self._model
+        return cast(SprakeModel, super().model)
     
     @model.setter
     def model(self, mdl: NewsegsModelInterface) -> None:
-        self.set_model(mdl)
+        super().model = mdl
 
     @classmethod
     def get_default_unit_costs(cls) -> dict:
         """
         Return the default unit cost dictionary
         """
-        return cls._default_unit_costs.copy()
+        odict = asdict(_DEFAULT_UNIT_COSTS)
+        _clean_unit_cost_dict(odict)
+        return odict
 
     @property
     def unit_costs(self) -> dict:
         """
         Get a copy of the current unit cost dictionary
         """
-        return self._unit_costs.copy()
+        odict = asdict(self._config) # pyright: ignore[reportArgumentType]
+        _clean_unit_cost_dict(odict)
+        return odict
 
     def _get_empty_df(self) -> pd.DataFrame:
         return _deferred_get_empty_df(self).copy()
@@ -413,57 +410,6 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
     def get_net_present_value_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
         return _deferred_get_net_present_value_discounted(self, horizon)
-    
-    # @override
-    # def to_dict(self) -> dict:
-    #     return {
-    #         'class': classfuncs.get_class(self),
-    #         'name': self._name,
-    #         'unit_costs': self._unit_costs,
-    #         'benefit_discount_rate': self._benefit_discount_rate,
-    #         'cost_discount_rate': self._cost_discount_rate
-    #     }
-    
-    # def sync_with_dict(self, config: Mapping) -> None:
-    #     """
-    #     Synchronise configuration with a config dictionary.
-    #     """
-        
-    #     config = copy.copy(config)
-
-    #     unit_costs = config.get('unit_costs', None)
-    #     if unit_costs:
-    #         self.set_unit_costs_from_dict(unit_costs)
-        
-    #     # This looks risky, but practically may only result in
-    #     # some redundant attributes if the config is bad.
-    #     conf_keys = config.keys()
-    #     for k in conf_keys:
-    #         if hasattr(self, k):
-    #             v = config.get(k)
-
-    #             # If the attribute is a read-write property, its class attribute 
-    #             # will have an fset
-    #             try:
-    #                 prop = getattr(type(self), k)
-    #                 if hasattr(prop, 'fset'):
-    #                     if getattr(prop, 'fset') is not None:
-    #                         getattr(prop, 'fset')(self, v)
-    #                     else:
-    #                         # Property is read-only; do nothing
-    #                         ...
-    #                 else:
-    #                     # Otherwise, we assume it is a simple attribute that may be overwritten
-    #                     setattr(self, k, v)
-    #             except AttributeError:
-    #                 setattr(self, k, v)
-    
-    # @classmethod
-    # def from_dict(cls, config: Mapping) -> SprakeFinance:
-    #     o = cls.from_none()
-    #     o.sync_with_dict(config)
-
-    #     return o
 
 # SprakeFinance copy constructor
 @SprakeFinance.__init__.register(SprakeFinance) # pyright: ignore[reportFunctionMemberAccess]
@@ -472,28 +418,14 @@ def _SprakeFinance_from_other(
     other: SprakeFinance
 ) -> None:
     super(SprakeFinance, self).__init__()
-
-    self._unit_costs = copy.copy(other.unit_costs)
-    self.benefit_discount_rate = other.benefit_discount_rate
-    self.cost_discount_rate = other.cost_discount_rate
     self.name = other.name
+    for k, v in asdict(other._config).items(): # pyright: ignore[reportArgumentType]
+        setattr(self, k, v)
+    
     try:
         self.model = other.model
     except AttributeError:
         pass
-
-def _make_unit_cost_property(key: str):
-    def getter(self) -> float:
-        return self._unit_costs.get(key)
-
-    def setter(self, value: float) -> None:
-        self.dirty = self.dirty or self._unit_costs[key] != value
-        self._unit_costs[key] = value
-
-    return property(getter, setter, doc=f"Unit cost for {key}")
-
-for _key in SprakeFinance._default_unit_costs.keys():
-    setattr(SprakeFinance, _key, _make_unit_cost_property(_key))
 
 @lru_cache
 def _deferred_get_empty_df(fnc: SprakeFinance):

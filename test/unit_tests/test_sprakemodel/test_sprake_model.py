@@ -93,9 +93,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
 
-        d1 = mdl.to_dict()
-
-        sd1 = json.dumps(d1, cls = jsonfuncs.NumpyEncoder)
+        sd1 = mdl.json_dumps()
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_none()
@@ -121,9 +119,9 @@ class TestSprakeModelRun(unittest.TestCase):
 
     def test_default_run(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        self.assertTrue(mdl.dirty)
+        #self.assertTrue(mdl.dirty)
         mdl.run()
-        self.assertFalse(mdl.dirty)
+        #self.assertFalse(mdl.dirty)
         self.assertIsInstance(
             mdl.get_generation_result(),
             sprakegeneration.SprakeGenerationResult

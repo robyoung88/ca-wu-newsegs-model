@@ -22,8 +22,6 @@ from newsegsmodelframework.core.timespan import TimeSpan, RegTimeSpan
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.util import classfuncs
 
-
-
 class NewsegsModule(newsegscomponent.NewsegsComponent):
     """
     Abstract base class for modules that run within a Newsegs model.
@@ -57,6 +55,7 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         self.last_run = run_start
         # Returns none as this is still abstract
    
+    # NB - model is not a ComponentProperty in order to avoid circular references
     @property
     def model(self) -> NewsegsModelInterface:
         """
@@ -81,10 +80,16 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         """
         Has the model configuration changed since last run?
         """
-        return self._dirty
+        return self.modified
+        #return self._dirty
 
     @dirty.setter
     def dirty(self, val:bool) -> None:
+        warnings.warn('Setting of dirty parameter is deprecated', DeprecationWarning)
+        if val:
+            self._config._revision += 1
+        else:
+            self._config._revision = self._config._last_syncronised
         self._dirty = val
 
 NewsegsModule._excluded_attributes = super(NewsegsModule, NewsegsModule)._excluded_attributes + ('_model',)

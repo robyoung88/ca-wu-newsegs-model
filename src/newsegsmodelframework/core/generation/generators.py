@@ -46,12 +46,9 @@ import pvlib
 
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.core import SerialiseToDictMixin
-from newsegsmodelframework.util import classfuncs
 from newsegsmodelframework.core import serialisation
-from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location
-from newsegsmodelframework.core import environmentserverinterface
 
 T = TypeVar('T')
 Real = SupportsFloat

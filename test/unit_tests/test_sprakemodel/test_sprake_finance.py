@@ -74,8 +74,7 @@ class TestSprakeFinanceConfigEqualities(unittest.TestCase):
             cost_discount_rate = 0.035
         )
 
-        d1 = fnc1.to_dict()
-        sd1 = json.dumps(d1)
+        sd1 = fnc1.json_dumps()
         d2 = json.loads(sd1)
 
         fnc2 = sprakefinance.SprakeFinance.from_none()

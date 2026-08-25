@@ -90,8 +90,10 @@ def get_datawithrevision_register():
     Configuration data classes
     """
     from newsegsmodelframework.core import newsegscomponent
+    import newsegsmodelframework.newsegsmodel as newsegsmodel
+    import newsegsmodelframework.newsegsfinance as newsegsfinance
     CONSTRUCTORS = {}
-    for pymod in [newsegscomponent]:
+    for pymod in [newsegscomponent, newsegsmodel, newsegsfinance]:
         CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.DataWithRevision)
         )

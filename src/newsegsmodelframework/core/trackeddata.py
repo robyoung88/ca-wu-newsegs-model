@@ -213,7 +213,6 @@ class ObservableDict(dict, RevisionNotifierMixin):
             self._children = []
             self._notify_change()
 
-T = TypeVar('T')
 
 class DataWithRevision(RevisionNotifierMixin, serialisation.SerialiseToDictMixin):
     """Base class for all revision-tracked dataclasses."""
@@ -222,11 +221,13 @@ class DataWithRevision(RevisionNotifierMixin, serialisation.SerialiseToDictMixin
 
     @classmethod
     @override
-    def from_dict(cls: type[T], config: dict[str, Any]) -> T:
+    def from_dict(cls, config):
         inst = super().from_dict(config)
         inst._children = []
         return inst
 
+
+T = TypeVar('T')
 
 @dataclass_transform()
 def revision_dataclass(cls: Type[T]) -> Type[T]:
