@@ -14,7 +14,7 @@ class TestRegisters(unittest.TestCase):
         compreg = registers.get_newsegscomponent_register()
         self.assertEqual(
             len(compreg),
-            1+1+9
+            2+2+3+2+9
         )
     
     def test_environment_register(self):

@@ -123,19 +123,20 @@ def get_sprake_environment_server():
 def get_sprake_wider_env_server():
     return DummyWiderEnv()
 
+def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
+    return int(round((timespan.end - timespan.start).total_seconds() * SECONDS_TO_DAYS / 365.25))
+
+
 @revision_dataclass
 class SprakeModelConfig(newsegsmodel.NewsegsModelConfig):
     timestep: pd.Timedelta = pd.Timedelta(_DEFAULT_TS)
     run_period: modtimespan.TimeSpan = field(default_factory = lambda: copy.copy(_DEFAULT_TIMESPAN))
 
 
-def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
-    return int(round((timespan.end - timespan.start).total_seconds() * SECONDS_TO_DAYS / 365.25))
-
-
 class SprakeModel(newsegsmodel.NewsegsModel):
     """Implementation of the model of Dr David Sprake as a NewsegsModel."""
     _name = 'Sprake Energy Model'
+    model_type = 'sprake'
     _version = '0.0.1'
 
     generation = newsegsmodel.NewsegsModelProperty(
@@ -237,7 +238,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     ) -> None:
 
         mod_gen = sprakegeneration.SprakeGeneration(sprakegeneration.get_sprake_ned100())
-        mod_gen.set_location(copy.copy(_DEFAULT_LOCATION))
+        mod_gen.location = copy.copy(_DEFAULT_LOCATION)
         cast(RaisedLocation, mod_gen.generator.generators[1].location).height_agl = 2.
 
         # Re-dispatch to SprakeGeneration singledispatchmethod
@@ -271,7 +272,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         ts.end = ts.start + pd.Timedelta(new_horizon*365, unit='d') 
         while ts.end.day != ts.start.day:
             ts.end = ts.end + pd.Timedelta(1, unit='d')
-        ts.timestep = self._default_timestep
+        ts.timestep = self.get_default_timestep()
 
         self.run_period = ts
         self._horizon = new_horizon
@@ -362,6 +363,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         config = config.copy()
         local_environment_server = config.pop('local_environment_server', None)
         wider_environment_server = config.pop('wider_environment_server', None)
+
         inst = super().from_dict(config)
 
         if local_environment_server:
@@ -385,6 +387,10 @@ class SprakeModel(newsegsmodel.NewsegsModel):
                 inst.wider_env = wider_environment_server
         else:
             inst._wider_environment_server = get_sprake_wider_env_server()
+
+        inst.grid.model = inst
+        inst.generation.model = inst
+        inst.consumption_storage.model = inst
         
         return inst
 
@@ -402,6 +408,7 @@ def _SprakeModel_from_other(
     super(SprakeModel, self).__init__()
     self.local_env = other.local_env
     self.wider_env = other.wider_env
+    self.name = other.name
 
     for k in asdict(other._config).keys(): # pyright: ignore[reportArgumentType]
         setattr(self, k, copy.copy(getattr(other, k)))

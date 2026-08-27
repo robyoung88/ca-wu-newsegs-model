@@ -18,17 +18,18 @@ from abc import ABCMeta, abstractmethod
 import copy
 import re
 import time
-from typing import Any, Optional, Sequence, Type, override
+from typing import Any, Callable, Iterable, Optional, Sequence, SupportsIndex, Type, override
 import uuid as mod_uuid
 
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import find_constructor
-from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
+from newsegsmodelframework.core.trackeddata import wrap_value as default_wrap_value
 from newsegsmodelframework.util import classfuncs
 
 __all__ = [
     'NewsegsComponent', 'RunnableNewsegsComponent', 'TableConfigNewsegsComponent',
-    'DataWithRevision', 'NoConfig',
+    'DataWithRevision'
 ]
 
 class ComponentProperty:
@@ -44,34 +45,141 @@ class ComponentProperty:
         self.name = f'_{name}' # Name as stored on object instance
         self.id = f'_{name}_id'
 
-    def __get__(self, instance: Optional['NewsegsComponent'], owner: type) -> Any:
+    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
         if instance is None:
             return self
-        return getattr(instance, self.name, None)
+        att = getattr(instance, self.name, None)
+        if att is not None:
+            return att
+        if isinstance(self.default, Callable):
+            default_val = self.default()
+        else:
+            default_val = self.default
+        return getattr(instance, self.name, default_val)
 
-    def __set__(self, instance: 'NewsegsComponent', value: 'NewsegsComponent'):
+    def __set__(self, instance: 'ConfigurationMixin', value: 'ConfigurationMixin'):
         if self.oftype:
             if not isinstance(value, self.oftype):
                 raise TypeError(f'"{self.name}" is expected as one of {self.oftype}, is {type(value)}')
         old_val = getattr(instance, self.name, None)
 
-        if old_val is not None and old_val is not value:
+        if old_val is not None and old_val is not value._config:
             instance._config._remove_child(old_val)
+            setattr(instance, self.id, None)
         
         instance._config._add_child(value._config)
         instance._config._notify_change()
 
         setattr(instance, self.name, value)
-        setattr(instance, self.id, value.id)
+        if isinstance(value, NewsegsComponent):
+            setattr(instance, self.id, value.id)
 
 
-@revision_dataclass
-class NoConfig(DataWithRevision):
-    """A placeholder configuration object"""
-    pass
+def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
+    if isinstance(val, NewsegsComponent):
+        parent._add_child(val._config)
+        return val
+    return default_wrap_value(val, parent)
+
+
+class ObservableComponentList(ObservableList):
+    @classmethod
+    @override
+    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
+        return wrap_value(val, parent)
+
+    def __init__(self, iterable = (), parent: Optional['RevisionNotifierMixin | NewsegsComponent'] = None):
+        if parent:
+            if isinstance(parent, NewsegsComponent):
+                super().__init__(iterable, parent = parent._config)
+            else:
+                super().__init__(iterable, parent)
+        else:
+            super().__init__(iterable)
+
+    def __setitem__(self, index, value):
+        old_val = super().__getitem__(index)
+        new_val = value
+        if isinstance(new_val, NewsegsComponent):
+            new_val._config = self._wrap_value(new_val._config, self)
+        else:
+            new_val = wrap_value(new_val, self)
+        if old_val != new_val:
+            if isinstance(old_val, NewsegsComponent):
+                self._remove_child(old_val._config)
+            if isinstance(old_val, RevisionNotifierMixin):
+                self._remove_child(old_val)
+            elif isinstance(old_val, Iterable):
+                for x in old_val:
+                    if isinstance(x, RevisionNotifierMixin):
+                        self._remove_child(x)
+
+            list.__setitem__(self, index, new_val)
+            self._notify_change()
+
+    def pop(self, index: SupportsIndex = -1):
+        item = super().pop(index)
+        if isinstance(item, NewsegsComponent):
+            self._remove_child(item._config)
+
+        # Notify is handled by ObservableList
+        return item
+
+    def remove(self, value):
+        try:
+            idx = self.index(value)
+            item = self[idx]
+        except ValueError:
+            # Let the standard error be raised
+            list.remove(self, value)
+            return
+
+        if isinstance(item, RevisionNotifierMixin):
+            self._remove_child(item)
+        elif isinstance(item, NewsegsComponent):
+            self._remove_child(item._config)
+        
+        list.remove(self, value)
+        self._notify_change()
+
+
+class ComponentListProperty:
+    """Descriptor for attributes which are lists of Components"""
+    def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
+        self.name = ""
+        self.oftype = oftype
+
+    def __set_name__(self, owner: type, name: str):
+        self.name = f'_{name}' # Name as stored on object instance
+
+    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
+        if instance is None:
+            return self
+        att = getattr(instance, self.name, [])
+        return att
+
+    def __set__(self, instance: 'ConfigurationMixin', value: Iterable):
+        if not isinstance(instance, NewsegsComponent):
+            raise TypeError(f'Component list properties should only be applied to NewsegsComponents, is applied to {type(instance)}')
+        
+        old_val = getattr(instance, self.name, None)
+        is_wrapped = False
+        if not isinstance(value, ObservableComponentList):    
+            value = ObservableComponentList(value, instance)
+            is_wrapped = True
+            
+        if old_val and not old_val == value:
+            instance._config._remove_child(old_val)
+            if not is_wrapped:
+                value = ObservableComponentList(value, instance)
+
+            instance._config._notify_change()
+
+        setattr(instance, self.name, value)
 
 
 class NewsegsComponent(
+    ConfigurationMixin,
     serialisation.SerialiseToDictMixin,
     metaclass = ABCMeta
 ):
@@ -93,8 +201,6 @@ class NewsegsComponent(
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsComponent'
 
-    _config: DataWithRevision
-    
     @classmethod
     def _make_id_regex(cls):
         return re.compile(rf'^{re.escape(cls._id_prefix)}' + r'-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')
@@ -103,39 +209,12 @@ class NewsegsComponent(
     def generate_new_id(cls) -> str:
         return cls._id_prefix + '-' + str(mod_uuid.uuid4())
 
-    def _generate_config(self, *args, **kwargs) -> DataWithRevision:
-        """Return an implementation of DataWithRevision in order to set _config"""
-        return NoConfig(*args, **kwargs)
-
     def __init__(self, *args, name: Optional[str] = None, **kwargs):
+        super().__init__(*args, **kwargs) 
         self.uuid = str(mod_uuid.uuid4())
         if name is not None:
             self.name = name
-        self._config = self._generate_config(*args, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        # Called ONLY when 'name' is not found on the Component instance or class
-        config = self.__dict__.get('_config')
-        if config is not None and hasattr(config, name):
-            return getattr(config, name)
-
-        raise AttributeError(f'"{type(self).__name__}" object has no attribute "{name}"')
-
-    def __setattr__(self, name: str, value: Any):
-        # Bypass custom logic for internal private attributes or initial _config setup
-        if name == '_config' or name.startswith('_'):
-            super().__setattr__(name, value)
-            return
-
-        config = getattr(self, '_config', None)
-        # If attribute belongs to _config dataclass, set it on _config
-        if config is not None and hasattr(config, name):
-            setattr(config, name, value)
-            return
-
-        # Default to setting attribute directly on Component instance
-        super().__setattr__(name, value)
-        
+            
     @property
     def name(self) -> str:
         return self._name
@@ -219,23 +298,18 @@ class NewsegsComponent(
             except AttributeError:
                 setattr(self, k, v)
 
-    @property 
-    def revision(self) -> int:
-        return self._config.revision
-
-    @property
-    def modified(self) -> bool:
-        return self._config.modified
-
-    @property
-    def chain_modified(self) -> bool:
-        return self._config.chain_modified
-
-    def syncronise(self):
-        self._config._syncronise()
-
-    def chain_syncronise(self):
-        self._config._chain_syncronise()
+    @classmethod
+    @override
+    def from_dict(cls, config):
+        config = config.copy()
+        #cfg = config.pop('_config', None)
+        inst = cls.__new__(cls)
+        inst._config = inst._generate_config()
+        inst.update(config)
+        #if cfg:
+        #    for k, v in cfg.items():
+        #        setattr(inst, k, v)
+        return inst
 
     @property
     def dirty(self):

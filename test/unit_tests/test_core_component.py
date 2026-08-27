@@ -5,15 +5,16 @@ from dataclasses import field
 from typing import Optional, cast, override
 import unittest
 
-from newsegsmodelframework.core.constructors import registers
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.trackeddata import revision_dataclass, DataWithRevision
 from newsegsmodelframework.core.newsegscomponent import ComponentProperty, NewsegsComponent
+from newsegsmodelframework import register_plugins
+from newsegsmodelframework.core.constructors import registers
 
 @revision_dataclass
 class ChildComponentConfig(DataWithRevision):
-    param_a: float
-    param_b: float
+    param_a: float = 1
+    param_b: float = 1
 
 class ChildComponent(NewsegsComponent):
     @override
@@ -24,7 +25,7 @@ class ChildComponent(NewsegsComponent):
 
 @revision_dataclass
 class ParentComponentConfig(DataWithRevision):
-    n_units: int
+    n_units: int = 1
     unit_costs: dict = field(default_factory = lambda: dict(fixed = 10., variable = 1.))
 
 class ParentComponent(NewsegsComponent):
@@ -32,7 +33,7 @@ class ParentComponent(NewsegsComponent):
     def _generate_config(self, *args, **kwargs) -> DataWithRevision:
         return ParentComponentConfig(*args, **kwargs)
 
-    child = ComponentProperty(default=ChildComponent)
+    child = ComponentProperty(default= lambda: ChildComponent(1,1))
 
     def __init__(self, *args, child: Optional[ChildComponent], **kwargs):
         super().__init__(*args, **kwargs)

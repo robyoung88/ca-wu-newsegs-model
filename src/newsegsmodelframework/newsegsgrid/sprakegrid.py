@@ -2,7 +2,9 @@
 from __future__ import annotations
 import copy
 from collections.abc import Mapping
+from dataclasses import asdict
 import datetime
+from typing import Optional
 from typing_extensions import override
 from numbers import Number
 from functools import singledispatchmethod
@@ -11,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsgrid.newsegsgrid import NewsegsGrid
 from newsegsmodelframework.util import classfuncs
 from newsegsmodelframework.core import newsegsmodule
@@ -71,20 +74,29 @@ class SprakeGridResult(NewsegsModuleResult):
         self._export = np.asarray(export_unit_cost).flatten()
 
 
+@revision_dataclass
+class SprakeGridConfig(DataWithRevision):
+    import_per_unit: float = 0.30
+    export_per_unit: float = 0.07
+
 class SprakeGrid(NewsegsGrid):
     """Implementation of NewsegsGrid for Sprake Model."""
 
     _name = "Sprake Grid Module"
 
+    @override
+    def _generate_config(self, *args, **kwargs) -> SprakeGridConfig:
+        return SprakeGridConfig(*args, **kwargs)
+    _config: SprakeGridConfig  # pyright: ignore[reportIncompatibleVariableOverride]
+
     @singledispatchmethod
     def __init__(
         self,
-        import_per_unit: Number | SprakeGrid,
-        export_per_unit: Number | None = None,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
+        dispatch_arg: Number | SprakeGrid,
+        *args,
+        **kwargs,
     ) -> None:
-        raise ValueError('First argument must be a number or a SprakeGrid, is %s', type(import_per_unit))
+        raise ValueError('First argument must be a number or a SprakeGrid, is %s', type(dispatch_arg))
 
     # Copy constructor is registered underneath class definition for late-bind.
     
@@ -92,19 +104,11 @@ class SprakeGrid(NewsegsGrid):
     def _from_Number(
         self,
         import_per_unit: Number,
-        export_per_unit: Number = 0.07,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None
-    ) -> None:
-        super().__init__()
-        self.import_rate = import_per_unit
-        self.export_rate = export_per_unit
-
-        if name is not None:
-            self.name = name
+        *args,
+        **kwargs
         
-        if model is not None:
-            self.model = model
+    ) -> None:
+        super().__init__(*args, import_per_unit = import_per_unit, **kwargs)
 
     @classmethod
     def from_none(cls):
@@ -112,21 +116,19 @@ class SprakeGrid(NewsegsGrid):
 
     @property
     def import_rate(self) -> float:
-        return self._import_rate
+        return self.import_per_unit
 
     @import_rate.setter
-    def import_rate(self, rate:float):
-        self._import_rate = rate
-        self.dirty = True
-
+    def import_rate(self, rate: float):
+        self.import_per_unit = rate
+        
     @property
     def export_rate(self) -> float:
-        return self._export_rate
+        return self.export_per_unit
 
     @export_rate.setter
-    def export_rate(self, rate:float):
-        self._export_rate = rate
-        self.dirty = True
+    def export_rate(self, rate: float):
+        self.export_per_unit = rate
 
     def run(
         self, 
@@ -142,7 +144,6 @@ class SprakeGrid(NewsegsGrid):
         
         model_length = timespan.n_node
 
-        self.dirty = False
         return SprakeGridResult(
             self.id,
             datetime.datetime.now(),
@@ -158,10 +159,12 @@ def _SprakeGrid_from_other(
     other: SprakeGrid
 ) -> None:
     super(SprakeGrid, self).__init__()
-    self.import_rate = other.import_rate
-    self.export_rate = other.export_rate
     self.name = other.name
     try:
-        self.model = other.model
+        if other.model:
+            self.model = other.model
     except AttributeError:
         pass
+
+    for k in asdict(other._config).keys(): # pyright: ignore[reportArgumentType]
+        setattr(self, k, copy.copy(getattr(other, k)))

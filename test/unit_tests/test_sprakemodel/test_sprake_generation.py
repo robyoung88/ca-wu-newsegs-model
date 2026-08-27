@@ -23,7 +23,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         loc = location.RaisedLocation(50, -3, 10)
 
         inst = sprakegeneration.SprakeGeneration(turbine)
-        inst.set_location(loc)
+        inst.location = loc
 
         self.assertEqual(
             location.Location(inst.generator.generators[0].location),
@@ -31,8 +31,6 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         )
 
         d1 = inst.to_dict()
-
-        turbine2 = sprakegeneration.get_sprake_gamesa_126()
 
         inst2 = sprakegeneration.SprakeGeneration.from_dict(d1)
 
@@ -61,7 +59,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen1 = sprakegeneration.SprakeGeneration(
             turbine,
-            loc = loc, 
+            location = loc, 
             name = 'Test generation module'
         )
 
@@ -93,7 +91,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen1 = sprakegeneration.SprakeGeneration(
             turbine,
-            loc = loc, 
+            location = loc, 
             name = 'Test generation module'
         )
 
@@ -132,7 +130,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen1 = sprakegeneration.SprakeGeneration(
             turbine,
-            loc = loc, 
+            location = loc, 
             name = 'Test generation module'
         )
 
@@ -175,7 +173,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         loc = location.RaisedLocation(50, -3, 10)
         mod_gen_1 = sprakegeneration.SprakeGeneration(
             turbine,
-            loc = loc, 
+            location = loc, 
             name = 'Test generation module'
         )
 
@@ -183,7 +181,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         loc_2 = location.RaisedLocation(55, -2, 50)
         mod_gen_2 = sprakegeneration.SprakeGeneration(
             turbine_2,
-            loc = loc_2,
+            location = loc_2,
             name = 'Target generation module'
         )
 
@@ -196,10 +194,3 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         
 
         full_dict = mod_gen_1.to_dict()
-
-
-
-
-
-
-

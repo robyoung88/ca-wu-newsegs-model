@@ -9,7 +9,7 @@ import datetime
 from collections.abc import Sequence
 import uuid
 from functools import lru_cache
-from typing import Any
+from typing import Any, Optional
 import warnings
 
 import numpy as np
@@ -38,11 +38,12 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsModule'
 
-    _dirty = True
     _model: NewsegsModelInterface
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, model: Optional[NewsegsModelInterface] = None, **kwargs):
         super().__init__(*args, **kwargs)
+        if model is not None:
+            self.model = model
 
     @abstractmethod
     def run(
@@ -61,18 +62,12 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         """
         The callback model associated with the module
         """
-        if hasattr(self, '_model'):
-            return self._model
-        raise AttributeError('model has not been set')
+        if not hasattr(self, '_model'):
+            raise AttributeError('model has not been set')
+        return self._model
 
     @model.setter
     def model(self, model: NewsegsModelInterface):
-        try:
-            current_mod = self.model
-        except AttributeError:
-            current_mod = None
-        if current_mod is None or not(current_mod == model):
-            self._dirty = self._dirty or True
         self._model = model
 
     @property
@@ -81,7 +76,6 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         Has the model configuration changed since last run?
         """
         return self.modified
-        #return self._dirty
 
     @dirty.setter
     def dirty(self, val:bool) -> None:

@@ -305,7 +305,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         mm = newsegsmetamodel.NewsegsMetaModel(mdl, fnc)
 
-        proj = newsegsproject.NewsegsProject([mm], 'sprake', mdl.version)
+        proj = newsegsproject.NewsegsProject([mm])
 
         with db.get_engine().begin() as conn:
             project_id = db.save_project(proj, conn)

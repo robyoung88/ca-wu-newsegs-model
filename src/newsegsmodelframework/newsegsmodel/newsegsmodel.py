@@ -20,7 +20,7 @@ from newsegsmodelframework.core import newsegsmodelinterface
 
 class NewsegsModelProperty(newsegscomponent.ComponentProperty):
     @override
-    def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'):
+    def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'): # pyright: ignore[reportIncompatibleMethodOverride]
         if not isinstance(instance, NewsegsModel):
             raise TypeError(f'Property accessing {self.name} should only be applied to a NewsegsModel, is attribute of {type(instance)}')
         if not isinstance(value, NewsegsModule):

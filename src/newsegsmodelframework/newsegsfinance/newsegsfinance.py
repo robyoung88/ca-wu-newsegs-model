@@ -39,7 +39,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
     finance_data = ComponentProperty(default = NewsegsFinanceData)
     table_config = ComponentProperty(default = TableConfigNewsegsComponent)
 
-    model = ComponentProperty(default = newsegsmodelinterface.NewsegsModelInterface)
+    model = ComponentProperty(default = None)
     
     last_update: float = 0.0
 

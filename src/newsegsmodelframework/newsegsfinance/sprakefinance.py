@@ -132,14 +132,16 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
             raise TypeError(f'SprakeFinance only compatible with SprakeModel, {type(mdl)} provided')
         return super().set_model(mdl, dirty)
     
-    @property
-    @override
-    def model(self) -> SprakeModel:
-        return cast(SprakeModel, super().model)
+    # @property
+    # @override
+    # def model(self) -> SprakeModel:
+    #     return cast(SprakeModel, super().model)
     
-    @model.setter
-    def model(self, mdl: NewsegsModelInterface) -> None:
-        super().model = mdl
+    # @model.setter
+    # def model(self, mdl: NewsegsModelInterface) -> None:
+    #     model_setter = newsegsfinance.NewsegsFinance.model.fset
+    #     assert model_setter is not None
+    #     model_setter(self, mdl)
 
     @classmethod
     def get_default_unit_costs(cls) -> dict:
@@ -423,7 +425,8 @@ def _SprakeFinance_from_other(
         setattr(self, k, v)
     
     try:
-        self.model = other.model
+        if other.model:
+            self.model = other.model
     except AttributeError:
         pass
 

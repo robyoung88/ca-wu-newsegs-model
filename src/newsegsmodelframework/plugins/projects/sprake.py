@@ -55,5 +55,5 @@ def sprake_project_factory():
 
     mm = newsegsmetamodel.NewsegsMetaModel(mdl, fnc, variables)
 
-    proj = newsegsproject.NewsegsProject([mm], MODEL_TYPE, mdl.version)
+    proj = newsegsproject.NewsegsProject([mm])
     return proj

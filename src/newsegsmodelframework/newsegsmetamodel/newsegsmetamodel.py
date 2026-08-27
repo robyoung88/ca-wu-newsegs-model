@@ -28,12 +28,14 @@ to a sample across all enabled PSA variables.
 from collections import OrderedDict
 import datetime
 import logging
-from typing import Any, Mapping, MutableSequence, Sequence, override
+from typing import Any, Mapping, MutableSequence, Optional, Sequence, override
 
 from newsegsmodelframework.core import serialisation
+from newsegsmodelframework.core.newsegscomponent import ComponentProperty
+from newsegsmodelframework.core.trackeddata import DataWithRevision
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
-from newsegsmodelframework.core import newsegscomponent
+from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable import variable
 
 logger = logging.getLogger(__name__)
@@ -60,7 +62,12 @@ def make_varid(
         section = 'None'
     return f'{section}.{key}.{subindex}'
 
-class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
+
+class NewsegsMetaModelConfig(DataWithRevision):
+    ...
+
+
+class NewsegsMetaModel(NewsegsComponent):
     """A container and controller for models and variables."""
 
     model_id: str
@@ -71,25 +78,29 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
     _version = '0.0.1'
     _id_prefix = 'metam'
     _last_modified: datetime.datetime = datetime.datetime.now()
+
     last_dsa_run: float = 0.
     last_psa_run: float = 0.
     last_optim_run: float = 0.
 
-    _table_config: newsegscomponent.TableConfigNewsegsComponent
+    model = ComponentProperty(oftype = newsegsmodel.NewsegsModel)
+    finance = ComponentProperty(oftype = newsegsfinance.NewsegsFinance)
+    table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
+
+    @override
+    def _generate_config(self, *args, **kwargs) -> NewsegsMetaModelConfig:
+        return NewsegsMetaModelConfig(*args, **kwargs)
+    _config: NewsegsMetaModelConfig # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __init__(
         self,
         model: newsegsmodel.NewsegsModel,
         finance: newsegsfinance.NewsegsFinance,
         variables: MutableSequence[variable.Variable] = [],
+        table_config: Optional[TableConfigNewsegsComponent] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
-
-        if 'table_config' in kwargs:
-            self.table_config = kwargs['table_config']
-        else:
-            self.table_config = newsegscomponent.TableConfigNewsegsComponent()
         
         self.model = model
         self.finance = finance
@@ -98,24 +109,7 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         """
         A set of variables that have been updated and have not yet been synchronised with model/finance
         """
-
-    @property
-    def table_config(self) -> newsegscomponent.TableConfigNewsegsComponent:
-        return self._table_config
-
-    @table_config.setter
-    def table_config(self, table_config: newsegscomponent.TableConfigNewsegsComponent):
-        self._table_config = table_config
-    
-    @property
-    def model(self) -> newsegsmodel.NewsegsModel:
-        """NewsegsModel: The associated Energy Model."""
-        return self._model
-    
-    @model.setter
-    def model(self, model: newsegsmodel.NewsegsModel) -> None:
-        self._model = model
-        self.model_id = model.id
+        self.table_config = table_config or TableConfigNewsegsComponent()
 
     def reattach_model(
         self,
@@ -131,29 +125,19 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             ValueError: If model_provider cannot provide the model.
             TypeError: If the provided object is not a NewsegsModel.
         """
-        if not hasattr(self, 'model_id') or self.model_id == '':
+        if not hasattr(self, '_model_id') or self._model_id == '':
             raise AttributeError('this MetaModel has no associated model to reattach.')
-        mdl = model_provider.get(self.model_id)
+        mdl = model_provider.get(self._model_id)
         if mdl is None:
-            raise ValueError(f'model_provider could not provide model for key {self.model_id}')
+            raise ValueError(f'model_provider could not provide model for key {self._model_id}')
         if not isinstance(mdl, newsegsmodel.NewsegsModel):
-            raise TypeError(f'model_provider did not provide a NewsegsModel for key {self.model_id} - {type(mdl)} returned instead')
+            raise TypeError(f'model_provider did not provide a NewsegsModel for key {self._model_id} - {type(mdl)} returned instead')
         self.model = mdl
         try:
             if self.finance is not None:
                 self.finance.set_model(self.model)
         except AttributeError:
             pass
-    
-    @property
-    def finance(self) -> newsegsfinance.NewsegsFinance:
-        """NewsegsFinance: The associated Finance Model."""
-        return self._finance
-    
-    @finance.setter
-    def finance(self, finance: newsegsfinance.NewsegsFinance) -> None:
-        self._finance = finance
-        self.finance_id = finance.id
 
     def reattach_finance(self, finance_provider: Mapping[str, newsegsfinance.NewsegsFinance]) -> None:
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
@@ -166,13 +150,13 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             ValueError: If finance_provider cannot provide the finance.
             TypeError: If the provided object is not a NewsegsFinance.
         """
-        if not hasattr(self, 'finance_id') or self.finance_id == '':
+        if not hasattr(self, '_finance_id') or self._finance_id == '':
             raise AttributeError('this MetaModel has no associated finance to reattach.')
-        fnc = finance_provider.get(self.finance_id)
+        fnc = finance_provider.get(self._finance_id)
         if fnc is None:
-            raise ValueError(f'finance_provider could not provide finance for key {self.finance_id}')
+            raise ValueError(f'finance_provider could not provide finance for key {self._finance_id}')
         if not isinstance(fnc, newsegsfinance.NewsegsFinance):
-            raise TypeError(f'finance_provider did not provide a NewsegsFinance for key {self.finance_id} - {type(fnc)} returned instead')
+            raise TypeError(f'finance_provider did not provide a NewsegsFinance for key {self._finance_id} - {type(fnc)} returned instead')
         self.finance = fnc
         if self.model is not None:
             self.finance.set_model(self.model, dirty = False)
@@ -312,10 +296,10 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
             except ValueError as e:
                 logger.error(e)
 
-        if 'model' in affected_models:
-            self.model._dirty = True
-        if 'finance' in affected_models:
-            self.finance._dirty= True
+        #if 'model' in affected_models:
+        #    self.model._dirty = True
+        #if 'finance' in affected_models:
+        #    self.finance._dirty= True
             
         return affected_models
 
@@ -324,6 +308,10 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         for dontpickle in ['_model', '_finance']:
             if dontpickle in state:
                 del state[dontpickle]
+        if self.model:
+            state['_model_id'] = self.model.id
+        if self.finance:
+            state['_finance_id'] = self.finance.id
         return state
     
     # Will have no explicit setstate - require using 'reattach_' methods
@@ -339,8 +327,8 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         return {
             'name': self.name,
             'metamodel_id': self.id,
-            'model_id': self.model_id,
-            'finance_id': self.finance_id,
+            '_model_id': self.model_id,
+            '_finance_id': self.finance_id,
             'last_modified': self._last_modified.isoformat()
         }
     
@@ -352,8 +340,8 @@ class NewsegsMetaModel(newsegscomponent.NewsegsComponent):
         return {
             'name': cls._name,
             'metamodel_id': cls.generate_new_id(),
-            'model_id': newsegsmodel.NewsegsModel.generate_new_id(),
-            'finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
+            '_model_id': newsegsmodel.NewsegsModel.generate_new_id(),
+            '_finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
             'last_modified': datetime.datetime.now().isoformat()
         }
     

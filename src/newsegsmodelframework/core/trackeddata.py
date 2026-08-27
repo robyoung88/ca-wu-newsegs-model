@@ -4,7 +4,13 @@ Classes and functions to enable automatic tracking of changes in members
 from dataclasses import dataclass, fields, asdict
 from typing import Any, Collection, Iterable, Optional, SupportsIndex, Type, TypeVar, dataclass_transform, override
 
+import numpy as np
+
 from newsegsmodelframework.core import serialisation
+
+__all__ = [
+    'NoConfig',
+]
 
 class RevisionNotifierMixin:
     """Handles part-child notifications and revision counts"""
@@ -59,7 +65,7 @@ class RevisionNotifierMixin:
         return self._revision
 
 
-def _wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
+def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
     """Wraps mutable structures or assigns children to parent objects."""
     if isinstance(val, RevisionNotifierMixin):
         parent._add_child(val)
@@ -78,16 +84,20 @@ def _wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
 class ObservableList(list, RevisionNotifierMixin):
     """List wrapper that triggers revision increment on mutation."""
 
+    @classmethod
+    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
+        return wrap_value(val, parent)
+
     def __init__(self, iterable = (), parent: Optional[RevisionNotifierMixin] = None):
         RevisionNotifierMixin.__init__(self)
-        wrapped = [_wrap_value(item, self) for item in iterable]
+        wrapped = [self._wrap_value(item, self) for item in iterable]
         super().__init__(wrapped)
         if parent:
             parent._add_child(self)
 
     def __setitem__(self, index, value):
         old_val = super().__getitem__(index)
-        new_val = _wrap_value(value, self)
+        new_val = self._wrap_value(value, self)
         if old_val != new_val:
             if isinstance(old_val, RevisionNotifierMixin):
                 self._remove_child(old_val)
@@ -99,17 +109,17 @@ class ObservableList(list, RevisionNotifierMixin):
             self._notify_change()
 
     def append(self, item):
-        super().append(_wrap_value(item, self))
+        super().append(self._wrap_value(item, self))
         self._notify_change()
 
     def extend(self, iterable: Iterable) -> None:
-        wrapped = [_wrap_value(item, self) for item in iterable]
+        wrapped = [self._wrap_value(item, self) for item in iterable]
         if wrapped:
             super().extend(wrapped)
             self._notify_change()
 
     def insert(self, index, item):
-        super().insert(index, _wrap_value(item, self))
+        super().insert(index, self._wrap_value(item, self))
         self._notify_change()
 
     def pop(self, index: SupportsIndex = -1):
@@ -152,7 +162,7 @@ class ObservableDict(dict, RevisionNotifierMixin):
     ):
         RevisionNotifierMixin.__init__(self)
         initial = dict(mapping, **kwargs)
-        wrapped = {k: _wrap_value(v, self) for k, v in initial.items()}
+        wrapped = {k: wrap_value(v, self) for k, v in initial.items()}
         super().__init__(wrapped)
         if parent:
             parent._add_child(self)
@@ -160,7 +170,7 @@ class ObservableDict(dict, RevisionNotifierMixin):
     def __setitem__(self, key: Any, value: Any) -> None:
         exists = key in self
         old_val = self.get(key) if exists else None
-        new_val = _wrap_value(value, self)
+        new_val = wrap_value(value, self)
 
         if not exists or old_val != new_val:
             super().__setitem__(key, new_val)
@@ -185,7 +195,7 @@ class ObservableDict(dict, RevisionNotifierMixin):
         other = dict(*args, **kwargs)
         changed = False
         for k, v in other.items():
-            wrapped_v = _wrap_value(v, self)
+            wrapped_v = wrap_value(v, self)
             if k not in self or self[k] != wrapped_v:
                 old_val = self.get(k)
                 if (
@@ -249,22 +259,28 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
         # Wrap lists, dicts, and children initially assigned
         for f in fields(self):
             val = getattr(self, f.name)
-            object.__setattr__(self, f.name, _wrap_value(val, self))
+            object.__setattr__(self, f.name, wrap_value(val, self))
 
         # Reset revision to 0
         self._revision = 0
 
     def new_setattr(self, name: str, value: Any):
         # Allow internal variables or setup prior to _revision existence
+        #print(f'set {name} to {value}')
         if name.startswith("_") or "_revision" not in self.__dict__:
             object.__setattr__(self, name, value)
             return
 
         has_old = hasattr(self, name)
         old_val = getattr(self, name, None)
-        new_val = _wrap_value(value, self)
+        new_val = wrap_value(value, self)
 
-        if not has_old or old_val != new_val:
+        if isinstance(value, np.ndarray):
+            unequal = not (new_val == old_val).all()
+        else:
+            unequal = not has_old or old_val != new_val
+            
+        if not has_old or unequal:
             if isinstance(old_val, RevisionNotifierMixin):
                 self._remove_child(old_val)
 
@@ -276,3 +292,68 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
     cls.__setattr__ = new_setattr
 
     return cls
+
+@revision_dataclass
+class NoConfig(DataWithRevision):
+    """A placeholder configuration object"""
+    pass
+
+class ConfigurationMixin:
+    _config: DataWithRevision
+
+    def __init__(self, *args, **kwargs):
+        self._config = self._generate_config(*args, **kwargs)
+
+    def _generate_config(self, *args, **kwargs) -> DataWithRevision:
+        """Return an implementation of DataWithRevision in order to set _config"""
+        return NoConfig(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        # Called ONLY when 'name' is not found on the Component instance or class
+        # ... in theory, anyway
+
+        config = self.__dict__.get('_config')
+        if config is not None and hasattr(config, name):
+            return getattr(config, name)
+
+        raise AttributeError(f'"{type(self).__name__}" object has no attribute "{name}"')
+
+    def __setattr__(self, name: str, value: Any):
+        # We end up here even if a setter has been created on the main component, so need to check
+        # for that.
+        if hasattr(self.__class__, name):
+            att = getattr(self.__class__, name)
+            if hasattr(att, 'fset'):
+                return getattr(att, 'fset')(self, value)
+
+        # Bypass custom logic for internal private attributes or initial _config setup
+        if name == '_config' or name.startswith('_'):
+            super().__setattr__(name, value)
+            return
+
+        config = getattr(self, '_config', None)
+        # If attribute belongs to _config dataclass, set it on _config
+        if config is not None and hasattr(config, name):
+            setattr(config, name, value)
+            return
+
+        # Default to setting attribute directly on Component instance
+        super().__setattr__(name, value)
+
+    @property 
+    def revision(self) -> int:
+        return self._config.revision
+
+    @property
+    def modified(self) -> bool:
+        return self._config.modified
+
+    @property
+    def chain_modified(self) -> bool:
+        return self._config.chain_modified
+
+    def syncronise(self):
+        self._config._syncronise()
+
+    def chain_syncronise(self):
+        self._config._chain_syncronise()

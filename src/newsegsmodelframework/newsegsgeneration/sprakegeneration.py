@@ -1,6 +1,7 @@
 """Provides implementation of NewsegsGeneration for Sprake Model."""
 from __future__ import annotations
 
+from dataclasses import asdict
 import os
 import copy
 import datetime
@@ -11,8 +12,10 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
+from newsegsmodelframework.core.newsegscomponent import ComponentProperty
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from .newsegsgeneration import NewsegsGeneration
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from .newsegsgeneration import NewsegsGeneration, NewsegsGenerationConfig
 from newsegsmodelframework.core import location
 from newsegsmodelframework.core import generation
 from newsegsmodelframework.core import timespan as modtimespan
@@ -133,21 +136,33 @@ class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
         self._solar = solar_energy
 
 
+@revision_dataclass
+class SprakeGenerationConfig(NewsegsGenerationConfig):
+    wind_capacity: float = 1.0
+    pv_capacity: float = 1.0
+
+
 class SprakeGeneration(NewsegsGeneration):
     """Implementation of NewsegsGeneration for Sprake Model."""
 
     _name = "Sprake Generation Module"
-        
+
+    @override
+    def _generate_config(self, *args, **kwargs) -> SprakeGenerationConfig:
+        return SprakeGenerationConfig(*args, **kwargs)
+    _config: SprakeGenerationConfig # pyright: ignore[reportIncompatibleVariableOverride]
+
+    generator = generation.NewsegsGeneratorProperty(
+        default = None,
+        oftype = generation.PowerPlantHeterogeneousGenerators
+    ) # pyright: ignore[reportAssignmentType]
 
     @singledispatchmethod
     def __init__(
         self,
-        turbine: generation.WindTurbineElecGenerator | generation.PowerPlantHeterogeneousGenerators | SprakeGeneration,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None, # pyright: ignore[reportUndefinedVariable]
-        loc: location.Location | None = None,
+        dispatch_arg: generation.WindTurbineElecGenerator | generation.PowerPlantHeterogeneousGenerators | SprakeGeneration,
     ) -> None:
-        raise ValueError('First argument must be a WindTurbineElecGenerator or a PowerPlantHeterogeneousGenerators or a SprakeGeneration, is %s', type(turbine))
+        raise ValueError(f'First argument must be a WindTurbineElecGenerator or a PowerPlantHeterogeneousGenerators or a SprakeGeneration, is {type(dispatch_arg)}')
     
     # Copy constructor is registered underneath class definition for late-bind.
 
@@ -155,44 +170,40 @@ class SprakeGeneration(NewsegsGeneration):
     def _from_WindTurbineElecGenerator(
         self,
         turbine: generation.WindTurbineElecGenerator,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None, # pyright: ignore[reportUndefinedVariable]
-        loc: location.Location | None = None,
+        *args,
+        **kwargs
     ) -> None:
-        super().__init__()
-        self._generator = generation.PowerPlantHeterogeneousGenerators([
+        super().__init__(*args, **kwargs)
+
+        self.generator = generation.PowerPlantHeterogeneousGenerators([
             generation.PowerPlantHomogeneousWind(turbine),
             generation.PowerPlantHomogeneousPV(
                 generation.SprakePVGISElecGenerator.from_none()
             )
         ])
 
-        self._generator.generators[1].location.height_agl = 2. # pyright: ignore[reportAttributeAccessIssue]
+        # Set the capacities again
+        self.pv_capacity = self._config.pv_capacity
+        self.wind_capacity = self._config.wind_capacity
 
-        if loc is not None:
-            self.set_location(loc)
-        
-        if name is not None:
-            self.name = name
-        
-        if model is not None:
-            self.model = model
+        if 'location' in kwargs.keys():
+            self.location = self._config.location # pyright: ignore[reportAttributeAccessIssue]
+
+        self.generator.generators[1].location.height_agl = 2. # pyright: ignore[reportAttributeAccessIssue]
 
     @__init__.register(generation.PowerPlantHeterogeneousGenerators)
     def _from_PowerPlantHeterogeneousGenerators(
         self,
         generator: generation.PowerPlantHeterogeneousGenerators,
-        name: str | None = None,
-        model: newsegsmodel.NewsegsModel | None = None # pyright: ignore[reportUndefinedVariable]
+        *args,
+        **kwargs
     ) -> None:
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self._generator = copy.deepcopy(generator)
-        
-        if name is not None:
-            self.name = name
-        
-        if model is not None:
-            self.model = model
+
+        # Set the capacities again
+        self.pv_capacity = self._config.pv_capacity
+        self.wind_capacity = self._config.wind_capacity
 
     @classmethod
     def from_none(cls) -> SprakeGeneration:
@@ -200,21 +211,41 @@ class SprakeGeneration(NewsegsGeneration):
         return cls(turbine)
 
     @property
-    def generator(self) -> generation.PowerPlantHeterogeneousGenerators:
-        if self._generator is None:
-            raise AttributeError('Generator not yet assigned to module')
-        return self._generator
-
-    @property
     @override
     def model(self) -> NewsegsModelInterface:
-        return self.generator.model
+        try:
+            return self.generator.model
+        except AttributeError:
+            return super().model
     
     @model.setter
     @override
     def model(self, model: NewsegsModelInterface) -> None:
-        self.generator.model = model
-        self.dirty = True
+        try:
+            self.generator.model = model
+        except AttributeError:
+            pass
+        model_setter = NewsegsGeneration.model.fset
+        assert model_setter is not None
+        model_setter(self, model)
+
+    @property
+    # @override # This is technically an override, but pylance doesn't know it
+    def location(self) -> location.Location:
+        try:
+            return self.generator.location
+        except AttributeError:
+            return super().location # type: ignore
+    
+    @location.setter
+    def location(self, loc: location.Location):
+        # Ensure location is only a location, i.e. not an elevated or aspect location
+        loc = location.Location(loc)
+        try:
+            self.generator.location = loc
+        except AttributeError:
+            pass
+        self._config.location = loc # pyright: ignore[reportAttributeAccessIssue]
 
     def run(
         self,
@@ -223,10 +254,11 @@ class SprakeGeneration(NewsegsGeneration):
     ) -> SprakeGenerationResult:
         super().run(timespan, run_start)
         energy = self.generator.run(timespan)
+
         timestep = self.model.get_default_timestep()
         r_timespan = modtimespan.RegTimeSpan(timespan)
         r_timespan.timestep = timestep
-        self.dirty = False
+
         return SprakeGenerationResult(
             self.id,
             self.last_run,
@@ -234,73 +266,57 @@ class SprakeGeneration(NewsegsGeneration):
             wind_energy = energy[0,:],
             solar_energy = energy[1,:]
         )
-
-    def set_location(self, loc: location.Location) -> None:
-        # Ensure location is only a location, i.e. not an elevated or aspect location
-        loc = location.Location(loc)
-        self.generator.location = loc
-
-    @property
-    @override
-    def location(self) -> location.Location:# | Sequence[location.Location]:
-        return self.generator.location#[0]
     
-    @location.setter
-    def location(self, loc: location.Location):
-        self.generator.location = loc
-
     @property
     def wind_capacity(self) -> float:
         """
         Capacity (kW) of wind turbines
         """
-        return self.generator.generators[0].nameplate_capacity
+        wind_cap = self._config.wind_capacity
+        if self.generator and not self.generator.generators[0].nameplate_capacity == wind_cap:
+            self.generator.generators[0].set_nameplate_capacity(wind_cap)
+        return wind_cap
     
     @wind_capacity.setter
     def wind_capacity(self, capacity: float) -> None:
-        if self.wind_capacity != capacity:
-            turbine_size = self.generator.generators[0].turbine.nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
-            n_turbines = capacity / turbine_size
-            self.generator.generators[0].n_turbines = n_turbines # pyright: ignore[reportAttributeAccessIssue]
-            self.dirty = True        
+        if self._config.wind_capacity != capacity:
+            self._config.wind_capacity = capacity
+        if self.generator:
+            self.generator.generators[0].set_nameplate_capacity(capacity)
     
     @property
     def pv_capacity(self) -> float:
         """
         Capacity (kWp) of PV array
         """
-        return self.generator.generators[1].nameplate_capacity
+        pv_cap = self._config.pv_capacity
+        if self.generator and not self.generator.generators[1].nameplate_capacity == pv_cap:
+            self.generator.generators[1].set_nameplate_capacity(pv_cap)
+        return pv_cap
     
     @pv_capacity.setter
     def pv_capacity(self, capacity: float) -> None:
-        if self.pv_capacity != capacity:
-            pv_size = self.generator.generators[1].pv_array.nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
-            n_arrays = capacity / pv_size
-            self.generator.generators[1].n_arrays = n_arrays # pyright: ignore[reportAttributeAccessIssue]
-            self.dirty = True
+        if self._config.pv_capacity != capacity:
+            self._config.pv_capacity = capacity
+        if self.generator:
+            self.generator.generators[1].set_nameplate_capacity(capacity)
 
-    @classmethod
-    def from_characteristics(cls,
-                             generator: generation.PowerPlantHeterogeneousGenerators,
-                             name: str|None = None,
-                             model: newsegsmodel.NewsegsModel | None = None, # pyright: ignore[reportUndefinedVariable]
-                             ) -> SprakeGeneration:
-        o = cls(generator)
-
-        if name is not None:
-            o.name = name
-        
-        if model is not None:
-            o.model = model
-        
-        return o
+    @override
+    def update(self, config):
+        super().update(config)
+        if isinstance(config, Mapping):
+            if '_config' in config.keys():
+                if 'pv_capacity' in config['_config'].keys():
+                    self.pv_capacity = self._config.pv_capacity
+                if 'wind_capacity' in config['_config'].keys():
+                    self.wind_capacity = self._config.wind_capacity
     
     @override
     def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
         odict['wind_capacity'] = self.wind_capacity
         odict['pv_capacity'] = self.pv_capacity
-        odict['location'] = self.location.to_dict() # pyright: ignore[reportAttributeAccessIssue]
+        #odict['location'] = self.location.to_dict() # pyright: ignore[reportAttributeAccessIssue]
         return odict
     
     @override
@@ -311,6 +327,9 @@ class SprakeGeneration(NewsegsGeneration):
     ) -> SprakeGeneration:
         inst = cls.from_none()
         inst.update(config)
+        inst.wind_capacity = inst.wind_capacity
+        inst.pv_capacity = inst.pv_capacity
+        inst.location = inst._config.location # pyright: ignore[reportAttributeAccessIssue]
         #cast(RaisedLocation, inst.generator.generators[1].location).height_agl = 2.
         return inst
 
@@ -321,12 +340,16 @@ def _SprakeGeneration_from_other(
     other: SprakeGeneration
 ) -> None:
     super(SprakeGeneration, self).__init__()
-    self._generator = copy.deepcopy(other.generator)
     self.name = other.name
     try:
         self.model = other.model
     except AttributeError:
         pass
+
+    for k in asdict(other._config).keys(): # pyright: ignore[reportArgumentType]
+        setattr(self, k, copy.copy(getattr(other, k)))
+
+    self.generator = copy.deepcopy(other.generator)
 
 # Exclude generator as not necessary - add it back in afterwards
 SprakeGeneration._excluded_attributes = (

@@ -189,12 +189,13 @@ def load_project(
     # Create the project
     project = NewsegsProject(
         metamodels, 
-        model_type = proj_data._mapping['model_type'],
-        model_version = proj_data._mapping['model_version'],
+        #model_type = proj_data._mapping['model_type'],
+        #model_version = proj_data._mapping['model_version'],
         dsa_config = dsa_config,
         psa_config = psa_config,
         table_config = table_config
     )
+    project.id = proj_data._mapping['id']
     project._project_id = project_id # pyright: ignore[reportAttributeAccessIssue]
 
     # Load the variables (and assign to metamodels for now)

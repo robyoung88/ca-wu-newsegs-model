@@ -137,8 +137,8 @@ class TestSprakeModelRun(unittest.TestCase):
     
     def test_post_serialisation_run_stability(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(50.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 50.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
         mdl.run()
@@ -147,8 +147,8 @@ class TestSprakeModelRun(unittest.TestCase):
         cs_meters_1 = mdl.get_consumption_storage_result().meters_to_pandas()
 
         d1 = mdl.to_dict()
-
-        sd1 = json.dumps(d1, cls = jsonfuncs.NumpyEncoder)
+        sd1 = mdl.json_dumps()
+        #sd1 = json.dumps(d1, cls = jsonfuncs.NumpyEncoder)
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_dict(d2)

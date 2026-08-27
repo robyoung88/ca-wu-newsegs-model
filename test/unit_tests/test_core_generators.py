@@ -31,6 +31,9 @@ class TestWindTurbineElecGenerator(unittest.TestCase):
         turb.location = loc
         turb.hub_height = 25.
 
+        self.assertTrue(turb.modified)
+        self.assertEqual(turb.location.height_agl, 25.)
+
         d1 = turb.to_dict()
         turb2 = generators.WindTurbineElecGenerator.from_dict(d1)
 
@@ -40,7 +43,7 @@ class TestWindTurbineElecGenerator(unittest.TestCase):
         )
 
         # JSON serialisation / unserialisation
-        sd1 = json.dumps(d1, cls=jsonfuncs.NumpyEncoder)
+        sd1 = turb.json_dumps()# json.dumps(d1, cls=jsonfuncs.NumpyEncoder)
         d2 = json.loads(sd1)
 
         turb3 = generators.WindTurbineElecGenerator.from_dict(d2)
@@ -69,6 +72,20 @@ class TestWindTurbineElecGenerator(unittest.TestCase):
         turb.update(d1)
         self.assertEqual(turb.location, turb2.location)
         self.assertEqual(turb.hub_height, turb2.hub_height)
+
+    def test_pickle_serialisation(self):
+        import pickle
+        turb = generators.WindTurbineElecGenerator.from_none()
+        loc = location.Location(55, -4)
+        turb.location = loc
+        turb.hub_height = 25.
+
+        s1 = pickle.dumps(turb)
+
+        t2 = pickle.loads(s1)
+
+        self.assertEqual(turb.cp(8.2), t2.cp(8.2))
+
 
 class TestPowerPlantHomogeneousWind(unittest.TestCase):
 

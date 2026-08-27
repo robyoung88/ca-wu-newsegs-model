@@ -17,12 +17,12 @@ class TestSprakeGridConfigEqualities(unittest.TestCase):
         self.assertEqual(gr1.import_rate, 0.2)
         self.assertEqual(gr1.export_rate, 0.07)
 
-        gr2 = sprakegrid.SprakeGrid(0.35, 0.1)
+        gr2 = sprakegrid.SprakeGrid(0.35, export_per_unit = 0.1)
         self.assertEqual(gr2.import_rate, 0.35)
         self.assertEqual(gr2.export_rate, 0.1)
     
     def test_copy_construction(self):
-        gr1 = sprakegrid.SprakeGrid(0.35, 0.1, name = 'Test')
+        gr1 = sprakegrid.SprakeGrid(0.35, export_per_unit = 0.1, name = 'Test')
         gr2 = sprakegrid.SprakeGrid(gr1)
         
         self.assertEqual(gr1.import_rate, gr2.import_rate)
@@ -33,7 +33,7 @@ class TestSprakeGridConfigEqualities(unittest.TestCase):
         self.assertNotEqual(gr1.export_rate, gr2.export_rate)
     
     def test_serialisation(self):
-        gr1 = sprakegrid.SprakeGrid(0.35, 0.1, name = 'Test')
+        gr1 = sprakegrid.SprakeGrid(0.35, export_per_unit = 0.1, name = 'Test')
         d1 = gr1.to_dict()
 
         gr2 = gridconstructors.grid_module_from_dict(d1)
@@ -42,7 +42,7 @@ class TestSprakeGridConfigEqualities(unittest.TestCase):
         self.assertEqual(gr1.name, gr2.name)
     
     def test_json_serialisation(self):
-        gr1 = sprakegrid.SprakeGrid(0.35, 0.1, name = 'Test')
+        gr1 = sprakegrid.SprakeGrid(0.35, export_per_unit = 0.1, name = 'Test')
         d1 = gr1.to_dict()
 
         sd1 = json.dumps(d1)
