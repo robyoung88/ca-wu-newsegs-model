@@ -274,13 +274,15 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
         has_old = hasattr(self, name)
         old_val = getattr(self, name, None)
         new_val = wrap_value(value, self)
-
-        if isinstance(value, np.ndarray):
-            unequal = not (new_val == old_val).all()
-        else:
-            unequal = not has_old or old_val != new_val
+        
+        
+        try:
+            equal = np.all(old_val == new_val)
+        except ValueError:
+            equal = False
+        
             
-        if not has_old or unequal:
+        if not has_old or not equal:
             if isinstance(old_val, RevisionNotifierMixin):
                 self._remove_child(old_val)
 

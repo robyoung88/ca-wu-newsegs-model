@@ -1,6 +1,7 @@
 """Provides implementation of NewsegsFinance for Sprake Model."""
 from __future__ import annotations
 from dataclasses import asdict
+import time
 from typing import Any, cast, override, Mapping
 from numbers import Number
 from functools import singledispatchmethod
@@ -131,17 +132,11 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         if not isinstance(mdl, SprakeModel):
             raise TypeError(f'SprakeFinance only compatible with SprakeModel, {type(mdl)} provided')
         return super().set_model(mdl, dirty)
-    
-    # @property
-    # @override
-    # def model(self) -> SprakeModel:
-    #     return cast(SprakeModel, super().model)
-    
-    # @model.setter
-    # def model(self, mdl: NewsegsModelInterface) -> None:
-    #     model_setter = newsegsfinance.NewsegsFinance.model.fset
-    #     assert model_setter is not None
-    #     model_setter(self, mdl)
+
+    @override
+    def run(self):
+        self.last_update = time.time_ns()
+        return super().run()
 
     @classmethod
     def get_default_unit_costs(cls) -> dict:
@@ -645,8 +640,8 @@ def _deferred_get_om_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.Dat
     pv_om_per_kw_month = fnc.pv_om_per_kw_year / 12 # pyright: ignore[reportAttributeAccessIssue]
     
     # Capacity in Sprake model is constant, so this is fine:
-    wind_om_per_month = wind_om_per_kw_month * fnc.model.generation.generator.generators[0].nameplate_capacity
-    pv_om_per_month = pv_om_per_kw_month * fnc.model.generation.generator.generators[1].nameplate_capacity
+    wind_om_per_month = wind_om_per_kw_month * fnc.model.generation.wind_capacity
+    pv_om_per_month = pv_om_per_kw_month * fnc.model.generation.pv_capacity
 
     # Shift the costs to the end of the first timestep in each month so that it can be
     # picked up in the meter summary statistics
@@ -692,7 +687,7 @@ def _deferred_get_om_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.DataFr
     bess_om_per_kwh_month = fnc.bess_om_per_kwh_year / 12 # pyright: ignore[reportAttributeAccessIssue]
 
     # Capacity in Sprake model is constant
-    bess_om_per_month = bess_om_per_kwh_month * fnc.model.consumption_storage.storage_params.get('storage_capacity')
+    bess_om_per_month = bess_om_per_kwh_month * fnc.model.consumption_storage.get_storage_params().get('storage_capacity')
 
     # Shift the costs to the end of the first timestep in each month so that it can be
     # picked up in the meter summary statistics
@@ -808,10 +803,10 @@ def _deferred_get_capex_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.
         return odf
     
     odf['wind_costs'] = 0.0
-    odf.iloc[0,-1] = fnc.wind_capex_per_kw * fnc.model.generation.generator.generators[0].nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
+    odf.iloc[0,-1] = fnc.wind_capex_per_kw * fnc.model.generation.wind_capacity # pyright: ignore[reportAttributeAccessIssue]
 
     odf['pv_costs'] = 0.0
-    odf.iloc[0,-1] = fnc.pv_capex_per_kw * fnc.model.generation.generator.generators[1].nameplate_capacity # pyright: ignore[reportAttributeAccessIssue]
+    odf.iloc[0,-1] = fnc.pv_capex_per_kw * fnc.model.generation.pv_capacity # pyright: ignore[reportAttributeAccessIssue]
 
     odf['costs'] = odf['wind_costs'] + odf['pv_costs']
     return odf
@@ -831,7 +826,7 @@ def _deferred_get_capex_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.Dat
         return odf
     
     odf['bess_costs'] = 0.0
-    odf.iloc[0,-1] = fnc.bess_capex_per_kwh * fnc.model.consumption_storage.storage_params.get('storage_capacity') # pyright: ignore[reportAttributeAccessIssue]
+    odf.iloc[0,-1] = fnc.bess_capex_per_kwh * fnc.model.consumption_storage.get_storage_params().get('storage_capacity') # pyright: ignore[reportAttributeAccessIssue]
 
     odf['costs'] = odf['bess_costs']
     return odf

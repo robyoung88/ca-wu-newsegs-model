@@ -46,7 +46,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
         mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
         mdl.grid.import_rate = 0.5
-        mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
+        mdl.consumption_storage.efficiency_reduction = 0.5
 
         mdl2 = sprakemodel.SprakeModel(mdl)
         self.assertEqual(
@@ -58,8 +58,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
             mdl2.grid.import_rate
         )
         self.assertDictEqual(
-            mdl.consumption_storage.appliance_params,
-            mdl2.consumption_storage.appliance_params
+            mdl.consumption_storage.get_appliance_params(),
+            mdl2.consumption_storage.get_appliance_params()
         )
     
     def test_serialisation(self):
@@ -67,7 +67,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
         mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
         mdl.grid.import_rate = 0.5
-        mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
+        mdl.consumption_storage.efficiency_reduction = 0.5
 
         d1 = mdl.to_dict()
 
@@ -82,8 +82,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
             mdl2.grid.import_rate
         )
         self.assertDictEqual(
-            mdl.consumption_storage.appliance_params,
-            mdl2.consumption_storage.appliance_params
+            mdl.consumption_storage.get_appliance_params(),
+            mdl2.consumption_storage.get_appliance_params()
         )
     
     def test_json_serialisation(self):
@@ -91,7 +91,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
         mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
         mdl.grid.import_rate = 0.5
-        mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
+        mdl.consumption_storage.efficiency_reduction = 0.5
 
         sd1 = mdl.json_dumps()
         d2 = json.loads(sd1)
@@ -108,8 +108,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
             mdl2.grid.import_rate
         )
         self.assertDictEqual(
-            mdl.consumption_storage.appliance_params,
-            mdl2.consumption_storage.appliance_params
+            mdl.consumption_storage.get_appliance_params(),
+            mdl2.consumption_storage.get_appliance_params()
         )
 
 class TestSprakeModelRun(unittest.TestCase):
@@ -140,15 +140,13 @@ class TestSprakeModelRun(unittest.TestCase):
         mdl.generation.wind_capacity = 200.
         mdl.generation.pv_capacity = 50.
         mdl.grid.import_rate = 0.5
-        mdl.consumption_storage.appliance_params['efficiency_reduction'] = 0.5
+        mdl.consumption_storage.efficiency_reduction = 0.5
         mdl.run()
 
         gen_meters_1 = mdl.get_generation_result().meters_to_pandas()
         cs_meters_1 = mdl.get_consumption_storage_result().meters_to_pandas()
 
-        d1 = mdl.to_dict()
         sd1 = mdl.json_dumps()
-        #sd1 = json.dumps(d1, cls = jsonfuncs.NumpyEncoder)
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_dict(d2)

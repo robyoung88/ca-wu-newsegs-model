@@ -39,6 +39,7 @@ class NewsegsGeneration(NewsegsModule):
     @override
     def update(self, config):
         super().update(config)
+        # After updating, trigger any logic on location
         if isinstance(config, Mapping):
             if '_config' in config.keys():
                 if 'location' in config['_config'].keys():

@@ -11,10 +11,10 @@ from newsegsmodelframework.newsegsmodel import sprakemodel
 
 if __name__ == '__main__':
     mdl = sprakemodel.SprakeModel.from_none()
-    mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-    mdl.generation.generator.generators[1].set_nameplate_capacity(200.)
-    mdl.consumption_storage.storage_params['storage_capacity'] = 4000.
-    mdl.consumption_storage.spaceheat_params['hlp'] = 0.3
+    mdl.generation.wind_capacity = 200.
+    mdl.generation.pv_capacity = 200.
+    mdl.consumption_storage.storage_capacity = 4000.
+    mdl.consumption_storage.hlp = 0.3
     mdl.consumption_storage.ev_per_unit = 0.2
 
     d1 = mdl.to_dict()

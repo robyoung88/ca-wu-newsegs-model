@@ -160,6 +160,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     def _generate_config(self, *args, **kwargs) -> SprakeModelConfig:
         return SprakeModelConfig(*args, **kwargs)
+    _config: SprakeModelConfig # pyright: ignore[reportIncompatibleVariableOverride]
 
     @singledispatchmethod
     def __init__(
@@ -252,9 +253,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
         new_timespan = modtimespan.RegTimeSpan(timespan)
         new_timespan.timestep = self.timestep
-        new_horizon = _timespan_to_horizon_years(new_timespan)
-        self.run_period = new_timespan
-        self._horizon = new_horizon
+        self._config.run_period = new_timespan
         
     def get_run_period(self) -> modtimespan.TimeSpan:
         return self.run_period
@@ -262,20 +261,16 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     @property
     def horizon(self) -> int:
         """Time horizon in years."""
-        return self._horizon
+        return _timespan_to_horizon_years(self._config.run_period)
     
     @horizon.setter
     def horizon(self, new_horizon: int):
-        if hasattr(self, '_horizon') and new_horizon == self._horizon:
-            return
         ts = modtimespan.RegTimeSpan(self.get_run_period())
         ts.end = ts.start + pd.Timedelta(new_horizon*365, unit='d') 
         while ts.end.day != ts.start.day:
             ts.end = ts.end + pd.Timedelta(1, unit='d')
         ts.timestep = self.get_default_timestep()
-
         self.run_period = ts
-        self._horizon = new_horizon
 
     @property
     def local_env(self) -> environment_servers.NewsegsLocalEnvironment:

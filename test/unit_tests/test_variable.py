@@ -1663,9 +1663,9 @@ class TestVariableSynchronisation(unittest.TestCase):
 
         vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
         self.assertEqual(vbl.model_parameter, 'storage_capacity')
-        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
         vbl.synchronise_from_model(mdl)
-        self.assertEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        self.assertEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
 
     def test_synchronisation_scalar_beta(self):
         vars = self.load_sprake_variables()
@@ -1673,9 +1673,9 @@ class TestVariableSynchronisation(unittest.TestCase):
 
         vbl = [x for x in vars if x.model_parameter == 'storage_rte'][0]
         self.assertEqual(vbl.model_parameter, 'storage_rte')
-        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_rte'])
         vbl.synchronise_from_model(mdl)
-        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_rte'])
     
     def test_synchronisation_scalar_normal(self):
         vars = self.load_sprake_variables()
@@ -1683,9 +1683,9 @@ class TestVariableSynchronisation(unittest.TestCase):
 
         vbl = [x for x in vars if x.model_parameter == 'hlp'][0]
         self.assertEqual(vbl.model_parameter, 'hlp')
-        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_sh_params()['hlp'])
         vbl.synchronise_from_model(mdl)
-        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.get_sh_params()['hlp'])
 
     def test_synchronisation_scalar_gamma(self):
         vars = self.load_sprake_variables()
@@ -1703,29 +1703,29 @@ class TestVariableSynchronisation(unittest.TestCase):
         """
         mdl = sprakemodel.SprakeModel.from_none()
         self.assertNotEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'],
+            mdl.consumption_storage.get_storage_params()['storage_capacity'],
             100.0
         )
         variable.update_model_with_value(
             100.0,
             mdl,
-            'mod_cs._storage_params',
+            'consumption_storage',
             'storage_capacity'
         )
         self.assertEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'],
+            mdl.consumption_storage.get_storage_params()['storage_capacity'],
             100.0
         )
 
         fnc = sprakefinance.SprakeFinance.from_none()
         self.assertNotEqual(
-            fnc.unit_costs['grid_import_sc_per_day'],
+            fnc.grid_import_sc_per_day,
             25
         )
         variable.update_model_with_value(
             25,
             fnc,
-            '_unit_costs',
+            None,
             'grid_import_sc_per_day'
         )
         self.assertEqual(
@@ -1741,13 +1741,13 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'storage_capacity')
         vbl.synchronise_from_model(mdl)
         self.assertNotEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'], 
+            mdl.consumption_storage.get_storage_params()['storage_capacity'], 
             100
         )
         vbl.set_parameters(100)
         vbl.update_model(mdl)
         self.assertEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'], 
+            mdl.consumption_storage.get_storage_params()['storage_capacity'], 
             100
         )
         
@@ -1759,14 +1759,14 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'storage_rte')
         vbl.synchronise_from_model(mdl)
         self.assertNotEqual(
-            mdl.consumption_storage.storage_params['storage_rte'], 
+            mdl.consumption_storage.get_storage_params()['storage_rte'], 
             0.8
         )
         self.assertEqual(vbl.parameterisation_index, 1)
         vbl.set_parameters(0.8, 0.1)
         vbl.update_model(mdl)
         self.assertEqual(
-            mdl.consumption_storage.storage_params['storage_rte'], 
+            mdl.consumption_storage.get_storage_params()['storage_rte'], 
             0.8
         )
     
@@ -1778,13 +1778,13 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'hlp')
         vbl.synchronise_from_model(mdl)
         self.assertNotEqual(
-            mdl.consumption_storage.spaceheat_params['hlp'], 
+            mdl.consumption_storage.get_sh_params()['hlp'], 
             0.5
         )
         vbl.set_parameters(0.5, 0.02)
         vbl.update_model(mdl)
         self.assertEqual(
-            mdl.consumption_storage.spaceheat_params['hlp'],
+            mdl.consumption_storage.get_sh_params()['hlp'],
             0.5
         )
     
@@ -1796,14 +1796,14 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'resident_var_per_unit')
         vbl.synchronise_from_model(fnc)
         self.assertNotEqual(
-            fnc.unit_costs['resident_var_per_unit'], 
+            fnc.resident_var_per_unit, 
             0.33
         )
         self.assertEqual(vbl.parameterisation_index, 1)
         vbl.set_parameters(0.33, 0.05)
         vbl.update_model(fnc)
         self.assertEqual(
-            fnc.unit_costs['resident_var_per_unit'],
+            fnc.resident_var_per_unit,
             0.33
         )
 
@@ -1826,7 +1826,7 @@ class TestVariableSerialisation(unittest.TestCase):
         self.assertEqual(vbl.distribution.distribution, 'numeric_constant')
         self.assertEqual(vbl.name, 'Storage capacity')
         
-        self.assertTupleEqual(vbl._raw_parameters, (4000,))
+        self.assertTupleEqual(vbl.raw_parameters, (4000,))
     
 class TestVariableCopy(unittest.TestCase):
     """

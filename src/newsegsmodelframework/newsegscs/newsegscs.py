@@ -1,35 +1,39 @@
 """Provides abstract base class for NewSEGS Consumption and Storage Module."""
 
 from abc import abstractmethod
+from dataclasses import field
+from typing import override
 
 import pandas as pd
 
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.core import newsegsmodule
+from newsegsmodelframework.core import NewsegsModule
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult, filter_meters
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 
-class NewsegsCS(newsegsmodule.NewsegsModule):
+@revision_dataclass
+class NewsegsCSConfig(DataWithRevision):
+    location: modlocation.Location = field(default_factory = modlocation.Location.from_none)
+    """
+    A generalised location for the module.
+
+    May or may not relate to the local environment of any of the
+    storage units or consumers, but should give an
+    indication of the consumption-storage location.
+
+    Returns:
+        modlocation.Location: Generalised location for the module.
+    """
+
+class NewsegsCS(NewsegsModule):
     """Abstract base class for NewSEGS Consumption and Storage Module."""
     component_type = 'cs'
 
-    @property
-    @abstractmethod
-    def location(self) -> modlocation.Location:
-        """
-        A generalised location for the module.
+    @override
+    def _generate_config(self, *args, **kwargs) -> NewsegsCSConfig:
+        return NewsegsCSConfig(*args, **kwargs)
+    _config: NewsegsCSConfig # pyright: ignore[reportIncompatibleVariableOverride]
 
-        May or may not relate to the local environment of any of the
-        storage units or consumers, but should give an
-        indication of the consumption-storage location.
-
-        Returns:
-            modlocation.Location: Generalised location for the module.
-        """
-    
-    @location.setter
-    @abstractmethod
-    def location(self, loc: modlocation.Location) -> None:
-        ...
 
 def get_consumption_meters(
     cs_results: NewsegsModuleResult

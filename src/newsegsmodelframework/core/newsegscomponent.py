@@ -15,13 +15,14 @@ These components require the following common behaviour:
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from collections import OrderedDict
 import copy
 import re
 import time
 from typing import Any, Callable, Iterable, Optional, Sequence, SupportsIndex, Type, override
 import uuid as mod_uuid
 
-from newsegsmodelframework.core import serialisation
+from newsegsmodelframework.core import serialisation, SerialisedConfigurationMixin
 from newsegsmodelframework.core import find_constructor
 from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
 from newsegsmodelframework.core.trackeddata import wrap_value as default_wrap_value
@@ -178,9 +179,99 @@ class ComponentListProperty:
         setattr(instance, self.name, value)
 
 
+class ObservableComponentOrderedDict(OrderedDict, RevisionNotifierMixin):
+    """Ordered dictionary wrapper that triggers a revision increment on mutation of child components."""
+    @classmethod
+    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
+        return wrap_value(val, parent)
+
+    def __init__(
+        self,
+        mapping = (),
+        parent: Optional['RevisionNotifierMixin | NewsegsComponent'] = None,
+        **kwargs
+    ):
+        RevisionNotifierMixin.__init__(self)
+        initial = OrderedDict(mapping, **kwargs)
+        wrapped = {k: self._wrap_value(v, self) for k, v in initial.items()}
+        super().__init__(wrapped)
+        if isinstance(parent, NewsegsComponent):
+            parent._config._add_child(self)
+        elif parent:
+            parent._add_child(self)
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        exists = key in self
+        old_val = self.get(key) if exists else None
+        new_val = self._wrap_value(value, self)
+
+        if not exists or old_val != new_val:
+            super().__setitem__(key, new_val)
+            self._notify_change()
+            if old_val is not None:
+                if isinstance(old_val, NewsegsComponent):
+                    self._remove_child(old_val._config)
+                elif isinstance(old_val, RevisionNotifierMixin):
+                    self._remove_child(old_val)
+            
+    def __delitem__(self, key):
+        old_val = self.get(key)
+        if  old_val is not None:
+            if isinstance(old_val, NewsegsComponent):
+                self._remove_child(old_val._config)
+            elif isinstance(old_val, RevisionNotifierMixin):
+                self._remove_child(old_val)
+
+        super().__delitem__(key)
+        self._notify_change()
+
+    def update(self, *args, **kwargs):
+        other = dict(*args, **kwargs)
+        changed = False
+        for k, v in other.items():
+            wrapped_v = wrap_value(v, self)
+            if k not in self or self[k] != wrapped_v:
+                old_val = self.get(k)
+                if old_val is not None:
+                    if isinstance(old_val, NewsegsComponent):
+                        self._remove_child(old_val._config)
+                    elif isinstance(old_val, RevisionNotifierMixin):
+                        self._remove_child(old_val)
+                
+                super().__setitem__(k, wrapped_v)
+                changed = True
+        if changed:
+            self._notify_change()
+    
+    def pop(self, key, *args, **kwargs):
+        if key in self:
+            item = super().pop(key)
+            self._notify_change()
+            if isinstance(item, NewsegsComponent):
+                self._remove_child(item._config)
+            elif isinstance(item, RevisionNotifierMixin):
+                self._remove_child(item)
+            return item
+        return super().pop(key, *args, **kwargs)
+
+    def popitem(self, last: bool = True) -> tuple:
+        item = super().popitem(last)
+        self._notify_change()
+        if isinstance(item, NewsegsComponent):
+            self._remove_child(item._config)
+        elif isinstance(item, RevisionNotifierMixin):
+            self._remove_child(item)
+        return item
+
+    def clear(self):
+        if len(self) > 0:
+            super().clear()
+            self._children = []
+            self._notify_change()
+
+
 class NewsegsComponent(
-    ConfigurationMixin,
-    serialisation.SerialiseToDictMixin,
+    SerialisedConfigurationMixin,
     metaclass = ABCMeta
 ):
     """

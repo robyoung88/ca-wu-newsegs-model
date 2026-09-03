@@ -51,6 +51,7 @@ from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location
 from newsegsmodelframework.core.newsegsmodule import NewsegsModule
+from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
 from newsegsmodelframework.util import jsonfuncs
 
@@ -83,8 +84,7 @@ class ABCElecGeneratorConfig(DataWithRevision):
 
 
 class ABCElecGenerator(
-    ConfigurationMixin,
-    SerialiseToDictMixin,
+    SerialisedConfigurationMixin,
     metaclass = ABCMeta
 ):
     """

@@ -235,7 +235,7 @@ class TestPowerPlantHeterogeneousGenerators(unittest.TestCase):
         loc.azimuth = 270.        
         g2.location = loc
         g2.peak_power = 20.
-        pp.append(g2)
+        pp.append(g2) # pyright: ignore[reportArgumentType]
         self.assertEqual(pp.nameplate_capacity, len(pp.generators)*20.)
 
     def test_json_reconstruction(self):

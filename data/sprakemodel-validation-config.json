@@ -1,49 +1,130 @@
 {
     "class": "SprakeModel",
     "constructor_class": "NewsegsComponent",
-    "uuid": "bf66a9bc-7158-4e74-a36c-492069716319",
-    "_mod_gen": {
-        "class": "SprakeGeneration",
-        "constructor_class": "NewsegsModule",
-        "uuid": "b64e11d7-e914-4733-a987-d88dce22851c",
-        "_dirty": true,
-        "wind_capacity": 200.0,
-        "pv_capacity": 200.0,
-        "location": {
-            "class": "Location",
-            "constructor_class": "Location",
-            "_lat": 53.25535,
-            "_lon": -3.47697,
-            "_name": "Site",
-            "_crs": "EPSG:4326"
+    "_config": {
+        "class": "SprakeModelConfig",
+        "constructor_class": "DataWithRevision",
+        "_last_syncronised": 0,
+        "_revision": 5,
+        "run_period": {
+            "class": "RegTimeSpan",
+            "constructor_class": "TimeSpan",
+            "_start_dt": {
+                "class": "Timestamp",
+                "constructor_class": "Timestamp",
+                "ts_input": "2005-01-01 00:00:00+00:00",
+                "tz": "UTC"
+            },
+            "_tz": "UTC",
+            "_end_dt": {
+                "class": "Timestamp",
+                "constructor_class": "Timestamp",
+                "ts_input": "2015-01-01 00:00:00+00:00",
+                "tz": "UTC"
+            },
+            "_delta": {
+                "class": "Timedelta",
+                "constructor_class": "Timedelta",
+                "value": "3652 days 00:00:00"
+            },
+            "_timestep": {
+                "class": "Timedelta",
+                "constructor_class": "Timedelta",
+                "value": "0 days 01:00:00"
+            },
+            "_n": 87648
+        },
+        "timestep": {
+            "class": "Timedelta",
+            "constructor_class": "Timedelta",
+            "value": "0 days 01:00:00"
         }
     },
-    "_mod_grid": {
+    "uuid": "d94c21a7-c387-484a-9c63-6d2409206e09",
+    "_name": "Sprake Energy Model",
+    "_model_data": {
+        "class": "NewsegsModelData",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "340b5032-b624-4ed8-9f5b-7e6257dd5af8"
+    },
+    "_model_data_id": "cmp-340b5032-b624-4ed8-9f5b-7e6257dd5af8",
+    "_table_config": {
+        "class": "TableConfigNewsegsComponent",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "e3f3bfc7-3183-4e93-83da-3340ac9fa6c8"
+    },
+    "_table_config_id": "cmp-e3f3bfc7-3183-4e93-83da-3340ac9fa6c8",
+    "_generation": {
+        "class": "SprakeGeneration",
+        "constructor_class": "NewsegsModule",
+        "_config": {
+            "class": "SprakeGenerationConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 4,
+            "location": {
+                "class": "Location",
+                "constructor_class": "Location",
+                "_lat": 53.25535,
+                "_lon": -3.47697,
+                "_name": "Site",
+                "_crs": "EPSG:4326"
+            },
+            "wind_capacity": 200.0,
+            "pv_capacity": 200.0
+        },
+        "uuid": "6e14567a-1158-42e0-9d8e-faea937430d5",
+        "wind_capacity": 200.0,
+        "pv_capacity": 200.0
+    },
+    "_generation_id": "cmp-6e14567a-1158-42e0-9d8e-faea937430d5",
+    "_grid": {
         "class": "SprakeGrid",
         "constructor_class": "NewsegsModule",
-        "uuid": "8413f1fd-a588-46e3-a9ae-33f88fca396f",
-        "_import_rate": 0.2,
-        "_dirty": true,
-        "_export_rate": 0.07
+        "_config": {
+            "class": "SprakeGridConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0,
+            "import_per_unit": 0.2,
+            "export_per_unit": 0.07
+        },
+        "uuid": "b7489635-bc43-477f-beb5-b214ff73e6ba"
     },
-    "_mod_cs": {
+    "_grid_id": "cmp-b7489635-bc43-477f-beb5-b214ff73e6ba",
+    "_consumption_storage": {
         "class": "SprakeCS",
         "constructor_class": "NewsegsModule",
-        "uuid": "b7404dc2-18ac-4e98-90db-b9dfe0729699",
-        "_appliance_params": {
+        "_config": {
+            "class": "SprakeCSConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 3,
+            "location": {
+                "class": "Location",
+                "constructor_class": "Location",
+                "_lat": 53.255,
+                "_lon": -3.477,
+                "_name": "St Asaph V72"
+            },
+            "n_units": 100.0,
+            "ev_per_unit": 0.2,
             "efficiency_reduction": 0.1,
-            "n_households": 100
-        },
-        "_ev_params": {
             "annual_residential_consumption_per_ev": 1314.72,
-            "n_evs": 20.0
-        },
-        "_dhw_params": {
             "ref_daily_consumption": 4.5,
             "seasonal_variance": 0.2,
-            "n_households": 100
-        },
-        "_spaceheat_params": {
             "hlp": 0.3,
             "gfa": 105.0,
             "timeseries_hdd_start": {
@@ -58,58 +139,12 @@
                 "ts_input": "2000-01-01 00:00:00+00:00",
                 "tz": "UTC"
             },
-            "n_households": 100
-        },
-        "_storage_params": {
             "storage_capacity": 4000.0,
             "storage_rte": 0.88
         },
-        "_ev_per_unit": 0.2,
-        "_dirty": true,
-        "_location": {
-            "class": "Location",
-            "constructor_class": "Location",
-            "_lat": 53.255,
-            "_lon": -3.477,
-            "_name": "St Asaph V72"
-        }
+        "uuid": "af95338f-b4e9-4c3c-be09-082d09b41e0b"
     },
-    "_default_timestep": {
-        "class": "Timedelta",
-        "constructor_class": "Timedelta",
-        "value": "0 days 01:00:00"
-    },
-    "_run_period": {
-        "class": "RegTimeSpan",
-        "constructor_class": "TimeSpan",
-        "_start_dt": {
-            "class": "Timestamp",
-            "constructor_class": "Timestamp",
-            "ts_input": "2005-01-01 00:00:00+00:00",
-            "tz": "UTC"
-        },
-        "_end_dt": {
-            "class": "Timestamp",
-            "constructor_class": "Timestamp",
-            "ts_input": "2015-01-01 00:00:00+00:00",
-            "tz": "UTC"
-        },
-        "_tz": "UTC",
-        "_delta": {
-            "class": "Timedelta",
-            "constructor_class": "Timedelta",
-            "value": "3652 days 00:00:00"
-        },
-        "_timestep": {
-            "class": "Timedelta",
-            "constructor_class": "Timedelta",
-            "value": "0 days 01:00:00"
-        },
-        "_n": 87648
-    },
-    "_horizon": 10,
-    "_dirty": true,
-    "_name": "Sprake Model",
+    "_consumption_storage_id": "cmp-af95338f-b4e9-4c3c-be09-082d09b41e0b",
     "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
     "wider_environment_server": "DummyWiderEnv v0.0.1"
 }
