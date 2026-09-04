@@ -3,6 +3,7 @@ Unit tests for newsegsmodelapp/backend database
 """
 import os
 import unittest
+import uuid
 
 import pandas as pd
 import sqlalchemy as sa
@@ -48,7 +49,13 @@ class TestDatabaseStart(unittest.TestCase):
                     
                     # Insert the data into the table
                     if not df.empty:
-                        df.to_sql(table.name, conn, if_exists='append', index=False)
+                        # Convert appropriate columns to uuid
+                        dtype_spec = {}
+                        for id_col in ['variable_config_id']:
+                            if id_col in df.columns:
+                                df[id_col] = df[id_col].apply(uuid.UUID) # type: ignore
+                                dtype_spec[id_col] = sa.Uuid()
+                        df.to_sql(table.name, conn, if_exists='append', index=False, dtype = dtype_spec)
             
             conn.commit()
 

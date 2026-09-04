@@ -311,8 +311,9 @@ def variable_to_raw_table_data(
 
     odict['payload'] = json.dumps(variable.to_dict())
 
-    if hasattr(variable, '_variable_config_id'):
-        odict['variable_config_id'] = variable._variable_config_id # pyright: ignore[reportAttributeAccessIssue]
+    odict['variable_config_id'] = variable.uuid
+    #if hasattr(variable, '_variable_config_id'):
+    #    odict['variable_config_id'] = variable._variable_config_id # pyright: ignore[reportAttributeAccessIssue]
 
     return odict
 
@@ -382,7 +383,7 @@ def _save_project_variables(
             result = encon.execute(
                 tbls.variable_configs.insert().values(insert_values[idx])
             )
-            var_to_comp_map[id]['variable']._variable_config_id = result.inserted_primary_key[0] # pyright: ignore[reportOptionalSubscript]
+            var_to_comp_map[id]['variable'].uuid = result.inserted_primary_key[0] # pyright: ignore[reportOptionalSubscript]
 
     component_ids = _get_all_component_ids(proj)
     encon.execute(
@@ -395,7 +396,7 @@ def _save_project_variables(
         vardata = var_to_comp_map[id]
         insert_list.extend([
             {
-                'variable_config_id': vardata['variable']._variable_config_id, 
+                'variable_config_id': vardata['variable'].uuid, 
                 'component_config_id': x
             } for x in vardata['components']
         ])
@@ -406,7 +407,7 @@ def _save_project_variables(
             .values(insert_list)
         )
 
-    return {id: var_to_comp_map[id]['variable']._variable_config_id for id in var_uuids}
+    return {id: var_to_comp_map[id]['variable'].uuid for id in var_uuids}
 
 # region LOAD
 def load_variable(

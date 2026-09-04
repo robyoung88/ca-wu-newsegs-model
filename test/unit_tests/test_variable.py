@@ -2348,8 +2348,8 @@ class TestVariableValidation(unittest.TestCase):
         var1 = cast(variable.NumericScalarVariable, var1)
 
         var1.dsa_bounds_type = 'offset'
-        var1.dsa_lower = -(1.96 * float(var1.parameters[1]))
-        var1.dsa_upper = 1.96 * float(var1.parameters[1])
+        var1.dsa_lower = -(1.96 * float(var1.parameters[1])) # pyright: ignore[reportArgumentType]
+        var1.dsa_upper = 1.96 * float(var1.parameters[1]) # pyright: ignore[reportArgumentType]
 
         self.assertEqual(
             var1.get_dsa_value('lower'),
@@ -2524,5 +2524,121 @@ class TestVariableValidation(unittest.TestCase):
 
     def test_gamma_deterministic(self):
         ...
-        
-    
+
+from collections import OrderedDict        
+from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider
+from newsegsmodelframework.core.newsegscomponent import ObservableComponentOrderedDict
+from dataclasses import dataclass, field
+
+class TestVariableListManagement(unittest.TestCase):
+    def load_sprake_variables(self):
+        with open('data/sprake-variable-config.json') as f:
+            var_conf_list = json.load(f)
+        return [variable.variable_from_dict(x) for x in var_conf_list]
+
+    def test_jointly_owned_variables(self):
+        variableprovider = InMemoryVariableProvider(
+            self.load_sprake_variables()
+        )
+
+        @dataclass
+        class VariableConsumer:
+            variable_ids: OrderedDict = field(default_factory=OrderedDict)
+            variables: ObservableComponentOrderedDict = field(default_factory=ObservableComponentOrderedDict)
+
+        varlist = [
+            'gen_input.wind_capacity.0',
+            'gen_input.pv_capacity.0',
+            'stor_input.storage_capacity.0',
+            'stor_input.storage_rte.0',
+            'bc_input.n_units.0',
+            'bc_input.hlp.0',
+            'bc_input.gfa.0'
+        ]
+        consumer1 = VariableConsumer()
+        for varname in varlist:
+            consumer1.variables[varname] = variableprovider.get_default_variable(varname)
+            consumer1.variable_ids[varname] = consumer1.variables[varname].id
+
+        consumer2 = VariableConsumer()
+        for varname in varlist:
+            consumer2.variables[varname] = variableprovider.get_default_variable(varname)
+            consumer2.variable_ids[varname] = consumer2.variables[varname].id
+
+        for varname in varlist:
+            self.assertEqual(
+                consumer1.variables[varname].deterministic_value,
+                consumer2.variables[varname].deterministic_value,
+            )
+
+        # Check the revision status of the variables
+        for varname in varlist:
+            self.assertEqual(
+                consumer1.variables[varname]._config.revision,
+                consumer2.variables[varname]._config.revision,
+            )
+
+        self.assertEqual(
+            consumer1.variables.chain_modified,
+            True
+        )
+
+        consumer1.variables._chain_syncronise()
+        # NB - only syncronising the container object as children should not be modified
+        consumer2.variables._syncronise()
+
+        self.assertEqual(
+            consumer1.variables.chain_modified,
+            False
+        )
+        self.assertEqual(
+            consumer2.variables.chain_modified,
+            False
+        )
+
+        # Modify one of the variables and check its chained status
+        v = consumer1.variables[varlist[0]]
+        cur_param = v.raw_parameters
+        new_param = tuple(x+10 for x in cur_param)
+        v.set_parameters(new_param)
+        new_val = v.deterministic_value
+        self.assertTrue(v._config.modified)
+        self.assertTrue(consumer1.variables.chain_modified)
+        self.assertTrue(consumer2.variables.chain_modified)
+        self.assertEqual(consumer2.variables[varlist[0]].deterministic_value, new_val)
+
+        consumer2.variables._chain_syncronise()
+        self.assertFalse(consumer1.variables.chain_modified)
+        self.assertFalse(consumer2.variables.chain_modified)
+
+        # Replace a variable in consumer 2
+        vname = varlist[1]
+        vid = consumer2.variable_ids[vname]
+        v = variableprovider.duplicate_variable(vid)
+        consumer2.variables[vname] = v
+        consumer2.variable_ids[vname] = v.id
+
+        self.assertNotEqual(
+            consumer1.variable_ids[vname],
+            consumer2.variable_ids[vname]
+        )
+        self.assertEqual(
+            consumer1.variables[vname].deterministic_value,
+            consumer2.variables[vname].deterministic_value,
+        )
+        self.assertFalse(consumer2.variables[vname]._config.modified)
+        self.assertTrue(consumer2.variables.chain_modified)
+        self.assertFalse(consumer1.variables.chain_modified)
+
+        consumer2.variables._chain_syncronise()
+        # Modifye the replaced variable
+        cur_param = v.raw_parameters
+        new_param = tuple(x + 2 for x in cur_param) # pyright: ignore[reportOperatorIssue]
+        v.set_parameters(new_param) # pyright: ignore[reportArgumentType]
+        self.assertTrue(consumer2.variables[vname]._config.modified)
+        self.assertTrue(consumer2.variables.chain_modified)
+        self.assertFalse(consumer1.variables.chain_modified)
+        self.assertNotEqual(
+            consumer1.variables[vname].deterministic_value,
+            consumer2.variables[vname].deterministic_value,
+        )

@@ -1,6 +1,9 @@
 from typing import Any
+import uuid
+import warnings
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 
 def generic_snapshot_entity(
     engine: sa.Engine,
@@ -227,14 +230,32 @@ def generic_restore_snapshot(
                 pk_cols = [c.name for c in table.primary_key.columns]
                 is_single_autoincrement_pk = len(pk_cols) == 1 and table.columns[pk_cols[0]].autoincrement
 
-                if is_single_autoincrement_pk:
-                    old_pk_val = record.pop(pk_cols[0], None)
-                    res = conn.execute(table.insert().values(**record))
-                    if res is None or res.inserted_primary_key is None:
-                        raise ValueError(f'Restore failed - {table.name} could not insert record {record}')
-                    new_pk_val = res.inserted_primary_key[0]
-                    # Map old primary key to new primary key for child references
-                    id_map[(table.name, old_pk_val)] = new_pk_val
+                if len(pk_cols) == 1:
+                    if isinstance(table.columns[pk_cols[0]].type, sa.Uuid): # This works because the type property is actually an instance
+                        # Not autoincrement so PK is a uuid4
+                        old_pk_val = record.pop(pk_cols[0], None)
+                        while True:
+                            new_pk_val = uuid.uuid4()
+                            record[pk_cols[0]] = new_pk_val
+                            try:
+                                res = conn.execute(table.insert().values(**record))
+                                break
+                            except IntegrityError:
+                                conn.rollback()
+                        # Map old primary key to new primary key for child references
+                        id_map[(table.name, old_pk_val)] = new_pk_val
+                    elif table.columns[pk_cols[0]].autoincrement:
+                        old_pk_val = record.pop(pk_cols[0], None)
+                        res = conn.execute(table.insert().values(**record))
+                        if res is None or res.inserted_primary_key is None:
+                            raise ValueError(f'Restore failed - {table.name} could not insert record {record}')
+                        new_pk_val = res.inserted_primary_key[0]
+                        # Map old primary key to new primary key for child references
+                        id_map[(table.name, old_pk_val)] = new_pk_val
+                    else:
+                        # Shouldn't really get here, but:
+                        warnings.warn(f'Inserting new record into table {table.name} without an incrementing primary key: {record}')
+                        conn.execute(table.insert().values(**record))
                 else:
                     # Junction table or fixed key insertion
                     conn.execute(table.insert().values(**record))

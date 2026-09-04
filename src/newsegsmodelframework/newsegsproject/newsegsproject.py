@@ -13,13 +13,15 @@ from newsegsmodelframework.core.newsegscomponent import ComponentListProperty, C
 from newsegsmodelframework.core.trackeddata import DataWithRevision
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
+from newsegsmodelframework.newsegsvariable.variable import Variable
+from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider
 
 
 class NewsegsProjectConfig(DataWithRevision):
     ...
 
 
-class NewsegsProject(NewsegsComponent):
+class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
     """A container and controller for metamodels and variables."""
     
     _name = 'NewSEGS Project'
@@ -40,12 +42,14 @@ class NewsegsProject(NewsegsComponent):
         self,
         metamodels: Sequence[newsegsmetamodel.NewsegsMetaModel],
         *args,
+        default_variables: Optional[Sequence[Variable]] = [],
         dsa_config: Optional[DSAComponent] = None,
         psa_config: Optional[PSAComponent] = None,
         table_config: Optional[TableConfigNewsegsComponent] = None,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
+        InMemoryVariableProvider.__init__(self, default_variables)
 
         self.metamodels = metamodels
 
