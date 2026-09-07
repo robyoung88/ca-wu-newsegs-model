@@ -46,6 +46,19 @@ class VariableProviderInterface(metaclass = ABCMeta):
         Useful for populating the variable list of a new metamodel.
         """
 
+
+class VariablePersistenceInterface(metaclass = ABCMeta):
+    """Interface for saving variables to persistent storage (in order that they may be accessed by other providers)"""
+
+    def upsert_variable(self, var: Variable | Sequence[Variable], force: bool = False) -> None:
+        """Insert or update a variable or list of variables into the store.
+                
+        Args:
+            var: A variable or sequence of variables to synchronise.
+            force: Overwrite the variable(s) regardless of whether their revision number has incremented.
+        """
+
+
 class InMemoryVariableProvider(VariableProviderInterface):
 
     def __init__(self, default_variables):

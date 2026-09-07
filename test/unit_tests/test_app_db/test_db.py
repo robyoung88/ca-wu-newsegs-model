@@ -355,7 +355,7 @@ class TestDatabaseStart(unittest.TestCase):
         for var in one_of_each.values():
             self.assertTrue(var.modified)
 
-        backend_var_provider.synchronise_variable(list(frontend_var_provider._variables_by_uid.values()))
+        backend_var_provider.upsert_variable(list(frontend_var_provider._variables_by_uid.values()))
 
         for var in one_of_each.values():
             self.assertFalse(var.modified)
@@ -425,7 +425,7 @@ class TestDatabaseStart(unittest.TestCase):
                     )
 
         # Synchronise via backend
-        backend_var_provider.synchronise_variable(
+        backend_var_provider.upsert_variable(
             list(frontend_var_provider._variables_by_uid.values())
         )
 
@@ -441,3 +441,70 @@ class TestDatabaseStart(unittest.TestCase):
                     v1.deterministic_value, 
                     v2.deterministic_value
                 )
+
+    def test_project_variable_syncronisation(self):
+        import numpy.testing as nptest
+
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        backend_var_provider = FromDatabaseVariableProvider(db.get_engine)
+
+        mm1 = proj.metamodels[0]
+
+        mm2 = proj.duplicate_metamodel(mm1.id)
+
+        self.assertEqual(
+            list(mm1.variables.values())[0].deterministic_value,
+            list(mm2.variables.values())[0].deterministic_value
+        )
+
+        mm1.variables['gen_input.wind_capacity.0'].set_single_parameter(999, 0)
+        self.assertEqual(
+            mm1.variables['gen_input.wind_capacity.0'].parameters[0],
+            mm2.variables['gen_input.wind_capacity.0'].parameters[0],
+        )
+
+        # Change one variable source
+        mm2.variables['gen_input.pv_capacity.0'] = proj.duplicate_variable(mm2.variables['gen_input.pv_capacity.0'].id)
+        self.assertEqual(
+            mm1.variables['gen_input.pv_capacity.0'].parameters[0],
+            mm2.variables['gen_input.pv_capacity.0'].parameters[0],
+        )
+        mm2.variables['gen_input.pv_capacity.0'].set_single_parameter(555, 0)
+        self.assertNotEqual(
+            mm1.variables['gen_input.pv_capacity.0'].parameters[0],
+            mm2.variables['gen_input.pv_capacity.0'].parameters[0],
+        )
+
+        # Save out variables
+        proj.variable_to_store(
+            backend_var_provider,
+            (x.id for x in mm1.variables.values()),
+        )
+
+        # Test reconstruction - deliberately recover from the wrong one so we check the variable sync
+        mm3 = proj.duplicate_metamodel(mm2.id)
+        mm3.variables.clear()
+        mm3._variable_ids = mm1.variable_ids
+        mm3.reattach_variables(backend_var_provider)
+
+        mm1.sync_model_with_changed_variables_deterministic()
+        mm2.sync_model_with_changed_variables_deterministic()
+        mm3.sync_model_with_changed_variables_deterministic()
+        mm1.model.run()
+        mm2.model.run()
+        mm3.model.run()
+
+        nptest.assert_array_equal(
+            mm1.model.get_generation_result().meters,
+            mm3.model.get_generation_result().meters
+        )
+
+        with self.assertRaises(AssertionError):
+            nptest.assert_array_equal(
+                mm1.model.get_generation_result().meters,
+                mm2.model.get_generation_result().meters
+            )

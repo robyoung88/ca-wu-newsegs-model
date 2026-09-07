@@ -6,6 +6,7 @@ sensitivity analysis.
 """
 from collections import OrderedDict
 from typing import Any, Optional, Sequence, override
+from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
@@ -14,7 +15,7 @@ from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_da
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable
-from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider
+from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, VariablePersistenceInterface
 
 @revision_dataclass
 class NewsegsProjectConfig(DataWithRevision):
@@ -73,10 +74,43 @@ class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
     def metamodel_ids(self) -> tuple[str, ...]:
         return tuple(mm.id for mm in self.metamodels)
 
+    def duplicate_metamodel(self, metamodel_id: str) -> newsegsmetamodel.NewsegsMetaModel:
+        try:
+            wch = self.metamodel_ids.index(metamodel_id)
+        except ValueError:
+            raise ValueError(f'Metamodel not found: {metamodel_id}')
+        mm = self.metamodels[wch]
+
+        mm2 = newsegsmetamodel.NewsegsMetaModel(
+            model = type(mm.model)(mm.model),
+            finance = type(mm.finance)(mm.finance),
+        )
+        mm2._variable_ids = mm.variable_ids
+        mm2.reattach_variables(self)
+
+        mm2.table_config.update(mm.table_config.to_dict())
+
+        self.metamodels.append(mm2)
+        return mm2
+
     @override
     def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
         odict['_metamodel_ids'] = self.metamodel_ids
         return odict
-        
+
+    def variable_to_store(
+            self, 
+            store_interface: VariablePersistenceInterface, 
+            variable_id: Optional['str, SequenceNotStr[str]'] = None,
+            force: bool = False,
+        ):
+        if isinstance(variable_id, str):
+            variable_id = [variable_id, ]
+        elif variable_id is None:
+            variable_id = list(self._variables_by_uid.keys())
+
+        vars = [self.get_variable(x) for x in variable_id]
+        store_interface.upsert_variable(vars, force)
+            
 NewsegsProject._excluded_attributes = super(NewsegsProject, NewsegsProject)._excluded_attributes + ('_metamodels', '_variables_by_uid', '_variables_by_varid')

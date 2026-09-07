@@ -189,6 +189,25 @@ class NewsegsMetaModel(NewsegsComponent):
             except KeyError:
                 v = variable_provider.get_default_variable(var_identifiers['varid'])
             self.variables[var_identifiers['varid']] = v
+
+    def reattach_table_config(self, component_provider: Mapping[str, NewsegsComponent]):
+        """Reattach the associated TableConfig instance after metamodel reconstruction.
+        
+        Args:
+            component_provider: Mapping of component IDs to NewsegsComponent instances.
+        Raises:
+            AttributeError: If the MetaModel has no associated table config ID.
+            ValueError: If component_provider cannot provide the table config.
+            TypeError: If the provided object is not a TableConfigNewsegsComponent.
+        """
+        if not hasattr(self, '_table_config_id') or self._table_config_id == '':
+            raise AttributeError('This MetaModel has no associated TableConfig to reattach.')
+        tc = component_provider.get(self._table_config_id)
+        if tc is None:
+            raise ValueError(f'component_provider could not provide table config for key {self._table_config_id}')
+        if not isinstance(tc, TableConfigNewsegsComponent):
+            raise TypeError(f'component_provider did not provide a TableConfigNewsegsComponent for key {self._table_config_id}')
+        self.table_config = tc
     
     def update_variable_from_interface(
         self,
@@ -295,6 +314,7 @@ class NewsegsMetaModel(NewsegsComponent):
             var.update_model(self.finance)
         else:
             var.update_model(self.model)
+        self._variables_last_model_sync[varid] = var.revision_string
         return var.configuration_type
     
     def sync_model_with_changed_variables_deterministic(
@@ -302,7 +322,7 @@ class NewsegsMetaModel(NewsegsComponent):
     ) -> set[str]:
         affected_models = set()
         for varid, var in self.variables.items():
-            if self._variables_last_model_sync.get(varid, 0) != var._config.revision:
+            if self._variables_last_model_sync.get(varid, '0') != var.revision_string:
                 try:
                     affected_models.add(self.update_model_from_variable_deterministic(varid))
                 except ValueError as e:
@@ -311,6 +331,15 @@ class NewsegsMetaModel(NewsegsComponent):
                 self._variables_last_model_sync[varid] = var._config.revision
   
         return affected_models
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        odict = super().to_dict()
+        odict['_model_id'] = self.model.id
+        odict['_finance_id'] = self.finance.id
+        odict['_variable_ids'] = self.variable_ids
+        odict['_table_config_id'] = self.table_config.id
+        return odict
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
@@ -362,4 +391,6 @@ class NewsegsMetaModel(NewsegsComponent):
         #if not isinstance(self.require_sync, set):
         #    self.require_sync = set(self.require_sync)
 
-NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + ('_model', '_finance')
+NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
+    '_model', '_finance', '_variables', '_table_config'
+)

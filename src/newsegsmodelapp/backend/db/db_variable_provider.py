@@ -1,7 +1,7 @@
 import copy
 import json
 import pickle
-from typing import Callable, Sequence, cast, overload
+from typing import Callable, Sequence, cast, overload, override
 
 import sqlalchemy as sa
 from useful_types import SequenceNotStr
@@ -9,7 +9,7 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.backend.db.project import variable_to_raw_table_data
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsvariable.variable import Variable
-from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
+from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface, VariablePersistenceInterface
 
 from newsegsmodelapp.backend.db import tables as tbls
 
@@ -21,7 +21,7 @@ def _variable_from_json(json_str) -> Variable:
     )
     
 
-class FromDatabaseVariableProvider(VariableProviderInterface):
+class FromDatabaseVariableProvider(VariableProviderInterface, VariablePersistenceInterface):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         self._get_engine = get_engine
 
@@ -99,7 +99,8 @@ class FromDatabaseVariableProvider(VariableProviderInterface):
             varids = conn.scalars(stmt)
         return tuple(varids)
 
-    def synchronise_variable(self, var: Variable | Sequence[Variable], force: bool = False):
+    @override
+    def upsert_variable(self, var: Variable | Sequence[Variable], force: bool = False):
         """Insert or update a variable or list of variables into the database.
         
         Args:
