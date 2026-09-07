@@ -5,7 +5,7 @@ from abc import abstractmethod
 from collections.abc import Mapping
 import copy
 from functools import partial
-from typing import Any, cast, Callable, Literal, Sequence, Sized, get_args, Union, overload, override
+from typing import Any, Iterable, cast, Callable, Literal, Sequence, Sized, get_args, Union, overload, override
 import warnings
 
 from matplotlib.pylab import Generator
@@ -2824,7 +2824,7 @@ class DirichletParameterisationExpected(
         n_means = len(mean)
         vcv = vcv.reshape((n_means, n_means))
 
-        alpha = fit_dirichlet(mean, vcv)
+        alpha = np.asarray(fit_dirichlet(mean, vcv))
         checksum = np.sum(np.abs(mean - (alpha/np.sum(alpha))))
         if checksum > 1e-6:
             raise ArithmeticError(f'Dirichlet fitting unable to recover means - {alpha/np.sum(alpha)}.')
@@ -3462,6 +3462,26 @@ class Variable(
             raise AttributeError('No parameterisation index set')
         return self.distribution.parameterisations[self.parameterisation_index]
 
+    def _get_native_parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
+        p = self._config.parameters
+        if p is not None:
+            if isinstance(p, Iterable):
+                return tuple(p)
+            else:
+                return (p,)
+        raise AttributeError('Parameters not yet set')
+
+    def _set_native_parameters(self, parameters: ParamList) -> None:
+        self._config.parameters = parameters
+
+    @property
+    def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
+        return self._get_native_parameters()
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
+
     def set_parameters(self, *parameters: Param):
         raw_parameters = copy.copy(parameters)
         
@@ -3932,7 +3952,6 @@ class ScalarVariable(Variable):
 
 class NumericScalarVariable(ScalarVariable):
     distribution: NumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
-    #_parameters : tuple[ScalarNumParam, ...]
 
     formatter_dp = 1
     @property
@@ -3944,6 +3963,15 @@ class NumericScalarVariable(ScalarVariable):
         return fstring.format
 
     @property
+    @override
+    def parameters(self) -> tuple[ScalarNumParam, ...]:
+        return cast(tuple[ScalarNumParam, ...], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
+
+    @property
     def deterministic_value(self) -> ScalarNumParam:
         return cast(ScalarNumParam, self.get_deterministic_value())
     
@@ -3953,7 +3981,16 @@ class NumericScalarVariable(ScalarVariable):
 
 class TwoParamNumericScalarVariable(NumericScalarVariable):
     distribution: TwoParamNumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
-    #_parameters : tuple[ScalarNumParam, ScalarNumParam]
+
+    @property
+    @override
+    def parameters(self) -> tuple[ScalarNumParam, ScalarNumParam]:
+        return cast(tuple[ScalarNumParam, ScalarNumParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
+    
 
 class VectorVariable(Variable):
 
@@ -3963,6 +4000,15 @@ class VectorVariable(Variable):
     _transform: tuple[VARIABLE_TRANSFORM, ...]
 
     variable_type = 'vector'
+
+    @property
+    @override
+    def parameters(self) -> tuple[VectorParam | MatrixParam, ...]:
+        return cast(tuple[VectorParam, ...], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
 
     def set_parameters(
         self, 
@@ -4076,6 +4122,15 @@ class NumericVectorVariable(VectorVariable):
     dsa_value_index = 1
     """Which Value is of interest in DSA?"""
 
+    @property
+    @override
+    def parameters(self) -> tuple[NumericVectorParam | MatrixNumParam, ...]:
+        return cast(tuple[NumericVectorParam, ...], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
+
     formatter_dp = 1
     @property
     def value_formatter(self) -> Callable[[NumericVectorParam], Sequence[str]]:        
@@ -4129,11 +4184,15 @@ class NumericVectorVariable(VectorVariable):
 
 class ConstantVariable(ScalarVariable):
     distribution = ConstantDistribution()
-    #_parameters : tuple[ScalarParam]
 
-    #@property
-    #def parameters(self) -> tuple[ScalarParam]:
-    #    return self._parameters
+    @property
+    @override
+    def parameters(self) -> tuple[ScalarParam]:
+        return cast(tuple[ScalarParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
     
     def synchronise_from_model(
         self, 
@@ -4170,11 +4229,15 @@ class ConstantVariable(ScalarVariable):
 
 class NumericConstantVariable(NumericScalarVariable):
     distribution = NumericConstantDistribution()
-    #_parameters : tuple[ScalarNumParam]
 
-    #@property
-    #def parameters(self) -> tuple[ScalarNumParam]:
-    #    return self._parameters
+    @property
+    @override
+    def parameters(self) -> tuple[ScalarNumParam]:
+        return cast(tuple[ScalarNumParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
     
     def synchronise_from_model(
         self, 
@@ -4384,12 +4447,15 @@ class GammaVariable(TwoParamNumericScalarVariable):
 
 class ConstantVectorVariable(VectorVariable):
     distribution = ConstantVectorDistribution()
-    #_parameters: tuple[VectorParam] = ([1],)
-
-    #@property
-    #def parameters(self) -> tuple[VectorParam]:
-    #    return self._parameters
     
+    @property
+    def parameters(self) -> tuple[VectorParam]:
+        return cast(tuple[VectorParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
+
     def synchronise_from_model(
         self, 
         model: ModelType
@@ -4419,11 +4485,18 @@ class ConstantVectorVariable(VectorVariable):
 
 class MultivariateNormalVariable(NumericVectorVariable):
     distribution = MultivariateNormalDistribution()
-    #_parameters: tuple[NumericVectorParam, MatrixNumParam] = (np.asarray([0,0]), np.asarray([[1,0],[0,1]]))
 
-    #@property
-    #def parameters(self) -> tuple[NumericVectorParam, MatrixNumParam]:
-    #    return self._parameters
+    @property
+    def parameters(self) -> tuple[NumericVectorParam, MatrixNumParam]:
+        return cast(
+            tuple[NumericVectorParam, MatrixNumParam],
+            self._get_native_parameters()
+        )
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
+    
     
     def set_parameters(self, *parameters: Param):
         if 'transform' in self.parameterisation.names and len(parameters) < 3:
@@ -4473,11 +4546,14 @@ class MultivariateNormalVariable(NumericVectorVariable):
 
 class DirichletVariable(NumericVectorVariable):
     distribution = DirichletDistribution()
-    # _parameters: tuple[NumericVectorParam] = (np.asarray([1,1]),)
 
-    # @property
-    # def parameters(self) -> tuple[NumericVectorParam]:
-    #     return self._parameters
+    @property
+    def parameters(self) -> tuple[NumericVectorParam]:
+        return cast(tuple[NumericVectorParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
     
     def synchronise_from_model(
         self, 
