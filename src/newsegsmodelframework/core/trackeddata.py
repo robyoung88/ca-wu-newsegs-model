@@ -37,12 +37,28 @@ class RevisionNotifierMixin:
                 self._children.pop(idx)
                 return
 
+    @property
+    def revision(self) -> int:
+        return self._revision
+
+    @property
+    def revision_string(self) -> str:
+        """A string which should remain invariant whilst self or children are unmodified.
+        
+        Technically possible to be spoofed, but the parent should in theory increment whenever children are replaced with equal revisions.
+        """
+        ostr = str(self.revision)
+        if self._children:
+            return ostr +'.' + '.'.join((x.revision_string for x in self._children))
+        else:
+            return ostr
+
     def _notify_change(self):
         self._revision += 1
 
     def _syncronise(self):
         """Use after saving status (to database)"""
-        self._last_syncronised = self._revision
+        self._last_syncronised = self.revision
 
     def _chain_syncronise(self):
         self._syncronise()
@@ -51,7 +67,7 @@ class RevisionNotifierMixin:
 
     @property
     def modified(self) -> bool:
-        return self._last_syncronised != self._revision
+        return self._last_syncronised != self.revision
 
     @property
     def chain_modified(self) -> bool:
@@ -59,11 +75,6 @@ class RevisionNotifierMixin:
             self.modified 
             or any((child.chain_modified for child in self._children))
         )
-
-    @property
-    def revision(self) -> int:
-        return self._revision
-
 
 def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
     """Wraps mutable structures or assigns children to parent objects."""
@@ -345,6 +356,14 @@ class ConfigurationMixin:
     @property 
     def revision(self) -> int:
         return self._config.revision
+
+    @property
+    def revision_string(self) -> str:
+        """A string which should remain invariant whilst self or children are unmodified.
+                
+        Technically possible to be spoofed, but the parent should in theory increment whenever children are replaced with equal revisions.
+        """
+        return self._config.revision_string
 
     @property
     def modified(self) -> bool:

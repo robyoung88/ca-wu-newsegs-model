@@ -492,13 +492,13 @@ class NewsegsFinance(NewsegsFinanceInterface):
             return hash(
                 (
                     self.id,
-                    self.last_update,
+                    self.revision_string,
                 )
             )
         return hash(
             (
                 self.id,
-                self.last_update,
+                self.revision_string,
                 mdl.id,
                 mdl.last_run
             )
