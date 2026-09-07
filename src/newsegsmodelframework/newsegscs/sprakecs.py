@@ -15,11 +15,8 @@ import numpy.typing as npt
 
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core.trackeddata import revision_dataclass
-from newsegsmodelframework.newsegscs.newsegscs import NewsegsCS, NewsegsCSConfig
-from newsegsmodelframework.core import newsegsmodule
 from newsegsmodelframework.core import timespan as modtimespan
-from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.newsegsmodel import newsegsmodel
+from newsegsmodelframework.newsegscs import NewsegsCS, NewsegsCSConfig
 
 from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelframework.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS

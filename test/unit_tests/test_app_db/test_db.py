@@ -2,6 +2,7 @@
 Unit tests for newsegsmodelapp/backend database
 """
 import os
+import pickle
 import unittest
 import uuid
 
@@ -10,6 +11,10 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from config import settings
+from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
+from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
+from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, RecoverableInMemoryVariableProvider
+from test.unit_tests import variable_helpers
 
 class TestDatabaseStart(unittest.TestCase):
     @classmethod
@@ -51,10 +56,10 @@ class TestDatabaseStart(unittest.TestCase):
                     if not df.empty:
                         # Convert appropriate columns to uuid
                         dtype_spec = {}
-                        for id_col in ['variable_config_id']:
-                            if id_col in df.columns:
-                                df[id_col] = df[id_col].apply(uuid.UUID) # type: ignore
-                                dtype_spec[id_col] = sa.Uuid()
+                        #for id_col in ['variable_config_id']:
+                        #    if id_col in df.columns:
+                        #        df[id_col] = df[id_col].apply(uuid.UUID) # type: ignore
+                        #        dtype_spec[id_col] = sa.Uuid()
                         df.to_sql(table.name, conn, if_exists='append', index=False, dtype = dtype_spec)
             
             conn.commit()
@@ -335,3 +340,104 @@ class TestDatabaseStart(unittest.TestCase):
             self.assertEqual(proj.metamodels[0].id, proj_dup.metamodels[0].id)
             self.assertEqual(len(proj.metamodels[0].variables), len(proj_dup.metamodels[0].variables))
         
+    def test_db_variable_provider(self):
+        from newsegsmodelapp.backend import db
+        import numpy.testing as nptest
+        one_of_each = variable_helpers.one_of_every_variable()
+
+        for var in one_of_each.values():
+            self.assertIsNotNone(var.deterministic_value)
+        
+        backend_var_provider = FromDatabaseVariableProvider(db.get_engine)
+        frontend_var_provider = RecoverableInMemoryVariableProvider(list(one_of_each.values()))
+
+        # Initial sync
+        for var in one_of_each.values():
+            self.assertTrue(var.modified)
+
+        backend_var_provider.synchronise_variable(list(frontend_var_provider._variables_by_uid.values()))
+
+        for var in one_of_each.values():
+            self.assertFalse(var.modified)
+
+        # Frontend recovery
+        collapsed = pickle.dumps(frontend_var_provider)
+
+        fvp2 = pickle.loads(collapsed)
+        fvp2.reattach_variables(backend_var_provider)
+
+        for var in one_of_each.values():
+            id = var.id
+            v1 = frontend_var_provider.get_variable(id)
+            v2 = fvp2.get_variable(id)
+            if isinstance(v1, ScalarVariable):
+                self.assertEqual(v1.deterministic_value, v2.deterministic_value)
+            else:
+                nptest.assert_array_equal(
+                    v1.deterministic_value, 
+                    v2.deterministic_value
+                )
+
+        # Assert that because the backend has intervened, there is no sync
+        # between variables in both frontends
+        for var in one_of_each.values():
+            id = var.id
+            v1 = frontend_var_provider.get_variable(id)
+            if isinstance(v1, ScalarVariable):
+                dv1 = v1.deterministic_value
+                prm = list(v1.raw_parameters)
+                if isinstance(prm[0], str):
+                    prm[0] = prm[0] + str(0.1)
+                elif v1.distribution.distribution == 'binomial':
+                    if v1.parameterisation_index == 0:
+                        prm[1] = prm[1] + 5
+                    else:
+                        prm[0] = prm[0] + 1
+                else:
+                    prm[0] = prm[0] + 0.1
+                v1.set_parameters(*prm)
+                self.assertNotEqual(v1.deterministic_value, dv1, f'{v1.name}')
+                self.assertTrue(v1.modified)
+                v2 = fvp2.get_variable(id)
+                self.assertNotEqual(v1.deterministic_value, v2.deterministic_value)
+            else:
+                dv1 = v1.deterministic_value
+                prm = list(v1.raw_parameters)
+                if isinstance(prm[0][0], str):
+                    prm[0][0] = prm[0][0] + str(0.1)
+                elif v1.distribution.distribution == 'dirichlet':
+                    if v1.parameterisation_index == 0:
+                        prm[0][0] = prm[0][0] + 10
+                    else:
+                        prm[0][0] = 0.75
+                        prm[0][1] = 0.25
+                else:
+                    prm[0][0] = prm[0][0] + 0.1
+                v1.set_parameters(*prm)
+                with self.assertRaises(AssertionError, msg=f'{v1.name}'):
+                    nptest.assert_array_equal(v1.deterministic_value, dv1)
+                self.assertTrue(v1.modified)
+                v2 = fvp2.get_variable(id)
+                with self.assertRaises(AssertionError):
+                    nptest.assert_array_equal(
+                        v1.deterministic_value,
+                        v2.deterministic_value
+                    )
+
+        # Synchronise via backend
+        backend_var_provider.synchronise_variable(
+            list(frontend_var_provider._variables_by_uid.values())
+        )
+
+        fvp2.reattach_variables(backend_var_provider)
+        for var in one_of_each.values():
+            id = var.id
+            v1 = frontend_var_provider.get_variable(id)
+            v2 = fvp2.get_variable(id)
+            if isinstance(v1, ScalarVariable):
+                self.assertEqual(v1.deterministic_value, v2.deterministic_value)
+            else:
+                nptest.assert_array_equal(
+                    v1.deterministic_value, 
+                    v2.deterministic_value
+                )

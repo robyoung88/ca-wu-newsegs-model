@@ -5,6 +5,7 @@ from abc import abstractmethod
 from collections.abc import Mapping
 import copy
 from functools import partial
+import json
 from typing import Any, Iterable, cast, Callable, Literal, Sequence, Sized, get_args, Union, overload, override
 import warnings
 
@@ -19,6 +20,7 @@ from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterfa
 from newsegsmodelframework.core import NewsegsComponent
 from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsstats.dirichlet import fit_dirichlet
+from newsegsmodelframework.util import jsonfuncs
 
 ScalarParam = Union[str | int | float]
 ScalarNumParam = Union[int | float]
@@ -3866,6 +3868,10 @@ class Variable(
             self.__dict__,
         )
 
+    @override
+    def json_dumps(self) -> str:
+        return json.dumps(self.to_dict(), cls = jsonfuncs.NumpyEncoder)
+
 def _recover_variable(name, dist):
     """
     When restoring variable from a reduced form, use this simple two-parameter constructor
@@ -4131,6 +4137,20 @@ class NumericVectorVariable(VectorVariable):
     def parameters(self, parameters: ParamList) -> None:
         return self._set_native_parameters(parameters)
 
+    @override
+    def _set_native_parameters(self, parameters: ParamList) -> None:
+        # Ensure that array types are recovered on deserialisation
+        px = list(parameters)
+        if not isinstance(px[0], np.ndarray):
+            px[0] = np.asarray(px[0])
+        #nd = len(px[0])
+        if len(px) > 1:
+            if not isinstance(px[1], np.ndarray):
+                # Assume should be square matrix
+                px[1] = np.asarray(px[1])
+
+        return super()._set_native_parameters(px)
+
     formatter_dp = 1
     @property
     def value_formatter(self) -> Callable[[NumericVectorParam], Sequence[str]]:        
@@ -4180,6 +4200,8 @@ class NumericVectorVariable(VectorVariable):
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> NumericVectorParam:
         return cast(NumericVectorParam, super().get_dsa_value(bound, force))
+
+    
 
 
 class ConstantVariable(ScalarVariable):

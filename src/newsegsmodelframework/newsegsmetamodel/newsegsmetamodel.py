@@ -31,12 +31,13 @@ import logging
 from typing import Any, Mapping, MutableSequence, Optional, Sequence, override
 
 from newsegsmodelframework.core import serialisation
-from newsegsmodelframework.core.newsegscomponent import ComponentProperty
+from newsegsmodelframework.core.newsegscomponent import ComponentOrderedDictProperty, ComponentProperty
 from newsegsmodelframework.core.trackeddata import DataWithRevision
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,10 @@ class NewsegsMetaModel(NewsegsComponent):
     finance = ComponentProperty(oftype = newsegsfinance.NewsegsFinance)
     table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
 
+    variables = ComponentOrderedDictProperty(oftype = variable.Variable)
+    _variables_last_model_sync: dict
+    """The revision number of the variable at last deterministic sync."""
+
     @override
     def _generate_config(self, *args, **kwargs) -> NewsegsMetaModelConfig:
         return NewsegsMetaModelConfig(*args, **kwargs)
@@ -104,11 +109,10 @@ class NewsegsMetaModel(NewsegsComponent):
         
         self.model = model
         self.finance = finance
-        self.variables = variables
-        self.require_sync = {x for x in self.variables.keys()} # pyright: ignore[reportAttributeAccessIssue]
-        """
-        A set of variables that have been updated and have not yet been synchronised with model/finance
-        """
+
+        self.variables = {variable.variable_uid(x):x for x in variables}
+        self._variables_last_model_sync = {}
+
         self.table_config = table_config or TableConfigNewsegsComponent()
 
     def reattach_model(
@@ -162,22 +166,30 @@ class NewsegsMetaModel(NewsegsComponent):
             self.finance.set_model(self.model, dirty = False)
 
     @property
-    def variables(self) -> OrderedDict[str, variable.Variable]:
-        """An OrderedDict mapping variable UIDs to Variable instances."""
-        return self._variables
-    
-    @variables.setter
-    def variables(self, variables: Sequence[variable.Variable]):
-        if not hasattr(self, '_variables'):
-            self._variables = OrderedDict()
-        for var in variables:
-            uid = variable.variable_uid(var)
-            if isinstance(uid, list):
-                for id in uid:
-                    self._variables[id] = var
-            else:
-                self._variables[uid] = var
+    def variable_ids(self) -> tuple[dict[str, str], ...]:
+        if len(self.variables) == 0 and hasattr(self, '_variable_ids'):
+            return self._variable_ids
+        return tuple(
+            {
+                'varid': k,
+                'uid': x.id
+            } for k, x in self.variables.items()
+        )
 
+    def reattach_variables(self, variable_provider: VariableProviderInterface) -> None:
+        """Reattach any associated Variables after metamodel reconstruction.
+        
+        Args:
+            variable_provider: Instance of VariableProviderInterface (typically a Project).
+        """
+        these_vars = self.variable_ids
+        for var_identifiers in these_vars:
+            try:
+                v = variable_provider.get_variable(var_identifiers['uid'])
+            except KeyError:
+                v = variable_provider.get_default_variable(var_identifiers['varid'])
+            self.variables[var_identifiers['varid']] = v
+    
     def update_variable_from_interface(
         self,
         section: str,
@@ -289,29 +301,27 @@ class NewsegsMetaModel(NewsegsComponent):
         self
     ) -> set[str]:
         affected_models = set()
-        while len(self.require_sync) > 0:
-            varid = self.require_sync.pop()
-            try:
-                affected_models.add(self.update_model_from_variable_deterministic(varid))
-            except ValueError as e:
-                logger.error(e)
-
-        #if 'model' in affected_models:
-        #    self.model._dirty = True
-        #if 'finance' in affected_models:
-        #    self.finance._dirty= True
-            
+        for varid, var in self.variables.items():
+            if self._variables_last_model_sync.get(varid, 0) != var._config.revision:
+                try:
+                    affected_models.add(self.update_model_from_variable_deterministic(varid))
+                except ValueError as e:
+                    logger.error(e)
+                
+                self._variables_last_model_sync[varid] = var._config.revision
+  
         return affected_models
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
-        for dontpickle in ['_model', '_finance']:
+        for dontpickle in ['_model', '_finance', '_variables']:
             if dontpickle in state:
                 del state[dontpickle]
         if self.model:
             state['_model_id'] = self.model.id
         if self.finance:
             state['_finance_id'] = self.finance.id
+        state['_variable_ids'] = self.variable_ids
         return state
     
     # Will have no explicit setstate - require using 'reattach_' methods
@@ -349,7 +359,7 @@ class NewsegsMetaModel(NewsegsComponent):
     def update(self, config: dict[str, Any] | type[serialisation.T]):
         super().update(config)
         # When coming from json, sets are as list, so will need reassigning
-        if not isinstance(self.require_sync, set):
-            self.require_sync = set(self.require_sync)
+        #if not isinstance(self.require_sync, set):
+        #    self.require_sync = set(self.require_sync)
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + ('_model', '_finance')

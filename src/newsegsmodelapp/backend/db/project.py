@@ -20,7 +20,9 @@ from newsegsmodelframework.newsegsproject import NewsegsProject
 from newsegsmodelframework.core import find_constructor
 
 from newsegsmodelapp.backend.db import tables as tbls
-from newsegsmodelframework.newsegsvariable.variable import Variable
+from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
+from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
+from newsegsmodelframework.newsegsvariable.variable import Variable, variable_uid
 
 def flatten(nested: list) -> list:
     return reduce(iconcat, nested, [])
@@ -182,8 +184,8 @@ def load_project(
     metamodels = load_project_metamodels(project_id, encon)
 
     # Load components
-    dsa_config = load_component(proj_data._mapping['dsa_component_config_id'], encon)
-    psa_config = load_component(proj_data._mapping['psa_component_config_id'], encon)
+    dsa_config = cast(DSAComponent, load_component(proj_data._mapping['dsa_component_config_id'], encon))
+    psa_config = cast(PSAComponent, load_component(proj_data._mapping['psa_component_config_id'], encon))
     table_config = cast(TableConfigNewsegsComponent, load_component(proj_data._mapping['table_config_id'], encon))
 
     # Create the project
@@ -305,11 +307,12 @@ def variable_to_raw_table_data(
     )
     odict = dict(
         id = variable.id,
+        varid = variable_uid(variable),
         component_type = model_sec,
         label = variable.name
     )
 
-    odict['payload'] = json.dumps(variable.to_dict())
+    odict['payload'] = variable.json_dumps()
 
     odict['variable_config_id'] = variable.uuid
     #if hasattr(variable, '_variable_config_id'):
@@ -383,7 +386,7 @@ def _save_project_variables(
             result = encon.execute(
                 tbls.variable_configs.insert().values(insert_values[idx])
             )
-            var_to_comp_map[id]['variable'].uuid = result.inserted_primary_key[0] # pyright: ignore[reportOptionalSubscript]
+            #var_to_comp_map[id]['variable'].uuid = result.inserted_primary_key[0] # pyright: ignore[reportOptionalSubscript]
 
     component_ids = _get_all_component_ids(proj)
     encon.execute(
@@ -396,7 +399,7 @@ def _save_project_variables(
         vardata = var_to_comp_map[id]
         insert_list.extend([
             {
-                'variable_config_id': vardata['variable'].uuid, 
+                'variable_config_id': vardata['variable'].id, 
                 'component_config_id': x
             } for x in vardata['components']
         ])
@@ -407,11 +410,11 @@ def _save_project_variables(
             .values(insert_list)
         )
 
-    return {id: var_to_comp_map[id]['variable'].uuid for id in var_uuids}
+    return {id: var_to_comp_map[id]['variable'].id for id in var_uuids}
 
 # region LOAD
 def load_variable(
-    variable_config_id: int,
+    variable_config_id: str,
     encon: sa.Engine | sa.Connection
 ) -> Variable:
     if isinstance(encon, sa.Engine):
@@ -426,19 +429,19 @@ def load_variable(
         find_constructor(constr_dict['constructor_class'], constr_dict['class'])(constr_dict)
     )
 
-    variable._variable_config_id = variable_config_id # pyright: ignore[reportAttributeAccessIssue]
+    #variable._variable_config_id = variable_config_id # pyright: ignore[reportAttributeAccessIssue]
     variable.id = variable_data._mapping['id']
     variable.name = variable_data._mapping['label']
 
     return variable
 
 def _load_variable_data(
-    variable_config_id: int,
+    variable_config_id: str,
     conn: sa.Connection
 ) -> sa.Row[Any]:
     result = conn.execute(
         tbls.variable_configs.select()
-        .where(tbls.variable_configs.c.variable_config_id == variable_config_id)
+        .where(tbls.variable_configs.c.id == variable_config_id)
     ).fetchall()
     if len(result) < 1:
         raise ValueError(f'Variable not found: {variable_config_id}')
@@ -468,7 +471,7 @@ def load_component_variables(
 def _load_variable_ids(
     component_config_id: int,
     conn: sa.Connection
-) -> tuple[int, ...]:
+) -> tuple[str, ...]:
     variable_ids = conn.execute(
         sa.select(tbls.component_variables.c.variable_config_id)
         .where(tbls.component_variables.c.component_config_id == component_config_id)

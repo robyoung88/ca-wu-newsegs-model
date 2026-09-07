@@ -53,7 +53,12 @@ def sprake_project_factory():
 
     variables = _create_default_variables()
 
-    mm = newsegsmetamodel.NewsegsMetaModel(mdl, fnc, variables)
+    proj = newsegsproject.NewsegsProject(default_variables = variables)
 
-    proj = newsegsproject.NewsegsProject([mm], default_variables = variables)
+    mm = newsegsmetamodel.NewsegsMetaModel(mdl, fnc)
+    varids = proj.get_varids()
+    
+
+
+
     return proj

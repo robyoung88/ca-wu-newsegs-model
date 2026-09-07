@@ -43,8 +43,10 @@ snapshots = sa.Table(
 variable_configs = sa.Table(
     'variable_configs',
     metadata,
-    sa.Column('variable_config_id', sa.Uuid(as_uuid = True), primary_key = True),
-    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
+    #sa.Column('variable_config_id', sa.Uuid(as_uuid = True), primary_key = True),
+    sa.Column('id', sa.String(38), primary_key = True), # NB - this is the prefix+uuid of the object
+    sa.Column('varid', sa.String), # The variable type identifier - e.g. {modelsection}.{key}.{subindex}
+    sa.Column('revision', sa.Integer), # The revision number - incremented on modification of _config
     sa.Column('component_type', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('label', sa.String, nullable = True),
@@ -55,7 +57,7 @@ snapshot_variable_configs = sa.Table(
     'snapshot_variable_configs',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('variable_config_id', sa.Uuid(as_uuid = True), primary_key = True),
+    sa.Column('id', sa.String(38), primary_key = True),
     *clone_columns_except_pk(variable_configs)
 )
 
@@ -95,7 +97,7 @@ component_variables = sa.Table(
     'component_variables',
     metadata,
     sa.Column('component_config_id', sa.Integer, sa.ForeignKey('component_configs.component_config_id'), primary_key = True),
-    sa.Column('variable_config_id', sa.Uuid, sa.ForeignKey('variable_configs.variable_config_id'), primary_key = True)
+    sa.Column('variable_config_id', sa.String(38), sa.ForeignKey('variable_configs.id'), primary_key = True)
 )
 
 snapshot_component_variables = sa.Table(
@@ -103,14 +105,14 @@ snapshot_component_variables = sa.Table(
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
     sa.Column('component_config_id', sa.Integer, primary_key = True),
-    sa.Column('variable_config_id', sa.Uuid, primary_key = True),
+    sa.Column('variable_config_id', sa.String(38), primary_key = True),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'component_config_id'],
         ['snapshot_component_configs.snapshot_id', 'snapshot_component_configs.component_config_id']
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'variable_config_id'],
-        ['snapshot_variable_configs.snapshot_id', 'snapshot_variable_configs.variable_config_id']
+        ['snapshot_variable_configs.snapshot_id', 'snapshot_variable_configs.id']
     )
 )
 

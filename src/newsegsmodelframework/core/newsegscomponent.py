@@ -270,6 +270,40 @@ class ObservableComponentOrderedDict(OrderedDict, RevisionNotifierMixin):
             self._notify_change()
 
 
+class ComponentOrderedDictProperty:
+    """Descriptor for attributes which are ordered dictionaries of Components (e.g. Variables)"""
+    def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
+        self.name = ""
+        self.oftype = oftype
+
+    def __set_name__(self, owner: type, name: str):
+        self.name = f'_{name}' # Name as stored on object instance
+
+    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
+        if isinstance is None:
+            return self
+        att = getattr(instance, self.name, OrderedDict())
+        return att
+
+    def __set__(self, instance: 'ConfigurationMixin', value: Mapping):
+        if not isinstance(instance, SerialisedConfigurationMixin):
+            raise TypeError(f'ComponentOrderedDict properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
+
+        old_val = getattr(instance, self.name, None)
+        is_wrapped = False
+        if not isinstance(value, ObservableComponentOrderedDict):
+            value = ObservableComponentOrderedDict(value, instance._config)
+            is_wrapped = True
+
+        if old_val and not old_val == value:
+            instance._config._remove_child(old_val)
+            if not is_wrapped:
+                value = ObservableComponentOrderedDict(value, instance._config)
+            instance._config._notify_change()
+
+        setattr(instance, self.name, value)
+
+
 class NewsegsComponent(
     SerialisedConfigurationMixin,
     metaclass = ABCMeta
