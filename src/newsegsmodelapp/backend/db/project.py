@@ -498,6 +498,7 @@ def metamodel_to_raw_table_data(
     odict = dict(
         id = metamodel.id,
         revision = metamodel.revision,
+        revision_string = metamodel.revision_string,
         label = metamodel.name,
         lat = metamodel.model.location.lat,
         lon = metamodel.model.location.lon,
@@ -505,9 +506,8 @@ def metamodel_to_raw_table_data(
     if hasattr(metamodel.model.consumption_storage ,'n_units'):
         odict['n_units'] = metamodel.model.consumption_storage.n_units # pyright: ignore[reportAttributeAccessIssue]
 
-    if hasattr(metamodel, '_metamodel_id'):
-        odict['metamodel_id'] = metamodel._metamodel_id # pyright: ignore[reportAttributeAccessIssue]
-
+    odict['payload'] = metamodel.json_dumps()
+    
     return odict
 
 def save_metamodel_children(
@@ -639,7 +639,7 @@ def energy_model_to_raw_table_data(
     )
     # Additional configuration needs to be implementation-specific, and might be things like
     # the default timestep. For now, let's use the already defined to_dict method
-    odict['payload'] = json.dumps(energy_model.to_dict())
+    odict['payload'] = energy_model.json_dumps()
 
     return odict
 
@@ -767,13 +767,11 @@ def finance_model_to_raw_table_data(
         model_class = finance_model.__class__.__name__,
         model_version = finance_model.version,
         revision = finance_model.revision,
+        revision_string = finance_model.revision_string,
         label = finance_model.name
     )
 
-    odict['config_payload'] = json.dumps(finance_model.to_dict())
-
-    if hasattr(finance_model, '_fm_config_id'):
-        odict['fm_config_id'] = finance_model._fm_config_id # pyright: ignore[reportAttributeAccessIssue]
+    odict['payload'] = finance_model.json_dumps()
 
     return odict
 

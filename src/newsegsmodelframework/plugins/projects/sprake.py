@@ -35,12 +35,12 @@ def _create_default_finance() -> newsegsfinance.NewsegsFinance:
     with open(
         os.path.join(
             STATICDATA,
-            'sprakemodel-validation-finance-config.json'
+            'sprakemodel-validation-finance-config.pickle'
         ),
-    'r') as f:
-        fnc_conf = json.load(f)
-    
-    return sprakefinance.SprakeFinance.from_dict(fnc_conf)
+    'rb') as f:
+        fnc_conf = pickle.load(f)
+    return fnc_conf
+    #return sprakefinance.SprakeFinance.from_dict(fnc_conf)
 
 def _create_default_variables() -> list[variable.Variable]:
     with open(os.path.join(STATICDATA, 'sprake-variable-config.json')) as f:
@@ -51,6 +51,8 @@ def _create_default_variables() -> list[variable.Variable]:
 def sprake_project_factory():
     mdl = _create_default_model()
     fnc = _create_default_finance()
+    # Do we want to randomise the ids? Leave as it at the moment,
+    # but bear this in mind.
     fnc.set_model(mdl)
 
     variables = _create_default_variables()
@@ -68,6 +70,6 @@ def sprake_project_factory():
         variables = [proj.get_default_variable(x) for x in varids]
     )
 
-    proj.metamodels.append(mm)
+    proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]
 
     return proj

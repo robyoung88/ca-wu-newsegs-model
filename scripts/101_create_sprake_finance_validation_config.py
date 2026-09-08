@@ -2,6 +2,7 @@
 Set up a Sprake finance wrapper per the external validation model, then save out the config
 """
 import json
+import pickle
 
 from common import setup_script_env
 setup_script_env()
@@ -22,3 +23,6 @@ if __name__ == '__main__':
     d1 = fnc.to_dict()
     with open('data/sprakemodel-validation-finance-config.json', 'w') as f:
         json.dump(d1, f, sort_keys=False, indent=4)
+
+    with open('data/sprakemodel-validation-finance-config.pickle', 'wb') as f:
+        pickle.dump(fnc, f)

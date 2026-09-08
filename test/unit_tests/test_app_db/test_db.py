@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from config import settings
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
@@ -484,7 +484,7 @@ class TestDatabaseStart(unittest.TestCase):
         # Save out variables
         proj.variable_to_store(
             backend_var_provider,
-            (x.id for x in mm1.variables.values()),
+            (x.id for x in mm1.variables.values()), # pyright: ignore[reportArgumentType]
         )
 
         # Test reconstruction - deliberately recover from the wrong one so we check the variable sync
@@ -551,6 +551,60 @@ class TestDatabaseStart(unittest.TestCase):
         nptest.assert_array_equal(
             mdl1.get_generation_result().meters,
             mdl2.get_generation_result().meters
+        )
+
+    def test_finance_provider(self):
+        import numpy.testing as nptest
+
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        model_provider = FromDatabaseNewsegsEMProvider(db.get_engine)
+        finance_provider = FromDatabaseNewsegsFMProvider(db.get_engine)
+
+        proj = PROJECT_FACTORIES['sprake']()
+        
+        mm1 = proj.metamodels[0]
+        mdl1 = mm1.model
+        fnc1 = mm1.finance
+        fnc1.cost_discount_rate = 0.1
+
+        model_provider.add_component(mdl1)
+        finance_provider.add_component(fnc1)
+
+        mdl2 = model_provider.get_component(mdl1.id)
+        fnc2 = finance_provider.get_component(fnc1.id)
+        fnc2.model = mdl2
+
+        mdl1.run()
+        mdl2.run()
+        nptest.assert_array_equal(
+            fnc1.get_costs_series_discounted(),
+            fnc2.get_costs_series_discounted()
+        )
+
+    def test_metamodel_provider(self):
+        import numpy.testing as nptest
+
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        mm_provider = FromDatabaseNewsegsMetamodelProvider(db.get_engine)
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        mm1 = proj.metamodels[0]
+        mm1.model.generation.wind_capacity = 0.1
+        mm1.finance.resident_var_per_unit = 0.1
+
+        mm_provider.add_component(mm1)
+
+        mm2 = mm_provider.get_component(mm1.id)
+        mm1.model.run()
+        mm2.model.run()
+        nptest.assert_array_equal(
+            mm1.finance.get_costs_series_discounted(),
+            mm2.finance.get_costs_series_discounted()
         )
 
 

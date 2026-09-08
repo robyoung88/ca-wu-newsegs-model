@@ -111,6 +111,12 @@ class NewsegsFinance(NewsegsFinanceInterface):
             argdict.update(kwdrs)
             self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate) or 0.0
             self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate) or 0.0
+
+    def get_components(self) -> tuple[NewsegsComponent, ...]:
+        return (
+            self.finance_data,
+            self.table_config
+        )
     
     # Benefits
     @property
@@ -486,6 +492,12 @@ class NewsegsFinance(NewsegsFinanceInterface):
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
         ...
 
+    def __getstate__(self) -> object:
+        attributes = self.__dict__.copy()
+        if '_model' in attributes:
+            del attributes['_model']
+        return attributes
+
     def __hash__(self):
         mdl = self.model
         if mdl is None:
@@ -506,5 +518,5 @@ class NewsegsFinance(NewsegsFinanceInterface):
 
 NewsegsFinance._excluded_attributes = (
     super(NewsegsFinance, NewsegsFinance)._excluded_attributes 
-    + ('_model',)
+    + ('_model', '_finance_data', '_table_config')
 )

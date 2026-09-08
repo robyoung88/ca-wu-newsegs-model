@@ -8,10 +8,12 @@ from useful_types import SequenceNotStr
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
 
-from newsegsmodelapp.backend.db.project import component_to_raw_table_data
+from newsegsmodelapp.backend.db.project import component_to_raw_table_data, finance_model_to_raw_table_data, metamodel_to_raw_table_data
 from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
+from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentProviderInterface,
@@ -60,7 +62,7 @@ class FromDatabaseNewsegsComponentProvider(
         reconstructed_components = [self._component_from_json(row.payload) for row in rows]
         if not is_sequence:
             if len(reconstructed_components) == 0:
-                raise ValueError(f'Component not found: {component_id}')
+                raise ValueError(f'Component not found: {component_id} in table {self._table}')
             return reconstructed_components[0]
 
         compmap = {x.id: x for x in reconstructed_components}
@@ -203,3 +205,119 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
             return super().upsert_component(component, force, tbl)
         else:
             return self._component_provider.upsert_component(component, force, tbl)
+
+class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
+    def __init__(self, get_engine: Callable[[], sa.Engine]):
+        super().__init__(get_engine)
+        self._table = tbls.fm_configs
+        self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
+
+    @override
+    def _component_from_json(self, json_payload: str):
+        obj = super()._component_from_json(json_payload)
+        obj.reattach_components(self._component_provider)
+        return obj
+
+    @override
+    def _component_to_table_data(self, component: NewsegsComponent) -> dict:
+        if not isinstance(component, NewsegsFinanceInterface):
+            return super()._component_to_table_data(component)
+
+        return finance_model_to_raw_table_data(component) # pyright: ignore[reportArgumentType]
+
+    @override
+    def upsert_component(
+        self,
+        component: NewsegsComponent | SequenceNotStr[NewsegsComponent], 
+        force: bool = False,
+        tbl: sa.Table | None = None
+    ) -> None:
+        if isinstance(component, NewsegsFinanceInterface) or isinstance(component, Sequence) and all(isinstance(x, NewsegsFinanceInterface) for x in component):
+            return super().upsert_component(component, force, tbl)
+        else:
+            return self._component_provider.upsert_component(component, force, tbl)
+
+class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider):
+    def __init__(self, get_engine: Callable[[], sa.Engine]):
+        super().__init__(get_engine)
+        self._table = tbls.metamodels
+        self._em_provider = FromDatabaseNewsegsEMProvider(get_engine)
+        self._fm_provider = FromDatabaseNewsegsFMProvider(get_engine)
+        self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
+
+    @override
+    def _component_from_json(self, json_payload: str):
+        obj = super()._component_from_json(json_payload)
+        obj.reattach_em(self._em_provider)
+        obj.reattach_fm(self._fm_provider)
+        obj.reattach_components(self._component_provider)
+        return obj
+
+    @override
+    def _component_to_table_data(self, component: NewsegsComponent) -> dict:
+        if not isinstance(component, NewsegsMetaModel):
+            return super()._component_to_table_data(component)
+        return metamodel_to_raw_table_data(component)
+
+    @override
+    def upsert_component(
+        self,
+        component: NewsegsComponent | SequenceNotStr[NewsegsComponent],
+        force: bool = False,
+        tbl: sa.Table | None = None
+    ) -> None:
+        if isinstance(component, NewsegsComponent):
+            if isinstance(component, NewsegsMetaModel):
+                rval = super().upsert_component(component, force, tbl)
+                if component.model:
+                    self._em_provider.upsert_component(component.model, force)
+                if component.finance:
+                    self._fm_provider.upsert_component(component.finance, force)
+                return rval
+            elif isinstance(component, NewsegsModelInterface):
+                return self._em_provider.upsert_component(component, force, tbl)
+            elif isinstance(component, NewsegsFinanceInterface):
+                return self._fm_provider.upsert_component(component, force, tbl)
+            else:
+                return self._component_provider.upsert_component(component, force, tbl)
+        else:
+            metamodel_indices = []
+            model_indices = []
+            finance_indices = []
+            component_indices = []
+            for i, comp in enumerate(component):
+                if isinstance(comp, NewsegsMetaModel):
+                    metamodel_indices.append(i)
+                elif isinstance(comp, NewsegsModelInterface):
+                    model_indices.append(i)
+                elif isinstance(comp, NewsegsFinanceInterface):
+                    finance_indices.append(i)
+                else:
+                    component_indices.append(i)
+
+            if metamodel_indices:
+                for idx in metamodel_indices:
+                    comp = component[idx]
+                    super().upsert_component(comp, force, tbl)
+                    if comp.model:
+                        self._em_provider.upsert_component(comp.model, force)
+                    if comp.finance:
+                        self._fm_provider.upsert_component(comp.finance, force)
+            if model_indices:
+                self._em_provider.upsert_component(
+                    [x for i, x in enumerate(component) if i in model_indices],
+                    force,
+                    tbl
+                )
+            if finance_indices:
+                self._fm_provider.upsert_component(
+                    [x for i, x in enumerate(component) if i in finance_indices],
+                    force,
+                    tbl
+                )
+            if component_indices:
+                self._component_provider.upsert_component(
+                    [x for i, x in enumerate(component) if i in component_indices],
+                    force,
+                    tbl
+                )

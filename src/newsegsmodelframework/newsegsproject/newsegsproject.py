@@ -90,7 +90,7 @@ class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
 
         mm2.table_config.update(mm.table_config.to_dict())
 
-        self.metamodels.append(mm2)
+        self.metamodels.append(mm2) # pyright: ignore[reportAttributeAccessIssue]
         return mm2
 
     @override
@@ -102,7 +102,7 @@ class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
     def variable_to_store(
             self, 
             store_interface: VariablePersistenceInterface, 
-            variable_id: Optional['str, SequenceNotStr[str]'] = None,
+            variable_id: Optional['str | SequenceNotStr[str]'] = None,
             force: bool = False,
         ):
         if isinstance(variable_id, str):

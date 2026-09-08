@@ -31,7 +31,7 @@ import logging
 from typing import Any, Mapping, MutableSequence, Optional, Sequence, override
 
 from newsegsmodelframework.core import serialisation
-from newsegsmodelframework.core.newsegscomponent import ComponentOrderedDictProperty, ComponentProperty
+from newsegsmodelframework.core.newsegscomponent import ComponentOrderedDictProperty, ComponentProperty, NewsegsComponentProviderInterface
 from newsegsmodelframework.core.trackeddata import DataWithRevision
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
@@ -143,6 +143,22 @@ class NewsegsMetaModel(NewsegsComponent):
         except AttributeError:
             pass
 
+    def reattach_em(self, em_provider: NewsegsComponentProviderInterface):
+        """Reattach the associated NewsegsModel instance after metamodel reconstruction.
+        
+        """
+        if not hasattr(self, '_model_id') or self._model_id == '':
+            raise AttributeError('This MetaModel has no associated model to reattach.')
+        mdl = em_provider.get_component(self._model_id)
+        if not isinstance(mdl, newsegsmodel.NewsegsModel):
+            raise TypeError(f'em_provider did not provide a NewsegsModel for key {self._model_id}')
+        self.model = mdl
+        try:
+            if self.finance is not None:
+                self.finance.set_model(self.model)
+        except AttributeError:
+            pass
+
     def reattach_finance(self, finance_provider: Mapping[str, newsegsfinance.NewsegsFinance]) -> None:
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
         
@@ -164,6 +180,28 @@ class NewsegsMetaModel(NewsegsComponent):
         self.finance = fnc
         if self.model is not None:
             self.finance.set_model(self.model, dirty = False)
+
+    def reattach_fm(self, fm_provider: NewsegsComponentProviderInterface):
+        """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
+        
+        """
+        if not hasattr(self, '_finance_id') or self._finance_id == '':
+            raise AttributeError('This MetaModel has no associated finance to reattach.')
+        fnc = fm_provider.get_component(self._finance_id)
+        if not isinstance(fnc, newsegsfinance.NewsegsFinance):
+            raise TypeError(f'fm_provider did not provide a NewsegsFinance for key {self._finance_id}')
+        self.finance = fnc
+        try:
+            if self.model is not None:
+                self.finance.set_model(self.model)
+        except AttributeError:
+            pass
+
+    @override
+    def get_components(self) -> tuple[NewsegsComponent, ...]:
+        return (
+            self.table_config,
+        )
 
     @property
     def variable_ids(self) -> tuple[dict[str, str], ...]:
@@ -387,9 +425,10 @@ class NewsegsMetaModel(NewsegsComponent):
     @override
     def update(self, config: dict[str, Any] | type[serialisation.T]):
         super().update(config)
-        # When coming from json, sets are as list, so will need reassigning
-        #if not isinstance(self.require_sync, set):
-        #    self.require_sync = set(self.require_sync)
+        try:
+            self.finance.set_model(self.model)
+        except AttributeError:
+            pass
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
     '_model', '_finance', '_variables', '_table_config'

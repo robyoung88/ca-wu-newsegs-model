@@ -46,7 +46,6 @@ snapshots = sa.Table(
 variable_configs = sa.Table(
     'variable_configs',
     metadata,
-    #sa.Column('variable_config_id', sa.Uuid(as_uuid = True), primary_key = True),
     sa.Column('id', sa.String(L_VARIABLE_UID), primary_key = True), # NB - this is the prefix+uuid of the object
     sa.Column('varid', sa.String), # The variable type identifier - e.g. {modelsection}.{key}.{subindex}
     sa.Column('revision', sa.Integer), # The revision number - incremented on modification of _config
@@ -72,7 +71,6 @@ snapshot_variable_configs = sa.Table(
 component_configs = sa.Table(
     'component_configs',
     metadata,
-    #sa.Column('component_config_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True), # NB - this is the prefix+uuid of the object and limits the prefix to 5 chars
     sa.Column('component_type', sa.String),
     sa.Column('component_class', sa.String),
@@ -217,14 +215,14 @@ snapshot_em_configs = sa.Table(
 fm_configs = sa.Table(
     'fm_configs',
     metadata,
-    sa.Column('fm_config_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
+    sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True), # NB - this is the prefix+uuid of the object
     sa.Column('financedata_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('model_class', sa.String),
     sa.Column('model_version', sa.String),
-    sa.Column('config_payload', sa.String),
+    sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
 )
@@ -233,7 +231,7 @@ snapshot_fm_configs = sa.Table(
     'snapshot_fm_configs',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('fm_config_id', sa.Integer, primary_key = True),
+    sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('financedata_config_id', sa.String(L_COMPONENT_UID)),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID)),
     sa.ForeignKeyConstraint(
@@ -255,11 +253,11 @@ snapshot_fm_configs = sa.Table(
 metamodels = sa.Table(
     'metamodels',
     metadata,
-    sa.Column('metamodel_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
+    sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True), # NB - this is the prefix+uuid of the object
     sa.Column('em_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('em_configs.id')),
-    sa.Column('fm_config_id', sa.Integer, sa.ForeignKey('fm_configs.fm_config_id')),
+    sa.Column('fm_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('fm_configs.id')),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
+    sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
@@ -273,9 +271,9 @@ snapshot_metamodels = sa.Table(
     'snapshot_metamodels',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('metamodel_id', sa.Integer, primary_key = True),
+    sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('em_config_id', sa.String(L_COMPONENT_UID)),
-    sa.Column('fm_config_id', sa.Integer),
+    sa.Column('fm_config_id', sa.String(L_COMPONENT_UID)),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID)),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'em_config_id'],
@@ -283,7 +281,7 @@ snapshot_metamodels = sa.Table(
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'fm_config_id'],
-        ['snapshot_fm_configs.snapshot_id', 'snapshot_fm_configs.fm_config_id']
+        ['snapshot_fm_configs.snapshot_id', 'snapshot_fm_configs.id']
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'table_config_id'],
@@ -350,7 +348,7 @@ project_metamodels = sa.Table(
     'project_metamodels',
     metadata,
     sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id'), primary_key = True),
-    sa.Column('metamodel_id', sa.Integer, sa.ForeignKey('metamodels.metamodel_id'), primary_key = True)
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id'), primary_key = True)
 )
 
 snapshot_project_metamodels = sa.Table(
@@ -358,14 +356,14 @@ snapshot_project_metamodels = sa.Table(
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
     sa.Column('project_id', sa.Integer, primary_key = True),
-    sa.Column('metamodel_id', sa.Integer, primary_key = True),
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'project_id'],
         ['snapshot_projects.snapshot_id', 'snapshot_projects.project_id']
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'metamodel_id'],
-        ['snapshot_metamodels.snapshot_id', 'snapshot_metamodels.metamodel_id']
+        ['snapshot_metamodels.snapshot_id', 'snapshot_metamodels.id']
     )
 )
 

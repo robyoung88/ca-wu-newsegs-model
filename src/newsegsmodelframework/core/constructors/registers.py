@@ -97,12 +97,14 @@ def get_datawithrevision_register():
     import newsegsmodelframework.newsegsgeneration as newsegsgeneration
     import newsegsmodelframework.newsegscs as newsegscs
     import newsegsmodelframework.newsegsvariable as newsegsvariable
+    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
     import newsegsmodelframework.core.trackeddata as trackeddata
     CONSTRUCTORS = {}
     for pymod in [
         newsegscomponent, newsegsmodel, newsegsfinance, 
         generation, newsegsgrid, newsegsgeneration, 
-        newsegscs, newsegsvariable, trackeddata
+        newsegscs, newsegsvariable, newsegsmetamodel, 
+        trackeddata
     ]:
         CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.DataWithRevision)
@@ -120,9 +122,10 @@ def get_newsegscomponent_register():
     import newsegsmodelframework.newsegsfinance as newsegsfinance
     import newsegsmodelframework.newsegsvariable as newsegsvariable
     import newsegsmodelframework.newsegssensitivity as newsegssensitivity
+    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
     
     COMPONENT_CONSTRUCTORS = {}
-    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent, newsegssensitivity]:
+    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent, newsegssensitivity, newsegsmetamodel]:
         COMPONENT_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.NewsegsComponent)
         )

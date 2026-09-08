@@ -20,30 +20,9 @@
         "grid_import_sc_per_day": 0.0,
         "grid_import_var_per_unit": 0.35
     },
-    "uuid": "fa3a625e-07e5-4008-9593-2298162943a8",
-    "_finance_data": {
-        "class": "NewsegsFinanceData",
-        "constructor_class": "NewsegsComponent",
-        "_config": {
-            "class": "NoConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 0
-        },
-        "uuid": "2d67240c-f8fd-4000-8e8a-93e1b138fe29"
-    },
-    "_finance_data_id": "cmp-2d67240c-f8fd-4000-8e8a-93e1b138fe29",
-    "_table_config": {
-        "class": "TableConfigNewsegsComponent",
-        "constructor_class": "NewsegsComponent",
-        "_config": {
-            "class": "NoConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 0
-        },
-        "uuid": "c192a756-1c43-4e0e-980e-b88c9923be3a"
-    },
-    "_table_config_id": "cmp-c192a756-1c43-4e0e-980e-b88c9923be3a",
+    "uuid": "8fbd7c6f-620f-4863-a996-b7c46a18e25d",
+    "_component_ids": {},
+    "_finance_data_id": "cmp-cbbfe84c-e87e-4f0b-838f-6722d9b0e010",
+    "_table_config_id": "cmp-654f1f58-b26a-41fe-8840-1383aa960cd4",
     "horizon": -1
 }
