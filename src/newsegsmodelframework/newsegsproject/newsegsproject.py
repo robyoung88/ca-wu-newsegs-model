@@ -10,12 +10,12 @@ from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
-from newsegsmodelframework.core.newsegscomponent import ComponentListProperty, ComponentProperty
+from newsegsmodelframework.core.newsegscomponent import ComponentListProperty, ComponentProperty, NewsegsComponentProviderInterface
 from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable
-from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, VariablePersistenceInterface
+from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, RecoverableInMemoryVariableProvider, VariablePersistenceInterface
 
 @revision_dataclass
 class NewsegsProjectConfig(DataWithRevision):
@@ -23,7 +23,7 @@ class NewsegsProjectConfig(DataWithRevision):
     model_version: str = ''
 
 
-class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
+class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     """A container and controller for metamodels and variables."""
     
     _name = 'NewSEGS Project'
@@ -93,10 +93,29 @@ class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
         self.metamodels.append(mm2) # pyright: ignore[reportAttributeAccessIssue]
         return mm2
 
+    def reattach_metamodels(self, provider: NewsegsComponentProviderInterface):
+        if not hasattr(self, '_metamodel_ids') or not self._metamodel_ids:
+            return
+        metamodels = provider.get_component(self._metamodel_ids)
+        for i, mm in enumerate(metamodels):
+            if not isinstance(mm, newsegsmetamodel.NewsegsMetaModel):
+                raise TypeError(f'Component provider did not return a metamodel for id {self._metamodel_ids[i]}, is {type(mm)}')
+            mm.reattach_variables(self)
+        self.metamodels = metamodels
+
+    @override
+    def get_components(self) -> tuple[NewsegsComponent, ...]:
+        return (
+            self.table_config,
+        )
+
     @override
     def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
         odict['_metamodel_ids'] = self.metamodel_ids
+        odict['_variable_recovery_uids'] = dict()
+        for k, v in self._variables_by_varid.items():
+            odict['_variable_recovery_uids'][k] = list(v.keys())
         return odict
 
     def variable_to_store(
@@ -113,4 +132,7 @@ class NewsegsProject(NewsegsComponent, InMemoryVariableProvider):
         vars = [self.get_variable(x) for x in variable_id]
         store_interface.upsert_variable(vars, force)
             
-NewsegsProject._excluded_attributes = super(NewsegsProject, NewsegsProject)._excluded_attributes + ('_metamodels', '_variables_by_uid', '_variables_by_varid')
+NewsegsProject._excluded_attributes = (
+    super(NewsegsProject, NewsegsProject)._excluded_attributes 
+    + ('_metamodels', '_variables_by_uid', '_variables_by_varid', '_table_config')
+)

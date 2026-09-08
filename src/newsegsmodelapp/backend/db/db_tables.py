@@ -33,7 +33,7 @@ snapshots = sa.Table(
     'snapshots',
     metadata,
     sa.Column('snapshot_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id')),
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id')),
     sa.Column('label', sa.String, nullable = False),
     sa.Column('timestamp', sa.DateTime, nullable = False, default = sa.func.current_timestamp())
 )
@@ -298,14 +298,15 @@ snapshot_metamodels = sa.Table(
 projects = sa.Table(
     'projects',
     metadata,
-    sa.Column('project_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('id', sa.String), # NB - this is the prefix+uuid of the object
+    sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True), # NB - this is the prefix+uuid of the object
     sa.Column('dsa_component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('psa_component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('model_type', sa.String, nullable = False),
     sa.Column('model_version', sa.String, nullable = False),
+    sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
+    sa.Column('revision_string', sa.String, default = ''),
     sa.Column('uuid', sa.String),
 
     # TODO: Implement these groups
@@ -320,7 +321,7 @@ snapshot_projects = sa.Table(
     'snapshot_projects',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('project_id', sa.Integer, primary_key = True),
+    sa.Column('id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('dsa_component_config_id', sa.String(L_COMPONENT_UID)),
     sa.Column('psa_component_config_id', sa.String(L_COMPONENT_UID)),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID)),
@@ -347,7 +348,7 @@ snapshot_projects = sa.Table(
 project_metamodels = sa.Table(
     'project_metamodels',
     metadata,
-    sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id'), primary_key = True),
+    sa.Column('project_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('projects.id'), primary_key = True),
     sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id'), primary_key = True)
 )
 
@@ -355,15 +356,42 @@ snapshot_project_metamodels = sa.Table(
     'snapshot_project_metamodels',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('project_id', sa.Integer, primary_key = True),
+    sa.Column('project_id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'project_id'],
-        ['snapshot_projects.snapshot_id', 'snapshot_projects.project_id']
+        ['snapshot_projects.snapshot_id', 'snapshot_projects.id']
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'metamodel_id'],
         ['snapshot_metamodels.snapshot_id', 'snapshot_metamodels.id']
+    )
+)
+
+# -----------------------------------------------------------------------------
+# Project Variables (Junction Tables)
+# -----------------------------------------------------------------------------
+
+project_variables = sa.Table(
+    'project_variables',
+    metadata,
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), primary_key = True),
+    sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('variable_configs.id'), primary_key = True),
+)
+
+snapshot_project_variables = sa.Table(
+    'snapshot_project_variables',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), primary_key = True),
+    sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), primary_key = True),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'project_id'],
+        ['snapshot_projects.snapshot_id', 'snapshot_projects.id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'variable_config_id'],
+        ['snapshot_variable_configs.snapshot_id', 'snapshot_variable_configs.id']
     )
 )
 
@@ -376,7 +404,7 @@ runs = sa.Table(
     'runs',
     metadata,
     sa.Column('run_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('project_id', sa.Integer, sa.ForeignKey('projects.project_id'), nullable = False),
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
     sa.Column('request_id', sa.String),
     sa.Column('request_type', sa.String),
     sa.Column('request_payload', sa.String),
@@ -396,5 +424,5 @@ sessions = sa.Table(
     'sessions',
     metadata,
     sa.Column('session_id', sa.String, primary_key = True),
-    sa.Column('active_project_id', sa.Integer, sa.ForeignKey('projects.project_id')),
+    sa.Column('active_project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id')),
 )

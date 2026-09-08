@@ -153,6 +153,10 @@ class RecoverableInMemoryVariableProvider(InMemoryVariableProvider):
 
         if uid_list:
             variables = variable_provider.get_variable(uid_list)
+            if not hasattr(self, '_variables_by_varid'):
+                self._variables_by_varid = OrderedDict()
+            if not hasattr(self, '_variables_by_uid'):
+                self._variables_by_uid = dict()
             for varid, uid, var in zip(varid_list, uid_list, variables):
                 if not varid in self._variables_by_varid:
                     self._variables_by_varid[varid] = OrderedDict()

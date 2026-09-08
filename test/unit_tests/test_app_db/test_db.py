@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from config import settings
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
@@ -602,6 +602,34 @@ class TestDatabaseStart(unittest.TestCase):
         mm2 = mm_provider.get_component(mm1.id)
         mm1.model.run()
         mm2.model.run()
+        nptest.assert_array_equal(
+            mm1.finance.get_costs_series_discounted(),
+            mm2.finance.get_costs_series_discounted()
+        )
+
+    def test_project_provider(self):
+        import numpy.testing as nptest
+        
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        mm1 = proj.metamodels[0]
+        mm1.model.generation.wind_capacity = 0.1
+        mm1.finance.resident_var_per_unit = 0.1
+
+        proj_provider.add_component(proj)
+
+        proj2 = proj_provider.get_component(proj.id)
+
+        proj.metamodels[0].model.run()
+        proj2.metamodels[0].model.run()
+        mm1 = proj.metamodels[0]
+        mm2 = proj2.metamodels[0]
+
         nptest.assert_array_equal(
             mm1.finance.get_costs_series_discounted(),
             mm2.finance.get_costs_series_discounted()

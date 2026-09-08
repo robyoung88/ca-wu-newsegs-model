@@ -44,10 +44,12 @@ def project_to_raw_table_data(
         model_version = proj.model_version,
         label = proj.name,
         revision = proj.revision,
-        uuid = proj.id
+        revision_string = proj.revision_string,
+        uuid = proj.id,
+        table_config_id = proj.table_config.id
     )
-    if hasattr(proj, '_project_id'):
-        odict['project_id'] = proj._project_id # pyright: ignore[reportAttributeAccessIssue]
+    odict['payload'] = proj.json_dumps()
+    
     return odict
 
 def _get_metamodel_component_ids(
@@ -502,6 +504,9 @@ def metamodel_to_raw_table_data(
         label = metamodel.name,
         lat = metamodel.model.location.lat,
         lon = metamodel.model.location.lon,
+        em_config_id = metamodel.model.id,
+        fm_config_id = metamodel.finance.id,
+        table_config_id = metamodel.table_config.id,
     )
     if hasattr(metamodel.model.consumption_storage ,'n_units'):
         odict['n_units'] = metamodel.model.consumption_storage.n_units # pyright: ignore[reportAttributeAccessIssue]
@@ -635,7 +640,11 @@ def energy_model_to_raw_table_data(
         model_version = energy_model.version,
         revision = energy_model.revision,
         revision_string = energy_model.revision_string,
-        label = energy_model.name
+        label = energy_model.name,
+        grid_config_id = energy_model.grid.id,
+        generation_config_id = energy_model.generation.id,
+        cs_config_id = energy_model.consumption_storage.id,
+        table_config_id = energy_model.table_config.id
     )
     # Additional configuration needs to be implementation-specific, and might be things like
     # the default timestep. For now, let's use the already defined to_dict method
@@ -768,7 +777,9 @@ def finance_model_to_raw_table_data(
         model_version = finance_model.version,
         revision = finance_model.revision,
         revision_string = finance_model.revision_string,
-        label = finance_model.name
+        label = finance_model.name,
+        financedata_config_id = finance_model.finance_data.id,
+        table_config_id = finance_model.table_config.id,
     )
 
     odict['payload'] = finance_model.json_dumps()
