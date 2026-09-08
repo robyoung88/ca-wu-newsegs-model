@@ -2,6 +2,7 @@ import copy
 import json
 from typing import Callable, Optional, Sequence, cast, overload, override
 
+import pandas as pd
 import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
@@ -16,6 +17,7 @@ from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInt
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
+from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.variable import Variable
 
 
@@ -369,7 +371,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
 
 
 class FromDatabaseNewsegsProjectProvider(
-    FromDatabaseNewsegsComponentProvider
+    FromDatabaseNewsegsComponentProvider,
+    NewsegsProjectProviderInterface,
 ):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         super().__init__(get_engine)
@@ -542,3 +545,61 @@ class FromDatabaseNewsegsProjectProvider(
                     force,
                     tbl
                 )
+
+    def _get_project_details_columns(self):
+        return (
+            self._table.c.id,
+            self._table.c.label,
+            self._table.c.model_type,
+            self._table.c.model_version,
+            self._table.c.created_at,
+        )
+
+    @override
+    def list_projects(
+        self,
+        model_type: Optional[str] = None,
+        model_version: Optional[str] = None
+    ) -> pd.DataFrame:
+        stmt = sa.select(*self._get_project_details_columns())
+        if model_type:
+            stmt = stmt.where(self._table.c.model_type == model_type)
+        if model_version:
+            stmt = stmt.where(self._table.c.model_version == model_version)
+
+        with self._get_engine().connect() as conn:
+            odf = pd.read_sql(stmt, conn)
+        return odf
+
+    @override
+    def recover_session_project(
+        self,
+        session_id: Optional[str] = None,
+        model_type: Optional[str] = None
+    ) -> NewsegsProject:
+        if session_id:
+            stmt = (
+                sa.select(self._table.c.id)
+                .select_from(tbls.sessions)
+                .join(
+                    self._table,
+                    tbls.sessions.c.active_project_id == self._table.c.id,
+                )
+                .where(tbls.sessions.c.session_id == session_id)
+                .limit(1)
+            )
+            with self._get_engine().connect() as conn:
+                project_id = conn.execute(stmt).scalar_one_or_none()
+                if project_id:
+                    return self.get_component(project_id)
+
+        projects = self.list_projects(model_type)
+        if len(projects):
+            return self.get_component(projects['id'].iloc[-1])
+
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        if model_type:
+            return PROJECT_FACTORIES[model_type]()
+        else:
+            return PROJECT_FACTORIES[list(PROJECT_FACTORIES.keys())[0]]()
+

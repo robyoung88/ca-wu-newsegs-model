@@ -133,9 +133,11 @@ results = sa.Table(
     sa.Column('component_class', sa.String),
     sa.Column('component_version', sa.String),
     sa.Column('component_config_revision', sa.Integer, default = 0),
+    sa.Column('component_config_revision_string', sa.String, default = ''),
     sa.Column('result_type', sa.String, nullable = False),
     sa.Column('result_file', sa.String),
     sa.Column('retain', sa.Boolean, default = False),
+    sa.Column('created_at', sa.DateTime(), server_default = sa.func.now()),
 )
 
 snapshot_results = sa.Table(
@@ -307,7 +309,6 @@ projects = sa.Table(
     sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('revision_string', sa.String, default = ''),
-    sa.Column('uuid', sa.String),
 
     # TODO: Implement these groups
     #sa.Column('read_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
@@ -315,6 +316,7 @@ projects = sa.Table(
     
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
+    sa.Column('created_at', sa.DateTime(), server_default = sa.func.now()),
 )
 
 snapshot_projects = sa.Table(
@@ -407,8 +409,9 @@ runs = sa.Table(
     sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
     sa.Column('request_id', sa.String),
     sa.Column('request_type', sa.String),
-    sa.Column('request_payload', sa.String),
+    sa.Column('payload', sa.String),
     sa.Column('status', sa.String),
+    sa.Column('created', sa.DateTime, server_default = sa.func.current_timestamp()),
     sa.Column('last_updated', sa.DateTime, default = sa.func.current_timestamp()),
     sa.Column('progress', sa.Float, default = 0.0),
     sa.Column('progress_message', sa.String, nullable = True),

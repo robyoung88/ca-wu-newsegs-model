@@ -2,7 +2,9 @@
 Unit tests for newsegsmodelapp/backend database
 """
 import os
+from pathlib import Path
 import pickle
+import tempfile
 import unittest
 import uuid
 
@@ -11,7 +13,10 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from config import settings
+from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
+from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
@@ -69,6 +74,14 @@ class TestDatabaseStart(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         ...
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.test_dir = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        """Clean up temporary directory after each test."""
+        self.temp_dir.cleanup()
 
     def test_tables_exist(self):
         from newsegsmodelapp.backend import db
@@ -615,6 +628,8 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
 
+        #proj_list = proj_provider.list_projects()
+        
         proj = PROJECT_FACTORIES['sprake']()
 
         mm1 = proj.metamodels[0]
@@ -635,4 +650,50 @@ class TestDatabaseStart(unittest.TestCase):
             mm2.finance.get_costs_series_discounted()
         )
 
+    def test_process_and_results(self):
+        import newsegsmodelapp.register_plugins
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
 
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+        result_provider = FromDatabaseResultProvider(db.get_engine, self.test_dir)
+
+        engine = db.get_engine()
+
+        proj = PROJECT_FACTORIES['sprake']()
+        proj_provider.add_component(proj)
+
+        request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_single_mm')
+        self.assertIsNotNone(request_creator)
+        request = request_creator(proj, db.get_engine()) # pyright: ignore[reportOptionalCall]
+
+        run_id = generate_claim_ticket(engine, request)
+
+        request.run_id = run_id
+
+        runner = registers.RUN_PROCEDURE_REGISTER.get(request.request_type)
+        self.assertIsNotNone(runner)
+
+        def update_progress(step, total, message):
+            return
+
+        def check_cancel_status():
+            return False
+
+        is_ok = runner(request, proj_provider, result_provider, run_id, update_progress, check_cancel_status) # pyright: ignore[reportOptionalCall]
+
+        self.assertEqual(is_ok, 'ok')
+
+        proj = proj_provider.get_component(proj.id)
+
+        grid = proj.metamodels[0].model.grid
+        grid_res, verstring = result_provider.get_result('deterministic_grid', grid, True)
+
+        self.assertEqual(grid.revision_string, verstring)
+
+        generation = proj.metamodels[0].model.generation
+        generation_res, verstring = result_provider.get_result('deterministic_generation', generation, True)
+
+        self.assertEqual(generation.revision_string, verstring)
+        self.assertGreater(len(generation_res.meters_to_pandas()), 8760)
+        

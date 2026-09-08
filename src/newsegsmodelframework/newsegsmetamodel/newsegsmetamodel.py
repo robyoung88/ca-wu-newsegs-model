@@ -362,7 +362,8 @@ class NewsegsMetaModel(NewsegsComponent):
         for varid, var in self.variables.items():
             if self._variables_last_model_sync.get(varid, '0') != var.revision_string:
                 try:
-                    affected_models.add(self.update_model_from_variable_deterministic(varid))
+                    if isinstance(varid, str):
+                        affected_models.add(self.update_model_from_variable_deterministic(varid)) 
                 except ValueError as e:
                     logger.error(e)
                 

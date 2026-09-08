@@ -35,6 +35,8 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     psa_config = ComponentProperty(oftype = PSAComponent)
     table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
 
+    _focussed_metamodel: int = 0
+
     @override
     def _generate_config(self, *args, **kwargs) -> NewsegsProjectConfig:
         return NewsegsProjectConfig(*args, **kwargs)
@@ -73,6 +75,21 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     @property
     def metamodel_ids(self) -> tuple[str, ...]:
         return tuple(mm.id for mm in self.metamodels)
+
+    def get_focussed_metamodel(self):
+        if self._focussed_metamodel >= len(self.metamodels):
+            if len(self.metamodels) == 0:
+                raise ValueError('No metamodels within project')
+            else:
+                self._focussed_metamodel = len(self.metamodels) - 1
+        return self.metamodels[self._focussed_metamodel]
+
+    def set_focussed_metamodel(self, metamodel_id: Optional[str] = None, metamodel_index: int = 0):
+        if metamodel_id:
+            for i, mm in enumerate(self.metamodels):
+                if mm.id == metamodel_id:
+                    self._focussed_metamodel = i
+        self._focussed_metamodel = metamodel_index
 
     def duplicate_metamodel(self, metamodel_id: str) -> newsegsmetamodel.NewsegsMetaModel:
         try:
