@@ -1492,53 +1492,55 @@ def _wrap_generator_value(val: Any, parent: ABCElecGenerator) -> Any:
     elif isinstance(val, list) and not isinstance(val, ObservableGeneratorList):
         return ObservableGeneratorList(val, parent = parent) # pyright: ignore[reportArgumentType]
 
+from newsegsmodelframework.core.trackeddata import wrap_value as default_wrap_value
+def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
+    if isinstance(val, SerialisedConfigurationMixin):
+        parent._add_child(val._config)
+        return val
+    return default_wrap_value(val, parent)
 
-class ObservableGeneratorList(list, RevisionNotifierMixin):
+class ObservableGeneratorList(ObservableList):
 
-    def __init__(self, iterable = (), parent: Optional[RevisionNotifierMixin] = None):
-        if parent is None:
-            raise TypeError('ObservableModelLists should not be initiated without parents')
-        if not isinstance(parent, ABCElecGenerator):
-            raise TypeError('Parent of a generator list should be a generator')
+    @classmethod
+    @override
+    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
+        return wrap_value(val, parent)
 
-        self._parent = parent
-        RevisionNotifierMixin.__init__(self)
-        wrapped = [_wrap_generator_value(item, parent) for item in iterable]
-        super().__init__(wrapped)
-        parent._add_child(self)
+    def __init__(self, iterable = (), parent: Optional['RevisionNotifierMixin | ABCElecGenerator'] = None):
+        if parent:
+            if isinstance(parent, ABCElecGenerator):
+                super().__init__(iterable, parent = parent._config)
+            else:
+                super().__init__(iterable, parent)
+        else:
+            super().__init__(iterable)
 
     def __setitem__(self, index, value):
         old_val = super().__getitem__(index)
-        new_val = _wrap_generator_value(value, self._parent)
+        new_val = value
+        if isinstance(new_val, ABCElecGenerator):
+            new_val._config = self._wrap_value(new_val._config, self)
+        else:
+            new_val = wrap_value(new_val, self)
         if old_val != new_val:
+            if isinstance(old_val, ABCElecGenerator):
+                self._remove_child(old_val._config)
             if isinstance(old_val, RevisionNotifierMixin):
-                self._parent._remove_child(old_val)
+                self._remove_child(old_val)
             elif isinstance(old_val, Iterable):
                 for x in old_val:
                     if isinstance(x, RevisionNotifierMixin):
-                        self._parent._remove_child(x)
-            super().__setitem__(index, new_val)
+                        self._remove_child(x)
+
+            list.__setitem__(self, index, new_val)
             self._notify_change()
-
-    def append(self, item):
-        super().append(_wrap_generator_value(item, self._parent))
-        self._notify_change()
-
-    def extend(self, iterable: Iterable) -> None:
-        wrapped = [_wrap_generator_value(item, self._parent) for item in iterable]
-        if wrapped:
-            super().extend(wrapped)
-            self._notify_change()
-
-    def insert(self, index, item):
-        super().insert(index, _wrap_generator_value(item, self._parent))
-        self._notify_change()
 
     def pop(self, index: SupportsIndex = -1):
         item = super().pop(index)
-        self._notify_change()
-        if isinstance(item, RevisionNotifierMixin):
-            self._parent._remove_child(item)
+        if isinstance(item, ABCElecGenerator):
+            self._remove_child(item._config)
+
+        # Notify is handled by ObservableList
         return item
 
     def remove(self, value):
@@ -1547,22 +1549,16 @@ class ObservableGeneratorList(list, RevisionNotifierMixin):
             item = self[idx]
         except ValueError:
             # Let the standard error be raised
-            super().remove(value)
+            list.remove(self, value)
             return
 
         if isinstance(item, RevisionNotifierMixin):
-            self._parent._remove_child(item)
+            self._remove_child(item)
+        elif isinstance(item, ABCElecGenerator):
+            self._remove_child(item._config)
         
-        super().remove(value)
+        list.remove(self, value)
         self._notify_change()
-
-    def clear(self):
-        if len(self) > 0:
-            for item in self:
-                if isinstance(item, RevisionNotifierMixin):
-                    self._parent._remove_child(item)
-            super().clear()
-            self._notify_change()
 
 
 class NewsegsGeneratorListProperty(newsegscomponent.ComponentProperty):

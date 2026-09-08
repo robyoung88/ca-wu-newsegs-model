@@ -19,8 +19,10 @@ from collections import OrderedDict
 import copy
 import re
 import time
-from typing import Any, Callable, Iterable, Optional, Sequence, SupportsIndex, Type, override
+from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, SupportsIndex, Type, overload, override
 import uuid as mod_uuid
+
+from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import serialisation, SerialisedConfigurationMixin
 from newsegsmodelframework.core import find_constructor
@@ -326,6 +328,9 @@ class NewsegsComponent(
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsComponent'
 
+    _component_ids: dict[str, str]
+    """IDs of subcomponents for reconstruction of component."""
+
     @classmethod
     def _make_id_regex(cls):
         return re.compile(rf'^{re.escape(cls._id_prefix)}' + r'-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')
@@ -339,6 +344,7 @@ class NewsegsComponent(
         self.uuid = str(mod_uuid.uuid4())
         if name is not None:
             self.name = name
+        self._component_ids = {}
             
     @property
     def name(self) -> str:
@@ -423,18 +429,45 @@ class NewsegsComponent(
             except AttributeError:
                 setattr(self, k, v)
 
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        self.update_component_id_dict()
+        return super().to_dict()
+
     @classmethod
     @override
     def from_dict(cls, config):
         config = config.copy()
-        #cfg = config.pop('_config', None)
         inst = cls.__new__(cls)
         inst._config = inst._generate_config()
         inst.update(config)
-        #if cfg:
-        #    for k, v in cfg.items():
-        #        setattr(inst, k, v)
         return inst
+
+    def get_component_attributes(self) -> tuple['str', ...]:
+        """A tuple of all the attributes of the object that are themselves NewsegsComponents"""
+        return ()
+
+    def get_components(self) -> tuple['NewsegsComponent', ...]:
+        """A tuple of all subcomponents that would require saving to store and reattaching after deserialisation."""
+        return tuple(getattr(self, nm) for nm in self.get_component_attributes())
+
+    def update_component_id_dict(self):
+        """Update ._component_ids prior to serialisation."""
+        self._component_ids.clear()
+        att_names = self.get_component_attributes()
+        for att in att_names:
+            comp = getattr(self, att)
+            if isinstance(comp, NewsegsComponent):
+                self._component_ids[att] = comp.id
+
+    def reattach_components(
+        self,
+        component_provider: NewsegsComponentProviderInterface
+    ):
+        """Using the component_provider, find all components for reattachment."""
+        for att_name, comp_id in self._component_ids.items():
+            comp = component_provider.get_component(comp_id)
+            setattr(self, att_name, comp)
 
     @property
     def dirty(self):
@@ -459,3 +492,46 @@ class RunnableNewsegsComponent(NewsegsComponent):
 class TableConfigNewsegsComponent(NewsegsComponent):
     """A reference config object to anchor table results."""
     component_type = 'table'
+
+
+class NewsegsComponentProviderInterface(metaclass = ABCMeta):
+    """Interface for providing components when given their ids."""
+
+    @overload
+    @abstractmethod
+    def get_component(self, component_id: str) -> NewsegsComponent:
+        ...
+
+    @overload
+    @abstractmethod
+    def get_component(self, component_id: SequenceNotStr[str]) -> SequenceNotStr[NewsegsComponent]:
+        ...
+
+    @abstractmethod
+    def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        ...
+
+    @abstractmethod
+    def duplicate_component(self, component_id: str) -> NewsegsComponent:
+        ...
+
+    @abstractmethod
+    def add_component(self, component: NewsegsComponent) -> str:
+        ...
+
+    @abstractmethod
+    def get_default_component(self, component_type: str, index: int = -1) -> NewsegsComponent:
+        ...
+
+
+class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
+    """Interface for saving components to persistent storage (in order that they may be accessed by other providers)"""
+
+    def upsert_component(self, component: NewsegsComponent | SequenceNotStr[NewsegsComponent], force: bool = False) -> None:
+        """Insert or update a component or list of components into the store.
+                        
+        Args:
+            component: A component or sequence of components to synchronise.
+            force: Overwrite the components(s) regardless of whether their revision number has incremented.
+        """
+    

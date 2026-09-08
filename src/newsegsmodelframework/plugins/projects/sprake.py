@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsmodel import sprakemodel
@@ -22,11 +23,12 @@ def _create_default_model() -> newsegsmodel.NewsegsModel:
     with open(
         os.path.join(
             STATICDATA, 
-            'sprakemodel-validation-config.json'
+            'sprakemodel-validation-config.pickle'
         ), 
-    'r') as f:
-        mdl_conf = json.load(f)
-    return sprakemodel.SprakeModel.from_dict(mdl_conf)
+    'rb') as f:
+        mdl_conf = pickle.load(f)
+    return mdl_conf
+    #return sprakemodel.SprakeModel.from_dict(mdl_conf)
 
 def _create_default_finance() -> newsegsfinance.NewsegsFinance:
     # Load finance configuration

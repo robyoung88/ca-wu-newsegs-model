@@ -126,14 +126,15 @@ class FromDatabaseVariableProvider(VariableProviderInterface, VariablePersistenc
             rows = conn.execute(stmt).fetchall()
 
         saved_revisions = {x.id: x.revision for x in rows}
-        existing_uids = list(saved_revisions.keys())
-        new_inserts = [x for x in uids if x not in existing_uids]
+        existing_uids = set({str(x) for x in saved_revisions.keys()})
+        new_inserts = [str(x) for x in uids if x not in existing_uids]
         if not force:
             requires_update = [x for x in existing_uids if current_revisions[x] != saved_revisions[x]]
         else:
             requires_update = existing_uids
 
-        requires_data = set(requires_update + new_inserts)
+        requires_data = set(requires_update)
+        requires_data.update(set(new_inserts))
 
         # First, do the updates, then do the inserts
         for v in var:

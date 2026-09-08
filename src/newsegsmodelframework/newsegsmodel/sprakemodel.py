@@ -383,11 +383,22 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         else:
             inst._wider_environment_server = get_sprake_wider_env_server()
 
-        inst.grid.model = inst
-        inst.generation.model = inst
-        inst.consumption_storage.model = inst
+        #inst.grid.model = inst
+        #inst.generation.model = inst
+        #inst.consumption_storage.model = inst
         
         return inst
+
+    def __getstate__(self) -> object:
+        attributes = self.__dict__.copy()
+        del attributes['_local_environment_server']
+        del attributes['_wider_environment_server']
+        return attributes
+
+    def __setstate__(self, state):
+        self.__dict__ = copy.copy(state) # pyright: ignore[reportAttributeAccessIssue, reportGeneralTypeIssues]
+        self.local_env =  get_sprake_environment_server()
+        self.wider_env = get_sprake_wider_env_server()
 
 SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_attributes) + (
     '_local_environment_server',

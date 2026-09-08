@@ -28,6 +28,8 @@ class RevisionNotifierMixin:
     def _add_child(self, child: 'RevisionNotifierMixin'):
         if child is self:
             raise ValueError('Circular reference - cannot add self as child.')
+        if not hasattr(self, '_children'):
+            self._children = []
         self._children.append(child)
 
     def _remove_child(self, child: 'RevisionNotifierMixin'):
@@ -54,6 +56,8 @@ class RevisionNotifierMixin:
             return ostr
 
     def _notify_change(self):
+        if not hasattr(self, '_revision'):
+            self._revision = 0
         self._revision += 1
 
     def _syncronise(self):

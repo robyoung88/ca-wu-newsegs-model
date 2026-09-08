@@ -2,10 +2,42 @@
 Abstract base class defining the minimal interface for a NewsegsFinance
 """
 from __future__ import annotations
+from abc import abstractmethod
+from typing import overload
+
+from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import RunnableNewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
 
 class NewsegsFinanceInterface(
     RunnableNewsegsComponent,
 ):
+    ...
+
+
+class NewsegsFinanceProviderInterface(NewsegsComponentProviderInterface):
+    @overload
+    @abstractmethod
+    def get_component(self, component_id: str) -> NewsegsFinanceInterface:
+        ...
+
+    @overload
+    def get_component(self, component_id: SequenceNotStr[str]) -> SequenceNotStr[NewsegsFinanceInterface]:
+        ...
+
+    @abstractmethod
+    def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsFinanceInterface | SequenceNotStr[NewsegsFinanceInterface]:
+        ...
+
+    @abstractmethod
+    def duplicate_component(self, component_id: str) -> NewsegsFinanceInterface:
+        ...
+
+    @abstractmethod
+    def get_default_component(self, component_type: str, index: int = -1) -> NewsegsFinanceInterface:
+        ...
+
+
+class NewsegsFinancePersistenceInterface(NewsegsComponentPersistenceInterface):
     ...

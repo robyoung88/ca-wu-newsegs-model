@@ -40,8 +40,14 @@
             "value": "0 days 01:00:00"
         }
     },
-    "uuid": "d94c21a7-c387-484a-9c63-6d2409206e09",
+    "uuid": "10a4f530-cd33-4efd-aaa2-0bbbe13abb7f",
     "_name": "Sprake Energy Model",
+    "_component_ids": {
+        "grid": "cmp-2369c4b3-8e48-4e02-b754-f1a8e2efdac9",
+        "generation": "cmp-7b1935c8-a08d-40d8-bbb7-7f2d1ef7965e",
+        "consumption_storage": "cmp-f123e458-6070-41cd-8819-5c8ef5828543",
+        "table_config": "cmp-d319665f-e2b1-47ca-a244-ec32b2163831"
+    },
     "_model_data": {
         "class": "NewsegsModelData",
         "constructor_class": "NewsegsComponent",
@@ -51,100 +57,14 @@
             "_last_syncronised": 0,
             "_revision": 0
         },
-        "uuid": "340b5032-b624-4ed8-9f5b-7e6257dd5af8"
+        "uuid": "c3ca824f-dc20-418e-9819-e2ef00dc0f97",
+        "_component_ids": {}
     },
-    "_model_data_id": "cmp-340b5032-b624-4ed8-9f5b-7e6257dd5af8",
-    "_table_config": {
-        "class": "TableConfigNewsegsComponent",
-        "constructor_class": "NewsegsComponent",
-        "_config": {
-            "class": "NoConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 0
-        },
-        "uuid": "e3f3bfc7-3183-4e93-83da-3340ac9fa6c8"
-    },
-    "_table_config_id": "cmp-e3f3bfc7-3183-4e93-83da-3340ac9fa6c8",
-    "_generation": {
-        "class": "SprakeGeneration",
-        "constructor_class": "NewsegsModule",
-        "_config": {
-            "class": "SprakeGenerationConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 4,
-            "location": {
-                "class": "Location",
-                "constructor_class": "Location",
-                "_lat": 53.25535,
-                "_lon": -3.47697,
-                "_name": "Site",
-                "_crs": "EPSG:4326"
-            },
-            "wind_capacity": 200.0,
-            "pv_capacity": 200.0
-        },
-        "uuid": "6e14567a-1158-42e0-9d8e-faea937430d5",
-        "wind_capacity": 200.0,
-        "pv_capacity": 200.0
-    },
-    "_generation_id": "cmp-6e14567a-1158-42e0-9d8e-faea937430d5",
-    "_grid": {
-        "class": "SprakeGrid",
-        "constructor_class": "NewsegsModule",
-        "_config": {
-            "class": "SprakeGridConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 0,
-            "import_per_unit": 0.2,
-            "export_per_unit": 0.07
-        },
-        "uuid": "b7489635-bc43-477f-beb5-b214ff73e6ba"
-    },
-    "_grid_id": "cmp-b7489635-bc43-477f-beb5-b214ff73e6ba",
-    "_consumption_storage": {
-        "class": "SprakeCS",
-        "constructor_class": "NewsegsModule",
-        "_config": {
-            "class": "SprakeCSConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 3,
-            "location": {
-                "class": "Location",
-                "constructor_class": "Location",
-                "_lat": 53.255,
-                "_lon": -3.477,
-                "_name": "St Asaph V72"
-            },
-            "n_units": 100.0,
-            "ev_per_unit": 0.2,
-            "efficiency_reduction": 0.1,
-            "annual_residential_consumption_per_ev": 1314.72,
-            "ref_daily_consumption": 4.5,
-            "seasonal_variance": 0.2,
-            "hlp": 0.3,
-            "gfa": 105.0,
-            "timeseries_hdd_start": {
-                "class": "Timestamp",
-                "constructor_class": "Timestamp",
-                "ts_input": "2000-01-01 00:00:00+00:00",
-                "tz": "UTC"
-            },
-            "timeseries_model_start": {
-                "class": "Timestamp",
-                "constructor_class": "Timestamp",
-                "ts_input": "2000-01-01 00:00:00+00:00",
-                "tz": "UTC"
-            },
-            "storage_capacity": 4000.0,
-            "storage_rte": 0.88
-        },
-        "uuid": "af95338f-b4e9-4c3c-be09-082d09b41e0b"
-    },
-    "_consumption_storage_id": "cmp-af95338f-b4e9-4c3c-be09-082d09b41e0b",
+    "_model_data_id": "cmp-c3ca824f-dc20-418e-9819-e2ef00dc0f97",
+    "_table_config_id": "cmp-d319665f-e2b1-47ca-a244-ec32b2163831",
+    "_generation_id": "cmp-7b1935c8-a08d-40d8-bbb7-7f2d1ef7965e",
+    "_grid_id": "cmp-2369c4b3-8e48-4e02-b754-f1a8e2efdac9",
+    "_consumption_storage_id": "cmp-f123e458-6070-41cd-8819-5c8ef5828543",
     "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
     "wider_environment_server": "DummyWiderEnv v0.0.1"
 }

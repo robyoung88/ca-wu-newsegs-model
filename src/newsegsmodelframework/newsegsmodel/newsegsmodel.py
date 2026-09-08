@@ -300,7 +300,81 @@ class NewsegsModel(
         
         return super().update(config)
 
+    @override
+    def get_component_attributes(self) -> tuple[str, ...]:
+        return (
+            'grid',
+            'generation',
+            'consumption_storage',
+            'table_config'
+        )
+
+    def reattach_grid(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('grid', '') == '':
+            raise AttributeError('This Energy Model has no grid module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('grid', ''))
+        if not isinstance(comp, NewsegsGrid):
+            raise TypeError(f'component_provider did not provide a grid module for key {self._component_ids.get('grid', '')}')
+        self.grid = comp
+
+    def reattach_generation(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('generation', '') == '':
+            raise AttributeError('This Energy Model has no generation module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('generation',''))
+        if not isinstance(comp, NewsegsGeneration):
+            raise TypeError(f'component_provider did not provide a generation module for key {self._component_ids.get('generation','')}')
+        self.generation = comp
+
+    def reattach_consumption_storage(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('consumption_storage', '') == '':
+            raise AttributeError('This Energy Model has no consumption_storage module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('consumption_storage', ''))
+        if not isinstance(comp, NewsegsCS):
+            raise TypeError(f'component_provider did not provide a consumption_storage module for key {self._component_ids.get('consumption_storage', '')}')
+        self.consumption_storage = comp
+
+    def reattach_table_config(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('table_config', '') == '':
+            raise AttributeError('This Energy Model has no table_config module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('table_config', ''))
+        if not isinstance(comp, newsegscomponent.TableConfigNewsegsComponent):
+            raise TypeError(f'component_provider did not provide a table_config module for key {self._component_ids.get('table_config', '')}')
+        self.table_config = comp
+
+    def get_components(self) -> tuple[newsegscomponent.NewsegsComponent, ...]:
+        return (
+            self.grid,
+            self.generation,
+            self.consumption_storage,
+            self.table_config
+        )
+
+    @override
+    def reattach_components(self, component_provider: newsegscomponent.NewsegsComponentProviderInterface):
+        super().reattach_components(component_provider)
+        self.grid.model = self
+        self.generation.model = self
+        self.consumption_storage.model = self
+
     def __hash__(self) -> int:
         return self._last_hash
 
-NewsegsModel._excluded_attributes = tuple(newsegscomponent.NewsegsComponent._excluded_attributes) + ('_generation_result', '_grid_result', '_cs_result')
+NewsegsModel._excluded_attributes = tuple(
+    newsegscomponent.NewsegsComponent._excluded_attributes
+) + (
+    '_grid', '_generation', '_consumption_storage',
+    '_generation_result', '_grid_result', '_cs_result',
+    '_table_config'
+)

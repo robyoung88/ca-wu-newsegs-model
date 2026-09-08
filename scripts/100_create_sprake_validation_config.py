@@ -2,6 +2,7 @@
 Set up a Sprake model per the external validation model, then save out the config as json.
 """
 import json
+import pickle
 
 from common import setup_script_env
 setup_script_env()
@@ -20,3 +21,8 @@ if __name__ == '__main__':
     d1 = mdl.to_dict()
     with open('data/sprakemodel-validation-config.json', 'w') as f:
         json.dump(d1, f, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4)
+
+    with open('data/sprakemodel-validation-config.pickle', 'wb') as f:
+        pickle.dump(mdl, f)
+    
+

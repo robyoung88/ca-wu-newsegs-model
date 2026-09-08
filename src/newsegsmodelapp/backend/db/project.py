@@ -7,6 +7,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, TableConfigNewsegsComponent
+from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.core.newsegsmodule import NewsegsModule
 from newsegsmodelframework.newsegscs.newsegscs import NewsegsCS
 from newsegsmodelframework.newsegsfinance import NewsegsFinance
@@ -210,7 +211,9 @@ def load_project(
     for metamodel in project.metamodels:
         component_ids = _get_metamodel_component_ids(metamodel)
         metamodel_vars = flatten([load_component_variables(id, encon) for id in component_ids])
-        metamodel.variables = metamodel_vars
+        if metamodel_vars:
+            for v in metamodel_vars:
+                metamodel.variables[v.id] = v
 
     return project
 
@@ -621,7 +624,7 @@ def _load_metamodel_data(
 # -----------------------------------------------------------------------------
 # region SAVE
 def energy_model_to_raw_table_data(
-    energy_model: NewsegsModel
+    energy_model: NewsegsModelInterface
 ) -> dict:
     """
     Convert an energy model to a dictionary representation without foreign keys
@@ -631,15 +634,13 @@ def energy_model_to_raw_table_data(
         model_class = energy_model.__class__.__name__,
         model_version = energy_model.version,
         revision = energy_model.revision,
+        revision_string = energy_model.revision_string,
         label = energy_model.name
     )
     # Additional configuration needs to be implementation-specific, and might be things like
     # the default timestep. For now, let's use the already defined to_dict method
-    odict['config_payload'] = json.dumps(energy_model.to_dict())
+    odict['payload'] = json.dumps(energy_model.to_dict())
 
-    if hasattr(energy_model, '_em_config_id'):
-        odict['em_config_id'] = energy_model._em_config_id # pyright: ignore[reportAttributeAccessIssue]
-    
     return odict
 
 def save_energy_model_children(
@@ -883,13 +884,14 @@ def component_to_raw_table_data(
         component_class = component.__class__.__name__,
         component_version = component.version,
         revision = component.revision,
+        revision_string = component.revision_string,
         label = component.name,
     )
 
-    odict['config_payload'] = json.dumps(component.to_dict())
+    odict['payload'] = component.json_dumps()
 
-    if hasattr(component, '_component_config_id'):
-        odict['component_config_id'] = component._module_config_id # pyright: ignore[reportAttributeAccessIssue]
+    #if hasattr(component, '_component_config_id'):
+    #    odict['component_config_id'] = component._module_config_id # pyright: ignore[reportAttributeAccessIssue]
 
     return odict
 

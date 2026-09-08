@@ -11,7 +11,9 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from config import settings
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
+from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
 from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, RecoverableInMemoryVariableProvider
 from test.unit_tests import variable_helpers
@@ -390,11 +392,11 @@ class TestDatabaseStart(unittest.TestCase):
                     prm[0] = prm[0] + str(0.1)
                 elif v1.distribution.distribution == 'binomial':
                     if v1.parameterisation_index == 0:
-                        prm[1] = prm[1] + 5
+                        prm[1] = prm[1] + 5 # pyright: ignore[reportOperatorIssue]
                     else:
-                        prm[0] = prm[0] + 1
+                        prm[0] = prm[0] + 1 # pyright: ignore[reportOperatorIssue]
                 else:
-                    prm[0] = prm[0] + 0.1
+                    prm[0] = prm[0] + 0.1 # pyright: ignore[reportOperatorIssue]
                 v1.set_parameters(*prm)
                 self.assertNotEqual(v1.deterministic_value, dv1, f'{v1.name}')
                 self.assertTrue(v1.modified)
@@ -403,16 +405,16 @@ class TestDatabaseStart(unittest.TestCase):
             else:
                 dv1 = v1.deterministic_value
                 prm = list(v1.raw_parameters)
-                if isinstance(prm[0][0], str):
-                    prm[0][0] = prm[0][0] + str(0.1)
+                if isinstance(prm[0][0], str): # pyright: ignore[reportIndexIssue]
+                    prm[0][0] = prm[0][0] + str(0.1) # pyright: ignore[reportIndexIssue,reportOperatorIssue]
                 elif v1.distribution.distribution == 'dirichlet':
                     if v1.parameterisation_index == 0:
-                        prm[0][0] = prm[0][0] + 10
+                        prm[0][0] = prm[0][0] + 10 # pyright: ignore[reportIndexIssue,reportOperatorIssue]
                     else:
-                        prm[0][0] = 0.75
-                        prm[0][1] = 0.25
+                        prm[0][0] = 0.75 # pyright: ignore[reportIndexIssue, reportOperatorIssue]
+                        prm[0][1] = 0.25 # pyright: ignore[reportIndexIssue,reportOperatorIssue]
                 else:
-                    prm[0][0] = prm[0][0] + 0.1
+                    prm[0][0] = prm[0][0] + 0.1 # pyright: ignore[reportIndexIssue,reportOperatorIssue]
                 v1.set_parameters(*prm)
                 with self.assertRaises(AssertionError, msg=f'{v1.name}'):
                     nptest.assert_array_equal(v1.deterministic_value, dv1)
@@ -508,3 +510,47 @@ class TestDatabaseStart(unittest.TestCase):
                 mm1.model.get_generation_result().meters,
                 mm2.model.get_generation_result().meters
             )
+
+    def test_component_provider(self):
+        from newsegsmodelapp.backend import db
+
+        component_provider = FromDatabaseNewsegsComponentProvider(db.get_engine)
+
+        comp1 = TableConfigNewsegsComponent()
+
+        comp1.name = 'My Table'
+
+        component_provider.add_component(comp1)
+
+        comp2 = component_provider.get_component(comp1.id)
+
+        self.assertEqual(
+            comp1.name,
+            comp2.name
+        )
+
+    def test_model_provider(self):
+        import numpy.testing as nptest
+        
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        model_provider = FromDatabaseNewsegsEMProvider(db.get_engine)
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        mm1 = proj.metamodels[0]
+        mdl1 = mm1.model
+
+        model_provider.add_component(mdl1)
+
+        mdl2 = model_provider.get_component(mdl1.id)
+
+        mdl1.run()
+        mdl2.run()
+        nptest.assert_array_equal(
+            mdl1.get_generation_result().meters,
+            mdl2.get_generation_result().meters
+        )
+
+

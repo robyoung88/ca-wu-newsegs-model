@@ -8,7 +8,8 @@ from .environment.environment_servers import NewsegsLocalEnvironment,NewsegsWide
 from .newsegsmoduleresult import NewsegsModuleResult
 from .newsegscomponent import DataWithRevision
 from .newsegscomponent import NewsegsComponent, RunnableNewsegsComponent, TableConfigNewsegsComponent
-from .newsegsmodelinterface import NewsegsModelInterface
+from .newsegscomponent import NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface
+from .newsegsmodelinterface import NewsegsModelInterface, NewsegsModelProviderInterface, NewsegsComponentPersistenceInterface
 from .newsegsmodule import NewsegsModule
 
 __all__ = [
