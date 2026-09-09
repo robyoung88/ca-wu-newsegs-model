@@ -6,7 +6,6 @@ from pathlib import Path
 import pickle
 import tempfile
 import unittest
-import uuid
 
 import pandas as pd
 import sqlalchemy as sa
@@ -709,6 +708,11 @@ class TestDatabaseStart(unittest.TestCase):
         ]
 
         for process_name in postprocess_list:
+            pp_req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(process_name)
+            self.assertIsNotNone(pp_req_provider, msg = f'Postprocess request generator not found for {process_name}')
+            pp_req = pp_req_provider(request) # pyright: ignore[reportOptionalCall]
+            self.assertIsInstance(pp_req, registers.PostprocessRequest)
+
             proc = registers.get_postprocess_procedure(process_name, request)
 
             is_ok = proc(
@@ -743,6 +747,11 @@ class TestDatabaseStart(unittest.TestCase):
         ]
 
         for table_section in table_section_list:
+            td_req_provider = registers.TABLE_DRAW_REQUEST_REGISTER.get(table_section)
+            self.assertIsNotNone(td_req_provider, msg = f'Table draw request generator not found for {table_section}')
+            td_req = td_req_provider(request) # pyright: ignore[reportOptionalCall]
+            self.assertIsInstance(td_req, registers.TableDrawRequest)
+            
             proc = registers.get_table_draw(table_section, request)
             is_ok = proc(
                 request,
@@ -751,7 +760,6 @@ class TestDatabaseStart(unittest.TestCase):
                 run_id,
                 update_progress,
                 check_cancel_status,
-                True
             )
             self.assertEqual(is_ok, 'ok')
 

@@ -12,6 +12,7 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
     ):
         """Add or update a result to the provider."""
 
+    @abstractmethod
     def get_result(
         self,
         result_type: str,

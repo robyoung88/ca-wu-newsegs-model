@@ -19,6 +19,7 @@ class RunRequest(SerialisableDataclass):
     project_id: str = ''
     model_type: str = 'default'
     request_id: str = ''
+    request_class: str = 'run'
     request_type: str = ''
     payload: str = ''
     status: str = ''
@@ -81,6 +82,30 @@ def register_run_procedure(name: str):
 # POSTPROCESS
 # -------------------------------------------------------------------------
 
+@dataclass
+class PostprocessRequest(RunRequest):
+    request_class: str = 'postprocess'
+    trigger_request_type: str = ''
+
+POSTPROCESS_REQUEST_REGISTER: dict[str, Callable[[RunRequest], PostprocessRequest]] = {}
+"""Register of functions to generate postprocess requests.
+
+Function arguments:
+    request [RunRequest]
+"""
+
+def register_postprocess_request(name: str):
+    """Add a postprocess request creation function to POSTPROCESS_REQUEST_REGISTER
+    
+    The name should correspond to the postprocess type / request_class.
+    """
+    def decorated(func):
+        if name in POSTPROCESS_REQUEST_REGISTER:
+            raise KeyError(f'A postprocess request function already exists for name {name}')
+        POSTPROCESS_REQUEST_REGISTER[name] = func
+        return func
+    return decorated
+
 POSTPROCESS_REGISTER: dict[
     tuple[str, str], 
     Callable[[
@@ -132,6 +157,31 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 # TABLES
 # -------------------------------------------------------------------------
 
+@dataclass
+class TableDrawRequest(RunRequest):
+    request_class: str = 'tabledraw'
+    trigger_request_type: str = ''
+    ann_hori_toggle: bool = False
+
+TABLE_DRAW_REQUEST_REGISTER: dict[str, Callable[[RunRequest], TableDrawRequest]] = {}
+"""Register of functions to generate table draw requests.
+
+Function arguments:
+    request [RunRequest]
+"""
+
+def register_table_draw_request(name: str):
+    """Add a table draw request creation function to TABLE_DRAW_REQUEST_REGISTER
+    
+    The name should correspond to the table field.
+    """
+    def decorated(func):
+        if name in TABLE_DRAW_REQUEST_REGISTER:
+            raise KeyError(f'A table draw request function already exists for name {name}')
+        TABLE_DRAW_REQUEST_REGISTER[name] = func
+        return func
+    return decorated
+
 TABLE_DRAW_REGISTER: dict[
     tuple[str, str],
     Callable[[
@@ -141,7 +191,6 @@ TABLE_DRAW_REGISTER: dict[
         int,
         Callable,
         Callable,
-        bool,
     ], str]] = {}
 """Register of functions to create table data given a tuple of live results.
 

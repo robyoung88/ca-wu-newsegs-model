@@ -1,4 +1,12 @@
 [default]
+appversion = 'dev'
+
+dispatchservers = ['0.0.0.0','127.0.0.1']
+FRONTENDPORT = 8555
+BACKENDPORT = 8556
+#HEARTBEAT_FILE = '/tmp/dispatcher_heartbeat.txt'
+HEARTBEAT_FILE = 'C:/Scratch/dispatcher_heartbeat.txt'
+
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
 SprakeStartDatetime = "2005-01-01T00:00:00"
 SprakeEndDatetime = "2015-01-01T00:00:00"
@@ -13,3 +21,6 @@ DiskcacheCache = 'C:\\scratch\\appdiskcache'
 
 [spraketest]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"
+
+[production]
+appversion = '0.1.1'

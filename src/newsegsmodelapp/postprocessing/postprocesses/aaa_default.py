@@ -1,4 +1,4 @@
-
+from dataclasses import asdict
 import json
 from typing import Callable, cast
 
@@ -9,14 +9,24 @@ from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_finance_value_result
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_gen_results import gen_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_net_results import net_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_storage_results import stor_results_to_interface_sprake
-from newsegsmodelapp.registers import RunRequest, register_postprocess_procedure
+from newsegsmodelapp.registers import PostprocessRequest, RunRequest, register_postprocess_procedure, register_postprocess_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
+def _postprocess_request_factory(postproc_request_type: str):
+    def make_request(request: RunRequest):
+        rdict = asdict(request)
+        request_type = rdict.pop('request_type', '')
+        _ = rdict.pop('request_class', '')
+        rdict['request_type'] = postproc_request_type
+        rdict['trigger_request_type'] = request_type
+        return PostprocessRequest(**rdict)    
+    return make_request
 
 MODEL_TYPE = 'default'
 POSTPROCESS_TYPE = 'postproc_model_grid'
+_request_postprocess_model_grid = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _grid_to_interface_sprake(
@@ -32,6 +42,8 @@ def _grid_to_interface_sprake(
 
 
 POSTPROCESS_TYPE = 'postproc_model_generation'
+_request_postprocess_model_generation = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _generation_to_interface_sprake(
     request: RunRequest,
@@ -81,6 +93,8 @@ def _generation_to_interface_sprake(
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_model_consumption'
+_request_postprocess_model_consumption = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _consumption_to_interface_sprake(
     request: RunRequest,
@@ -130,6 +144,8 @@ def _consumption_to_interface_sprake(
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_model_storage'
+_request_postprocess_model_storage = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _storage_to_interface_sprake(
     request: RunRequest,
@@ -179,6 +195,8 @@ def _storage_to_interface_sprake(
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_model_net'
+_request_postprocess_model_net = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _net_to_interface_sprake(
     request: RunRequest,
@@ -228,6 +246,8 @@ def _net_to_interface_sprake(
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_finance_benefits'
+_request_postprocess_finance_benefits = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _finance_benefits_to_interface_sprake(
     request: RunRequest,
@@ -282,6 +302,8 @@ def _finance_benefits_to_interface_sprake(
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_finance_costs'
+_request_postprocess_finance_costs = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _finance_costs_to_interface_sprake(
     request: RunRequest,
@@ -336,6 +358,8 @@ def _finance_costs_to_interface_sprake(
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_finance_value'
+_request_postprocess_finance_value = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _finance_value_to_interface_sprake(
     request: RunRequest,

@@ -10,6 +10,10 @@ def generate_claim_ticket(engine: sa.Engine, job: RunRequest) -> int:
 
     jobval = asdict(job)
     del jobval['run_id']
+    valid_cols = set(tbls.runs.columns.keys())
+    for key in list(jobval.keys()):
+        if key not in valid_cols:
+            del jobval[key]
 
     stmt = (
         sa.insert(tbls.runs)

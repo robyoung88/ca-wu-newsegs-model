@@ -409,6 +409,7 @@ runs = sa.Table(
     sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
     sa.Column('model_type', sa.String),
     sa.Column('request_id', sa.String),
+    sa.Column('request_class', sa.String),
     sa.Column('request_type', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('status', sa.String),

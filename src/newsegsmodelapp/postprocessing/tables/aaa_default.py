@@ -1,19 +1,29 @@
+from dataclasses import asdict
 from typing import Callable, cast
 
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import result_tables_sprake
 from newsegsmodelapp.postprocessing.tables.get_result_list import get_result_list
-from newsegsmodelapp.registers import RunRequest, register_table_draw
+from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
+def _table_draw_request_factory(postproc_request_type: str):
+    def make_request(request: RunRequest):
+        rdict = asdict(request)
+        request_type = rdict.pop('request_type', '')
+        _ = rdict.pop('request_class', '')
+        rdict['request_type'] = postproc_request_type
+        rdict['trigger_request_type'] = request_type
+        return TableDrawRequest(**rdict)    
+    return make_request
 
 MODEL_TYPE = 'default'
 TABLE_SECTION = 'grid'
-
+_request_table_draw_grid = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw((TABLE_SECTION, MODEL_TYPE))
 def _make_grid_tables_sprake(
-    request: RunRequest,
+    request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
@@ -26,16 +36,17 @@ def _make_grid_tables_sprake(
 
 
 TABLE_SECTION = 'generation'
+_request_table_draw_generation = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw((TABLE_SECTION, MODEL_TYPE))
 def _make_generation_tables_sprake(
-    request: RunRequest,
+    request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
-    ann_hori_toggle: bool = False
 ) -> str:
+    ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_generation'
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 
@@ -65,16 +76,17 @@ def _make_generation_tables_sprake(
     return 'ok'
 
 TABLE_SECTION = 'consumption'
+_request_table_draw_consumption = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw((TABLE_SECTION, MODEL_TYPE))
 def _make_consumption_tables_sprake(
-    request: RunRequest,
+    request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
-    ann_hori_toggle: bool = False
 ) -> str:
+    ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_consumption'
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 
@@ -97,16 +109,17 @@ def _make_consumption_tables_sprake(
     return 'ok'
 
 TABLE_SECTION = 'storage'
+_request_table_draw_storage = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw((TABLE_SECTION, MODEL_TYPE))
 def _make_storage_tables_sprake(
-    request: RunRequest,
+    request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
-    ann_hori_toggle: bool = False
 ) -> str:
+    ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_storage'
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 
@@ -122,16 +135,17 @@ def _make_storage_tables_sprake(
     return 'ok'
 
 TABLE_SECTION = 'net'
+_request_table_draw_net = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw((TABLE_SECTION, MODEL_TYPE))
 def _make_net_tables_sprake(
-    request: RunRequest,
+    request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
-    ann_hori_toggle: bool = False
 ) -> str:
+    ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_net'
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 
@@ -154,16 +168,17 @@ def _make_net_tables_sprake(
     return 'ok'
 
 TABLE_SECTION = 'finance'
+_request_table_draw_finance = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw((TABLE_SECTION, MODEL_TYPE))
 def _make_finance_tables_sprake(
-    request: RunRequest,
+    request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
-    ann_hori_toggle: bool = False
 ) -> str:
+    ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_net'
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 

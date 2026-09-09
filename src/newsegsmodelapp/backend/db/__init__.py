@@ -1,4 +1,4 @@
-from .db import get_engine
+from .db import get_engine, init_db
 import newsegsmodelapp.backend.db.db_tables as tables
 from .db_snapshot import *
 from .project import *
@@ -9,5 +9,6 @@ __all__ = [
     'generic_restore_snapshot',
     'tables',
     'save_project',
-    'load_project'
+    'load_project',
+    'init_db'
 ]
