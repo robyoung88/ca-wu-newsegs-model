@@ -1,11 +1,7 @@
-import numpy as np
-import pandas as pd
-
-from newsegsmodelframework.core.timespan import SEASON_NAMES
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegsgeneration import newsegsgeneration
 from newsegsmodelframework.newsegscs import newsegscs
-from newsegsmodelframework.newsegsstats.core import assign_year_index, assign_peaktime_index, assign_season_index
+from newsegsmodelframework.newsegsstats.core import assign_year_index, assign_peaktime_index
 from newsegsmodelframework.newsegsstats import basic_summary_stats
 from newsegsmodelframework.newsegsstats import seasonal_statistics
 
@@ -51,12 +47,12 @@ def net_results_to_interface_sprake(
 
     export_seas_stats, export_seas_stats_norm = seasonal_statistics.summarise_normalise_meters_by_season(
         energy_combined.loc[:, ['grid_export', 'peak_grid_export']],
-        newsegsgeneration.get_generation_meters(genr).loc[:, 'generation_export']
+        newsegsgeneration.get_generation_meters(genr).loc[:, 'generation_export'] # pyright: ignore[reportArgumentType]
     )
 
     import_seas_stats, import_seas_stats_norm = seasonal_statistics.summarise_normalise_meters_by_season(
         energy_combined.loc[:, ['grid_import', 'peak_grid_import']],
-        newsegscs.get_consumption_meters(conr).loc[:, 'consumption']
+        newsegscs.get_consumption_meters(conr).loc[:, 'consumption'] # pyright: ignore[reportArgumentType]
     )
 
     results_to_interface['export_seasonal_statistics'] = export_seas_stats.to_dict(orient='list')

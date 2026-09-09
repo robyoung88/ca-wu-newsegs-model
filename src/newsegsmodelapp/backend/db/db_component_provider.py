@@ -138,14 +138,14 @@ class FromDatabaseNewsegsComponentProvider(
         if isinstance(component, NewsegsComponent):
             component = [component, ]
 
-        current_revisions = {x.id: x.revision_string for x in component}
+        current_revisions = {x.id: x.revision for x in component}
         uids = list(current_revisions.keys())
 
         # Get saved revision if exists
         stmt = (
             sa.select(
                 tbl.c.id,
-                tbl.c.revision_string
+                tbl.c.revision
             )
             .where(tbl.c.id.in_(uids))
         )
@@ -153,20 +153,32 @@ class FromDatabaseNewsegsComponentProvider(
         with engine.connect() as conn:
             rows = conn.execute(stmt).fetchall()
 
-        saved_revisions = {x.id: x.revision_string for x in rows}
+        saved_revisions = {x.id: x.revision for x in rows}
         existing_uids = set(saved_revisions.keys())
         new_inserts = [x for x in uids if x not in existing_uids]
         if not force:
             requires_update = [x for x in existing_uids if current_revisions[x] != saved_revisions[x]]
+            # If the object exists and has a matching version number but its children have been modified
+            # then we do a simple bump of the revision number to indicate that downstream results are stale
+            requires_revision_increment = []
+            for comp in component:
+                if comp.id not in new_inserts and comp.id not in requires_update:
+                    if comp.chain_modified:
+                        requires_revision_increment.append(comp.id)
+                        comp.revision += 1
         else:
             requires_update = existing_uids
+            requires_revision_increment = []
 
         requires_data = set(requires_update)
         requires_data.update(set(new_inserts))
 
+        requires_sync = copy.copy(requires_data)
+        requires_sync.update(set(requires_revision_increment))
+
         # First, do the updates, then do the inserts
         for cmp in component:
-            if cmp.id in requires_data:
+            if cmp.id in requires_sync:
                 # TODO: Consider whether to set a rollback here in case we can't access DB
                 
                 #### Save out all child components ####
@@ -178,13 +190,22 @@ class FromDatabaseNewsegsComponentProvider(
 
         cmpdata = {cmp.id: self._component_to_table_data(cmp) for cmp in component if cmp.id in requires_data}
 
+        revdata = {cmp.id: {'id': cmp.id, 'revision': cmp.revision, 'revision_string': cmp.revision_string} for cmp in component if cmp.id in requires_revision_increment}
+
         update_payload = [cmpdata[x] for x in requires_update]
         insert_payload = [cmpdata[x] for x in new_inserts]
+        rev_payload = [revdata[x] for x in requires_revision_increment]
 
         if not (update_payload or insert_payload):
             return
         
         with engine.begin() as conn:
+            if rev_payload:
+                # Cannot use 'id' as the bindparam - rename it
+                rev_payload = [{'b_id': x.pop('id'), **x} for x in rev_payload]
+                rev_stmt = sa.update(tbl).where(tbl.c.id == sa.bindparam('b_id'))
+                conn.execute(rev_stmt, rev_payload)
+
             if update_payload:
                 # Cannot use 'id' as the bindparam - rename it
                 update_payload = [{'b_id': x.pop('id'), **x} for x in update_payload]

@@ -128,27 +128,46 @@ class FromDatabaseVariableProvider(VariableProviderInterface, VariablePersistenc
         saved_revisions = {x.id: x.revision for x in rows}
         existing_uids = set({str(x) for x in saved_revisions.keys()})
         new_inserts = [str(x) for x in uids if x not in existing_uids]
+        requires_revision_increment = []
         if not force:
             requires_update = [x for x in existing_uids if current_revisions[x] != saved_revisions[x]]
+            for x in var:
+                if x.id not in new_inserts and x.id not in requires_update:
+                    if x.chain_modified:
+                        requires_revision_increment.append(x.id)
+                        x.revision += 1
         else:
             requires_update = existing_uids
 
         requires_data = set(requires_update)
         requires_data.update(set(new_inserts))
 
+        requires_sync = copy.copy(requires_data)
+        requires_sync.update(set(requires_revision_increment))
+
         # First, do the updates, then do the inserts
         for v in var:
-            if v.id in requires_data:
+            if v.id in requires_sync:
                 # TODO: Consider whether to set a rollback here in case we can't access the DB
                 v.syncronise()
 
         vardata = {v.id: variable_to_raw_table_data(v) for v in var if v.id in requires_data}
+        revdata = {v.id: {'id': v.id, 'revision': v.revision, 'revision_string': v.revision_string} for v in var if v.id in requires_revision_increment}
 
         update_payload = [vardata[x] for x in requires_update]
         insert_payload = [vardata[x] for x in new_inserts]
+        rev_payload = [revdata[x] for x in requires_revision_increment]
+
         if not (update_payload or insert_payload):
             return
+        
         with engine.begin() as conn:
+            if rev_payload:
+                # Cannot use 'id' as the bindparam - rename it
+                rev_payload = [{'b_id': x.pop('id'), **x} for x in rev_payload]
+                rev_stmt = sa.update(tbls.variable_configs).where(tbls.variable_configs.c.id == sa.bindparam('b_id'))
+                conn.execute(rev_stmt, rev_payload)
+
             if update_payload:
                 # Cannot use 'id' as the bindparam - rename it.
                 update_payload = [{'b_id': x.pop('id'), **x} for x in update_payload]

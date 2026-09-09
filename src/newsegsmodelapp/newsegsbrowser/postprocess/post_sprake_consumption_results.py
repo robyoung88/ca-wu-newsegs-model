@@ -50,7 +50,7 @@ def calculate_sprake_admd(n_units, n_evs):
     op = default_model_outputs.copy()
     dr = _ADMD_DR
 
-    o = dr.execute(op, inputs = ip)
+    o = dr.execute(op, inputs = ip) # pyright: ignore[reportArgumentType]
 
     return o.get('ADMD_standard')
 
@@ -107,7 +107,7 @@ def consumption_results_to_interface_sprake(
 
     conr = mdl.get_consumption_storage_result()
     n_units = mdl.consumption_storage.n_units
-    n_evs = mdl.consumption_storage.ev_params.get('n_evs')
+    n_evs = mdl.consumption_storage.get_ev_params().get('n_evs')
 
     cons_data = (
         newsegscs.get_consumption_meters(conr)
@@ -199,7 +199,7 @@ def consumption_results_to_interface_sprake(
     )
 
     results_to_interface['seasonal_consumption'] = {
-        k: (seasonal_data.loc[k,:].to_dict(orient='tight')) for k in np.unique(seasonal_data.index)
+        k: (seasonal_data.loc[k,:].to_dict(orient='tight')) for k in np.unique(seasonal_data.index) # pyright: ignore[reportCallIssue]
     }
 
     return results_to_interface

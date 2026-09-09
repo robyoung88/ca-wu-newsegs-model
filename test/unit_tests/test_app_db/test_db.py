@@ -663,7 +663,7 @@ class TestDatabaseStart(unittest.TestCase):
         proj = PROJECT_FACTORIES['sprake']()
         proj_provider.add_component(proj)
 
-        request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_single_mm')
+        request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
         self.assertIsNotNone(request_creator)
         request = request_creator(proj, db.get_engine()) # pyright: ignore[reportOptionalCall]
 
@@ -695,5 +695,42 @@ class TestDatabaseStart(unittest.TestCase):
         generation_res, verstring = result_provider.get_result('deterministic_generation', generation, True)
 
         self.assertEqual(generation.revision_string, verstring)
-        self.assertGreater(len(generation_res.meters_to_pandas()), 8760)
+        self.assertGreater(len(generation_res.meters_to_pandas()), 8760) # pyright: ignore[reportOptionalMemberAccess]
+
+        postprocess_list = [
+            'postproc_model_grid',
+            'postproc_model_generation',
+            'postproc_model_consumption',
+            'postproc_model_storage',
+            'postproc_model_net',
+            'postproc_finance_benefits',
+            'postproc_finance_costs',
+            'postproc_finance_value'
+        ]
+
+        for process_name in postprocess_list:
+            proc = registers.get_postprocess_procedure(process_name, request)
+
+            is_ok = proc(
+                request,
+                proj_provider,
+                result_provider,
+                run_id,
+                update_progress,
+                check_cancel_status
+            )
+
+            self.assertEqual(is_ok, 'ok')
+
+        result_getters = [
+            (x, proj.metamodels[0].model.table_config if 'model' in x else proj.metamodels[0].finance.table_config) for x in postprocess_list
+        ]
+
+        for rg in result_getters:
+            if rg[0] == 'postproc_model_grid':
+                # No result expected
+                continue
+            res, rev = result_provider.get_result(rg[0], rg[1], True)
+            self.assertIsNotNone(res, msg = f'No result for {rg[0]}, {rg[1]}')
+
         

@@ -10,16 +10,16 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from newsegsmodelframework.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 
-REQUEST_TYPE = 'deterministic_single_mm'
+REQUEST_TYPE = 'deterministic_run_metamodel'
 
 @dataclass
-class DeterministicSingleMMRunRequest(RunRequest):
+class DeterministicRunMetamodelRunRequest(RunRequest):
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
 def request_deterministic_single_mm_run(proj: NewsegsProject, engine: sa.Engine):
     mm = proj.get_focussed_metamodel()
-    return DeterministicSingleMMRunRequest(
+    return DeterministicRunMetamodelRunRequest(
         project_id = proj.id,
         request_id = 'Deterministic run - ' + str(datetime.datetime.now()),
         payload = json.dumps({
@@ -29,7 +29,7 @@ def request_deterministic_single_mm_run(proj: NewsegsProject, engine: sa.Engine)
 
 @register_run_procedure(REQUEST_TYPE)
 def execute_deterministic_single_mm_run(
-    request: DeterministicSingleMMRunRequest,
+    request: DeterministicRunMetamodelRunRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
@@ -62,6 +62,8 @@ def execute_deterministic_single_mm_run(
     progress_callback(step, n_steps, f'Running model.')
 
     mm.model.run()
+    # TODO: May want to pull this into the run
+    mm.model.table_config.revision += 1
 
     if check_cancel_status():
         raise InterruptedError(f'Process {run_id} has been cancelled.')
@@ -70,6 +72,8 @@ def execute_deterministic_single_mm_run(
     progress_callback(step, n_steps, f'Running finance.')
 
     mm.finance.run()
+    # TODO: May want to pull this into the run
+    mm.finance.table_config.revision += 1
 
 
     if check_cancel_status():

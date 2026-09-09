@@ -30,7 +30,7 @@ def stor_results_to_interface_sprake(
 
     conr = mdl.get_consumption_storage_result()
 
-    storage_capacity = mdl.consumption_storage.storage_params.get('storage_capacity')
+    storage_capacity = mdl.consumption_storage.get_storage_params().get('storage_capacity')
 
     to_stor = newsegscs.get_storage_import_meters(conr)
     from_stor = newsegscs.get_storage_export_meters(conr)

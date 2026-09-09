@@ -13,6 +13,17 @@ def load_processes():
 
 load_processes()
 
+import newsegsmodelapp.postprocessing.postprocesses as postprocesses
+def load_postprocesses():
+    d = {}
+    for info in pkgutil.iter_modules(
+        postprocesses.__path__, prefix = 'newsegsmodelapp.postprocessing.postprocesses.'
+    ):
+        d[info.name] = importlib.import_module(info.name)
+    return d
+
+load_postprocesses()
+
 # import postprocessing.loaders
 # def load_loaders():
 #     d = {}

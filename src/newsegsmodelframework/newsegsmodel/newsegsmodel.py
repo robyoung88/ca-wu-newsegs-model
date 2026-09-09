@@ -10,6 +10,7 @@ from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import location as modlocation
 from newsegsmodelframework.core import TimeSpan
 from newsegsmodelframework.core.newsegsmodule import NewsegsModule
+from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.core.serialisation import T
 from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
@@ -368,6 +369,29 @@ class NewsegsModel(
         self.generation.model = self
         self.consumption_storage.model = self
 
+
+    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True):
+        try:
+            self._grid_result, self._grid_result_revision = results_provider.get_result(
+                'deterministic_grid', self.grid, allow_stale
+            )
+        except Exception as e:
+            print (e)
+
+        try:
+            self._generation_result, self._generation_result_revision = results_provider.get_result(
+                'deterministic_generation', self.generation, allow_stale
+            )
+        except Exception as e:
+            print (e)
+
+        try:
+            self._cs_result, self._cs_result_revision = results_provider.get_result(
+                'deterministic_consumption_storage', self.consumption_storage, allow_stale
+            )
+        except Exception as e:
+            print(e)
+        
     def __hash__(self) -> int:
         return self._last_hash
 

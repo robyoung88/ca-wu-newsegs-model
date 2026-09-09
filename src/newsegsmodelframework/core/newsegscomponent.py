@@ -320,7 +320,6 @@ class NewsegsComponent(
     _name: str = 'Model component'
     _version: str = '0.0.1'
     _id_prefix: str = 'cmp'
-    _revision: int = 0
 
     uuid: str = '1'
     component_type = 'abstract'

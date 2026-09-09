@@ -9,10 +9,15 @@ from newsegsmodelapp.components.serialisable_dataclass import SerialisableDatacl
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
 
+# -------------------------------------------------------------------------
+# MAIN RUNNING PROCEDURES
+# -------------------------------------------------------------------------
+
 @dataclass
 class RunRequest(SerialisableDataclass):
     run_id: int = 0
     project_id: str = ''
+    model_type: str = 'default'
     request_id: str = ''
     request_type: str = ''
     payload: str = ''
@@ -51,8 +56,8 @@ RUN_PROCEDURE_REGISTER: dict[str, Callable[[
 
 Function arguments:
     The request [RunRequest]
-    The project provider (NewsegsProjectProviderInterface)
-    The results handler (NesegsResultProviderInterface)
+    A project provider [NewsegsProjectProviderInterface]
+    A results handler [NewsegsResultProviderInterface]
     The run id [int]
     Progress callback function [Callable[float, float, str]]
     Progress cancelled function [Callable[[], bool]]
@@ -70,6 +75,58 @@ def register_run_procedure(name: str):
         RUN_PROCEDURE_REGISTER[name] = func
         return func
     return decorated
+
+
+# -------------------------------------------------------------------------
+# POSTPROCESS
+# -------------------------------------------------------------------------
+
+POSTPROCESS_REGISTER: dict[
+    tuple[str, str], 
+    Callable[[
+        RunRequest, 
+        NewsegsProjectProviderInterface, 
+        NewsegsResultProviderInterface,
+        int,
+        Callable,
+        Callable
+    ], str]] = {}
+"""Register of functions to undertake postprocessing procedures.
+
+Keyed by a tuple of:
+    (process_name [str], model_type[str])
+For any given process, it is advised that a 'default' model type key is provided as a fallback.
+
+Function arguments:
+    The original procedure request for which this is postprocessing [RunRequest]
+    A project provider [NewsegsProjectProviderInterface]
+    A results handler [NewsegsResultProviderInterface]
+    The run id [int]
+    Progress callback function [Callable[float, float, str]]
+    Progress cancelled function [Callable[[], bool]]
+
+Function returns:
+    Status message ('ok')
+"""
+def register_postprocess_procedure(name_type: tuple[str, str]):
+    def decorated(func):
+        POSTPROCESS_REGISTER[name_type] = func
+        key_default = (name_type[0], 'default')
+        if key_default not in POSTPROCESS_REGISTER:
+            POSTPROCESS_REGISTER[key_default] = func
+        return func
+    return decorated
+
+def get_postprocess_procedure(procedure: str, request: RunRequest):
+    proc = POSTPROCESS_REGISTER.get((procedure, request.model_type))
+    if proc is None:
+        proc = POSTPROCESS_REGISTER.get((procedure, 'default'))
+
+    if proc is None:
+        raise KeyError(f'Postprocess procedure {procedure} not found - available procedures are {[x[0] for x in POSTPROCESS_REGISTER.keys()]}')
+
+    return proc
+
 
 LOADER_REGISTER: dict[str, Callable[[str], Any]] =  {}
 """Register of functions to retrieve results from a directory.
@@ -93,6 +150,10 @@ def register_loader(name: str):
         LOADER_REGISTER[name] = func
         return func
     return decorated
+
+# -------------------------------------------------------------------------
+# DRAWING
+# -------------------------------------------------------------------------
 
 TABLE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
 """Register of functions to create table data given a tuple of live results.

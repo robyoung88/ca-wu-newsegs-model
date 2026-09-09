@@ -7,6 +7,8 @@ from typing import Any, Callable, Union
 
 import pandas as pd
 
+#from newsegsmodelapp.postprocessing import cache
+
 # -------------------------------------------------------------------------
 # SAVE
 # -------------------------------------------------------------------------
@@ -107,7 +109,7 @@ def register_loader(*extensions: str):
         return func
     return decorator
 
-
+#@cache.memoize()
 def load_result(filepath: Union[str, Path]) -> Any:
     """
     Dispatches loading based on the file extension string value.

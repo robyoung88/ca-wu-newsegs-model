@@ -58,7 +58,7 @@ def finance_benefits_results_to_interface_sprake(
 
     # Results used by the summary headers
     undiscounted_receipts_summaries = undiscounted_receipts_summaries.set_index(['variable','statistic'])
-    results_to_interface['smry_residential_peryear'] = float(undiscounted_receipts_summaries.loc[('receipts_resident', 'mean'), 'value'])
-    results_to_interface['smry_exports_peryear'] = float(undiscounted_receipts_summaries.loc[('receipts_exports', 'mean'),'value'])
+    results_to_interface['smry_residential_peryear'] = float(undiscounted_receipts_summaries.loc[('receipts_resident', 'mean'), 'value']) # pyright: ignore[reportArgumentType]
+    results_to_interface['smry_exports_peryear'] = float(undiscounted_receipts_summaries.loc[('receipts_exports', 'mean'),'value']) # pyright: ignore[reportArgumentType]
 
     return results_to_interface

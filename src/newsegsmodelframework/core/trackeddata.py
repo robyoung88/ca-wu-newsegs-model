@@ -43,6 +43,10 @@ class RevisionNotifierMixin:
     def revision(self) -> int:
         return self._revision
 
+    @revision.setter
+    def revision(self, revision: int):
+        self._revision = revision
+
     @property
     def revision_string(self) -> str:
         """A string which should remain invariant whilst self or children are unmodified.
@@ -361,6 +365,11 @@ class ConfigurationMixin:
     def revision(self) -> int:
         return self._config.revision
 
+    @revision.setter
+    def revision(self, revision: int):
+        """Use with caution - direct setting of the revision number"""
+        self._config.revision += 1
+    
     @property
     def revision_string(self) -> str:
         """A string which should remain invariant whilst self or children are unmodified.

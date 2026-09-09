@@ -120,6 +120,14 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
             mm.reattach_variables(self)
         self.metamodels = metamodels
 
+    def get_metamodel_by_id(self, metamodel_id: str):
+        for mm in self.metamodels:
+            if mm.id == metamodel_id:
+                break
+        else:
+            raise KeyError(f'Metamodel {metamodel_id} not found for project {self.name}[{self.id}] - available values are {[x.id for x in self.metamodels]}.')
+        return mm
+
     @override
     def get_components(self) -> tuple[NewsegsComponent, ...]:
         return (
