@@ -128,6 +128,60 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
     return proc
 
 
+# -------------------------------------------------------------------------
+# TABLES
+# -------------------------------------------------------------------------
+
+TABLE_DRAW_REGISTER: dict[
+    tuple[str, str],
+    Callable[[
+        RunRequest,
+        NewsegsProjectProviderInterface,
+        NewsegsResultProviderInterface,
+        int,
+        Callable,
+        Callable,
+        bool,
+    ], str]] = {}
+"""Register of functions to create table data given a tuple of live results.
+
+Keyed by a tuple of:
+    (table_section_name [str], model_type[str])
+For any given table section, it is advised that a 'default' model type key is provided as a fallback.
+
+Function arguments:
+    The original procedure request for which this is postprocessing [RunRequest]
+    A project provider [NewsegsProjectProviderInterface]
+    A results handler [NewsegsResultProviderInterface]
+    The run id [int]
+    Progress callback function [Callable[float, float, str]]
+    Progress cancelled function [Callable[[], bool]]
+    The annual/horizon toggle [bool]
+
+Function returns:
+    Status message ('ok')
+"""
+
+def register_table_draw(name_type: tuple[str, str]):
+    def decorated(func):
+        TABLE_DRAW_REGISTER[name_type] = func
+        key_default = (name_type[0], 'default')
+        if key_default not in TABLE_DRAW_REGISTER:
+            TABLE_DRAW_REGISTER[key_default] = func
+        return func
+    return decorated
+
+def get_table_draw(table_section: str, request: RunRequest):
+    proc = TABLE_DRAW_REGISTER.get((table_section, request.model_type))
+    if proc is None:
+        proc = TABLE_DRAW_REGISTER.get((table_section, 'default'))
+
+    if proc is None:
+        raise KeyError(f'Table draw for {table_section} not found - available table draw procedures are {[x[0] for x in TABLE_DRAW_REGISTER.keys()]}')
+
+    return proc
+
+
 LOADER_REGISTER: dict[str, Callable[[str], Any]] =  {}
 """Register of functions to retrieve results from a directory.
 
@@ -155,28 +209,6 @@ def register_loader(name: str):
 # DRAWING
 # -------------------------------------------------------------------------
 
-TABLE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
-"""Register of functions to create table data given a tuple of live results.
-
-Function arguments:
-    tuple of ResultMeta objects
-
-Function returns:
-    Table as dash components.
-
-Notes:
-    The function is memoised, so results should not re-use the same path.
-"""
-
-def register_table_draw(name: str):
-    """Add a table draw function to the register.
-    
-    The name should correspond to the key of the table container id.
-    """
-    def decorated(func):
-        TABLE_DRAW_REGISTER[name] = func
-        return func
-    return decorated
 
 FIGURE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
 """Register of functions to create figures given a tuple of live results.

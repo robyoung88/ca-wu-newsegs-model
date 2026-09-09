@@ -24,6 +24,17 @@ def load_postprocesses():
 
 load_postprocesses()
 
+import newsegsmodelapp.postprocessing.tables
+def load_tables():
+    d = {}
+    for info in pkgutil.iter_modules(
+        newsegsmodelapp.postprocessing.tables.__path__, prefix = 'newsegsmodelapp.postprocessing.tables.'
+    ):
+        d[info.name] = importlib.import_module(info.name)
+    return d
+
+load_tables()
+
 # import postprocessing.loaders
 # def load_loaders():
 #     d = {}
@@ -35,16 +46,7 @@ load_postprocesses()
 
 # load_loaders()
 
-# import postprocessing.tables
-# def load_tables():
-#     d = {}
-#     for info in pkgutil.iter_modules(
-#         postprocessing.tables.__path__, prefix = 'postprocessing.tables.'
-#     ):
-#         d[info.name] = importlib.import_module(info.name)
-#     return d
 
-# load_tables()
 
 # import postprocessing.figures
 # def load_figures():

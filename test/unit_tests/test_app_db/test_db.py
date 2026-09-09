@@ -733,4 +733,42 @@ class TestDatabaseStart(unittest.TestCase):
             res, rev = result_provider.get_result(rg[0], rg[1], True)
             self.assertIsNotNone(res, msg = f'No result for {rg[0]}, {rg[1]}')
 
-        
+        table_section_list = [
+            'grid',
+            'generation',
+            'consumption',
+            'storage',
+            'net',
+            'finance'
+        ]
+
+        for table_section in table_section_list:
+            proc = registers.get_table_draw(table_section, request)
+            is_ok = proc(
+                request,
+                proj_provider,
+                result_provider,
+                run_id,
+                update_progress,
+                check_cancel_status,
+                True
+            )
+            self.assertEqual(is_ok, 'ok')
+
+        project_tables = [
+            'table_model_generation_wind',
+            'table_model_generation_pv',
+            'table_model_generation_combined',
+            'table_model_consumption',
+            'table_model_consumption_seasonal',
+            'table_model_storage',
+            'table_model_net_energy',
+            'table_model_net_energy_seasonal',
+            'table_finance_so_benefits',
+            'table_finance_so_costs',
+            'table_finance_so_value',
+        ]
+        for tbl in project_tables:
+            res, rev = result_provider.get_result(tbl, proj.table_config, False)
+
+            self.assertIsNotNone(res, msg = f'No table for {tbl}')
