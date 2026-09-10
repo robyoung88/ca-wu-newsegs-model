@@ -10,8 +10,9 @@ from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts
+from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 from newsegsmodelapp.newsegsbrowser import variable_dash_component as var_dc
+from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import optim
 from newsegsmodelframework.newsegsvariable import variable
 
@@ -351,4 +352,13 @@ def create_dsa_layout(*args, **kwargs):
         fluid = True,
         id = 'app-layout-wrapper',
         class_name = 'app-layout-wrapper',
+    )
+
+@register_page_layout('dsa')
+def _create_dsa_configuration_layout(app_state: dict):
+    selected_model = app_state.get('selected_model', 'default')
+    return create_dsa_layout(
+        **layout_registry.get_dsa_layout_config(
+            selected_model
+        )
     )

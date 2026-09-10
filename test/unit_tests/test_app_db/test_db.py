@@ -5,12 +5,16 @@ import os
 from pathlib import Path
 import pickle
 import tempfile
+from typing import cast
 import unittest
 
 import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+
+os.environ['DYNACONF_DB_PATH'] = ':memory:'
 from config import settings
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
@@ -647,6 +651,49 @@ class TestDatabaseStart(unittest.TestCase):
         nptest.assert_array_equal(
             mm1.finance.get_costs_series_discounted(),
             mm2.finance.get_costs_series_discounted()
+        )
+
+    def test_duplication(self):
+        import numpy.testing as nptest
+        
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)#
+        mm_provider = proj_provider.metamodel_provider
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        mm1 = proj.metamodels[0]
+        mm1.model.generation.wind_capacity = 0.1
+        mm1.finance.resident_var_per_unit = 0.1
+
+        proj_provider.add_component(proj)
+
+        mm_copy = cast(NewsegsMetaModel, mm_provider.get_component(proj.metamodels[0].id))
+        # Straight from the mm provider, there will be no variables attached
+        mm_copy.reattach_variables(proj)
+        self.assertEqual(mm1.id, mm_copy.id)
+        self.assertEqual(
+            list(mm1.variables.values())[0].id,
+            list(mm_copy.variables.values())[0].id
+        )
+
+        mm_dup = mm_provider.duplicate_component(proj.metamodels[0].id)
+        self.assertNotEqual(mm1.id, mm_dup.id)
+        # Variables, however, should be maintained on a metamodel duplication
+        self.assertEqual(
+            list(mm1.variables.values())[0].id,
+            list(mm_copy.variables.values())[0].id
+        )
+
+        proj_dup = proj_provider.duplicate_component(proj.id)
+        self.assertNotEqual(proj.id, proj_dup.id)
+        self.assertNotEqual(proj.metamodels[0].id, proj_dup.metamodels[0].id)
+        # Critically, the variables should have been duplicated and are nonequal
+        self.assertNotEqual(
+            list(proj.metamodels[0].variables.values())[0].id,
+            list(proj_dup.metamodels[0].variables.values())[0].id
         )
 
     def test_process_and_results(self):

@@ -319,10 +319,6 @@ def variable_to_raw_table_data(
 
     odict['payload'] = variable.json_dumps()
 
-    odict['variable_config_id'] = variable.uuid
-    #if hasattr(variable, '_variable_config_id'):
-    #    odict['variable_config_id'] = variable._variable_config_id # pyright: ignore[reportAttributeAccessIssue]
-
     return odict
 
 def _get_variable_to_component_map(

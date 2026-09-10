@@ -35,7 +35,7 @@ snapshots = sa.Table(
     sa.Column('snapshot_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id')),
     sa.Column('label', sa.String, nullable = False),
-    sa.Column('timestamp', sa.DateTime, nullable = False, default = sa.func.current_timestamp())
+    sa.Column('created_at', sa.DateTime, nullable = False, default = sa.func.current_timestamp())
 )
 
 
@@ -377,7 +377,7 @@ snapshot_project_metamodels = sa.Table(
 project_variables = sa.Table(
     'project_variables',
     metadata,
-    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), primary_key = True),
+    sa.Column('project_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('projects.id'), primary_key = True),
     sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('variable_configs.id'), primary_key = True),
 )
 
@@ -385,11 +385,38 @@ snapshot_project_variables = sa.Table(
     'snapshot_project_variables',
     metadata,
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('project_id', sa.String(L_VARIABLE_UID), primary_key = True),
+    sa.Column('project_id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), primary_key = True),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'project_id'],
         ['snapshot_projects.snapshot_id', 'snapshot_projects.id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'variable_config_id'],
+        ['snapshot_variable_configs.snapshot_id', 'snapshot_variable_configs.id']
+    )
+)
+
+# -----------------------------------------------------------------------------
+# Metamodel Variables (Junction Tables)
+# -----------------------------------------------------------------------------
+
+metamodel_variables = sa.Table(
+    'metamodel_variables',
+    metadata,
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id'), primary_key = True),
+    sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('variable_configs.id'), primary_key = True),
+)
+
+snapshot_metamodel_variables = sa.Table(
+    'snapshot_metamodel_variables',
+    metadata,
+    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
+    sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), primary_key = True),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'metamodel_id'],
+        ['snapshot_metamodels.snapshot_id', 'snapshot_metamodels.id']
     ),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'variable_config_id'],

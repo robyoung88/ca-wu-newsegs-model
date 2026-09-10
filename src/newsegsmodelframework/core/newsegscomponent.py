@@ -511,7 +511,7 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
         ...
 
     @abstractmethod
-    def duplicate_component(self, component_id: str) -> NewsegsComponent:
+    def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
         ...
 
     @abstractmethod

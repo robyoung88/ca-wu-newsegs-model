@@ -8,8 +8,9 @@ import dash_daq as daq
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts
+from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
+from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import psa
 
 def create_psa_header():
@@ -24,8 +25,8 @@ def create_psa_header():
                         html.Span(id = {'type': 'generic_text', 'section': 'any', 'key': 'site-name'}),
                     ]
                 )
-            )
-        ]),
+            ) # pyright: ignore[reportCallIssue]
+        ]), # pyright: ignore[reportCallIssue]
         dbc.Row([
             dbc.Col([
                 html.H2(
@@ -34,8 +35,8 @@ def create_psa_header():
                         html.Span(id = {'type': 'generic_text', 'section': 'any', 'key': 'configuration-name'})
                     ]
                 )
-            ])
-        ])
+            ]) # pyright: ignore[reportCallIssue]
+        ]) # pyright: ignore[reportCallIssue]
     ])
 
 def create_psa_configuration_editor():
@@ -60,7 +61,7 @@ def create_psa_configuration_editor():
                 html.Div([
                     html.H4('Number of samples:'),
                     dbc.InputGroup([
-                        dbc.InputGroupText('N'),
+                        dbc.InputGroupText('N'), # pyright: ignore[reportCallIssue]
                         dbc.Input(
                             id = {'type': 'numeric-input', 'target': 'psa-settings', 'key': 'samples'},
                             placeholder = 'N',
@@ -68,22 +69,22 @@ def create_psa_configuration_editor():
                             min = 0,
                             max = 10000,
                             step = 1
-                        )
-                    ])
+                        ) # pyright: ignore[reportCallIssue]
+                    ]) # pyright: ignore[reportCallIssue]
                 ],
                 className = 'input-settings'
                 ),
                 html.Div([
                     html.H4('Random Seed:'),
                     dbc.InputGroup([
-                        dbc.InputGroupText('Seed'),
+                        dbc.InputGroupText('Seed'), # pyright: ignore[reportCallIssue]
                         dbc.Input(
                             id = {'type': 'numeric-input', 'target': 'psa-settings', 'key': 'seed'},
                             placeholder = 'seed',
                             value = None,
                             className = 'input-numeric'
-                        )
-                    ])
+                        ) # pyright: ignore[reportCallIssue]
+                    ]) # pyright: ignore[reportCallIssue]
                 ],
                 className = 'input-settings'
                 ),
@@ -105,7 +106,7 @@ def create_psa_configuration_editor():
         html.Div(
             id = {'type': 'input-container', 'supersection': 'psa', 'section': 'psa'}
         )
-    ])
+    ]) # pyright: ignore[reportCallIssue]
 
 DEFAULT_LAYOUT_PSA = {
     'layout_navigation': navigation.create_navigator_buttons_default,
@@ -128,12 +129,12 @@ def create_psa_layout(*args, **kwargs):
             ),
             class_name = 'newsegs-navbar-vertical collapsed',
             width = config_dict['width_navigation'],
-        ),
+        ), # pyright: ignore[reportCallIssue]
         dbc.Col(
             config_dict['layout_head'](),
             width = config_dict['width_head']
-        )
-    ])
+        ) # pyright: ignore[reportCallIssue]
+    ]) # pyright: ignore[reportCallIssue]
 
     psa_config = create_psa_configuration_editor()
 
@@ -152,7 +153,7 @@ def create_psa_layout(*args, **kwargs):
                             )
                         ],
                         width = 12
-                    ),
+                    ), # pyright: ignore[reportCallIssue]
                     html.Hr(),
                     dbc.Col(
                         [
@@ -185,7 +186,7 @@ def create_psa_layout(*args, **kwargs):
                             )
                         ],
                         width = 12
-                    ),
+                    ), # pyright: ignore[reportCallIssue]
                     dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-run-postprocess'}, data = []),
                     dcc.Store(id={'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'}, data = []),
                 ],
@@ -212,7 +213,7 @@ def create_psa_layout(*args, **kwargs):
                 'Cancel PSA',
                 id = {'type': 'metamodel-process-cancel', 'target': 'psa_run_request'},
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
-            ),
+            ), # pyright: ignore[reportCallIssue]
             html.Progress(
                 id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
                 className='resize-handle resize-handle-progress',
@@ -222,7 +223,7 @@ def create_psa_layout(*args, **kwargs):
                 'PSA Running',
                 id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
-            ),
+            ), # pyright: ignore[reportCallIssue]
 
         ],
         className = 'drawer-container',
@@ -242,7 +243,7 @@ def create_psa_layout(*args, **kwargs):
                 html.Hr(),
                 dbc.Row(
                     psa_config
-                ),
+                ), # pyright: ignore[reportCallIssue]
                 html.Hr()
             ] 
             + results_section
@@ -263,4 +264,13 @@ def create_psa_layout(*args, **kwargs):
         fluid = True,
         id = 'app-layout-wrapper',
         class_name = 'app-layout-wrapper',
+    ) # pyright: ignore[reportCallIssue]
+
+@register_page_layout('psa')
+def _create_psa_configuration_layout(app_state: dict):
+    selected_model = app_state.get('selected_model', 'default')
+    return create_psa_layout(
+        **layout_registry.get_psa_layout_config(
+            selected_model
+        )
     )

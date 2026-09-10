@@ -8,12 +8,12 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
-from newsegsmodelapp.newsegsbrowser.components import project_selector
+from newsegsmodelapp.components import project_selector
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import maps
 from newsegsmodelapp.newsegsbrowser.layouts.feedback import indicative_net_energy
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts
+from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import generation_input_sprake
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import storage_input_sprake
@@ -34,6 +34,7 @@ from newsegsmodelapp.newsegsbrowser.layouts.results import storage_results_sprak
 from newsegsmodelapp.newsegsbrowser.layouts.results import consumption_results_sprake
 from newsegsmodelapp.newsegsbrowser.layouts.results import net_energy_results_sprake
 from newsegsmodelapp.newsegsbrowser.layouts.results import economic_results_so_sprake
+from newsegsmodelapp.registers import register_page_layout
 
 DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_top': project_selector.create_project_selector_block,
@@ -125,7 +126,7 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict[f'layout_{sec}'](),
                 width = config_dict[f'width_{sec}']
-            )
+            ) # pyright: ignore[reportCallIssue]
         )
 
     finance_input_sections = []
@@ -140,7 +141,7 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict[f'layout_{sec}'](),
                 width = config_dict[f'width_{sec}']
-            )
+            ) # pyright: ignore[reportCallIssue]
         )
 
     site_details = [
@@ -148,14 +149,14 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict['layout_top_feedback'](),
                 width = config_dict['width_top_feedback']
-            )
-        ),
+            ) # pyright: ignore[reportCallIssue]
+        ), # pyright: ignore[reportCallIssue]
 
-        dbc.Row(model_input_sections),
+        dbc.Row(model_input_sections), # pyright: ignore[reportCallIssue]
         
         html.Hr(),
 
-        dbc.Row(finance_input_sections),
+        dbc.Row(finance_input_sections), # pyright: ignore[reportCallIssue]
     ]
 
     results_table_functions = config_dict['results_table_functions']
@@ -173,7 +174,7 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict[f'layout_{sec}'](results_table_functions),
                 width = config_dict[f'width_{sec}']
-            )
+            ) # pyright: ignore[reportCallIssue]
         )
 
     results_section = [
@@ -184,7 +185,7 @@ def create_model_configuration_layout(*args, **kwargs):
                     config_dict['layout_configuration_selector'](),
                     dbc.Row(
                         results_subsections
-                    )
+                    ) # pyright: ignore[reportCallIssue]
                 ],
                 id = 'drawer-content',
                 className = 'drawer-content',
@@ -255,5 +256,13 @@ def create_model_configuration_layout(*args, **kwargs):
         fluid = False,
         #id = 'app-layout-wrapper',
         class_name = 'app-layout-wrapper',
+    ) # pyright: ignore[reportCallIssue]
+
+@register_page_layout('site-config')
+def _create_model_configuration_layout(app_state: dict):
+    selected_model = app_state.get('selected_model', 'default')
+    return create_model_configuration_layout(
+        **layout_registry.get_model_configuration_layout_config(
+            selected_model
+        )
     )
-    

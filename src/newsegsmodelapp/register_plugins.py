@@ -2,6 +2,16 @@
 import importlib
 import pkgutil
 
+import newsegsmodelapp.newsegsbrowser.layouts as layouts
+def load_layouts():
+    layout_dict = {}
+    for info in pkgutil.iter_modules(
+        layouts.__path__, prefix = 'newsegsmodelapp.newsegsbrowser.layouts.'
+    ):
+        layout_dict[info.name] = importlib.import_module(info.name)
+    return layout_dict
+load_layouts()
+
 import newsegsmodelapp.processes as processes
 def load_processes():
     process_dict = {}

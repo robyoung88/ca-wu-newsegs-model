@@ -221,6 +221,8 @@ class NewsegsMetaModel(NewsegsComponent):
             variable_provider: Instance of VariableProviderInterface (typically a Project).
         """
         these_vars = self.variable_ids
+        if not hasattr(self, '_variables'):
+            self.variables = {}
         for var_identifiers in these_vars:
             try:
                 v = variable_provider.get_variable(var_identifiers['uid'])

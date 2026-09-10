@@ -25,6 +25,11 @@ class FromDatabaseVariableProvider(VariableProviderInterface, VariablePersistenc
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         self._get_engine = get_engine
 
+    def _reconstruct_variable(self, row) -> Variable:
+        v = _variable_from_json(row.payload)
+        v.id = row.id # ID may have been reassigned in database
+        return v
+    
     @overload
     def get_variable(self, instance_id: str) -> Variable:
         ...
@@ -49,9 +54,10 @@ class FromDatabaseVariableProvider(VariableProviderInterface, VariablePersistenc
         with self._get_engine().connect() as conn:
             rows = conn.execute(stmt).fetchall()
 
-        reconstructed_vars = [_variable_from_json(row.payload) for row in rows]
+        reconstructed_vars = [self._reconstruct_variable(row) for row in rows]
         if not is_sequence:
             return reconstructed_vars[0]
+        
 
         varmap = {x.id:x for x in reconstructed_vars}
         return [varmap[x] for x in instance_id]

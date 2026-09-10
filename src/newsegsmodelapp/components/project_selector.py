@@ -1,3 +1,5 @@
+import json
+
 from dash import Dash, Input, Output, State, ctx, dcc, html
 import dash_bootstrap_components as dbc
 from dash_iconify import DashIconify
@@ -5,6 +7,9 @@ import sqlalchemy as sa
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db import db_tables as tbls
+from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
+from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
 
 # -----------------------------------------------------------------------------
@@ -13,7 +18,7 @@ from newsegsmodelapp.backend.db import db_tables as tbls
 def get_all_projects():
     engine = db.get_engine()
     with engine.connect() as conn:
-        stmt = sa.select(tbls.projects.c.project_id, tbls.projects.c.label)
+        stmt = sa.select(tbls.projects.c.id, tbls.projects.c.label)
         return conn.execute(stmt).fetchall()
 
 def get_snapshots_for_project(project_id):
@@ -45,33 +50,53 @@ def create_snapshot(project_id: int, label: str) -> int:
 # -----------------------------------------------
 # Helper functions
 # -----------------------------------------------
-results = [
-        {'project_id': 1, 'label': 'Proj A'},
-        {'project_id': 2, 'label': 'Proj B'}
-    ]
 
-def fetch_project_options() -> list[dict[str, str]]:
+def fetch_project_options(
+        project_provider: NewsegsProjectProviderInterface,
+        model_type: str|None = None
+    ) -> list[dict[str, str]]:
     """Obtains available projects"""
-    global results
+    all_projects = project_provider.list_projects(model_type = model_type).to_dict(orient = 'list')
+    if not all_projects:
+        return []
     return [
         {
-            'value': str(row.get('project_id')),
-            'label': row.get('label') or f"Project {row.get('project_id')}"} 
-        for row in results
+            'value' : str(all_projects['id'][i]),
+            'label': f'{all_projects['label'][i]} [{all_projects['created_at'][i]}]'
+        } 
+        for i in range(len(all_projects['id']))
     ]
 
-    engine = db.get_engine()
-    with engine.connect() as conn:
-        stmt = sa.select(tbls.projects.c.project_id, tbls.projects.c.label)
-        results = conn.execute(stmt).fetchall()
-
-    # Note that DMC Multiselect requires the value to be a string
+def fetch_snapshot_options(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str
+) -> list[dict[str, str]]:
+    """Obtains snapshots for nominated project."""
+    all_snapshots = project_provider.list_project_snapshots(project_id).to_dict(orient = 'list')
+    if not all_snapshots:
+        return []
     return [
         {
-            'value': str(row.project_id),
-            'label': row.label or f"Project {row.project_id}"} 
-        for row in results
+            'value': str(all_snapshots['snapshot_id'][i]),
+            'label': f'{all_snapshots['label'][i]} [{all_snapshots['created_at'][i]}]'
+        }
+        for i in range(len(all_snapshots['snapshot_id']))
     ]
+
+def create_project(
+    project_provider: NewsegsProjectProviderInterface,
+    current_project_id: str,
+    new_project_label: str,
+    model_type: str | None = None
+) -> NewsegsProject:
+    if current_project_id:
+        new_proj = project_provider.duplicate_component(current_project_id)
+    else:
+        current_project_id = project_provider.get_session_project_id(model_type = model_type, on_missing = 'last')
+        new_proj = project_provider.duplicate_component(current_project_id)
+        
+    
+    
 
 def insert_new_project(label: str | None = None) -> int:
     """Inserts a new project into the database and returns its project_id"""
@@ -96,8 +121,7 @@ def insert_new_project(label: str | None = None) -> int:
 def create_project_selector():
     return dbc.Container(
         [
-            dcc.Store(id = 'active-project', storage_type = 'session'),
-            dcc.Store(id="active-snapshot", storage_type="session"),
+            dcc.Store(id="active-snapshot-id", storage_type="session"),
 
             # Delete project confirmation dialog
             dcc.ConfirmDialog(
@@ -261,35 +285,49 @@ def create_project_selector_block(**kwargs):
 # -----------------------------------------------
 # Callbacks
 # -----------------------------------------------
-def add_project_selector_callbacks(app: Dash) -> Dash:
+def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
 
     @app.callback(
-        # Options & Input sync
-        Output("project-datalist-options", "children"),
+        Output('project-datalist-options', 'children'),
         Output("snapshot-datalist-options", "children"),
-        Output("project-label-input", "value"),
+        Output('project-label-input', 'value'),
+
         # Project Buttons logic
         Output("btn-save-project", "style"),
         Output("btn-save-project", "disabled"),
         Output("btn-load-project", "style"),
         Output("btn-load-project", "disabled"),
         Output("btn-delete-project", "disabled"),
+
         # Snapshot Buttons logic
         Output("btn-save-snapshot", "disabled"),
         Output("btn-load-snapshot", "disabled"),
+
         # State Inputs
-        Input("active-project", "data"),
-        Input("project-label-input", "value"),
-        Input("snapshot-label-input", "value"),
+        Input('active-project-id', 'data'),
+        Input('project-label-input', 'value'),
+        Input('snapshot-label-input', 'value'),
+        Input('app-state', 'data'),
     )
-    def update_ui_states(active_project_id, current_project_label, current_snapshot_label):
+    def update_ui_states(
+        active_project_id,
+        current_project_label,
+        current_snapshot_label,
+        app_state,
+    ):
+        app_state = json.loads(app_state) if app_state else {}
+        model_type = app_state.get('selected_model', 'default')
+
         # 1. Fetch Projects & Populate Datalist
-        all_projects = get_all_projects()
-        project_map = {row.label: row.project_id for row in all_projects if row.label}
-        project_options = [html.Option(value=row.label) for row in all_projects if row.label]
+        all_projects = fetch_project_options(app.project_provider, model_type)
+
+        project_map = {row['label']: row['value'] for row in all_projects if row.get('label')}
+        project_options = [
+            html.Option(value = x['label'], id = x['value']) for x in all_projects
+        ]
 
         # Resolve active project label
-        active_project_label = next((p.label for p in all_projects if p.project_id == active_project_id), "")
+        active_project_label = next((p['label'] for p in all_projects if p['value'] == active_project_id), "")
 
         # Sync input value if initialized from active-project store
         input_text = current_project_label if current_project_label is not None else active_project_label
@@ -313,9 +351,21 @@ def add_project_selector_callbacks(app: Dash) -> Dash:
         delete_disabled = active_project_id is None
 
         # 3. Fetch Snapshots for active project
-        all_snapshots = get_snapshots_for_project(active_project_id)
-        snapshot_labels = {s.label for s in all_snapshots}
-        snapshot_options = [html.Option(value=s.label) for s in all_snapshots]
+        if active_project_id:
+            all_snapshots = fetch_snapshot_options(
+                app.project_provider,
+                active_project_id
+            )
+        else:
+            all_snapshots = []
+        snapshot_labels = {x['label'] for x in all_snapshots}
+        snapshot_options = [
+            html.Option(
+                value = x['label'],
+                id = x['value']
+            ) 
+            for x in all_snapshots
+        ]
 
         # 4. Compute Save/Load state for Snapshot
         snap_text_valid = bool(current_snapshot_label and current_snapshot_label.strip())
@@ -342,18 +392,21 @@ def add_project_selector_callbacks(app: Dash) -> Dash:
     # -----------------------------------------------------------------------------
 
     @app.callback(
-        Output("active-project", "data"),
-        Output("active-snapshot", "data"),
+        Output("active-project-id", "data"),
+        Output("active-snapshot-id", "data"),
+
         # Triggers
         Input("btn-save-project", "n_clicks"),
         Input("btn-load-project", "n_clicks"),
         Input("delete-confirm-dialog", "submit_n_clicks"),
         Input("btn-save-snapshot", "n_clicks"),
         Input("btn-load-snapshot", "n_clicks"),
+
         # States
         State("project-label-input", "value"),
         State("snapshot-label-input", "value"),
         State("active-project", "data"),
+
         prevent_initial_call=True,
     )
     def handle_project_actions(
@@ -393,61 +446,61 @@ def add_project_selector_callbacks(app: Dash) -> Dash:
         return current_active_proj, None
 
 
-    @app.callback(
-        Output("delete-confirm-dialog", "displayed"),
-        Input("btn-delete-project", "n_clicks"),
-        prevent_initial_call=True,
-    )
-    def display_delete_confirm(n_clicks):
-        if n_clicks:
-            return True
-        return False
+    # @app.callback(
+    #     Output("delete-confirm-dialog", "displayed"),
+    #     Input("btn-delete-project", "n_clicks"),
+    #     prevent_initial_call=True,
+    # )
+    # def display_delete_confirm(n_clicks):
+    #     if n_clicks:
+    #         return True
+    #     return False
 
 
-    @app.callback(
-        Output("project-input", "value"),
-        Input("active-project", "data"),
-        State("project-datalist-options", "children")
-    )
-    def sync_active_project_to_ui(active_data, options):
-        """Initializes input label when active-project changes."""
-        if not active_data or not options:
-            return ""
+    # @app.callback(
+    #     Output("project-input", "value"),
+    #     Input("active-project", "data"),
+    #     State("project-datalist-options", "children")
+    # )
+    # def sync_active_project_to_ui(active_data, options):
+    #     """Initializes input label when active-project changes."""
+    #     if not active_data or not options:
+    #         return ""
         
-        # Match active_data (project_id) with corresponding option label
-        for opt in options:
-            if opt.get("props", {}).get("id", {}).get('key') == str(active_data):
-                return opt.get("props", {}).get("value")
-        return ""
+    #     # Match active_data (project_id) with corresponding option label
+    #     for opt in options:
+    #         if opt.get("props", {}).get("id", {}).get('key') == str(active_data):
+    #             return opt.get("props", {}).get("value")
+    #     return ""
     
-    @app.callback(
-        Output("active-project", "data"),
-        Output("project-datalist-options", "children"),
-        Input("save-project-btn", "n_clicks"),
-        State("project-input", "value"),
-        State("project-datalist-options", "children"),
-        prevent_initial_call=True
-    )
-    def handle_project_selection_and_creation(n_clicks, typed_value, options):
-        """Saves typed text as a new SQLite row or matches existing project label."""
-        if not typed_value:
-            return None, options
+    # @app.callback(
+    #     Output("active-project", "data"),
+    #     Output("project-datalist-options", "children"),
+    #     Input("save-project-btn", "n_clicks"),
+    #     State("project-input", "value"),
+    #     State("project-datalist-options", "children"),
+    #     prevent_initial_call=True
+    # )
+    # def handle_project_selection_and_creation(n_clicks, typed_value, options):
+    #     """Saves typed text as a new SQLite row or matches existing project label."""
+    #     if not typed_value:
+    #         return None, options
 
-        # Check if typed text matches an existing project label
-        existing_map = {
-            opt["props"]["value"]: opt["props"]["id"] 
-            for opt in options if "props" in opt
-        }
+    #     # Check if typed text matches an existing project label
+    #     existing_map = {
+    #         opt["props"]["value"]: opt["props"]["id"] 
+    #         for opt in options if "props" in opt
+    #     }
 
-        if typed_value in existing_map:
-            return int(existing_map[typed_value]), options
+    #     if typed_value in existing_map:
+    #         return int(existing_map[typed_value]), options
 
-        # Create new project in SQLite if label doesn't exist
-        new_id = insert_new_project(label=typed_value)
+    #     # Create new project in SQLite if label doesn't exist
+    #     new_id = insert_new_project(label=typed_value)
 
-        updated_options = list(options)
-        updated_options.append(html.Option(value=typed_value, id=str(new_id)))
+    #     updated_options = list(options)
+    #     updated_options.append(html.Option(value=typed_value, id=str(new_id)))
 
-        return new_id, updated_options
+    #     return new_id, updated_options
 
     return app

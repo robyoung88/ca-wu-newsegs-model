@@ -2,12 +2,37 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from dash.development.base_component import Component as DashComponent
 import sqlalchemy as sa
 
-from newsegsmodelapp.components.resultmeta import ResultMeta
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
+
+# -------------------------------------------------------------------------
+# APP PAGE REGISTER
+# -------------------------------------------------------------------------
+PAGE_LAYOUT_REGISTER: dict[str, Callable[[dict], DashComponent]] = {}
+"""Register of functions to return page contents.
+
+Function arguments:
+    app_state [dict]
+"""
+
+def register_page_layout(name: str):
+    """Add a page layout creation function to PAGE_LAYOUT_REGISTER
+    
+    The name should correspond to the page path (after the model specifier)
+
+    Raises:
+        KeyError - if name already present in register
+    """
+    def decorated(func):
+        if name in PAGE_LAYOUT_REGISTER:
+            raise KeyError(f'A page layout function already exists for name {name}')
+        PAGE_LAYOUT_REGISTER[name] = func
+        return func
+    return decorated
 
 # -------------------------------------------------------------------------
 # MAIN RUNNING PROCEDURES
@@ -231,53 +256,53 @@ def get_table_draw(table_section: str, request: RunRequest):
     return proc
 
 
-LOADER_REGISTER: dict[str, Callable[[str], Any]] =  {}
-"""Register of functions to retrieve results from a directory.
+# LOADER_REGISTER: dict[str, Callable[[str], Any]] =  {}
+# """Register of functions to retrieve results from a directory.
 
-Function arguments:
-    File path [str]
+# Function arguments:
+#     File path [str]
 
-Function returns:
-    Loaded results
+# Function returns:
+#     Loaded results
 
-Notes:
-    The function is memoised, so results should not re-use the same path.
-"""
+# Notes:
+#     The function is memoised, so results should not re-use the same path.
+# """
 
-def register_loader(name: str):
-    """Add a loader to the register.
+# def register_loader(name: str):
+#     """Add a loader to the register.
     
-    The name should correspond to the suffix (extension) of the results file
-    """
-    def decorated(func):
-        LOADER_REGISTER[name] = func
-        return func
-    return decorated
+#     The name should correspond to the suffix (extension) of the results file
+#     """
+#     def decorated(func):
+#         LOADER_REGISTER[name] = func
+#         return func
+#     return decorated
 
 # -------------------------------------------------------------------------
 # DRAWING
 # -------------------------------------------------------------------------
 
 
-FIGURE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
-"""Register of functions to create figures given a tuple of live results.
+# FIGURE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
+# """Register of functions to create figures given a tuple of live results.
 
-Function arguments:
-    tuple of ResultMeta objects
+# Function arguments:
+#     tuple of ResultMeta objects
 
-Function returns:
-    Figures as dash components.
+# Function returns:
+#     Figures as dash components.
 
-Notes:
-    The function is memoised, so results should not re-use the same path.
-"""
+# Notes:
+#     The function is memoised, so results should not re-use the same path.
+# """
 
-def register_figure_draw(name: str):
-    """Add a figure draw function to the register.
+# def register_figure_draw(name: str):
+#     """Add a figure draw function to the register.
     
-    The name should respond the the key of the graph id.
-    """
-    def decorated(func):
-        FIGURE_DRAW_REGISTER[name] = func
-        return func
-    return decorated
+#     The name should respond the the key of the graph id.
+#     """
+#     def decorated(func):
+#         FIGURE_DRAW_REGISTER[name] = func
+#         return func
+#     return decorated

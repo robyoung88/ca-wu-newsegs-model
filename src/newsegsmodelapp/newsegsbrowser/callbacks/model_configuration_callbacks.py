@@ -19,6 +19,7 @@ from dash import clientside_callback, ClientsideFunction
 import numpy as np
 from useful_types import SequenceNotStr
 
+from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser import common as browser
 from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 from newsegsmodelapp.newsegsbrowser.callbacks import callbacks_map
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 SYNC_DEBOUNCE_SECONDS = 0.1
 
-def add_initial_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
+def add_initial_callbacks(app: NewsegsDash):#, acm: NewsegsBrowserCacheManager):
     """
     Functions which are triggered immediately after page load.
     """

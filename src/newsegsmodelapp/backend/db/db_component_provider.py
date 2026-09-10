@@ -1,6 +1,6 @@
 import copy
 import json
-from typing import Callable, Optional, Sequence, cast, overload, override
+from typing import Callable, Literal, Optional, Sequence, cast, overload, override
 
 import pandas as pd
 import sqlalchemy as sa
@@ -17,9 +17,8 @@ from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInt
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
-from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
+from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSING_OPTION, NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.variable import Variable
-
 
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentProviderInterface,
@@ -46,6 +45,7 @@ class FromDatabaseNewsegsComponentProvider(
 
     def _reconstruct_component(self, json_payload, row) -> NewsegsComponent:
         obj = self._component_from_json(json_payload)
+        obj.id = row.id # The ID may have changed from the payload - set it now
         obj = self._assign_updated_child_uids(obj, row)
         obj = self._reattach_children(obj)
         return obj
@@ -87,18 +87,28 @@ class FromDatabaseNewsegsComponentProvider(
 
         compmap = {x.id: x for x in reconstructed_components}
         return [compmap[x] for x in component_id]
-    
-    @override
-    def duplicate_component(self, component_id: str) -> NewsegsComponent:
-        comp1 = self.get_component(component_id)
+
+    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+        comp1 = original
         comp2 = copy.deepcopy(comp1)
         comp2.id = comp2.generate_new_id()
-        compdata = self._component_to_table_data(comp2)
-        stmt = self._table.insert().values(compdata)
-
-        with self._get_engine().begin() as conn:
-            conn.execute(stmt)
-
+        for childattr in comp2.get_component_attributes():
+            setattr(
+                comp2,
+                childattr,
+                self.duplicate_component(getattr(comp2, childattr))
+            )
+        return comp2
+    
+    @override
+    def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
+        if isinstance(component_id, str):
+            orig = self.get_component(component_id)
+        else:
+            orig = component_id
+        comp2 = self._create_duplicate_component(orig)
+        self.upsert_component(comp2, force = False)
+        
         return comp2
 
     @override
@@ -244,7 +254,7 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
             return super()._component_to_table_data(component)
 
         return energy_model_to_raw_table_data(component)
-
+        
     @override
     def upsert_component(
         self,
@@ -304,6 +314,10 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         self._em_provider = FromDatabaseNewsegsEMProvider(get_engine)
         self._fm_provider = FromDatabaseNewsegsFMProvider(get_engine)
         self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
+        # This may be overwritten - e.g. by an enclosing ProjectProvider
+        self.variable_provider = FromDatabaseVariableProvider(get_engine)
+
+        self._metamodel_variable_jct = tbls.metamodel_variables
 
     @override
     def _assign_updated_child_uids(self, obj, row):
@@ -311,6 +325,46 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             obj._model_id = row.em_config_id
             obj._finance_id = row.fm_config_id
             obj._component_ids['table_config'] = row.table_config_id
+
+            var_stmt = (
+                sa.select(
+                    tbls.variable_configs.c.varid,
+                    tbls.variable_configs.c.id,
+                )
+                .select_from(self._metamodel_variable_jct)
+                .join(
+                    tbls.variable_configs,
+                    self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
+                )
+                .where(self._metamodel_variable_jct.c.metamodel_id == obj.id)
+            )
+            with self._get_engine().connect() as conn:
+                result = conn.execute(var_stmt)
+                var_mapping = {
+                    row[0]: row[1] for row in result
+                }
+                # To keep order, try to use the existing order
+                used_keys = []
+                var_ids = []
+                for x in obj.variable_ids:
+                    k = x['varid']
+                    uid = var_mapping.get(k)
+                    if uid:
+                        var_ids.append({
+                            'varid': k,
+                            'uid': uid
+                        })
+                        used_keys.append(k)
+                used_keys = set(used_keys)
+                for k in var_mapping.keys():
+                    if not k in used_keys:
+                        var_ids.append({
+                            'varid': k,
+                            'uid': var_mapping[k]
+                        })
+                
+                obj._variable_ids = tuple(var_ids)
+
         return obj
 
     @override
@@ -319,7 +373,17 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         obj.reattach_em(self._em_provider)
         obj.reattach_fm(self._fm_provider)
         obj.reattach_components(self._component_provider)
+        # Do not reattach variables here - wait until the project does it.
         return obj
+
+    @override
+    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+        new =  super()._create_duplicate_component(original)
+        if isinstance(original, NewsegsMetaModel):
+            new.model = self._em_provider.duplicate_component(new._model_id)
+            new.finance = self._fm_provider.duplicate_component(new._finance_id)
+            new.variables = {k: v for k, v in original.variables.items()}
+        return new
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
@@ -327,6 +391,28 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             return super()._component_to_table_data(component)
         return metamodel_to_raw_table_data(component)
 
+    def _set_metamodel_variable_junction(self, metamodel: NewsegsMetaModel):
+        clear_statement = (
+            self._metamodel_variable_jct.delete()
+            .where(
+                self._metamodel_variable_jct.c.metamodel_id == metamodel.id
+            )
+        )
+        new_variable_entries = [
+            {
+                'metamodel_id': metamodel.id,
+                'variable_config_id': var['uid']
+            } for var in metamodel.variable_ids
+        ]
+        with self._get_engine().begin() as conn:
+            conn.execute(clear_statement)
+
+            if new_variable_entries:
+                conn.execute(
+                    self._metamodel_variable_jct.insert(),
+                    new_variable_entries
+                )
+        
     @override
     def upsert_component(
         self,
@@ -341,6 +427,9 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                     self._em_provider.upsert_component(component.model, force)
                 if component.finance:
                     self._fm_provider.upsert_component(component.finance, force)
+                for v in component.variables.values():
+                    self.variable_provider.upsert_variable(v)
+                self._set_metamodel_variable_junction(component)
                 return rval
             elif isinstance(component, NewsegsModelInterface):
                 return self._em_provider.upsert_component(component, force, tbl)
@@ -366,11 +455,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             if metamodel_indices:
                 for idx in metamodel_indices:
                     comp = component[idx]
-                    super().upsert_component(comp, force, tbl)
-                    if comp.model:
-                        self._em_provider.upsert_component(comp.model, force)
-                    if comp.finance:
-                        self._fm_provider.upsert_component(comp.finance, force)
+                    self.upsert_component(comp, force, tbl)
             if model_indices:
                 self._em_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in model_indices],
@@ -444,7 +529,6 @@ class FromDatabaseNewsegsProjectProvider(
                     if not varid in vrus:
                         vrus[varid] = []
                     vrus[varid].append(uid)
-                #variable_ids = [str(row[0]) for row in result]
             obj._variable_recovery_uids = vrus
         return obj
 
@@ -455,6 +539,49 @@ class FromDatabaseNewsegsProjectProvider(
         obj.reattach_variables(self.variable_provider)
         obj.reattach_metamodels(self.metamodel_provider)
         return obj
+
+    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+        new = super()._create_duplicate_component(original)
+        if isinstance(new, NewsegsProject):
+            new._variables_by_uid.clear()
+            var_mapping = {}
+            for var_uid in original._variables_by_uid.keys():
+                new_var = self.variable_provider.duplicate_variable(var_uid)
+                var_mapping[var_uid] = new_var.id
+                new.add_variable(new_var)
+            new.metamodels = [self.metamodel_provider.duplicate_component(x) for x in new._metamodel_ids]
+            for mm in new.metamodels:
+                old_variables = mm.variable_ids
+                new_variables = tuple(
+                    (
+                        {
+                            'varid': x['varid'],
+                            'uid': var_mapping[x['uid']]
+                        }
+                        for x in old_variables
+                    )
+                )
+                mm.variables = {} # Just in case
+                mm._variable_ids = new_variables
+                mm.reattach_variables(new)
+            
+        return new
+    
+    @override
+    def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
+        if isinstance(component_id, str):
+            orig = self.get_component(component_id)
+        else:
+            orig = component_id
+        if isinstance(orig, NewsegsMetaModel):
+            return self.metamodel_provider.duplicate_component(orig)
+        elif isinstance(orig, Variable):
+            return self.variable_provider.duplicate_variable(orig.id)
+        elif not isinstance(orig, NewsegsProject):
+            # Is a normal component
+            return self._component_provider.duplicate_component(orig)
+        else:
+            return super().duplicate_component(orig)
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
@@ -623,4 +750,80 @@ class FromDatabaseNewsegsProjectProvider(
             return PROJECT_FACTORIES[model_type]()
         else:
             return PROJECT_FACTORIES[list(PROJECT_FACTORIES.keys())[0]]()
+
+    @override
+    def get_session_project_id(
+        self, 
+        session_id: str | None = None, 
+        model_type: str | None = None,
+        on_missing: ON_MISSING_OPTION = 'last'
+    ) -> str:
+        if session_id:
+            stmt = (
+                sa.select(tbls.sessions.c.active_project_id)
+                .where(tbls.sessions.c.session_id == session_id)
+                .limit(1)
+            )
+            with self._get_engine().connect() as conn:
+                project_id = conn.execute(stmt).scalar_one_or_none()
+                if project_id:
+                    # Assert that the project is of the correct type
+                    if not model_type:
+                        return project_id
+                    
+                    stmt = (
+                        sa.select(self._table.c.model_type)
+                        .where(self._table.c.id == project_id)
+                        .limit(1)
+                    )
+                    with self._get_engine().connect() as conn:
+                        current_proj_type = conn.execute(stmt).scalar_one()
+                        if current_proj_type == model_type:
+                            return project_id
+
+        # Project not found OR project does not match type
+        # For on_missing == 'last', convert to 'create' if no projects available
+        if on_missing == 'last':
+            project_list = self.list_projects(model_type)
+            if len(project_list):
+                return project_list['id'].iloc[-1]
+            on_missing = 'create'
+
+        match on_missing:
+            case 'create':
+                from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+                if model_type:
+                    factory = PROJECT_FACTORIES.get(model_type, PROJECT_FACTORIES['default'])
+                else:
+                    factory = PROJECT_FACTORIES[list(PROJECT_FACTORIES.keys())[0]]
+
+                proj = factory()
+                self.upsert_component(proj)
+                if session_id:
+                    self.set_session_project_id(session_id, proj.id)
+                
+                return proj.id
+            case 'none':
+                return ''
+
+        return ''
+
+    @override
+    def set_session_project_id(self, session_id: str, project_id: str):
+        delete_stmt = sa.delete(tbls.sessions).where(tbls.sessions.c.session_id == session_id)
+        create_stmt = sa.insert(tbls.sessions).values(dict(session_id = session_id, active_project_id = project_id))
+
+        with self._get_engine().begin() as conn:
+            conn.execute(delete_stmt)
+            conn.execute(create_stmt)
+
+    @override
+    def list_project_snapshots(self, project_id: str) -> pd.DataFrame:
+        stmt = sa.select(
+            tbls.snapshots.c.snapshot_id,
+            tbls.snapshots.c.label,
+            tbls.snapshots.c.created_at
+        )
+        with self._get_engine().connect() as conn:
+            return pd.read_sql(stmt, conn)
 

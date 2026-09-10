@@ -131,6 +131,8 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     @override
     def get_components(self) -> tuple[NewsegsComponent, ...]:
         return (
+            self.dsa_config,
+            self.psa_config,
             self.table_config,
         )
 

@@ -18,5 +18,7 @@ def register_project_factory(name: str):
     """
     def decorated(func):
         PROJECT_FACTORIES[name] = func
+        if 'default' not in PROJECT_FACTORIES:
+            PROJECT_FACTORIES['default'] = func
         return func
     return decorated

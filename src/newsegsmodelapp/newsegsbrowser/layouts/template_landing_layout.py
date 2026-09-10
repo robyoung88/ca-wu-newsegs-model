@@ -6,7 +6,8 @@ import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts
+from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
+from newsegsmodelapp.registers import register_page_layout
 
 def create_landing_header(**kwargs):
     return html.H1(kwargs.get('head_text', ''))
@@ -84,4 +85,13 @@ def create_landing_layout(*args, **kwargs):
         + clayouts.model_run_components(**kwargs)
         + clayouts.finance_run_components(**kwargs)
         + clayouts.metamodel_process_components()
+    )
+
+@register_page_layout('landing')
+def _create_landing_layout(app_state: dict):
+    selected_model = app_state.get('selected_model', 'default')
+    return create_landing_layout(
+        **layout_registry.get_landing_layout_config(
+            selected_model
+        )
     )

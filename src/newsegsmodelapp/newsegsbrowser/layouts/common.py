@@ -5,6 +5,10 @@ def NULL_LAYOUT(*args, **kwargs):
     return html.Span()
 
 def post_page_load_components(model_type, page_type):
+    """App control components which should be the last things loaded onto a page.
+    
+    Used to trigger callbacks on page load completion.
+    """
     return [
         dcc.Store(id = {
             'type': 'firstload-config-watcher',
