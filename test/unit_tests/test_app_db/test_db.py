@@ -96,8 +96,6 @@ class TestDatabaseStart(unittest.TestCase):
             'snapshot_variable_configs',
             'component_configs',
             'snapshot_component_configs',
-            'component_variables',
-            'snapshot_component_variables',
             'results',
             'snapshot_results',
             'em_configs',
@@ -110,6 +108,10 @@ class TestDatabaseStart(unittest.TestCase):
             'snapshot_projects',
             'project_metamodels',
             'snapshot_project_metamodels',
+            'project_variables',
+            'snapshot_project_variables',
+            'metamodel_variables',
+            'snapshot_metamodel_variables',
             'runs',
             'sessions',
         )
@@ -131,7 +133,13 @@ class TestDatabaseStart(unittest.TestCase):
         from newsegsmodelapp.backend.db import tables as tbls
         from newsegsmodelapp.backend.db import db_snapshot
 
-        project_id = 1
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+        proj = PROJECT_FACTORIES['sprake']()
+        proj_provider.add_component(proj)
+
+        project_id = proj.id
 
         snapshot_id = db_snapshot.generic_snapshot_entity(
             db.get_engine(),
@@ -141,6 +149,7 @@ class TestDatabaseStart(unittest.TestCase):
             'First snapshot',
             project_id
         )
+
 
         # Check that the snapshot has been created
         with db.get_engine().connect() as conn:
@@ -152,7 +161,7 @@ class TestDatabaseStart(unittest.TestCase):
 
             result = conn.execute(
                 tbls.snapshot_metamodels.select()
-                .where(tbls.snapshot_metamodels.c.metamodel_id == 1)
+                .where(tbls.snapshot_metamodels.c.snapshot_id == snapshot_id)
             )
             self.assertEqual(len(result.fetchall()), 1)
 
@@ -164,13 +173,13 @@ class TestDatabaseStart(unittest.TestCase):
 
             result = conn.execute(
                 tbls.snapshot_em_configs.select()
-                .where(tbls.snapshot_em_configs.c.em_config_id == 1)
+                .where(tbls.snapshot_em_configs.c.snapshot_id == snapshot_id)
             )
             self.assertEqual(len(result.fetchall()), 1)
 
             result = conn.execute(
                 tbls.snapshot_fm_configs.select()
-                .where(tbls.snapshot_fm_configs.c.fm_config_id == 1)
+                .where(tbls.snapshot_fm_configs.c.snapshot_id == snapshot_id)
             )
             self.assertEqual(len(result.fetchall()), 1)
 
@@ -184,19 +193,13 @@ class TestDatabaseStart(unittest.TestCase):
                 tbls.snapshot_variable_configs.select()
                 .where(tbls.snapshot_variable_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 8)
-
-            result = conn.execute(
-                tbls.snapshot_component_variables.select()
-                .where(tbls.snapshot_component_variables.c.snapshot_id == snapshot_id)
-            )
-            self.assertEqual(len(result.fetchall()), 8)
+            self.assertEqual(len(result.fetchall()), 26)
 
             result = conn.execute(
                 tbls.snapshot_results.select()
                 .where(tbls.snapshot_results.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 4)
+            self.assertEqual(len(result.fetchall()), 0)
 
         # Restore the snapshot
         new_ids = db_snapshot.generic_restore_snapshot(
@@ -210,11 +213,11 @@ class TestDatabaseStart(unittest.TestCase):
         with db.get_engine().connect() as conn:
             r0 = conn.execute(
                 tbls.projects.select()
-                .where(tbls.projects.c.project_id == project_id)
+                .where(tbls.projects.c.id == project_id)
             ).fetchall()
             r1 = conn.execute(
                 tbls.projects.select()
-                .where(tbls.projects.c.project_id == new_project_id)
+                .where(tbls.projects.c.id == new_project_id)
             ).fetchall()
             for row0, row1 in zip(r0, r1):
                 for colname in ('model_type', 'model_version', 'label'):
@@ -225,23 +228,23 @@ class TestDatabaseStart(unittest.TestCase):
                 r0 = conn.execute(
                     tbls.component_configs.select()
                     .where(
-                        tbls.component_configs.c.component_config_id.in_(
+                        tbls.component_configs.c.id.in_(
                             sa.select(col)
-                            .where(tbls.projects.c.project_id == project_id)
+                            .where(tbls.projects.c.id == project_id)
                         )
                     )
                 ).fetchall()
                 r1 = conn.execute(
                     tbls.component_configs.select()
                     .where(
-                        tbls.component_configs.c.component_config_id.in_(
+                        tbls.component_configs.c.id.in_(
                             sa.select(col)
-                            .where(tbls.projects.c.project_id == new_project_id)
+                            .where(tbls.projects.c.id == new_project_id)
                         )
                     )
                 ).fetchall()
                 for row0, row1 in zip(r0, r1):
-                    for colname in ('component_type', 'component_class', 'component_version', 'config_payload', 'revision', 'last_result_id', 'label'):
+                    for colname in ('component_type', 'component_class', 'component_version', 'payload', 'revision', 'last_result_id', 'label'):
                         self.assertEqual(row0._mapping[colname], row1._mapping[colname])
 
             metamodel_ids_0 = conn.execute(
@@ -256,11 +259,11 @@ class TestDatabaseStart(unittest.TestCase):
 
             r0 = conn.execute(
                 tbls.metamodels.select()
-                .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_0]))
+                .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_0]))
             ).fetchall()
             r1 = conn.execute(
                 tbls.metamodels.select()
-                .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_1]))
+                .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_1]))
             ).fetchall()
             for row0, row1 in zip(r0, r1):
                 for colname in ('revision', 'label', 'lat', 'lon', 'n_units'):
@@ -270,54 +273,54 @@ class TestDatabaseStart(unittest.TestCase):
                 x[0] for x in 
                 conn.execute(
                     sa.select(tbls.metamodels.c.em_config_id)
-                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_0]))
+                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_0]))
                 ).fetchall()
             ]
             em_config_ids_1 = [
                 x[0] for x in 
                 conn.execute(
                     sa.select(tbls.metamodels.c.em_config_id)
-                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_1]))
+                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_1]))
                 ).fetchall()
             ]
 
             r0 = conn.execute(
                 tbls.em_configs.select()
-                .where(tbls.em_configs.c.em_config_id.in_(em_config_ids_0))
+                .where(tbls.em_configs.c.id.in_(em_config_ids_0))
             ).fetchall()
             r1 = conn.execute(
                 tbls.em_configs.select()
-                .where(tbls.em_configs.c.em_config_id.in_(em_config_ids_1))
+                .where(tbls.em_configs.c.id.in_(em_config_ids_1))
             ).fetchall()
             for row0, row1 in zip(r0, r1):
-                for colname in ('model_class', 'model_version', 'config_payload', 'revision', 'label'):
+                for colname in ('model_class', 'model_version', 'payload', 'revision', 'label'):
                     self.assertEqual(row0._mapping[colname], row1._mapping[colname])
 
             fm_config_ids_0 = [
                 x[0] for x in 
                 conn.execute(
                     sa.select(tbls.metamodels.c.fm_config_id)
-                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_0]))
+                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_0]))
                 ).fetchall()
             ]
             fm_config_ids_1 = [
                 x[0] for x in 
                 conn.execute(
                     sa.select(tbls.metamodels.c.fm_config_id)
-                    .where(tbls.metamodels.c.metamodel_id.in_([x[0] for x in metamodel_ids_1]))
+                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_1]))
                 ).fetchall()
             ]
 
             r0 = conn.execute(
                 tbls.fm_configs.select()
-                .where(tbls.fm_configs.c.fm_config_id.in_(fm_config_ids_0))
+                .where(tbls.fm_configs.c.id.in_(fm_config_ids_0))
             ).fetchall()
             r1 = conn.execute(
                 tbls.fm_configs.select()
-                .where(tbls.fm_configs.c.fm_config_id.in_(fm_config_ids_1))
+                .where(tbls.fm_configs.c.id.in_(fm_config_ids_1))
             ).fetchall()
             for row0, row1 in zip(r0, r1):
-                for colname in ('model_class', 'model_version', 'config_payload', 'revision', 'label'):
+                for colname in ('model_class', 'model_version', 'payload', 'revision', 'label'):
                     self.assertEqual(row0._mapping[colname], row1._mapping[colname])
 
     def test_project_save(self):
@@ -345,8 +348,8 @@ class TestDatabaseStart(unittest.TestCase):
 
         with db.get_engine().connect() as conn:
             result = conn.execute(
-                sa.select(tbls.projects.c.project_id)
-                .where(tbls.projects.c.project_id == project_id)
+                sa.select(tbls.projects.c.id)
+                .where(tbls.projects.c.id == project_id)
             )
             self.assertEqual(len(result.fetchall()),1)
 
@@ -653,7 +656,7 @@ class TestDatabaseStart(unittest.TestCase):
             mm2.finance.get_costs_series_discounted()
         )
 
-    def test_duplication(self):
+    def test_duplication_and_deletion(self):
         import numpy.testing as nptest
         
         from newsegsmodelapp.backend import db
@@ -695,6 +698,14 @@ class TestDatabaseStart(unittest.TestCase):
             list(proj.metamodels[0].variables.values())[0].id,
             list(proj_dup.metamodels[0].variables.values())[0].id
         )
+
+        all_projects = proj_provider.list_projects()
+        n_proj = len(all_projects)
+        proj_provider.delete_component(proj_dup.id)
+
+        all_projects_now = proj_provider.list_projects()
+        n_proj_2 = len(all_projects_now)
+        self.assertEqual(n_proj, n_proj_2 + 1)
 
     def test_process_and_results(self):
         import newsegsmodelapp.register_plugins
@@ -760,10 +771,10 @@ class TestDatabaseStart(unittest.TestCase):
             pp_req = pp_req_provider(request) # pyright: ignore[reportOptionalCall]
             self.assertIsInstance(pp_req, registers.PostprocessRequest)
 
-            proc = registers.get_postprocess_procedure(process_name, request)
+            proc = registers.get_postprocess_procedure(process_name, pp_req)
 
             is_ok = proc(
-                request,
+                pp_req,
                 proj_provider,
                 result_provider,
                 run_id,
@@ -799,9 +810,9 @@ class TestDatabaseStart(unittest.TestCase):
             td_req = td_req_provider(request) # pyright: ignore[reportOptionalCall]
             self.assertIsInstance(td_req, registers.TableDrawRequest)
             
-            proc = registers.get_table_draw(table_section, request)
+            proc = registers.get_table_draw(table_section, td_req)
             is_ok = proc(
-                request,
+                td_req,
                 proj_provider,
                 result_provider,
                 run_id,

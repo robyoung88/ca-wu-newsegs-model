@@ -526,11 +526,29 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
 class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
     """Interface for saving components to persistent storage (in order that they may be accessed by other providers)"""
 
+    @abstractmethod
     def upsert_component(self, component: NewsegsComponent | SequenceNotStr[NewsegsComponent], force: bool = False) -> None:
         """Insert or update a component or list of components into the store.
                         
         Args:
             component: A component or sequence of components to synchronise.
             force: Overwrite the components(s) regardless of whether their revision number has incremented.
+        """
+
+    @abstractmethod
+    def delete_component(
+        self, 
+        component_id: str | SequenceNotStr[str],
+        ignore_ids: list[str] = [],
+    ) -> list[str]:
+        """Delete a component or list of components in the store.
+
+        Will remove all dependent components and snapshots (if applicable).
+
+        Args:
+            component_id [str | Sequence[str]]: ID(s) of component(s) to delete.
+            ignore_ids [list[str]]: IDs of components which may be ignored in dependents search
+        Returns:
+            List of component_ids for which deletion has failed.
         """
     

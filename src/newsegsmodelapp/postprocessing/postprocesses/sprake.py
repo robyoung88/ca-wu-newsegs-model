@@ -9,7 +9,7 @@ from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_finance_value_result
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_gen_results import gen_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_net_results import net_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_storage_results import stor_results_to_interface_sprake
-from newsegsmodelapp.registers import RunRequest, register_postprocess_procedure
+from newsegsmodelapp.registers import PostprocessRequest, RunRequest, register_postprocess_procedure
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
@@ -20,7 +20,7 @@ POSTPROCESS_TYPE = 'postproc_model_grid'
 
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _grid_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
@@ -34,17 +34,17 @@ def _grid_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_generation'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _generation_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)
@@ -83,17 +83,17 @@ def _generation_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_consumption'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _consumption_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)
@@ -132,17 +132,17 @@ def _consumption_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_storage'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _storage_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)
@@ -181,17 +181,17 @@ def _storage_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_net'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _net_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)
@@ -230,17 +230,17 @@ def _net_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_finance_benefits'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _finance_benefits_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)
@@ -284,17 +284,17 @@ def _finance_benefits_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_finance_costs'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _finance_costs_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)
@@ -338,17 +338,17 @@ def _finance_costs_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_finance_value'
 @register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
 def _finance_value_to_interface_sprake(
-    request: RunRequest,
+    request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     run_id: int,
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    if request.request_type == 'deterministic_run_project':
+    if request.trigger_request_type == 'deterministic_run_project':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
         metamodels = proj.metamodels
-    elif request.request_type == 'deterministic_run_metamodel':
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
     
         run_config = json.loads(request.payload)

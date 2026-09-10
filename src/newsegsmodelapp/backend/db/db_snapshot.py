@@ -9,9 +9,9 @@ def generic_snapshot_entity(
     engine: sa.Engine,
     metadata: sa.MetaData,
     root_table_name: str,
-    root_id: int,
+    root_id: str,
     snapshot_label: str,
-    project_id: int
+    project_id: str
 ) -> int:
     """
     Introspects schema dependencies starting from root_table_name and
@@ -156,8 +156,12 @@ def generic_snapshot_entity(
                         .where(pk_cols[0].in_(collected_ids[table.name]))
                     )
                 else:
-                    # Junction table filtering
-                    stmt = sa.select(table)
+                    # Junction / Composite PK table filtering:
+                    # Match each composite primary key column to the tuple of collected IDs
+                    composite_conditions = [
+                        sa.tuple_(*pk_cols).in_(collected_ids[table.name])
+                    ]
+                    stmt = sa.select(table).where(sa.or_(*composite_conditions))
 
                 rows = conn.execute(stmt).mappings().fetchall()
 
@@ -176,7 +180,7 @@ def generic_snapshot_entity(
         if projects is not None and 'retain' in projects.c:
             conn.execute(
                 projects.update()
-                .where(projects.c.project_id == project_id)
+                .where(projects.c.id == project_id)
                 .values(retain=True)
             )
 
@@ -231,7 +235,7 @@ def generic_restore_snapshot(
                 is_single_autoincrement_pk = len(pk_cols) == 1 and table.columns[pk_cols[0]].autoincrement
 
                 if len(pk_cols) == 1:
-                    if isinstance(table.columns[pk_cols[0]].type, sa.Uuid): # This works because the type property is actually an instance
+                    if isinstance(table.columns[pk_cols[0]].type, sa.String): # This works because the type property is actually an instance
                         # Not autoincrement so PK is a stringified uuid4
                         old_pk_val = str(record.pop(pk_cols[0], None))
                         prefix = old_pk_val.rsplit('-', 1)[0]
@@ -268,3 +272,64 @@ def generic_restore_snapshot(
         for k, v in id_map.items():
             id_remap[k[0]].update({k[1]: v})
     return id_remap
+
+def delete_snapshots_for_project(
+    engine: sa.Engine,
+    metadata: sa.MetaData,
+    project_id: str
+) -> int:
+    """
+    Deletes all snapshots and their associated data across all snapshot_* 
+    tables for a given project_id.
+    
+    Returns:
+        int: The number of master snapshot records deleted.
+    """
+    snapshots_table = metadata.tables.get('snapshots')
+    if snapshots_table is None:
+        raise ValueError("The 'snapshots' table is not present in metadata.")
+
+    with engine.begin() as conn:
+        # 1. Fetch all snapshot_ids associated with the given project_id
+        snapshot_ids = conn.execute(
+            sa.select(snapshots_table.c.snapshot_id).where(
+                snapshots_table.c.project_id == project_id
+            )
+        ).scalars().all()
+
+        if not snapshot_ids:
+            return 0
+
+        # 2. Iterate through sorted_tables in reverse order (bottom-up: children before parents)
+        # to respect Foreign Key constraints when deleting from child/junction snapshot tables.
+        for table in reversed(metadata.sorted_tables):
+            if table.name.startswith("snapshot_") and "snapshot_id" in table.c:
+                conn.execute(
+                    table.delete().where(table.c.snapshot_id.in_(snapshot_ids))
+                )
+
+        # 3. Delete the parent records in the master 'snapshots' table
+        result = conn.execute(
+            snapshots_table.delete().where(
+                snapshots_table.c.snapshot_id.in_(snapshot_ids)
+            )
+        )
+
+        # 4. Optional: Update project retention status if required
+        projects_table = metadata.tables.get('projects')
+        if projects_table is not None and 'retain' in projects_table.c:
+            # Check if there are any remaining snapshots for this project
+            remaining_snapshots_count = conn.execute(
+                sa.select(sa.func.count(snapshots_table.c.snapshot_id)).where(
+                    snapshots_table.c.project_id == project_id
+                )
+            ).scalar()
+
+            if remaining_snapshots_count == 0:
+                conn.execute(
+                    projects_table.update()
+                    .where(projects_table.c.id == project_id)
+                    .values(retain=False)
+                )
+
+        return result.rowcount

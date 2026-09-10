@@ -45,8 +45,9 @@ def project_to_raw_table_data(
         label = proj.name,
         revision = proj.revision,
         revision_string = proj.revision_string,
-        uuid = proj.id,
-        table_config_id = proj.table_config.id
+        dsa_component_config_id = proj.dsa_config.id,
+        psa_component_config_id = proj.psa_config.id,
+        table_config_id = proj.table_config.id,
     )
     odict['payload'] = proj.json_dumps()
     
@@ -450,39 +451,6 @@ def _load_variable_data(
         raise ValueError(f'Multiple variables found for id {variable_config_id}')
     return result[0]
 
-
-# -----------------------------------------------------------------------------
-# Component-Variable Junction table
-# -----------------------------------------------------------------------------
-# region LOAD
-def load_component_variables(
-    component_config_id: int,
-    encon: sa.Engine | sa.Connection
-) -> tuple[Variable, ...]:
-    if isinstance(encon, sa.Engine):
-        with encon.connect() as conn:
-            return load_component_variables(component_config_id, conn)
-
-    variable_ids = _load_variable_ids(component_config_id, encon)
-    if not variable_ids:
-        return tuple([])
-
-    return tuple((load_variable(id, encon) for id in variable_ids))
-
-def _load_variable_ids(
-    component_config_id: int,
-    conn: sa.Connection
-) -> tuple[str, ...]:
-    variable_ids = conn.execute(
-        sa.select(tbls.component_variables.c.variable_config_id)
-        .where(tbls.component_variables.c.component_config_id == component_config_id)
-    ).fetchall()
-
-    if variable_ids:
-        variable_ids = tuple(x[0] for x in variable_ids)
-        return variable_ids
-    return tuple([])
-
 # -----------------------------------------------------------------------------
 # Metamodels
 # -----------------------------------------------------------------------------
@@ -640,6 +608,7 @@ def energy_model_to_raw_table_data(
         grid_config_id = energy_model.grid.id,
         generation_config_id = energy_model.generation.id,
         cs_config_id = energy_model.consumption_storage.id,
+        modeldata_config_id = energy_model.model_data.id,
         table_config_id = energy_model.table_config.id
     )
     # Additional configuration needs to be implementation-specific, and might be things like

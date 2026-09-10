@@ -6,6 +6,7 @@ import pandas as pd
 import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
+from newsegsmodelapp.backend.db import DependentObjectsExistError, db_snapshot
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
@@ -226,6 +227,122 @@ class FromDatabaseNewsegsComponentProvider(
                 insert_stmt = tbl.insert()
                 conn.execute(insert_stmt, insert_payload)
 
+    def _delete_one_component(
+            self, 
+            component_id: str,
+            ignore_ids: list[str] = []
+            ) -> None:
+        # Assume that we are dealing only with members of the component_config table.
+
+        # Any energy model configurations using this component must be identified
+        get_em_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(tbls.em_configs)
+            .where(
+                sa.and_(
+                    tbls.em_configs.c.id.not_in(ignore_ids),
+                    (
+                        (tbls.em_configs.c.grid_config_id == component_id) |
+                        (tbls.em_configs.c.generation_config_id == component_id) |
+                        (tbls.em_configs.c.cs_config_id == component_id) |
+                        (tbls.em_configs.c.modeldata_config_id == component_id) |
+                        (tbls.em_configs.c.table_config_id == component_id)
+                    )
+                )
+            )
+        )
+
+        # Any finance model configurations using this component must be identified
+        get_fm_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(tbls.fm_configs)
+            .where(
+                sa.and_(
+                    tbls.fm_configs.c.id.not_in(ignore_ids),
+                    (
+                        (tbls.fm_configs.c.financedata_config_id == component_id) |
+                        (tbls.fm_configs.c.table_config_id == component_id)
+                    )
+                )
+            )
+        )
+
+        # Any metamodels using this component directly must be identified
+        get_mm_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(tbls.metamodels)
+            .where(
+                sa.and_(
+                    tbls.metamodels.c.id.not_in(ignore_ids),
+                    (
+                        (tbls.metamodels.c.table_config_id == component_id)
+                    )
+                )
+            )
+        )
+
+        # Any projects using this component directly must be identified
+        get_proj_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(tbls.projects)
+            .where(
+                sa.and_(
+                    tbls.projects.c.id.not_in(ignore_ids),
+                    (
+                        (tbls.projects.c.dsa_component_config_id == component_id) |
+                        (tbls.projects.c.psa_component_config_id == component_id) |
+                        (tbls.projects.c.table_config_id == component_id)
+                    )
+                )
+            )
+        )
+
+        # All associated results must be deleted
+        del_res_stmt = (
+            tbls.results.delete()
+            .where(tbls.results.c.component_config_id == component_id)
+        )
+
+        # And then the component will be free to delete
+        del_comp_stmt = (
+            tbls.component_configs.delete()
+            .where(tbls.component_configs.c.id == component_id)
+        )
+
+        with self._get_engine().connect() as conn:
+            for trial_stmt in (
+                get_em_count_stmt,
+                get_fm_count_stmt,
+                get_mm_count_stmt,
+                get_proj_count_stmt
+            ):
+                count = conn.execute(trial_stmt).scalar()
+                if count:
+                    raise DependentObjectsExistError(f'Cannot delete - dependents exist for component {component_id}')
+
+            # Proceed with deletion
+            conn.execute(del_res_stmt)
+            conn.execute(del_comp_stmt)
+            conn.commit()
+
+    @override
+    def delete_component(
+        self, 
+        component_id: str | SequenceNotStr[str],
+        ignore_ids: list[str] = []
+    ) -> list[str]:
+
+        if isinstance(component_id, str):
+            component_id = [component_id, ]
+
+        failures = []
+        for id in component_id:
+            try:
+                self._delete_one_component(id)
+            except DependentObjectsExistError:
+                failures.append(id)
+
+        return failures
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
@@ -267,6 +384,66 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
         else:
             return self._component_provider.upsert_component(component, force, tbl)
 
+    @override
+    def _delete_one_component(
+        self, 
+        component_id: str,
+        ignore_ids: list[str] = [],
+    ) -> None:
+        # Assume that we are dealing only with members of the em_configs table
+
+        # Any metamodel configurations using this model must be identified
+        get_mm_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(tbls.metamodels)
+            .where(
+                sa.and_(
+                    tbls.metamodels.c.id.not_in(ignore_ids),
+                    (
+                        (tbls.metamodels.c.em_config_id == component_id)
+                    )
+                )
+            )
+        )
+
+        # Child components should be identified and subsequently deleted, where appropriate
+        get_child_component_id_stmt = (
+            sa.select(
+                self._table.c.grid_config_id,
+                self._table.c.generation_config_id,
+                self._table.c.cs_config_id,
+                self._table.c.modeldata_config_id,
+                self._table.c.table_config_id,
+            )
+            .where(self._table.c.id == component_id)
+        )
+
+        del_stmt = (
+            self._table.delete()
+            .where(self._table.c.id == component_id)
+        )
+
+        child_ids = []
+        with self._get_engine().connect() as conn:
+            for trial_stmt in (
+                get_mm_count_stmt,
+            ):
+                count = conn.execute(trial_stmt).scalar()
+                if count:
+                    raise DependentObjectsExistError(f'Cannot delete - dependents exist for energy model {component_id}')
+
+            # Get child ids
+            row = conn.execute(get_child_component_id_stmt).fetchone()
+            if row:
+                child_ids = [x for x in row if x]
+
+            # Delete model
+            conn.execute(del_stmt)
+            conn.commit()
+
+        # Delete children
+        _ = self._component_provider.delete_component(child_ids)
+
 
 class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
@@ -305,6 +482,63 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
             return super().upsert_component(component, force, tbl)
         else:
             return self._component_provider.upsert_component(component, force, tbl)
+
+    @override
+    def _delete_one_component(
+        self, 
+        component_id: str,
+        ignore_ids: list[str] = [],
+    ) -> None:
+        # Assume that we are dealing only with members of the fm_configs table
+
+        # Any metamodel configurations using this model must be identified
+        get_mm_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(tbls.metamodels)
+            .where(
+                sa.and_(
+                    tbls.metamodels.c.id.not_in(ignore_ids),
+                    (
+                        (tbls.metamodels.c.fm_config_id == component_id)
+                    )
+                )
+            )
+        )
+
+        # Child components should be identified and subsequently deleted, where appropriate
+        get_child_component_id_stmt = (
+            sa.select(
+                self._table.c.financedata_config_id,
+                self._table.c.table_config_id,
+            )
+            .where(self._table.c.id == component_id)
+        )
+
+        del_stmt = (
+            self._table.delete()
+            .where(self._table.c.id == component_id)
+        )
+
+        child_ids = []
+        with self._get_engine().connect() as conn:
+            for trial_stmt in (
+                get_mm_count_stmt,
+            ):
+                count = conn.execute(trial_stmt).scalar()
+                if count:
+                    raise DependentObjectsExistError(f'Cannot delete - dependents exist for energy model {component_id}')
+
+            # Get child ids
+            row = conn.execute(get_child_component_id_stmt).fetchone()
+            if row:
+                child_ids = [x for x in row if x]
+
+            # Delete model
+            conn.execute(del_stmt)
+            conn.commit()
+
+        # Delete children
+        _ = self._component_provider.delete_component(child_ids)
 
 
 class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider):
@@ -474,6 +708,83 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                     force,
                     tbl
                 )
+
+    @override
+    def _delete_one_component(
+        self, 
+        component_id: str, 
+        ignore_ids: list[str] = []
+    ) -> None:
+        # Assume that we are dealing only with members of the metamodels table
+
+        # Identify associated EM for deletion
+        get_em_id_stmt = (
+            sa.select(
+                self._table.c.em_config_id
+            )
+            .where(self._table.c.id == component_id)
+        )
+
+        get_fm_id_stmt = (
+            sa.select(
+                self._table.c.fm_config_id
+            )
+            .where(self._table.c.id == component_id)
+        )
+
+        get_child_component_id_stmt = (
+            sa.select(
+                self._table.c.table_config_id
+            )
+            .where(self._table.c.id == component_id)
+        )
+
+        # Delete entries in junction tables
+        # Note that we will not delete orphan variables, as these are considered managed by the project.
+        # It is recommended that the project performs a sweep after metamodel deletion.
+        del_proj_mm_stmt = (
+            tbls.project_metamodels.delete()
+            .where(tbls.project_metamodels.c.metamodel_id == component_id)
+        )
+
+        del_mm_var_stmt = (
+            tbls.metamodel_variables.delete()
+            .where(tbls.metamodel_variables.c.metamodel_id == component_id)
+        )
+
+        del_mm_stmt = (
+            self._table.delete()
+            .where(self._table.c.id == component_id)
+        )
+
+        em_ids = []
+        fm_ids = []
+        child_ids = []
+        with self._get_engine().connect() as conn:
+            # No trials, can get on with finding children
+            row = conn.execute(get_em_id_stmt).fetchone()
+            if row:
+                em_ids = [x for x in row if x]
+
+            row = conn.execute(get_fm_id_stmt).fetchone()
+            if row:
+                fm_ids = [x for x in row if x]
+
+            row = conn.execute(get_child_component_id_stmt).fetchone()
+            if row:
+                child_ids = [x for x in row if x]
+
+            # Delete metamodel
+            conn.execute(del_proj_mm_stmt)
+            conn.execute(del_mm_var_stmt)
+            conn.execute(del_mm_stmt)
+
+            conn.commit()
+
+        # Delete children
+        _ = self._em_provider.delete_component(em_ids)
+        _ = self._fm_provider.delete_component(fm_ids)
+        _ = self._component_provider.delete_component(child_ids)
 
 
 class FromDatabaseNewsegsProjectProvider(
@@ -827,3 +1138,93 @@ class FromDatabaseNewsegsProjectProvider(
         with self._get_engine().connect() as conn:
             return pd.read_sql(stmt, conn)
 
+    @override
+    def _delete_one_component(
+        self,
+        component_id: str,
+        ignore_ids: list[str] = []
+    ) -> None:
+        # Delete an entire project, including any snapshots
+
+        # Delete snapshots straight away
+        _ = db_snapshot.delete_snapshots_for_project(
+            self._get_engine(),
+            tbls.metadata,
+            component_id
+        )
+
+        # Find metamodels which are only associated with this project (really, none should have multiple projects)
+        find_mm_stmt = (
+            sa.select(tbls.project_metamodels.c.metamodel_id)
+            .group_by(tbls.project_metamodels.c.metamodel_id)
+            .having(
+                sa.and_(
+                    sa.func.count(sa.distinct(tbls.project_metamodels.c.project_id)) == 1,
+                    sa.func.max(tbls.project_metamodels.c.project_id) == component_id
+                )
+            )
+        )
+
+        # Find direct children of this project
+        get_child_component_id_stmt = (
+            sa.select(
+                self._table.c.dsa_component_config_id,
+                self._table.c.psa_component_config_id,
+                self._table.c.table_config_id,
+            )
+            .where(self._table.c.id == component_id)
+        )
+
+        # Delete junction table values
+
+        # By the time this is executed, it should do nothing
+        del_proj_mm_stmt = (
+            tbls.project_metamodels.delete()
+            .where(tbls.project_metamodels.c.project_id == component_id)
+        )
+
+        del_proj_var_stmt = (
+            tbls.project_variables.delete()
+            .where(tbls.project_variables.c.project_id == component_id)
+        )
+
+        del_proj_stmt = (
+            self._table.delete()
+            .where(self._table.c.id == component_id)
+        )
+
+        mm_ids = []
+        child_ids = []
+        with self._get_engine().connect() as conn:
+            mm_ids = [x for x in conn.execute(find_mm_stmt).scalars().all()]
+
+            row = conn.execute(get_child_component_id_stmt).fetchone()
+            if row:
+                child_ids = [x for x in row if x]
+
+        _ = self.metamodel_provider.delete_component(mm_ids)
+
+        with self._get_engine().begin() as conn:
+            conn.execute(del_proj_mm_stmt)
+            conn.execute(del_proj_var_stmt)
+            conn.execute(del_proj_stmt)
+
+        _ = self._component_provider.delete_component(child_ids)
+
+        _ = self.delete_orphan_variables()
+
+    def delete_orphan_variables(self) -> int:
+
+        referenced_variable_ids = sa.union(
+            sa.select(tbls.project_variables.c.variable_config_id),
+            sa.select(tbls.metamodel_variables.c.variable_config_id)
+        )
+
+        del_stmt = (
+            tbls.variable_configs.delete()
+            .where(tbls.variable_configs.c.id.not_in(referenced_variable_ids))
+        )
+
+        with self._get_engine().begin() as conn:
+            result = conn.execute(del_stmt)
+            return result.rowcount

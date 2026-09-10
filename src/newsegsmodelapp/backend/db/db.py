@@ -22,6 +22,10 @@ RETRIEVAL_STATUS = Literal[
     'missing'
 ]
 
+class DependentObjectsExistError(ValueError):
+    """Raised when attempting to delete a component that still has dependent children."""
+    pass
+
 _engine: sqlalchemy.Engine|None = None
 _connected_db_path: str | None = None
 def get_engine(db_path: str | Path = DB_PATH):

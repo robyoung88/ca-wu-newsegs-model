@@ -1,4 +1,4 @@
-from .db import get_engine, init_db
+from .db import get_engine, init_db, DependentObjectsExistError
 import newsegsmodelapp.backend.db.db_tables as tables
 from .db_snapshot import *
 from .project import *
@@ -10,5 +10,6 @@ __all__ = [
     'tables',
     'save_project',
     'load_project',
-    'init_db'
+    'init_db',
+    'DependentObjectsExistError',
 ]

@@ -91,33 +91,6 @@ snapshot_component_configs = sa.Table(
     *clone_columns_except_pk(component_configs)
 )
 
-# -----------------------------------------------------------------------------
-# Component Variables (Junction Tables)
-# -----------------------------------------------------------------------------
-
-component_variables = sa.Table(
-    'component_variables',
-    metadata,
-    sa.Column('component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id'), primary_key = True),
-    sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('variable_configs.id'), primary_key = True)
-)
-
-snapshot_component_variables = sa.Table(
-    'snapshot_component_variables',
-    metadata,
-    sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
-    sa.Column('component_config_id', sa.String(L_COMPONENT_UID), primary_key = True),
-    sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), primary_key = True),
-    sa.ForeignKeyConstraint(
-        ['snapshot_id', 'component_config_id'],
-        ['snapshot_component_configs.snapshot_id', 'snapshot_component_configs.id']
-    ),
-    sa.ForeignKeyConstraint(
-        ['snapshot_id', 'variable_config_id'],
-        ['snapshot_variable_configs.snapshot_id', 'snapshot_variable_configs.id']
-    )
-)
-
 
 # -----------------------------------------------------------------------------
 # Results
