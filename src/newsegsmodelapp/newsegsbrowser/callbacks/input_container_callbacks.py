@@ -15,7 +15,7 @@ from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser.common import get_triggered_value
-from newsegsmodelapp.registers import get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
+from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
@@ -235,6 +235,42 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                 print(f'No handlers for purpose {trigger_id["purpose"]}')
 
         return (input_returns, header_returns, trigger_returns)
+
+    @app.callback(
+        Output({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'figure'),
+
+        Input({'type': 'input-group-config-update-trigger', 
+                'supersection': ALL, 'purpose': ALL,
+                'section': ALL, 'key': ALL, 'subindex': ALL,
+                'parameter_index': ALL, 'vector_location': ALL}, 
+                'data'),
+
+        State({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'id'),
+        State('active-project-id', 'data'),
+        State('app-state', 'data'),
+
+        prevent_initial_call = True
+    )
+    def update_feedback_graphs(
+        configuration_update_trigger,
+        figure_ids,
+        active_project_id,
+        app_state
+    ):
+        app_state = json.loads(app_state) if app_state else {}
+        selected_model = app_state.get('selected_model', 'default')
+
+        figure_returns: list[Any] = [no_update] * len(figure_ids)
+
+        for idx, id in enumerate(figure_ids):
+            try:
+                artist = get_feedback_graph_artist(id['key'], selected_model)
+            except KeyError:
+                artist = None
+            if artist:
+                figure_returns[idx] = artist(active_project_id, app.project_provider)
+
+        return figure_returns        
     
     return app
 

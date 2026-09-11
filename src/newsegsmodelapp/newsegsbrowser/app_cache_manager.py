@@ -9,7 +9,7 @@ from typing import Any, Literal, MutableMapping
 import diskcache
 from dash import CeleryManager, DiskcacheManager
 
-from newsegsmodelapp.newsegsbrowser import energy_balance_estimation
+from newsegsmodelapp.components import energy_balance_estimation
 from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
 from newsegsmodelframework.newsegsfinance import newsegsfinance
 from newsegsmodelframework.newsegsmetamodel import newsegsmetamodel

@@ -427,33 +427,45 @@ def get_single_input_header_content_creator(
     )
     return getter(supersection, section, model_type)
 
-# LOADER_REGISTER: dict[str, Callable[[str], Any]] =  {}
-# """Register of functions to retrieve results from a directory.
-
-# Function arguments:
-#     File path [str]
-
-# Function returns:
-#     Loaded results
-
-# Notes:
-#     The function is memoised, so results should not re-use the same path.
-# """
-
-# def register_loader(name: str):
-#     """Add a loader to the register.
-    
-#     The name should correspond to the suffix (extension) of the results file
-#     """
-#     def decorated(func):
-#         LOADER_REGISTER[name] = func
-#         return func
-#     return decorated
-
 # -------------------------------------------------------------------------
 # DRAWING
 # -------------------------------------------------------------------------
 
+FEEDBACK_GRAPH_ARTISTS: dict[
+    tuple[str, str],
+    Callable[[
+        str,
+        NewsegsProjectProviderInterface
+    ], DashComponent]] = {}
+"""Register of functions to update feedback graphs as configurations change.
+
+Keyed by a tuple of:
+    figure key [str] 
+    model_type [str]
+
+Functions take the active project id as string and a project provider.
+"""
+
+def register_feedback_graph_artist(figure_key: str, model_type: str):
+    key = (figure_key, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in FEEDBACK_GRAPH_ARTISTS:
+                raise KeyError(f'Feedback graph artist already exists for key {key}')
+        FEEDBACK_GRAPH_ARTISTS[key] = func
+        key_default = (key[0], 'default')
+        if key_default not in FEEDBACK_GRAPH_ARTISTS:
+            FEEDBACK_GRAPH_ARTISTS[key_default] = func
+        return func
+    return decorated
+
+def get_feedback_graph_artist(figure_key: str, model_type: str = 'default'):
+    key = (figure_key, model_type)
+    artist = FEEDBACK_GRAPH_ARTISTS.get(key)
+    if artist:
+        return artist
+    key = (figure_key, 'default')
+    return FEEDBACK_GRAPH_ARTISTS[key]
 
 # FIGURE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
 # """Register of functions to create figures given a tuple of live results.

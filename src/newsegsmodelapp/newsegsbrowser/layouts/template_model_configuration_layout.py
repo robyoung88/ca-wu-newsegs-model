@@ -12,7 +12,7 @@ from newsegsmodelapp.newsegsbrowser.background_callback_errors import background
 from newsegsmodelapp.components import project_selector
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
-from newsegsmodelapp.newsegsbrowser.layouts.feedback import indicative_net_energy
+from newsegsmodelapp.components.feedback import indicative_net_energy
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 

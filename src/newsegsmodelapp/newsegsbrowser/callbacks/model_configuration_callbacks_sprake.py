@@ -13,6 +13,7 @@ from dash import html, no_update
 import pandas as pd
 import plotly.express as px
 
+from newsegsmodelapp.components.update_energy_balance_sprake import update_estimated_energy_balance
 from newsegsmodelframework.core import location
 from newsegsmodelapp.newsegsbrowser import icons
 from newsegsmodelapp.newsegsbrowser import common as browser
@@ -23,7 +24,7 @@ from newsegsmodelapp.newsegsbrowser.callbacks import model_creation_sprake
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import sprakefinance
-from newsegsmodelapp.newsegsbrowser import energy_balance_estimation
+from newsegsmodelapp.components import energy_balance_estimation
 from newsegsmodelframework.newsegsvariable import variable
 
 logger = logging.getLogger(__name__)
@@ -252,44 +253,6 @@ sync_config = partial(
 def _get_val(mm, key) -> int | float:
     return cast(variable.NumericScalarVariable, mm.variables.get(key)).deterministic_value
 
-def _update_estimated_energy_balance(
-    mm: NewsegsMetaModel,
-    energy_balance: energy_balance_estimation.EstimatedEnergyBalance
-) -> energy_balance_estimation.EstimatedEnergyBalance:
-    # Generation
-    wind_capacity = _get_val(mm, 'gen_input.wind_capacity.0')
-    pv_capacity = _get_val(mm, 'gen_input.pv_capacity.0')
-    energy_balance.set_wind_generation(wind_capacity)
-    energy_balance.set_pv_generation(pv_capacity)
-
-    # Consumption
-    n_units = _get_val(mm, 'bc_input.n_units.0')
-    
-    hlp = _get_val(mm, 'bc_input.hlp.0')
-    gfa = _get_val(mm, 'bc_input.gfa.0')
-    # Could use this, but default is more than ok
-    # ann_hdd = model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_hdd_per_year']
-    energy_balance.set_spaceheat_consumption(n_units, hlp, gfa)
-
-    ref_daily_consumption = _get_val(mm, 'bc_input.ref_daily_consumption.0')
-    # Assume conversion efficiency of 1
-    energy_balance.set_dhw_consumption(n_units, ref_daily_consumption)
-
-    efficiency_reduction = _get_val(mm, 'dc_input.efficiency_reduction.0')
-    energy_balance.set_direct_consumption(
-        n_units,
-        (1 - efficiency_reduction) * model_creation_sprake.MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
-    )
-
-    n_evs_per_household = _get_val(mm, 'dc_input.n_evs_per_household.0')
-    ev_consumption_per_year = _get_val(mm, 'dc_input.annual_residential_consumption_per_ev.0')
-    energy_balance.set_ev_consumption(n_units, ev_consumption_per_year, n_evs_per_household)
-
-    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
-    energy_balance.set_storage_capacity(stor_cap)
-
-    return energy_balance
-
 def _create_generation_header_summary(mm):
     wind_cap = _get_val(mm, 'gen_input.wind_capacity.0')
     pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
@@ -366,7 +329,7 @@ def update_headers_model_config(
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
 
-    eb = _update_estimated_energy_balance(mm, acm.estimated_energy_balance)
+    eb = update_estimated_energy_balance(mm, acm.estimated_energy_balance)
 
     for i, id in enumerate(header_ids):
         match id['key']:
@@ -427,9 +390,9 @@ def _create_cost_sales_header_summary(
         mm,
         eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
     ):
-    if not eb:
+    if eb is None:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
-        eb = _update_estimated_energy_balance(mm, eb)
+        eb = update_estimated_energy_balance(mm, eb)
     
     n_units = _get_val(mm, 'bc_input.n_units.0')
 
@@ -499,7 +462,7 @@ def _create_cost_import_header_summary(
     ):
     if not eb:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
-        eb = _update_estimated_energy_balance(mm, eb)
+        eb = update_estimated_energy_balance(mm, eb)
 
     aeb = eb.estimated_annual_energy_balance
     total_consumption = (
@@ -563,7 +526,7 @@ def update_headers_finance_config(
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
     
-    eb = _update_estimated_energy_balance(mm, acm.estimated_energy_balance)
+    eb = update_estimated_energy_balance(mm, acm.estimated_energy_balance)
 
     for i, id in enumerate(header_ids):
         match id['key']:
@@ -615,7 +578,7 @@ def update_feedback_graphs(
     if mm is None:
         raise ValueError(f'Metamodel {mm_id} cannot be retrieved')
     
-    eb = _update_estimated_energy_balance(mm, acm.estimated_energy_balance)
+    eb = update_estimated_energy_balance(mm, acm.estimated_energy_balance)
     df = eb.estimated_annual_energy_balance
 
     fig_ann = _feedback_graph_bar(df, y = 'type')

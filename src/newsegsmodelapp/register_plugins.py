@@ -57,6 +57,18 @@ def load_input_container_content_creators():
 
 load_input_container_content_creators()
 
+import newsegsmodelapp.components.feedback as feedback
+
+def load_feedback():
+    d = {}
+    for info in pkgutil.iter_modules(
+        feedback.__path__, prefix = 'newsegsmodelapp.components.feedback.'
+    ):
+        d[info.name] = importlib.import_module(info.name)
+    return d
+
+load_feedback()
+
 # import postprocessing.loaders
 # def load_loaders():
 #     d = {}
