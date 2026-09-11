@@ -7,24 +7,14 @@ the bespoke layout creation.
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.components import project_selector
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import maps
+from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
 from newsegsmodelapp.newsegsbrowser.layouts.feedback import indicative_net_energy
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
-
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import generation_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import storage_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import building_consumption_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import direct_consumption_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import model_settings_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import gen_cost_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import storage_cost_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import sales_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import import_cost_input_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.inputs import finance_settings_input_sprake
 
 from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
 from newsegsmodelapp.newsegsbrowser.layouts.results import configuration_selector
@@ -45,29 +35,29 @@ DEFAULT_LAYOUT_CONFIGURATION = {
     'width_map': 11,
     'layout_top_feedback': indicative_net_energy.create_indicative_net_energy_card,
     'width_top_feedback': 12,
-    'layout_generation_input': generation_input_sprake.create_generation_input_card,
+    'layout_generation_input': input_sections_sprake.create_generation_input_card,
     'width_generation_input': 6,
-    'layout_storage_input': storage_input_sprake.create_storage_input_card,
+    'layout_storage_input': input_sections_sprake.create_storage_input_card,
     'width_storage_input': 6,
-    'layout_building_consumption_input': building_consumption_input_sprake.create_building_consumption_input_card,
+    'layout_building_consumption_input': input_sections_sprake.create_building_consumption_input_card,
     'width_building_consumption_input': 6,
-    'layout_direct_consumption_input': direct_consumption_input_sprake.create_direct_consumption_input_card,
+    'layout_direct_consumption_input': input_sections_sprake.create_direct_consumption_input_card,
     'width_direct_consumption_input': 6,
     'layout_grid_input': NULL_LAYOUT,
     'width_grid_input': 12,
     'layout_environment_input': NULL_LAYOUT,
     'width_environment_input': 12,
-    'layout_model_settings_input': model_settings_input_sprake.create_model_settings_input_card,
+    'layout_model_settings_input': input_sections_sprake.create_model_settings_input_card,
     'width_model_settings_input': 12,
-    'layout_generation_cost_input': gen_cost_input_sprake.create_gen_cost_input_card,
+    'layout_generation_cost_input': input_sections_sprake.create_gen_cost_input_card,
     'width_generation_cost_input': 6,
-    'layout_storage_cost_input': storage_cost_input_sprake.create_storage_cost_input_card,
+    'layout_storage_cost_input': input_sections_sprake.create_storage_cost_input_card,
     'width_storage_cost_input': 6,
-    'layout_sales_input': sales_input_sprake.create_sales_input_card,
+    'layout_sales_input': input_sections_sprake.create_sales_input_card,
     'width_sales_input': 6,
-    'layout_import_cost_input': import_cost_input_sprake.create_import_cost_input_card,
+    'layout_import_cost_input': input_sections_sprake.create_import_cost_input_card,
     'width_import_cost_input': 6,
-    'layout_finance_settings_input': finance_settings_input_sprake.create_finance_settings_input_card,
+    'layout_finance_settings_input': input_sections_sprake.create_finance_settings_input_card,
     'width_finance_settings_input': 12,
 
     'layout_results_header': results_header.create_results_header,
@@ -245,7 +235,7 @@ def create_model_configuration_layout(*args, **kwargs):
                 + [html.Hr()]
                 + results_section
                 + background_callback_error_handler_components()
-                + clayouts.post_page_load_components(
+                + create_post_page_load_components(
                     kwargs.get('selected_model'),
                     kwargs.get('page_type')
                 )

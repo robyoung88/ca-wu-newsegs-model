@@ -322,9 +322,6 @@ class NewsegsMetaModel(NewsegsComponent):
 
         det_changed = old_value != new_value
 
-        if det_changed:
-            self.require_sync.add(varid)
-
         return is_ok, det_changed, dsa_changed, psa_changed, new_params
     
     def update_model_from_variable_deterministic(

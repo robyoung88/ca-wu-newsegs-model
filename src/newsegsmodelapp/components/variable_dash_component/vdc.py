@@ -8,6 +8,8 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 
+from newsegsmodelapp.components.input_components import create_numeric_variable_parameter_input
+from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelframework.newsegsvariable import variable
 import newsegsmodelapp.newsegsbrowser.common as browser
 
@@ -117,13 +119,13 @@ def create_dsa_input_vector_parameter_input(
         param_class = parameter_names
 
     def make_input(placeholder: Any):
-        return dbc.Input(type = 'number', debounce = True, placeholder = placeholder)
+        return dbc.Input(type = 'number', debounce = True, placeholder = placeholder) # pyright: ignore[reportCallIssue]
 
     def make_inputgroup(label: str, placeholder: Any):
         return dbc.InputGroup([
-            dbc.InputGroupText(label+':'),
+            dbc.InputGroupText(label+':'), # pyright: ignore[reportCallIssue]
             make_input(placeholder)
-        ])
+        ]) # pyright: ignore[reportCallIssue]
     
     rval = []
     for idx in are_scalars:
@@ -181,29 +183,34 @@ def _create_numeric_inputgroup_from_var(
     max: int | float | None = None,
     stepscale: float = 1.,
     type_id: str | None = None,
-    
-
+    supersection: str = 'deterministic',
+    purpose: str = 'parameter',
 ):
     if type_id is None:
-        type_id = f'input-{var.configuration_type}-config'
+        type_id = f'single-input-config'
+    
+    variable_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = type_id,
+        supersection = supersection,
+        purpose = purpose,
+        parameter_index = parameter_index
+    )
     
     return dbc.InputGroup(
         [
-            dbc.InputGroupText(parameter_name + ":"),
-            browser.create_numeric_input_compound_key(
-                type_id,
-                var.interface_key,
-                section = var.interface_section,
-                subindex = var.interface_subindex,
-                parameter_index = parameter_index,
-                value = var._raw_parameters[parameter_index], # pyright: ignore[reportArgumentType]
+            dbc.InputGroupText(parameter_name + ":"), # pyright: ignore[reportCallIssue]
+            
+            create_numeric_variable_parameter_input(
+                variable_id,
+                value = var.raw_parameters[parameter_index], # pyright: ignore[reportArgumentType]
                 placeholder = parameter_name,
                 min = min,
                 max = max,
                 step = var.interface_step * stepscale if var.interface_step else 1
-            )
+            ),
         ]
-    )
+    ) # pyright: ignore[reportCallIssue]
 
 def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
@@ -211,6 +218,21 @@ def create_dsa_bounds_inputs_scalar(
 ):
     type_id_lower = f'input-dsabound-lower'
     type_id_upper = f'input-dsabound-upper'
+
+    variable_id_lower = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-config',
+        supersection = 'dsa',
+        purpose = 'bound-lower',
+    )
+
+    variable_id_upper = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-config',
+        supersection = 'dsa',
+        purpose = 'bound-upper',
+    )
+
     match bounds_type:
         case 'absolute' | 'relative' | 'offset':
             if bounds_type == 'relative':
@@ -222,40 +244,32 @@ def create_dsa_bounds_inputs_scalar(
 
             return [
                 dbc.InputGroup([
-                    dbc.InputGroupText('Lower:'),
-                    browser.create_numeric_input_compound_key(
-                        type_id_lower,
-                        var.interface_key,
-                        section = var.interface_section,
-                        subindex = var.interface_subindex,
+                    dbc.InputGroupText('Lower:'), # pyright: ignore[reportCallIssue]
+                    
+                    create_numeric_variable_parameter_input(
+                        variable_id_lower,
                         value = var.dsa_lower, # pyright: ignore[reportArgumentType]
                         step = step_size
-                    )
+                    ),
                 ]
-                ),
+                ), # type: ignore
                 dbc.InputGroup([
-                    dbc.InputGroupText('Upper:'),
-                    browser.create_numeric_input_compound_key(
-                        type_id_upper,
-                        var.interface_key,
-                        section = var.interface_section,
-                        subindex = var.interface_subindex,
+                    dbc.InputGroupText('Upper:'), # pyright: ignore[reportCallIssue]
+                    create_numeric_variable_parameter_input(
+                        variable_id_upper,
                         value = var.dsa_upper, # pyright: ignore[reportArgumentType]
                         step = step_size
-                    )
+                    ),
                 ]
                 ),
             ]
         case 'interval':
             return [
                 dbc.InputGroup([
-                    dbc.InputGroupText('Confidence:'),
-                    browser.create_numeric_input_compound_key(
-                        type_id_lower,
-                        var.interface_key,
-                        section = var.interface_section,
-                        subindex = var.interface_subindex,
-                        value = var.dsa_lower # pyright: ignore[reportArgumentType]
+                    dbc.InputGroupText('Confidence:'), # pyright: ignore[reportCallIssue]
+                    create_numeric_variable_parameter_input(
+                        variable_id_lower,
+                        value = var.dsa_lower, # pyright: ignore[reportArgumentType]
                     )
                 ])
             ] 
@@ -269,7 +283,7 @@ def create_dsa_bounds_input_vector(
 ):
     
     def make_input(placeholder: Any):
-        return dbc.Input(type = 'number', debounce = True, placeholder = placeholder)
+        return dbc.Input(type = 'number', debounce = True, placeholder = placeholder) # pyright: ignore[reportCallIssue]
     
     # TODO: Make this responsive to the variable
     n_values = 2
@@ -316,21 +330,17 @@ def create_dsa_bound_type_selector(
     selected_bound,
     var: variable.Variable,
 ):
-    type_id = f'dropdown-dsaboundtype'
-    section = var.interface_section
-    if section is None:
-        section = 'None'
-    id_ = {
-        'type': type_id,
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    id_ = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'dropdown',
+        supersection = 'dsa',
+        purpose = 'dsaboundtype'
+    )
     return [
         dcc.Dropdown(
             permitted_dsa_bounds,
             selected_bound,
-            id = id_,
+            id = id_.as_dict(),
             searchable = False,
             clearable = False
         )
@@ -343,37 +353,40 @@ def compose_dsa_input(
     dsa_bound_component,
     var: variable.Variable,
 ):
-    section = var.interface_section
-    if section is None:
-        section = 'None'
-    
-    overall_id = {
-        'type': 'dsa-input-element',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    overall_input_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-component',
+        supersection = 'dsa',
+        purpose = 'input-group-container',
+    )
 
-    toggle_id = {
-        'type': 'toggle-dsa-variable',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    toggle_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'toggle',
+        supersection = 'dsa',
+        purpose = 'dsa-active'
+    )
 
-    header_id = {
-        'type': 'dsa-input-header',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    header_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-header',
+        supersection = 'dsa',
+        purpose = 'header',
+    )
 
-    bounds_id = {
-        'type': 'dsa-bounds-inputcontainer',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    bounds_container_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-component',
+        supersection = 'dsa',
+        purpose = 'bounds-container'
+    )
+
+    trigger_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-group-config-update-trigger',
+        supersection = 'dsa',
+        purpose = 'trigger',
+    )
 
     if var.dsa_selected:
         cn = 'dsa-input-single-value-block'
@@ -386,13 +399,13 @@ def compose_dsa_input(
             className = 'dsa-toggle',
             size = 30,
             value = var.dsa_selected,
-            id = toggle_id,
+            id = toggle_id.as_dict(),
         ),
         html.Details([
             html.Summary(
                 header_component,
                 className='dsa-configuration-summary',
-                id = header_id
+                id = header_id.as_dict()
             ),
             html.Div((
                 parameter_component
@@ -400,15 +413,16 @@ def compose_dsa_input(
                 + [
                     html.Span(
                         dsa_bound_component,
-                        id = bounds_id
+                        id = bounds_container_id.as_dict()
                     )
                 ]
             ))
         ],
         ),
+        dcc.Store(id = trigger_id.as_dict())
     ],
     className=cn,
-    id = overall_id,
+    id = overall_input_id.as_dict(),
     )
 
 def create_dsa_header(
@@ -437,7 +451,9 @@ def create_dsa_input_scalar_constant(
         create_dsa_header(var),
         [
              _create_numeric_inputgroup_from_var(
-                var, 'Value', 0, min = var.interface_min, max = var.interface_max # pyright: ignore[reportArgumentType]
+                var, 'Value', 0,  # pyright: ignore[reportArgumentType]
+                min = var.interface_min, max = var.interface_max, 
+                supersection = 'dsa' # pyright: ignore[reportArgumentType]
             ),
         ],
         create_dsa_bound_type_selector(
@@ -462,10 +478,13 @@ def create_dsa_input_scalar_normal(
         create_dsa_header(var),
         [
             _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+                var, 'Mean', 0, 
+                min = var.interface_min, max = var.interface_max,
+                supersection = 'dsa'
             ),
             _create_numeric_inputgroup_from_var(
                 var, 'SD', 1, stepscale = 0.1,
+                supersection = 'dsa'
             ),
         ],
         create_dsa_bound_type_selector(
@@ -483,15 +502,16 @@ def create_dsa_input_scalar_normal(
 def create_dsa_input_scalar_beta(
     var: variable.NumericScalarVariable,
 ):
-    type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
         create_dsa_header(var),
         [
             _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
+                supersection = 'dsa'
             ),
             _create_numeric_inputgroup_from_var(
                 var, 'SD', 1, stepscale = 0.1,
+                supersection = 'dsa'
             ),
         ],
         create_dsa_bound_type_selector(
@@ -514,10 +534,12 @@ def create_dsa_input_scalar_gamma(
         create_dsa_header(var),
         [
             _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
+                supersection = 'dsa'
             ),
             _create_numeric_inputgroup_from_var(
                 var, 'SD', 1, stepscale = 0.1,
+                supersection = 'dsa'
             ),
         ],
         create_dsa_bound_type_selector(
@@ -531,20 +553,6 @@ def create_dsa_input_scalar_gamma(
         ),
         var
     )
-
-# def create_dsa_input_vector_mvn(
-#     var: variable.NumericVectorVariable,
-# ):
-#     fmt = var.value_formatter
-#     label = f'{var.label} ({var.unit})'
-#     type_id = f'input-{var.configuration_type}-config'
-#     return compose_dsa_input(
-#         create_dsa_input_vector_numeric_header(label, type_id, key, section),
-#         create_dsa_input_vector_parameter_input(OrderedDict(mean = ['shape', 'scale'], vcv = ['covariance']), ('vector', 'matrix'), type_id, key, section),
-#         create_dsa_bound_type_selector(['absolute', 'relative', 'offset', 'interval'],'interval', type_id, key, section),
-#         create_dsa_bounds_input_vector('relative', type_id, key, section),
-#         var
-#     )
 
 def create_psa_input_scalar_numeric_header(
     label: str,
@@ -631,30 +639,33 @@ def compose_psa_input(
     parameter_component,
     var: variable.Variable,
 ):
-    section = var.interface_section
-    if section is None:
-        section = 'None'
-    
-    overall_id = {
-        'type': 'psa-input-element',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex,
-    }
+    overall_input_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-component',
+        supersection = 'psa',
+        purpose = 'input-group-container',
+    )
 
-    toggle_id = {
-        'type': 'toggle-psa-variable',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    toggle_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'toggle',
+        supersection = 'psa',
+        purpose = 'psa-active',
+    )
 
-    header_id = {
-        'type': 'psa-input-header',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    header_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-header',
+        supersection = 'psa',
+        purpose = 'header'
+    )
+
+    trigger_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-group-config-update-trigger',
+        supersection = 'psa',
+        purpose = 'trigger',
+    )
 
     if var.psa_selected:
         cn = 'psa-input-single-value-block'
@@ -666,13 +677,13 @@ def compose_psa_input(
             className = 'psa-toggle',
             size = 30,
             value = var.psa_selected,
-            id = toggle_id,
+            id = toggle_id.as_dict(),
         ),
         html.Details([
             html.Summary(
                 header_component,
                 className = 'psa-configuration-summary',
-                id = header_id
+                id = header_id.as_dict()
             ),
             html.Div((
                 [html.Div(
@@ -681,10 +692,11 @@ def compose_psa_input(
                 )]
                 +parameter_component
             ))
-        ])
+        ]),
+        dcc.Store(id = trigger_id.as_dict())
     ],
     className = cn,
-    id = overall_id,
+    id = overall_input_id.as_dict(),
     )
 
 def create_psa_input_scalar_constant(
@@ -695,7 +707,9 @@ def create_psa_input_scalar_constant(
         create_psa_distribution_component(var),
         [
             _create_numeric_inputgroup_from_var(
-                var, 'Value', 0, min = var.interface_min, max = var.interface_max # pyright: ignore[reportArgumentType]
+                var, 'Value', 0, # pyright: ignore[reportArgumentType]
+                min = var.interface_min, max = var.interface_max,
+                supersection = 'psa'
             ),
         ],
         var
@@ -709,10 +723,12 @@ def create_psa_input_twoparam(
         create_psa_distribution_component(var),
         [
             _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max
+                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
+                supersection = 'psa'
             ),
             _create_numeric_inputgroup_from_var(
                 var, 'SD', 1, stepscale = 0.1,
+                supersection = 'psa'
             ),
         ],
         var
@@ -740,65 +756,69 @@ def compose_optim_input(
     bound_inputs,
     var
 ):
-    section = var.interface_section
-    if section is None:
-        section = 'None'
+    toggle_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'toggle',
+        supersection = 'optim',
+        purpose = 'toggle-optim-active',
+    )
 
-    toggle_id = {
-        'type': 'toggle-optim-variable',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    header_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-header',
+        supersection = 'optim',
+        purpose = 'header',
+    )
 
-    header_id = {
-        'type': 'optim-input-header',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    bounds_container_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'optim-bounds-inputcontainer',
+        supersection = 'optim',
+        purpose = 'container',
+    )
 
-    bounds_id = {
-        'type': 'optim-bounds-inputcontainer',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    trigger_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-group-config-update-trigger',
+        supersection = 'optim',
+        purpose = 'trigger',
+    )
 
     if var.optim_selected:
         cn = 'optim-input-single-value-block'
     else:
         cn = 'optim-input-single-value-block deselected'
 
-    overall_id = {
-        'type': 'optim-input-element',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    overall_input_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'input-component',
+        supersection = 'optim',
+        purpose = 'container'
+    )
 
     return html.Div([
         daq.ToggleSwitch(
             className = 'optim-toggle',
             size = 30,
             value = var.optim_selected,
-            id = toggle_id,
+            id = toggle_id.as_dict(),
         ),
         html.Details([
             html.Summary(
                 header,
                 className = 'optim-configuration-summary',
-                id = header_id
+                id = header_id.as_dict()
             ),
             html.Div((
                 #[positive_toggle]
                 #+[bounded_toggle]
-                [html.Span(bound_inputs, id = bounds_id)]
+                [html.Span(bound_inputs, id = bounds_container_id.as_dict())]
             ))
-        ])
+        ]),
+        dcc.Store(id = trigger_id.as_dict())
     ],
     className= cn,
-    id = overall_id
+    id = overall_input_id.as_dict()
     )
 
 def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.NumericScalarVariable | None = None):
@@ -816,47 +836,55 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
     if section is None:
         section = 'None'
 
+    input_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = f'single-input-config',
+        supersection = 'optim',
+        purpose = 'parameter',
+    )
+    
     if refvar is not None:
         content = [
             html.Span([
                 fmt(refvar.get_deterministic_value()), # pyright: ignore[reportArgumentType]
                 ' -> ',
-                browser.create_numeric_input_compound_key(
-                    f'input-{var.configuration_type}-config',
-                    var.interface_key,
-                    section = var.interface_section,
-                    subindex = var.interface_subindex,
-                    parameter_index = 0,
-                    value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                create_numeric_variable_parameter_input(
+                    input_id,
+                    value = var.raw_parameters[0], # pyright: ignore[reportArgumentType]
                     placeholder = var.name
                 ),
-                #fmt(var.get_deterministic_value()),
             ])
         ]
     else:
         content = [
             html.Span(
-                browser.create_numeric_input_compound_key(
-                    f'input-{var.configuration_type}-config',
-                    var.interface_key,
-                    section = var.interface_section,
-                    subindex = var.interface_subindex,
-                    parameter_index = 0,
-                    value = var._raw_parameters[0], # pyright: ignore[reportArgumentType]
+                create_numeric_variable_parameter_input(
+                    input_id,
+                    value = var.raw_parameters[0], # pyright: ignore[reportArgumentType]
                     placeholder = var.name
-                )
-                #fmt(var.get_deterministic_value()),
+                ),
             )
         ]
 
+    plot_button_id = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'action-button',
+        supersection = 'optim',
+        purpose = 'draw-marginal-plot',
+    )
     button_container_children = [
         dbc.Button(
             'Plot',
             color = 'primary',
-            id = {'type': 'optim-marginal-plot-button', 'section': section, 'key': var.interface_key, 'subindex': var.interface_subindex},
+            id = {
+                'type': 'optim-marginal-plot-button',
+                'section': section, 
+                'key': var.interface_key, 
+                'subindex': var.interface_subindex
+            },
             title = 'Plot marginal statistic',
             disabled = False
-        )
+        ) # pyright: ignore[reportCallIssue]
     ]
 
     return [
@@ -874,16 +902,13 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
     ]
 
 def create_positive_toggle(var):
-    section = var.interface_section
-    if section is None:
-        section = 'None'
+    toggleid = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'toggle',
+        supersection = 'optim',
+        purpose = 'variable-positive',
+    )
 
-    id = {
-        'type': 'toggle-optim-variable-positive',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
     return html.Span(
         [
             'Positive:',
@@ -891,23 +916,20 @@ def create_positive_toggle(var):
                 className = 'optim-opt-toggle',
                 size = 25,
                 value = False,
-                id = id,
+                id = toggleid.as_dict(),
             )
         ],
         className = 'optim-toggle-row',
     )
 
 def create_bounded_toggle(var):
-    section = var.interface_section
-    if section is None:
-        section = 'None'
-
-    id = {
-        'type': 'toggle-optim-variable-bounded',
-        'section': section,
-        'key': var.interface_key,
-        'subindex': var.interface_subindex
-    }
+    toggleid = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'toggle',
+        supersection = 'optim',
+        purpose = 'variable-bounded',
+    )
+    
     return html.Span(
         [
             'Bounded:',
@@ -915,44 +937,54 @@ def create_bounded_toggle(var):
                 className = 'optim-opt-toggle',
                 size = 25,
                 value = False,
-                id = id,
+                id = toggleid.as_dict(),
             )
         ],
         className = 'optim-toggle-row',
     )
 
 def create_optim_bound_inputs(var: variable.ScalarVariable):
+    variable_id_lower = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-config',
+        supersection = 'optim',
+        purpose = 'bound-lower'
+    )
+    variable_id_upper = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-config',
+        supersection = 'optim',
+        purpose = 'bound-upper'
+    )
+    variable_id_plotintervals = VariableInstanceParameterComponentID.from_variable(
+        var,
+        type = 'single-input-config',
+        supersection = 'optim',
+        purpose = 'plot-intervals',
+    )
+    
     return [
         dbc.InputGroup([
-            dbc.InputGroupText('Lower bound:'),
-            browser.create_numeric_input_compound_key(
-                    'input-optimbound-lower',
-                    var.interface_key,
-                    section = var.interface_section,
-                    subindex = var.interface_subindex,
-                    value = var.interface_min,
-                )
+            dbc.InputGroupText('Lower bound:'), # pyright: ignore[reportCallIssue]
+            create_numeric_variable_parameter_input(
+                variable_id_lower,
+                value = var.interface_min,
+            ),
         ]),
         dbc.InputGroup([
-            dbc.InputGroupText('Upper bound:'),
-            browser.create_numeric_input_compound_key(
-                    'input-optimbound-upper',
-                    var.interface_key,
-                    section = var.interface_section,
-                    subindex = var.interface_subindex,
-                    value = var.interface_max
-                )
+            dbc.InputGroupText('Upper bound:'), # pyright: ignore[reportCallIssue]
+            create_numeric_variable_parameter_input(
+                variable_id_upper,
+                value = var.interface_max,
+            ),
         ]),
         dbc.InputGroup([
-            dbc.InputGroupText('N plot:'),
-            browser.create_numeric_input_compound_key(
-                    'input-optim-plotintervals',
-                    var.interface_key,
-                    section = var.interface_section,
-                    subindex = var.interface_subindex,
-                    value = 10,
-                    step = 1
-                )
+            dbc.InputGroupText('N plot:'), # pyright: ignore[reportCallIssue]
+            create_numeric_variable_parameter_input(
+                variable_id_plotintervals,
+                value = 10,
+                step = 1,
+            ),
         ])
     ]
 

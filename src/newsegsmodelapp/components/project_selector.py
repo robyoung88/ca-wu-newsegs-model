@@ -1,3 +1,4 @@
+import datetime
 import json
 from typing import cast
 
@@ -9,38 +10,9 @@ import sqlalchemy as sa
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db import db_tables as tbls
 from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelapp.newsegsbrowser.common import get_triggered_value
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-
-
-# -----------------------------------------------------------------------------
-# Helper Database Query Functions
-# -----------------------------------------------------------------------------
-def get_all_projects():
-    engine = db.get_engine()
-    with engine.connect() as conn:
-        stmt = sa.select(tbls.projects.c.id, tbls.projects.c.label)
-        return conn.execute(stmt).fetchall()
-
-def get_snapshots_for_project(project_id):
-    if not project_id:
-        return []
-    engine = db.get_engine()
-    with engine.connect() as conn:
-        stmt = sa.select(tbls.snapshots.c.snapshot_id, tbls.snapshots.c.label).where(tbls.snapshots.c.project_id == project_id)
-        return conn.execute(stmt).fetchall()
-
-def delete_project_by_id(project_id: int):
-    engine = db.get_engine()
-    with engine.begin() as conn:
-        conn.execute(tbls.snapshots.delete().where(tbls.snapshots.c.project_id == project_id))
-        conn.execute(tbls.projects.delete().where(tbls.projects.c.project_id == project_id))
-
-def create_snapshot(project_id: int, label: str) -> int:
-    engine = db.get_engine()
-    with engine.begin() as conn:
-        res = conn.execute(tbls.snapshots.insert().values(project_id=project_id, label=label))
-        return res.inserted_primary_key[0]
 
 # -----------------------------------------------
 # Helper functions
@@ -94,6 +66,26 @@ def create_project(
     project_provider.upsert_component(new_proj)
     return new_proj
 
+def create_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    current_project_id: str,
+    snapshot_label: str | None,
+) -> int:
+    snapshot_label = snapshot_label if snapshot_label else str(datetime.datetime.now())
+    return project_provider.create_project_snapshot(current_project_id, snapshot_label)
+
+def load_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    current_project_id: str,
+    snapshot_id: str
+) -> NewsegsProject:
+    int_snapshot_id = int(snapshot_id)
+    new_proj = project_provider.load_project_snapshot(current_project_id, int_snapshot_id)
+    new_proj.name = new_proj.name + ' from snapshot'
+    new_proj.revision += 1
+    project_provider.upsert_component(new_proj)
+    return new_proj
+
 def delete_project(
     project_provider: NewsegsProjectProviderInterface,
     project_id: str,
@@ -101,23 +93,6 @@ def delete_project(
     returned = project_provider.delete_component(project_id)
     if returned:
         raise ValueError('Project could not be deleted')
-    
-def insert_new_project(label: str | None = None) -> int:
-    """Inserts a new project into the database and returns its project_id"""
-    global results
-    results.append({'project_id': len(results), 'label': label})
-    return results[-1].get('project_id')
-    engine = db.get_engine()
-    with engine.begin() as conn:
-        result = conn.execute(
-            tbls.projects.insert().values(
-                label = label if label else sa.null,
-                retain = False
-            )
-        )
-    if result is None or result.inserted_primary_key is None:
-        raise ValueError(f'Project not inserted: {label}')
-    return result.inserted_primary_key[0]
 
 # -----------------------------------------------
 # Layout component
@@ -402,7 +377,7 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
         # Triggers
         Input("btn-save-project", "n_clicks"),
         Input("btn-load-project", "n_clicks"),
-        Input("delete-confirm-dialog", "submit_n_clicks"),
+        Input("delete-project-confirm-dialog", "submit_n_clicks"),
         Input("btn-save-snapshot", "n_clicks"),
         Input("btn-load-snapshot", "n_clicks"),
 
@@ -420,6 +395,11 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
         project_label, snapshot_label, active_project_id, app_state
     ):
         triggered = ctx.triggered_id
+        trig_val = get_triggered_value()
+        if not trig_val:
+            return no_update, no_update
+        print('project selector event: ',triggered)
+        print('project selector triggering value: ', trig_val)
 
         # Save Project
         if triggered == "btn-save-project" and project_label:
@@ -443,33 +423,47 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
             return no_update, no_update
 
         # Delete Project
-        if triggered == "delete-confirm-dialog" and active_project_id:
-            delete_project_by_id(active_project_id)
+        if triggered == "delete-project-confirm-dialog" and active_project_id and trig_val:
+            delete_project(
+                app.project_provider,
+                active_project_id
+            )
             return None, None
 
         # Create Snapshot
-        if triggered == "btn-save-snapshot" and current_active_proj and snapshot_label:
-            snap_id = create_snapshot(current_active_proj, snapshot_label.strip())
-            return current_active_proj, snap_id
+        if triggered == "btn-save-snapshot" and active_project_id and snapshot_label:
+            snap_id = create_snapshot(
+                app.project_provider,
+                active_project_id, 
+                snapshot_label.strip()
+            )
+            return active_project_id, str(snap_id)
 
         # Load Snapshot
-        if triggered == "btn-load-snapshot" and current_active_proj and snapshot_label:
-            snaps = get_snapshots_for_project(current_active_proj)
-            snap_id = next((s.snapshot_id for s in snaps if s.label == snapshot_label), None)
-            return current_active_proj, snap_id
+        if triggered == "btn-load-snapshot" and active_project_id and snapshot_label:
+            all_snapshots = fetch_snapshot_options(app.project_provider, active_project_id)
+            snap_id = next((s['value'] for s in all_snapshots if s['label'] == snapshot_label), None)
+            if snap_id:
+                new_proj = load_snapshot(
+                    app.project_provider,
+                    active_project_id,
+                    snap_id,
+                )
+                return new_proj.id, snap_id
+            return no_update, no_update
 
-        return current_active_proj, None
+        return active_project_id, None
 
 
-    # @app.callback(
-    #     Output("delete-confirm-dialog", "displayed"),
-    #     Input("btn-delete-project", "n_clicks"),
-    #     prevent_initial_call=True,
-    # )
-    # def display_delete_confirm(n_clicks):
-    #     if n_clicks:
-    #         return True
-    #     return False
+    @app.callback(
+        Output("delete-project-confirm-dialog", "displayed"),
+        Input("btn-delete-project", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def display_delete_confirm(n_clicks):
+        if n_clicks:
+            return True
+        return False
 
 
     # @app.callback(

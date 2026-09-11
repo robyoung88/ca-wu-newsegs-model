@@ -264,11 +264,11 @@ def add_feedback_callbacks(app, acm: NewsegsBrowserCacheManager):
     """
 
     @app.callback(
-        Output({'type': 'input-header', 'section': 'model-config', 'key': ALL}, 'children'),
+        Output({'type': 'input-section-header', 'section': 'model-config', 'key': ALL}, 'children'),
         
         Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
         State('store-selected-configuration', 'data'),
-        State({'type': 'input-header', 'section': 'model-config', 'key': ALL}, 'id'),
+        State({'type': 'input-section-header', 'section': 'model-config', 'key': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )
@@ -288,12 +288,12 @@ def add_feedback_callbacks(app, acm: NewsegsBrowserCacheManager):
     
     # Trigger on both model and finance config updates
     @app.callback(
-        Output({'type': 'input-header', 'section': 'finance-config', 'key': ALL}, 'children'),
+        Output({'type': 'input-section-header', 'section': 'finance-config', 'key': ALL}, 'children'),
         
         Input({'type': 'trigger', 'page': ALL, 'key': 'finance-config'}, 'data'),
         Input({'type': 'trigger', 'page': ALL, 'key': 'model-config'}, 'data'),
         State('store-selected-configuration', 'data'),
-        State({'type': 'input-header', 'section': 'finance-config', 'key': ALL}, 'id'),
+        State({'type': 'input-section-header', 'section': 'finance-config', 'key': ALL}, 'id'),
         State('selected-model', 'data'),
         prevent_initial_call = True
     )

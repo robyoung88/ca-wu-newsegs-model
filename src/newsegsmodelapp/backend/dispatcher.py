@@ -31,11 +31,11 @@ def run_proxy(server = DISPATCHSERVER, frontendport = FRONTENDPORT, backendport 
     zmq.proxy(frontend, backend)
 
 def run_dispatcher(
-        num_workers = 4, 
-        db_path: str | Path = DB_PATH,
+        num_workers = 4,
         server = DISPATCHSERVER,
         frontendport = FRONTENDPORT,
-        backendport = BACKENDPORT
+        backendport = BACKENDPORT,
+        stop_event = None,
     ):
     """Supervisor to the proxy and workers"""
     # Start Proxy in the background
@@ -54,7 +54,7 @@ def run_dispatcher(
     for idx in range(num_workers):
         p = multiprocessing.Process(
             target = worker_process,
-            args = (idx, db_path)
+            args = (idx, server, backendport)
         )
         p.start()
         workers[idx] = p
@@ -64,7 +64,8 @@ def run_dispatcher(
 
     try:
         # The supervisor loop
-        while True:
+        while stop_event is None or not stop_event.is_set():
+            
             for idx in range(num_workers):
                 # Check if process has died
                 if not workers[idx].is_alive():
@@ -73,7 +74,7 @@ def run_dispatcher(
                     # Spawn a replacement worker
                     p = multiprocessing.Process(
                         target = worker_process,
-                        args = (idx, db_path)
+                        args = (idx, server, backendport)
                     )
                     p.start()
                     workers[idx] = p
@@ -81,7 +82,13 @@ def run_dispatcher(
             # Check if proxy has died
             if not proxy_process.is_alive():
                 print(f"CRITICAL: Proxy died! Restarting...")
-                proxy_process = multiprocessing.Process(target = run_proxy)
+                proxy_process = multiprocessing.Process(
+                    target = run_proxy,
+                    kwargs = {
+                        'server': server, 
+                        'frontendport': frontendport, 
+                        'backendport': backendport
+                    })
                 proxy_process.start()
 
             # Check for dead jobs
@@ -95,10 +102,16 @@ def run_dispatcher(
 
     except KeyboardInterrupt:
         print('\nShutting down supervisor...')
-        proxy_process.terminate()
+    finally:
+        # Ensure all subprocesses are terminated upon exit
+        if proxy_process.is_alive():
+            proxy_process.terminate()
+            proxy_process.join(timeout=1)
         for p in workers.values():
-            p.terminate()
-
+            if p.is_alive():
+                p.terminate()
+                p.join(timeout=1)
+            
 def _cleanup_dead_jobs(engine, dead_interval_seconds: int) -> int:
     stmt = (
         sa.update(runs)

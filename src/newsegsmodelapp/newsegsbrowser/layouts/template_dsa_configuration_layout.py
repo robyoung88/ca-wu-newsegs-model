@@ -6,15 +6,15 @@ from typing import cast
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
-from newsegsmodelapp.newsegsbrowser import variable_dash_component as var_dc
+
 from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import optim
-from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
 
@@ -340,7 +340,7 @@ def create_dsa_layout(*args, **kwargs):
             + clayouts.metamodel_process_components()
             + clayouts.dsa_process_components(**kwargs)
             + background_callback_error_handler_components()
-            + clayouts.post_page_load_components(
+            + create_post_page_load_components(
                 kwargs.get('selected_model'),
                 kwargs.get('page_type')
                 )

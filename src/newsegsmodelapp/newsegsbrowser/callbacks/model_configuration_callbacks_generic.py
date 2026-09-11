@@ -11,7 +11,7 @@ import dash_bootstrap_components as dbc
 from newsegsmodelapp.newsegsbrowser import icons
 from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 import newsegsmodelapp.newsegsbrowser.common as browser
-from newsegsmodelapp.newsegsbrowser import variable_dash_component as var_dc
+from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelapp.newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 
 from newsegsmodelapp.newsegsbrowser.layouts.results import configuration_selector
@@ -23,75 +23,7 @@ from newsegsmodelframework.newsegsvariable import variable
 import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
 
 logger = logging.getLogger(__name__)
-
-def create_dsa_input(
-    var: variable.Variable
-):
-    if not var.dsa_show:
-        return []
-    match var.distribution.distribution:
-        case 'constant':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_constant
-        case 'numeric_constant':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_constant
-        case 'normal':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_normal
-        case 'beta':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_beta
-        case 'gamma':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_gamma
-        case _:
-            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
     
-    if is_scalar:
-        var = cast(variable.NumericScalarVariable, var)
-        return creation_func(var)
-    else:
-        raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
-    
-def create_psa_input(
-    var: variable.Variable
-):
-    if not var.psa_show:
-        return None
-    match var.distribution.distribution:
-        case 'constant':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_constant
-        case 'numeric_constant':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_constant
-        case 'normal':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_normal
-        case 'beta':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_beta
-        case 'gamma':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_gamma
-        case _:
-            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
-        
-    if is_scalar:
-        var = cast(variable.NumericScalarVariable, var)
-        return creation_func(var)
-    else:
-        raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
-    
-def create_optim_input(
-    var: variable.Variable
-):
-    if not var.optim_show:
-        return None
-    var = cast(variable.NumericScalarVariable, var)
-    return var_dc.create_optim_input(var)
-
 def get_or_create_metamodel_components(
     selected_configuration: dict[str, Any],
 

@@ -3,6 +3,7 @@ Unit tests for the ZeroMQ proxy
 """
 import os
 from pathlib import Path
+import random
 import tempfile
 import threading
 import time
@@ -36,27 +37,43 @@ class TestProxy(unittest.TestCase):
 
         cls.context = zmq.Context.instance()
         # Bind frontend and backend on dynamically allocated ports (port=0)
-        
-        cls.frontend_port = '8555'
-        cls.backend_port = '8556'
+        # Allocate ephemeral ports dynamically
+        frontend_socket = cls.context.socket(zmq.ROUTER)
+        backend_socket = cls.context.socket(zmq.DEALER)
+
+        cls.frontend_port = frontend_socket.bind_to_random_port("tcp://127.0.0.1")
+        cls.backend_port = backend_socket.bind_to_random_port("tcp://127.0.0.1")
+
+        frontend_socket.close(linger=0)
+        backend_socket.close(linger=0)
+
+        # # As won't do the bind until later, let's just try random ports.
+        # cls.frontend_port =  '8555'#str(random.randrange(8500, 8600))#'8555'
+        # while True:
+        #     cls.backend_port = '8556'#str(random.randrange(8500, 8600))
+        #     if cls.backend_port != cls.frontend_port:
+        #         break
 
         # Start proxy in a daemon thread
-        cls.stop_proxy_event = threading.Event()
-        cls.proxy_thread = threading.Thread(
+        cls.stop_dispatcher_event = threading.Event()
+        
+        cls.dispatcher_thread = threading.Thread(
             target = cls.run_proxy,
-            args = (cls.frontend_port, cls.backend_port, cls.stop_proxy_event),
+            args = (cls.frontend_port, cls.backend_port, cls.stop_dispatcher_event),
             daemon = True
         )
-        cls.proxy_thread.start()
+        cls.dispatcher_thread.start()
 
         # Give the proxy thread a moment to initialise
-        time.sleep(0.1)
+        time.sleep(0.5)
 
     @classmethod
     def tearDownClass(cls) -> None:
         """Clean up proxy threads"""
-        cls.stop_proxy_event.set()
+        cls.stop_dispatcher_event.set()
 
+        # Wait for the thread and its underlying multiprocessing children to terminate
+        cls.dispatcher_thread.join(timeout=3.0)
         cls.context.term()
 
     def setUp(self) -> None:
@@ -75,7 +92,8 @@ class TestProxy(unittest.TestCase):
             dispatcher.run_dispatcher(
                 server = '127.0.0.1',
                 frontendport = frontendport,
-                backendport = backendport
+                backendport = backendport,
+                stop_event = stop_event
             )
         except zmq.ZMQError:
             pass # Expected when sockets are closed during cleanup

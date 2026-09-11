@@ -6,6 +6,7 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 
+from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
@@ -251,7 +252,7 @@ def create_psa_layout(*args, **kwargs):
             + clayouts.model_run_components(**kwargs)
             + clayouts.finance_run_components(**kwargs)
             
-            + clayouts.post_page_load_components(
+            + create_post_page_load_components(
                 kwargs.get('selected_model'),
                 kwargs.get('page_type')
                 )

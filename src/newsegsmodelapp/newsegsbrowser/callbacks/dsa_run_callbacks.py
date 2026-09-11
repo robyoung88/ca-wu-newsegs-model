@@ -206,7 +206,7 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         ),
         prevent_initial_call = True
     )
-    def upload_psa_results(
+    def upload_dsa_results(
         uploads,
         triggers,
         configurations,

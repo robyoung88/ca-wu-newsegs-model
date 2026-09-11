@@ -48,3 +48,11 @@ class NewsegsProjectProviderInterface(NewsegsComponentProviderInterface, Newsegs
     def list_project_snapshots(self, project_id: str) -> pd.DataFrame:
         """Provide a list of available snapshots as a pandas dataframe."""
 
+    @abstractmethod
+    def create_project_snapshot(self, project_id: str, snapshot_label: str) -> int:
+        """Snapshot the project state."""
+
+    @abstractmethod
+    def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
+        """Recover a snapshot of the project state."""
+

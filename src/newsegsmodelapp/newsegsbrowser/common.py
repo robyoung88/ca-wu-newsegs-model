@@ -21,6 +21,7 @@ import pathvalidate
 from useful_types import SequenceNotStr
 
 # from newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager # Need __future__ for typing to avoid circular
+from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelapp.newsegsbrowser import icons
 from newsegsmodelapp.newsegsbrowser.icons import get_icon
 from newsegsmodelapp.newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
@@ -32,188 +33,6 @@ from newsegsmodelframework.newsegssensitivity import optim
 from newsegsmodelframework.util import jsonfuncs
 
 logger = logging.getLogger(__name__)
-
-def create_numeric_card_input(
-    icon_name: str | SequenceNotStr[str],
-    label: str,
-    input_id: str
-):
-    return html.Div([
-        html.H5([
-            get_icon(icon_name, None, 'default'),
-            html.Span(label+":", className='mr-3')
-        ],
-        style={'display':'inline'}),
-        dbc_Input(
-            id = input_id,
-            type = 'number',
-            placeholder = 0.0,
-            debounce = True,
-            style = {
-            'display': 'inline-block',
-            'float': 'right',
-            'width': '30%'
-            }
-        )
-    ])
-
-def create_numeric_input_compound_key(
-    type_id: str,
-    key: str,
-    section: str | None = None,
-    subindex: int = 0,
-    parameter_index: int = 0,
-    vector_location: int = 0,
-    placeholder: int | float | str = 0.0,
-    value: int | float | None = None,
-    min: int | float | None = 0.0,
-    max: int | float | None = None,
-    step: int | float  = 1
-):
-    if section is None:
-        section = 'None'
-    
-    input_id = {
-        'type': type_id,
-        'key': key,
-        'section': section,
-        'subindex': subindex,
-        'parameter_index': parameter_index,
-        'vector_location': vector_location,
-    }
-    if float(int(step)) == float(step):
-        step = int(step)
-        cn = f'dynamic-step-field step-val-{step:d}'
-    else:
-        cn = f'dynamic-step-field step-val-{step:f}'
-    
-    return dbc_Input(
-        id = input_id,
-        type = 'number',
-        value = value,
-        placeholder = placeholder,
-        debounce = True,
-        min = min,
-        max = max,
-        step = 'any',
-        className = cn,
-    )
-
-def create_value_reset_button(
-    key,
-    section,
-    subindex,
-    parameter_index,
-    vector_location
-):
-    if section is None:
-        section = 'None'
-    button_id = {
-        'type': 'value-reset-button',
-        'key': key,
-        'section': section,
-        'subindex': subindex,
-        'parameter_index': parameter_index,
-        'vector_location': vector_location,
-    }
-    return dbc_Button(
-        html.I(
-            className = icons.get_icon('value-reset', style_name = 'raw'),
-            style = {'display': 'inline'}
-        ),
-        color = 'light',
-        id = button_id,
-        title = 'Reset to default',
-        outline = False,
-        size = 'sm'
-    )
-
-def create_value_set_default_button(
-    key,
-    section,
-    subindex,
-    parameter_index,
-    vector_location
-):
-    if section is None:
-        section = 'None'
-    button_id = {
-        'type': 'value-set-default-button',
-        'key': key,
-        'section': section,
-        'subindex': subindex,
-        'parameter_index': parameter_index,
-        'vector_location': vector_location,
-    }
-    return dbc_Button(
-        html.I(
-            className = icons.get_icon('value-set-default', style_name = 'raw'),
-            style = {'display': 'inline'}
-        ),
-        color = 'light',
-        id = button_id,
-        title = 'Set default to current value',
-        outline = False,
-        size = 'sm',
-        class_name = 'set-default',
-    )
-
-def create_numeric_card_input_compound_key(
-    icon_name: str | SequenceNotStr[str],
-    label: str,
-    type_id: str,
-    key: str,
-    section: str | None = None,
-    subindex: int = 0,
-    parameter_index: int = 0,
-    vector_location: int = 0,
-    placeholder: int | float = 0.0,
-    value: int | float | None = None,
-    min: int | float | None = 0.0,
-    max: int | float | None = None,
-    step: int | float  = 1,
-    reset_button = True
-):  
-    button_elements = []
-    if reset_button:
-        button_elements = [
-            html.Details([
-                html.Summary(),
-                html.Div([
-                    create_value_reset_button(
-                        key, section, subindex, parameter_index, vector_location
-                    ),
-                    create_value_set_default_button(
-                        key, section, subindex, parameter_index, vector_location
-                    ),
-                ])
-            ])
-        ]
-    return html.Div(
-        button_elements + [
-        html.H5(
-            [
-                get_icon(icon_name, None, 'default'),
-                html.Span(label+":", className='mr-3')
-            ],
-            style={'display':'inline'}
-        ),
-        create_numeric_input_compound_key(
-            type_id,
-            key,
-            section,
-            subindex,
-            parameter_index,
-            vector_location,
-            placeholder,
-            value,
-            min,
-            max,
-            step
-        ),
-        ],
-        className = 'numeric-card-input'
-    )
 
 def unescape_html_icons(html_text):
     return (
@@ -551,10 +370,16 @@ def get_triggered_value() -> Any:
     trig_id = ctx.triggered_id
     if trig_id is None:
         return None
+    isdict = isinstance(trig_id, dict)
 
     val = None
     for prop in ctx.triggered:
-        pid = json.loads(prop['prop_id'].rsplit('.',1)[0])
+        pid = prop['prop_id'].rsplit('.',1)[0]
+        if isdict:
+            try:
+                pid = json.loads(pid)
+            except json.decoder.JSONDecodeError:
+                pass
         if pid == trig_id:
             val = prop['value']
             break
@@ -906,3 +731,107 @@ def metamodel_from_configuration_file(
         raise e
     
     return working_mm
+
+# ------------------------------------------------
+# DEPRECATED
+# ------------------------------------------------
+def create_numeric_input_compound_key(
+    type_id: str,
+    key: str,
+    section: str | None = None,
+    subindex: int = 0,
+    parameter_index: int = 0,
+    vector_location: int = 0,
+    placeholder: int | float | str = 0.0,
+    value: int | float | None = None,
+    min: int | float | None = 0.0,
+    max: int | float | None = None,
+    step: int | float  = 1
+):
+    if section is None:
+        section = 'None'
+    
+    input_id = {
+        'type': type_id,
+        'key': key,
+        'section': section,
+        'subindex': subindex,
+        'parameter_index': parameter_index,
+        'vector_location': vector_location,
+    }
+    if float(int(step)) == float(step):
+        step = int(step)
+        cn = f'dynamic-step-field step-val-{step:d}'
+    else:
+        cn = f'dynamic-step-field step-val-{step:f}'
+    
+    return dbc_Input(
+        id = input_id,
+        type = 'number',
+        value = value,
+        placeholder = placeholder,
+        debounce = True,
+        min = min,
+        max = max,
+        step = 'any',
+        className = cn,
+    )
+
+def create_numeric_card_input_compound_key(
+    icon_name: str | SequenceNotStr[str],
+    label: str,
+    type_id: str,
+    key: str,
+    section: str | None = None,
+    subindex: int = 0,
+    parameter_index: int = 0,
+    vector_location: int = 0,
+    placeholder: int | float = 0.0,
+    value: int | float | None = None,
+    min: int | float | None = 0.0,
+    max: int | float | None = None,
+    step: int | float  = 1,
+    reset_button = True
+):  
+    button_elements = []
+    if reset_button:
+        button_elements = [
+            html.Details([
+                html.Summary(),
+                html.Div([
+                    create_value_reset_button(
+                        key, section, subindex, parameter_index, vector_location
+                    ),
+                    create_value_set_default_button(
+                        key, section, subindex, parameter_index, vector_location
+                    ),
+                ])
+            ])
+        ]
+    return html.Div(
+        button_elements + [
+        html.H5(
+            [
+                get_icon(icon_name, None, 'default'),
+                html.Span(label+":", className='mr-3')
+            ],
+            style={'display':'inline'}
+        ),
+        create_numeric_input_compound_key(
+            type_id,
+            key,
+            section,
+            subindex,
+            parameter_index,
+            vector_location,
+            placeholder,
+            value,
+            min,
+            max,
+            step
+        ),
+        ],
+        className = 'numeric-card-input'
+    )
+
+

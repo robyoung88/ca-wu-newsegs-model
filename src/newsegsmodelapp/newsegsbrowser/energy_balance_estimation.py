@@ -1,4 +1,6 @@
 
+from typing import cast
+
 import pandas as pd
 
 class EstimatedEnergyBalance:
@@ -24,9 +26,12 @@ class EstimatedEnergyBalance:
         max_wind = self.estimated_maximum_daily_balance.loc[
             self.estimated_maximum_daily_balance['label']=='Wind', 'value'
         ].values[0]
+        max_wind = cast(float, max_wind)
+
         max_pv = self.estimated_maximum_daily_balance.loc[
             self.estimated_maximum_daily_balance['label']=='PV', 'value'
         ].values[0]
+        max_pv = cast(float, max_pv)
 
         PV_CF_ON_MAX_WIND = 0.19
         PV_CF_ON_MAX_DAY = 0.33
@@ -60,7 +65,7 @@ class EstimatedEnergyBalance:
             tot += v * self.estimated_annual_energy_balance.loc[
                 self.estimated_annual_energy_balance['label'] == k,
                 'value'
-            ].values[0] / 365
+            ].values[0] / 365 # pyright: ignore[reportOperatorIssue]
         self.estimated_maximum_daily_balance.loc[
             self.estimated_maximum_daily_balance['label']=='Consumption', 'value'
         ] = tot

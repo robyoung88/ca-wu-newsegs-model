@@ -423,7 +423,13 @@ def _create_cost_storage_header_summary(mm):
         "/yr"
     ]
 
-def _create_cost_sales_header_summary(mm, eb: energy_balance_estimation.EstimatedEnergyBalance):
+def _create_cost_sales_header_summary(
+        mm,
+        eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
+    ):
+    if not eb:
+        eb = energy_balance_estimation.EstimatedEnergyBalance()
+        eb = _update_estimated_energy_balance(mm, eb)
     
     n_units = _get_val(mm, 'bc_input.n_units.0')
 
@@ -487,7 +493,14 @@ def _create_cost_sales_header_summary(mm, eb: energy_balance_estimation.Estimate
         "/yr"
     ]
 
-def _create_cost_import_header_summary(mm, eb: energy_balance_estimation.EstimatedEnergyBalance):
+def _create_cost_import_header_summary(
+        mm,
+        eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
+    ):
+    if not eb:
+        eb = energy_balance_estimation.EstimatedEnergyBalance()
+        eb = _update_estimated_energy_balance(mm, eb)
+
     aeb = eb.estimated_annual_energy_balance
     total_consumption = (
         aeb

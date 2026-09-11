@@ -1,16 +1,13 @@
 import json
 
-from dash import Dash, Input, Output, ALL, ctx, no_update
+from dash import Input, Output, ALL, ctx, no_update
 
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser import variable_dash_component as var_dc
-from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 
 def assign_callbacks(app: NewsegsDash) -> NewsegsDash:#, acm: NewsegsBrowserCacheManager):
 
     @app.callback(
         Output('url', 'pathname'),
-        #Output('selected-model', 'data'),
         Input({'type': 'btn-model-type-selector', 'label': ALL}, 'n_clicks'),
         prevent_initial_call = True,
     )

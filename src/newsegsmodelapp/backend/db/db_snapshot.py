@@ -238,7 +238,7 @@ def generic_restore_snapshot(
                     if isinstance(table.columns[pk_cols[0]].type, sa.String): # This works because the type property is actually an instance
                         # Not autoincrement so PK is a stringified uuid4
                         old_pk_val = str(record.pop(pk_cols[0], None))
-                        prefix = old_pk_val.rsplit('-', 1)[0]
+                        prefix = old_pk_val.split('-', 1)[0]
                         while True:
                             new_pk_val = prefix + '-' + str(uuid.uuid4())
                             record[pk_cols[0]] = new_pk_val

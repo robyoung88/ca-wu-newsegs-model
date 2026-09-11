@@ -14,17 +14,17 @@ RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
 DISPATCHSERVER = settings['DISPATCHSERVERS'][0]
-BACKENDPORT = settings['BACKENDPORT']
+BACKENDPORT = str(settings['BACKENDPORT'])
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_tables import runs
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
 import newsegsmodelapp.registers as registers
 
-def worker_process(worker_id: str, db_path: str):
+def worker_process(worker_id: str, server: str = '127.0.0.1', port: str = BACKENDPORT):
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.connect(f'tcp://{"127.0.0.1"}:{BACKENDPORT}')
+    socket.connect(f'tcp://{server}:{port}')
 
     engine = db.get_engine()
 

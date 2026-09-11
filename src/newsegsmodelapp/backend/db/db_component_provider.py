@@ -1228,3 +1228,23 @@ class FromDatabaseNewsegsProjectProvider(
         with self._get_engine().begin() as conn:
             result = conn.execute(del_stmt)
             return result.rowcount
+
+    def create_project_snapshot(self, project_id: str, snapshot_label: str) -> int:
+        snapshot_id = db_snapshot.generic_snapshot_entity(
+            self._get_engine(),
+            tbls.metadata,
+            'projects',
+            project_id,
+            snapshot_label,
+            project_id
+        )
+        return snapshot_id
+
+    def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
+        id_remap = db_snapshot.generic_restore_snapshot(
+            self._get_engine(),
+            tbls.metadata,
+            snapshot_id
+        )
+        new_project_id = id_remap['projects'][project_id]
+        return self.get_component(new_project_id)

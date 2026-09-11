@@ -45,6 +45,18 @@ def load_tables():
 
 load_tables()
 
+# This should cover both INPUT_CONTAINER_CONTENT_CREATORS and INPUT_SECTION_HEADER_CONTENT_CREATORS
+import newsegsmodelapp.newsegsbrowser.layouts.inputs as input_layouts
+def load_input_container_content_creators():
+    d = {}
+    for info in pkgutil.iter_modules(
+        input_layouts.__path__, prefix = 'newsegsmodelapp.newsegsbrowser.layouts.inputs.'
+    ):
+        d[info.name] = importlib.import_module(info.name)
+    return d
+
+load_input_container_content_creators()
+
 # import postprocessing.loaders
 # def load_loaders():
 #     d = {}

@@ -10,8 +10,6 @@ from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from newsegsmodelapp.components import project_selector
-
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings
@@ -25,6 +23,12 @@ from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser.callbacks import model_selection_callbacks
+
+from newsegsmodelapp.components import project_selector
+from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
+from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.input_container_callbacks import add_input_container_callbacks
+
 
 # LAYOUTS
 from newsegsmodelapp.newsegsbrowser.layouts import model_selection_layout
@@ -48,6 +52,8 @@ def serve_layout():
         dcc.Store(id = 'session-id', data = '', storage_type = 'local'),
         dcc.Store(id = 'app-state', data = '{}', storage_type = 'session'),
         dcc.Store(id = 'active-project-id', data = '', storage_type = 'session'),
+        dcc.Store(id = 'layout-update-trigger', data = '', storage_type = 'memory'),
+        dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
     ])
 
 # -----------------------------------------------
@@ -178,6 +184,8 @@ def create_app(external_stylesheets = None) -> Dash:
 
     # Bind callbacks
     app = add_display_callbacks(app)
+    app = add_post_page_load_callbacks(app)
+    app = add_input_container_callbacks(app)
     app = model_selection_callbacks.assign_callbacks(app)
     app = project_selector.add_project_selector_callbacks(app)
 

@@ -1,12 +1,13 @@
 """Registers and associated for the various dispatch functions"""
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from dash.development.base_component import Component as DashComponent
 import sqlalchemy as sa
 
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
 
 # -------------------------------------------------------------------------
@@ -217,7 +218,7 @@ TABLE_DRAW_REGISTER: dict[
         Callable,
         Callable,
     ], str]] = {}
-"""Register of functions to create table data given a tuple of live results.
+"""Register of functions to create table data after a Run.
 
 Keyed by a tuple of:
     (table_section_name [str], model_type[str])
@@ -255,6 +256,176 @@ def get_table_draw(table_section: str, request: RunRequest):
 
     return proc
 
+
+# -------------------------------------------------------------------------
+# Input Layouts
+# -------------------------------------------------------------------------
+INPUT_CONTAINER_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        NewsegsProjectProviderInterface
+    ], list[DashComponent]]] = {}
+"""Register of functions to create Input fields within input-containers.
+
+Keyed by a tuple of:
+    supersection [str] - e.g. dsa, model-inputs etc
+    section [str | None] - e.g. gen-inputs
+    model_type [str]
+"""
+
+def register_input_container_content_creator(supersection: str, section: str | None, model_type: str):
+    section = section if section else 'ALL'
+    key = (supersection, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in INPUT_CONTAINER_CONTENT_CREATORS:
+                raise KeyError(f'Input container content creation function already exists for {key}')
+        INPUT_CONTAINER_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in INPUT_CONTAINER_CONTENT_CREATORS:
+            INPUT_CONTAINER_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def _three_param_key_getter_with_fallback(
+    dictionary_: dict[tuple[str, str | None, str], Any],
+    b_default: str = 'ALL',
+    c_default: str = 'default',
+    return_type_description: str = 'value'
+):
+    def f(a, b, c):
+        b = b_default if b is None else b
+        c = c_default if c is None else c
+
+        key = (a, b, c)
+        rval = dictionary_.get(key)
+        if rval:
+            return rval
+
+        # Fallback 1 - default model
+        key = (a, b, c_default)
+        rval = dictionary_.get(key)
+        if rval:
+            return rval
+
+        # Fallback 2 - generic section
+        key = (a, b_default, c)
+        rval = dictionary_.get(key)
+        if rval:
+            return rval
+
+        # Fallback 3 - generic section and default model
+        key = (a, b_default, c_default)
+        rval = dictionary_.get(key)
+        if rval:
+            return rval
+
+        key = (a, b, c)
+        KeyError(f'No {return_type_description} found for key {key} - available keys are {list(INPUT_CONTAINER_CONTENT_CREATORS.keys())}')
+    
+    return f
+
+def get_input_container_content_creator(
+    supersection: str, 
+    section: str | None, 
+    model_type: str = 'default'
+) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    getter = _three_param_key_getter_with_fallback(
+        INPUT_CONTAINER_CONTENT_CREATORS,
+        return_type_description = 'content creation function'
+    )
+    return cast(
+        Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]],
+        getter(supersection, section, model_type)
+    )
+
+
+INPUT_SECTION_HEADER_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        NewsegsProjectProviderInterface
+    ], list[DashComponent]]] = {}
+"""Register of functions to create feedback elements within `input-section-header`s.
+
+Keyed by a tuple of:
+    supersection [str] - e.g. dsa, model-inputs etc
+    section [str | None] - e.g. gen-inputs
+    model_type [str]
+"""
+
+def register_input_section_header_content_creator(supersection: str, section: str | None, model_type: str):
+    section = section if section else 'ALL'
+    key = (supersection, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in INPUT_SECTION_HEADER_CONTENT_CREATORS:
+                raise KeyError(f'Input header content creation function already exists for {key}')
+        INPUT_SECTION_HEADER_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in INPUT_SECTION_HEADER_CONTENT_CREATORS:
+            INPUT_SECTION_HEADER_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def get_input_section_header_content_creator(
+    supersection: str, 
+    section: str | None, 
+    model_type: str = 'default'
+) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    getter = _three_param_key_getter_with_fallback(
+        INPUT_SECTION_HEADER_CONTENT_CREATORS,
+        return_type_description = 'header content creation function'
+    )
+    return cast(
+        Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]], 
+        getter(supersection, section, model_type)
+    )
+
+
+SINGLE_INPUT_HEADER_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        NewsegsMetaModel
+    ], list[DashComponent]]] = {}
+"""Register of functions to create header elements for a single input.
+
+Keyed by a tuple of:
+    supersection [str] - e.g. deterministic, dsa.
+    section [str | None] - e.g. bc_input
+    model_type [str]
+
+Functions take the variable id as string and the containing metamodel.
+"""
+
+def register_single_input_header_content_creator(
+    supersection: str, section: str | None, model_type: str
+):
+    section = 'ALL' if section is None else section
+    key = (supersection, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in SINGLE_INPUT_HEADER_CONTENT_CREATORS:
+                raise KeyError(f'Single input header content creation already exists for {key}')
+        SINGLE_INPUT_HEADER_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in SINGLE_INPUT_HEADER_CONTENT_CREATORS:
+            SINGLE_INPUT_HEADER_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def get_single_input_header_content_creator(
+    supersection: str,
+    section: str | None,
+    model_type: str = 'default'
+):
+    getter = _three_param_key_getter_with_fallback(
+        SINGLE_INPUT_HEADER_CONTENT_CREATORS,
+        return_type_description = 'single input header content creation function'
+    )
+    return getter(supersection, section, model_type)
 
 # LOADER_REGISTER: dict[str, Callable[[str], Any]] =  {}
 # """Register of functions to retrieve results from a directory.
