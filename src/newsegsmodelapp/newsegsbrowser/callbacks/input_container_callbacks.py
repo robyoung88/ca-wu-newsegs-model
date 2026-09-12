@@ -45,7 +45,6 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         app_state,
         container_id
     ):
-        print('update input has been fired for ', container_id)
         trig = ctx.triggered_id
         if isinstance(trig, Mapping) and trig.get('type') == 'input-group-config-update-trigger':
             trig_val = get_triggered_value()
@@ -93,7 +92,6 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         app_state,
         container_id,
     ):
-        print('section header update triggered')
         app_state = json.loads(app_state) if app_state else {}
                 
         supersection = container_id.get('supersection')
@@ -172,7 +170,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'id'),
 
-        Input('active-project-id', 'data'),
+        State('active-project-id', 'data'),
         State('app-state', 'data'),
 
         prevent_initial_call = True
@@ -440,6 +438,25 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
             [bounds_input] * len(container_ids),
             [cn] * len(container_ids)
         )
+
+     # Updates to inputs based on config
+    @app.callback(
+        Output('site-location', 'data', allow_duplicate = True),
+        
+        Input('active-project-id', 'data'),
+        prevent_initial_call = True
+    )
+    def sync_loc_inputs_to_store(
+        active_project_id
+    ):
+        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+        
+        loc_input = {
+            'lat': mm.model.location.lat,
+            'lon': mm.model.location.lon,
+            'name': mm.model.location.name
+        }
+        return json.dumps(loc_input)
 
     @app.callback(
         Output({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'figure'),

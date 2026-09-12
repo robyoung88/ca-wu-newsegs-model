@@ -28,6 +28,7 @@ from newsegsmodelapp.components import project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.input_container_callbacks import add_input_container_callbacks
+from newsegsmodelapp.components import map
 
 
 # LAYOUTS
@@ -188,6 +189,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = add_input_container_callbacks(app)
     app = model_selection_callbacks.assign_callbacks(app)
     app = project_selector.add_project_selector_callbacks(app)
+    app = map.add_site_selector_callbacks(app)
 
     return app
 

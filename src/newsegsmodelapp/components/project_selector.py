@@ -386,13 +386,14 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
         State("snapshot-label-input", "value"),
         State("active-project-id", "data"),
         State('app-state', 'data'),
+        State("session-id", 'data'),
 
         prevent_initial_call=True,
     )
     def handle_project_actions(
         save_proj_click, load_proj_click, confirm_delete_click,
         save_snap_click, load_snap_click,
-        project_label, snapshot_label, active_project_id, app_state
+        project_label, snapshot_label, active_project_id, app_state, session_id
     ):
         triggered = ctx.triggered_id
         trig_val = get_triggered_value()
@@ -407,6 +408,7 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
                 app.project_provider,
                 active_project_id,
                 project_label.strip())
+            app.project_provider.set_session_project_id(session_id, new_proj.id)
             return new_proj.id, None
 
         # Load Project
@@ -419,6 +421,8 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
             )
             matched_id = next((p['value'] for p in all_projects if p['label'] == project_label), None)
             if matched_id:
+                print ('switching to project ', matched_id)
+                app.project_provider.set_session_project_id(session_id, matched_id)
                 return matched_id, None
             return no_update, no_update
 
@@ -449,6 +453,7 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
                     active_project_id,
                     snap_id,
                 )
+                app.project_provider.set_session_project_id(session_id, new_proj.id)
                 return new_proj.id, snap_id
             return no_update, no_update
 
