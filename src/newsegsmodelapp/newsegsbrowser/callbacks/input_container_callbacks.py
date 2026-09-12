@@ -107,45 +107,45 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
     @app.callback(
         Output({
             'type': 'single-input-config', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
         Output({
             'type': 'single-input-header', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'children'),
         Output({
             'type': 'input-group-config-update-trigger', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'data'),
 
         Input({
             'type': 'single-input-config', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
 
         State({
             'type': 'single-input-config', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'id'),
         State({
             'type': 'single-input-header', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'id'),
         State({
             'type': 'input-group-config-update-trigger', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'id'),
@@ -179,6 +179,8 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         input_returns: list[Any] = [no_update] * len(input_ids)
         header_returns: list[Any] = [no_update] * len(header_ids)
         trigger_returns: list[Any] = [no_update] * len(trigger_ids)
+
+        now = time.time_ns()
         
         match trigger_id['purpose']:
             case 'parameter':
@@ -216,7 +218,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                         header_returns[idx] = content_creator(varid, mm)
                 
                 # Update triggers
-                now = time.time_ns()
+                
                 for idx, id in enumerate(trigger_ids):
                     match id['supersection']:
                         case 'deterministic':
@@ -231,6 +233,53 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
 
                 # Sync project to store
                 app.project_provider.upsert_component(proj)
+
+                # TODO: Feed back to inputs if the update is not ok (set invalid)
+            case 'bound-lower' | 'bound-upper':
+                match trigger_id['supersection']:
+                    case 'dsa':
+                        new_val = get_triggered_value()
+                        proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                        mm = proj.get_focussed_metamodel()
+                        varid =  make_varid(**trigger_id)
+                        var = mm.variables.get(varid)
+                        if not var:
+                            raise PreventUpdate
+                        dsa_changed = False
+                        if trigger_id['purpose'] == 'bound-lower':
+                            if not new_val == var.dsa_lower:
+                                var.dsa_lower = new_val
+                                dsa_changed = True
+                        else:
+                            if not new_val == var.dsa_upper:
+                                var.dsa_upper = new_val
+                                dsa_changed = True
+
+                        if dsa_changed:
+                            # Update headers
+                            for idx, id in enumerate(header_ids):
+                                try:
+                                    content_creator = get_single_input_header_content_creator(
+                                        id['supersection'], id['section'], mm.model.model_type
+                                    )
+                                except KeyError:
+                                    content_creator = None
+                                if content_creator:
+                                    varid =  make_varid(**trigger_id)
+                                    header_returns[idx] = content_creator(varid, mm)
+
+                            # Update triggers
+                            for idx, id in enumerate(trigger_ids):
+                                match id['supersection']:
+                                    case 'dsa':
+                                        trigger_returns[idx] = now
+
+                        # Sync project to store
+                        app.project_provider.upsert_component(proj)
+                    case 'optim':
+                        # Only need to pick up the bounds values when we perform the optimisation.
+                        pass
+                            
             case _:
                 print(f'No handlers for purpose {trigger_id["purpose"]}')
 

@@ -4140,7 +4140,10 @@ class NumericVectorVariable(VectorVariable):
     @override
     def _set_native_parameters(self, parameters: ParamList) -> None:
         # Ensure that array types are recovered on deserialisation
-        px = list(parameters)
+        if not isinstance(parameters, Iterable):
+            px: list[Any] = [parameters, ]
+        else:
+            px: list[Any] = list(parameters)
         if not isinstance(px[0], np.ndarray):
             px[0] = np.asarray(px[0])
         #nd = len(px[0])
