@@ -4,7 +4,7 @@ Callbacks to populate input containers when the project or active metamodel chan
 
 import json
 import time
-from typing import Any, cast
+from typing import Any, Mapping, cast
 
 from dash import ALL, MATCH, Input, Output, State, no_update
 from dash import ctx
@@ -13,11 +13,13 @@ import numpy as np
 
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID, VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
+from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser.common import get_triggered_value
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
+from newsegsmodelframework.newsegsvariable import variable
 
 def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
     """
@@ -44,6 +46,13 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         container_id
     ):
         print('update input has been fired for ', container_id)
+        trig = ctx.triggered_id
+        if isinstance(trig, Mapping) and trig.get('type') == 'input-group-config-update-trigger':
+            trig_val = get_triggered_value()
+            if isinstance(trig_val, int):
+                # Standard update - do nothing.
+                raise PreventUpdate
+                        
         app_state = json.loads(app_state) if app_state else {}
         
         input_supersection = container_id.get('supersection')
@@ -84,6 +93,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         app_state,
         container_id,
     ):
+        print('section header update triggered')
         app_state = json.loads(app_state) if app_state else {}
                 
         supersection = container_id.get('supersection')
@@ -130,6 +140,18 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
+        Input({
+            'type': 'dropdown',
+            'supersection': ALL, 'purpose': ALL,
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL,
+        }, 'value'),
+        Input({
+            'type': 'toggle',
+            'supersection': ALL, 'purpose': ALL,
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL,
+        }, 'value'),
 
         State({
             'type': 'single-input-config', 
@@ -157,6 +179,8 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
     )
     def react_to_input_change(
         changed_input_values,
+        changed_dropdown_values,
+        changed_toggle_values,
         input_ids,
         header_ids,
         trigger_ids,
@@ -164,9 +188,8 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         active_project_id,
         app_state
     ):
-        print('Responding to a change in input within group ', input_ids, type(input_ids[0]))
+        
         print('Triggering object was ', ctx.triggered_id, type(ctx.triggered_id))
-        print('Changed values are ', changed_input_values)
         print('Header ids are ', header_ids)
         print('Trigger ids are ', trigger_ids)
         print('Updated value is ', get_triggered_value())
@@ -274,16 +297,149 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                                     case 'dsa':
                                         trigger_returns[idx] = now
 
-                        # Sync project to store
-                        app.project_provider.upsert_component(proj)
+                            # Sync project to store
+                            app.project_provider.upsert_component(proj)
+
                     case 'optim':
                         # Only need to pick up the bounds values when we perform the optimisation.
                         pass
-                            
+
+            case 'dsaboundtype':
+                new_val = get_triggered_value()
+                proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                mm = proj.get_focussed_metamodel()
+                varid =  make_varid(**trigger_id)
+                var = mm.variables.get(varid)
+                if not var or new_val == var.dsa_bounds_type:
+                    raise PreventUpdate
+
+                var.dsa_bounds_type = new_val
+                dsa_lower, dsa_upper = var.distribution.dsa_auto_values(var)
+                var.dsa_lower = dsa_lower
+                var.dsa_upper = dsa_upper
+
+                # Update inputs
+                for idx, id in enumerate(input_ids):
+                    if id['purpose'] == 'bound-lower':
+                        input_returns[idx] = dsa_lower
+                    if id['purpose'] == 'bound-upper':
+                        input_returns[idx] = dsa_upper
+
+                # Update headers
+                for idx, id in enumerate(header_ids):
+                    try:
+                        content_creator = get_single_input_header_content_creator(
+                            id['supersection'], id['section'], mm.model.model_type
+                        )
+                    except KeyError:
+                        content_creator = None
+                    if content_creator:
+                        varid =  make_varid(**trigger_id)
+                        header_returns[idx] = content_creator(varid, mm)
+                
+                # Update triggers with a dictionary, not an integer
+                trig_val = json.dumps({
+                    'message': 'dsa_bounds_modified',
+                    'time': now
+                })
+                for idx, id in enumerate(trigger_ids):
+                    match id['supersection']:
+                        case 'dsa':
+                            trigger_returns[idx] = trig_val
+
+                 # Sync project to store
+                app.project_provider.upsert_component(proj)
+
+            case 'dsa-active':
+                new_val = get_triggered_value()
+                proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                mm = proj.get_focussed_metamodel()
+                varid =  make_varid(**trigger_id)
+                var = mm.variables.get(varid)
+                if not var or new_val == var.dsa_selected:
+                    raise PreventUpdate
+
+                var.dsa_selected = new_val
+
+                # Update triggers with a dictionary, not an integer
+                trig_val = json.dumps({
+                    'message': 'dsa_selection_status_modified',
+                    'time': now
+                })
+                for idx, id in enumerate(trigger_ids):
+                    match id['supersection']:
+                        case 'dsa':
+                            trigger_returns[idx] = trig_val
+
+                # Sync project to store
+                app.project_provider.upsert_component(proj)
+
             case _:
                 print(f'No handlers for purpose {trigger_id["purpose"]}')
 
         return (input_returns, header_returns, trigger_returns)
+
+    @app.callback(
+        Output({
+            'type': 'input-component', 
+            'supersection': 'dsa', 'purpose': 'bounds-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'children'
+        ),
+        Output({
+            'type': 'input-component', 
+            'supersection': 'dsa', 'purpose': 'input-group-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'className'
+        ),
+
+        Input({
+            'type': 'input-group-config-update-trigger', 
+            'supersection': 'dsa', 'purpose': 'trigger',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'data'
+        ),
+
+        Input('active-project-id', 'data'),
+        State('app-state', 'data'),
+        State({
+            'type': 'input-component', 
+            'supersection': 'dsa', 'purpose': 'bounds-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'id'
+        ),
+    )
+    def update_dsa_input_contents(
+        input_group_triggers,
+        active_project_id,
+        app_state,
+        container_ids
+    ):
+        if not len(container_ids):
+            raise PreventUpdate
+        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+
+        varid = make_varid(**container_ids[0])
+        var = mm.variables.get(varid)
+        if not var:
+            raise PreventUpdate
+        if not isinstance(var, variable.NumericScalarVariable):
+            raise PreventUpdate
+        bounds_input = create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
+
+        if var.dsa_selected:
+            cn = 'dsa-input-single-value-block'
+        else:
+            cn = 'dsa-input-single-value-block deselected'
+
+        return (
+            [bounds_input] * len(container_ids),
+            [cn] * len(container_ids)
+        )
 
     @app.callback(
         Output({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'figure'),
