@@ -727,7 +727,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider.add_component(proj)
 
-        proj2 = proj_provider.get_component(proj.id)
+        proj2 = proj_provider.get_project(proj.id)
 
         proj.metamodels[0].model.run()
         proj2.metamodels[0].model.run()
@@ -738,6 +738,51 @@ class TestDatabaseStart(unittest.TestCase):
             mm1.finance.get_costs_series_discounted(),
             mm2.finance.get_costs_series_discounted()
         )
+
+    def test_modification_triggers(self):
+        import time
+        from newsegsmodelapp.backend import db
+        from newsegsmodelapp.backend.db import tables as tbls
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+
+        #proj_list = proj_provider.list_projects()
+        
+        proj = PROJECT_FACTORIES['sprake']()
+        proj_provider.add_component(proj)
+        with db.get_engine().connect() as conn:
+
+            init_values = tuple(conn.execute(
+                sa.select(
+                    tbls.projects.c.revision,
+                    tbls.projects.c.modified_at,
+                    tbls.projects.c.modified_order
+                )
+                .where(
+                    tbls.projects.c.id == proj.id
+                )
+            ).fetchone())
+
+        time.sleep(2)
+        proj.revision += 1
+        proj_provider.upsert_component(proj)
+        with db.get_engine().connect() as conn:
+        
+            updated_values = tuple(conn.execute(
+                sa.select(
+                    tbls.projects.c.revision,
+                    tbls.projects.c.modified_at,
+                    tbls.projects.c.modified_order
+                )
+                .where(
+                    tbls.projects.c.id == proj.id
+                )
+            ).fetchone())
+
+        self.assertNotEqual(init_values[0], updated_values[0], 'revision')
+        self.assertNotEqual(init_values[1], updated_values[1], 'modified_at')
+        self.assertNotEqual(init_values[2], updated_values[2], 'modified_order')
 
     def test_duplication_and_deletion(self):
         import numpy.testing as nptest
@@ -831,7 +876,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         self.assertEqual(is_ok, 'ok')
 
-        proj = proj_provider.get_component(proj.id)
+        proj = proj_provider.get_project(proj.id)
 
         grid = proj.metamodels[0].model.grid
         grid_res, verstring = result_provider.get_result('deterministic_grid', grid, True)

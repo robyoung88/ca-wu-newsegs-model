@@ -253,7 +253,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         if active_project_id is None or len(configuration_container_ids) == 0:
             raise PreventUpdate
 
-        proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+        proj = app.project_provider.get_project(active_project_id)
         config_rows = _create_configuration_rows_for_metamodels(proj.metamodels, proj.get_focussed_metamodel_index())
         header_elements = _create_configuration_header_elements_for_metamodels(proj.metamodels, proj.get_focussed_metamodel_index())
 
@@ -435,6 +435,8 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         trig_val = callback_utils.get_triggered_value()
+        if not trig_val:
+            raise PreventUpdate
 
         try:
             working_conf = trig_val

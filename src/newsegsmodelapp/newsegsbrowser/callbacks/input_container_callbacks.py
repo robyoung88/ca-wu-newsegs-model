@@ -210,7 +210,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         match trigger_id['purpose']:
             case 'parameter':
                 new_val = callback_utils.get_triggered_value()
-                proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                proj = app.project_provider.get_project(active_project_id)
                 mm = proj.get_focussed_metamodel()
                 variable_keys = {k: trigger_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
                 
@@ -264,7 +264,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                 match trigger_id['supersection']:
                     case 'dsa':
                         new_val = callback_utils.get_triggered_value()
-                        proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                        proj = app.project_provider.get_project(active_project_id)
                         mm = proj.get_focussed_metamodel()
                         varid =  make_varid(**trigger_id)
                         var = mm.variables.get(varid)
@@ -308,7 +308,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
 
             case 'dsaboundtype':
                 new_val = callback_utils.get_triggered_value()
-                proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                proj = app.project_provider.get_project(active_project_id)
                 mm = proj.get_focussed_metamodel()
                 varid =  make_varid(**trigger_id)
                 var = mm.variables.get(varid)
@@ -354,7 +354,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
 
             case 'dsa-active':
                 new_val = callback_utils.get_triggered_value()
-                proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+                proj = app.project_provider.get_project(active_project_id)
                 mm = proj.get_focussed_metamodel()
                 varid =  make_varid(**trigger_id)
                 var = mm.variables.get(varid)

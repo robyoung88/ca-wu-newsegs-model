@@ -89,10 +89,15 @@ def load_snapshot(
 def delete_project(
     project_provider: NewsegsProjectProviderInterface,
     project_id: str,
+    model_type: str,
 ):
     returned = project_provider.delete_component(project_id)
     if returned:
         raise ValueError('Project could not be deleted')
+    proj_options = fetch_project_options(project_provider, model_type)
+    if proj_options:
+        return proj_options[0].get('value')
+    return None
 
 # -----------------------------------------------
 # Layout component
@@ -294,8 +299,10 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
         current_snapshot_label,
         app_state,
     ):
+        print('updating project selector ui')
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('selected_model', 'default')
+        trig = ctx.triggered_id
 
         # 1. Fetch Projects & Populate Datalist
         all_projects = fetch_project_options(app.project_provider, model_type)
@@ -307,9 +314,15 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
 
         # Resolve active project label
         active_project_label = next((p['label'] for p in all_projects if p['value'] == active_project_id), "")
+        force_label_update = trig is not None and isinstance(trig, str) and trig == 'active-project-id'
+        print(f'updating project label to {active_project_label} for id {active_project_id}')
+        print(f'current project label is {current_project_label} and force is {force_label_update}')
 
         # Sync input value if initialized from active-project store
-        input_text = current_project_label if current_project_label is not None else active_project_label
+        if force_label_update:
+            input_text = active_project_label
+        else:
+            input_text = current_project_label if current_project_label is not None else active_project_label
 
         # 2. Compute Save/Load state for Project
         has_text = bool(input_text and input_text.strip())
@@ -326,8 +339,8 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
         load_style = {"display": "inline-block"} if show_load else {"display": "none"}
         load_disabled = not show_load
 
-        # Delete button: Disabled if no project active
-        delete_disabled = active_project_id is None
+        # Delete button: Disabled if no project active or only one project exists
+        delete_disabled = active_project_id is None or len(project_options) < 2
 
         # 3. Fetch Snapshots for active project
         if active_project_id:
@@ -428,11 +441,16 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
 
         # Delete Project
         if triggered == "delete-project-confirm-dialog" and active_project_id and trig_val:
-            delete_project(
+            app_state = json.loads(app_state) if app_state else {}
+            model_type = app_state.get('selected_model', 'default')
+            new_selected_project_id = delete_project(
                 app.project_provider,
-                active_project_id
+                active_project_id,
+                model_type,
             )
-            return None, None
+            if new_selected_project_id:
+                app.project_provider.set_session_project_id(session_id, new_selected_project_id)
+            return new_selected_project_id, None
 
         # Create Snapshot
         if triggered == "btn-save-snapshot" and active_project_id and snapshot_label:

@@ -36,7 +36,7 @@ def execute_deterministic_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+    proj = project_provider.get_project(request.project_id)
 
     run_config = json.loads(request.payload)
 

@@ -171,7 +171,7 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         
         newloc = modlocation.Location(lat, lon, name = name)
 
-        proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
+        proj = app.project_provider.get_project(active_project_id)
         mm = proj.get_focussed_metamodel()
 
         modified = False

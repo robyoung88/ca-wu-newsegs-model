@@ -2,8 +2,10 @@ import copy
 import json
 from typing import Any, Callable, Literal, Optional, Sequence, cast, overload, override
 
+from cachetools import LRUCache
 import pandas as pd
 import sqlalchemy as sa
+from sqlalchemy.exc import NoResultFound
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.backend.db import DependentObjectsExistError, db_snapshot
@@ -1131,10 +1133,13 @@ class FromDatabaseNewsegsProjectProvider(
                         .where(self._table.c.id == project_id)
                         .limit(1)
                     )
-                    with self._get_engine().connect() as conn:
-                        current_proj_type = conn.execute(stmt).scalar_one()
-                        if current_proj_type == model_type:
-                            return project_id
+                    try:
+                        with self._get_engine().connect() as conn:
+                            current_proj_type = conn.execute(stmt).scalar_one()
+                            if current_proj_type == model_type:
+                                return project_id
+                    except NoResultFound:
+                        return project_id
 
         # Project not found OR project does not match type
         # For on_missing == 'last', convert to 'create' if no projects available
@@ -1305,4 +1310,62 @@ class FromDatabaseNewsegsProjectProvider(
             result = list(conn.execute(find_mm_stmt).scalars())
         #result.reverse()
         return tuple(result)
-    
+
+class CachedFromDatabaseNewsegsProjectProvider(
+    FromDatabaseNewsegsProjectProvider
+):
+    def __init__(self, get_engine: Callable[[], sa.Engine]):
+        super().__init__(get_engine)
+        self._project_cache = LRUCache(maxsize = 5)
+        self._project_last_accessed = {}
+
+    def _get_project_modification_key(self, project_id: str) -> str | None:
+        stmt = (
+            sa.select(self._table.c.modified_order)
+            .where(self._table.c.id == project_id)
+        )
+        with self._get_engine().connect() as conn:
+            res = conn.execute(stmt).scalar()
+            if not res:
+                raise KeyError(f'Project {project_id} not found.')
+            return res
+
+    @override
+    def get_project(self, project_id: str) -> NewsegsProject:
+        new_modkey = self._get_project_modification_key(project_id)
+
+        if (
+            project_id in self._project_last_accessed
+            and (new_modkey == self._project_last_accessed[project_id])
+            and (project_id in self._project_cache)
+        ):
+            return self._project_cache[project_id]
+
+        proj = super().get_project(project_id)
+        self._project_last_accessed[project_id] = new_modkey
+        self._project_cache[project_id] = proj
+        return proj
+
+    @override
+    def upsert_component(self, component: NewsegsComponent | SequenceNotStr[NewsegsComponent], force: bool = False, tbl: sa.Table | None = None) -> None:
+        super().upsert_component(component, force, tbl)
+        if isinstance(component, NewsegsProject):
+            project_id = component.id
+            modkey = self._get_project_modification_key(project_id)
+            self._project_last_accessed[project_id] = modkey
+            self._project_cache[project_id] = component
+
+    @override
+    def delete_component(self, component_id: str | SequenceNotStr[str], ignore_ids: list[str] = []) -> list[str]:
+        olist = super().delete_component(component_id, ignore_ids)
+        # Even if they haven't been deleted, let's delete them from the caches
+        component_id = [component_id] if isinstance(component_id, str) else component_id
+        for id in component_id:
+            try:
+                del self._project_last_accessed[id]
+            except KeyError:
+                pass
+            try:
+                del self._project_cache[id]
+            except KeyError:
+                pass

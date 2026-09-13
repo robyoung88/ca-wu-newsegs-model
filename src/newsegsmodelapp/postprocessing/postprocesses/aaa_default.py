@@ -54,10 +54,10 @@ def _generation_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
@@ -105,10 +105,10 @@ def _consumption_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
@@ -156,10 +156,10 @@ def _storage_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
@@ -207,10 +207,10 @@ def _net_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
@@ -258,10 +258,10 @@ def _finance_benefits_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
@@ -314,10 +314,10 @@ def _finance_costs_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
@@ -370,10 +370,10 @@ def _finance_value_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
         metamodels = proj.metamodels
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+        proj = project_provider.get_project(request.project_id)
     
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')

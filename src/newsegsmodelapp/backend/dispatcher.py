@@ -120,7 +120,7 @@ def _cleanup_dead_jobs(engine, dead_interval_seconds: int) -> int:
         .values(status = 'FAILED')
         .where(
             runs.c.status == 'CALCULATING',
-            (sa.func.strftime('%s', 'now') - sa.func.strftime('%s', runs.c.modified_time)) > dead_interval_seconds
+            (sa.func.strftime('%s', 'now') - sa.func.strftime('%s', runs.c.modified_at)) > dead_interval_seconds
         )
     )
 

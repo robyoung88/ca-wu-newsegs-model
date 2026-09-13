@@ -23,7 +23,7 @@ import newsegsmodelapp.register_plugins # MUST be imported
 from newsegsmodelapp.registers import PAGE_LAYOUT_REGISTER
 
 from newsegsmodelapp.backend import db
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser.callbacks import model_selection_callbacks
 
@@ -169,7 +169,7 @@ def create_app(external_stylesheets = None) -> Dash:
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
-    project_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+    project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
     results_provider = FromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
 
     app = NewsegsDash(

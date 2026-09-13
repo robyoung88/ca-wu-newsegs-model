@@ -133,7 +133,7 @@ class TestProxy(unittest.TestCase):
                     tbls.runs.c.run_id,
                     tbls.runs.c.progress,
                     tbls.runs.c.status,
-                    tbls.runs.c.modified_time,
+                    tbls.runs.c.modified_at,
                     tbls.runs.c.progress_message,
                 )
                 .where(tbls.runs.c.run_id.in_(job_id))
@@ -143,14 +143,14 @@ class TestProxy(unittest.TestCase):
 
             if len(rows) < 1:
                 raise ValueError(f'Run not present in database: {job_id}')
-            print(rows[0]._mapping['progress'], ' at ', rows[0]._mapping['modified_time'], ' with message ', rows[0]._mapping['progress_message'], ' and status ', rows[0]._mapping['status'])
+            print(rows[0]._mapping['progress'], ' at ', rows[0]._mapping['modified_at'], ' with message ', rows[0]._mapping['progress_message'], ' and status ', rows[0]._mapping['status'])
             if rows[0].status == 'SUCCESS':
                 break
             elif rows[0].status == 'FAILED':
                 raise ValueError(f'Run failed')
             time.sleep(0.1)
         
-        proj = proj_provider.get_component(proj.id)
+        proj = proj_provider.get_project(proj.id)
 
         generation = proj.metamodels[0].model.generation
         generation_res, verstring = result_provider.get_result('deterministic_generation', generation, True)

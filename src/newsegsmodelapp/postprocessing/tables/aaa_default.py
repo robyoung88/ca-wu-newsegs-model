@@ -48,7 +48,7 @@ def _make_generation_tables_sprake(
 ) -> str:
     ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_generation'
-    proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+    proj = project_provider.get_project(request.project_id)
 
     res = get_result_list(result_type, proj, result_provider, True)
 
@@ -88,7 +88,7 @@ def _make_consumption_tables_sprake(
 ) -> str:
     ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_consumption'
-    proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+    proj = project_provider.get_project(request.project_id)
 
     res = get_result_list(result_type, proj, result_provider, True)
 
@@ -121,7 +121,7 @@ def _make_storage_tables_sprake(
 ) -> str:
     ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_storage'
-    proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+    proj = project_provider.get_project(request.project_id)
 
     res = get_result_list(result_type, proj, result_provider, True)
 
@@ -147,7 +147,7 @@ def _make_net_tables_sprake(
 ) -> str:
     ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_net'
-    proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+    proj = project_provider.get_project(request.project_id)
 
     res = get_result_list(result_type, proj, result_provider, True)
 
@@ -180,7 +180,7 @@ def _make_finance_tables_sprake(
 ) -> str:
     ann_hori_toggle = request.ann_hori_toggle
     result_type = 'postproc_model_net'
-    proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
+    proj = project_provider.get_project(request.project_id)
 
     benefits = get_result_list(
         'postproc_finance_benefits', proj,
