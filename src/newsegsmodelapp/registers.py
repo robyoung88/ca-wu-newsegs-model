@@ -35,6 +35,58 @@ def register_page_layout(name: str):
         return func
     return decorated
 
+
+# -------------------------------------------------------------------------
+# INPUT HANDLERS
+# -------------------------------------------------------------------------
+INPUT_HANDLERS: dict[
+    tuple[str, str, str],
+    Callable[
+        [dict, list[dict[str,str]], list[Any], list[dict[str,str]], list[dict[str,str]], str, NewsegsProjectProviderInterface],
+        tuple[list[DashComponent], list[DashComponent], list[DashComponent]]
+    ]
+] = {}
+"""Register of functions to handle changes in inputs.
+
+Keyed by a tuple of:
+    purpose [str] - the 'purpose' field of the id of the triggering component
+    type [str] - the 'type' field of the id of the triggering component
+    model_type [str]
+
+Handler functions take:
+    triggered_id [dict] - the id of the triggering component
+    input_ids [list[dict]] - a list of the ids of the associated Input html elements
+    input_values [list] - a llist of the values of the associated Input html elements
+    header_ids [list[dict]] - a list of the ids of the associated header container html elements
+    trigger_ids [list[dict]] - a list of the ids of the associated trigger dcc.Store elements
+    active_project_id [str]
+    project_provider [NewsegsProjectProviderInterface]
+
+They should return a tuple of three lists:
+    updates for Input values
+    updates for header children
+    updates for trigger data
+"""
+
+def register_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
+    type_ = 'ALL' if type_ is None else type_
+    key = (purpose, type_, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in INPUT_HANDLERS:
+                raise KeyError(f'Input hander already exists for key {key}')
+        INPUT_HANDLERS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in INPUT_HANDLERS:
+            INPUT_HANDLERS[key_default] = func
+        return func
+    return decorated
+
+def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
+    getter = _three_param_key_getter_with_fallback(INPUT_HANDLERS, return_type_description = 'input handler')
+    return getter(purpose, type_, model_type)
+
+
 # -------------------------------------------------------------------------
 # MAIN RUNNING PROCEDURES
 # -------------------------------------------------------------------------

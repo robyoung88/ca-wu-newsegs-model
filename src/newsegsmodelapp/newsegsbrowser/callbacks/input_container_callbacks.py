@@ -20,6 +20,7 @@ from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_conta
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelapp.registers import get_input_handler
 
 def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
     """
@@ -154,6 +155,12 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
+        Input({
+            'type': 'action-button',
+            'supersection': ALL, 'purpose': ALL,
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL,
+        }, 'n_clicks'),
 
         State({
             'type': 'single-input-config', 
@@ -183,6 +190,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         changed_input_values,
         changed_dropdown_values,
         changed_toggle_values,
+        changed_action_button_values,
         input_ids,
         header_ids,
         trigger_ids,
@@ -208,58 +216,6 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         now = time.time_ns()
         
         match trigger_id['purpose']:
-            case 'parameter':
-                new_val = callback_utils.get_triggered_value()
-                proj = app.project_provider.get_project(active_project_id)
-                mm = proj.get_focussed_metamodel()
-                variable_keys = {k: trigger_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
-                
-                update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = mm.update_variable_from_interface(
-                    value = new_val, **variable_keys
-                )
-
-                # Feed back current parameters
-                for idx, id in enumerate(input_ids):
-                    if id['purpose'] == 'parameter':
-                        pi = id['parameter_index']
-                        new_param = raw_params[pi]
-                        if not isinstance(new_param, np.ndarray):
-                            input_returns[idx] = new_param
-                        else:
-                            vi = id['vector_location']
-                            new_val = new_param.flat[vi]
-                            input_returns[idx] = new_val
-
-                # Update headers
-                for idx, id in enumerate(header_ids):
-                    try:
-                        content_creator = get_single_input_header_content_creator(
-                            id['supersection'], id['section'], mm.model.model_type
-                        )
-                    except KeyError:
-                        content_creator = None
-                    if content_creator:
-                        varid =  make_varid(**trigger_id)
-                        header_returns[idx] = content_creator(varid, mm)
-                
-                # Update triggers
-                
-                for idx, id in enumerate(trigger_ids):
-                    match id['supersection']:
-                        case 'deterministic':
-                            if deterministic_changed:
-                                trigger_returns[idx] = now
-                        case 'dsa':
-                            if dsa_changed:
-                                trigger_returns[idx] = now
-                        case 'psa':
-                            if psa_changed:
-                                trigger_returns[idx] = now
-
-                # Sync project to store
-                app.project_provider.upsert_component(proj)
-
-                # TODO: Feed back to inputs if the update is not ok (set invalid)
             case 'bound-lower' | 'bound-upper':
                 match trigger_id['supersection']:
                     case 'dsa':
@@ -377,7 +333,20 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                 app.project_provider.upsert_component(proj)
 
             case _:
-                print(f'No handlers for purpose {trigger_id["purpose"]}')
+                try:
+                    handler = get_input_handler(trigger_id['purpose'], trigger_id['type'], json.loads(app_state).get('selected_model', 'default'))
+                except KeyError:
+                    print(f'No handlers for purpose {trigger_id["purpose"]}')
+                    raise PreventUpdate
+                return handler(
+                    trigger_id,
+                    input_ids,
+                    changed_input_values,
+                    header_ids,
+                    trigger_ids,
+                    active_project_id,
+                    app.project_provider
+                )
 
         return (input_returns, header_returns, trigger_returns)
 

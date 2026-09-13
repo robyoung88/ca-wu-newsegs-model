@@ -12,6 +12,16 @@ def load_layouts():
     return layout_dict
 load_layouts()
 
+import newsegsmodelapp.components as components
+def load_components():
+    d = {}
+    for info in pkgutil.iter_modules(
+        components.__path__, prefix = 'newsegsmodelapp.components.'
+    ):
+        d[info.name] = importlib.import_module(info.name)
+    return d
+load_components()
+
 import newsegsmodelapp.processes as processes
 def load_processes():
     process_dict = {}
