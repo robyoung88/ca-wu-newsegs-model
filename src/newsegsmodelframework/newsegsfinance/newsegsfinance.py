@@ -112,11 +112,9 @@ class NewsegsFinance(NewsegsFinanceInterface):
             self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate) or 0.0
             self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate) or 0.0
 
-    def get_components(self) -> tuple[NewsegsComponent, ...]:
-        return (
-            self.finance_data,
-            self.table_config
-        )
+    def get_component_attributes(self) -> tuple[str, ...]:
+        atts = super().get_component_attributes()
+        return ('finance_data', 'table_config', *atts)
     
     # Benefits
     @property

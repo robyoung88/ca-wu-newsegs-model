@@ -20,9 +20,9 @@
         "grid_import_sc_per_day": 0.0,
         "grid_import_var_per_unit": 0.35
     },
-    "uuid": "8fbd7c6f-620f-4863-a996-b7c46a18e25d",
+    "uuid": "f134aae4-c3fa-4ff1-ba34-03093b3ce352",
     "_component_ids": {},
-    "_finance_data_id": "cmp-cbbfe84c-e87e-4f0b-838f-6722d9b0e010",
-    "_table_config_id": "cmp-654f1f58-b26a-41fe-8840-1383aa960cd4",
+    "_finance_data_id": "cmp-c08161ca-102f-4cfd-bb4a-e49e5c4912f7",
+    "_table_config_id": "cmp-0912487d-c9f3-4e6d-b6d4-7a20b86330d1",
     "horizon": -1
 }

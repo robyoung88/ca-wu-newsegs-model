@@ -9,8 +9,8 @@ import sqlalchemy as sa
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db import db_tables as tbls
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser.common import get_triggered_value
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
@@ -396,7 +396,7 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
         project_label, snapshot_label, active_project_id, app_state, session_id
     ):
         triggered = ctx.triggered_id
-        trig_val = get_triggered_value()
+        trig_val = callback_utils.get_triggered_value()
         if not trig_val:
             return no_update, no_update
         print('project selector event: ',triggered)

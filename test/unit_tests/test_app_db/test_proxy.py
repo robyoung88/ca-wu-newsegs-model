@@ -133,6 +133,8 @@ class TestProxy(unittest.TestCase):
                     tbls.runs.c.run_id,
                     tbls.runs.c.progress,
                     tbls.runs.c.status,
+                    tbls.runs.c.modified_time,
+                    tbls.runs.c.progress_message,
                 )
                 .where(tbls.runs.c.run_id.in_(job_id))
             )
@@ -141,7 +143,7 @@ class TestProxy(unittest.TestCase):
 
             if len(rows) < 1:
                 raise ValueError(f'Run not present in database: {job_id}')
-            print(rows[0]._mapping['progress'])
+            print(rows[0]._mapping['progress'], ' at ', rows[0]._mapping['modified_time'], ' with message ', rows[0]._mapping['progress_message'], ' and status ', rows[0]._mapping['status'])
             if rows[0].status == 'SUCCESS':
                 break
             elif rows[0].status == 'FAILED':
@@ -153,5 +155,5 @@ class TestProxy(unittest.TestCase):
         generation = proj.metamodels[0].model.generation
         generation_res, verstring = result_provider.get_result('deterministic_generation', generation, True)
 
-        self.assertEqual(generation.revision_string, verstring)
+        self.assertEqual(generation.revision, verstring)
         self.assertGreater(len(generation_res.meters_to_pandas()), 8760) # pyright: ignore[reportOptionalMemberAccess]

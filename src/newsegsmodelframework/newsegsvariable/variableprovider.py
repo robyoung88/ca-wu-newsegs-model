@@ -58,6 +58,9 @@ class VariablePersistenceInterface(metaclass = ABCMeta):
             force: Overwrite the variable(s) regardless of whether their revision number has incremented.
         """
 
+class VariableManagerInterface(VariableProviderInterface, VariablePersistenceInterface):
+    ...
+
 
 class InMemoryVariableProvider(VariableProviderInterface):
 

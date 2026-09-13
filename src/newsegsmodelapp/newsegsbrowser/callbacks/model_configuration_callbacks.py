@@ -19,6 +19,7 @@ from dash import clientside_callback, ClientsideFunction
 import numpy as np
 from useful_types import SequenceNotStr
 
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser import common as browser
 from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
@@ -1043,7 +1044,7 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
                 ),
             )
         )
-        val = browser.get_triggered_value()
+        val = callback_utils.get_triggered_value()
         if val is None:
             return rval
 
@@ -1064,10 +1065,10 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
         finance_search_id = copy.copy(tid)
         finance_search_id.update({'type': 'input-finance-config'})
         did_update = (
-            browser.update_return_list(
+            callback_utils.update_return_list(
                 model_search_id, reset_value, 
                 config_inputs['model']['ids'], rval['config_inputs']['model']['values']
-            ) or browser.update_return_list(
+            ) or callback_utils.update_return_list(
                 finance_search_id, reset_value, 
                 config_inputs['finance']['ids'], rval['config_inputs']['finance']['values']
             )
@@ -1108,7 +1109,7 @@ def add_interface_to_model_callbacks(app, acm: NewsegsBrowserCacheManager):
         selected_configuration
     ):
         rval = None
-        val = browser.get_triggered_value()
+        val = callback_utils.get_triggered_value()
         if val is None:
             return rval
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 import copy
+import json
 import re
 import time
 from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, SupportsIndex, Type, overload, override
@@ -28,14 +29,17 @@ from newsegsmodelframework.core import serialisation, SerialisedConfigurationMix
 from newsegsmodelframework.core import find_constructor
 from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
 from newsegsmodelframework.core.trackeddata import wrap_value as default_wrap_value
-from newsegsmodelframework.util import classfuncs
+from newsegsmodelframework.util import classfuncs, jsonfuncs
 
 __all__ = [
     'NewsegsComponent', 'RunnableNewsegsComponent', 'TableConfigNewsegsComponent',
     'DataWithRevision'
 ]
 
-class ComponentProperty:
+class ComponentPropertyInterface(metaclass = ABCMeta):
+    """All component properties should inherit this"""
+
+class ComponentProperty(ComponentPropertyInterface):
     """Descriptor for attributes which are Components"""
 
     def __init__(self, default: Any = None, oftype: Optional[type | tuple[type, ...]] = None):
@@ -146,7 +150,7 @@ class ObservableComponentList(ObservableList):
         self._notify_change()
 
 
-class ComponentListProperty:
+class ComponentListProperty(ComponentPropertyInterface):
     """Descriptor for attributes which are lists of Components"""
     def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
         self.name = ""
@@ -158,7 +162,7 @@ class ComponentListProperty:
     def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
         if instance is None:
             return self
-        att = getattr(instance, self.name, [])
+        att = getattr(instance, self.name, ObservableComponentList(parent = instance._config))
         return att
 
     def __set__(self, instance: 'ConfigurationMixin', value: Iterable):
@@ -272,7 +276,7 @@ class ObservableComponentOrderedDict(OrderedDict, RevisionNotifierMixin):
             self._notify_change()
 
 
-class ComponentOrderedDictProperty:
+class ComponentOrderedDictProperty(ComponentPropertyInterface):
     """Descriptor for attributes which are ordered dictionaries of Components (e.g. Variables)"""
     def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
         self.name = ""
@@ -282,9 +286,9 @@ class ComponentOrderedDictProperty:
         self.name = f'_{name}' # Name as stored on object instance
 
     def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
-        if isinstance is None:
+        if instance is None:
             return self
-        att = getattr(instance, self.name, OrderedDict())
+        att = getattr(instance, self.name, ObservableComponentOrderedDict(parent = instance._config))
         return att
 
     def __set__(self, instance: 'ConfigurationMixin', value: Mapping):
@@ -388,7 +392,7 @@ class NewsegsComponent(
         for k in config.keys():
             if hasattr(type_, k):
                 prop = getattr(type_, k)
-                if hasattr(prop, 'fset') and getattr(prop, 'fset') is not None:
+                if isinstance(prop, ComponentPropertyInterface) or (hasattr(prop, 'fset') and getattr(prop, 'fset') is not None):
                     v = config.get(k)
                     if isinstance(v, dict):
                         child_cc = v.get('constructor_class', None)
@@ -432,6 +436,31 @@ class NewsegsComponent(
     def to_dict(self) -> dict[str, Any]:
         self.update_component_id_dict()
         return super().to_dict()
+
+    def to_dict_repr(self) -> dict[str, Any]:
+        """A dictionary reproduction of the component including child components (not references)."""
+        odict = self.to_dict()
+        att_names = self.get_component_attributes()
+        for att in att_names:
+            odict[att] = self._repr_represent(getattr(self, att))
+            attunder = '_' + att
+            if attunder in odict:
+                del odict[attunder]
+        return odict
+
+    def json_dumps_repr(self) -> str:
+        return json.dumps(self.to_dict_repr(), cls = jsonfuncs.NumpyEncoder)
+    
+    def _repr_represent(self, value):
+        if isinstance(value, object) and hasattr(value, 'to_dict_repr'):
+                return value.to_dict_repr() # pyright: ignore[reportAttributeAccessIssue]
+        return self._represent(value)
+
+    def anonymise_ids(self):
+        self.id = self.generate_new_id()
+        for comp in self.get_components():
+            if comp is not None:
+                comp.id = comp.generate_new_id()
 
     @classmethod
     @override
@@ -522,6 +551,14 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsComponent:
         ...
 
+    @abstractmethod
+    def get_component_metadata(
+        self,
+        component_id: str | SequenceNotStr[str],
+        metadata_ids: str | SequenceNotStr[str]
+    ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        ...
+
 
 class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
     """Interface for saving components to persistent storage (in order that they may be accessed by other providers)"""
@@ -551,4 +588,6 @@ class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
         Returns:
             List of component_ids for which deletion has failed.
         """
-    
+
+class NewsegsComponentManagerInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
+    ...

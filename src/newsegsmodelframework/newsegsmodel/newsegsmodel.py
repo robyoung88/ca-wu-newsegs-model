@@ -301,15 +301,6 @@ class NewsegsModel(
         
         return super().update(config)
 
-    @override
-    def get_component_attributes(self) -> tuple[str, ...]:
-        return (
-            'grid',
-            'generation',
-            'consumption_storage',
-            'table_config'
-        )
-
     def reattach_grid(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
@@ -354,13 +345,10 @@ class NewsegsModel(
             raise TypeError(f'component_provider did not provide a table_config module for key {self._component_ids.get('table_config', '')}')
         self.table_config = comp
 
-    def get_components(self) -> tuple[newsegscomponent.NewsegsComponent, ...]:
-        return (
-            self.grid,
-            self.generation,
-            self.consumption_storage,
-            self.table_config
-        )
+    @override
+    def get_component_attributes(self) -> tuple[str, ...]:
+        atts = super().get_component_attributes()
+        return ('grid', 'generation', 'consumption_storage', 'table_config', 'model_data', *atts)
 
     @override
     def reattach_components(self, component_provider: newsegscomponent.NewsegsComponentProviderInterface):
@@ -368,7 +356,6 @@ class NewsegsModel(
         self.grid.model = self
         self.generation.model = self
         self.consumption_storage.model = self
-
 
     def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True):
         try:

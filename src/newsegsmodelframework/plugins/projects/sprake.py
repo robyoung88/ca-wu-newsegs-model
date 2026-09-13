@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+from typing import cast
 
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsmodel import sprakemodel
@@ -26,7 +27,8 @@ def _create_default_model() -> newsegsmodel.NewsegsModel:
             'sprakemodel-validation-config.pickle'
         ), 
     'rb') as f:
-        mdl_conf = pickle.load(f)
+        mdl_conf = cast(newsegsmodel.NewsegsModel, pickle.load(f))
+        mdl_conf.anonymise_ids()
     return mdl_conf
     #return sprakemodel.SprakeModel.from_dict(mdl_conf)
 
@@ -38,14 +40,19 @@ def _create_default_finance() -> newsegsfinance.NewsegsFinance:
             'sprakemodel-validation-finance-config.pickle'
         ),
     'rb') as f:
-        fnc_conf = pickle.load(f)
+        fnc_conf = cast(newsegsfinance.NewsegsFinance, pickle.load(f))
+        fnc_conf.anonymise_ids()
     return fnc_conf
     #return sprakefinance.SprakeFinance.from_dict(fnc_conf)
 
 def _create_default_variables() -> list[variable.Variable]:
     with open(os.path.join(STATICDATA, 'sprake-variable-config.json')) as f:
         var_conf_list = json.load(f)
-    return [variable.variable_from_dict(x) for x in var_conf_list]
+    def _make_var_from_dict(d):
+        v = variable.variable_from_dict(d)
+        v.id = v.generate_new_id()
+        return v
+    return [_make_var_from_dict(x) for x in var_conf_list]
 
 @register_project_factory(MODEL_TYPE)
 def sprake_project_factory():

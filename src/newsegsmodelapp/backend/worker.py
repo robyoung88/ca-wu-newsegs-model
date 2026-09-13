@@ -82,7 +82,7 @@ def worker_process(worker_id: str, server: str = '127.0.0.1', port: str = BACKEN
             print(f"Worker {worker_id} finished Job {job_id} with message {is_ok}. Ready for next request.")
 
         except Exception as e:
-            _set_status_failed(engine, job_id)
+            _set_status_failed(engine, job_id, str(e))
 
             print(f"Worker {worker_id} failed Job {job_id}. Error {e}.")
             
@@ -125,12 +125,17 @@ def _set_status_completed(engine: sa.Engine, job_id: int):
     with engine.begin() as conn:
         conn.execute(stmt)
 
-def _set_status_failed(engine: sa.Engine, job_id: int):
+def _set_status_failed(engine: sa.Engine, job_id: int, message: str | None):
+    update_vals = dict(
+        status = 'FAILED',
+        progress = 0.0
+    )
+    if message is not None:
+        update_vals['progress_message'] = message
     stmt = (
         sa.update(runs)
         .values(
-            status = 'FAILED',
-            progress = 0.0
+            **update_vals
         )
         .where(runs.c.run_id == job_id)
     )

@@ -18,7 +18,7 @@ if __name__ == '__main__':
     mdl.consumption_storage.hlp = 0.3
     mdl.consumption_storage.ev_per_unit = 0.2
 
-    d1 = mdl.to_dict()
+    d1 = mdl.to_dict_repr()
     with open('data/sprakemodel-validation-config.json', 'w') as f:
         json.dump(d1, f, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4)
 

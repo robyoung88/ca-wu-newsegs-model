@@ -14,7 +14,7 @@ import newsegsmodelapp.newsegsbrowser.common as browser
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelapp.newsegsbrowser.callbacks.locks import ok_run_model, ok_run_finance
 
-from newsegsmodelapp.newsegsbrowser.layouts.results import configuration_selector
+from newsegsmodelapp.components import configuration_selector
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel

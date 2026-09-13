@@ -53,13 +53,13 @@ from newsegsmodelapp.newsegsbrowser.callbacks import callbacks_map
 from newsegsmodelapp.newsegsbrowser.callbacks import timeseries_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks import configuration_selector_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks import dsa_run_callbacks
-from newsegsmodelapp.newsegsbrowser.map import add_site_selector_callbacks
+from newsegsmodelapp.components.map import add_site_selector_callbacks
 
 from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
 
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import add_background_callback_error_dispatch, background_callback_error_handler_factory
 
-from newsegsmodelapp.newsegsbrowser import energy_balance_estimation
+from newsegsmodelapp.components import energy_balance_estimation
 
 # -----------------------------------------------
 # Set up logging

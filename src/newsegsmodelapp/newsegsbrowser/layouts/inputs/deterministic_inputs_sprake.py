@@ -1,6 +1,7 @@
 from typing import cast
 
 import dash
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
@@ -68,6 +69,8 @@ for supersection, section_tuple in sections_by_supersection.items():
                 proj_provider: NewsegsProjectProviderInterface, 
                 _section: str = section # Using default argument trick to force evaluation of section
             ) -> list[dash.development.base_component.Component]:
+                if not proj_id:
+                    raise PreventUpdate
                 return _generic_create_deterministic_input_header_contents(
                     _section, get_focussed_metamodel(proj_id, proj_provider)
                 )

@@ -17,7 +17,7 @@ from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 
 from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
-from newsegsmodelapp.newsegsbrowser.layouts.results import configuration_selector
+from newsegsmodelapp.components import configuration_selector
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import results_tables_map
 from newsegsmodelapp.newsegsbrowser.layouts.results import generation_results_sprake
 from newsegsmodelapp.newsegsbrowser.layouts.results import storage_results_sprake

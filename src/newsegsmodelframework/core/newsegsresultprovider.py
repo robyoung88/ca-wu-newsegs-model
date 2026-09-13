@@ -18,12 +18,12 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
         result_type: str,
         parent_component: NewsegsComponent,
         allow_stale: bool = True
-    ) -> tuple[Any, str] | tuple[None, None]:
+    ) -> tuple[Any, int] | tuple[None, None]:
         """Retrieve a result from the provider. 
         
-        If allow_stale is true, will return the latest result if none matching the revision string are found.
+        If allow_stale is true, will return the latest result if none matching the revision are found.
         
         Returns:
-            tuple[object, str] - The result and the revision string of the component generating the result.
+            tuple[object, int] - The result and the revision of the component generating the result.
             None if no applicable results are found.
         """

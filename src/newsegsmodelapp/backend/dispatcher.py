@@ -93,6 +93,8 @@ def run_dispatcher(
 
             # Check for dead jobs
             n_cleaned = _cleanup_dead_jobs(db.get_engine(), DEAD_CALCULATION_INTERVAL_SECONDS)
+            if n_cleaned:
+                print(f'Killed {n_cleaned} jobs due to timeout')
 
             # Touch the heartbeat file
             HEARTBEAT_FILE.touch()
@@ -118,7 +120,7 @@ def _cleanup_dead_jobs(engine, dead_interval_seconds: int) -> int:
         .values(status = 'FAILED')
         .where(
             runs.c.status == 'CALCULATING',
-            (sa.func.strftime('%s', 'now') - sa.func.strftime('%s', runs.c.last_updated)) > dead_interval_seconds
+            (sa.func.strftime('%s', 'now') - sa.func.strftime('%s', runs.c.modified_time)) > dead_interval_seconds
         )
     )
 

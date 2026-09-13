@@ -1,6 +1,9 @@
 """Provides table definitions for application"""
 
+import uuid6
+
 import sqlalchemy as sa
+from sqlalchemy import event as sa_event
 
 L_VARIABLE_UID = 38
 L_COMPONENT_UID = 42
@@ -77,7 +80,7 @@ component_configs = sa.Table(
     sa.Column('component_version', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
-    sa.Column('revision_string', sa.String, default = ''),
+    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('last_result_id', sa.Integer, nullable = True),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
@@ -106,7 +109,7 @@ results = sa.Table(
     sa.Column('component_class', sa.String),
     sa.Column('component_version', sa.String),
     sa.Column('component_config_revision', sa.Integer, default = 0),
-    sa.Column('component_config_revision_string', sa.String, default = ''),
+    #sa.Column('component_config_revision_string', sa.String, default = ''),
     sa.Column('result_type', sa.String, nullable = False),
     sa.Column('result_file', sa.String),
     sa.Column('retain', sa.Boolean, default = False),
@@ -144,7 +147,7 @@ em_configs = sa.Table(
     sa.Column('model_version', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
-    sa.Column('revision_string', sa.String, default = ''),
+    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
 )
@@ -197,7 +200,7 @@ fm_configs = sa.Table(
     sa.Column('model_version', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
-    sa.Column('revision_string', sa.String, default = ''),
+    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
 )
@@ -234,7 +237,7 @@ metamodels = sa.Table(
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
-    sa.Column('revision_string', sa.String, default = ''),
+    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
     sa.Column('lat', sa.Float, default = 53.0),
@@ -277,11 +280,12 @@ projects = sa.Table(
     sa.Column('dsa_component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('psa_component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
+    sa.Column('focussed_metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id')),
     sa.Column('model_type', sa.String, nullable = False),
     sa.Column('model_version', sa.String, nullable = False),
     sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
-    sa.Column('revision_string', sa.String, default = ''),
+    #sa.Column('revision_string', sa.String, default = ''),
 
     # TODO: Implement these groups
     #sa.Column('read_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))
@@ -290,6 +294,8 @@ projects = sa.Table(
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
     sa.Column('created_at', sa.DateTime(), server_default = sa.func.now()),
+    sa.Column('modified_time', sa.DateTime(), server_default = sa.func.now()),
+    sa.Column('modified_order', sa.String(36), default = lambda: str(uuid6.uuid7())),
 )
 
 snapshot_projects = sa.Table(
@@ -324,7 +330,9 @@ project_metamodels = sa.Table(
     'project_metamodels',
     metadata,
     sa.Column('project_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('projects.id'), primary_key = True),
-    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id'), primary_key = True)
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id'), primary_key = True),
+    sa.Column('created_at', sa.DateTime, server_default = sa.func.now(), nullable = False,),
+    sa.Column('created_order', sa.String(36), default = lambda: str(uuid6.uuid7()))
 )
 
 snapshot_project_metamodels = sa.Table(
@@ -333,6 +341,7 @@ snapshot_project_metamodels = sa.Table(
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
     sa.Column('project_id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
+    *clone_columns_except_pk(project_metamodels),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'project_id'],
         ['snapshot_projects.snapshot_id', 'snapshot_projects.id']
@@ -414,7 +423,8 @@ runs = sa.Table(
     sa.Column('payload', sa.String),
     sa.Column('status', sa.String),
     sa.Column('created', sa.DateTime, server_default = sa.func.current_timestamp()),
-    sa.Column('last_updated', sa.DateTime, default = sa.func.current_timestamp()),
+    sa.Column('modified_time', sa.DateTime, default = sa.func.current_timestamp()),
+    #sa.Column('modified_order', sa.String(36), default = lambda: str(uuid6.uuid7())),
     sa.Column('progress', sa.Float, default = 0.0),
     sa.Column('progress_message', sa.String, nullable = True),
     sa.Column('cancel_requested', sa.Boolean, default = False),
@@ -431,3 +441,49 @@ sessions = sa.Table(
     sa.Column('session_id', sa.String, primary_key = True),
     sa.Column('active_project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id')),
 )
+
+
+# -----------------------------------------------------------------------------
+# Table creation
+# -----------------------------------------------------------------------------
+
+get_uuid7 = lambda: str(uuid6.uuid7())
+
+def find_tables_with_column(metadata: sa.MetaData, column_name: str) -> list[str]:
+    return [
+        table.name
+        for table in metadata.tables.values()
+        if column_name in table.columns
+    ]
+
+table_has_modified_order = find_tables_with_column(metadata, 'modified_order')
+table_has_modified_time = find_tables_with_column(metadata, 'modified_time')
+
+@sa_event.listens_for(sa.Connection, "before_execute")
+def receive_before_execute(
+    conn, 
+    clauseelement, 
+    multiparams, 
+    params, 
+    execution_options
+):
+    if isinstance(clauseelement, sa.Update):
+        if clauseelement.table.name in table_has_modified_order:
+            # Handle dict or list-of-dicts parameter formats
+            if params:
+                params["modified_order"] = str(get_uuid7())
+            elif multiparams:
+                for param_dict in multiparams:
+                    param_dict["modified_order"] = str(get_uuid7())
+        if clauseelement.table.name in table_has_modified_time:
+            # Handle dict or list-of-dicts parameter formats
+            now = datetime.datetime.now()
+            if params:
+                params["modified_time"] = now
+            elif multiparams:
+                for param_dict in multiparams:
+                    param_dict["modified_time"] = now
+
+def create_all_tables(engine: sa.Engine):
+    metadata.create_all(engine)
+    #add_triggers(engine)

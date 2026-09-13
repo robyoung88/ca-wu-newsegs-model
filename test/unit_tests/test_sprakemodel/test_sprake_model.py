@@ -9,9 +9,6 @@ import pandas as pd
 import numpy as np
 import numpy.testing
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
-
 from config import settings
 
 from newsegsmodelframework.util import jsonfuncs
@@ -69,7 +66,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
-        d1 = mdl.to_dict()
+        # Use the without component server form
+        d1 = mdl.to_dict_repr()
 
         mdl2 = sprakemodel.SprakeModel.from_dict(d1)
 
@@ -93,7 +91,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
-        sd1 = mdl.json_dumps()
+        sd1 = mdl.json_dumps_repr()
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_none()
@@ -146,7 +144,7 @@ class TestSprakeModelRun(unittest.TestCase):
         gen_meters_1 = mdl.get_generation_result().meters_to_pandas()
         cs_meters_1 = mdl.get_consumption_storage_result().meters_to_pandas()
 
-        sd1 = mdl.json_dumps()
+        sd1 = mdl.json_dumps_repr()
         d2 = json.loads(sd1)
 
         mdl2 = sprakemodel.SprakeModel.from_dict(d2)
@@ -177,7 +175,7 @@ class TestSprakeModelRun(unittest.TestCase):
             .set_index('datetime')
         )
 
-        with open('data/sprakemodel-validation-config.json', 'r') as f:
+        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-config.json', 'r') as f:
             d1 = json.load(f)
         
         mdl = sprakemodel.SprakeModel.from_dict(d1)
@@ -235,10 +233,10 @@ class TestSprakeFinanceRun(unittest.TestCase):
             )
         )
 
-        with open('data/sprakemodel-validation-config.json', 'r') as f:
+        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-config.json', 'r') as f:
             d1 = json.load(f)
 
-        with open('data/sprakemodel-validation-finance-config.json', 'r') as f:
+        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-finance-config.json', 'r') as f:
             fd1 = json.load(f)
         
         mdl = sprakemodel.SprakeModel.from_dict(d1)

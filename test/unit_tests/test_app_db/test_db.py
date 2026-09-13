@@ -12,9 +12,10 @@ import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
+from newsegsmodelapp.backend.db import db_tables
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
-os.environ['DYNACONF_DB_PATH'] = ':memory:'
+#os.environ['DYNACONF_DB_PATH'] = ':memory:'
 from config import settings
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
@@ -26,12 +27,12 @@ from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
 from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, RecoverableInMemoryVariableProvider
 from test.unit_tests import variable_helpers
 
-SEED_TABLES = True
+SEED_TABLES = False
 
 class TestDatabaseStart(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        os.environ['DYNACONF_DB_PATH'] = ':memory:'
+        #os.environ['DYNACONF_DB_PATH'] = ':memory:'
         from newsegsmodelapp.backend import db
         from newsegsmodelapp.backend.db import tables as tbls
         metadata = tbls.metadata
@@ -43,7 +44,8 @@ class TestDatabaseStart(unittest.TestCase):
         )
 
         # Create all tables
-        metadata.create_all(db.get_engine())
+        db_tables.create_all_tables(db.get_engine())
+        #metadata.create_all(db.get_engine())
 
         if SEED_TABLES:
             # Load sheet names from Excel file
@@ -140,7 +142,36 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
         proj = PROJECT_FACTORIES['sprake']()
+
+        proj_2 = PROJECT_FACTORIES['sprake']()
+        for varid in proj.metamodels[0].variables.keys():
+            self.assertNotEqual(
+                proj.metamodels[0].variables[varid].id,
+                proj_2.metamodels[0].variables[varid].id
+            )
+        self.assertNotEqual(
+            proj.metamodels[0].id,
+            proj_2.metamodels[0].id
+        )
+
+        self.assertNotEqual(
+            proj.metamodels[0].model.id,
+            proj_2.metamodels[0].model.id
+        )
+
+        self.assertNotEqual(
+            proj.metamodels[0].finance.id,
+            proj_2.metamodels[0].finance.id
+        )
+
         proj_provider.add_component(proj)
+        mm2 = proj_provider.metamodel_provider.duplicate_component(proj.metamodels[0])
+        mm2.name = 'Second mm'
+        mm2.revision += 1
+        proj.metamodels.append(mm2) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
+        proj.revision += 1
+        proj_provider.upsert_component(proj)
+        
 
         project_id = proj.id
 
@@ -149,13 +180,12 @@ class TestDatabaseStart(unittest.TestCase):
             tbls.metadata,
             'projects',
             project_id,
-            'First snapshot',
-            project_id
+            'First snapshot'
         )
-
 
         # Check that the snapshot has been created
         with db.get_engine().connect() as conn:
+           
             result = conn.execute(
                 tbls.snapshot_projects.select()
                 .where(tbls.snapshot_projects.c.snapshot_id == snapshot_id)
@@ -166,31 +196,31 @@ class TestDatabaseStart(unittest.TestCase):
                 tbls.snapshot_metamodels.select()
                 .where(tbls.snapshot_metamodels.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 1)
+            self.assertEqual(len(result.fetchall()), 2)
 
             result = conn.execute(
                 tbls.snapshot_project_metamodels.select()
                 .where(tbls.snapshot_project_metamodels.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 1)
+            self.assertEqual(len(result.fetchall()), 2)
 
             result = conn.execute(
                 tbls.snapshot_em_configs.select()
                 .where(tbls.snapshot_em_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 1)
+            self.assertEqual(len(result.fetchall()), 2)
 
             result = conn.execute(
                 tbls.snapshot_fm_configs.select()
                 .where(tbls.snapshot_fm_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 1)
+            self.assertEqual(len(result.fetchall()), 2)
 
             result = conn.execute(
                 tbls.snapshot_component_configs.select()
                 .where(tbls.snapshot_component_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 10)
+            self.assertEqual(len(result.fetchall()), 19)
 
             result = conn.execute(
                 tbls.snapshot_variable_configs.select()
@@ -248,80 +278,130 @@ class TestDatabaseStart(unittest.TestCase):
                 ).fetchall()
                 for row0, row1 in zip(r0, r1):
                     for colname in ('component_type', 'component_class', 'component_version', 'payload', 'revision', 'last_result_id', 'label'):
-                        self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+                        self.assertEqual(row0._mapping[colname], row1._mapping[colname], f'{module_name}, {colname}')
 
-            metamodel_ids_0 = conn.execute(
-                sa.select(tbls.project_metamodels.c.metamodel_id)
+            metamodel_id_subq_0 = (
+                sa.select(
+                    tbls.project_metamodels.c.metamodel_id,
+                    tbls.project_metamodels.c.created_order,
+                )
                 .where(tbls.project_metamodels.c.project_id == project_id)
-            ).fetchall()
+                .subquery()
+            )
 
-            metamodel_ids_1 = conn.execute(
-                sa.select(tbls.project_metamodels.c.metamodel_id)
+            metamodel_id_subq_1 = (
+                sa.select(
+                    tbls.project_metamodels.c.metamodel_id,
+                    tbls.project_metamodels.c.created_order,
+                )
                 .where(tbls.project_metamodels.c.project_id == new_project_id)
-            ).fetchall()
+                .subquery()
+            )
 
             r0 = conn.execute(
-                tbls.metamodels.select()
-                .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_0]))
+                sa.select(tbls.metamodels)
+                .join(
+                    metamodel_id_subq_0,
+                    tbls.metamodels.c.id == metamodel_id_subq_0.c.metamodel_id
+                )
+                .order_by(metamodel_id_subq_0.c.created_order)
             ).fetchall()
             r1 = conn.execute(
-                tbls.metamodels.select()
-                .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_1]))
+                sa.select(tbls.metamodels)
+                .join(
+                    metamodel_id_subq_1,
+                    tbls.metamodels.c.id == metamodel_id_subq_1.c.metamodel_id
+                )
+                .order_by(metamodel_id_subq_1.c.created_order)
             ).fetchall()
             for row0, row1 in zip(r0, r1):
-                for colname in ('revision', 'label', 'lat', 'lon', 'n_units'):
-                    self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+                for colname in ('label', 'lat', 'lon', 'n_units', 'revision',):
+                    self.assertEqual(row0._mapping[colname], row1._mapping[colname], f'{colname} not equal')
 
-            em_config_ids_0 = [
-                x[0] for x in 
-                conn.execute(
-                    sa.select(tbls.metamodels.c.em_config_id)
-                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_0]))
-                ).fetchall()
-            ]
-            em_config_ids_1 = [
-                x[0] for x in 
-                conn.execute(
-                    sa.select(tbls.metamodels.c.em_config_id)
-                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_1]))
-                ).fetchall()
-            ]
-
+            em_subq_0 = (
+                sa.select(
+                    tbls.metamodels.c.em_config_id,
+                    metamodel_id_subq_0.c.created_order,
+                )
+                .join(
+                    metamodel_id_subq_0,
+                    tbls.metamodels.c.id == metamodel_id_subq_0.c.metamodel_id
+                )
+                .subquery()
+            )
+            em_subq_1 = (
+                sa.select(
+                    tbls.metamodels.c.em_config_id,
+                    metamodel_id_subq_1.c.created_order,
+                )
+                .join(
+                    metamodel_id_subq_1,
+                    tbls.metamodels.c.id == metamodel_id_subq_1.c.metamodel_id
+                )
+                .subquery()
+            )
+            
             r0 = conn.execute(
-                tbls.em_configs.select()
-                .where(tbls.em_configs.c.id.in_(em_config_ids_0))
+                sa.select(tbls.em_configs)
+                .join(
+                    em_subq_0,
+                    tbls.em_configs.c.id == em_subq_0.c.em_config_id
+                )
+                .order_by(em_subq_0.c.created_order)
             ).fetchall()
             r1 = conn.execute(
-                tbls.em_configs.select()
-                .where(tbls.em_configs.c.id.in_(em_config_ids_1))
+                sa.select(tbls.em_configs)
+                .join(
+                    em_subq_1,
+                    tbls.em_configs.c.id == em_subq_1.c.em_config_id
+                )
+                .order_by(em_subq_1.c.created_order)
             ).fetchall()
+
             for row0, row1 in zip(r0, r1):
-                for colname in ('model_class', 'model_version', 'payload', 'revision', 'label'):
-                    self.assertEqual(row0._mapping[colname], row1._mapping[colname])
+                for colname in ('label', 'model_class', 'model_version', 'revision', 'payload',):
+                    self.assertEqual(row0._mapping[colname], row1._mapping[colname], f'{colname} not equal')
 
-            fm_config_ids_0 = [
-                x[0] for x in 
-                conn.execute(
-                    sa.select(tbls.metamodels.c.fm_config_id)
-                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_0]))
-                ).fetchall()
-            ]
-            fm_config_ids_1 = [
-                x[0] for x in 
-                conn.execute(
-                    sa.select(tbls.metamodels.c.fm_config_id)
-                    .where(tbls.metamodels.c.id.in_([x[0] for x in metamodel_ids_1]))
-                ).fetchall()
-            ]
+            fm_subq_0 = (
+                sa.select(
+                    tbls.metamodels.c.fm_config_id,
+                    metamodel_id_subq_0.c.created_order,
+                )
+                .join(
+                    metamodel_id_subq_0,
+                    tbls.metamodels.c.id == metamodel_id_subq_0.c.metamodel_id
+                )
+                .subquery()
+            )
+            fm_subq_1 = (
+                sa.select(
+                    tbls.metamodels.c.fm_config_id,
+                    metamodel_id_subq_1.c.created_order,
+                )
+                .join(
+                    metamodel_id_subq_1,
+                    tbls.metamodels.c.id == metamodel_id_subq_1.c.metamodel_id
+                )
+                .subquery()
+            )
 
             r0 = conn.execute(
-                tbls.fm_configs.select()
-                .where(tbls.fm_configs.c.id.in_(fm_config_ids_0))
+                sa.select(tbls.fm_configs)
+                .join(
+                    fm_subq_0,
+                    tbls.fm_configs.c.id == fm_subq_0.c.fm_config_id
+                )
+                .order_by(fm_subq_0.c.created_order)
             ).fetchall()
             r1 = conn.execute(
-                tbls.fm_configs.select()
-                .where(tbls.fm_configs.c.id.in_(fm_config_ids_1))
+                sa.select(tbls.fm_configs)
+                .join(
+                    fm_subq_1,
+                    tbls.fm_configs.c.id == fm_subq_1.c.fm_config_id
+                )
+                .order_by(fm_subq_1.c.created_order)
             ).fetchall()
+
             for row0, row1 in zip(r0, r1):
                 for colname in ('model_class', 'model_version', 'payload', 'revision', 'label'):
                     self.assertEqual(row0._mapping[colname], row1._mapping[colname])
@@ -685,6 +765,8 @@ class TestDatabaseStart(unittest.TestCase):
             list(mm_copy.variables.values())[0].id
         )
 
+        n_proj_metamodels = len(proj.metamodels)
+
         mm_dup = mm_provider.duplicate_component(proj.metamodels[0].id)
         self.assertNotEqual(mm1.id, mm_dup.id)
         # Variables, however, should be maintained on a metamodel duplication
@@ -692,6 +774,11 @@ class TestDatabaseStart(unittest.TestCase):
             list(mm1.variables.values())[0].id,
             list(mm_copy.variables.values())[0].id
         )
+
+        # Check if the metamodel has NOT been connected to the project
+        proj = proj_provider.get_project(proj.id)
+        n_proj_metamodels_post_dup = len(proj.metamodels)
+        self.assertEqual(n_proj_metamodels_post_dup, n_proj_metamodels)
 
         proj_dup = proj_provider.duplicate_component(proj.id)
         self.assertNotEqual(proj.id, proj_dup.id)
@@ -749,12 +836,12 @@ class TestDatabaseStart(unittest.TestCase):
         grid = proj.metamodels[0].model.grid
         grid_res, verstring = result_provider.get_result('deterministic_grid', grid, True)
 
-        self.assertEqual(grid.revision_string, verstring)
+        self.assertEqual(grid.revision, verstring)
 
         generation = proj.metamodels[0].model.generation
         generation_res, verstring = result_provider.get_result('deterministic_generation', generation, True)
 
-        self.assertEqual(generation.revision_string, verstring)
+        self.assertEqual(generation.revision, verstring)
         self.assertGreater(len(generation_res.meters_to_pandas()), 8760) # pyright: ignore[reportOptionalMemberAccess]
 
         postprocess_list = [

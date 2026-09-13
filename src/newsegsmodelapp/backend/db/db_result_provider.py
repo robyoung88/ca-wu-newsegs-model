@@ -6,7 +6,7 @@ import pandas as pd
 import sqlalchemy as sa
 
 from newsegsmodelapp.components.result_file import load_result, save_result
-from newsegsmodelframework.core import NewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
@@ -36,7 +36,6 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             component_class = parent_component.__class__.__name__,
             component_version = parent_component.version,
             component_config_revision = parent_component.revision,
-            component_config_revision_string = parent_component.revision_string,
             result_type = result_type
         )
         if request:
@@ -68,33 +67,33 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_type: str,
         parent_component: NewsegsComponent,
         allow_stale: bool = True
-    ) -> tuple[Any, str] | tuple[None, None]:
+    ) -> tuple[Any, int] | tuple[None, None]:
         stmt = (
             sa.select(
                 self._table.c.result_id,
                 self._table.c.created_at,
                 self._table.c.result_file,
-                self._table.c.component_config_revision_string,
+                self._table.c.component_config_revision,
             )
             .where(self._table.c.result_type == result_type)
             .where(self._table.c.component_config_id == parent_component.id)
         )
 
-        revision_string = parent_component.revision_string
+        revision = parent_component.revision
         if not allow_stale:
-            stmt = stmt.where(self._table.c.component_config_revision_string == revision_string)
+            stmt = stmt.where(self._table.c.component_config_revision == revision)
 
         with self._get_engine().connect() as conn:
             odf = pd.read_sql(stmt, conn)
 
         if len(odf):
-            if revision_string in odf['component_config_revision_string']:
-                file_name = odf['result_file'].loc[odf['component_config_revision_string'] == revision_string][0]
-                rrs = revision_string
+            if revision in odf['component_config_revision']:
+                file_name = odf['result_file'].loc[odf['component_config_revision'] == revision][0]
+                rrs = revision
             else:
                 odf = odf.sort_values('created_at')
                 file_name = odf['result_file'].iloc[-1]
-                rrs = odf['component_config_revision_string'].iloc[-1]
+                rrs = odf['component_config_revision'].iloc[-1]
 
             obj = load_result(Path(file_name))
             return (obj, rrs)

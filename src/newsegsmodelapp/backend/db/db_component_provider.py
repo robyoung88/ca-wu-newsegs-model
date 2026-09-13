@@ -1,6 +1,6 @@
 import copy
 import json
-from typing import Callable, Literal, Optional, Sequence, cast, overload, override
+from typing import Any, Callable, Literal, Optional, Sequence, cast, overload, override
 
 import pandas as pd
 import sqlalchemy as sa
@@ -9,7 +9,7 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.backend.db import DependentObjectsExistError, db_snapshot
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.constructors.constructors import find_constructor
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentManagerInterface, NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
 
 from newsegsmodelapp.backend.db.project import component_to_raw_table_data, finance_model_to_raw_table_data, metamodel_to_raw_table_data, project_to_raw_table_data
 from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
@@ -22,8 +22,7 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSI
 from newsegsmodelframework.newsegsvariable.variable import Variable
 
 class FromDatabaseNewsegsComponentProvider(
-    NewsegsComponentProviderInterface,
-    NewsegsComponentPersistenceInterface,
+    NewsegsComponentManagerInterface
 ):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         self._get_engine = get_engine
@@ -201,7 +200,7 @@ class FromDatabaseNewsegsComponentProvider(
 
         cmpdata = {cmp.id: self._component_to_table_data(cmp) for cmp in component if cmp.id in requires_data}
 
-        revdata = {cmp.id: {'id': cmp.id, 'revision': cmp.revision, 'revision_string': cmp.revision_string} for cmp in component if cmp.id in requires_revision_increment}
+        revdata = {cmp.id: {'id': cmp.id, 'revision': cmp.revision,} for cmp in component if cmp.id in requires_revision_increment}
 
         update_payload = [cmpdata[x] for x in requires_update]
         insert_payload = [cmpdata[x] for x in new_inserts]
@@ -343,6 +342,52 @@ class FromDatabaseNewsegsComponentProvider(
                 failures.append(id)
 
         return failures
+
+    @overload
+    def get_component_metadata(
+        self,
+        component_id: str,
+        metadata_ids: str | SequenceNotStr[str]
+    ) -> dict[str, Any]:
+        ...
+
+    @overload 
+    def get_component_metadata(
+        self,
+        component_id: SequenceNotStr[str],
+        metadata_ids: str | SequenceNotStr[str]
+    ) -> dict[str, dict[str, Any]]:
+        ...
+
+    def get_component_metadata(
+        self,
+        component_id: str | SequenceNotStr[str],
+        metadata_ids: str | SequenceNotStr[str]
+    ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        is_single_id = isinstance(component_id, (str, bytes))
+        component_id = [component_id] if is_single_id else list(component_id)
+
+        cols = [metadata_ids] if isinstance(metadata_ids, (str, bytes)) else list(metadata_ids)
+
+        if not component_id:
+            return {}
+
+        pk_col = list(self._table.primary_key.columns)[0]
+        select_cols = [self._table.c[col_name] for col_name in cols]
+
+        fetch_cols = list({pk_col, *select_cols})
+        stmt = sa.select(*fetch_cols).where(pk_col.in_(component_id))
+        with self._get_engine().connect() as conn:
+            results = conn.execute(stmt).mappings().all()
+
+        mapped_data = {
+            row[pk_col.name]: {c: row[c] for c in cols} for row in results
+        }
+
+        if is_single_id:
+            return mapped_data.get(component_id[0], {})
+
+        return mapped_data
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
@@ -806,16 +851,13 @@ class FromDatabaseNewsegsProjectProvider(
     def _assign_updated_child_uids(self, obj, row):
         if isinstance(obj, NewsegsProject):
             obj._component_ids['table_config'] = row.table_config_id
+            # No need to update the focussed metamodel - as this is
+            # stored as an int, it should not be impacted so long
+            # as the order of metamodels is consistent.
 
             # The row is not enough for us to reassign metamodel uids
             # - need to go to the junction table
-            stmt = (
-                sa.select(self._project_metamodel_jct.c.metamodel_id)
-                .where(self._project_metamodel_jct.c.project_id == obj.id)
-            )
-            with self._get_engine().connect() as conn:
-                result = conn.execute(stmt)
-                metamodel_ids = [str(row[0]) for row in result]
+            metamodel_ids = self.list_project_metamodel_ids(obj.id)
             obj._metamodel_ids = metamodel_ids
 
             # Similarly, variable uids may have been modified.
@@ -934,7 +976,10 @@ class FromDatabaseNewsegsProjectProvider(
 
         # Project - Metamodel junction
         new_metamodel_entries = [
-            {'project_id': project.id, 'metamodel_id': mm.id}
+            {
+                'project_id': project.id, 
+                'metamodel_id': mm.id,
+            }
             for mm in project.metamodels
         ]
         with self._get_engine().begin() as conn:
@@ -964,7 +1009,7 @@ class FromDatabaseNewsegsProjectProvider(
             if isinstance(component, NewsegsProject):
                 return self._upsert_project(component, force, tbl)
             elif isinstance(component, NewsegsMetaModel):
-                return self.metamodel_provider.upsert_component(component, force, tbl)
+                return self.metamodel_provider.upsert_component(component, force)
             elif isinstance(component, Variable):
                 return self.variable_provider.upsert_variable(component, force)
             else:
@@ -990,8 +1035,7 @@ class FromDatabaseNewsegsProjectProvider(
             if metamodel_indices:
                 self.metamodel_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in metamodel_indices],
-                    force,
-                    tbl
+                    force
                 )
             if variable_indices:
                 self.variable_provider.upsert_variable(
@@ -1248,3 +1292,17 @@ class FromDatabaseNewsegsProjectProvider(
         )
         new_project_id = id_remap['projects'][project_id]
         return self.get_component(new_project_id)
+
+    @override
+    def list_project_metamodel_ids(self, project_id: str) -> tuple[str, ...]:
+        find_mm_stmt = (
+            sa.select(self._project_metamodel_jct.c.metamodel_id)
+            .where(self._project_metamodel_jct.c.project_id == project_id)
+            .order_by(self._project_metamodel_jct.c.created_order)
+        )
+
+        with self._get_engine().connect() as conn:
+            result = list(conn.execute(find_mm_stmt).scalars())
+        #result.reverse()
+        return tuple(result)
+    

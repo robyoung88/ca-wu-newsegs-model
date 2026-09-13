@@ -76,6 +76,12 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     def metamodel_ids(self) -> tuple[str, ...]:
         return tuple(mm.id for mm in self.metamodels)
 
+    def get_focussed_metamodel_index(self) -> int:
+        return self._focussed_metamodel
+
+    def set_focussed_metamodel_index(self, metamodel_index: int = 0):
+        self.set_focussed_metamodel(metamodel_index = metamodel_index)
+
     def get_focussed_metamodel(self):
         if self._focussed_metamodel >= len(self.metamodels):
             if len(self.metamodels) == 0:
@@ -128,13 +134,9 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
             raise KeyError(f'Metamodel {metamodel_id} not found for project {self.name}[{self.id}] - available values are {[x.id for x in self.metamodels]}.')
         return mm
 
-    @override
-    def get_components(self) -> tuple[NewsegsComponent, ...]:
-        return (
-            self.dsa_config,
-            self.psa_config,
-            self.table_config,
-        )
+    def get_component_attributes(self) -> tuple[str, ...]:
+        atts = super().get_component_attributes()
+        return ('dsa_config', 'psa_config', 'table_config', *atts)
 
     @override
     def to_dict(self) -> dict[str, Any]:

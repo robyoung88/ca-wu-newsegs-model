@@ -10,6 +10,9 @@ from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
+from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
+from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
+
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings
@@ -29,6 +32,10 @@ from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.input_container_callbacks import add_input_container_callbacks
 from newsegsmodelapp.components import map
+
+RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
+if not RESULTS_STORE.exists():
+    RESULTS_STORE.mkdir(parents=True, exist_ok=True)
 
 
 # LAYOUTS
@@ -163,6 +170,7 @@ def create_app(external_stylesheets = None) -> Dash:
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
     project_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+    results_provider = FromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
 
     app = NewsegsDash(
         __name__,
@@ -170,6 +178,7 @@ def create_app(external_stylesheets = None) -> Dash:
         update_title = None, # pyright: ignore[reportArgumentType]
         external_stylesheets = external_stylesheets,
         project_provider = project_provider,
+        results_provider = results_provider,
         #routing_callback_inputs = {
         #    'session-id': Input('session-id', 'data'),
         #    'app-state': Input('app-state', 'data'),
@@ -190,6 +199,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = model_selection_callbacks.assign_callbacks(app)
     app = project_selector.add_project_selector_callbacks(app)
     app = map.add_site_selector_callbacks(app)
+    add_configuration_selector_callbacks(app)
 
     return app
 

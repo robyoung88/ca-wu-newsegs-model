@@ -5,6 +5,7 @@ from dash.dash import _default_index
 from dash.dependencies import Input, State
 from dash.types import RendererHooks
 
+from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
 
@@ -14,12 +15,18 @@ class NewsegsDash(Dash):
         self,
         *args,
         project_provider: NewsegsProjectProviderInterface,
+        results_provider: NewsegsResultProviderInterface,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self._project_provider = project_provider
+        self._results_provider = results_provider
 
     @property
     def project_provider(self) -> NewsegsProjectProviderInterface:
         return self._project_provider
+
+    @property
+    def results_provider(self) -> NewsegsResultProviderInterface:
+        return self._results_provider
     

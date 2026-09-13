@@ -1,16 +1,20 @@
 """Interface for providing Projects"""
 
 from abc import abstractmethod
-from typing import Literal, Optional
+from typing import Literal, Optional, cast
 
 import pandas as pd
 
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentManagerInterface
 from newsegsmodelframework.newsegsproject import NewsegsProject
+from newsegsmodelframework.newsegsvariable.variableprovider import VariableManagerInterface
 
 ON_MISSING_OPTION = Literal['last', 'create', 'none']
 
-class NewsegsProjectProviderInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
+class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
+    metamodel_provider: NewsegsComponentManagerInterface
+    variable_provider: VariableManagerInterface
+
     @abstractmethod
     def list_projects(
         self,
@@ -56,3 +60,9 @@ class NewsegsProjectProviderInterface(NewsegsComponentProviderInterface, Newsegs
     def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
         """Recover a snapshot of the project state."""
 
+    def get_project(self, project_id: str) -> NewsegsProject:
+        return cast(NewsegsProject, self.get_component(project_id))
+
+    @abstractmethod
+    def list_project_metamodel_ids(self, project_id: str) -> tuple[str, ...]:
+        """Get a tuple of the ids of the metamodels owned by a project."""

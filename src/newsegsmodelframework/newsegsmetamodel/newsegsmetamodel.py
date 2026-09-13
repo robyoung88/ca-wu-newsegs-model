@@ -197,11 +197,9 @@ class NewsegsMetaModel(NewsegsComponent):
         except AttributeError:
             pass
 
-    @override
-    def get_components(self) -> tuple[NewsegsComponent, ...]:
-        return (
-            self.table_config,
-        )
+    def get_component_attributes(self) -> tuple[str, ...]:
+        atts = super().get_component_attributes()
+        return ('table_config', *atts)
 
     @property
     def variable_ids(self) -> tuple[dict[str, str], ...]:
@@ -379,6 +377,30 @@ class NewsegsMetaModel(NewsegsComponent):
         odict['_table_config_id'] = self.table_config.id
         return odict
 
+    @override
+    def to_dict_repr(self) -> dict[str, Any]:
+        odict = super().to_dict_repr()
+        
+        odict['model'] = self.model.to_dict_repr()
+        del odict['_model_id']
+        odict['finance'] = self.finance.to_dict_repr()
+        del odict['_finance_id']
+
+        vars = {k: v.to_dict() for k, v in self.variables.items()}
+        odict['variables'] = vars
+        # Clear the old variable ids, as don't want to get confused when we reconstruct
+        odict['_variable_ids'] = []
+
+        return odict
+
+    @override
+    def anonymise_ids(self):
+        super().anonymise_ids()
+        self.model.anonymise_ids()
+        self.finance.anonymise_ids()
+        for v in self.variables.values():
+            v.anonymise_ids()
+
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         for dontpickle in ['_model', '_finance', '_variables']:
@@ -421,6 +443,16 @@ class NewsegsMetaModel(NewsegsComponent):
             '_finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
             'last_modified': datetime.datetime.now().isoformat()
         }
+
+    @classmethod
+    @override
+    def from_dict(cls, config):
+        config = config.copy()
+        inst = cls.__new__(cls)
+        inst._config = inst._generate_config()
+        inst.variables = {}
+        inst.update(config)
+        return inst
     
     @override
     def update(self, config: dict[str, Any] | type[serialisation.T]):
@@ -429,6 +461,8 @@ class NewsegsMetaModel(NewsegsComponent):
             self.finance.set_model(self.model)
         except AttributeError:
             pass
+
+    
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
     '_model', '_finance', '_variables', '_table_config'

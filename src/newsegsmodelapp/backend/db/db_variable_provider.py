@@ -9,7 +9,7 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.backend.db.project import variable_to_raw_table_data
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsvariable.variable import Variable
-from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface, VariablePersistenceInterface
+from newsegsmodelframework.newsegsvariable.variableprovider import VariableManagerInterface
 
 from newsegsmodelapp.backend.db import tables as tbls
 
@@ -21,7 +21,7 @@ def _variable_from_json(json_str) -> Variable:
     )
     
 
-class FromDatabaseVariableProvider(VariableProviderInterface, VariablePersistenceInterface):
+class FromDatabaseVariableProvider(VariableManagerInterface):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         self._get_engine = get_engine
 

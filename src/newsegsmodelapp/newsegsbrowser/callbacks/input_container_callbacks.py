@@ -11,11 +11,11 @@ from dash import ctx
 from dash.exceptions import PreventUpdate
 import numpy as np
 
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID, VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser.common import get_triggered_value
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
@@ -45,9 +45,11 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         app_state,
         container_id
     ):
+        if active_project_id is None:
+            raise PreventUpdate
         trig = ctx.triggered_id
         if isinstance(trig, Mapping) and trig.get('type') == 'input-group-config-update-trigger':
-            trig_val = get_triggered_value()
+            trig_val = callback_utils.get_triggered_value()
             if isinstance(trig_val, int):
                 # Standard update - do nothing.
                 raise PreventUpdate
@@ -92,6 +94,8 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         app_state,
         container_id,
     ):
+        if active_project_id is None:
+            raise PreventUpdate
         app_state = json.loads(app_state) if app_state else {}
                 
         supersection = container_id.get('supersection')
@@ -190,11 +194,11 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         print('Triggering object was ', ctx.triggered_id, type(ctx.triggered_id))
         print('Header ids are ', header_ids)
         print('Trigger ids are ', trigger_ids)
-        print('Updated value is ', get_triggered_value())
+        print('Updated value is ', callback_utils.get_triggered_value())
 
         # Primary dispatch is on the purpose of the input
         trigger_id = ctx.triggered_id
-        if trigger_id is None:
+        if trigger_id is None or active_project_id is None:
             raise PreventUpdate
 
         input_returns: list[Any] = [no_update] * len(input_ids)
@@ -205,7 +209,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         
         match trigger_id['purpose']:
             case 'parameter':
-                new_val = get_triggered_value()
+                new_val = callback_utils.get_triggered_value()
                 proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
                 mm = proj.get_focussed_metamodel()
                 variable_keys = {k: trigger_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
@@ -259,7 +263,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
             case 'bound-lower' | 'bound-upper':
                 match trigger_id['supersection']:
                     case 'dsa':
-                        new_val = get_triggered_value()
+                        new_val = callback_utils.get_triggered_value()
                         proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
                         mm = proj.get_focussed_metamodel()
                         varid =  make_varid(**trigger_id)
@@ -303,7 +307,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                         pass
 
             case 'dsaboundtype':
-                new_val = get_triggered_value()
+                new_val = callback_utils.get_triggered_value()
                 proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
                 mm = proj.get_focussed_metamodel()
                 varid =  make_varid(**trigger_id)
@@ -349,7 +353,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                 app.project_provider.upsert_component(proj)
 
             case 'dsa-active':
-                new_val = get_triggered_value()
+                new_val = callback_utils.get_triggered_value()
                 proj = cast(NewsegsProject, app.project_provider.get_component(active_project_id))
                 mm = proj.get_focussed_metamodel()
                 varid =  make_varid(**trigger_id)

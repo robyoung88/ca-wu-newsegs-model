@@ -11,12 +11,15 @@ def generic_snapshot_entity(
     root_table_name: str,
     root_id: str,
     snapshot_label: str,
-    project_id: str
+    project_id: str | None = None
 ) -> int:
     """
     Introspects schema dependencies starting from root_table_name and
     automatically creates a snapshot of all linked child and junction records.
     """
+
+    project_id = root_id if project_id is None else project_id
+
     with engine.begin() as conn:
         # Create the master Snapshot entry
         snapshots = metadata.tables['snapshots']
