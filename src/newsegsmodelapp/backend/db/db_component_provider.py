@@ -1311,6 +1311,16 @@ class FromDatabaseNewsegsProjectProvider(
         #result.reverse()
         return tuple(result)
 
+    @override
+    def get_focussed_metamodel_id(self, project_id: str) -> str:
+        stmt = (
+            sa.select(self._table.c.focussed_metamodel_id)
+            .where(self._table.c.id == project_id)
+        )
+        with self._get_engine().connect() as conn:
+            res = conn.execute(stmt).scalar_one()
+        return res
+
 class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
 ):

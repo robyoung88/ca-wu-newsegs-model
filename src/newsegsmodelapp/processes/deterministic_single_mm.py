@@ -17,13 +17,13 @@ class DeterministicRunMetamodelRunRequest(RunRequest):
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
-def request_deterministic_single_mm_run(proj: NewsegsProject, engine: sa.Engine):
-    mm = proj.get_focussed_metamodel()
+def request_deterministic_single_mm_run(project_id: str, project_provider: NewsegsProjectProviderInterface):
+    mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return DeterministicRunMetamodelRunRequest(
-        project_id = proj.id,
+        project_id = project_id,
         request_id = 'Deterministic run - ' + str(datetime.datetime.now()),
         payload = json.dumps({
-            'metamodel_id': mm.id
+            'metamodel_id': mm_id
         })
     )
 

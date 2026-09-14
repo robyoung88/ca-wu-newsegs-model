@@ -4,6 +4,7 @@ from typing import Any, Callable, Sequence, cast
 
 from dash.development.base_component import Component as DashComponent
 import sqlalchemy as sa
+from useful_types import SequenceNotStr
 
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -119,14 +120,14 @@ class RunRequest(SerialisableDataclass):
     progress: float = 0.0
     progress_message: str = ''
     cancel_requested: bool = False
-    background_procedure: bool = True
+    background_procedure: bool = False # TODO: Set to default background once the dispatcher is enabled
 
-RUN_REQUEST_REGISTER: dict[str, Callable[[NewsegsProject, sa.Engine], RunRequest]] = {}
+RUN_REQUEST_REGISTER: dict[str, Callable[[str, NewsegsProjectProviderInterface], RunRequest]] = {}
 """Register of functions to generate run requests.
 
 Function arguments:
-    proj [NewsegsProject]
-    engine [sqlalchemy engine]
+    project_id [str]
+    project_provider [NewsegsProjectProviderInterface]
 """
 
 def register_run_request(name: str,):
@@ -166,12 +167,14 @@ Function returns:
 
 def register_run_procedure(
     name: str,
-    triggers: Sequence[str] = [],
+    triggers: SequenceNotStr[str] = [],
 ):
     """Add a background run procedure to the register.
     
     The name should correspond to the request_type of the RunRequest
     """
+    if isinstance(triggers, str):
+        triggers = [triggers]
     def decorated(func):
         if name in RUN_PROCEDURE_REGISTER:
             raise KeyError(f'A run procedure already exists for key {name}')
@@ -239,9 +242,11 @@ Function returns:
 """
 def register_postprocess_procedure(
         name: str, model_type: str = 'default',
-        triggers: Sequence[str] = []
+        triggers: SequenceNotStr[str] = []
     ):
     key = (name, model_type)
+    if isinstance(triggers, str):
+        triggers = [triggers]
     def decorated(func):
         if model_type != 'default':
             if key in POSTPROCESS_REGISTER:
@@ -331,9 +336,11 @@ Function returns:
 
 def register_table_draw(
     name: str, model_type: str = 'default',
-    triggers: Sequence[str] = []
+    triggers: SequenceNotStr[str] = []
 ):
     key = (name, model_type)
+    if isinstance(triggers, str):
+        triggers = [triggers]
     def decorated(func):
         if model_type != 'default':
             if key in TABLE_DRAW_REGISTER:
@@ -362,6 +369,9 @@ def get_table_draw(table_section: str, request: RunRequest):
 
     return proc
 
+
+def trigger_name_clash(purpose: str) -> bool:
+    return purpose in [*RUN_REQUEST_REGISTER.keys(), *POSTPROCESS_REQUEST_REGISTER.keys(), *TABLE_DRAW_REQUEST_REGISTER.keys()]
 
 # -------------------------------------------------------------------------
 # Input Layouts

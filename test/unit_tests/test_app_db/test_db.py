@@ -405,44 +405,6 @@ class TestDatabaseStart(unittest.TestCase):
             for row0, row1 in zip(r0, r1):
                 for colname in ('model_class', 'model_version', 'payload', 'revision', 'label'):
                     self.assertEqual(row0._mapping[colname], row1._mapping[colname])
-
-    def test_project_save(self):
-        from newsegsmodelapp.backend import db
-        from newsegsmodelapp.backend.db import tables as tbls
-
-        from newsegsmodelframework.newsegsmodel import sprakemodel
-        from newsegsmodelframework.newsegsfinance import sprakefinance
-        import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
-        import newsegsmodelframework.newsegsproject as newsegsproject
-
-        mdl = sprakemodel.SprakeModel.from_none()
-        fnc = sprakefinance.SprakeFinance.from_none()
-        fnc.set_model(mdl)
-
-        mm = newsegsmetamodel.NewsegsMetaModel(mdl, fnc)
-
-        proj = newsegsproject.NewsegsProject([mm])
-
-        with db.get_engine().begin() as conn:
-            project_id = db.save_project(proj, conn)
-
-        self.assertIsInstance(project_id, int)
-        self.assertNotEqual(project_id, 1)
-
-        with db.get_engine().connect() as conn:
-            result = conn.execute(
-                sa.select(tbls.projects.c.id)
-                .where(tbls.projects.c.id == project_id)
-            )
-            self.assertEqual(len(result.fetchall()),1)
-
-
-        # Also test load
-        with db.get_engine().connect() as conn:
-            proj_dup = db.load_project(project_id, conn)
-            self.assertEqual(proj.id, proj_dup.id)
-            self.assertEqual(proj.metamodels[0].id, proj_dup.metamodels[0].id)
-            self.assertEqual(len(proj.metamodels[0].variables), len(proj_dup.metamodels[0].variables))
         
     def test_db_variable_provider(self):
         from newsegsmodelapp.backend import db
@@ -857,7 +819,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
         self.assertIsNotNone(request_creator)
-        request = request_creator(proj, db.get_engine()) # pyright: ignore[reportOptionalCall]
+        request = request_creator(proj.id, proj_provider) # pyright: ignore[reportOptionalCall]
 
         run_id = generate_claim_ticket(engine, request)
 

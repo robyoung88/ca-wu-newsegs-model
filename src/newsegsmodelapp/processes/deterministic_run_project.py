@@ -16,9 +16,9 @@ class DeterministicRunProjectRunRequest(RunRequest):
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
-def request_deterministic_run_project(proj: NewsegsProject, engine: sa.Engine):
+def request_deterministic_run_project(project_id: str, project_provider: NewsegsProjectProviderInterface):
     return DeterministicRunProjectRunRequest(
-        project_id = proj.id,
+        project_id = project_id,
         request_id = 'Deterministic project run - ' + str(datetime.datetime.now())
     )
 

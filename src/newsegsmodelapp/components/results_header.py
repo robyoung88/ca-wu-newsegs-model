@@ -43,7 +43,7 @@ def create_results_header(**kwargs):
                                         id = {
                                             'type': 'action-button',
                                             'purpose': 'deterministic_run_metamodel',
-                                            'section': 'result-header',
+                                            'section': 'run',
                                         },
                                         style = {
                                             'margin-left': '5px',
@@ -52,7 +52,6 @@ def create_results_header(**kwargs):
                                         },
                                         title = 'Run single configuration',
                                     ), # pyright: ignore[reportCallIssue]
-                                    dcc.Store(id = {'type': 'postaction-trigger', 'purpose': 'deterministic_run_metamodel', 'section': 'result-header'}),
 
                                     # Run project button
                                     dbc.Button(
@@ -64,7 +63,7 @@ def create_results_header(**kwargs):
                                         id = {
                                             'type': 'action-button',
                                             'purpose': 'deterministic_run_project',
-                                            'section': 'result-header',
+                                            'section': 'run',
                                         },
                                         style = {
                                             'margin-left': '5px',
@@ -73,7 +72,6 @@ def create_results_header(**kwargs):
                                         },
                                         title = 'Run all configurations',
                                     ), # pyright: ignore[reportCallIssue]
-                                    dcc.Store(id = {'type': 'postaction-trigger', 'purpose': 'deterministic_run_project', 'section': 'result-header'}),
                                 ],
                             ),
                             className = 'results-title-block'

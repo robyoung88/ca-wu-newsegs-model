@@ -13,6 +13,7 @@ import dash_bootstrap_components as dbc
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import add_action_callbacks
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -57,7 +58,7 @@ def serve_layout():
     """
     post_action_triggers = [
         dcc.Store(id = {'type': 'postaction-trigger', 'purpose': x, 'section': 'global'})
-        for x  in [*registers.RUN_REQUEST_REGISTER.keys(), *registers.POSTPROCESS_REQUEST_REGISTER.keys(), *registers.TABLE_DRAW_REQUEST_REGISTER.keys()]
+        for x  in set([*registers.RUN_REQUEST_REGISTER.keys(), *registers.POSTPROCESS_REQUEST_REGISTER.keys(), *registers.TABLE_DRAW_REQUEST_REGISTER.keys()])
     ]
     return html.Div([
         dcc.Location(id = 'url', refresh = 'callback-nav'),
@@ -69,7 +70,9 @@ def serve_layout():
         dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
-    ] + post_action_triggers)
+    ] 
+    + post_action_triggers
+)
 
 # -----------------------------------------------
 # Navigation
@@ -207,6 +210,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = project_selector.add_project_selector_callbacks(app)
     app = map.add_site_selector_callbacks(app)
     add_configuration_selector_callbacks(app)
+    add_action_callbacks(app)
 
     return app
 

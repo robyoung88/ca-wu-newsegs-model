@@ -425,10 +425,10 @@ runs = sa.Table(
     sa.Column('status', sa.String),
     sa.Column('created_at', sa.DateTime, server_default = sa.func.now()),
     sa.Column('modified_at', sa.DateTime, default = datetime.datetime.now, onupdate = datetime.datetime.now), # Do not use server_onupdate, as not all backends can handle it.
-    #sa.Column('modified_order', sa.String(36), default = lambda: str(uuid6.uuid7())),
     sa.Column('progress', sa.Float, default = 0.0),
     sa.Column('progress_message', sa.String, nullable = True),
     sa.Column('cancel_requested', sa.Boolean, default = False),
+    sa.Column('children_spawned', sa.Boolean, default = False)
 )
 
 
@@ -448,72 +448,5 @@ sessions = sa.Table(
 # Table creation
 # -----------------------------------------------------------------------------
 
-
-
-# def find_tables_with_column(metadata: sa.MetaData, column_name: str) -> list[str]:
-#     return [
-#         table.name
-#         for table in metadata.tables.values()
-#         if column_name in table.columns
-#     ]
-
-# # table_has_modified_order = find_tables_with_column(metadata, 'modified_order')
-# # table_has_modified_time = find_tables_with_column(metadata, 'modified_time')
-
-# # @sa_event.listens_for(sa.Connection, "before_execute")
-# # def receive_before_execute(
-# #     conn, 
-# #     clauseelement, 
-# #     multiparams, 
-# #     params, 
-# #     execution_options
-# # ):
-# #     if isinstance(clauseelement, sa.Update):
-# #         if clauseelement.table.name in table_has_modified_order:
-# #             # Handle dict or list-of-dicts parameter formats
-# #             if params:
-# #                 params["modified_order"] = str(get_uuid7())
-# #             elif multiparams:
-# #                 for param_dict in multiparams:
-# #                     param_dict["modified_order"] = str(get_uuid7())
-# #         if clauseelement.table.name in table_has_modified_time:
-# #             # Handle dict or list-of-dicts parameter formats
-# #             now = datetime.datetime.now()
-# #             if params:
-# #                 params["modified_time"] = now
-# #             elif multiparams:
-# #                 for param_dict in multiparams:
-# #                     param_dict["modified_time"] = now
-
-# # Fast set lookup for performance
-# TABLES_WITH_MODIFIED_ORDER = set(
-#     find_tables_with_column(metadata, "modified_order")
-# )
-# TABLES_WITH_MODIFIED_TIME = set(
-#     find_tables_with_column(metadata, "modified_time")
-# )
-
-
-# @sa_event.listens_for(sa.Update, "before_compile", retval=True)
-# def auto_update_modified_metadata(clause, compiler):
-#     table_name = getattr(clause.table, "name", None)
-#     if not table_name:
-#         return clause
-
-#     updates = {}
-
-#     if table_name in TABLES_WITH_MODIFIED_ORDER:
-#         updates["modified_order"] = str(uuid6.uuid7())
-
-#     if table_name in TABLES_WITH_MODIFIED_TIME:
-#         updates["modified_time"] = datetime.datetime.now(datetime.timezone.utc)
-
-#     if updates:
-#         # Appends values to the UPDATE statement construct before compilation
-#         clause = clause.values(**updates)
-
-#     return clause
-
 def create_all_tables(engine: sa.Engine):
     metadata.create_all(engine)
-    #add_triggers(engine)

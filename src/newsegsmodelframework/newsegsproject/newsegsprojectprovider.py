@@ -66,3 +66,7 @@ class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
     @abstractmethod
     def list_project_metamodel_ids(self, project_id: str) -> tuple[str, ...]:
         """Get a tuple of the ids of the metamodels owned by a project."""
+
+    @abstractmethod
+    def get_focussed_metamodel_id(self, project_id: str) -> str:
+        """Get the id of the focussed metamodel."""
