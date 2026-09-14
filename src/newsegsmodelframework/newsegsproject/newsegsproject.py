@@ -77,24 +77,25 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
         return tuple(mm.id for mm in self.metamodels)
 
     def get_focussed_metamodel_index(self) -> int:
+        if self._focussed_metamodel >= len(self.metamodels):
+            if len(self.metamodels) == 0:
+                raise ValueError('No metamodels within project')
+            else:
+                self._focussed_metamodel = len(self.metamodels) - 1
         return self._focussed_metamodel
 
     def set_focussed_metamodel_index(self, metamodel_index: int = 0):
         self.set_focussed_metamodel(metamodel_index = metamodel_index)
 
     def get_focussed_metamodel(self):
-        if self._focussed_metamodel >= len(self.metamodels):
-            if len(self.metamodels) == 0:
-                raise ValueError('No metamodels within project')
-            else:
-                self._focussed_metamodel = len(self.metamodels) - 1
-        return self.metamodels[self._focussed_metamodel]
+        return self.metamodels[self.get_focussed_metamodel_index()]
 
     def set_focussed_metamodel(self, metamodel_id: Optional[str] = None, metamodel_index: int = 0):
         if metamodel_id:
             for i, mm in enumerate(self.metamodels):
                 if mm.id == metamodel_id:
                     self._focussed_metamodel = i
+                    return
         self._focussed_metamodel = metamodel_index
 
     def duplicate_metamodel(self, metamodel_id: str) -> newsegsmetamodel.NewsegsMetaModel:

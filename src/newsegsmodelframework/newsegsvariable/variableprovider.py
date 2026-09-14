@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 import copy
-from typing import Sequence, cast, overload
+from typing import Sequence, cast, overload, override
 
 from useful_types import SequenceNotStr
 
@@ -50,6 +50,7 @@ class VariableProviderInterface(metaclass = ABCMeta):
 class VariablePersistenceInterface(metaclass = ABCMeta):
     """Interface for saving variables to persistent storage (in order that they may be accessed by other providers)"""
 
+    @abstractmethod
     def upsert_variable(self, var: Variable | Sequence[Variable], force: bool = False) -> None:
         """Insert or update a variable or list of variables into the store.
                 
@@ -58,11 +59,24 @@ class VariablePersistenceInterface(metaclass = ABCMeta):
             force: Overwrite the variable(s) regardless of whether their revision number has incremented.
         """
 
+    @abstractmethod
+    def delete_variable(self, variable_id: str | SequenceNotStr[str]) -> list[str]:
+        """Delete a component or list of components in the store.
+
+        Will remove all dependent components and snapshots (if applicable).
+
+        Args:
+            component_id [str | Sequence[str]]: ID(s) of component(s) to delete.
+            ignore_ids [list[str]]: IDs of components which may be ignored in dependents search
+        Returns:
+            List of component_ids for which deletion has failed.
+        """
+
 class VariableManagerInterface(VariableProviderInterface, VariablePersistenceInterface):
     ...
 
 
-class InMemoryVariableProvider(VariableProviderInterface):
+class InMemoryVariableProvider(VariableManagerInterface):
 
     def __init__(self, default_variables):
         super().__init__()
@@ -122,6 +136,32 @@ class InMemoryVariableProvider(VariableProviderInterface):
     def get_varids(self) -> tuple[str, ...]:
         return tuple(self._variables_by_varid.keys())
 
+    @override
+    def upsert_variable(self, var: Variable | Sequence[Variable], force: bool = False) -> None:
+        if isinstance(var, Variable):
+            var = [var]
+        for var in var:
+            var.chain_syncronise()
+
+    @override
+    def delete_variable(self, variable_id: str | SequenceNotStr[str]) -> list[str]:
+        if isinstance(variable_id, str):
+            variable_id = [variable_id]
+        for uid in variable_id:
+            var = self._variables_by_uid.get(uid, None)
+            if var is None:
+                continue
+
+            varid = variable_uid(var)
+            try:
+                del self._variables_by_varid[varid][uid]
+            except KeyError as e:
+                pass
+            try:
+                del self._variables_by_uid[uid]
+            except KeyError as e:
+                pass
+        return []
 
 class RecoverableInMemoryVariableProvider(InMemoryVariableProvider):
     """Extends InMemoryVariableProvider with capabilities to restore variables from another (store) provider."""
@@ -166,3 +206,28 @@ class RecoverableInMemoryVariableProvider(InMemoryVariableProvider):
 
                 self._variables_by_varid[varid][uid] = var
                 self._variables_by_uid[uid] = var
+
+    @override
+    def delete_variable(self, variable_id: str | SequenceNotStr[str]) -> list[str]:
+        if isinstance(variable_id, str):
+            variable_id = [variable_id]
+        for uid in variable_id:
+            var = self._variables_by_uid.get(uid, None)
+            if var is None:
+                continue
+
+            varid = variable_uid(var)
+            try:
+                del self._variables_by_varid[varid][uid]
+            except KeyError as e:
+                pass
+            try:
+                del self._variables_by_uid[uid]
+            except KeyError as e:
+                pass
+            if hasattr(self, '_variable_recovery_uids'):
+                    try:
+                        self._variable_recovery_uids[varid].remove(uid) # pyright: ignore[reportAttributeAccessIssue]
+                    except ValueError as e:
+                        pass
+        return []

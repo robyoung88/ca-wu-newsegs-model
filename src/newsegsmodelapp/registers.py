@@ -83,7 +83,7 @@ def register_input_handler(purpose: str, type_: str | None = None, model_type: s
     return decorated
 
 def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
-    getter = _three_param_key_getter_with_fallback(INPUT_HANDLERS, return_type_description = 'input handler')
+    getter = _three_param_key_getter_with_fallback(INPUT_HANDLERS, return_type_description = 'input handler') # pyright: ignore[reportArgumentType]
     return getter(purpose, type_, model_type)
 
 

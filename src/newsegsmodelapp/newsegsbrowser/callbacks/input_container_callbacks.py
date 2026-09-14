@@ -14,6 +14,7 @@ import numpy as np
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID, VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
+from newsegsmodelapp.components.input_components import get_variable_sharing_status
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
@@ -338,15 +339,19 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                 except KeyError:
                     print(f'No handlers for purpose {trigger_id["purpose"]}')
                     raise PreventUpdate
-                return handler(
-                    trigger_id,
-                    input_ids,
-                    changed_input_values,
-                    header_ids,
-                    trigger_ids,
-                    active_project_id,
-                    app.project_provider
-                )
+                if handler:
+                    return handler(
+                        trigger_id,
+                        input_ids,
+                        changed_input_values,
+                        header_ids,
+                        trigger_ids,
+                        active_project_id,
+                        app.project_provider
+                    )
+                else:
+                    print(f'No handlers for purpose {trigger_id["purpose"]}')
+                    raise PreventUpdate
 
         return (input_returns, header_returns, trigger_returns)
 
@@ -466,7 +471,55 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                 figure_returns[idx] = artist(active_project_id, app.project_provider)
 
         return figure_returns        
-    
+
+
+    @app.callback(
+        Output({
+            'type': 'action-button', 
+            'supersection': MATCH, 'purpose': 'variable-status-toggle',
+            'section': MATCH, 'key': MATCH, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'children'),
+        Output({
+            'type': 'action-button', 
+            'supersection': MATCH, 'purpose': 'variable-status-toggle',
+            'section': MATCH, 'key': MATCH, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'color'),
+
+        Input({
+            'type': 'input-group-config-update-trigger', 
+            'supersection': MATCH, 'purpose': 'variable-status-trigger',
+            'section': MATCH, 'key': MATCH, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'data'),
+
+        State({
+            'type': 'action-button', 
+            'supersection': MATCH, 'purpose': 'variable-status-toggle',
+            'section': MATCH, 'key': MATCH, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'id'),
+
+        State('active-project-id', 'data'),
+        prevent_initial_call = True,
+    )
+    def update_variable_status_badge(
+        trigger_data,
+        button_ids,
+        active_project_id
+    ):
+        trigger_id = ctx.triggered_id
+        if trigger_id is None or active_project_id is None:
+            raise PreventUpdate
+
+        triggered_id = ctx.triggered_id
+        proj = app.project_provider.get_project(active_project_id)
+        mm = proj.get_focussed_metamodel()
+        varid = make_varid(**triggered_id) # pyright: ignore[reportCallIssue]
+        contents, colour = get_variable_sharing_status(proj, mm, varid)
+        return [contents] * len(button_ids), [colour] * len(button_ids)
+        
     return app
 
     

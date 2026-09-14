@@ -1369,3 +1369,5 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 del self._project_cache[id]
             except KeyError:
                 pass
+
+        return olist

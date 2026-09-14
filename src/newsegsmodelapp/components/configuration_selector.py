@@ -312,8 +312,12 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         proj = app.project_provider.get_project(active_project_id)
         ref_mm = proj.metamodels[mm_index]
-        new_mm = app.project_provider.metamodel_provider.duplicate_component(ref_mm.id) # pyright: ignore[reportAttributeAccessIssue]
+        new_mm = cast(
+            NewsegsMetaModel,
+            app.project_provider.metamodel_provider.duplicate_component(ref_mm.id) # pyright: ignore[reportAttributeAccessIssue]
+        )
         new_mm.name = new_mm.name + ' - Copy'
+        new_mm.reattach_variables(proj)
         new_mm.revision += 1
         proj.metamodels.append(new_mm) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         proj.set_focussed_metamodel(new_mm.id)

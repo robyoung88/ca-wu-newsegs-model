@@ -183,4 +183,16 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             if insert_payload:
                 insert_stmt = tbls.variable_configs.insert()
                 conn.execute(insert_stmt, insert_payload)
+
+    @override
+    def delete_variable(self, variable_id: str | SequenceNotStr[str]) -> list[str]:
+        if isinstance(variable_id, str):
+            variable_id = [variable_id]
+        del_stmt = (
+            tbls.variable_configs.delete()
+            .where(tbls.variable_configs.c.id.in_(variable_id))
+        )
+        with self._get_engine().begin() as conn:
+            result = conn.execute(del_stmt)
+            return [str(result.rowcount)]
     

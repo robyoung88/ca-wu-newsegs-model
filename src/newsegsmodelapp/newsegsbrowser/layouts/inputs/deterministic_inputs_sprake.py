@@ -36,8 +36,10 @@ for supersection, section_tuple in sections_by_supersection.items():
             proj_provider: NewsegsProjectProviderInterface, 
             _section: str = section # Using default argument trick to force evaluation of section
         ) -> list[dash.development.base_component.Component]:
+            proj = proj_provider.get_project(proj_id)
+            mm = proj.get_focussed_metamodel()
             return generic_create_deterministic_input_container_contents(
-                _section, get_focussed_metamodel(proj_id, proj_provider)
+                _section, proj, mm
             )
 
 
