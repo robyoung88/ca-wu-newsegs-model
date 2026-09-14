@@ -15,7 +15,7 @@ from sqlalchemy import inspect
 from newsegsmodelapp.backend.db import db_tables
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
-#os.environ['DYNACONF_DB_PATH'] = ':memory:'
+os.environ['DYNACONF_DB_PATH'] = ':memory:'
 from config import settings
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
@@ -762,7 +762,7 @@ class TestDatabaseStart(unittest.TestCase):
                 .where(
                     tbls.projects.c.id == proj.id
                 )
-            ).fetchone())
+            ).fetchone()) # pyright: ignore[reportArgumentType]
 
         time.sleep(2)
         proj.revision += 1
@@ -778,7 +778,7 @@ class TestDatabaseStart(unittest.TestCase):
                 .where(
                     tbls.projects.c.id == proj.id
                 )
-            ).fetchone())
+            ).fetchone()) # pyright: ignore[reportArgumentType]
 
         self.assertNotEqual(init_values[0], updated_values[0], 'revision')
         self.assertNotEqual(init_values[1], updated_values[1], 'modified_at')
@@ -900,6 +900,13 @@ class TestDatabaseStart(unittest.TestCase):
             'postproc_finance_value'
         ]
 
+        postactions_from_reg = registers.POST_ACTION_REGISTER.get(request.request_type)
+        self.assertIsNotNone(postactions_from_reg)
+        self.assertTrue(all(x[0] in postprocess_list for x in postactions_from_reg.postprocess_procedures)) # pyright: ignore[reportOptionalMemberAccess]
+        self.assertTrue(all(x in [y[0] for y in postactions_from_reg.postprocess_procedures] for x in postprocess_list)) # pyright: ignore[reportOptionalMemberAccess]
+
+        table_draws_done = set()
+
         for process_name in postprocess_list:
             pp_req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(process_name)
             self.assertIsNotNone(pp_req_provider, msg = f'Postprocess request generator not found for {process_name}')
@@ -919,6 +926,28 @@ class TestDatabaseStart(unittest.TestCase):
 
             self.assertEqual(is_ok, 'ok')
 
+            postactions_from_reg = registers.POST_ACTION_REGISTER.get(pp_req.request_type)
+            if postactions_from_reg is not None:
+                for td_artist_name in postactions_from_reg.table_draw_artists:
+                    td_req_func = registers.TABLE_DRAW_REQUEST_REGISTER.get(td_artist_name[0])
+                    if td_req_func:
+                        td_req = td_req_func(pp_req)
+                    else:
+                        td_req = pp_req
+
+                    td_artist = registers.get_table_draw(td_artist_name[0], pp_req)
+                    if td_artist:
+                        is_ok = td_artist(
+                            td_req,
+                            proj_provider,
+                            result_provider,
+                            run_id,
+                            update_progress,
+                            check_cancel_status,
+                        )
+                        self.assertEqual(is_ok, 'ok')
+                    table_draws_done.add(td_artist_name[0])
+        
         result_getters = [
             (x, proj.metamodels[0].model.table_config if 'model' in x else proj.metamodels[0].finance.table_config) for x in postprocess_list
         ]
@@ -938,23 +967,8 @@ class TestDatabaseStart(unittest.TestCase):
             'net',
             'finance'
         ]
-
-        for table_section in table_section_list:
-            td_req_provider = registers.TABLE_DRAW_REQUEST_REGISTER.get(table_section)
-            self.assertIsNotNone(td_req_provider, msg = f'Table draw request generator not found for {table_section}')
-            td_req = td_req_provider(request) # pyright: ignore[reportOptionalCall]
-            self.assertIsInstance(td_req, registers.TableDrawRequest)
-            
-            proc = registers.get_table_draw(table_section, td_req)
-            is_ok = proc(
-                td_req,
-                proj_provider,
-                result_provider,
-                run_id,
-                update_progress,
-                check_cancel_status,
-            )
-            self.assertEqual(is_ok, 'ok')
+        self.assertTrue(all(x in table_section_list for x in table_draws_done))
+        self.assertTrue(all(x in table_draws_done for x in table_section_list))
 
         project_tables = [
             'table_model_generation_wind',

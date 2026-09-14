@@ -28,7 +28,7 @@ MODEL_TYPE = 'default'
 POSTPROCESS_TYPE = 'postproc_model_grid'
 _request_postprocess_model_grid = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _grid_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -44,7 +44,7 @@ def _grid_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_generation'
 _request_postprocess_model_generation = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _generation_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -95,7 +95,7 @@ def _generation_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_consumption'
 _request_postprocess_model_consumption = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _consumption_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -146,7 +146,7 @@ def _consumption_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_storage'
 _request_postprocess_model_storage = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _storage_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -197,7 +197,7 @@ def _storage_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_model_net'
 _request_postprocess_model_net = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _net_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -248,7 +248,7 @@ def _net_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_finance_benefits'
 _request_postprocess_finance_benefits = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _finance_benefits_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -304,7 +304,7 @@ def _finance_benefits_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_finance_costs'
 _request_postprocess_finance_costs = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _finance_costs_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -360,7 +360,7 @@ def _finance_costs_to_interface_sprake(
 POSTPROCESS_TYPE = 'postproc_finance_value'
 _request_postprocess_finance_value = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
-@register_postprocess_procedure((POSTPROCESS_TYPE, MODEL_TYPE))
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
 def _finance_value_to_interface_sprake(
     request: PostprocessRequest,
     project_provider: NewsegsProjectProviderInterface,

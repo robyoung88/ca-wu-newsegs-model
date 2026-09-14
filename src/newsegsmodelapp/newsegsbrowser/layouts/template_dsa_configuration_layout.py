@@ -16,7 +16,7 @@ from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_re
 from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import optim
 
-from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
+from newsegsmodelapp.components import results_header
 
 def create_dsa_header():
     return html.Div([

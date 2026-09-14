@@ -10,7 +10,7 @@ from newsegsmodelapp.components.post_page_load import create_post_page_load_comp
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
-from newsegsmodelapp.newsegsbrowser.layouts.results import results_header
+from newsegsmodelapp.components import results_header
 from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import psa
 

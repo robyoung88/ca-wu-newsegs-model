@@ -77,6 +77,9 @@ DEFAULT_ICONS = {
     'autorun-false': 'bi bi-stop-circle',
     'value-reset': 'bi bi-arrow-clockwise',
     'value-set-default': 'bi bi-sticky',
+    'deterministic-run-metamodel': 'bi bi-play-circle-fill',
+    'deterministic-run-project': 'bi bi-fast-forward-circle-fill',
+
 }
 
 ICON_COLOUR_CLASSES = [

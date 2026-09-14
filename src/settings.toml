@@ -19,6 +19,8 @@ NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1
 NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/"
 DiskcacheCache = 'C:\\scratch\\appdiskcache'
 
+PROGRESS_POLL_INTERVAL = 1000
+
 [spraketest]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"
 

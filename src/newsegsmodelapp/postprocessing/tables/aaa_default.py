@@ -21,7 +21,7 @@ def _table_draw_request_factory(postproc_request_type: str):
 MODEL_TYPE = 'default'
 TABLE_SECTION = 'grid'
 _request_table_draw_grid = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw((TABLE_SECTION, MODEL_TYPE))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_grid'])
 def _make_grid_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -37,7 +37,7 @@ def _make_grid_tables_sprake(
 
 TABLE_SECTION = 'generation'
 _request_table_draw_generation = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw((TABLE_SECTION, MODEL_TYPE))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_generation'])
 def _make_generation_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -77,7 +77,7 @@ def _make_generation_tables_sprake(
 
 TABLE_SECTION = 'consumption'
 _request_table_draw_consumption = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw((TABLE_SECTION, MODEL_TYPE))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_consumption'])
 def _make_consumption_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -110,7 +110,7 @@ def _make_consumption_tables_sprake(
 
 TABLE_SECTION = 'storage'
 _request_table_draw_storage = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw((TABLE_SECTION, MODEL_TYPE))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_storage'])
 def _make_storage_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -136,7 +136,7 @@ def _make_storage_tables_sprake(
 
 TABLE_SECTION = 'net'
 _request_table_draw_net = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw((TABLE_SECTION, MODEL_TYPE))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_net'])
 def _make_net_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -169,7 +169,7 @@ def _make_net_tables_sprake(
 
 TABLE_SECTION = 'finance'
 _request_table_draw_finance = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw((TABLE_SECTION, MODEL_TYPE))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_finance_benefits', 'postproc_finance_costs', 'postproc_finance_value'])
 def _make_finance_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,

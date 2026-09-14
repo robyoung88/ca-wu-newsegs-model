@@ -1,6 +1,6 @@
 """Registers and associated for the various dispatch functions"""
-from dataclasses import dataclass
-from typing import Any, Callable, cast
+from dataclasses import dataclass, field
+from typing import Any, Callable, Sequence, cast
 
 from dash.development.base_component import Component as DashComponent
 import sqlalchemy as sa
@@ -92,6 +92,21 @@ def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 
 # -------------------------------------------------------------------------
 
 @dataclass
+class Postactions(SerialisableDataclass):
+    action_type: str
+    run_procedures: set[str] = field(default_factory = set)
+    postprocess_procedures: set[tuple[str, str]] = field(default_factory = set)
+    table_draw_artists: set[tuple[str, str]] = field(default_factory = set)
+
+POST_ACTION_REGISTER: dict[str, Postactions] = {}
+"""Register of Postactions to undertake when triggered after a completed procedure.
+
+Within the Postaction, each entry in the list of procedures should be the key
+to identify the procedure and run creator (e.g. all strings in run_procedures should
+be found in RUN_PROCEDURE_REGISTER.)
+"""
+
+@dataclass
 class RunRequest(SerialisableDataclass):
     run_id: int = 0
     project_id: str = ''
@@ -104,6 +119,7 @@ class RunRequest(SerialisableDataclass):
     progress: float = 0.0
     progress_message: str = ''
     cancel_requested: bool = False
+    background_procedure: bool = True
 
 RUN_REQUEST_REGISTER: dict[str, Callable[[NewsegsProject, sa.Engine], RunRequest]] = {}
 """Register of functions to generate run requests.
@@ -113,13 +129,16 @@ Function arguments:
     engine [sqlalchemy engine]
 """
 
-def register_run_request(name: str):
+def register_run_request(name: str,):
     """Add a run request creation function to RUN_REQUEST_REGISTER
     
-    The name should correspond to the key of the calling component.
+    The name should correspond to the purpose of the calling component (typically an action-button).
     """
     def decorated(func):
+        if name in RUN_REQUEST_REGISTER:
+            raise KeyError(f'A run request creator already exists for key {name}')
         RUN_REQUEST_REGISTER[name] = func
+        
         return func
     return decorated
 
@@ -145,16 +164,23 @@ Function returns:
     Status message ('ok')
 """
 
-def register_run_procedure(name: str):
+def register_run_procedure(
+    name: str,
+    triggers: Sequence[str] = [],
+):
     """Add a background run procedure to the register.
     
     The name should correspond to the request_type of the RunRequest
     """
     def decorated(func):
+        if name in RUN_PROCEDURE_REGISTER:
+            raise KeyError(f'A run procedure already exists for key {name}')
         RUN_PROCEDURE_REGISTER[name] = func
+        for trig in triggers:
+            pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
+            pa.run_procedures.add(name)
         return func
     return decorated
-
 
 # -------------------------------------------------------------------------
 # POSTPROCESS
@@ -211,12 +237,26 @@ Function arguments:
 Function returns:
     Status message ('ok')
 """
-def register_postprocess_procedure(name_type: tuple[str, str]):
+def register_postprocess_procedure(
+        name: str, model_type: str = 'default',
+        triggers: Sequence[str] = []
+    ):
+    key = (name, model_type)
     def decorated(func):
-        POSTPROCESS_REGISTER[name_type] = func
-        key_default = (name_type[0], 'default')
+        if model_type != 'default':
+            if key in POSTPROCESS_REGISTER:
+                raise KeyError(f'Postprocess procedure already exists for key {key}')
+        POSTPROCESS_REGISTER[key] = func
+        for trig in triggers:
+            pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
+            pa.postprocess_procedures.add(key)
+
+        key_default = (key[0], 'default')
         if key_default not in POSTPROCESS_REGISTER:
             POSTPROCESS_REGISTER[key_default] = func
+            for trig in triggers:
+                pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
+                pa.postprocess_procedures.add(key_default)
         return func
     return decorated
 
@@ -289,12 +329,26 @@ Function returns:
     Status message ('ok')
 """
 
-def register_table_draw(name_type: tuple[str, str]):
+def register_table_draw(
+    name: str, model_type: str = 'default',
+    triggers: Sequence[str] = []
+):
+    key = (name, model_type)
     def decorated(func):
-        TABLE_DRAW_REGISTER[name_type] = func
-        key_default = (name_type[0], 'default')
+        if model_type != 'default':
+            if key in TABLE_DRAW_REGISTER:
+                raise KeyError(f'Table draw artist already exists for key {key}')
+        TABLE_DRAW_REGISTER[key] = func
+        for trig in triggers:
+            pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
+            pa.table_draw_artists.add(key)
+
+        key_default = (key[0], 'default')
         if key_default not in TABLE_DRAW_REGISTER:
             TABLE_DRAW_REGISTER[key_default] = func
+            for trig in triggers:
+                pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
+                pa.table_draw_artists.add(key_default)
         return func
     return decorated
 

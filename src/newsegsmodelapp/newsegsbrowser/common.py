@@ -24,7 +24,7 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelapp.newsegsbrowser import icons
 from newsegsmodelapp.newsegsbrowser.icons import get_icon
-from newsegsmodelapp.newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
+#from newsegsmodelapp.newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import newsegsmodel
@@ -302,144 +302,6 @@ def optim_run_request(
 
 # endregion
 
-# region -- Callback helpers --
-
-
-    
-# region -- Exporting --
-
-def export_results(
-    result_type: Literal['dsa','psa','det'],
-    selected_configuration: dict[str, Any],
-    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
-    contents_option: str = 'result',
-    format_option: str = 'csv',
-):
-    match result_type:
-        case 'dsa':
-            result_data = postprocess_utils.get_dsa_raw_data(selected_configuration, acm)
-        case 'psa':
-            result_data = postprocess_utils.get_psa_raw_data(selected_configuration, acm)
-        case 'det':
-            result_data = postprocess_utils.get_det_raw_data(selected_configuration, acm)
-        case _:
-            raise ValueError(f'result_type not recognised: {result_type}')
-    if result_data is None:
-        return None
-    
-    def _strip_index_tz(df):
-        index = df.index
-        if getattr(index, 'tz', None) is not None:
-            df = df.copy()
-            df.index = index.tz_localize(None)
-        return df
-    
-    mm = acm.metamodels[selected_configuration['metamodel_id']]
-    file_name_stub =f'{mm.name}-{result_type}-results'
-    match contents_option:
-        case 'result':
-            out_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.{format_option}')
-        case 'result_and_config':
-            out_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.zip')
-        case _:
-            raise ValueError(f'contents_option not recognised: {contents_option}')
-    
-    match contents_option:
-        case 'result':
-            match format_option:
-                case 'csv':
-                    return dcc.send_data_frame(result_data.to_csv, out_fn)
-                case 'xlsx':
-                    result_data_for_export = _strip_index_tz(result_data)
-                    return dcc.send_data_frame(
-                        result_data_for_export.to_excel,
-                        out_fn,
-                        sheet_name = f'{result_type} results'
-                    )
-                case _:
-                    raise ValueError(f'format_option not recognised: {format_option}')
-        case 'result_and_config':
-            result_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.{format_option}')
-            match format_option:
-                case 'csv':
-                    results_mode = 'w+b'
-                case 'xlsx':
-                    results_mode = 'w+b'
-                case _:
-                    raise ValueError(f'format_option not recognised: {format_option}')
-            
-            with tempfile.TemporaryFile(mode = results_mode, suffix = result_fn) as resultsfile:
-                match format_option:
-                    case 'csv':
-                        result_data.to_csv(resultsfile)
-                    case 'xlsx':
-                        result_data_for_export = _strip_index_tz(result_data)
-                        result_data_for_export.to_excel(resultsfile, sheet_name = f'{result_type} results')
-                resultsfile.seek(0)
-
-                with tempfile.TemporaryFile(mode = 'w+', suffix = '.json') as configfile:
-                    json.dump(
-                        metamodel_to_dict(mm),
-                        configfile,
-                        cls = jsonfuncs.NumpyEncoder,
-                        sort_keys = False, indent = 4
-                    )
-                    configfile.seek(0)
-
-                    with io.BytesIO() as zip_buffer:
-                        with zipfile.ZipFile(zip_buffer, mode = 'w', compression = zipfile.ZIP_DEFLATED) as ziparchive:
-                            ziparchive.writestr(result_fn, resultsfile.read())
-                            ziparchive.writestr(
-                                pathvalidate.sanitize_filename(
-                                    f'{mm.name}-config.json'
-                                ),
-                                configfile.read()
-                            )
-                        zip_buffer.seek(0)
-                        return dcc.send_bytes(
-                            lambda buffer: buffer.write(zip_buffer.getvalue()),
-                            filename = out_fn
-                        )
-
-# region -- Removing models --
-                    
-def safe_remove_model(
-    model_id: str,
-    configurations: list[str],
-    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
-):
-    has_model = [x for x in configurations if json.loads(x)['finance_id'] == model_id]
-    if len(has_model) == 0:
-        acm.remove_model(model_id)
-
-def safe_remove_finance(
-    finance_id: str,
-    configurations: list[str],
-    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
-):
-    has_finance = [x for x in configurations if json.loads(x)['finance_id'] == finance_id]
-    if len(has_finance) == 0:
-        acm.remove_finance(finance_id)
-
-def safe_remove_metamodel(
-    metamodel_id: str,
-    configurations: list[str],
-    acm: NewsegsBrowserCacheManager, # pyright: ignore[reportUndefinedVariable]
-):
-    """
-    Remove a metamodel, its associated model and finance, and results, from app.
-
-    configurations should already have the metamodel removed.
-    """
-    mm = acm.metamodels.get(metamodel_id)
-    if mm is None:
-        return
-    safe_remove_finance(mm.finance.id, configurations, acm)
-    safe_remove_model(mm.model.id, configurations, acm)
-    # Always safe to drop the metamodel, just don't necessarily remove the children
-    acm.remove_metamodel(mm.id, False)
-    return
-
 # region -- Progress bars --
 
 def set_progression_factory(
@@ -618,116 +480,12 @@ def metamodel_from_configuration_file(
         logger.info('metamodel loaded: %s, %s', working_mm.name, working_mm.id)
 
     except Exception as e:
-        if not overwrite_selected_config:
-            safe_remove_metamodel(
-                working_mm.id,
-                configurations,
-                acm
-            )
+        # if not overwrite_selected_config:
+            # safe_remove_metamodel(
+            #     working_mm.id,
+            #     configurations,
+            #     acm
+            # )
         raise e
     
     return working_mm
-
-# ------------------------------------------------
-# DEPRECATED
-# ------------------------------------------------
-def create_numeric_input_compound_key(
-    type_id: str,
-    key: str,
-    section: str | None = None,
-    subindex: int = 0,
-    parameter_index: int = 0,
-    vector_location: int = 0,
-    placeholder: int | float | str = 0.0,
-    value: int | float | None = None,
-    min: int | float | None = 0.0,
-    max: int | float | None = None,
-    step: int | float  = 1
-):
-    if section is None:
-        section = 'None'
-    
-    input_id = {
-        'type': type_id,
-        'key': key,
-        'section': section,
-        'subindex': subindex,
-        'parameter_index': parameter_index,
-        'vector_location': vector_location,
-    }
-    if float(int(step)) == float(step):
-        step = int(step)
-        cn = f'dynamic-step-field step-val-{step:d}'
-    else:
-        cn = f'dynamic-step-field step-val-{step:f}'
-    
-    return dbc_Input(
-        id = input_id,
-        type = 'number',
-        value = value,
-        placeholder = placeholder,
-        debounce = True,
-        min = min,
-        max = max,
-        step = 'any',
-        className = cn,
-    )
-
-def create_numeric_card_input_compound_key(
-    icon_name: str | SequenceNotStr[str],
-    label: str,
-    type_id: str,
-    key: str,
-    section: str | None = None,
-    subindex: int = 0,
-    parameter_index: int = 0,
-    vector_location: int = 0,
-    placeholder: int | float = 0.0,
-    value: int | float | None = None,
-    min: int | float | None = 0.0,
-    max: int | float | None = None,
-    step: int | float  = 1,
-    reset_button = True
-):  
-    button_elements = []
-    if reset_button:
-        button_elements = [
-            html.Details([
-                html.Summary(),
-                html.Div([
-                    create_value_reset_button(
-                        key, section, subindex, parameter_index, vector_location
-                    ),
-                    create_value_set_default_button(
-                        key, section, subindex, parameter_index, vector_location
-                    ),
-                ])
-            ])
-        ]
-    return html.Div(
-        button_elements + [
-        html.H5(
-            [
-                get_icon(icon_name, None, 'default'),
-                html.Span(label+":", className='mr-3')
-            ],
-            style={'display':'inline'}
-        ),
-        create_numeric_input_compound_key(
-            type_id,
-            key,
-            section,
-            subindex,
-            parameter_index,
-            vector_location,
-            placeholder,
-            value,
-            min,
-            max,
-            step
-        ),
-        ],
-        className = 'numeric-card-input'
-    )
-
-

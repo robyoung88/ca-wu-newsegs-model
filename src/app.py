@@ -10,6 +10,7 @@ from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
+from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
 
@@ -54,6 +55,10 @@ def serve_layout():
     """
     
     """
+    post_action_triggers = [
+        dcc.Store(id = {'type': 'postaction-trigger', 'purpose': x, 'section': 'global'})
+        for x  in [*registers.RUN_REQUEST_REGISTER.keys(), *registers.POSTPROCESS_REQUEST_REGISTER.keys(), *registers.TABLE_DRAW_REQUEST_REGISTER.keys()]
+    ]
     return html.Div([
         dcc.Location(id = 'url', refresh = 'callback-nav'),
         html.Div(id = 'page-content'),
@@ -62,7 +67,9 @@ def serve_layout():
         dcc.Store(id = 'active-project-id', data = '', storage_type = 'session'),
         dcc.Store(id = 'layout-update-trigger', data = '', storage_type = 'memory'),
         dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
-    ])
+        dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
+        dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
+    ] + post_action_triggers)
 
 # -----------------------------------------------
 # Navigation
