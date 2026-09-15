@@ -126,13 +126,19 @@ def create_results_header(**kwargs):
                                 style = {
                                     'height': '300px',
                                 }
-                            )
+                            ),
+                            
                         ],
                         id = 'timeseries-graph-container',
                         style = {
                             'display': 'none'
                             },
-                    ) # pyright: ignore[reportCallIssue]
+                    ), # pyright: ignore[reportCallIssue]
+                    dcc.Store({
+                        'type': 'postaction-trigger', 'purpose': 'manualtrigger',
+                        'supersection': 'global', 'section': 'tabledraw',
+                        'key': 'timeseriesupdate', 'subindex': 0
+                    }, data = 0),
                 ]), # pyright: ignore[reportCallIssue]
             className = 'drawer-title'
             ),

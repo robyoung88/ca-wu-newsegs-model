@@ -1,97 +1,98 @@
 import json
+import time
 
 from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
+from dash.exceptions import PreventUpdate
 import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+from plotly_resampler import FigureResampler
 
-from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
+from newsegsmodelapp.dash_extension import NewsegsDash
 
-def add_result_timeseries_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
+resampler = FigureResampler(make_subplots(specs=[[{"secondary_y": True}]]))
+
+def add_result_timeseries_callbacks(app: NewsegsDash):
+    resampler.register_update_graph_callback(
+        app=app,
+        graph_id="graph-timeseries",
+    )
+
 
     @app.callback(
         Output('timeseries-graph-container', 'style'),
         Output('btn-show-timeseries', 'outline'),
-        Output('store-selected-configuration', 'data', allow_duplicate = True),
+        Output({
+            'type': 'postaction-trigger', 'purpose': 'manualtrigger',
+            'supersection': 'global', 'section': 'tabledraw',
+            'key': 'timeseriesupdate', 'subindex': 0
+        }, 'data'),
         Input('btn-show-timeseries', 'n_clicks'),
         State('timeseries-graph-container', 'style'),
-        State('store-selected-configuration', 'data'),
+        State('active-project-id', 'data'),
         prevent_initial_call = True
     )
-    def toggle_timeseries_visibility(n_clicks, current_style, store_selected_configuration):
-        NUP = no_update, no_update, no_update
+    def toggle_timeseries_visibility(n_clicks, current_style, active_project_id):
         if n_clicks is None:
-            return NUP
+            raise PreventUpdate
 
         if current_style.get('display') == 'none':
             r_containerstyle = {
                 'display': 'block',
-                #'height': '400px'
             }
             r_btnoutline = False
-            r_ssc = store_selected_configuration
         else:
             r_containerstyle = {
                 'display': 'none',
-                #'height': '0px'
             }
             r_btnoutline = True
-            r_ssc = no_update
-        return r_containerstyle, r_btnoutline, r_ssc
+        return r_containerstyle, r_btnoutline, time.time_ns()
     
     @app.callback(
         Output('graph-timeseries', 'figure', allow_duplicate = True),
-        Input('trigger-postprocess-model-run', 'data'),
-        Input('store-selected-configuration', 'data'),
+
+        Input({
+            'type': 'postaction-trigger', 'purpose': 'manualtrigger',
+            'supersection': 'global', 'section': 'tabledraw',
+            'key': 'timeseriesupdate', 'subindex': 0
+        }, 'data'),
+        Input({
+            'type': 'postaction-trigger', 'purpose': 'trigger',
+            'supersection': 'global', 'section': 'tabledraw',
+            'key': 'table_generation', 'subindex': 0
+        }, 'data'),
+
+        Input('active-project-id', 'data'),
         State('timeseries-graph-container', 'style'),
+
         prevent_initial_call = True
     )
     def show_model_timeseries(
-        model_run_json,
-        store_selected_configuration,
+        trigger_1,
+        trigger_2,
+        active_project_id,
         container_style
     ):
-        NUP = no_update
-        if store_selected_configuration is None:
-            return NUP
+        if active_project_id is None:
+            raise PreventUpdate
+
         
         if container_style.get('display') == 'none':
-            return NUP
-        
-        if ctx.triggered_id == 'store-selected-configuration':
-            model_id = json.loads(store_selected_configuration).get('model_id')
-            if model_id is None:
-                return NUP
-            mdl = acm.models[model_id]
-        elif ctx.triggered_id == 'trigger-postprocess-model-run':
-            active_model_id = json.loads(store_selected_configuration).get('model_id')
-            model_run = model_run_json
-            do_continue = False
-            if isinstance(model_run, list):
-                for mr in model_run:
-                    model_id = json.loads(mr).get('model_id')
-                    if model_id == active_model_id:
-                        do_continue = True
-                        break
-            elif isinstance(model_run, dict):
-                model_id = model_run.get('model_id')
-                if model_id == active_model_id:
-                    do_continue = True
-            else:
-                model_id = json.loads(model_run).get('model_id')
-                if model_id == active_model_id:
-                    do_continue = True
-            
-            if not do_continue:
-                return NUP
-            mdl = acm.models[active_model_id]
-        else:
-            return NUP
+            raise PreventUpdate
+
+        proj = app.project_provider.get_project(active_project_id)
+        mm = proj.get_focussed_metamodel()
+        try:
+            _ = mm.model.get_grid_result()
+        except AttributeError:
+            mm.model.reattach_results(app.results_provider)
+
+        mdl = mm.model
 
         genr = mdl.get_generation_result()
         cs = mdl.get_consumption_storage_result()
         if genr is None or cs is None:
-            return NUP
+            raise PreventUpdate
 
         df = (
             genr.meters_to_pandas()
@@ -131,9 +132,11 @@ def add_result_timeseries_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             )
         )
 
-        #fig = px.line(df)
+        fig = FigureResampler(
+            make_subplots(specs=[[{'secondary_y': True}]])
+        )
 
-        fig = make_subplots(specs=[[{'secondary_y': True}]])
+        fig.register_update_graph_callback(app, 'graph-timeseries')
         df1_varnames = [
             'Gen - Wind',
             'Gen - PV',
@@ -148,10 +151,11 @@ def add_result_timeseries_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         for vn in df1_varnames:
             fig.add_trace(
                 go.Scattergl(
-                    x = df.index,
-                    y = df.loc[:,vn],
+                   
                     name = vn
                 ),
+                hf_x = df.index,
+                hf_y = df.loc[:,vn],
                 secondary_y = False
             )
         
@@ -160,11 +164,11 @@ def add_result_timeseries_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         ]
         for vn in df2_varnames:
             fig.add_trace(
-                go.Scattergl(
-                    x = df2.index,
-                    y = df2.loc[:,vn],
+                go.Scattergl(  
                     name = vn
                 ),
+                hf_x = df2.index,
+                hf_y = df2.loc[:,vn],
                 secondary_y = True
             )
         

@@ -15,6 +15,7 @@ from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResu
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import add_action_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.result_container_callbacks import add_result_container_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -244,6 +245,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
     add_result_container_callbacks(app)
+    add_result_timeseries_callbacks(app)
 
     return app
 
