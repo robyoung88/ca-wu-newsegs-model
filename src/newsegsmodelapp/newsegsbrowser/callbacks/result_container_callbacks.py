@@ -163,7 +163,21 @@ def add_result_container_callbacks(app: NewsegsDash):
             'supersection': ALL, 'section': MATCH,
             'key': MATCH, 'subindex': ALL
         }, 'data-is-stale'),
-        
+        Output({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data-rendered-project-id'),
+        Output({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data-rendered-project-table-revision'),
+        Output({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data-rendered-ann-hori-state'),
 
         Input({
             'type': 'postaction-trigger', 'purpose': 'trigger',
@@ -180,6 +194,21 @@ def add_result_container_callbacks(app: NewsegsDash):
             'supersection': ALL, 'section': MATCH,
             'key': MATCH, 'subindex': ALL
         }, 'id'),
+        State({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data-rendered-project-id'),
+        State({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data-rendered-project-table-revision'),
+        State({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data-rendered-ann-hori-state'),
     )
     def update_result_section_contents(
         postaction_triggers,
@@ -187,21 +216,36 @@ def add_result_container_callbacks(app: NewsegsDash):
         active_project_id,
         app_state,
         container_ids,
+        rendered_project_ids,
+        rendered_project_table_revision,
+        rendered_ann_hori_state,
     ):
         print(f'Updating results {container_ids}')
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
+        # Do not update if the toggle status has not changed, the project is the same,
+        # and the table revision number is the same.
+        
+        proj = app.project_provider.get_project(active_project_id)
+        table_rev = proj.table_config.revision
         ann_hori_toggle = True if ann_hori_toggle is None else ann_hori_toggle
+        if all(x is not None and x == ann_hori_toggle for x in rendered_ann_hori_state):
+            if all(x is not None and x == active_project_id for x in rendered_project_ids):
+                if all(x is not None and x==table_rev for x in rendered_project_table_revision):
+                    raise PreventUpdate
 
         return_contents: list[Any] = [no_update] * len(container_ids)
         return_is_stale: list[Any] = [no_update] * len(container_ids)
+        return_rendered_project_id = [active_project_id] * len(rendered_project_ids)
+        return_rendered_project_table_revision = [table_rev] * len(rendered_project_table_revision)
+        return_ann_hori_state = [ann_hori_toggle] * len(rendered_ann_hori_state)
+
         contents_by_section_subindex = {}
 
         app_state = json.loads(app_state) if app_state else {}
         selected_model = app_state.get('selected_model', 'default')
 
-        proj = app.project_provider.get_project(active_project_id)
         for idx, cid in enumerate(container_ids):
             section = cid.get('section')
             subindex = int(cid.get('subindex'))
@@ -243,8 +287,15 @@ def add_result_container_callbacks(app: NewsegsDash):
                 contents_by_section_subindex[ss] = [res]
                 return_contents[idx] = [res]
                 return_is_stale[idx] = rev != proj.table_config.revision
+                return_rendered_project_table_revision[idx] = rev
 
-        return return_contents, return_is_stale
+        return (
+            return_contents, 
+            return_is_stale, 
+            return_rendered_project_id, 
+            return_rendered_project_table_revision, 
+            return_ann_hori_state
+        )
 
     @app.callback(
         Output({'type': 'resize-handle', 'page': ALL}, 'className'),
@@ -263,18 +314,42 @@ def add_result_container_callbacks(app: NewsegsDash):
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'data'),
 
+        State('active-project-id', 'data'),
+        State({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': ALL,
+            'key': ALL, 'subindex': ALL
+        }, 'data-rendered-project-id'),
+        State({
+            'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': ALL,
+            'key': ALL, 'subindex': ALL
+        }, 'data-rendered-project-table-revision'),
+
         State({'type': 'resize-handle', 'page': ALL}, 'className'),
         State({'type': 'result-tooltip', 'page': ALL}, 'children'),
     )
     def update_stale_indicators(
         data_stale,
         config_update,
+        active_project_id,
+        rendered_project_ids,
+        rendered_project_table_revisions,
         handle_ids,
         tooltip_ids,
     ):
         triggered_id = ctx.triggered_id
+        print(f'checking staleness - triggered by {triggered_id}')
         if isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
-            results_stale = True
+            proj = app.project_provider.get_project(active_project_id)
+            results_stale = False
+            # Because have retrieved the proj from database, will never be modified.
+            #results_stale = proj.table_config.chain_modified or any(x.modified for x in proj._variables_by_uid.values())
+            if not results_stale:
+                results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
+            if not results_stale:
+                table_revision = proj.table_config.revision
+                results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
         else:
             if data_stale is None:
                 raise PreventUpdate

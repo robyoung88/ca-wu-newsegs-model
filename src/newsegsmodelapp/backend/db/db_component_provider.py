@@ -1352,14 +1352,17 @@ class CachedFromDatabaseNewsegsProjectProvider(
     def get_project(self, project_id: str) -> NewsegsProject:
         new_modkey = self._get_project_modification_key(project_id)
 
+        print(f'FINDING PROJECT {project_id}')
         if (
             project_id in self._project_last_accessed
             and (new_modkey == self._project_last_accessed[project_id])
             and (project_id in self._project_cache)
         ):
+            print(f'RETURNING PROJECT FROM CACHE {project_id}')
             return self._project_cache[project_id]
 
         proj = super().get_project(project_id)
+        print(f'ADDING PROJECT TO CACHE {project_id} - modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
         self._project_last_accessed[project_id] = new_modkey
         self._project_cache[project_id] = proj
         return proj
@@ -1369,6 +1372,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
         super().upsert_component(component, force, tbl)
         if isinstance(component, NewsegsProject):
             project_id = component.id
+            print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - modified is {component.chain_modified} and table revision is {component.table_config.revision}')
             modkey = self._get_project_modification_key(project_id)
             self._project_last_accessed[project_id] = modkey
             self._project_cache[project_id] = component

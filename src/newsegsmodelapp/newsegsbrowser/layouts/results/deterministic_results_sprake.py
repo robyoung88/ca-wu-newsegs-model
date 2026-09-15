@@ -321,7 +321,6 @@ def _(
     mod = mm.model.table_config
 
     res, rev = result_provider.get_result(key_, mod)
-    print(f'Result is {res} for storage keyed by {key_}')
     return _make_storage_result_header(res, ann_hori_toggle)
 
 SECTION = 'postprocess'

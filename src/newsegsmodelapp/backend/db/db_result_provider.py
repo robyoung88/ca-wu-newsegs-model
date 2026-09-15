@@ -124,11 +124,18 @@ class CachedFromDatabaseResultProvider(
     def get_result(self, result_type: str, parent_component: NewsegsComponent, allow_stale: bool = True) -> tuple[Any, int] | tuple[None, None]:
 
         result_key = (result_type, parent_component.id, parent_component.revision)
+        print(f'FINDING RESULT {result_key}')
         if result_key in self._result_cache:
-            return self._result_cache[result_key], result_key[1] # pyright: ignore[reportReturnType]
+            print(f'RETURNING RESULT FROM CACHE {result_key}')
+            return self._result_cache[result_key], result_key[2] # pyright: ignore[reportReturnType]
 
         obj, rrs = super().get_result(result_type, parent_component, allow_stale)
-        if obj is not None and rrs == result_key[1]:
+        if obj is None:
+            print(f'NOT ADDING TO CACHE AS NO RESULT - {result_key}')
+        if rrs is None or rrs != result_key[2]:
+            print(f'NOT ADDING TO CACHE AS STALE - {result_key} - current value {rrs}')
+        if obj is not None and rrs == result_key[2]:
+            print(f'ADDING TO CACHE - {result_key}')
             self._result_cache[result_key] = obj
         return (obj, rrs) # pyright: ignore[reportReturnType]
     
