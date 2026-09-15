@@ -103,7 +103,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             'key': MATCH, 'subindex': ALL
         }, 'data'),
 
-        Input('annual-horizon-toggle', 'value'),
+        Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
         Input('active-project-id', 'data'),
         State('app-state', 'data'),
 
@@ -124,6 +124,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
+        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
         return_headers: list[Any] = [no_update] * len(container_ids)
         contents_by_section = {}
 
@@ -185,12 +186,23 @@ def add_result_container_callbacks(app: NewsegsDash):
             'key': MATCH, 'subindex': ALL
         }, 'data'),
 
-        Input('annual-horizon-toggle', 'value'),
+        Input({
+            'type': 'result-table-option', 'purpose': ALL,
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'value'),
+
+        Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
         Input('active-project-id', 'data'),
         State('app-state', 'data'),
 
         State({
             'type': 'result-table', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'id'),
+        State({
+            'type': 'result-table-option', 'purpose': ALL,
             'supersection': ALL, 'section': MATCH,
             'key': MATCH, 'subindex': ALL
         }, 'id'),
@@ -209,13 +221,16 @@ def add_result_container_callbacks(app: NewsegsDash):
             'supersection': ALL, 'section': MATCH,
             'key': MATCH, 'subindex': ALL
         }, 'data-rendered-ann-hori-state'),
+        prevent_initial_call = True
     )
     def update_result_section_contents(
         postaction_triggers,
+        result_table_options,
         ann_hori_toggle,
         active_project_id,
         app_state,
         container_ids,
+        option_ids,
         rendered_project_ids,
         rendered_project_table_revision,
         rendered_ann_hori_state,
@@ -229,7 +244,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         
         proj = app.project_provider.get_project(active_project_id)
         table_rev = proj.table_config.revision
-        ann_hori_toggle = True if ann_hori_toggle is None else ann_hori_toggle
+        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
         if all(x is not None and x == ann_hori_toggle for x in rendered_ann_hori_state):
             if all(x is not None and x == active_project_id for x in rendered_project_ids):
                 if all(x is not None and x==table_rev for x in rendered_project_table_revision):
@@ -246,6 +261,13 @@ def add_result_container_callbacks(app: NewsegsDash):
         app_state = json.loads(app_state) if app_state else {}
         selected_model = app_state.get('selected_model', 'default')
 
+        table_options = {}
+        for optid, optval in zip(option_ids, result_table_options):
+            table_options[optid['purpose']] = optval
+
+        print('TABLE OPTIONS')
+        print(table_options)
+
         for idx, cid in enumerate(container_ids):
             section = cid.get('section')
             subindex = int(cid.get('subindex'))
@@ -259,19 +281,28 @@ def add_result_container_callbacks(app: NewsegsDash):
                 continue
 
             table_name = key
-            if subindex > 0:
-                subindex_map = registers.get_table_subindex_map(key, selected_model)
-                if subindex_map:
-                    table_name = subindex_map[subindex]
-
-            
-            sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
-            print (f'getting from table {sub_table_name} - subindex is {subindex}')
-            res, rev = app.results_provider.get_result(sub_table_name, proj.table_config)
-            if res is None:
-                # Retry without the subtable
-                print (f'getting from table {table_name} - subindex is {subindex}')
-                res, rev = app.results_provider.get_result(table_name, proj.table_config)
+            table_getter = None
+            try:
+                table_getter = registers.get_table_getter(table_name, selected_model)
+            except KeyError:
+                continue
+            if table_getter is not None:
+                table_options['ann_hori_toggle'] = ann_hori_toggle
+                table_options['subindex'] = subindex
+                res, rev = table_getter(active_project_id, table_options, app.project_provider, app.results_provider)
+            else:
+                if subindex > 0:
+                    subindex_map = registers.get_table_subindex_map(key, selected_model)
+                    if subindex_map:
+                        table_name = subindex_map[subindex]
+                
+                sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
+                print (f'getting from table {sub_table_name} - subindex is {subindex}')
+                res, rev = app.results_provider.get_result(sub_table_name, proj.table_config)
+                if res is None:
+                    # Retry without the subtable
+                    print (f'getting from table {table_name} - subindex is {subindex}')
+                    res, rev = app.results_provider.get_result(table_name, proj.table_config)
 
             print(type(res))
             if isinstance(res, list):
@@ -297,6 +328,102 @@ def add_result_container_callbacks(app: NewsegsDash):
             return_ann_hori_state
         )
 
+    # Graphs can't hold data attributes, so can't use them directly
+    # for state monitoring.
+    @app.callback(
+        Output({
+            'type': 'result-figure', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'figure'),
+
+        Input({
+            'type': 'postaction-trigger', 'purpose': 'trigger',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'data'),
+
+        Input({
+            'type': 'result-table-option', 'purpose': ALL,
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'value'),
+
+        Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
+        Input('active-project-id', 'data'),
+        State('app-state', 'data'),
+
+        State({
+            'type': 'result-figure', 'purpose': 'container',
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'id'),
+        State({
+            'type': 'result-table-option', 'purpose': ALL,
+            'supersection': ALL, 'section': MATCH,
+            'key': MATCH, 'subindex': ALL
+        }, 'id'),
+        prevent_initial_call = True
+    )
+    def update_result_figure_contents(
+        postaction_triggers,
+        result_table_options,
+        ann_hori_toggle,
+        active_project_id,
+        app_state,
+        container_ids,
+        option_ids,
+    ):
+        print(f'Updating figures {container_ids}')
+        if active_project_id is None or container_ids is None or not len(container_ids):
+            raise PreventUpdate
+        
+        proj = app.project_provider.get_project(active_project_id)
+        table_rev = proj.table_config.revision
+        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
+
+        return_contents: list[Any] = [no_update] * len(container_ids)
+
+        contents_by_section_subindex = {}
+
+        app_state = json.loads(app_state) if app_state else {}
+        selected_model = app_state.get('selected_model', 'default')
+
+        table_options = {}
+        for optid, optval in zip(option_ids, result_table_options):
+            table_options[optid['purpose']] = optval
+
+        for idx, cid in enumerate(container_ids):
+            res = None
+            rev = None
+            section = cid.get('section')
+            subindex = int(cid.get('subindex'))
+            ss = (section, subindex)
+            if ss in contents_by_section_subindex:
+                return_contents[idx] = contents_by_section_subindex[ss]
+                continue
+
+            key = cid.get('key')
+            if not section or not key:
+                continue
+
+            table_name = key
+            table_getter = None
+            try:
+                figure_getter = registers.get_table_getter(table_name, selected_model)
+            except KeyError:
+                continue
+            if figure_getter is not None:
+                table_options['ann_hori_toggle'] = ann_hori_toggle
+                table_options['subindex'] = subindex
+                res, rev = figure_getter(active_project_id, table_options, app.project_provider, app.results_provider)
+            
+            if res is not None:
+                contents_by_section_subindex[ss] = res
+                return_contents[idx] = res
+
+        return return_contents 
+        
     @app.callback(
         Output({'type': 'resize-handle', 'page': ALL}, 'className'),
         Output({'type': 'result-tooltip', 'page': ALL}, 'children'),

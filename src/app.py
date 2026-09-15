@@ -10,13 +10,6 @@ from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from newsegsmodelapp import registers
-from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
-from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import add_action_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.result_container_callbacks import add_result_container_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
-
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings
@@ -25,6 +18,14 @@ from config import settings
 import newsegsmodelframework.register_plugins
 import newsegsmodelapp.register_plugins # MUST be imported
 from newsegsmodelapp.registers import PAGE_LAYOUT_REGISTER
+
+from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
+from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import add_action_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.dsa_run_callbacks import add_dsa_run_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.result_container_callbacks import add_result_container_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
@@ -246,6 +247,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_action_callbacks(app)
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)
+    add_dsa_run_callbacks(app)
 
     return app
 

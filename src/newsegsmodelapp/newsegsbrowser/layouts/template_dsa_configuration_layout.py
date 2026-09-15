@@ -6,6 +6,7 @@ from typing import cast
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from newsegsmodelapp.components.dsa_process_components import dsa_process_components
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
@@ -97,7 +98,11 @@ def create_optim_configuration_editor(**kwargs):
                         searchable = False,
                         multi = False,
                         clearable = False,
-                        id = {'type': 'optim-run-option', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-marginal-statistic'}
+                        id = {
+                            'type': 'result-table-option', 'purpose': 'statistic',
+                            'supersection': 'dsa', 'section': 'tabledraw',
+                            'key': 'table_dsa_metamodel', 'subindex': 0
+                        },
                     ),
                 ]), # pyright: ignore[reportCallIssue]
                 
@@ -249,7 +254,11 @@ def create_dsa_layout(*args, **kwargs):
                             html.H2("DSA Results Table"),
                             html.Div(
                                 'No DSA Run',
-                                id = {'type': 'result-table-container', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-results-table'},
+                                id = {
+                                    'type': 'result-table', 'purpose': 'container',
+                                    'supersection': 'dsa', 'section': 'tabledraw',
+                                    'key': 'table_dsa_metamodel', 'subindex': 0,
+                                }
                             )
                         ],
                         width = 12
@@ -260,7 +269,12 @@ def create_dsa_layout(*args, **kwargs):
                             html.H2("Tornado plot"),
                             html.Div(
                                 dcc.Graph(
-                                    id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-tornado-plot'},
+                                    # Using result-table dispatch to call a custom table getter
+                                    id = {
+                                        'type': 'result-figure', 'purpose': 'container',
+                                        'supersection': 'dsa', 'section': 'tabledraw',
+                                        'key': 'table_dsa_metamodel', 'subindex': 1,
+                                    },
                                     style= {
                                         'height': '590px',
                                         'border': '1px solid #dee2e6',
@@ -338,7 +352,7 @@ def create_dsa_layout(*args, **kwargs):
             + clayouts.model_run_components(**kwargs)
             + clayouts.finance_run_components(**kwargs)
             + clayouts.metamodel_process_components()
-            + clayouts.dsa_process_components(**kwargs)
+            + dsa_process_components(**kwargs)
             + background_callback_error_handler_components()
             + create_post_page_load_components(
                 kwargs.get('selected_model'),

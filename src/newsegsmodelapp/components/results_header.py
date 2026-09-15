@@ -111,7 +111,7 @@ def create_results_header(**kwargs):
                             daq.ToggleSwitch(style={'display': 'inline-block',
                                                     'verticalAlign': 'middle',
                                                     'padding': "10px"},
-                                            id='annual-horizon-toggle'),
+                                            id={'type': 'annual-horizon-toggle', 'page': kwargs.get('page_type', 'None')},),
                             html.H5('To horizon',style={'display': 'inline-block', 'verticalAlign': 'middle'})
                         ],
                         id = 'annual-horizon-toggle-container',
@@ -217,7 +217,11 @@ def create_results_header_dsa(**kwargs):
                                 {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
                             ],
                             value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
-                            id = {'type': 'dsa-results-statistic-dropdown', 'page': kwargs.get('page_type', 'None')},
+                            id = {
+                                'type': 'result-table-option', 'purpose': 'statistic',
+                                'supersection': 'dsa', 'section': 'tabledraw',
+                                'key': 'table_dsa_metamodel', 'subindex': 0
+                            },
                             searchable = False,
                             clearable = False,
                         )

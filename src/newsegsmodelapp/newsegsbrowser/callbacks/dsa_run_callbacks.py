@@ -6,26 +6,32 @@ import io
 import json
 import logging
 import os
+import random
 import tempfile
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Mapping, MutableMapping, cast
 import zipfile
 
 from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
+from dash.exceptions import PreventUpdate
 import dash_ag_grid as dag
 import pandas as pd
 import pathvalidate
 
+from newsegsmodelapp import registers
+from newsegsmodelapp.components import callback_utils, export
+from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
+from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser import common as browser
 from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
-from newsegsmodelapp.newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
+from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import dsa
 from newsegsmodelframework.util import jsonfuncs
 
 logger = logging.getLogger(__name__)
 
-def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
+def add_dsa_run_callbacks(app: NewsegsDash):
 
     @app.callback(
         output = {
@@ -38,7 +44,11 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         },
         inputs = {
             'dsa_run_button': {
-                'n_clicks': Input({'type': 'dsa-run-button', 'page': ALL}, 'n_clicks'),
+                'n_clicks': Input({
+                    'type': 'action-button', 'purpose': 'request-process',
+                    'supersection': 'dsa', 'section': 'run',
+                    'key': 'dsa_run_metamodel', 'subindex': 0,
+                }, 'n_clicks'),
             },
             'modal_close_button': {
                 'n_clicks': Input(
@@ -132,7 +142,7 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
                     'id'
                 )
             },
-            'selected_configuration': State('store-selected-configuration', 'data'),
+            'active_project_id': State('active-project-id', 'data'),
         }
     )
     def confirm_dsa_results_download(
@@ -142,7 +152,7 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         modal,
         options,
         download,
-        selected_configuration,
+        active_project_id,
     ):
         n_modals = len(modal['ids'])
         n_downloads = len(download['ids'])
@@ -161,18 +171,18 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             case 'results-download-btn':
                 rval['modal']['is_opens'] = [False] * n_modals
                 page = trig_id.get('page')
-                opts = browser.get_options(
+                opts = callback_utils.get_options(
                     options['ids'],
                     options['values'],
                     page,
                     ['contents-option', 'format-option']
                 )
-                selected_configuration = json.loads(selected_configuration)
 
-                to_export = browser.export_results(
+                to_export = export.export_results(
                     'dsa',
-                    selected_configuration,
-                    app,
+                    app.project_provider,
+                    app.results_provider,
+                    active_project_id,
                     opts.get('contents-option', 'result'),
                     opts.get('format-option', 'csv')
                 )
@@ -187,10 +197,15 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
     
     @app.callback(
         output = dict(
-            configurations = Output('store-configurations', 'data', allow_duplicate = True),
-            selected_configuration = Output('store-selected-configuration', 'data', allow_duplicate = True),
+            active_project_id = Output('active-project-id', 'data', allow_duplicate = True),
 
-            triggers = dict(values = Output({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'data', allow_duplicate = True))
+            trigger = dict(
+                value = Output({
+                    'type': 'postaction-trigger', 'purpose': 'trigger',
+                    'supersection': 'global', 'section': 'run',
+                    'key': 'dsa_run_metamodel', 'subindex': 0
+                }, 'data', allow_duplicate = True)
+            ),
         ),
         inputs = dict(
             uploads = dict(
@@ -200,29 +215,22 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             )
         ),
         state = dict(
-            triggers = dict(ids = State({'type': 'trigger', 'page': ALL, 'key': 'dsa-run-postprocess'}, 'id')),
-            configurations = State('store-configurations', 'data'),
-            selected_configuration = State('store-selected-configuration', 'data'),
+            active_project_id = State('active-project-id', 'data'),
         ),
         prevent_initial_call = True
     )
     def upload_dsa_results(
         uploads,
-        triggers,
-        configurations,
-        selected_configuration
+        active_project_id,
     ):
         rval: dict[str, Any] = dict(
-            configurations = no_update,
-            selected_configuration = no_update,
-            triggers = dict(values = [no_update] * len(triggers['ids']))
+            active_project_id = no_update,
+            trigger = dict(value = no_update)
         )
 
         trig = ctx.triggered_id
         if trig is None:
             return rval
-        
-        page = trig.get('page')
         
         raw_data = None
         raw_filename = None
@@ -243,9 +251,10 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             file_ext = split_fn[1]
         else:
             file_ext = 'csv'
-        
+
+        proj = app.project_provider.get_project(active_project_id)
         result_df = None
-        selected_configuration = json.loads(selected_configuration)
+        mm_new = None
         try:
             match file_ext:
                 case 'csv':
@@ -265,8 +274,8 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
                                     break
                         if results_file is None:
                             return rval
+
                         
-                        new_mm = None
                         for root, dirs, files in os.walk(temp_dir):
                             for file in files:
                                 if file.endswith('.json'):
@@ -274,25 +283,24 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
                                     try:
                                         with open(json_file, 'r') as f:
                                             cfg = json.load(f)
-                                            new_mm = browser.metamodel_from_configuration_file(
-                                                cfg,
-                                                selected_configuration,
-                                                configurations,
-                                                app,
-                                                overwrite_selected_config = False
-                                            )
-                                            if new_mm is not None:
-                                                break
+                                            constr = find_constructor(cfg['constructor_class'], cfg['class'])
+                                            if not constr:
+                                                raise PreventUpdate
+                                            mm_new = cast(NewsegsMetaModel, constr(cfg))
+                                            mm_new.anonymise_ids()
+
+                                            proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
+                                            proj.set_focussed_metamodel(mm_new.id)
+                                            proj.revision += 1
+                                            app.project_provider.upsert_component(proj)
+                                            
                                     except ValueError as e:
                                         logger.error(str(e))
                                         continue
                         
-                        if new_mm:
-                            selected_configuration = new_mm.to_config()
-                            selected_configuration['config_index'] = len(configurations) - 1
-                            
-                            rval['configurations'] = configurations
-                            rval['selected_configuration'] = json.dumps(selected_configuration) # pyright: ignore[reportArgumentType]
+                        if mm_new:
+                            rval['active_project_id'] = active_project_id
+                        
                         
                         split_results_fn = str(results_file).rsplit('.', 1)
                         if len(split_results_fn) == 2:
@@ -313,70 +321,17 @@ def add_dsa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             logger.error('No results in archive, but initial results file check has passed')
             return rval
         
-        # Set the result_df as appropriate for a psa result and trigger post-processing
+        # Set the result_df as appropriate for a dsa result and trigger post-processing
         result_df = result_df.set_index(['variable', 'bound'])
-        mm = acm.metamodels[str(selected_configuration.get('metamodel_id'))]
-        result_id = postprocess_utils.assign_dsa_results(mm, result_df)
-        logger.info('Results %s created', result_id)
-        acm.results[result_id] = result_df
+        mm = proj.get_focussed_metamodel()
+        mark_stale = mm_new is None
+        app.results_provider.upsert_result('dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale)
+        
+        rr_generator = registers.RUN_REQUEST_REGISTER['dsa_single_metamodel']
+        request = rr_generator(active_project_id, app.project_provider)
+        request.run_id = -random.randrange(1, 10000)
 
-        for idx, id in enumerate(triggers['ids']):
-            if id.get('page') == page:
-                rval['triggers']['values'][idx] = [json.dumps(
-                    browser.dsa_run_request(
-                        metamodel_id = mm.id,
-                        debounce = False,
-                    ).as_dict()
-                )]
+        rval['trigger']['value'] = [json.dumps(request.as_dict())]
 
         return rval
-
-    @app.callback(
-        Output('prequeue-action-user', 'data', allow_duplicate = True),
-        
-        Input({'type': 'dsa-run-button', 'page': ALL}, 'n_clicks'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call = True
-    )
-    def start_dsa_run(n_clicks, selected_configuration):
-        if n_clicks is None:
-            return no_update
-        
-        if selected_configuration is None:
-            return no_update
-        selected_configuration = json.loads(selected_configuration)
-        
-        request_ = browser.dsa_run_request(
-            metamodel_id = selected_configuration.get('metamodel_id'),
-            debounce = False
-        )
-        prequeue_patch = Patch()
-        prequeue_patch.append(
-            json.dumps(
-                request_.as_dict()
-            )
-        )
-        logger.info('Adding dsa request to prequeue-action-user: %s', request_)
-
-        return prequeue_patch
     
-    return app
-
-def dsa_metamodel_process(
-    set_progress,
-    process_request: dict[str, Any],
-    mm: NewsegsMetaModel,
-    cache: MutableMapping[str, Any]
-):
-    debug_dsa_run_results_fn = os.path.join('.', 'temp_dsa_run_results.csv')
-    if os.path.isfile(debug_dsa_run_results_fn):
-        dsa_results = pd.read_csv(debug_dsa_run_results_fn).set_index(['variable', 'bound'])
-    else:
-        set_progression = browser.set_progression_factory(set_progress, 'DSA running')
-        dsa_results = dsa.run_dsa(
-            mm,
-            progress = set_progression
-        ).set_index(['variable', 'bound'])
-        dsa_results.to_csv(debug_dsa_run_results_fn)
-    dsa_result_id = postprocess_utils.assign_dsa_results(mm, dsa_results)
-    cache[dsa_result_id] = dsa_results

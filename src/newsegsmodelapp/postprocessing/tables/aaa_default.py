@@ -1,12 +1,18 @@
 from dataclasses import asdict
+import json
 from typing import Callable, cast
 
+import dash_ag_grid as dag
+
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import result_tables_sprake
+from newsegsmodelapp.newsegsbrowser.stats import tornado_plot
 from newsegsmodelapp.postprocessing.tables.get_result_list import get_result_list
-from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request
+from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request, register_table_getter
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
+from newsegsmodelframework.newsegssensitivity import common as sensitivity
+
 
 def _table_draw_request_factory(postproc_request_type: str):
     def make_request(request: RunRequest):
@@ -336,3 +342,102 @@ def _make_finance_tables_sprake(
     )
 
     return 'ok'
+
+TABLE_SECTION = 'table_dsa_metamodel'
+_request_table_draw_dsa_metamodel = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_dsa_metamodel'])
+def _make_dsa_tables_sprake(
+    request: TableDrawRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    proj = project_provider.get_project(request.project_id)
+            
+    run_config = json.loads(request.payload)
+    mm_id = run_config.get('metamodel_id')
+    if not mm_id:
+        raise ValueError('Metamodel ID not provided for single run.')
+    mm = proj.get_metamodel_by_id(mm_id)
+
+    raw_table, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config, allow_stale = False)
+    if raw_table is None:
+        return 'missing'
+    stale = mm.table_config.revision != rev
+
+    dsa_statistics = list(sensitivity.DSA_STATISTIC_LABELS.keys())
+
+    table_name = 'table_dsa_metamodel'
+    for stat in dsa_statistics:
+        otable = (
+            raw_table
+            .xs(stat, level=1, axis=0)
+            .xs('absolute', level = 0, axis = 1)
+            .loc[:,['central', 'interval', 'lower', 'upper']]
+            .reset_index()
+        )
+        formatters = {
+            'variable': {"function":  "params.value ? params.value : '-' "},
+        }
+        columnDefs = [
+            {
+                'field': i,
+                "valueFormatter": formatters.get(i, {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "})
+            }
+            for i in otable.columns
+        ]
+        res = dag.AgGrid(
+            rowData = otable.to_dict('records'),
+            columnDefs = columnDefs
+        )
+        result_provider.upsert_result(
+            table_name + '_' + stat,
+            mm.table_config,
+            res,
+            mark_stale = stale
+        )
+    
+    return 'ok'
+
+@register_table_getter(TABLE_SECTION, MODEL_TYPE)
+def _get_dsa_metamodel_table(
+    active_project_id: str,
+    table_options: dict,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface
+):
+    stat = table_options.get('statistic')
+    subindex = table_options['subindex']
+
+    proj = project_provider.get_project(active_project_id)
+    mm = proj.get_focussed_metamodel()
+
+    match int(subindex):
+        case 1:
+            #Tornado!
+            dsa_df, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config)
+            #dsa_df, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config)
+            if dsa_df is None:
+                return None, None
+            index_vars = ['variable', 'statistic']
+            if not set(dsa_df.index.names) == set(index_vars):
+                dsa_df = dsa_df.set_index(index_vars)
+
+            label_df, _ = result_provider.get_result('postproc_dsa_single_metamodel_labels', mm.table_config)
+
+
+            stat = 'net_present_value_undiscounted' if not stat else stat
+            plot = tornado_plot(dsa_df, label_df, stat)
+            return plot, rev
+        case _:
+            if stat:
+                table_name = 'table_dsa_metamodel_'+stat
+            else:
+                table_name = 'table_dsa_metamodel'
+
+            proj = project_provider.get_project(active_project_id)
+            mm = proj.get_focussed_metamodel()
+            return result_provider.get_result(table_name, mm.table_config, True)
+

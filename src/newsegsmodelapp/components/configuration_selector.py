@@ -459,10 +459,11 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         except json.JSONDecodeError as e:
             print(e)
             raise PreventUpdate
-
+        
         mm_config = cfg.get('metamodel')
+        if mm_config is None:
+            mm_config = cfg
         constr = find_constructor(mm_config['constructor_class'], mm_config['class'])
-        print(constr)
         if not constr:
             raise PreventUpdate
 

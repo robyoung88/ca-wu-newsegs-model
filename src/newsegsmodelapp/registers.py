@@ -402,6 +402,47 @@ def get_table_subindex_map(table_section:str, model_type: str = 'default'):
     return map_
 
 
+TABLE_GETTER_REGISTER: dict[
+    tuple[str, str],
+    Callable[[str, dict, NewsegsProjectProviderInterface, NewsegsResultProviderInterface], Any]
+] = {}
+"""Register functions for retrieving custom tables from the results provider using a dictionary of options associated with the component(s)
+
+Keyed by a tuple of:
+    (table_section_name [str], model_type[str])
+"""
+
+def register_table_getter(
+    name: str, model_type: str = 'default',
+    triggers: SequenceNotStr[str] = []
+):
+    key = (name, model_type)
+    if isinstance(triggers, str):
+        triggers = [triggers]
+    def decorated(func):
+        if model_type != 'default':
+            if key in TABLE_GETTER_REGISTER:
+                raise KeyError(f'Table getter already exists for key {key}')
+        TABLE_GETTER_REGISTER[key] = func
+        
+        key_default = (key[0], 'default')
+        if key_default not in TABLE_GETTER_REGISTER:
+            TABLE_GETTER_REGISTER[key_default] = func
+            
+        return func
+    return decorated
+
+def get_table_getter(table_section: str, model_type: str = 'default'):
+    proc = TABLE_GETTER_REGISTER.get((table_section, model_type))
+    if proc is None:
+        proc = TABLE_GETTER_REGISTER.get((table_section, 'default'))
+
+    if proc is None:
+        raise KeyError(f'Table getter for {table_section} not found - available table getter procedures are {[x[0] for x in TABLE_GETTER_REGISTER.keys()]}')
+
+    return proc
+
+
 def trigger_name_clash(purpose: str) -> bool:
     return purpose in [*RUN_REQUEST_REGISTER.keys(), *POSTPROCESS_REQUEST_REGISTER.keys(), *TABLE_DRAW_REQUEST_REGISTER.keys()]
 

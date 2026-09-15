@@ -2,6 +2,7 @@
 
 import copy
 import json
+import random
 from typing import Any
 import warnings
 
@@ -172,7 +173,7 @@ def add_action_callbacks(app: NewsegsDash):
             'type': 'postaction-trigger', 'purpose': 'trigger',
             'supersection': 'global', 'section': ALL,
             'key': ALL, 'subindex': 0
-        }, 'data'),
+        }, 'data', allow_duplicate = True),
         Output('ongoing-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
 
@@ -181,6 +182,11 @@ def add_action_callbacks(app: NewsegsDash):
             'supersection': ALL, 'section': ALL,
             'key': ALL, 'subindex': ALL
         }, 'n_clicks'),
+        Input({
+            'type': 'postaction-trigger', 'purpose': 'trigger',
+            'supersection': 'global', 'section': ALL,
+            'key': ALL, 'subindex': 0
+        }, 'data'), # Generally, this won't feature as won't be triggered by feedback. However, there are a few external loaders which may set the postprocess sequence running.
 
         Input('progress-poll-interval', 'n_intervals'),
 
@@ -195,6 +201,7 @@ def add_action_callbacks(app: NewsegsDash):
     )
     def manage_actions(
         action_button_clicks,
+        postaction_triggers,
         poll_intervals,
 
         ongoing_actions: list[int],
@@ -206,6 +213,10 @@ def add_action_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)
+        failed_actions = []
+        completed_actions = []
+        spawned_actions = []
+        spawn_ids: set[tuple] = set()
 
         if not isinstance(trigger_id, str):
             # An action button or ???
@@ -218,13 +229,68 @@ def add_action_callbacks(app: NewsegsDash):
                     case 'action-button':
                         if not callback_utils.get_triggered_value():
                             raise PreventUpdate
-                        print('handling action from button: ', action_type)
+                        print(f'handling action from {trigger_id.get('type')}: ', action_type)
                         run_id = spawn_job(
                             action_type, action_class, active_project_id, 
                             app.project_provider, app.results_provider, None
                         )
                         if run_id:
                             ongoing_actions.append(run_id)
+            elif action_purpose == 'trigger':
+                # A postaction trigger from a non-feedback process
+                requests = callback_utils.get_triggered_value()
+                if not isinstance(requests, list):
+                    raise TypeError('postaction triggers should contain a list of jsonified requests - got {type(requests)}')
+                for req_json in requests:
+                    req_data = json.loads(req_json)
+                    action_type = req_data['request_type']
+                    print(f'handling postaction from {trigger_id.get('type')}: ', action_type)
+                    new_actions = registers.POST_ACTION_REGISTER.get(action_type)
+                    if new_actions:
+                        run_id = req_data.get('run_id', -random.randrange(1, 10000))
+                        for run_procedure in new_actions.run_procedures:
+                            # Prevent adding the same procedure twice in the same callback
+                            spawn_id = (run_procedure, run_id)
+                            if spawn_id in spawn_ids:
+                                continue
+                            spawn_ids.add(spawn_id)
+                            
+                            new_run_id = spawn_job(
+                                run_procedure, 'run',
+                                req_data['project_id'], 
+                                app.project_provider, app.results_provider,
+                                registers.RunRequest.from_dict(req_data)
+                            )
+                            if new_run_id:
+                                spawned_actions.append(new_run_id)
+                        for postproc_procedure in new_actions.postprocess_procedures:
+                            # Prevent adding the same procedure twice in the same callback
+                            spawn_id = (postproc_procedure[0], run_id)
+                            if spawn_id in spawn_ids:
+                                continue
+                            spawn_ids.add(spawn_id)
+                            new_run_id = spawn_job(
+                                postproc_procedure[0], 'postprocess',
+                                req_data['project_id'], 
+                                app.project_provider, app.results_provider,
+                                registers.RunRequest.from_dict(req_data)
+                            )
+                            if new_run_id:
+                                spawned_actions.append(new_run_id)
+                        for table_draw_procedure in new_actions.table_draw_artists:
+                            # Prevent adding the same procedure twice in the same callback
+                            spawn_id = (table_draw_procedure[0], run_id)
+                            if spawn_id in spawn_ids:
+                                continue
+                            spawn_ids.add(spawn_id)
+                            new_run_id = spawn_job(
+                                table_draw_procedure[0], 'tabledraw',
+                                req_data['project_id'], 
+                                app.project_provider, app.results_provider,
+                                registers.RunRequest.from_dict(req_data)
+                            )
+                            if new_run_id:
+                                spawned_actions.append(new_run_id)
                     
         # Check on ongoing actions
         if ongoing_actions:
@@ -241,10 +307,6 @@ def add_action_callbacks(app: NewsegsDash):
             if not job_statuses:
                 ongoing_actions = []
             else:
-                failed_actions = []
-                completed_actions = []
-                spawned_actions = []
-                spawn_ids: set[tuple] = set()
                 status_map = {x[0]: x[1] for x in job_statuses}
                 for run_id in ongoing_actions:
                     

@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 import datetime
 import json
-from typing import Callable, cast
-
-import sqlalchemy as sa
+from typing import Callable
 
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -78,9 +76,8 @@ def execute_deterministic_single_mm_run(
     # TODO: May want to pull this into the run
     mm.finance.table_config.revision += 1
 
-
     if check_cancel_status():
-        raise InterruptedError(f'Process {run_id} has been cancelled.')
+        raise InterruptedError(f'Deterministic single configuration process {run_id} has been cancelled.')
 
     step += 1
     progress_callback(step, n_steps, f'Saving results.')

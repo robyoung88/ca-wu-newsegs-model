@@ -2,6 +2,7 @@ from dataclasses import asdict
 import json
 from typing import Callable, cast
 
+from newsegsmodelapp.newsegsbrowser.postprocess import post_dsa_results
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_consumption_results import consumption_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_finance_benefits_results import finance_benefits_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_finance_costs_results import finance_costs_results_to_interface_sprake
@@ -411,5 +412,49 @@ def _finance_value_to_interface_sprake(
 
         res = finance_value_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
         result_provider.upsert_result('postproc_finance_value', fnc.table_config, res, mark_stale = any_stale)
+
+    return 'ok'
+
+# -----------------------------------------------
+# DSA
+# -----------------------------------------------
+
+POSTPROCESS_TYPE = 'postproc_dsa_metamodel'
+_request_postprocess_dsa_metamodel = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['dsa_run_metamodel'])
+def _dsa_to_interface(
+    request: PostprocessRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    proj = project_provider.get_project(request.project_id)
+        
+    run_config = json.loads(request.payload)
+    mm_id = run_config.get('metamodel_id')
+    if not mm_id:
+        raise ValueError('Metamodel ID not provided for single run.')
+    mm = proj.get_metamodel_by_id(mm_id)
+
+    # Check if result exists
+    exist_res, exist_rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config, False)
+    if exist_res is not None:
+        return 'ok'
+
+    dsa_results, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config, True)
+    if dsa_results is None:
+        return 'missing'
+    any_stale = rev != mm.table_config.revision
+
+    index_vars = ['variable', 'bound']
+    if not set(dsa_results.index.names) == set(index_vars):
+        dsa_results = dsa_results.set_index(index_vars)
+    res_table, label_table = post_dsa_results.dsa_results_to_tables(dsa_results)
+
+    result_provider.upsert_result('postproc_dsa_single_metamodel_data', mm.table_config, res_table, mark_stale = any_stale)
+    result_provider.upsert_result('postproc_dsa_single_metamodel_labels', mm.table_config, label_table, mark_stale = any_stale)
 
     return 'ok'
