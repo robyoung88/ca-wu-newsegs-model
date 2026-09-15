@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from plotly_resampler import FigureResampler
 
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
 
 resampler = FigureResampler(make_subplots(specs=[[{"secondary_y": True}]]))
@@ -181,62 +182,48 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
         return fig
     
     @app.callback(
-        Output('graph-timeseries', 'figure', allow_duplicate=True),
+        Output('graph-timeseries', 'relayoutData', allow_duplicate=True),
         Input({'type': 'link-event-date', 'date': ALL}, 'n_clicks'),
         prevent_initial_call = True
     )
     def zoom_to_event(event_datetime_click):
-        NUP = no_update
-        if event_datetime_click is None:
-            return NUP
-        id = ctx.triggered
-        if len(id) > 1:
-            return NUP
-        id = id[0]
-        if id['value'] is None:
-            return NUP
-        
-        try:
-            pid = json.loads(id['prop_id'].rstrip('.n_clicks'))
-        except json.JSONDecodeError:
-            return NUP
-        if pid['type'] != 'link-event-date':
-            return NUP
-        eventdate = pd.Timestamp(pid['date'], tz ='utc')
+
+        triggered_id = ctx.triggered_id
+        if triggered_id is None or isinstance(triggered_id, str):# or not callback_utils.get_triggered_value(): # n_clicks does not seem to be held
+            raise PreventUpdate
+
+        eventdate = pd.Timestamp(triggered_id['date'], tz ='utc')
         window_start = eventdate - pd.Timedelta(days=0.5)
         window_end = eventdate + pd.Timedelta(days=1.5)
-        fig_patch = Patch()
-        fig_patch['layout']['xaxis'] = {'range': (window_start, window_end), 'autoscale': False}
-        
+        #fig_patch = Patch()
+        #fig_patch['layout']['xaxis'] = {'range': (window_start, window_end), 'autoscale': False}
+        return {
+            'xaxis.range[0]': window_start,
+            'xaxis.range[1]': window_end
+        }
         return fig_patch
     
     @app.callback(
-        Output('graph-timeseries', 'figure', allow_duplicate=True),
+        Output('graph-timeseries', 'relayoutData', allow_duplicate=True),
         Input({'type': 'link-event-daterange', 'datetime_start': ALL, 'datetime_end': ALL}, 'n_clicks'),
         prevent_initial_call = True
     )
     def zoom_to_daterange(event_datetime_click):
-        NUP = no_update
-        if event_datetime_click is None:
-            return NUP
-        id = ctx.triggered
-        if len(id) > 1:
-            return NUP
-        id = id[0]
-        if id['value'] is None:
-            return NUP
+
+        triggered_id = ctx.triggered_id
+        if triggered_id is None or isinstance(triggered_id, str):# or not callback_utils.get_triggered_value():
+            raise PreventUpdate
+
+        window_start = pd.Timestamp(triggered_id['datetime_start'], tz ='utc') - pd.Timedelta(days=0.5)
+        window_end = pd.Timestamp(triggered_id['datetime_end'], tz ='utc') + pd.Timedelta(days=0.5)
         
-        try:
-            pid = json.loads(id['prop_id'].rstrip('.n_clicks'))
-        except json.JSONDecodeError:
-            return NUP
-        if pid['type'] != 'link-event-daterange':
-            return NUP
-        window_start = pd.Timestamp(pid['datetime_start'], tz ='utc') - pd.Timedelta(days=0.5)
-        window_end = pd.Timestamp(pid['datetime_end'], tz ='utc') + pd.Timedelta(days=0.5)
-        fig_patch = Patch()
-        fig_patch['layout']['xaxis'] = {'range': (window_start, window_end), 'autoscale': False}
+        return {
+            'xaxis.range[0]': window_start,
+            'xaxis.range[1]': window_end
+        }
+        # fig_patch = Patch()
+        # fig_patch['layout']['xaxis'] = {'range': (window_start, window_end), 'autoscale': False}
         
-        return fig_patch
+        # return fig_patch
 
     return app
