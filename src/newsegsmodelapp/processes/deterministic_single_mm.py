@@ -49,6 +49,9 @@ def execute_deterministic_single_mm_run(
     else:
         raise KeyError(f'Metamodel {mm_id} not found for project {proj.id} - available values are {[x.id for x in proj.metamodels]}.')
 
+    # Ensure that the output tables get updated
+    proj.table_config.revision += 1
+
     n_steps = 3
     step = 0
     progress_callback(step, n_steps, f'Setting model variables.')

@@ -7,9 +7,10 @@ def get_result_list(
     project: NewsegsProject,
     result_provider: NewsegsResultProviderInterface,
     allow_stale: bool = True
-):
+) -> tuple[list, bool]:
     is_finance = 'finance' in result_type
     results_list = []
+    any_stale = False
     for mm in project.metamodels:
         if is_finance:
             component = mm.finance.table_config
@@ -20,9 +21,10 @@ def get_result_list(
             component,
             allow_stale
         )
+        any_stale = any_stale or rev != component.revision
         # Can't set an attribute on a dict, so need to think of some other way of flagging stale data
         #if res is not None:
         #    setattr(res, '_stale', rev != component.revision)
         results_list.append(res)
-    return results_list
+    return results_list, any_stale
     

@@ -18,12 +18,8 @@ from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_re
 
 from newsegsmodelapp.components import results_header
 from newsegsmodelapp.components import configuration_selector
+from newsegsmodelapp.newsegsbrowser.layouts.results import results_sections_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import results_tables_map
-from newsegsmodelapp.newsegsbrowser.layouts.results import generation_results_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.results import storage_results_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.results import consumption_results_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.results import net_energy_results_sprake
-from newsegsmodelapp.newsegsbrowser.layouts.results import economic_results_so_sprake
 from newsegsmodelapp.registers import register_page_layout
 
 DEFAULT_LAYOUT_CONFIGURATION = {
@@ -63,17 +59,17 @@ DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_results_header': results_header.create_results_header,
     'layout_configuration_selector': configuration_selector.create_configuration_selector,
     'results_table_functions': results_tables_map.SPRAKE_RESULT_TABLES,
-    'layout_generation_results': generation_results_sprake.create_generation_results_card,
+    'layout_generation_results': results_sections_sprake.create_generation_results_card,
     'width_generation_results': 12,
     'layout_grid_results': NULL_LAYOUT,
     'width_grid_results': 12,
-    'layout_storage_results': storage_results_sprake.create_storage_results_card,
+    'layout_storage_results': results_sections_sprake.create_storage_results_card,
     'width_storage_results': 12,
-    'layout_consumption_results': consumption_results_sprake.create_consumption_results_card,
+    'layout_consumption_results': results_sections_sprake.create_consumption_results_card,
     'width_consumption_results': 12,
-    'layout_net_results': net_energy_results_sprake.create_net_results_card,
+    'layout_net_results': results_sections_sprake.create_net_results_card,
     'width_net_results': 12,
-    'layout_economic_so_results': economic_results_so_sprake.create_economic_results_so_card,
+    'layout_economic_so_results': results_sections_sprake.create_finance_results_so_card,
     'width_economic_so_results': 12,
 }
 
@@ -149,7 +145,7 @@ def create_model_configuration_layout(*args, **kwargs):
         dbc.Row(finance_input_sections), # pyright: ignore[reportCallIssue]
     ]
 
-    results_table_functions = config_dict['results_table_functions']
+    #results_table_functions = config_dict['results_table_functions']
 
     results_subsections = []
     for sec in [
@@ -162,7 +158,7 @@ def create_model_configuration_layout(*args, **kwargs):
     ]:
         results_subsections.append(
             dbc.Col(
-                config_dict[f'layout_{sec}'](results_table_functions),
+                config_dict[f'layout_{sec}'](),
                 width = config_dict[f'width_{sec}']
             ) # pyright: ignore[reportCallIssue]
         )

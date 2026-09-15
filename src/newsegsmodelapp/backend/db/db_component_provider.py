@@ -178,6 +178,10 @@ class FromDatabaseNewsegsComponentProvider(
                     if comp.chain_modified:
                         requires_revision_increment.append(comp.id)
                         comp.revision += 1
+                        # Update the table config revision if components have been modified.
+                        if hasattr(comp, 'table_config'):
+                            if not comp.table_config.modified:
+                                comp.table_config.revision += 1
         else:
             requires_update = existing_uids
             requires_revision_increment = []
@@ -951,7 +955,11 @@ class FromDatabaseNewsegsProjectProvider(
         tbl: sa.Table | None = None
     ) -> None:
         # Unlike other upsertions, projects require junction tables to be sorted.
-        self.variable_provider.upsert_variable(list(project._variables_by_uid.values()))
+        v_to_sync = list(project._variables_by_uid.values())
+        vars_modified = any(x.modified for x in v_to_sync)
+        self.variable_provider.upsert_variable(v_to_sync)
+        if vars_modified:
+            project.table_config.revision += 1
         self.metamodel_provider.upsert_component(list(project.metamodels))
         super().upsert_component(project, force, tbl)
 

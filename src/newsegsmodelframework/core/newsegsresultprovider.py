@@ -8,7 +8,8 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
     def upsert_result(self,
         result_type: str,
         parent_component: NewsegsComponent,
-        result_object: object
+        result_object: object,
+        mark_stale: bool = False,
     ):
         """Add or update a result to the provider."""
 

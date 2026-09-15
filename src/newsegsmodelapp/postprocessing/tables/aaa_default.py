@@ -19,9 +19,9 @@ def _table_draw_request_factory(postproc_request_type: str):
     return make_request
 
 MODEL_TYPE = 'default'
-TABLE_SECTION = 'grid'
+TABLE_SECTION = 'table_grid'
 _request_table_draw_grid = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_grid'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_grid'])
 def _make_grid_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -35,9 +35,9 @@ def _make_grid_tables_sprake(
     return 'ok'
 
 
-TABLE_SECTION = 'generation'
+TABLE_SECTION = 'table_generation'
 _request_table_draw_generation = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_generation'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_generation'])
 def _make_generation_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -46,38 +46,73 @@ def _make_generation_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    ann_hori_toggle = request.ann_hori_toggle
-    result_type = 'postproc_model_generation'
+    result_type = 'postproc_generation'
     proj = project_provider.get_project(request.project_id)
 
-    res = get_result_list(result_type, proj, result_provider, True)
+    res, stale = get_result_list(result_type, proj, result_provider, True)
 
-    wind_results = result_tables_sprake.create_wind_results(res, not(ann_hori_toggle))
+    wind_results = [
+        result_tables_sprake.create_wind_results(res, True),
+        result_tables_sprake.create_wind_results(res, False),
+    ]
+                    
+    table_name = 'table_generation_wind'
     result_provider.upsert_result(
-        'table_model_generation_wind',
+        table_name + '_ann',
         proj.table_config,
-        wind_results
+        wind_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        wind_results[1],
+        mark_stale = stale
     )
 
-    pv_results = result_tables_sprake.create_pv_results(res, not(ann_hori_toggle))
+    pv_results = [
+        result_tables_sprake.create_pv_results(res, True),
+        result_tables_sprake.create_pv_results(res, False),
+    ]
+
+    table_name = 'table_generation_pv'
     result_provider.upsert_result(
-        'table_model_generation_pv',
+        table_name + '_ann',
         proj.table_config,
-        pv_results
+        pv_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        pv_results[1],
+        mark_stale = stale
     )
 
-    combined_generation_results = result_tables_sprake.create_combined_generation_results(res, not(ann_hori_toggle))
+    combined_generation_results = [
+        result_tables_sprake.create_combined_generation_results(res, True),
+        result_tables_sprake.create_combined_generation_results(res, False)
+    ]
+
+    table_name = 'table_generation_combined'
     result_provider.upsert_result(
-        'table_model_generation_combined',
+        table_name + '_ann',
         proj.table_config,
-        combined_generation_results
+        combined_generation_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        combined_generation_results[1],
+        mark_stale = stale
     )
 
     return 'ok'
 
-TABLE_SECTION = 'consumption'
+TABLE_SECTION = 'table_consumption'
 _request_table_draw_consumption = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_consumption'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_consumption'])
 def _make_consumption_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -86,31 +121,51 @@ def _make_consumption_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    ann_hori_toggle = request.ann_hori_toggle
-    result_type = 'postproc_model_consumption'
+    result_type = 'postproc_consumption'
     proj = project_provider.get_project(request.project_id)
 
-    res = get_result_list(result_type, proj, result_provider, True)
+    res, stale = get_result_list(result_type, proj, result_provider, True)
 
-    consumption_results = result_tables_sprake.create_cons_results(res, not(ann_hori_toggle))
+    consumption_results = [
+        result_tables_sprake.create_cons_results(res, True),
+        result_tables_sprake.create_cons_results(res, False)
+    ]
+    table_name = 'table_consumption'
     result_provider.upsert_result(
-        'table_model_consumption',
+        table_name + '_ann',
         proj.table_config,
-        consumption_results
+        consumption_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        consumption_results[1],
+        mark_stale = stale
     )
 
-    seasonal_consumption_results = result_tables_sprake.create_seasonal_cons_results(res, not(ann_hori_toggle))
+    seasonal_consumption_results = [
+        result_tables_sprake.create_seasonal_cons_results(res, True),
+        result_tables_sprake.create_seasonal_cons_results(res, False),
+    ]
+    table_name = 'table_consumption_seasonal'
     result_provider.upsert_result(
-        'table_model_consumption_seasonal',
+        table_name + '_ann',
         proj.table_config,
-        seasonal_consumption_results
+        seasonal_consumption_results[0],
+        mark_stale = stale
     )
-
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        seasonal_consumption_results[1],
+        mark_stale = stale
+    )
     return 'ok'
 
-TABLE_SECTION = 'storage'
+TABLE_SECTION = 'table_storage'
 _request_table_draw_storage = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_storage'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_storage'])
 def _make_storage_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -119,24 +174,34 @@ def _make_storage_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    ann_hori_toggle = request.ann_hori_toggle
-    result_type = 'postproc_model_storage'
+    result_type = 'postproc_storage'
     proj = project_provider.get_project(request.project_id)
 
-    res = get_result_list(result_type, proj, result_provider, True)
+    res,stale = get_result_list(result_type, proj, result_provider, True)
 
-    storage_results = result_tables_sprake.create_stor_results(res, not(ann_hori_toggle))
+    storage_results = [
+        result_tables_sprake.create_stor_results(res, True),
+        result_tables_sprake.create_stor_results(res, False)
+    ]
+    table_name = 'table_storage'
     result_provider.upsert_result(
-        'table_model_storage',
+        table_name + '_ann',
         proj.table_config,
-        storage_results
+        storage_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        storage_results[1],
+        mark_stale = stale
     )
 
     return 'ok'
 
-TABLE_SECTION = 'net'
+TABLE_SECTION = 'table_net'
 _request_table_draw_net = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_model_net'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_net'])
 def _make_net_tables_sprake(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -145,29 +210,50 @@ def _make_net_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    ann_hori_toggle = request.ann_hori_toggle
-    result_type = 'postproc_model_net'
+    result_type = 'postproc_net'
     proj = project_provider.get_project(request.project_id)
 
-    res = get_result_list(result_type, proj, result_provider, True)
+    res, stale = get_result_list(result_type, proj, result_provider, True)
 
-    net_results = result_tables_sprake.create_net_results(res, not(ann_hori_toggle))
+    net_results = [
+        result_tables_sprake.create_net_results(res, True),
+        result_tables_sprake.create_net_results(res, False)
+    ]
+    table_name = 'table_net'
     result_provider.upsert_result(
-        'table_model_net_energy',
+        table_name + '_ann',
         proj.table_config,
-        net_results
+        net_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        net_results[1],
+        mark_stale = stale
     )
 
-    seasonal_net_results = result_tables_sprake.create_seasonal_net_results(res, not(ann_hori_toggle))
+    seasonal_net_results = [
+        result_tables_sprake.create_seasonal_net_results(res, True),
+        result_tables_sprake.create_seasonal_net_results(res, False),
+    ]
+    table_name = 'table_net_seasonal'
     result_provider.upsert_result(
-        'table_model_net_energy_seasonal',
+        table_name + '_ann',
         proj.table_config,
-        seasonal_net_results
+        seasonal_net_results[0],
+        mark_stale = stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        seasonal_net_results[1],
+        mark_stale = stale
     )
 
     return 'ok'
 
-TABLE_SECTION = 'finance'
+TABLE_SECTION = 'table_finance'
 _request_table_draw_finance = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 @register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_finance_benefits', 'postproc_finance_costs', 'postproc_finance_value'])
 def _make_finance_tables_sprake(
@@ -178,44 +264,75 @@ def _make_finance_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    ann_hori_toggle = request.ann_hori_toggle
-    result_type = 'postproc_model_net'
     proj = project_provider.get_project(request.project_id)
 
-    benefits = get_result_list(
+    # TODO: Check which of these actually needs reprocessing, as we have multiple
+    # triggers.
+
+    benefits, b_stale = get_result_list(
         'postproc_finance_benefits', proj,
         result_provider, True
     )
-
-    costs = get_result_list(
+    benefits_results = [
+        result_tables_sprake.create_so_benefits_results(benefits, True),
+        result_tables_sprake.create_so_benefits_results(benefits, False)
+    ]
+    table_name = 'table_finance_so_benefits'
+    result_provider.upsert_result(
+        table_name + '_ann',
+        proj.table_config,
+        benefits_results[0],
+        mark_stale = b_stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        benefits_results[1],
+        mark_stale = b_stale
+    )
+    
+    costs, c_stale = get_result_list(
         'postproc_finance_costs', proj,
         result_provider, True
     )
+    costs_results = [
+        result_tables_sprake.create_so_costs_results(costs, True),
+        result_tables_sprake.create_so_costs_results(costs, False),
+    ]
+    table_name = 'table_finance_so_costs'
+    result_provider.upsert_result(
+        table_name + '_ann',
+        proj.table_config,
+        costs_results[0],
+        mark_stale = c_stale
+    )
+    result_provider.upsert_result(
+        table_name + '_hori',
+        proj.table_config,
+        costs_results[1],
+        mark_stale = c_stale
+    )
 
-    value = get_result_list(
+    value, v_stale = get_result_list(
         'postproc_finance_value', proj,
         result_provider, True
     )
-
-    benefits_results = result_tables_sprake.create_so_benefits_results(benefits, not(ann_hori_toggle))
+    value_results = [
+        result_tables_sprake.create_so_value_results(value, True),
+        result_tables_sprake.create_so_value_results(value, False),
+    ]
+    table_name = 'table_finance_so_value'
     result_provider.upsert_result(
-        'table_finance_so_benefits',
+        table_name + '_ann',
         proj.table_config,
-        benefits_results
+        value_results[0],
+        mark_stale = v_stale
     )
-
-    costs_results = result_tables_sprake.create_so_costs_results(costs, not(ann_hori_toggle))
     result_provider.upsert_result(
-        'table_finance_so_costs',
+        table_name + '_hori',
         proj.table_config,
-        costs_results
-    )
-    
-    value_results = result_tables_sprake.create_so_value_results(value, not(ann_hori_toggle))
-    result_provider.upsert_result(
-        'table_finance_so_value',
-        proj.table_config,
-        value_results
+        value_results[1],
+        mark_stale = v_stale
     )
 
     return 'ok'

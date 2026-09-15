@@ -41,9 +41,9 @@ def create_results_header(**kwargs):
                                         ),
                                         color = 'primary',
                                         id = {
-                                            'type': 'action-button',
-                                            'purpose': 'deterministic_run_metamodel',
-                                            'section': 'run',
+                                            'type': 'action-button', 'purpose': 'request-process',
+                                            'supersection': 'deterministic', 'section': 'run',
+                                            'key': 'deterministic_run_metamodel', 'subindex': 0,
                                         },
                                         style = {
                                             'margin-left': '5px',
@@ -61,9 +61,9 @@ def create_results_header(**kwargs):
                                         ),
                                         color = 'primary',
                                         id = {
-                                            'type': 'action-button',
-                                            'purpose': 'deterministic_run_project',
-                                            'section': 'run',
+                                            'type': 'action-button', 'purpose': 'request-process',
+                                            'supersection': 'deterministic', 'section': 'run',
+                                            'key': 'deterministic_run_project', 'subindex': 0,
                                         },
                                         style = {
                                             'margin-left': '5px',
@@ -87,7 +87,11 @@ def create_results_header(**kwargs):
                                 outline = False
                             ) # pyright: ignore[reportCallIssue]
                         ],
-                        id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-header-selector'},
+                        id = {
+                            'type': 'metamodel-input-container', 'purpose': 'container',
+                            'supersection': 'configurations', 'section': 'configuration-header-selector',
+                            'key': 'results-header-metamodel-input-container', 'subindex': 0
+                            },
                         className = 'configuration-selector-hdrcontainer'
                         ),
 

@@ -116,6 +116,8 @@ def update_single_parameter(
 
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
+        if new_val is None:
+            new_val = 0
     proj = project_provider.get_project(active_project_id)
     mm = proj.get_focussed_metamodel()
     variable_keys = {k: triggered_id.get(k) for k in VARIABLE_PARAMETER_KEYS}

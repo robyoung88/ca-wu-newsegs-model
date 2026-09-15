@@ -1,6 +1,6 @@
 """Registers and associated for the various dispatch functions"""
 from dataclasses import dataclass, field
-from typing import Any, Callable, Sequence, cast
+from typing import Any, Callable, Optional, Sequence, cast
 
 from dash.development.base_component import Component as DashComponent
 import sqlalchemy as sa
@@ -75,7 +75,7 @@ def register_input_handler(purpose: str, type_: str | None = None, model_type: s
     def decorated(func):
         if model_type != 'default':
             if key in INPUT_HANDLERS:
-                raise KeyError(f'Input hander already exists for key {key}')
+                raise KeyError(f'Input handler already exists for key {key}')
         INPUT_HANDLERS[key] = func
         key_default = (key[0], key[1], 'default')
         if key_default not in INPUT_HANDLERS:
@@ -369,6 +369,38 @@ def get_table_draw(table_section: str, request: RunRequest):
 
     return proc
 
+TABLE_SUBINDEX_MAPS: dict[
+    tuple[str, str],
+    dict[int, str]
+] = {}
+"""Register of mappings from subindices to result item names.
+
+Keyed by a tuple of:
+    (table_section_name [str], model_type[str])
+"""
+
+def register_table_subindex_map(map_: dict, name: str, model_type: str = 'default'):
+    key = (name, model_type)
+    if model_type != 'default':
+        if key in TABLE_SUBINDEX_MAPS:
+            raise KeyError(f'Table subindex map already exists for key {key}')
+    TABLE_SUBINDEX_MAPS[key] = map_
+    key_default = (key[0], 'default')
+    if key_default not in TABLE_SUBINDEX_MAPS:
+        TABLE_SUBINDEX_MAPS[key_default] = map_
+    return map_
+
+def get_table_subindex_map(table_section:str, model_type: str = 'default'):
+    key = (table_section, model_type)
+    map_ = TABLE_SUBINDEX_MAPS.get(key)
+    if map_ is None:
+        key = (table_section, 'default')
+        
+        map_ = TABLE_SUBINDEX_MAPS.get(key)
+        if not map_:
+            raise KeyError(f'{key} not found in table subindex maps - available values are {TABLE_SUBINDEX_MAPS.keys()}')
+    return map_
+
 
 def trigger_name_clash(purpose: str) -> bool:
     return purpose in [*RUN_REQUEST_REGISTER.keys(), *POSTPROCESS_REQUEST_REGISTER.keys(), *TABLE_DRAW_REQUEST_REGISTER.keys()]
@@ -438,7 +470,7 @@ def _three_param_key_getter_with_fallback(
             return rval
 
         key = (a, b, c)
-        KeyError(f'No {return_type_description} found for key {key} - available keys are {list(INPUT_CONTAINER_CONTENT_CREATORS.keys())}')
+        raise KeyError(f'No {return_type_description} found for key {key} - available keys are {list(dictionary_.keys())}')
     
     return f
 
@@ -492,7 +524,7 @@ def get_input_section_header_content_creator(
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
     getter = _three_param_key_getter_with_fallback(
         INPUT_SECTION_HEADER_CONTENT_CREATORS,
-        return_type_description = 'header content creation function'
+        return_type_description = 'input header content creation function'
     )
     return cast(
         Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]], 
@@ -542,6 +574,97 @@ def get_single_input_header_content_creator(
         return_type_description = 'single input header content creation function'
     )
     return getter(supersection, section, model_type)
+
+
+# -------------------------------------------------------------------------
+# Result Layouts
+# -------------------------------------------------------------------------
+RESULT_CONTAINER_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        NewsegsProjectProviderInterface
+    ], list[DashComponent]]] = {}
+"""Register of functions to create results contents within result-containers.
+
+Keyed by a tuple of:
+    key_ [str] - e.g. postproc_generation
+    section [str | None] - e.g. postprocess
+    model_type [str]
+"""
+
+def register_result_container_content_creator(key_: str, section: str | None, model_type: str):
+    section = section if section else 'ALL'
+    key = (key_, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in RESULT_CONTAINER_CONTENT_CREATORS:
+                raise KeyError(f'Result container content creation function already exists for {key}')
+        RESULT_CONTAINER_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in RESULT_CONTAINER_CONTENT_CREATORS:
+            RESULT_CONTAINER_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def get_result_container_content_creator(
+    key_: str, 
+    section: str | None, 
+    model_type: str = 'default'
+) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    getter = _three_param_key_getter_with_fallback(
+        RESULT_CONTAINER_CONTENT_CREATORS,
+        return_type_description = 'content creation function'
+    )
+    return cast(
+        Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]],
+        getter(key_, section, model_type)
+    )
+
+RESULT_SECTION_HEADER_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        NewsegsProjectProviderInterface,
+        NewsegsResultProviderInterface,
+        bool
+    ], list[DashComponent]]] = {}
+"""Register of functions to create feedback elements within `result-section-header`s.
+
+Keyed by a tuple of:
+    key [str] - e.g. postproc_generation
+    section [str | None] - e.g. postprocess
+    model_type [str]
+"""
+
+def register_result_section_header_content_creator(key_: str, section: str | None, model_type: str):
+    section = section if section else 'ALL'
+    key = (key_, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in RESULT_SECTION_HEADER_CONTENT_CREATORS:
+                raise KeyError(f'Result header content creation function already exists for {key}')
+        RESULT_SECTION_HEADER_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in RESULT_SECTION_HEADER_CONTENT_CREATORS:
+            RESULT_SECTION_HEADER_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def get_result_section_header_content_creator(
+    key_: str, 
+    section: str | None, 
+    model_type: str = 'default'
+) -> Callable[[str, NewsegsProjectProviderInterface, NewsegsResultProviderInterface, Optional[bool]], list[DashComponent]]:
+    getter = _three_param_key_getter_with_fallback(
+        RESULT_SECTION_HEADER_CONTENT_CREATORS,
+        return_type_description = 'result header content creation function'
+    )
+    return cast(
+        Callable[[str, NewsegsProjectProviderInterface, NewsegsResultProviderInterface, Optional[bool]], list[DashComponent]], 
+        getter(key_, section, model_type)
+    )
+
 
 # -------------------------------------------------------------------------
 # DRAWING

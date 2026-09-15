@@ -40,6 +40,9 @@ def execute_deterministic_run_project(
     n_steps = n_mm * 4 - 1
     step = 0
 
+    # Ensure that the output tables get updated
+    proj.table_config.revision += 1
+
     for i, mm in enumerate(metamodels):
         progress_callback(step, n_steps, f'Setting model variables - metamodel {i+1} of {n_mm}')
         step += 1

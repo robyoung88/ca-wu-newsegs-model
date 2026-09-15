@@ -11,9 +11,10 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp import registers
-from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
+from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import add_action_callbacks
+from newsegsmodelapp.newsegsbrowser.callbacks.result_container_callbacks import add_result_container_callbacks
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -47,6 +48,14 @@ AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
+import threading
+import traceback
+
+def thread_exception_handler(args):
+    print(f"Exception in thread {args.thread.name}: {args.exc_type}")
+    traceback.print_tb(args.exc_traceback)
+
+threading.excepthook = thread_exception_handler
 
 # -----------------------------------------------
 # Layout
@@ -56,10 +65,33 @@ def serve_layout():
     """
     
     """
-    post_action_triggers = [
-        dcc.Store(id = {'type': 'postaction-trigger', 'purpose': x, 'section': 'global'})
-        for x  in set([*registers.RUN_REQUEST_REGISTER.keys(), *registers.POSTPROCESS_REQUEST_REGISTER.keys(), *registers.TABLE_DRAW_REQUEST_REGISTER.keys()])
-    ]
+    post_action_triggers = (
+        [
+            dcc.Store(id = {
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': 'global', 'section': 'run',
+                'key': x, 'subindex': 0
+            })
+            for x  in registers.RUN_REQUEST_REGISTER.keys()
+        ]
+        + [
+            dcc.Store(id = {
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': 'global', 'section': 'postprocess',
+                'key': x, 'subindex': 0
+            })
+            for x  in registers.POSTPROCESS_REQUEST_REGISTER.keys()
+        ]
+        +[
+            dcc.Store(id = {
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': 'global', 'section': 'tabledraw',
+                'key': x, 'subindex': 0
+            })
+            for x  in registers.TABLE_DRAW_REQUEST_REGISTER.keys()
+        ]
+    )
+
     return html.Div([
         dcc.Location(id = 'url', refresh = 'callback-nav'),
         html.Div(id = 'page-content'),
@@ -180,7 +212,7 @@ def create_app(external_stylesheets = None) -> Dash:
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
     project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
-    results_provider = FromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
+    results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
 
     app = NewsegsDash(
         __name__,
@@ -211,6 +243,7 @@ def create_app(external_stylesheets = None) -> Dash:
     app = map.add_site_selector_callbacks(app)
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
+    add_result_container_callbacks(app)
 
     return app
 
@@ -220,4 +253,10 @@ def create_app(external_stylesheets = None) -> Dash:
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug = True)
+    try:
+        app.run(debug = True, use_reloader=False)
+    except SystemExit as e:
+        print(f"Caught SystemExit with code: {e.code}")
+        import traceback
+        traceback.print_stack()
+        

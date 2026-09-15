@@ -5,7 +5,7 @@ import json
 from typing import Any
 import warnings
 
-from dash import ALL, Input, NoUpdate, Output, State, ctx, no_update
+from dash import ALL, MATCH, Input, NoUpdate, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 import sqlalchemy as sa
 import zmq
@@ -168,22 +168,33 @@ def spawn_job(
     
 def add_action_callbacks(app: NewsegsDash):
     @app.callback(
-        Output({'type': 'postaction-trigger', 'purpose': ALL, 'section': ALL}, 'data'),
+        Output({
+            'type': 'postaction-trigger', 'purpose': 'trigger',
+            'supersection': 'global', 'section': ALL,
+            'key': ALL, 'subindex': 0
+        }, 'data'),
         Output('ongoing-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
 
-        Input({'type': 'action-button', 'purpose': ALL, 'section': ALL,}, 'n_clicks'),
-        #Input({'type': 'postaction-trigger', 'purpose': ALL, 'section': ALL}, 'data'),
+        Input({
+            'type': 'action-button', 'purpose': ALL, 
+            'supersection': ALL, 'section': ALL,
+            'key': ALL, 'subindex': ALL
+        }, 'n_clicks'),
+
         Input('progress-poll-interval', 'n_intervals'),
 
         State('ongoing-actions', 'data'),
-        State({'type': 'postaction-trigger', 'purpose': ALL, 'section': ALL}, 'id'),
+        State({
+            'type': 'postaction-trigger', 'purpose': 'trigger',
+            'supersection': 'global', 'section': ALL,
+            'key': ALL, 'subindex': 0
+        }, 'id'),
         State('active-project-id', 'data'),
         prevent_initial_call = True
     )
     def manage_actions(
         action_button_clicks,
-        #postaction_trigger_data,
         poll_intervals,
 
         ongoing_actions: list[int],
@@ -198,19 +209,23 @@ def add_action_callbacks(app: NewsegsDash):
 
         if not isinstance(trigger_id, str):
             # An action button or ???
-            # Handle new action creation.
-            action_type = trigger_id.get('purpose')
-            action_class = trigger_id.get('section')
-            match trigger_id.get('type'):
-                case 'action-button':
-                    if not callback_utils.get_triggered_value():
-                        raise PreventUpdate
-                    print('handling action from button: ', action_type)
-                    run_id = spawn_job(action_type, action_class, active_project_id, app.project_provider, app.results_provider, None)
-                    if run_id:
-                        ongoing_actions.append(run_id)
+            action_purpose = trigger_id.get('purpose')
+            if action_purpose == 'request-process':
+                # Handle new action creation.
+                action_class = trigger_id.get('section')
+                action_type = trigger_id.get('key')
+                match trigger_id.get('type'):
+                    case 'action-button':
+                        if not callback_utils.get_triggered_value():
+                            raise PreventUpdate
+                        print('handling action from button: ', action_type)
+                        run_id = spawn_job(
+                            action_type, action_class, active_project_id, 
+                            app.project_provider, app.results_provider, None
+                        )
+                        if run_id:
+                            ongoing_actions.append(run_id)
                     
-
         # Check on ongoing actions
         if ongoing_actions:
             check_job_stmt = (
@@ -248,11 +263,13 @@ def add_action_callbacks(app: NewsegsDash):
                     # TODO: Retry or otherwise deal with failure.
                     for run_id in failed_actions:
                         ongoing_actions.remove(run_id)
+
                 if completed_actions:
                     completed_actions_stmt = (
                         sa.select(
                             tbls.runs.c.run_id,
                             tbls.runs.c.request_type,
+                            tbls.runs.c.request_class,
                             tbls.runs.c.payload,
                             tbls.runs.c.project_id,
                             tbls.runs.c.children_spawned
@@ -264,24 +281,26 @@ def add_action_callbacks(app: NewsegsDash):
                         result = conn.execute(completed_actions_stmt).fetchall()
                     completed_request_map = {
                         x[0]: {
-                            'purpose': x[1], 
-                            'payload': x[2], 
-                            'project_id': x[3],
-                            'children_spawned': x[4]
+                            'action_type': x[1], 
+                            'action_class': x[2],
+                            'payload': x[3], 
+                            'project_id': x[4],
+                            'children_spawned': x[5]
                         } for x in result
                     }
                     for run_id in completed_actions:
                         req_data = completed_request_map.get(run_id)
                         if req_data is not None and not req_data['children_spawned']:
-                            print(f'Handling the completion of job {run_id} of type {req_data["purpose"]} for project {req_data["project_id"]}')
-                            purpose = req_data['purpose']
+                            print(f'Handling the completion of job {run_id} of type {req_data["action_type"]} for project {req_data["project_id"]}')
+                            action_type = req_data['action_type']
                             for idx, id in enumerate(postaction_trigger_ids):
-                                if id['purpose'] == purpose:
+                                if id['key'] == action_type:
+                                    print(f'adding trigger for {action_type}')
                                     if isinstance(postaction_trigger_returns[idx], NoUpdate):
                                         postaction_trigger_returns[idx] = [req_data['payload']]
                                     else:
                                         postaction_trigger_returns[idx].append(req_data['payload'])
-                            new_actions = registers.POST_ACTION_REGISTER.get(purpose)
+                            new_actions = registers.POST_ACTION_REGISTER.get(action_type)
                             if new_actions:
                                 for run_procedure in new_actions.run_procedures:
                                     # Prevent adding the same procedure twice in the same callback

@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Any, Callable, Optional, override
 import uuid
 
+from cachetools import LRUCache
+import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
@@ -48,9 +50,13 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_type: str,
         parent_component: NewsegsComponent,
         result_object: object,
+        mark_stale: bool = False,
         request: Optional[RunRequest] = None,
     ):
         result_details = self._result_to_table_data(result_type, parent_component, request = request)
+        if mark_stale:
+            # Just knock the revision down a level for now
+            result_details['component_config_revision'] = result_details['component_config_revision'] - 1 # pyright: ignore[reportOperatorIssue]
 
         # Try to save out the result object
         filename_root = self._result_store / ('res-' + str(uuid.uuid4()))
@@ -77,6 +83,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             )
             .where(self._table.c.result_type == result_type)
             .where(self._table.c.component_config_id == parent_component.id)
+            .order_by(self._table.c.created_at)
         )
 
         revision = parent_component.revision
@@ -87,16 +94,41 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             odf = pd.read_sql(stmt, conn)
 
         if len(odf):
-            if revision in odf['component_config_revision']:
-                file_name = odf['result_file'].loc[odf['component_config_revision'] == revision][0]
+            if np.any(odf['component_config_revision'] == revision):
+                file_name = odf.loc[odf['component_config_revision'] == revision, 'result_file'].iloc[-1]
                 rrs = revision
             else:
-                odf = odf.sort_values('created_at')
+                #odf = odf.sort_values('created_at')
                 file_name = odf['result_file'].iloc[-1]
                 rrs = odf['component_config_revision'].iloc[-1]
 
-            obj = load_result(Path(file_name))
+            try:
+                obj = load_result(Path(file_name))
+            except FileNotFoundError:
+                with self._get_engine().begin() as conn:
+                    conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
+                return None, None
             return (obj, rrs)
 
         return None, None
-        
+
+class CachedFromDatabaseResultProvider(
+    FromDatabaseResultProvider
+):
+    
+    def __init__(self, get_engine: Callable[[], sa.Engine], result_store: Path):
+        super().__init__(get_engine, result_store)
+        self._result_cache = LRUCache(maxsize = 64)
+
+    @override
+    def get_result(self, result_type: str, parent_component: NewsegsComponent, allow_stale: bool = True) -> tuple[Any, int] | tuple[None, None]:
+
+        result_key = (result_type, parent_component.id, parent_component.revision)
+        if result_key in self._result_cache:
+            return self._result_cache[result_key], result_key[1] # pyright: ignore[reportReturnType]
+
+        obj, rrs = super().get_result(result_type, parent_component, allow_stale)
+        if obj is not None and rrs == result_key[1]:
+            self._result_cache[result_key] = obj
+        return (obj, rrs) # pyright: ignore[reportReturnType]
+    

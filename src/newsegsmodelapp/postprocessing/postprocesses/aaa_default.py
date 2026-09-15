@@ -25,7 +25,7 @@ def _postprocess_request_factory(postproc_request_type: str):
     return make_request
 
 MODEL_TYPE = 'default'
-POSTPROCESS_TYPE = 'postproc_model_grid'
+POSTPROCESS_TYPE = 'postproc_grid'
 _request_postprocess_model_grid = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
 @register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
@@ -41,7 +41,7 @@ def _grid_to_interface_sprake(
     return 'ok'
 
 
-POSTPROCESS_TYPE = 'postproc_model_generation'
+POSTPROCESS_TYPE = 'postproc_generation'
 _request_postprocess_model_generation = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
 @register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
@@ -81,18 +81,19 @@ def _generation_to_interface_sprake(
         mdl = mm.model
 
         # Check if result exists
-        exist_res, exist_rev = result_provider.get_result('postproc_model_generation', mdl.table_config, False)
+        exist_res, exist_rev = result_provider.get_result('postproc_generation', mdl.table_config, False)
         if exist_res is not None:
             continue
-                
-        mdl.reattach_results(result_provider, True)
+
+        
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = gen_results_to_interface_sprake(mdl)
-        result_provider.upsert_result('postproc_model_generation', mdl.table_config, res)
+        result_provider.upsert_result('postproc_generation', mdl.table_config, res, mark_stale = any_stale)
 
     return 'ok'
 
-POSTPROCESS_TYPE = 'postproc_model_consumption'
+POSTPROCESS_TYPE = 'postproc_consumption'
 _request_postprocess_model_consumption = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
 @register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
@@ -132,18 +133,18 @@ def _consumption_to_interface_sprake(
         mdl = mm.model
 
         # Check if result exists
-        exist_res, exist_rev = result_provider.get_result('postproc_model_consumption', mdl.table_config, False)
+        exist_res, exist_rev = result_provider.get_result('postproc_consumption', mdl.table_config, False)
         if exist_res is not None:
             continue
-                
-        mdl.reattach_results(result_provider, True)
+
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = consumption_results_to_interface_sprake(mdl) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_model_consumption', mdl.table_config, res)
+        result_provider.upsert_result('postproc_consumption', mdl.table_config, res, mark_stale = any_stale)
 
     return 'ok'
 
-POSTPROCESS_TYPE = 'postproc_model_storage'
+POSTPROCESS_TYPE = 'postproc_storage'
 _request_postprocess_model_storage = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
 @register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
@@ -183,18 +184,18 @@ def _storage_to_interface_sprake(
         mdl = mm.model
 
         # Check if result exists
-        exist_res, exist_rev = result_provider.get_result('postproc_model_storage', mdl.table_config, False)
+        exist_res, exist_rev = result_provider.get_result('postproc_storage', mdl.table_config, False)
         if exist_res is not None:
             continue
                 
-        mdl.reattach_results(result_provider, True)
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = stor_results_to_interface_sprake(mdl) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_model_storage', mdl.table_config, res)
+        result_provider.upsert_result('postproc_storage', mdl.table_config, res, mark_stale = any_stale)
 
     return 'ok'
 
-POSTPROCESS_TYPE = 'postproc_model_net'
+POSTPROCESS_TYPE = 'postproc_net'
 _request_postprocess_model_net = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
 
 @register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['deterministic_run_metamodel', 'deterministic_run_project'])
@@ -234,14 +235,14 @@ def _net_to_interface_sprake(
         mdl = mm.model
 
         # Check if result exists
-        exist_res, exist_rev = result_provider.get_result('postproc_model_net', mdl.table_config, False)
+        exist_res, exist_rev = result_provider.get_result('postproc_net', mdl.table_config, False)
         if exist_res is not None:
             continue
                 
-        mdl.reattach_results(result_provider, True)
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = net_results_to_interface_sprake(mdl) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_model_net', mdl.table_config, res)
+        result_provider.upsert_result('postproc_net', mdl.table_config, res, mark_stale = any_stale)
 
     return 'ok'
 
@@ -294,10 +295,10 @@ def _finance_benefits_to_interface_sprake(
         if exist_res is not None:
             continue
 
-        mdl.reattach_results(result_provider, True)
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = finance_benefits_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_finance_benefits', fnc.table_config, res)
+        result_provider.upsert_result('postproc_finance_benefits', fnc.table_config, res, mark_stale = any_stale)
 
     return 'ok'
 
@@ -350,10 +351,10 @@ def _finance_costs_to_interface_sprake(
         if exist_res is not None:
             continue
 
-        mdl.reattach_results(result_provider, True)
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = finance_costs_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_finance_costs', fnc.table_config, res)
+        result_provider.upsert_result('postproc_finance_costs', fnc.table_config, res, mark_stale = any_stale)
 
     return 'ok'
 
@@ -406,9 +407,9 @@ def _finance_value_to_interface_sprake(
         if exist_res is not None:
             continue
 
-        mdl.reattach_results(result_provider, True)
+        any_stale = mdl.reattach_results(result_provider, True)
 
         res = finance_value_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_finance_value', fnc.table_config, res)
+        result_provider.upsert_result('postproc_finance_value', fnc.table_config, res, mark_stale = any_stale)
 
     return 'ok'

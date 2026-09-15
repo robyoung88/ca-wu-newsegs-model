@@ -357,27 +357,36 @@ class NewsegsModel(
         self.generation.model = self
         self.consumption_storage.model = self
 
-    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True):
+    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True) -> bool:
+        any_stale = False
         try:
             self._grid_result, self._grid_result_revision = results_provider.get_result(
                 'deterministic_grid', self.grid, allow_stale
             )
+            any_stale = any_stale or self._grid_result_revision != self.grid.revision
         except Exception as e:
             print (e)
+            any_stale = True
 
         try:
             self._generation_result, self._generation_result_revision = results_provider.get_result(
                 'deterministic_generation', self.generation, allow_stale
             )
+            any_stale = any_stale or self._generation_result_revision != self.generation.revision
         except Exception as e:
             print (e)
+            any_stale = True
 
         try:
             self._cs_result, self._cs_result_revision = results_provider.get_result(
                 'deterministic_consumption_storage', self.consumption_storage, allow_stale
             )
+            any_stale = any_stale or self._cs_result_revision != self.consumption_storage.revision
         except Exception as e:
             print(e)
+            any_stale = True
+            
+        return any_stale
         
     def __hash__(self) -> int:
         return self._last_hash

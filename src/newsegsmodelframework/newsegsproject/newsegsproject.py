@@ -5,13 +5,13 @@ Provides a class which encapsulates multiple NewSEGS metamodels, for multi-way
 sensitivity analysis.
 """
 from collections import OrderedDict
-from typing import Any, Optional, Sequence, override
+from typing import Any, Iterable, Optional, Sequence, override
 from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
 from newsegsmodelframework.core.newsegscomponent import ComponentListProperty, ComponentProperty, NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -22,6 +22,56 @@ class NewsegsProjectConfig(DataWithRevision):
     model_type: str = ''
     model_version: str = ''
 
+class TableModifyingObservableComponentList(ObservableList):
+    """A list which modifies the revision of the table_config on the parent when changed."""
+
+    def __init__(self, iterable=(), parent: 'NewsegsProject | ConfigurationMixin | RevisionNotifierMixin | None' = None):
+        if parent and isinstance(parent, NewsegsProject):
+            super().__init__(iterable, parent._config)
+            self._table = parent.table_config
+        elif isinstance (parent, ConfigurationMixin):
+            super().__init__(iterable, parent._config)
+            self._table = None
+        else:
+            super().__init__(iterable, parent)
+            self._table = None
+
+    @override
+    def _notify_change(self):
+        super()._notify_change()
+        if self._table:
+            self._table.revision += 1
+
+class TableModifyingComponentListProperty(ComponentListProperty):
+    """A component list which modifies the revision of the table_config on the parent when changed."""
+
+    @override
+    def __get__(self, instance: ConfigurationMixin | None, owner: type) -> Any:
+        if instance is None:
+            return self
+        att = getattr(instance, self.name, TableModifyingObservableComponentList(parent = instance))
+        return att
+
+    @override
+    def __set__(self, instance: ConfigurationMixin, value: Iterable):
+        if not isinstance(instance, NewsegsComponent):
+            raise TypeError(f'Component list properties should only be applied to NewsegsComponents, is applied to {type(instance)}')
+        
+        old_val = getattr(instance, self.name, None)
+        is_wrapped = False
+        if not isinstance(value, TableModifyingObservableComponentList):    
+            value = TableModifyingObservableComponentList(value, instance)
+            is_wrapped = True
+            
+        if old_val and not old_val == value:
+            instance._config._remove_child(old_val)
+            if not is_wrapped:
+                value = TableModifyingObservableComponentList(value, instance)
+
+            instance._config._notify_change()
+
+        setattr(instance, self.name, value)
+
 
 class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     """A container and controller for metamodels and variables."""
@@ -30,7 +80,7 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     _version = 'v0.0.1'
     _id_prefix = 'proj'
 
-    metamodels = ComponentListProperty(oftype = newsegsmetamodel.NewsegsMetaModel)
+    metamodels = TableModifyingComponentListProperty(oftype = newsegsmetamodel.NewsegsMetaModel)
     dsa_config = ComponentProperty(oftype = DSAComponent)
     psa_config = ComponentProperty(oftype = PSAComponent)
     table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
@@ -96,7 +146,7 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
                 if mm.id == metamodel_id:
                     self._focussed_metamodel = i
                     return
-        self._focussed_metamodel = metamodel_index
+        self._focussed_metamodel = max(0, min(len(self.metamodels)-1, metamodel_index))
 
     def duplicate_metamodel(self, metamodel_id: str) -> newsegsmetamodel.NewsegsMetaModel:
         try:

@@ -67,6 +67,17 @@ def load_input_container_content_creators():
 
 load_input_container_content_creators()
 
+import newsegsmodelapp.newsegsbrowser.layouts.results as result_layouts
+def load_result_container_content_creators():
+    d = {}
+    for info in pkgutil.iter_modules(
+        result_layouts.__path__, prefix = 'newsegsmodelapp.newsegsbrowser.layouts.results.'
+    ):
+        d[info.name] = importlib.import_module(info.name)
+    return d
+
+load_result_container_content_creators()
+
 import newsegsmodelapp.components.feedback as feedback
 
 def load_feedback():

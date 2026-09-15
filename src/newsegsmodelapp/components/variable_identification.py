@@ -7,11 +7,12 @@ from newsegsmodelframework.newsegsvariable import variable
 
 @dataclass
 class VariableComponentID(SerialisableDataclass):
-    """Data to describe some comonent associated with a variable."""
+    """Data to describe some component associated with a variable."""
     type: str
-    supersection: str
-    section: str
-    key: str
+    purpose: str = 'variable'
+    supersection: str = 'global'
+    section: str = 'global'
+    key: str = 'component'
 
     @classmethod
     def from_variable(

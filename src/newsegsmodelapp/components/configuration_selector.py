@@ -385,6 +385,9 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         if proj.get_focussed_metamodel_index() == mm_index:
             raise PreventUpdate
 
+        mm = proj.get_focussed_metamodel()
+        mm.sync_model_with_changed_variables_deterministic()
+
         proj.set_focussed_metamodel_index(mm_index)
         proj.revision += 1
         app.project_provider.upsert_component(proj)

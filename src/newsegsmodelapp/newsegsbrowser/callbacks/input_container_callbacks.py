@@ -50,11 +50,11 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         if active_project_id is None:
             raise PreventUpdate
         trig = ctx.triggered_id
-        if isinstance(trig, Mapping) and trig.get('type') == 'input-group-config-update-trigger':
-            trig_val = callback_utils.get_triggered_value()
-            if isinstance(trig_val, int):
-                # Standard update - do nothing.
-                raise PreventUpdate
+        # if isinstance(trig, Mapping) and trig.get('type') == 'input-group-config-update-trigger':
+        #     trig_val = callback_utils.get_triggered_value()
+        #     if isinstance(trig_val, int):
+        #         # Standard update - do nothing.
+        #         raise PreventUpdate
                         
         app_state = json.loads(app_state) if app_state else {}
         
@@ -79,10 +79,12 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
     @app.callback(
         Output({'type': 'input-section-header', 'supersection': MATCH, 'section': MATCH}, 'children'),
 
-        Input({'type': 'input-group-config-update-trigger', 
-                       'supersection': MATCH, 'purpose': ALL,
-                        'section': MATCH, 'key': ALL, 'subindex': ALL,
-                        'parameter_index': ALL, 'vector_location': ALL}, 'data'),
+        Input({
+            'type': 'input-group-config-update-trigger', 
+            'supersection': MATCH, 'purpose': ALL,
+            'section': MATCH, 'key': ALL, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'data'),
         Input(CONFIGURATION_UPDATE_TRIGGER_ID, 'data'),
         Input('active-project-id', 'data'),
         State('app-state', 'data'),
@@ -107,15 +109,22 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         if not supersection or not section:
             raise PreventUpdate
 
+        def _not_found(msg = None):
+            print('Header creator not found for ', str(container_id))
+            if msg:
+                print(msg)
+            return []
+        
         try:
             content_creator = get_input_section_header_content_creator(
                 supersection, section, selected_model
             )
         except KeyError as e:
-            print('Header creator not found for ', str(container_id))
-            print(e)
-            return []
+            return _not_found(e)
 
+        if content_creator is None:
+            return _not_found()
+        
         return content_creator(active_project_id, app.project_provider)
 
     @app.callback(
