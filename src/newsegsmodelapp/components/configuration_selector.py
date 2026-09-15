@@ -238,12 +238,19 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
     # Populate
     @app.callback(
         Output({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-selector'}, 'children'),
-        Output({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-header-selector'}, 'children'),
+        Output({
+            'type': 'metamodel-input-container', 'purpose': 'container',
+            'supersection': ALL, 'section': 'configuration-header-selector',
+            'key': ALL, 'subindex': ALL
+        }, 'children'),
 
         Input('active-project-id', 'data'),
         State({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-selector'}, 'id'),
-        State({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-header-selector'}, 'id'),
-
+        State({
+            'type': 'metamodel-input-container', 'purpose': 'container',
+            'supersection': ALL, 'section': 'configuration-header-selector',
+            'key': ALL, 'subindex': ALL
+        }, 'id'),
     )
     def population_configuration_selector(
         active_project_id,
