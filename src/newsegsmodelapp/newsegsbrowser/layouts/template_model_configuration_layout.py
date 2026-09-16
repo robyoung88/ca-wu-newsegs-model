@@ -10,7 +10,7 @@ import dash_bootstrap_components as dbc
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.components import project_selector
-from newsegsmodelapp.newsegsbrowser.components.layout import navigation
+from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
 from newsegsmodelapp.components.feedback import indicative_net_energy
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT

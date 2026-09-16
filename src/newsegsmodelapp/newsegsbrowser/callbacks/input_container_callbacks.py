@@ -18,10 +18,26 @@ from newsegsmodelapp.components.input_components import get_variable_sharing_sta
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp.registers import get_input_handler
+
+def _create_text_field_values(
+    mm: NewsegsMetaModel,
+
+    generic_text_ids: list[dict[str, Any]],
+) -> list[Any]:
+    text_values = []
+    for text_id in generic_text_ids:
+        match text_id.get('key'):
+            case 'site-name':
+                text_values.append(mm.model.location.name)
+            case 'configuration-name':
+                text_values.append(mm.name)
+            case _:
+                text_values.append(no_update)
+    return text_values
 
 def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
     """
@@ -45,7 +61,8 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         layout_update_trigger,
         active_project_id,
         app_state,
-        container_id
+        container_id,
+        
     ):
         if active_project_id is None:
             raise PreventUpdate
@@ -75,6 +92,29 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
             return []
 
         return content_creator(active_project_id, app.project_provider)
+
+    @app.callback(
+        Output({'type': 'generic_text', 'section': ALL, 'key': ALL}, 'children'),
+
+        Input('layout-update-trigger', 'data'),
+        Input('active-project-id', 'data'),
+        
+        State({'type': 'generic_text', 'section': ALL, 'key': ALL}, 'id'),
+        prevent_initial_call = True
+    )
+    def update_generic_text_contents(
+        layout_update_trigger,
+        active_project_id,
+        generic_text_ids,
+    ):
+        if active_project_id is None:
+            raise PreventUpdate
+        
+        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+
+        text_values = _create_text_field_values(mm, generic_text_ids)
+
+        return text_values
 
     @app.callback(
         Output({'type': 'input-section-header', 'supersection': MATCH, 'section': MATCH}, 'children'),

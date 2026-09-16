@@ -173,7 +173,7 @@ def create_project_selector():
                                                         # Snapshot management row
                                                         dbc.Row(
                                                             [
-                                                                dbc.Col(
+                                                                dbc.Row(
                                                                     [
                                                                         dbc.Label('Snapshot', class_name = 'fw-bold mb-1'), # pyright: ignore[reportCallIssue]
                                                                         dbc.Input(
@@ -185,9 +185,10 @@ def create_project_selector():
                                                                         ), # pyright: ignore[reportCallIssue]
                                                                         html.Datalist(id = 'snapshot-datalist-options'),
                                                                     ],
-                                                                    width = True,
+                                                                    #width = True,
                                                                 ), # pyright: ignore[reportCallIssue]
-                                                                dbc.Col(
+                                                                dbc.Row(
+                                                                    dbc.Col(
                                                                     [
                                                                         # Save snapshot (Disabled if snapshot label exists)
                                                                         dbc.Button(
@@ -217,6 +218,7 @@ def create_project_selector():
                                                                     width = 'auto',
                                                                     class_name = 'd-flex align-items-end gap-2',
                                                                 ), # pyright: ignore[reportCallIssue]
+                                                                )
                                                             ],
                                                             class_name = 'align-items-center border-bottom mb-2 pb-2',
                                                         ), # pyright: ignore[reportCallIssue]

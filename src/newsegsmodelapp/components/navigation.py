@@ -4,12 +4,13 @@ Functions for building navigation layouts
 
 from dash import html
 import dash_bootstrap_components as dbc
+from dash_bootstrap_components._components.Button import Button as dbc_Button
 from functools import partial
 
 from newsegsmodelapp.newsegsbrowser import icons
 
 create_optionsbutton = partial(
-    dbc.Button,
+    dbc_Button,
     color = 'info',
     class_name = 'newsegs-options-button btn-block',
 )
@@ -101,7 +102,7 @@ def create_navigator_buttons_default(selected_model: str = 'sprake'):
     match selected_model:
         case 'sprake':
             return [
-                create_nav_options(selected_model),
+                #create_nav_options(selected_model),
                 create_nav_landing(selected_model),
                 create_nav_system_config(selected_model),
                 create_nav_dsa(selected_model),

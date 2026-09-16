@@ -10,7 +10,7 @@ from newsegsmodelapp.components.dsa_process_components import dsa_process_compon
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
-from newsegsmodelapp.newsegsbrowser.components.layout import navigation
+from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 
