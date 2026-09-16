@@ -15,7 +15,6 @@ from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
 from dash.exceptions import PreventUpdate
 import dash_ag_grid as dag
 import pandas as pd
-import pathvalidate
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.components import callback_utils, export
@@ -47,7 +46,7 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                 'n_clicks': Input({
                     'type': 'action-button', 'purpose': 'request-process',
                     'supersection': 'dsa', 'section': 'run',
-                    'key': 'dsa_run_metamodel', 'subindex': 0,
+                    'key': 'dsa_run_metamodel', 'subindex': ALL,
                 }, 'n_clicks'),
             },
             'modal_close_button': {

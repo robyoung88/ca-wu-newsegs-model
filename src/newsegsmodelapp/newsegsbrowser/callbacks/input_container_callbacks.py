@@ -226,7 +226,7 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         now = time.time_ns()
         
         match trigger_id['purpose']:
-            case 'bound-lower' | 'bound-upper':
+            case 'bound-lower' | 'bound-upper' | 'plot-intervals':
                 match trigger_id['supersection']:
                     case 'dsa':
                         new_val = callback_utils.get_triggered_value()
@@ -269,9 +269,25 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
                             app.project_provider.upsert_component(proj)
 
                     case 'optim':
-                        # Only need to pick up the bounds values when we perform the optimisation.
-                        pass
-
+                        new_val = callback_utils.get_triggered_value()
+                        proj = app.project_provider.get_project(active_project_id)
+                        varid = make_varid(**trigger_id)
+                        # For now, just going to hack this onto the dsa configuration
+                        # Note that it will not be an observed component.
+                        if not hasattr(proj.dsa_config, 'optim_config'):
+                            proj.dsa_config.optim_config = {}
+                        variable_bounds = proj.dsa_config.optim_config.setdefault('bounds', {})
+                        bound = variable_bounds.setdefault(varid, {})
+                        match trigger_id['purpose']:
+                            case 'plot-intervals':
+                                bound['intervals'] = new_val
+                            case 'bound-lower':
+                                bound['lower'] = new_val
+                            case _:
+                                bound['upper'] = new_val
+                        proj.dsa_config.revision += 1
+                        app.project_provider.upsert_component(proj)
+                        
             case 'dsaboundtype':
                 new_val = callback_utils.get_triggered_value()
                 proj = app.project_provider.get_project(active_project_id)
@@ -423,6 +439,59 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
 
         return (
             [bounds_input] * len(container_ids),
+            [cn] * len(container_ids)
+        )
+
+    @app.callback(
+        Output({
+            'type': 'input-component', 
+            'supersection': 'psa', 'purpose': 'input-group-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'className'
+        ),
+
+        Input({
+            'type': 'input-group-config-update-trigger', 
+            'supersection': 'psa', 'purpose': 'trigger',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'data'
+        ),
+
+        Input('active-project-id', 'data'),
+        State('app-state', 'data'),
+        State({
+            'type': 'input-component', 
+            'supersection': 'psa', 'purpose': 'input-group-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'id'
+        ),
+    )
+    def update_psa_input_contents(
+        input_group_triggers,
+        active_project_id,
+        app_state,
+        container_ids
+    ):
+        if not len(container_ids):
+            raise PreventUpdate
+        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+
+        varid = make_varid(**container_ids[0])
+        var = mm.variables.get(varid)
+        if not var:
+            raise PreventUpdate
+        if not isinstance(var, variable.NumericScalarVariable):
+            raise PreventUpdate
+        
+        if var.psa_selected:
+            cn = 'psa-input-single-value-block'
+        else:
+            cn = 'psa-input-single-value-block deselected'
+
+        return (
             [cn] * len(container_ids)
         )
 

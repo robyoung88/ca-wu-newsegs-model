@@ -40,7 +40,7 @@ class VariableComponentID(SerialisableDataclass):
 
 @dataclass
 class VariableInstanceComponentID(VariableComponentID):
-    subindex: int = 0
+    subindex: int|str = 0
 
     @override
     @classmethod

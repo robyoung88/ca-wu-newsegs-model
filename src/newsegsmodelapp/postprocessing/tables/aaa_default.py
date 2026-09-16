@@ -3,24 +3,37 @@ import json
 from typing import Callable, cast
 
 import dash_ag_grid as dag
+from dash import html
 
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import result_tables_sprake
 from newsegsmodelapp.newsegsbrowser.stats import tornado_plot
 from newsegsmodelapp.postprocessing.tables.get_result_list import get_result_list
 from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request, register_table_getter
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegssensitivity import common as sensitivity
+from newsegsmodelframework.newsegssensitivity import common as sensitivity, optim
 
 
-def _table_draw_request_factory(postproc_request_type: str):
-    def make_request(request: RunRequest):
+def _table_draw_request_factory(postproc_request_type: str, **kwargs):
+    _update_kwargs = {k:v for k,v in kwargs.items()}
+    def make_request(request: RunRequest, config: dict | None = None):
         rdict = asdict(request)
         request_type = rdict.pop('request_type', '')
         _ = rdict.pop('request_class', '')
         rdict['request_type'] = postproc_request_type
         rdict['trigger_request_type'] = request_type
+        if config:
+            payload = rdict.get('payload', '{}')
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                payload = {}
+            payload.update(config)
+            rdict['payload'] = json.dumps(payload)
+        if _update_kwargs:
+            rdict.update(_update_kwargs) # Powerful but dangerous
         return TableDrawRequest(**rdict)    
     return make_request
 
@@ -427,7 +440,6 @@ def _get_dsa_metamodel_table(
 
             label_df, _ = result_provider.get_result('postproc_dsa_single_metamodel_labels', mm.table_config)
 
-
             stat = 'net_present_value_undiscounted' if not stat else stat
             plot = tornado_plot(dsa_df, label_df, stat)
             return plot, rev
@@ -441,3 +453,119 @@ def _get_dsa_metamodel_table(
             mm = proj.get_focussed_metamodel()
             return result_provider.get_result(table_name, mm.table_config, True)
 
+TABLE_SECTION = 'table_optim_metamodel'
+_request_plot_marginal_optim = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_dsa_metamodel'])
+def _trigger_plot_marginal_optim(
+    request: TableDrawRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    # Set partial calling options into the store so that the plotter can get them
+    proj = project_provider.get_project(request.project_id)
+
+    run_config = json.loads(request.payload)
+    mm_id = run_config.get('metamodel_id')
+    if not mm_id:
+        raise ValueError('Metamodel ID not provided for single run.')
+    mm = proj.get_metamodel_by_id(mm_id)
+
+    varid = run_config.get('subindex') # Custom use of subindex
+    if varid is None or varid not in mm.variables:
+        return 'variable missing'
+
+    # TODO: This needs replacing with a dedicated configuration one day.
+    if hasattr(proj.dsa_config, 'optim_config'):
+        raw_config = proj.dsa_config.optim_config
+    else:
+        raw_config = {}
+
+    bounds_config = raw_config.get('bounds', {})
+    var_bounds = bounds_config.get(varid, {})
+
+    lower = var_bounds.get('lower', 0)
+    upper = var_bounds.get('upper', 10000)
+    res = var_bounds.get('intervals', 10)
+
+    if lower > upper:
+        temp = lower
+        lower = upper
+        upper = temp
+
+    res = int(res)
+    if res <= 0:
+        res = 2
+    if res > 20:
+        res = 20
+
+    stat = run_config.get('statistic', 'net_present_value_discounted')
+
+    # TODO: Add progress
+    plot_df = optim.evaluate_statistic_across_margin(
+        mm, varid, stat, lower, upper, res
+    )
+
+    fig = optim.statistic_across_margin_plot(plot_df, mm)
+
+    proj.table_config.revision += 1
+    project_provider.upsert_component(proj)
+
+    result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig)
+
+    return 'ok'
+    
+@register_table_getter(TABLE_SECTION, MODEL_TYPE)
+def _plot_marginal_optim(
+    active_project_id: str,
+    table_options: dict,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface
+):
+    
+    proj = project_provider.get_project(active_project_id)
+    fig, rev = result_provider.get_result('plot_marginal_optim', proj.table_config)
+
+    return fig, rev
+
+TABLE_SECTION = 'table_postopt_metamodel'
+_request_table_draw_postopt_metamodel = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['optim_run_metamodel'])
+def _make_postopt_tables_sprake(
+    request: TableDrawRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    proj = project_provider.get_project(request.project_id)
+    optdict, _ = result_provider.get_result('optimisation_result', proj.table_config)
+
+    run_config = json.loads(request.payload)
+    mm_id = run_config.get('metamodel_id')
+    
+    if optdict is None:
+        return 'missing'
+
+    if optdict['success']:
+        table_data = [
+            html.H4('Success'),
+            str(optdict['opt'])
+        ]
+
+        project_provider.upsert_component(proj)
+    else:
+        opt = optdict['opt']
+        table_data = [
+            html.H4('Failure'),
+            f'Optimisation was not a success: {opt.message}' + \
+            '\n Try again with a different method, variables or bounds.' + \
+            str(opt),
+        ]
+
+        result_provider.upsert_result('table_postopt_metamodel', proj.table_config, table_data)
+
+    return 'ok'

@@ -15,11 +15,11 @@ class DeterministicRunMetamodelRunRequest(RunRequest):
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
-def request_deterministic_single_mm_run(project_id: str, project_provider: NewsegsProjectProviderInterface):
+def request_deterministic_single_mm_run(project_id: str, project_provider: NewsegsProjectProviderInterface, config: dict | None = None):
     mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return DeterministicRunMetamodelRunRequest(
         project_id = project_id,
-        request_id = 'Deterministic run - ' + str(datetime.datetime.now()),
+        request_id = 'Deterministic run for single metamodel - ' + str(datetime.datetime.now()),
         payload = json.dumps({
             'metamodel_id': mm_id
         })

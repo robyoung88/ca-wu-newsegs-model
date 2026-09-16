@@ -113,29 +113,31 @@ def spawn_job(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface,
     triggering_request: registers.RunRequest | None,
-
+    config: dict | None = None,
 ) -> int | None:
     print(f'spawning job type {procedure_name}')
+
+    config = {} if config is None else config
 
     # 1. Make request
     match procedure_class:
         case 'run':
             get_req = registers.RUN_REQUEST_REGISTER[procedure_name]
-            request = get_req(active_project_id, project_provider)
+            request = get_req(active_project_id, project_provider, config)
         case 'postprocess':
             if triggering_request is None:
-                return None
+                triggering_request = registers.RUN_REQUEST_REGISTER['_dummyrequest'](active_project_id, project_provider, config)
             get_req = registers.POSTPROCESS_REQUEST_REGISTER.get(procedure_name)
             if get_req:
-                request = get_req(triggering_request)
+                request = get_req(triggering_request, config)
             else:
                 request = triggering_request
         case 'tabledraw':
             if triggering_request is None:
-                return None
+                triggering_request = registers.RUN_REQUEST_REGISTER['_dummyrequest'](active_project_id, project_provider, config)
             get_req = registers.TABLE_DRAW_REQUEST_REGISTER.get(procedure_name)
             if get_req:
-                request = get_req(triggering_request)
+                request = get_req(triggering_request, config)
             else:
                 request = triggering_request
         case _:
@@ -187,7 +189,6 @@ def add_action_callbacks(app: NewsegsDash):
             'supersection': 'global', 'section': ALL,
             'key': ALL, 'subindex': 0
         }, 'data'), # Generally, this won't feature as won't be triggered by feedback. However, there are a few external loaders which may set the postprocess sequence running.
-
         Input('progress-poll-interval', 'n_intervals'),
 
         State('ongoing-actions', 'data'),
@@ -195,6 +196,16 @@ def add_action_callbacks(app: NewsegsDash):
             'type': 'postaction-trigger', 'purpose': 'trigger',
             'supersection': 'global', 'section': ALL,
             'key': ALL, 'subindex': 0
+        }, 'id'),
+        State({
+            'type': 'result-table-option', 'purpose': ALL,
+            'supersection': ALL, 'section': ALL,
+            'key': ALL, 'subindex': ALL
+        }, 'value'),
+        State({
+            'type': 'result-table-option', 'purpose': ALL,
+            'supersection': ALL, 'section': ALL,
+            'key': ALL, 'subindex': ALL
         }, 'id'),
         State('active-project-id', 'data'),
         prevent_initial_call = True
@@ -206,6 +217,8 @@ def add_action_callbacks(app: NewsegsDash):
 
         ongoing_actions: list[int],
         postaction_trigger_ids,
+        options: list,
+        option_ids: list,
         active_project_id,
     ):
         trigger_id = ctx.triggered_id
@@ -230,9 +243,18 @@ def add_action_callbacks(app: NewsegsDash):
                         if not callback_utils.get_triggered_value():
                             raise PreventUpdate
                         print(f'handling action from {trigger_id.get('type')}: ', action_type)
+                        config = {k: v for k,v in trigger_id.items()}
+                        # Two ways of picking up configuration from result-table-option inputs:
+                        # Their value, and their subindex.
+                        for id, val in zip(option_ids, options):
+                            if id['key'] == action_type:
+                                config[id['purpose']] = val
+                                config[id['purpose']+'_subindex'] = id['subindex']
+
                         run_id = spawn_job(
                             action_type, action_class, active_project_id, 
-                            app.project_provider, app.results_provider, None
+                            app.project_provider, app.results_provider, None,
+                            config = config
                         )
                         if run_id:
                             ongoing_actions.append(run_id)

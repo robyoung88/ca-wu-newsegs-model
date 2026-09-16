@@ -11,6 +11,7 @@ from newsegsmodelapp.newsegsbrowser.background_callback_errors import background
 from newsegsmodelapp.newsegsbrowser.components.layout import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 from newsegsmodelapp.components import results_header
+from newsegsmodelapp.components.psa_process_components import psa_process_components
 from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import psa
 
@@ -53,55 +54,12 @@ def create_psa_configuration_editor():
             ),
         html.Hr(),
         html.Div(
-            [
-                html.P(
-                    html.H3(
-                        'PSA Settings'
-                    )
-                ),
-                html.Div([
-                    html.H4('Number of samples:'),
-                    dbc.InputGroup([
-                        dbc.InputGroupText('N'), # pyright: ignore[reportCallIssue]
-                        dbc.Input(
-                            id = {'type': 'numeric-input', 'target': 'psa-settings', 'key': 'samples'},
-                            placeholder = 'N',
-                            value = 1000,
-                            min = 0,
-                            max = 10000,
-                            step = 1
-                        ) # pyright: ignore[reportCallIssue]
-                    ]) # pyright: ignore[reportCallIssue]
-                ],
-                className = 'input-settings'
-                ),
-                html.Div([
-                    html.H4('Random Seed:'),
-                    dbc.InputGroup([
-                        dbc.InputGroupText('Seed'), # pyright: ignore[reportCallIssue]
-                        dbc.Input(
-                            id = {'type': 'numeric-input', 'target': 'psa-settings', 'key': 'seed'},
-                            placeholder = 'seed',
-                            value = None,
-                            className = 'input-numeric'
-                        ) # pyright: ignore[reportCallIssue]
-                    ]) # pyright: ignore[reportCallIssue]
-                ],
-                className = 'input-settings'
-                ),
-                html.Div([
-                    html.H4('Keep drawn parameters:'),
-                    daq.ToggleSwitch(
-                        id = {'type': 'toggle-input', 'target': 'psa-settings', 'key': 'return_draws'},
-                        value = False,
-                        size = 36,
-                        className = 'input-toggle',
-                    )
-                ],
-                className = 'input-settings'
-                )
-                
-            ]
+            html.P(
+                html.H3('PSA Settings')
+            )
+        ),
+        html.Div(
+            id = {'type': 'input-container', 'supersection': 'psa', 'section': 'psa-settings'},
         ),
         html.Hr(),
         html.Div(
@@ -196,7 +154,7 @@ def create_psa_layout(*args, **kwargs):
                 ),
             ]
             + clayouts.metamodel_process_components()
-            + clayouts.psa_process_components(**kwargs)
+            + psa_process_components(**kwargs)
             + background_callback_error_handler_components()
             ),
             overlay_style = {

@@ -119,13 +119,16 @@ def run_optimisation(
         dtype = np.float64
     )
 
-    def optfunc(x, *args) -> float:
+    def setpars(x, mm):
         x_trans = [y(v) for v, y in zip(x, inv_transforms)]
         for var, val in zip(variables, x_trans):
             par0 = list(mm.variables[var.varid].parameters)
             par0[var.param_index] = val
             mm.variables[var.varid].set_parameters(*par0)
             mm.update_model_from_variable_deterministic(var.varid)
+
+    def optfunc(x, *args) -> float:
+        setpars(x, mm)
         mm.model.run()
         mm.finance.run()
         return _optim_float_statistic_mapper(target, mm.model, mm.finance)
@@ -141,6 +144,8 @@ def run_optimisation(
     else:
         opt = scipy_opt.minimize(optfunc, x0, method = method)
 
+    if opt.success:
+        setpars(opt.x, mm)
     return opt
 
 def evaluate_statistic_across_margin(
@@ -167,7 +172,9 @@ def evaluate_statistic_across_margin(
     # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
 
-    var_backup = copy.deepcopy(mm.variables[varid])
+    var_hold = mm.variables[varid]
+    var_edit = copy.deepcopy(mm.variables[varid])
+    mm.variables[varid] = var_edit
     par0 = list(mm.variables[varid].parameters)
 
     param_range = np.linspace(lower, upper, resolution + 1, dtype = np.float64)
@@ -194,7 +201,7 @@ def evaluate_statistic_across_margin(
         stat: oarray,
     })
 
-    mm.variables[varid] = var_backup
+    mm.variables[varid] = var_hold
     mm.update_model_from_variable_deterministic(varid)
     mm.model.run()
     mm.finance.run()

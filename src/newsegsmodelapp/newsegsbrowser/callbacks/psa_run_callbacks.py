@@ -6,26 +6,29 @@ import io
 import json
 import logging
 import os
+import random
 import tempfile
 import zipfile
-from typing import Any, MutableMapping
+from typing import Any, MutableMapping, cast
 
 from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
+from dash.exceptions import PreventUpdate
 import pandas as pd
-import pathvalidate
 
-
+from newsegsmodelapp import registers
+from newsegsmodelapp.components import callback_utils, export
+from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser import common as browser
 from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
-from newsegsmodelapp.newsegsbrowser.callbacks.configuration_selector_callbacks import metamodel_to_dict
 from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
+from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import psa
 from newsegsmodelframework.util import jsonfuncs
 
 logger = logging.getLogger(__name__)
 
-def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
+def add_psa_run_callbacks(app: NewsegsDash):
     @app.callback(
         output = {
             'modal': {
@@ -37,7 +40,9 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         },
         inputs = {
             'psa_run_button': {
-                'n_clicks': Input({'type': 'psa-run-button', 'page': ALL}, 'n_clicks'),
+                'type': 'action-button', 'purpose': 'request-process',
+                'supersection': 'psa', 'section': 'run',
+                'key': 'psa_run_metamodel', 'subindex': ALL,
             },
             'modal_close_button': {
                 'n_clicks': Input(
@@ -130,7 +135,7 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
                     'id'
                 )
             },
-            'selected_configuration': State('store-selected-configuration', 'data'),
+            'active_project_id': State('active-project-id', 'data'),
         },
         prevent_initial_call = True
     )
@@ -141,7 +146,7 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         modal,
         options,
         download,
-        selected_configuration,
+        active_project_id,
     ):
         n_modals = len(modal['ids'])
         n_downloads = len(download['ids'])
@@ -160,18 +165,18 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             case 'results-download-btn':
                 rval['modal']['is_opens'] = [False] * n_modals
                 page = trig_id.get('page')
-                opts = browser.get_options(
+                opts = callback_utils.get_options(
                     options['ids'],
                     options['values'],
                     page,
                     ['contents-option', 'format-option']
                 )
-                selected_configuration = json.loads(selected_configuration)
 
-                to_export = browser.export_results(
+                to_export = export.export_results(
                     'psa',
-                    selected_configuration,
-                    app,
+                    app.project_provider,
+                    app.results_provider,
+                    active_project_id,
                     opts.get('contents-option', 'result'),
                     opts.get('format-option', 'csv')
                 )
@@ -186,10 +191,15 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
     
     @app.callback(
         output = dict(
-            configurations = Output('store-configurations', 'data', allow_duplicate = True),
-            selected_configuration = Output('store-selected-configuration', 'data', allow_duplicate = True),
+            active_project_id = Output('active-project-id', 'data', allow_duplicate = True),
 
-            triggers = dict(values = Output({'type': 'trigger', 'page': ALL, 'key': 'psa-run-postprocess'}, 'data', allow_duplicate = True))
+            trigger = dict(
+                value = Output({
+                    'type': 'postaction-trigger', 'purpose': 'trigger',
+                    'supersection': 'global', 'section': 'run',
+                    'key': 'psa_run_metamodel', 'subindex': 0
+                }, 'data', allow_duplicate = True)
+            ),
         ),
         inputs = dict(
             uploads = dict(
@@ -199,29 +209,22 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             )
         ),
         state = dict(
-            triggers = dict(ids = State({'type': 'trigger', 'page': ALL, 'key': 'psa-run-postprocess'}, 'id')),
-            configurations = State('store-configurations', 'data'),
-            selected_configuration = State('store-selected-configuration', 'data'),
+           active_project_id = State('active-project-id', 'data'),
         ),
         prevent_initial_call = True
     )
     def upload_psa_results(
         uploads,
-        triggers,
-        configurations,
-        selected_configuration
+        active_project_id,
     ):
         rval: dict[str, Any] = dict(
-            configurations = no_update,
-            selected_configuration = no_update,
-            triggers = dict(values = [no_update] * len(triggers['ids']))
+            active_project_id = no_update,
+            trigger = dict(value = no_update)
         )
 
         trig = ctx.triggered_id
         if trig is None:
             return rval
-        
-        page = trig.get('page')
         
         raw_data = None
         raw_filename = None
@@ -243,8 +246,9 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
         else:
             file_ext = 'csv'
         
+        proj = app.project_provider.get_project(active_project_id)
         result_df = None
-        selected_configuration = json.loads(selected_configuration)
+        mm_new = None
         try:
             match file_ext:
                 case 'csv':
@@ -265,7 +269,6 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
                         if results_file is None:
                             return rval
                         
-                        new_mm = None
                         for root, dirs, files in os.walk(temp_dir):
                             for file in files:
                                 if file.endswith('.json'):
@@ -273,25 +276,22 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
                                     try:
                                         with open(json_file, 'r') as f:
                                             cfg = json.load(f)
-                                            new_mm = browser.metamodel_from_configuration_file(
-                                                cfg,
-                                                selected_configuration,
-                                                configurations,
-                                                app,
-                                                overwrite_selected_config = False
-                                            )
-                                            if new_mm is not None:
-                                                break
+                                            constr = find_constructor(cfg['constructor_class'], cfg['class'])
+                                            if not constr:
+                                                raise PreventUpdate
+                                            mm_new = cast(NewsegsMetaModel, constr(cfg))
+                                            mm_new.anonymise_ids()
+
+                                            proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
+                                            proj.set_focussed_metamodel(mm_new.id)
+                                            proj.revision += 1
+                                            app.project_provider.upsert_component(proj)
                                     except ValueError as e:
                                         logger.error(str(e))
                                         continue
                         
-                        if new_mm:
-                            selected_configuration = new_mm.to_config()
-                            selected_configuration['config_index'] = len(configurations) - 1
-                            
-                            rval['configurations'] = configurations
-                            rval['selected_configuration'] = json.dumps(selected_configuration) # pyright: ignore[reportArgumentType]
+                        if mm_new:
+                            rval['active_project_id'] = active_project_id
                         
                         split_results_fn = str(results_file).rsplit('.', 1)
                         if len(split_results_fn) == 2:
@@ -313,97 +313,14 @@ def add_psa_run_callbacks(app: Dash, acm: NewsegsBrowserCacheManager):
             return rval
         
         # Set the result_df as appropriate for a psa result and trigger post-processing
-        mm = acm.metamodels[str(selected_configuration['metamodel_id'])]
-        result_id = postprocess_utils.assign_psa_results(mm, result_df)
-        logger.info('Results %s created', result_id)
-        acm.results[result_id] = result_df
+        mm = proj.get_focussed_metamodel()
+        mark_stale = mm_new is None
+        app.results_provider.upsert_result('psa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale)
 
-        for idx, id in enumerate(triggers['ids']):
-            if id.get('page') == page:
-                rval['triggers']['values'][idx] = [json.dumps(
-                    browser.psa_run_request(
-                        metamodel_id = mm.id,
-                        debounce = False,
-                    ).as_dict()
-                )]
+        rr_generator = registers.RUN_REQUEST_REGISTER['psa_single_metamodel']
+        request = rr_generator(active_project_id, app.project_provider)
+        request.run_id = -random.randrange(1, 10000)
+
+        rval['trigger']['value'] = [json.dumps(request.as_dict())]
 
         return rval
-
-    @app.callback(
-        Output('prequeue-action-user', 'data', allow_duplicate = True),
-
-        Input({'type': 'psa-run-button', 'page': ALL}, 'n_clicks'),
-        State({'type': ALL, 'target': 'psa-settings', 'key': ALL}, 'id'),
-        State({'type': ALL, 'target': 'psa-settings', 'key': ALL}, 'value'),
-        State('store-selected-configuration', 'data'),
-        prevent_initial_call = True
-    )
-    def start_psa_run(
-        n_clicks,
-        input_ids,
-        input_values,
-        selected_configuration
-    ):
-        if n_clicks is None:
-            return no_update
-        
-        if selected_configuration is None:
-            return no_update
-        logger.info('a psa-run-button has been hit - n_clicks is %s', n_clicks)
-        
-        selected_configuration = json.loads(selected_configuration)
-
-        kwargs = {}
-        for idx, id in enumerate(input_ids):
-            if id.get('key') in {'samples', 'seed'}:
-                if input_values[idx] is not None:
-                    kwargs[id.get('key')] = int(input_values[idx])
-                else:
-                    kwargs[id.get('key')] = input_values[idx]
-            elif id.get('key') in {'return_draws'}:
-                kwargs[id.get('key')] = bool(input_values[idx])
-
-        prequeue_patch = Patch()
-        prequeue_patch.append(
-            json.dumps(
-                browser.psa_run_request(
-                    metamodel_id = selected_configuration.get('metamodel_id'), 
-                    debounce = False,
-                    **kwargs
-                ).as_dict()
-            )
-        )
-
-        return prequeue_patch
-
-    return app
-
-def psa_metamodel_process(
-    set_progress,
-    process_request: dict[str, Any],
-    mm: NewsegsMetaModel,
-    cache: MutableMapping[str, Any]
-):
-    set_progress(json.dumps(dict(value=str(1),max=str(3),message='searching for results')))
-    debug_psa_run_results_fn = os.path.join('.', 'temp_psa_run_results.csv')
-    if os.path.isfile(debug_psa_run_results_fn):
-        set_progress(json.dumps(dict(value=str(2),max=str(3),message='loading results')))
-        psa_results = (
-            pd.read_csv(
-                debug_psa_run_results_fn
-            )
-        )
-    else:
-        set_progression = browser.set_progression_factory(set_progress, 'PSA running')
-        psa_results = psa.run_psa(
-            mm,
-            samples = process_request.get('samples', 10),
-            return_draws = process_request.get('return_draws', False),
-            seed = process_request.get('seed', None),
-            progress = set_progression
-        )
-        psa_results.to_csv(debug_psa_run_results_fn)
-
-    set_progress(json.dumps(dict(value=str(3),max=str(3),message='syncing results')))
-    psa_result_id = postprocess_utils.assign_psa_results(mm, psa_results)
-    cache[psa_result_id] = psa_results

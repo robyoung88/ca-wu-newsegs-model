@@ -667,6 +667,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         if isinstance(original, NewsegsMetaModel):
             new.model = self._em_provider.duplicate_component(new._model_id)
             new.finance = self._fm_provider.duplicate_component(new._finance_id)
+            # Worth double checking that model is set on finance
+            new.finance.set_model(new.model)
             new.variables = {k: v for k, v in original.variables.items()}
         return new
 

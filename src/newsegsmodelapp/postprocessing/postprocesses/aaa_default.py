@@ -15,13 +15,24 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
-def _postprocess_request_factory(postproc_request_type: str):
-    def make_request(request: RunRequest):
+def _postprocess_request_factory(postproc_request_type: str, **kwargs):
+    _update_kwargs = {k:v for k,v in kwargs.items()}
+    def make_request(request: RunRequest, config: dict | None = None):
         rdict = asdict(request)
         request_type = rdict.pop('request_type', '')
         _ = rdict.pop('request_class', '')
         rdict['request_type'] = postproc_request_type
         rdict['trigger_request_type'] = request_type
+        if config:
+            payload = rdict.get('payload', '{}')
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                payload = {}
+            payload.update(config)
+            rdict['payload'] = json.dumps(payload)
+        if _update_kwargs:
+            rdict.update(_update_kwargs) # Powerful but dangerous
         return PostprocessRequest(**rdict)    
     return make_request
 

@@ -16,11 +16,11 @@ class DSARunMetamodelRunRequest(RunRequest):
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
-def _(project_id: str, project_provider: NewsegsProjectProviderInterface):
+def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config: dict | None = None):
     mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return DSARunMetamodelRunRequest(
         project_id = project_id,
-        request_id = 'Deterministic run - ' + str(datetime.datetime.now()),
+        request_id = 'DSA run for single metamodel - ' + str(datetime.datetime.now()),
         payload = json.dumps({
             'metamodel_id': mm_id
         })

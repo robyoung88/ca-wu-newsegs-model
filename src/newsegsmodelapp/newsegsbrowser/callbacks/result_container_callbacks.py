@@ -285,8 +285,9 @@ def add_result_container_callbacks(app: NewsegsDash):
             try:
                 table_getter = registers.get_table_getter(table_name, selected_model)
             except KeyError:
-                continue
+                pass
             if table_getter is not None:
+                print(f'Found getter for {table_name}')
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
                 res, rev = table_getter(active_project_id, table_options, app.project_provider, app.results_provider)

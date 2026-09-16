@@ -877,10 +877,10 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
             'Plot',
             color = 'primary',
             id = {
-                'type': 'optim-marginal-plot-button',
-                'section': section, 
-                'key': var.interface_key, 
-                'subindex': var.interface_subindex
+                'type': 'action-button', 'purpose': 'request-process',
+                'supersection': 'optim', 'section': 'tabledraw',
+                'key': 'table_optim_metamodel', 'subindex': f'{section}.{var.interface_key}.{var.interface_subindex}',
+                #'type': 'optim-marginal-plot-button',
             },
             title = 'Plot marginal statistic',
             disabled = False

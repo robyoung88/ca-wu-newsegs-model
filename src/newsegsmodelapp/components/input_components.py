@@ -467,7 +467,47 @@ def _toggle_variable_sharing(
 
     # Update triggers
     for idx, id in enumerate(trigger_ids):
-        print (id)
         trigger_returns[idx] = now
         
+    return input_returns, header_returns, trigger_returns
+
+@register_input_handler('toggle-optim-active', 'toggle')
+def _set_variable_optim_active(
+    triggered_id: dict,
+    input_ids: list[dict[str, str]],
+    input_values: list[Any],
+    header_ids: list[dict[str, str]],
+    trigger_ids: list[dict[str, str]],
+    active_project_id: str,
+    project_provider: NewsegsProjectProviderInterface,
+):
+    val = callback_utils.get_triggered_value()
+    if val is None:
+        raise PreventUpdate
+
+    proj = project_provider.get_project(active_project_id)
+    mm = proj.get_focussed_metamodel()
+    varid = make_varid(**triggered_id)
+
+    var = mm.variables.get(varid)
+    if var is None:
+        raise PreventUpdate
+
+    if var.optim_selected == val:
+        raise PreventUpdate
+
+    var.optim_selected = True
+    proj.revision += 1
+    project_provider.upsert_component(proj)
+
+    # Return update signals to refresh input card headers and values
+    input_returns: list[Any] = [no_update] * len(input_ids)
+    header_returns: list[Any] = [no_update] * len(header_ids)
+    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
+
+    now = time.time_ns()
+    # Update triggers in case there is any formatting that needs to be done.
+    for idx, id in enumerate(trigger_ids):
+        trigger_returns[idx] = now
+
     return input_returns, header_returns, trigger_returns

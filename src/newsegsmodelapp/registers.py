@@ -1,6 +1,7 @@
 """Registers and associated for the various dispatch functions"""
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Sequence, cast
+import json
+from typing import Any, Callable, Optional, Protocol, Sequence, cast
 
 from dash.development.base_component import Component as DashComponent
 import sqlalchemy as sa
@@ -122,12 +123,22 @@ class RunRequest(SerialisableDataclass):
     cancel_requested: bool = False
     background_procedure: bool = False # TODO: Set to default background once the dispatcher is enabled
 
-RUN_REQUEST_REGISTER: dict[str, Callable[[str, NewsegsProjectProviderInterface], RunRequest]] = {}
+class RunRequestHandler(Protocol):
+    def __call__(
+        self,
+        project_id: str,
+        project_provider: NewsegsProjectProviderInterface,
+        config: dict[str, Any] | None = None,
+    ) -> RunRequest:
+        ...
+
+RUN_REQUEST_REGISTER: dict[str, RunRequestHandler] = {}
 """Register of functions to generate run requests.
 
 Function arguments:
     project_id [str]
     project_provider [NewsegsProjectProviderInterface]
+    calling_arguments [dict]
 """
 
 def register_run_request(name: str,):
@@ -142,6 +153,17 @@ def register_run_request(name: str,):
         
         return func
     return decorated
+
+@register_run_request('_dummyrequest')
+def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config: dict | None = None):
+    mm_id = project_provider.get_focussed_metamodel_id(project_id)
+    config = config.copy() if config else {}
+    config.update({'metamodel_id': mm_id})
+    return RunRequest(
+        project_id = project_id,
+        request_id = 'A dummy request',
+        payload = json.dumps(config)
+    )
 
 RUN_PROCEDURE_REGISTER: dict[str, Callable[[
     RunRequest,
@@ -194,7 +216,15 @@ class PostprocessRequest(RunRequest):
     request_class: str = 'postprocess'
     trigger_request_type: str = ''
 
-POSTPROCESS_REQUEST_REGISTER: dict[str, Callable[[RunRequest], PostprocessRequest]] = {}
+class PostprocessRequestHandler(Protocol):
+    def __call__(
+        self,
+        trigger_request: RunRequest,
+        config: dict[str, Any] | None = None,
+    ) -> PostprocessRequest:
+        ...
+
+POSTPROCESS_REQUEST_REGISTER: dict[str, PostprocessRequestHandler] = {}
 """Register of functions to generate postprocess requests.
 
 Function arguments:
@@ -286,7 +316,15 @@ class TableDrawRequest(RunRequest):
     trigger_request_type: str = ''
     ann_hori_toggle: bool = False
 
-TABLE_DRAW_REQUEST_REGISTER: dict[str, Callable[[RunRequest], TableDrawRequest]] = {}
+class TableDrawRequestHandler(Protocol):
+    def __call__(
+        self,
+        trigger_request: RunRequest,
+        config: dict[str, Any] | None = None,
+    ) -> TableDrawRequest:
+        ...
+
+TABLE_DRAW_REQUEST_REGISTER: dict[str, TableDrawRequestHandler] = {}
 """Register of functions to generate table draw requests.
 
 Function arguments:

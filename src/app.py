@@ -10,6 +10,8 @@ from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
+from newsegsmodelapp.newsegsbrowser.callbacks.optim_run_callbacks import add_optim_run_callbacks
+
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings
@@ -248,6 +250,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)
     add_dsa_run_callbacks(app)
+    add_optim_run_callbacks(app)
 
     return app
 

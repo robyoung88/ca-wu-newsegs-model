@@ -17,7 +17,8 @@ from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_re
 from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import optim
 
-from newsegsmodelapp.components import results_header
+from newsegsmodelapp.components import  results_header
+from newsegsmodelapp.components.optim_process_components import optim_process_components
 
 def create_dsa_header():
     return html.Div([
@@ -100,15 +101,19 @@ def create_optim_configuration_editor(**kwargs):
                         clearable = False,
                         id = {
                             'type': 'result-table-option', 'purpose': 'statistic',
-                            'supersection': 'dsa', 'section': 'tabledraw',
-                            'key': 'table_dsa_metamodel', 'subindex': 0
+                            'supersection': 'optim', 'section': 'tabledraw',
+                            'key': 'table_optim_metamodel', 'subindex': 0
                         },
                     ),
                 ]), # pyright: ignore[reportCallIssue]
                 
                 dbc.Row([
                     dcc.Graph(
-                        id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-marginal-statistic'},
+                        id = {
+                            'type': 'result-figure', 'purpose': 'container',
+                            'supersection': 'optim', 'section': 'tabledraw',
+                            'key': 'table_optim_metamodel', 'subindex': 0
+                        },
                         style= {
                             'height': '590px',
                             'border': '1px solid #dee2e6',
@@ -117,96 +122,17 @@ def create_optim_configuration_editor(**kwargs):
                         }
                     )
                 ]), # pyright: ignore[reportCallIssue]
+                html.Div(
+                    id = {
+                        'type': 'result-table', 'purpose': 'container',
+                        'supersection': 'optim', 'section': 'tabledraw',
+                        'key': 'table_postopt_metamodel', 'subindex': 0
+                    }
+                ), # pyright: ignore[reportCallIssue]
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
                 ), # pyright: ignore[reportCallIssue]
-                dcc.Store(
-                    id = {'type': 'store-optim-marginal-statistic-plot', 'page': kwargs.get('page_type', 'None')},
-                    data = None,
-                ),
-                dbc.Modal(
-                    [
-                        dbc.ModalHeader(dbc.ModalTitle('Start system optimisation')), # pyright: ignore[reportCallIssue]
-                        dbc.ModalBody([
-                            html.H3('Automatically optimise system size'),
-                            html.P((
-                                'This automated process can take a substantial amount of time, ' \
-                                'dependent on the complexity of the model, the number of ' \
-                                'parameters to be optimised, and the optimisation method. '
-                                'Before running, we advise taking the following steps:' \
-                            )),
-                            html.P((
-                                '- Check the measure you want to optimise against - ' \
-                                ' discounting can have a major impact on the location of the ' \
-                                ' optimal point.'
-                            )),
-                            html.P((
-                                '- Look at the marginal values of the measure against each of the ' \
-                                'parameters. If the plot does not show a "peak" within the range then ' \
-                                'it is likely to move to the bound of its range. Check if that ' \
-                                'bound is plausible (e.g. can 4 MW of wind generation be exported ' \
-                                'from the site, and is it physically big enough?). It is preferable ' \
-                                'to set the value of these parameters and remove them from ' \
-                                'optimisation, as gradient methods tend not to work well at the ' \
-                                'boundary.'
-                            )),
-                            html.P((
-                                '- All optimisation methods are sensitive to the starting parameter ' \
-                                'values. Check that the current value is close to the "peak" in the ' \
-                                'marginal plot to avoid getting trapped in a local maximum. However, ' \
-                                'in complex cases where the interaction between parameters has a ' \
-                                'strong and inconsistent impact on the measure, it is not guaranteed ' \
-                                'that you will find the "global" maximum over the N-dimensional ' \
-                                'parameter volume.'
-                            )),
-                            html.P((
-                                '- The optimisation method can impact how long it takes to find ' \
-                                'the optimal point, if it can be found at all. The default ' \
-                                '(Nelder-Mead) is good at finding the optimum, but not as robust as ' \
-                                'L-BFGS-B to a "rough" function. Powell optimisation is extremely '
-                                'robust and simple, but requires a lot of function evaluations.'
-                            )),
-                            html.H3('Optimisation method:'),
-                            dcc.Dropdown(
-                                options = optim.OPTIMISATION_METHODS,
-                                value = optim.OPTIMISATION_METHODS[0],
-                                searchable = False,
-                                multi = False,
-                                clearable = False,
-                                id = {'type': 'optim-run-option', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-method'},
-                                persistence = True
-                            ),
-                        ]), # pyright: ignore[reportCallIssue]
-                        dbc.ModalFooter([
-                            dbc.Button(
-                                'OK',
-                                id = {'type': 'optim-run-btn', 'page': kwargs.get('page_type', 'None')},
-                                n_clicks = 0
-                            ), # pyright: ignore[reportCallIssue]
-                            dbc.Button(
-                                'Cancel',
-                                id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-run-confirm'},
-                                className = 'ms-auto',
-                                n_clicks = 0
-                            ) # pyright: ignore[reportCallIssue]
-                        ])
-                    ],
-                    id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'optim-run-confirm'},
-                    is_open = False,
-                    size = 'xl',
-                ),
-                dbc.Toast(
-                    ['Optimisation unsuccessful'],
-                    id = {'type': 'feedback-toast', 'page': kwargs.get('page_type', 'None'), 'key': 'optim'},
-                    header = 'Optimisation exit',
-                    icon = 'warning',
-                    dismissable = True,
-                    is_open = False,
-                    duration = 5000,
-                    style = {'position': 'fixed', 'top': 66, 'right': 10, 'width': 350},
-                ), # pyright: ignore[reportCallIssue]
-                dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-run-postprocess'}, data = []),
-            ]
+            ] + optim_process_components(**kwargs)
         )
         
     ]) # pyright: ignore[reportCallIssue]
