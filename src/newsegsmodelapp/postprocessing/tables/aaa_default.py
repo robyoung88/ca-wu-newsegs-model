@@ -13,7 +13,7 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegssensitivity import common as sensitivity, optim
+from newsegsmodelframework.newsegssensitivity import common as sensitivity, optim, psa
 
 
 def _table_draw_request_factory(postproc_request_type: str, **kwargs):
@@ -569,3 +569,125 @@ def _make_postopt_tables_sprake(
         result_provider.upsert_result('table_postopt_metamodel', proj.table_config, table_data)
 
     return 'ok'
+
+TABLE_SECTION = 'table_psa_metamodel'
+_request_table_draw_psa_metamodel = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_psa_metamodel'])
+def _make_psa_tables_sprake(
+    request: TableDrawRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    proj = project_provider.get_project(request.project_id)
+            
+    run_config = json.loads(request.payload)
+    mm_id = run_config.get('metamodel_id')
+    if not mm_id:
+        raise ValueError('Metamodel ID not provided for single run.')
+    mm = proj.get_metamodel_by_id(mm_id)
+
+    raw_table, rev = result_provider.get_result('postproc_psa_single_metamodel_data', mm.table_config, allow_stale = False)
+    if raw_table is None:
+        return 'missing'
+    any_stale = mm.table_config.revision != rev
+
+    psa_statistics = list(sensitivity.PSA_STATISTIC_LABELS.keys())
+
+    table_name = 'table_psa_metamodel'
+    otable = (
+        raw_table
+        .rename(sensitivity.PSA_STATISTIC_LABELS)
+        .reset_index(drop=False)
+        .rename(columns={'index':'Statistic'})
+    )
+
+    rval = []
+        
+    formatters = {
+        'Statistic': {"function":  "params.value ? params.value : '-' "},
+    }
+    columnDefs = [
+        {
+            'field': i,
+            "valueFormatter": formatters.get(i, {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "})
+        }
+        for i in otable.columns
+    ]
+
+    tbl1 = dag.AgGrid(
+        rowData = otable.to_dict('records'),
+        columnDefs = columnDefs
+    )
+
+    rval.append(
+        tbl1   
+    )
+
+    npv_data, rev_ppv = result_provider.get_result('postproc_psa_single_metamodel_prob_positive_npv', mm.table_config, allow_stale = False)
+    if npv_data is None:
+        return 'missing'
+
+    pnpv = [
+        html.H2('Probability of positive NPV:'),
+        html.H3(
+            f'Undiscounted: {npv_data.loc['net_present_value_undiscounted','prob_pos_npv']:.1%}'
+        ),
+        html.H3(
+            f'Discounted: {npv_data.loc['net_present_value_discounted','prob_pos_npv']:.1%}'
+        ),
+    ]
+    rval.extend(pnpv)
+
+    result_provider.upsert_result('table_psa_metamodel', mm.table_config, html.Div(rval), mark_stale = any_stale)
+    
+    return 'ok'
+
+@register_table_getter(TABLE_SECTION, MODEL_TYPE)
+def _get_psa_metamodel_table(
+    active_project_id: str,
+    table_options: dict,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface
+):
+    #stat = table_options.get('statistic')
+    subindex = table_options['subindex']
+    plot_type = table_options.get('plot-type')
+
+    proj = project_provider.get_project(active_project_id)
+    mm = proj.get_focussed_metamodel()
+
+    match int(subindex):
+        case 1:
+            return None, None
+            # plot_type = psa.PSA_PLOT_TYPES[0] if plot_type is None else plot_type
+            # plot_funcs = psa.psa_plots.get(plot_type)
+            # if plot_funcs is None:
+            #     return None, None
+            # plot_kwargs = plot_funcs['arguments'](table_options)
+
+
+
+            # #Tornado!
+            # dsa_df, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config)
+            # #dsa_df, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config)
+            # if dsa_df is None:
+            #     return None, None
+            # index_vars = ['variable', 'statistic']
+            # if not set(dsa_df.index.names) == set(index_vars):
+            #     dsa_df = dsa_df.set_index(index_vars)
+
+            # label_df, _ = result_provider.get_result('postproc_dsa_single_metamodel_labels', mm.table_config)
+
+            # stat = 'net_present_value_undiscounted' if not stat else stat
+            # plot = tornado_plot(dsa_df, label_df, stat)
+            # return plot, rev
+        case _:
+            
+            table_name = 'table_psa_metamodel'
+
+            proj = project_provider.get_project(active_project_id)
+            mm = proj.get_focussed_metamodel()
+            return result_provider.get_result(table_name, mm.table_config, True)

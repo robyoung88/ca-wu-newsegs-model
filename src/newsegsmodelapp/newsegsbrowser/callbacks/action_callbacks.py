@@ -222,7 +222,9 @@ def add_action_callbacks(app: NewsegsDash):
         active_project_id,
     ):
         trigger_id = ctx.triggered_id
-        if trigger_id is None:
+        if trigger_id is None or len(ctx.triggered) > 1:
+            raise PreventUpdate
+        if not isinstance(trigger_id, str) and trigger_id['type'] == 'action-button' and callback_utils.get_triggered_value() == 0:
             raise PreventUpdate
 
         postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)

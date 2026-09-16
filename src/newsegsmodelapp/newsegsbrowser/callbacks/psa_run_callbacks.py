@@ -39,11 +39,11 @@ def add_psa_run_callbacks(app: NewsegsDash):
             }
         },
         inputs = {
-            'psa_run_button': {
+            'psa_run_button': Input({
                 'type': 'action-button', 'purpose': 'request-process',
                 'supersection': 'psa', 'section': 'run',
                 'key': 'psa_run_metamodel', 'subindex': ALL,
-            },
+            },'n_clicks'),
             'modal_close_button': {
                 'n_clicks': Input(
                     {'type': 'modal-close-button', 'page': ALL, 'key': 'psa-run-confirm'},
@@ -323,4 +323,175 @@ def add_psa_run_callbacks(app: NewsegsDash):
 
         rval['trigger']['value'] = [json.dumps(request.as_dict())]
 
+        return rval
+
+    ##################################################
+    # Totally different style for syncing psa figures - will update in future
+    ##################################################
+    @app.callback(
+        output = {
+            'plot_header' : {
+                'children': Output(
+                    {
+                        'type': 'result-figure-header', 'purpose': 'header',
+                        'supersection': 'psa', 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': 1
+                    },
+                    'children', allow_duplicate = True
+                )
+            },
+            'plot': {
+                'figures' : Output(
+                    {                    
+                        'type': 'result-figure', 'purpose': 'container',
+                        'supersection': 'psa', 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': 1,
+                    },
+                    'figure', allow_duplicate = True
+                )
+            },
+            'plot_container': {
+                'children' : Output(
+                    {'type': 'plot-container', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'children', allow_duplicate = True
+                )
+            }
+        },
+
+        inputs = {
+            'psa_table': {
+                'trigger': Input(
+                    {
+                        'type': 'postaction-trigger', 'purpose': 'trigger',
+                        'supersection': ALL, 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': ALL
+                    },
+                    'data'
+                ),
+            },
+            'graph_selection_dropdown': {
+                'values': Input(
+                    {
+                        'type': 'result-table-option', 'purpose': 'plot-type',
+                        'supersection': 'psa', 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': ALL
+                    },
+                    'value'
+                ),
+                'ids': State(
+                    {
+                        'type': 'result-table-option', 'purpose': 'plot-type',
+                        'supersection': 'psa', 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': ALL
+                    },
+                    'id'
+                )
+            },
+            'plot_controls': {
+                'values': Input(
+                    {'type': 'psa-graph-plot-control', 'page': ALL, 'key': ALL},
+                    'value'
+                ),
+                'ids': State(
+                    {'type': 'psa-graph-plot-control', 'page': ALL, 'key': ALL},
+                    'id'
+                ),
+            }
+        },
+
+        state = {
+            'plot_header': {
+                'ids': State(
+                    {
+                        'type': 'result-figure-header', 'purpose': 'header',
+                        'supersection': 'psa', 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': 1
+                    },
+                    'id'
+                )
+            },
+            'plot': {
+                'ids' : State(
+                    {                    
+                        'type': 'result-figure', 'purpose': 'container',
+                        'supersection': 'psa', 'section': 'tabledraw',
+                        'key': 'table_psa_metamodel', 'subindex': 1,
+                    },
+                    'id'
+                )
+            },
+            'plot_container': {
+                'ids' : State(
+                    {'type': 'plot-container', 'page': ALL, 'key': 'psa-primary-plot'},
+                    'id'
+                )
+            },
+            'active_project_id': State('active-project-id', 'data'),
+        },
+
+        prevent_initial_call = True
+    )
+    def sync_psa_primary_plot_to_store(
+        psa_table,
+        graph_selection_dropdown,
+        plot_controls,
+        plot_header,
+        plot,
+        plot_container,
+        active_project_id
+    ):
+        null_return = dict(
+            plot_header = dict(children = no_update),
+            plot = dict(figures = no_update),
+            plot_container = dict(children = [no_update] * len(plot_container['ids'])),
+        )
+        rval = null_return
+        if len(plot_container['ids']) == 0 or len(graph_selection_dropdown['values']) == 0:
+            raise PreventUpdate
+        
+        trig = ctx.triggered_id
+        if trig is None:
+            raise PreventUpdate
+        
+        proj = app.project_provider.get_project(active_project_id)
+        mm = proj.get_focussed_metamodel()
+
+        psa_raw_data, _ = app.results_provider.get_result('psa_single_metamodel', mm.table_config, False)
+        if psa_raw_data is None:
+            raise PreventUpdate
+        
+        graph_type = None
+        full_draw = False
+        if trig.get('purpose') == 'plot-type':
+            # Need to do a full graph refresh
+            full_draw = True
+            graph_type = callback_utils.get_triggered_value()
+        
+        if graph_type is None:
+            graph_type = graph_selection_dropdown['values'][0]
+        
+        graph_drawn_indicator_key = 'psa-primary-plot-'+graph_type+'-ii'
+        if not full_draw:
+            graph_is_drawn = False
+            for id in plot_controls['ids']:
+                if id.get('key') == graph_drawn_indicator_key:
+                    graph_is_drawn = True
+            
+                
+            full_draw = not graph_is_drawn
+        
+        plot_funcs = psa.psa_plots.get(graph_type)
+        if plot_funcs is None:
+            raise ValueError(f'Plot functions not found for graph_type {graph_type}')
+    
+        plot_kwargs = plot_funcs['arguments'](plot_controls)
+    
+        if full_draw:
+            rval['plot_header']['children'] = plot_funcs['controls'](plot_header['ids']['subindex'])
+            
+            rval['plot']['figures'] = plot_funcs['draw'](psa_raw_data, **plot_kwargs)
+    
+        else:
+            rval['plot']['figures'] = plot_funcs['update'](psa_raw_data, **plot_kwargs)
+    
         return rval

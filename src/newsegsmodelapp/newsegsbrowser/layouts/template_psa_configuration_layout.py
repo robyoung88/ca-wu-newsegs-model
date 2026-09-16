@@ -108,7 +108,16 @@ def create_psa_layout(*args, **kwargs):
                             html.H2("PSA Results Table"),
                             html.Div(
                                 'No PSA Run',
-                                id = {'type': 'result-table-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-results-table'},
+                                id = {
+                                    'type': 'result-table', 'purpose': 'container',
+                                    'supersection': 'psa', 'section': 'tabledraw',
+                                    'key': 'table_psa_metamodel', 'subindex': 0,
+                                }
+                                # id = {
+                                #     'type': 'result-table-container', 
+                                #     'page': kwargs.get('page_type', 'None'), 
+                                #     'key': 'psa-results-table'
+                                # },
                             )
                         ],
                         width = 12
@@ -120,19 +129,32 @@ def create_psa_layout(*args, **kwargs):
                                 dcc.Dropdown(
                                     options = psa.PSA_PLOT_TYPES,
                                     value = psa.PSA_PLOT_TYPES[0],
-                                    id = {'type': 'psa-graph-selection-dropdown', 'page': kwargs.get('page-type', 'None'), 'key': 'psa-primary-plot'},
+                                    id = {
+                                        'type': 'result-table-option', 'purpose': 'plot-type',
+                                        'supersection': 'psa', 'section': 'tabledraw',
+                                        'key': 'table_psa_metamodel', 'subindex': 0
+                                    },
                                     searchable = False,
                                     clearable = False,
                                 )
                             ]),
                             html.Div(
                                 html.H2(""),
-                                id = {'type': 'plot-header-container', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-primary-plot'}
+                                id = {
+                                    'type': 'result-figure-header', 'purpose': 'header',
+                                    'supersection': 'psa', 'section': 'tabledraw',
+                                    'key': 'table_psa_metamodel', 'subindex': 1
+                                },
                             ),
                             
                             html.Div(
                                 dcc.Graph(
-                                    id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-primary-plot'},
+                                    id = {
+                                        'type': 'result-figure', 'purpose': 'container',
+                                        'supersection': 'psa', 'section': 'tabledraw',
+                                        'key': 'table_psa_metamodel', 'subindex': 1,
+                                    },
+                                    #id = {'type': 'plot', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-primary-plot'},
                                     style= {
                                         'height': '590px',
                                         'border': '1px solid #dee2e6',

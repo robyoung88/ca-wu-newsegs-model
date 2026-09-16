@@ -2,7 +2,7 @@ from dataclasses import asdict
 import json
 from typing import Callable, cast
 
-from newsegsmodelapp.newsegsbrowser.postprocess import post_dsa_results
+from newsegsmodelapp.newsegsbrowser.postprocess import post_dsa_results, post_psa_results
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_consumption_results import consumption_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_finance_benefits_results import finance_benefits_results_to_interface_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.post_sprake_finance_costs_results import finance_costs_results_to_interface_sprake
@@ -467,5 +467,46 @@ def _dsa_to_interface(
 
     result_provider.upsert_result('postproc_dsa_single_metamodel_data', mm.table_config, res_table, mark_stale = any_stale)
     result_provider.upsert_result('postproc_dsa_single_metamodel_labels', mm.table_config, label_table, mark_stale = any_stale)
+
+    return 'ok'
+
+# -----------------------------------------------
+# DSA
+# -----------------------------------------------
+
+POSTPROCESS_TYPE = 'postproc_psa_metamodel'
+_request_postprocess_psa_metamodel = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['psa_run_metamodel'])
+def _psa_to_interface(
+    request: PostprocessRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    proj = project_provider.get_project(request.project_id)
+        
+    run_config = json.loads(request.payload)
+    mm_id = run_config.get('metamodel_id')
+    if not mm_id:
+        raise ValueError('Metamodel ID not provided for single run.')
+    mm = proj.get_metamodel_by_id(mm_id)
+
+    # Check if result exists
+    exist_res, exist_rev = result_provider.get_result('postproc_psa_single_metamodel_data', mm.table_config, False)
+    if exist_res is not None:
+        return 'ok'
+
+    psa_results, rev = result_provider.get_result('psa_single_metamodel', mm.table_config, True)
+    if psa_results is None:
+        return 'missing'
+    any_stale = rev != mm.table_config.revision
+
+    res_table, ppv = post_psa_results.psa_results_to_tables(psa_results)
+
+    result_provider.upsert_result('postproc_psa_single_metamodel_data', mm.table_config, res_table, mark_stale = any_stale)
+    result_provider.upsert_result('postproc_psa_single_metamodel_prob_positive_npv', mm.table_config, ppv, mark_stale = any_stale)
 
     return 'ok'

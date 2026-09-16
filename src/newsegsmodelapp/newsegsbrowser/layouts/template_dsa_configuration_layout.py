@@ -19,6 +19,7 @@ from newsegsmodelframework.newsegssensitivity import optim
 
 from newsegsmodelapp.components import  results_header
 from newsegsmodelapp.components.optim_process_components import optim_process_components
+from newsegsmodelframework.newsegssensitivity import common as sensitivity
 
 def create_dsa_header():
     return html.Div([
@@ -173,6 +174,21 @@ def create_dsa_layout(*args, **kwargs):
         html.Div([
             dcc.Loading([
                 config_dict['layout_results_header'](**kwargs),
+                dbc.Row([
+                    dcc.Dropdown(
+                        options = [
+                            {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
+                        ],
+                        value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
+                        id = {
+                            'type': 'result-table-option', 'purpose': 'statistic',
+                            'supersection': 'dsa', 'section': 'tabledraw',
+                            'key': 'table_dsa_metamodel', 'subindex': 0
+                        },
+                        searchable = False,
+                        clearable = False,
+                    )
+                ]), # pyright: ignore[reportCallIssue]
             
                 html.Div([
                     dbc.Col(

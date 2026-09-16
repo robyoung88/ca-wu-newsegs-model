@@ -211,21 +211,7 @@ def create_results_header_dsa(**kwargs):
                             className = 'results-header-button-container'
                         )
                     ]), # pyright: ignore[reportCallIssue]
-                    dbc.Row([
-                        dcc.Dropdown(
-                            options = [
-                                {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
-                            ],
-                            value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
-                            id = {
-                                'type': 'result-table-option', 'purpose': 'statistic',
-                                'supersection': 'dsa', 'section': 'tabledraw',
-                                'key': 'table_dsa_metamodel', 'subindex': 0
-                            },
-                            searchable = False,
-                            clearable = False,
-                        )
-                    ]) # pyright: ignore[reportCallIssue]
+                    
                 ]), # pyright: ignore[reportCallIssue]
             className = 'drawer-title',
             )
