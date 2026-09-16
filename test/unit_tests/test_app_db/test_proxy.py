@@ -119,7 +119,7 @@ class TestProxy(unittest.TestCase):
         proj_provider.add_component(proj)
 
         request_creator = registers.RUN_REQUEST_REGISTER['deterministic_run_metamodel']
-        request = request_creator(proj, db.get_engine())
+        request = request_creator(proj.id, proj_provider)
 
         prox_resp = self.send_to_dispatcher(request)
         self.assertEqual(prox_resp.get('status'), 'started')
