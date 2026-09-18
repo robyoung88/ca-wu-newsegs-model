@@ -559,6 +559,15 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
         ...
 
+    @abstractmethod
+    def set_component_metadata(
+        self,
+        component_id: str,
+        metadata_id: str,
+        metadata_value: Any
+    ):
+        """Directly set a field in the table. Use with caution!"""
+
 
 class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
     """Interface for saving components to persistent storage (in order that they may be accessed by other providers)"""

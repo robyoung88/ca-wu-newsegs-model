@@ -38,7 +38,10 @@ class FromDatabaseNewsegsComponentProvider(
         )
 
     def _assign_updated_child_uids(self, obj, row):
-        """Given the row for the component, get the live ids for each of the child components."""
+        """Given the row for the component, get the live ids for each of the child components.
+        
+        Also take the opportunity to update any metadata that may have changed."""
+        obj.name = row._mapping['label']
         return obj
 
     def _reattach_children(self, obj):
@@ -394,6 +397,28 @@ class FromDatabaseNewsegsComponentProvider(
             return mapped_data.get(component_id[0], {})
 
         return mapped_data
+
+    @override
+    def set_component_metadata(
+        self, 
+        component_id: str, 
+        metadata_id: str, 
+        metadata_value: Any
+    ):
+        
+        pk_col = list(self._table.primary_key.columns)[0]
+        update_col = self._table.c[metadata_id]
+
+        stmt = (
+            sa.update(self._table)
+            .where(pk_col == component_id)
+            .values(**{update_col.name: metadata_value})
+        )
+
+        with self._get_engine().begin() as conn:
+            conn.execute(stmt)
+
+        return
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
     def __init__(self, get_engine: Callable[[], sa.Engine]):
@@ -1189,13 +1214,30 @@ class FromDatabaseNewsegsProjectProvider(
 
     @override
     def list_project_snapshots(self, project_id: str) -> pd.DataFrame:
-        stmt = sa.select(
-            tbls.snapshots.c.snapshot_id,
-            tbls.snapshots.c.label,
-            tbls.snapshots.c.created_at
+        stmt = (
+            sa.select(
+                tbls.snapshots.c.snapshot_id,
+                tbls.snapshots.c.label,
+                tbls.snapshots.c.created_at
+            )
+            .where(tbls.snapshots.c.project_id == project_id)
         )
         with self._get_engine().connect() as conn:
             return pd.read_sql(stmt, conn)
+
+    def rename_snapshot(
+        self,
+        snapshot_id: int,
+        snapshot_name: str
+    ):
+        stmt = (
+            sa.update(tbls.snapshots)
+            .where(tbls.snapshots.c.snapshot_id == snapshot_id)
+            .values(label = snapshot_name)
+        )
+
+        with self._get_engine().begin() as conn:
+            conn.execute(stmt)
 
     @override
     def _delete_one_component(
@@ -1306,7 +1348,10 @@ class FromDatabaseNewsegsProjectProvider(
             snapshot_id
         )
         new_project_id = id_remap['projects'][project_id]
-        return self.get_component(new_project_id)
+        return self.get_project(new_project_id)
+
+    def delete_project_snapshot(self, project_id: str, snapshot_id: int):
+        db_snapshot.delete_snapshot(self._get_engine(), tbls.metadata, snapshot_id)
 
     @override
     def list_project_metamodel_ids(self, project_id: str) -> tuple[str, ...]:

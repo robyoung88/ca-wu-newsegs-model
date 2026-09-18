@@ -147,7 +147,7 @@ def _find_output_locations(
             if new_locs:
                 return_locs.append([k, new_locs])
     elif isinstance(search_object, dict):
-        if search_object['property'] != property:
+        if not(str(search_object['property']).startswith(property)):
             return []
         obj_id = search_object['id']
         if type(obj_id) != type(id):
@@ -177,14 +177,14 @@ def _update_these_elements(element_index, update_value, return_value):
                 val, update_value, return_value[key]
             )
 
-def update_return_by_id(
+def update_property_by_id(
     id: str|dict,
     property: str,
     update_value: Any,
-    return_value: Any | None
+    out: Any | None
 ) -> Any:
-    if not return_value:
-        return_value = create_noupdate_return()
+    if not out:
+        out = create_noupdate_return()
 
     if ctx.using_outputs_grouping:
         locations_to_update = _find_output_locations(id, property, ctx.outputs_grouping)
@@ -192,8 +192,8 @@ def update_return_by_id(
         locations_to_update = _find_output_locations(id, property, ctx.outputs_list)
 
     if not locations_to_update:
-        return return_value
+        return out
 
-    _update_these_elements(locations_to_update, update_value, return_value)
+    _update_these_elements(locations_to_update, update_value, out)
         
-    return return_value
+    return out

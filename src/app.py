@@ -35,7 +35,7 @@ from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseN
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser.callbacks import model_selection_callbacks
 
-from newsegsmodelapp.components import project_selector_v2 as project_selector
+from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.input_container_callbacks import add_input_container_callbacks

@@ -276,6 +276,40 @@ def generic_restore_snapshot(
             id_remap[k[0]].update({k[1]: v})
     return id_remap
 
+def delete_snapshot(
+    engine: sa.Engine,
+    metadata: sa.MetaData,
+    snapshot_id: int,
+) -> int:
+    """
+    Deletes a snapshot its associated data across all snapshot_* 
+    tables.
+    
+    Returns:
+        int: The number of master snapshot records deleted.
+    """
+    snapshots_table = metadata.tables.get('snapshots')
+    if snapshots_table is None:
+        raise ValueError("The 'snapshots' table is not present in metadata.")
+
+    with engine.begin() as conn:
+        # Iterate through sorted_tables in reverse order (bottom-up: children before parents)
+        # to respect Foreign Key constraints when deleting from child/junction snapshot tables.
+        for table in reversed(metadata.sorted_tables):
+            if table.name.startswith("snapshot_") and "snapshot_id" in table.c:
+                conn.execute(
+                    table.delete().where(table.c.snapshot_id == snapshot_id)
+                )
+
+        # 3. Delete the parent records in the master 'snapshots' table
+        result = conn.execute(
+            snapshots_table.delete().where(
+                snapshots_table.c.snapshot_id == snapshot_id
+            )
+        )
+
+    return result.rowcount
+
 def delete_snapshots_for_project(
     engine: sa.Engine,
     metadata: sa.MetaData,

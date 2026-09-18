@@ -1,15 +1,18 @@
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import dash
 from dash import ALL, Input, Output, State, dcc, html, ctx
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
+import numpy as np
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
 # -----------------------------------------------
@@ -29,7 +32,7 @@ def fetch_project_options(
             'value' : str(all_projects['id'][i]),
             'label': f'{all_projects['label'][i]} [created: {all_projects['created_at'][i]}]'
         } 
-        for i in range(len(all_projects['id']))
+        for i in range(len(all_projects['id'])-1, -1, -1)
     ]
 
 def fetch_snapshot_options(
@@ -47,6 +50,118 @@ def fetch_snapshot_options(
         }
         for i in range(len(all_snapshots['snapshot_id']))
     ]
+
+def rename_project(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str,
+    project_name: str,
+):
+    project_provider.set_component_metadata(
+        project_id,
+        'label',
+        project_name,
+    )
+
+def create_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str,
+    snapshot_name: str,
+) -> int:
+    return project_provider.create_project_snapshot(
+        project_id, snapshot_name
+    )
+
+def verify_project_exists(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str
+) -> bool:
+    try:
+        label = project_provider.get_component_metadata(
+            project_id, 'label'
+        )
+    except Exception as e:
+        print(f'Failed to retrieve project {project_id} - {e}')
+        return False
+    return label is not None
+
+def load_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    current_project_id: str,
+    snapshot_id: str
+) -> str | None:
+    int_snapshot_id = int(snapshot_id)
+    all_snapshots = project_provider.list_project_snapshots(current_project_id)
+    if not np.any(all_snapshots['snapshot_id'] == int_snapshot_id):
+        return None
+    snapshot_label = all_snapshots.loc[all_snapshots['snapshot_id']==int_snapshot_id,'label'].iloc[0]
+    new_proj = project_provider.load_project_snapshot(
+        current_project_id, int_snapshot_id
+    )
+    rename_project(project_provider, new_proj.id, f'{new_proj.name} from {snapshot_label}')
+    return new_proj.id
+
+def new_project(
+    project_provider: NewsegsProjectProviderInterface,
+    model_type: str
+) -> str:
+    from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+                    
+    factory = PROJECT_FACTORIES.get(model_type, PROJECT_FACTORIES['default'])
+
+    proj = factory()
+    project_provider.upsert_component(proj)
+    return proj.id
+
+def duplicate_project(
+    project_provider: NewsegsProjectProviderInterface,
+    current_project_id: str,
+) -> str:
+    new_proj = cast(
+        NewsegsProject, 
+        project_provider.duplicate_component(current_project_id)
+    )
+    project_provider.upsert_component(new_proj)
+    rename_project(
+        project_provider,
+        new_proj.id,
+        new_proj.name + ' - Copy'
+    )
+    return new_proj.id
+
+def rename_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    snapshot_id: str,
+    snapshot_name: str,
+):
+    if not isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
+        return
+    project_provider.rename_snapshot(int(snapshot_id), snapshot_name)
+
+def delete_project(
+    project_provider: NewsegsProjectProviderInterface,
+    delete_project_id: str,
+    active_project_id: str,
+    model_type: str,
+) -> str | None:
+    returned = project_provider.delete_component(delete_project_id)
+    if returned:
+        raise ValueError('Project could not be deleted')
+    if delete_project_id != active_project_id:
+        return active_project_id
+
+    proj_options = fetch_project_options(project_provider, model_type)
+    if proj_options:
+        return proj_options[0].get('value')
+
+    return None
+
+def delete_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str,
+    delete_snapshot_id: str
+):
+    int_dsi = int(delete_snapshot_id)
+    project_provider.delete_project_snapshot(project_id, int_dsi)
 
 # -----------------------------------------------
 # Layout component
@@ -211,7 +326,6 @@ def create_project_selector(**kwargs):
                     dbc.Button(
                         [DashIconify(icon="bi:box-arrow-in-right", className="me-1"), "Load"],
                         id = {'type': 'action-button-ps', 'key': 'load-snapshot'},
-                        #id="btn-load-snapshot",
                         color="info",
                         size="sm",
                         disabled=True,
@@ -231,7 +345,6 @@ def create_project_selector(**kwargs):
                         dbc.Button(
                             [DashIconify(icon="bi:file-earmark-plus", className="me-1"), "Fresh Project"],
                             id = {'type': 'action-button-ps', 'key': 'new-project'},
-                            #id="btn-new-project",
                             color="success",
                             size="sm",
                             class_name = ACTION_BUTTON_CLASSNAME,
@@ -242,7 +355,6 @@ def create_project_selector(**kwargs):
                         dbc.Button(
                             [DashIconify(icon="bi:copy", className="me-1"), "Duplicate Project"],
                             id = {'type': 'action-button-ps', 'key': 'duplicate-project'},
-                            #id="btn-duplicate-project",
                             color="primary",
                             size="sm",
                             outline=True,
@@ -253,7 +365,6 @@ def create_project_selector(**kwargs):
                         dbc.Button(
                             [DashIconify(icon="bi:trash", className="me-1"), "Delete Project"],
                             id = {'type': 'action-button-ps', 'key': 'delete-project'},
-                            #id="btn-delete-project",
                             color="danger",
                             size="sm",
                             outline=True,
@@ -288,7 +399,6 @@ def create_project_selector(**kwargs):
                         dbc.Button(
                             [DashIconify(icon="bi:trash", className="me-1"), "Delete Snapshot"],
                             id = {'type': 'action-button-ps', 'key': 'delete-snapshot'},
-                            #id="btn-delete-snapshot",
                             color="danger",
                             size="sm",
                             outline=True,
@@ -365,13 +475,13 @@ def add_project_selector_callbacks(app: NewsegsDash):
 
     def _disable_project_load_buttons(state: bool, rval):
         # As no project selected, disable the load and delete buttons
-        callback_utils.update_return_by_id(
+        callback_utils.update_property_by_id(
             {'type': 'action-button-ps', 'key': 'load-project'},
             'disabled',
             state,
             rval
         )
-        callback_utils.update_return_by_id(
+        callback_utils.update_property_by_id(
             {'type': 'action-button-ps', 'key': 'delete-project'},
             'disabled',
             state,
@@ -379,27 +489,29 @@ def add_project_selector_callbacks(app: NewsegsDash):
         )
 
     def _disable_project_rename_button(state: bool, rval):
-        callback_utils.update_return_by_id(
+        callback_utils.update_property_by_id(
                 {'type': 'action-button-ps', 'key': 'rename-project'},
                 'disabled',
                 state,
                 rval
             )
 
-    def _disable_snapshot_load_buttons(state: bool, rval):
-        callback_utils.update_return_by_id(
-            {'type': 'action-button-ps', 'key': 'load-snapshot'},
-            'disabled',
-            state,
-            rval
-        )
-        callback_utils.update_return_by_id(
+    def _disable_snapshot_rename_button(state: bool, rval):
+        callback_utils.update_property_by_id(
             {'type': 'action-button-ps', 'key': 'rename-snapshot'},
             'disabled',
             state,
             rval
         )
-        callback_utils.update_return_by_id(
+
+    def _disable_snapshot_load_buttons(state: bool, rval):
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'load-snapshot'},
+            'disabled',
+            state,
+            rval
+        )
+        callback_utils.update_property_by_id(
             {'type': 'action-button-ps', 'key': 'delete-snapshot'},
             'disabled',
             state,
@@ -407,7 +519,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
         )
 
     def _disable_snapshot_create_button(state: bool, rval):
-        callback_utils.update_return_by_id(
+        callback_utils.update_property_by_id(
             {'type': 'action-button-ps', 'key': 'create-snapshot'},
             'disabled',
             state,
@@ -474,6 +586,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
             # Also clear the name input
             rval['input_snapshot_name']['value'] = None
             _disable_snapshot_create_button(True, rval)
+            _disable_snapshot_rename_button(True, rval)
             
         if isinstance(triggered_id, str) and triggered_id in set(('active-project-id', 'app-state')):
             # Update project selector
@@ -499,6 +612,8 @@ def add_project_selector_callbacks(app: NewsegsDash):
                 case 'select-load-snapshot':
                     snapshot_nominated = select_snapshot is not None
                     _disable_snapshot_load_buttons(not(snapshot_nominated), rval)
+                    new_snapshot_name = input_snapshot_name is not None and input_snapshot_name != ''
+                    _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
 
                 case 'input-project-name':
                     new_project_name = input_project_name
@@ -507,6 +622,8 @@ def add_project_selector_callbacks(app: NewsegsDash):
                 case 'input-snapshot-name':
                     new_snapshot_name = input_snapshot_name
                     _disable_snapshot_create_button((new_snapshot_name is None or not new_snapshot_name), rval)
+                    snapshot_nominated = select_snapshot is not None
+                    _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
 
         return rval
 
@@ -521,11 +638,19 @@ def add_project_selector_callbacks(app: NewsegsDash):
         inputs = dict(
             buttons = dict(
                 n_clicks = Input({'type': 'action-button-ps', 'key': ALL}, 'n_clicks')
-            )
+            ),
+            delete_project_confirm = Input('delete-project-confirm-dialog', 'submit_n_clicks'),
+            delete_snapshot_confirm = Input('delete-snapshot-confirm-dialog', 'submit_n_clicks'),
         ),
 
         state = dict(
-            active_project_id = State('active_project_id', 'data')
+            active_project_id = State('active-project-id', 'data'),
+            session_id = State('session-id', 'data'),
+            app_state = State('app-state', 'data'),
+            input_project_name = State('input-project-name', 'value'),
+            input_snapshot_name = State('input-snapshot-name', 'value'),
+            select_project = State('select-load-project', 'value'),
+            select_snapshot = State('select-load-snapshot', 'value'),
         ),
         prevent_initial_call = True
     )
@@ -533,37 +658,218 @@ def add_project_selector_callbacks(app: NewsegsDash):
         active_project_id,
         **kwargs 
     ):
-        triggered = ctx.triggered_id
         trig_val = callback_utils.get_triggered_value()
         if not trig_val:
             raise PreventUpdate
-        
-        raise PreventUpdate
 
-    @app.callback(
-        Output({'type': 'action-button-ps', 'key': ALL}, 'style'),
-        Input({'type': 'action-button-ps', 'key': ALL}, 'n_clicks'),
-        prevent_initial_call = True
-    )
-    def single_output_list(n_clicks):
-        context = ctx
-        outputs = ctx.outputs_grouping
-        olist = ctx.outputs_list
+        triggered = cast(dict, ctx.triggered_id)
+
+        app_state = kwargs.get('app_state')
+        app_state = json.loads(app_state) if app_state else {}
 
         rval = callback_utils.create_noupdate_return()
+
+        if isinstance(triggered, str):
+            match triggered:
+                case 'delete-project-confirm-dialog':
+                    project_id = kwargs['select_project']
+                    if project_id is not None:
+                        print (f'Deleting project {project_id}')
+                        try:
+                            active_project_id = delete_project(
+                                app.project_provider,
+                                project_id,
+                                active_project_id,
+                                app_state.get('selected_model', 'default')
+                            )
+                        except Exception as e:
+                            print(f'Could not delete project {project_id}: {e}')
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            active_project_id,
+                            rval
+                        )
+
+                case 'delete-snapshot-confirm-dialog':
+                    snapshot_id = kwargs['select_snapshot']
+                    if snapshot_id is not None:
+                        print (f'Deleting snapshot {snapshot_id}')
+                        delete_snapshot(
+                            app.project_provider,
+                            active_project_id,
+                            snapshot_id
+                        )
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            active_project_id,
+                            rval
+                        )
+                case _:
+                    print (f'Unknown trigger: {triggered}')
+
+            return rval
+
+        match triggered['key']:
+
+            case 'rename-project':
+                new_name = kwargs['input_project_name']
+                if new_name is not None:
+                    rename_project(
+                        app.project_provider,
+                        active_project_id,
+                        new_name.strip()
+                    )
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        active_project_id,
+                        rval
+                    )
+
+            case 'create-snapshot':
+                snapshot_name = kwargs['input_snapshot_name']
+                if snapshot_name is not None:
+                    s_id = create_snapshot(
+                        app.project_provider,
+                        active_project_id,
+                        snapshot_name.strip()
+                    )
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        active_project_id,
+                        rval
+                    )
+
+            case 'load-project':
+                project_id = kwargs['select_project']
+                if project_id is not None:
+                    can_load = verify_project_exists(
+                        app.project_provider, project_id
+                    )
+                    if can_load:
+                        if kwargs['session_id']:
+                            app.project_provider.set_session_project_id(
+                                kwargs['session_id'],
+                                project_id
+                            )
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            project_id,
+                            rval
+                        )
+
+
+            case 'load-snapshot':
+                snapshot_id = kwargs['select_snapshot']
+                if snapshot_id is not None:
+                    created_project_id = load_snapshot(
+                        app.project_provider,
+                        active_project_id,
+                        snapshot_id
+                    )
+                    if created_project_id is not None:
+                        if kwargs['session_id']:
+                            app.project_provider.set_session_project_id(
+                                kwargs['session_id'],
+                                created_project_id
+                            )
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            created_project_id,
+                            rval
+                        )
+
+            case 'new-project':
+                model_type = app_state.get('selected_model', 'default')
+                created_project_id = new_project(
+                    app.project_provider,
+                    model_type
+                )
+                if created_project_id is not None:
+                    if kwargs['session_id']:
+                        app.project_provider.set_session_project_id(
+                            kwargs['session_id'],
+                            created_project_id
+                        )
+
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        created_project_id,
+                        rval
+                    )
+                
+            case 'duplicate-project':
+                created_project_id = duplicate_project(
+                    app.project_provider,
+                    active_project_id
+                )
+                if created_project_id is not None:
+                    if kwargs['session_id']:
+                        app.project_provider.set_session_project_id(
+                            kwargs['session_id'],
+                            created_project_id
+                        )
+
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        created_project_id,
+                        rval
+                    )
+
+            case 'delete-project':
+                # Launches confirm via another callback.
+                pass
+
+            case 'rename-snapshot':
+                new_name = kwargs['input_snapshot_name']
+                snapshot_id = kwargs['select_snapshot']
+                if new_name is not None and snapshot_id is not None:
+                    rename_snapshot(app.project_provider, snapshot_id, new_name)
+
+                callback_utils.update_property_by_id(
+                    'active-project-id',
+                    'data',
+                    active_project_id,
+                    rval
+                )
+
+            case 'delete-snapshot':
+                # Launches confirm via another callback.
+                pass
+
+            case _:
+                print(f'Unknown trigger: {triggered}')
+        
         return rval
 
     @app.callback(
-        Output({'type': 'action-button-nonexistent', 'key': ALL}, 'style'),
-        Input({'type': 'action-button-ps', 'key': ALL}, 'n_clicks'),
-        prevent_initial_call = True
+        Output("delete-project-confirm-dialog", "displayed"),
+        Input({'type': 'action-button-ps', 'key': 'delete-project'}, 'n_clicks'),
+        prevent_initial_call=True,
     )
-    def single_output_missing(n_clicks):
-        context = ctx
-        outputs = ctx.outputs_grouping
-        olist = ctx.outputs_list
+    def display_delete_project_confirm(n_clicks):
+        if n_clicks:
+            return True
+        return False
 
-        rval = callback_utils.create_noupdate_return()
-        return rval
-        
-        raise PreventUpdate
+    @app.callback(
+        Output("delete-snapshot-confirm-dialog", "displayed"),
+        Input({'type': 'action-button-ps', 'key': 'delete-snapshot'}, 'n_clicks'),
+        prevent_initial_call=True,
+    )
+    def display_delete_snapshot_confirm(n_clicks):
+        if n_clicks:
+            return True
+        return False
+    

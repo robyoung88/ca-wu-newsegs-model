@@ -60,6 +60,10 @@ class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
     def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
         """Recover a snapshot of the project state."""
 
+    @abstractmethod
+    def delete_project_snapshot(self, project_id: str, snapshot_id: int):
+        """Delete a specific snapshot"""
+
     def get_project(self, project_id: str) -> NewsegsProject:
         return cast(NewsegsProject, self.get_component(project_id))
 
