@@ -291,9 +291,6 @@ def create_dsa_layout(*args, **kwargs):
             ] 
             + results_section
             + clayouts.user_action_components()
-            + clayouts.model_run_components(**kwargs)
-            + clayouts.finance_run_components(**kwargs)
-            + clayouts.metamodel_process_components()
             + dsa_process_components(**kwargs)
             + background_callback_error_handler_components()
             + create_post_page_load_components(

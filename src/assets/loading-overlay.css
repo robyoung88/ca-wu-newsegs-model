@@ -1,0 +1,69 @@
+/* Container must establish a stacking context and relative bounds */
+.results-container {
+    position: relative;
+    min-height: 200px;
+}
+
+/* 1. The Content Wrapper: Blurs and disables pointer events when calculating */
+.results-content {
+    transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+.results-container[data-status="CALCULATING"] .results-content {
+    filter: blur(4px);
+    opacity: 0.6;
+    /* Prevents users from clicking or highlighting staled result controls */
+    pointer-events: none; 
+    user-select: none;
+}
+
+/* 2. The Spinner Overlay: Hidden by default, centered over content when calculating */
+.results-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    
+    /* Center spinner over content */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    
+    /* Invisible and non-interactive by default */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 10;
+}
+
+/* Style for feedback text */
+.results-overlay p {
+    margin-top: 12px;
+    font-weight: bold;
+}
+
+/* Show overlay during calculating state */
+.results-container[data-status="CALCULATING"] .results-overlay {
+    opacity: 1;
+    visibility: visible;
+    /* Traps all clicks and hover events over the blurred area */
+    pointer-events: auto; 
+}
+
+/* CSS-only Loading Spinner */
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #e2e8f0;
+    border-top: 5px solid #2b6cb0; /* Accent color matching architecture palette */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

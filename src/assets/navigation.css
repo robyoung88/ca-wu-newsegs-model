@@ -1,0 +1,22 @@
+div.newsegs-navbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: auto;
+    border-color: #ccc;
+    border-radius: 10px;
+    border-style: solid;
+    border-width: 1px;
+}
+
+.newsegs-project-selector .action-button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+}
+.newsegs-project-selector .toggle-controls {
+    align-self: end;
+}
+
+.newsegs-project-selector .header {
+    width: 100%;
+}

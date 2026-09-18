@@ -24,11 +24,11 @@
 }
 
 .newsegs-navbar-vertical .btn-block {
-    display: block;
+    display: inline-block;
 }
 
-.newsegs-navbar-vertical > div{
-    display: inline-block;
+.newsegs-navbar-vertical {
+    display: inline;
     border-color: #ccc;
     border-radius: 10px;
     border-style: solid;

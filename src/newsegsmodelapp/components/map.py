@@ -302,5 +302,3 @@ def add_site_selector_callbacks(app: NewsegsDash):
 
     add_remove_confirm_popup(app)
     add_site_change_callback(app)
-    
-    return app

@@ -35,7 +35,7 @@ from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseN
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.newsegsbrowser.callbacks import model_selection_callbacks
 
-from newsegsmodelapp.components import project_selector
+from newsegsmodelapp.components import project_selector_v2 as project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks.input_container_callbacks import add_input_container_callbacks
@@ -115,7 +115,7 @@ def serve_layout():
 # Navigation
 # -----------------------------------------------
 
-def add_display_callbacks(app: NewsegsDash) -> NewsegsDash:
+def add_display_callbacks(app: NewsegsDash):
     """
     Attach callbacks for multi-page handling to app
     """
@@ -146,17 +146,21 @@ def add_display_callbacks(app: NewsegsDash) -> NewsegsDash:
         # content will be permanently blank until we navigate.
         #if current_page == pathname:
         #    raise PreventUpdate
+        app_state_hold = app_state.copy()
+
+        def return_app_state(app_state):
+            if app_state == app_state_hold:
+                return no_update
+            return json.dumps(app_state)
 
         app_state['current_page'] = pathname
         app_state['session_id'] = session_id # Layout functions should not be reliant on having access to session_id, but it might cut down on some redundant draws.
 
-        rval = [no_update, json.dumps(app_state)]
         if pathname in (
             '/',
             '/model_selection'
         ):
-            rval[0] = model_selection_layout.model_selection_layout
-            return tuple(rval)
+            return model_selection_layout.model_selection_layout, return_app_state(app_state)
 
         splitname = str(pathname).lstrip('/').split("/")
         selected_model = splitname[0]
@@ -165,7 +169,7 @@ def add_display_callbacks(app: NewsegsDash) -> NewsegsDash:
             return model_selection_layout.model_selection_layout
 
         app_state['selected_model'] = selected_model
-        rval = [no_update, json.dumps(app_state)]
+        rval = [no_update, return_app_state(app_state)]
         pagename = '/'.join(splitname[1:])
 
         layout_function = PAGE_LAYOUT_REGISTER.get(pagename)
@@ -196,9 +200,6 @@ def add_display_callbacks(app: NewsegsDash) -> NewsegsDash:
         )
         print (f'Project {proj_id} has been found for session {session_id}')
         return proj_id
-        
-
-    return app
 
 # -----------------------------------------------
 # Create App
@@ -240,19 +241,19 @@ def create_app(external_stylesheets = None) -> Dash:
     ])
 
     # Bind callbacks
-    app = add_display_callbacks(app)
-    app = add_post_page_load_callbacks(app)
-    app = add_input_container_callbacks(app)
-    app = model_selection_callbacks.assign_callbacks(app)
-    app = project_selector.add_project_selector_callbacks(app)
-    app = map.add_site_selector_callbacks(app)
-    add_configuration_selector_callbacks(app)
-    add_action_callbacks(app)
-    add_result_container_callbacks(app)
-    add_result_timeseries_callbacks(app)
-    add_dsa_run_callbacks(app)
-    add_optim_run_callbacks(app)
-    add_psa_run_callbacks(app)
+    add_display_callbacks(app)
+    # add_post_page_load_callbacks(app)
+    # add_input_container_callbacks(app)
+    # model_selection_callbacks.assign_callbacks(app)
+    project_selector.add_project_selector_callbacks(app)
+    # map.add_site_selector_callbacks(app)
+    # add_configuration_selector_callbacks(app)
+    # add_action_callbacks(app)
+    # add_result_container_callbacks(app)
+    # add_result_timeseries_callbacks(app)
+    # add_dsa_run_callbacks(app)
+    # add_optim_run_callbacks(app)
+    # add_psa_run_callbacks(app)
 
     return app
 
@@ -262,10 +263,10 @@ def create_app(external_stylesheets = None) -> Dash:
 
 if __name__ == '__main__':
     app = create_app()
-    try:
-        app.run(debug = True, use_reloader=False)
-    except SystemExit as e:
-        print(f"Caught SystemExit with code: {e.code}")
-        import traceback
-        traceback.print_stack()
+    #try:
+    app.run(debug = True, use_reloader = False)
+    # except SystemExit as e:
+    #     print(f"Caught SystemExit with code: {e.code}")
+    #     import traceback
+    #     traceback.print_stack()
         

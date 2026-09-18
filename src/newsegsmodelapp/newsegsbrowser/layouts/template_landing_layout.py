@@ -82,9 +82,6 @@ def create_landing_layout(*args, **kwargs):
         ]
         + background_callback_error_handler_components()
         + clayouts.user_action_components()
-        + clayouts.model_run_components(**kwargs)
-        + clayouts.finance_run_components(**kwargs)
-        + clayouts.metamodel_process_components()
     )
 
 @register_page_layout('landing')

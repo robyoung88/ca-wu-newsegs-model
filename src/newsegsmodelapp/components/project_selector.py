@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import cast
+from typing import Any, cast
 
 from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 import dash_bootstrap_components as dbc
@@ -99,14 +99,19 @@ def delete_project(
         return proj_options[0].get('value')
     return None
 
+dbc_Button: Any = dbc.Button
+dbc_Input: Any = dbc.Input
+dbc_Label: Any = dbc.Label
+
+
 # -----------------------------------------------
 # Layout component
 # -----------------------------------------------
 def create_project_selector():
-    return dbc.Container(
-        [
+    def _stores_and_dialogs():
+        return [
             dcc.Store(id="active-snapshot-id", storage_type="session"),
-
+            
             # Delete project confirmation dialog
             dcc.ConfirmDialog(
                 id = 'delete-project-confirm-dialog',
@@ -118,6 +123,96 @@ def create_project_selector():
                 id = 'delete-snapshot-confirm-dialog',
                 message = 'Proceeding will delete the selected snapshot and all saved results. Continue?'
             ),
+        ]
+
+    def project_title():
+        return dbc_Label(html.H4('Project'), class_name = 'fw-bold')
+
+    def project_label_input():
+        return [
+            dcc.Input(
+                id = 'project-label-input',
+                type = 'text',
+                placeholder = 'Select or enter project name',
+                list = 'project-datalist-options',
+                className = 'fw-bold'
+            ),
+            html.Datalist(id = 'project-datalist-options')
+        ]
+
+    def save_project_button():
+        return dbc_Button(
+            [DashIconify(icon = 'bi:floppy-fill', className = 'me-1'), 'Save New'],
+            id = 'btn-save-project',
+            color = 'primary',
+            disabled = True,
+            style = {'display': 'none'},
+        )
+
+    def load_project_button():
+        return dbc_Button(
+            [DashIconify(icon = 'bi:box-arrow-in-right', className = 'me-1'), 'Load'],
+            id = 'btn-load-project',
+            color = 'primary',
+            disabled = True,
+            style = {'display': 'none'},
+        )
+
+    def snapshot_title():
+        return html.H4('Snapshots')
+
+    def snapshot_label_input():
+        return [
+            dbc_Label('Snapshot', class_name = 'fw-bold mb-1'),
+            dbc_Input(
+                id = 'snapshot-label-input',
+                type = 'text',
+                placeholder = 'Enter existing or new name',
+                value = '',
+                list = 'snapshot-datalist-options',
+            ), 
+            html.Datalist(id = 'snapshot-datalist-options'),
+        ]
+
+    def save_snapshot_button():
+        return dbc_Button(
+            [DashIconify(icon = 'bi:camera-fill', className = 'me-1'), 'Save Snapshot'],
+            id = 'btn-save-snapshot',
+            color = 'secondary',
+            size = 'sm',
+            disabled = False,
+        )
+
+    def load_snapshot_button():
+        return dbc_Button(
+            [DashIconify(icon = 'bi:download', className = 'me-1'), 'Load Snapshot'],
+            id = 'btn-load-snapshot',
+            color = 'secondary',
+            size = 'sm',
+            disabled = True,
+        )
+
+    def delete_snapshot_button():
+        return dbc_Button(
+            [DashIconify(icon = 'bi:trash-fill', className = 'me-1'), 'Delete Snapshot'],
+            id = 'btn-delete-snapshot',
+            color = 'danger',
+            size = 'sm',
+            disabled = True,
+        )
+
+    def delete_project_button():
+        return dbc_Button(
+            [DashIconify(icon='bi:trash-fill', className = 'me-1'), 'Delete Current Project'],
+            id = 'btn-delete-project',
+            color = 'danger',
+            outline = True,
+            size = 'sm'
+        )
+
+    return dbc.Container(
+        _stores_and_dialogs() + [
+            
 
             dbc.Card(
                 dbc.CardBody(
@@ -143,21 +238,9 @@ def create_project_selector():
                                 dbc.Col(
                                     [
                                         # Save Button (Visible/Enabled when label is unused an non-empty)
-                                        dbc.Button(
-                                            [DashIconify(icon = 'bi:floppy-fill', className = 'me-1'), 'Save New'],
-                                            id = 'btn-save-project',
-                                            color = 'primary',
-                                            disabled = True,
-                                            style = {'display': 'none'},
-                                        ), # pyright: ignore[reportCallIssue]
+                                        save_project_button(),
                                         # Load Button (Visible/Enabled when label matches another existing project)
-                                        dbc.Button(
-                                            [DashIconify(icon = 'bi:box-arrow-in-right', className = 'me-1'), 'Load'],
-                                            id = 'btn-load-project',
-                                            color = 'primary',
-                                            disabled = True,
-                                            style = {'display': 'none'},
-                                        ), # pyright: ignore[reportCallIssue]
+                                        load_project_button()
                                     ],
                                     width = 'auto',
                                     class_name = 'd-flex align-items-end gap-2',
@@ -191,29 +274,11 @@ def create_project_selector():
                                                                     dbc.Col(
                                                                     [
                                                                         # Save snapshot (Disabled if snapshot label exists)
-                                                                        dbc.Button(
-                                                                            [DashIconify(icon = 'bi:camera-fill', className = 'me-1'), 'Save Snapshot'],
-                                                                            id = 'btn-save-snapshot',
-                                                                            color = 'secondary',
-                                                                            size = 'sm',
-                                                                            disabled = False,
-                                                                        ), # pyright: ignore[reportCallIssue]
+                                                                        save_snapshot_button(),
                                                                         # Load snapshot (Enabled only if snapshot label exists)
-                                                                        dbc.Button(
-                                                                            [DashIconify(icon = 'bi:download', className = 'me-1'), 'Load Snapshot'],
-                                                                            id = 'btn-load-snapshot',
-                                                                            color = 'secondary',
-                                                                            size = 'sm',
-                                                                            disabled = True,
-                                                                        ), # pyright: ignore[reportCallIssue]
-                                                                        # Load snapshot (Enabled only if snapshot label exists)
-                                                                        dbc.Button(
-                                                                            [DashIconify(icon = 'bi:trash-fill', className = 'me-1'), 'Delete Snapshot'],
-                                                                            id = 'btn-delete-snapshot',
-                                                                            color = 'danger',
-                                                                            size = 'sm',
-                                                                            disabled = True,
-                                                                        ), # pyright: ignore[reportCallIssue]
+                                                                        load_snapshot_button(),
+                                                                        # Delete snapshot (Enabled only if snapshot label exists)
+                                                                        delete_snapshot_button()
                                                                     ],
                                                                     width = 'auto',
                                                                     class_name = 'd-flex align-items-end gap-2',
@@ -227,13 +292,7 @@ def create_project_selector():
                                                         dbc.Row(
                                                             [
                                                                 dbc.Col(
-                                                                    dbc.Button(
-                                                                        [DashIconify(icon='bi:trash-fill', className = 'me-1'), 'Delete Current Project'],
-                                                                        id = 'btn-delete-project',
-                                                                        color = 'danger',
-                                                                        outline = True,
-                                                                        size = 'sm'
-                                                                    ), # pyright: ignore[reportCallIssue]
+                                                                    delete_project_button(),
                                                                     width = 'auto',
                                                                 ) # pyright: ignore[reportCallIssue]
                                                             ],
@@ -271,7 +330,7 @@ def create_project_selector_block(**kwargs):
 # -----------------------------------------------
 # Callbacks
 # -----------------------------------------------
-def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
+def add_project_selector_callbacks(app: NewsegsDash):
 
     @app.callback(
         Output('project-datalist-options', 'children'),
@@ -536,5 +595,3 @@ def add_project_selector_callbacks(app: NewsegsDash) -> NewsegsDash:
     #     updated_options.append(html.Option(value=typed_value, id=str(new_id)))
 
     #     return new_id, updated_options
-
-    return app

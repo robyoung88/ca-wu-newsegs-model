@@ -1,7 +1,10 @@
+import copy
 import json
 from typing import Any
 
-from dash import ctx
+import dash
+from dash import ctx, no_update
+from dash.exceptions import PreventUpdate
 
 def get_options(
     option_ids: list[dict[str, str]],
@@ -108,3 +111,89 @@ def update_return_list(
             values[idx] = update_value
             updated = True
     return updated
+
+def _create_noupdate_return(out: Any):
+    if isinstance(out, list):
+        # Assume list of id property pairs
+        return [no_update]*len(out)
+    elif isinstance(out, dash._utils.AttributeDict):
+            return {k: _create_noupdate_return(v) for k, v in out.items()}
+    elif isinstance(out, dict):
+        # A single id property pair
+        return no_update
+    else:
+        raise TypeError(f'Unhandled output specification type: {type(out)}')
+
+def create_noupdate_return() -> Any:
+    """Within a callback, use the context to create the noupdate return"""
+
+    if ctx.using_outputs_grouping:
+        return _create_noupdate_return(ctx.outputs_grouping)
+
+    return _create_noupdate_return(ctx.outputs_list)
+
+def intersection_values_match(d1, d2):
+    return all(d1[k] == d2[k] for k in (d1.keys() & d2.keys()))
+
+def _find_output_locations(
+    id: str | dict,
+    property: str,
+    search_object
+):
+    return_locs = []
+    if isinstance(search_object, dash._utils.AttributeDict):
+        for k, v in search_object.items():
+            new_locs = _find_output_locations(id, property, v)
+            if new_locs:
+                return_locs.append([k, new_locs])
+    elif isinstance(search_object, dict):
+        if search_object['property'] != property:
+            return []
+        obj_id = search_object['id']
+        if type(obj_id) != type(id):
+            return []
+        if isinstance(id, str):
+            if obj_id == id:
+                return_locs.append(True)
+        elif isinstance(id, dict):
+            if intersection_values_match(obj_id, id):
+                return_locs.append(True)
+    elif isinstance(search_object, list):
+        for idx, v in enumerate(search_object):
+            new_locs = _find_output_locations(id, property, v)
+            if new_locs:
+                return_locs.append([idx, new_locs])
+
+    return return_locs
+
+def _update_these_elements(element_index, update_value, return_value):
+    for keyval in element_index:
+        key = keyval[0]
+        val = keyval[1]
+        if isinstance(val[0], bool):
+            return_value[key] = update_value
+        else:
+            _update_these_elements(
+                val, update_value, return_value[key]
+            )
+
+def update_return_by_id(
+    id: str|dict,
+    property: str,
+    update_value: Any,
+    return_value: Any | None
+) -> Any:
+    if not return_value:
+        return_value = create_noupdate_return()
+
+    if ctx.using_outputs_grouping:
+        locations_to_update = _find_output_locations(id, property, ctx.outputs_grouping)
+    else:
+        locations_to_update = _find_output_locations(id, property, ctx.outputs_list)
+
+    if not locations_to_update:
+        return return_value
+
+    _update_these_elements(locations_to_update, update_value, return_value)
+        
+    return return_value

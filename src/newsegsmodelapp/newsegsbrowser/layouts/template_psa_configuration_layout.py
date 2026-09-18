@@ -175,7 +175,6 @@ def create_psa_layout(*args, **kwargs):
                 className = 'drawer-content',
                 ),
             ]
-            + clayouts.metamodel_process_components()
             + psa_process_components(**kwargs)
             + background_callback_error_handler_components()
             ),
@@ -229,8 +228,6 @@ def create_psa_layout(*args, **kwargs):
             ] 
             + results_section
             + clayouts.user_action_components()
-            + clayouts.model_run_components(**kwargs)
-            + clayouts.finance_run_components(**kwargs)
             
             + create_post_page_load_components(
                 kwargs.get('selected_model'),

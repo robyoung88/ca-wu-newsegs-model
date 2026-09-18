@@ -39,7 +39,7 @@ def _create_text_field_values(
                 text_values.append(no_update)
     return text_values
 
-def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
+def add_input_container_callbacks(app: NewsegsDash):
     """
     Callbacks to populate input containers.
 
@@ -637,7 +637,3 @@ def add_input_container_callbacks(app: NewsegsDash) -> NewsegsDash:
         varid = make_varid(**triggered_id) # pyright: ignore[reportCallIssue]
         contents, colour = get_variable_sharing_status(proj, mm, varid)
         return [contents] * len(button_ids), [colour] * len(button_ids)
-        
-    return app
-
-    

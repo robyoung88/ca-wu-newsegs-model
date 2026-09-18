@@ -70,4 +70,3 @@ def add_post_page_load_callbacks(app: NewsegsDash) -> NewsegsDash:
         print('Model configuration onload div constructed.')
         return [datetime.datetime.now().timestamp()] * len(config_watcher_ids)
     
-    return app

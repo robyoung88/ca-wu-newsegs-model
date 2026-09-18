@@ -43,4 +43,5 @@ def create_results_table_card(
                 className = container_class_name
             ),
         ]) # pyright: ignore[reportCallIssue]
-    ]) # pyright: ignore[reportCallIssue]
+    ],
+    ) # pyright: ignore[reportCallIssue]

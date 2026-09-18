@@ -4,12 +4,15 @@ Functions for creating a model configuration layout for an app.
 Many of these functions require configured sub-functions to actually perform
 the bespoke layout creation.
 """
+from typing import Any
+
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
-from newsegsmodelapp.components import project_selector
+from newsegsmodelapp.components import result_group_containers
+from newsegsmodelapp.components import project_selector_v2 as project_selector
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
 from newsegsmodelapp.components.feedback import indicative_net_energy
@@ -22,10 +25,17 @@ from newsegsmodelapp.newsegsbrowser.layouts.results import results_sections_spra
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import results_tables_map
 from newsegsmodelapp.registers import register_page_layout
 
+dbc_Container: Any = dbc.Container
+dbc_Button: Any = dbc.Button
+dbc_Card: Any = dbc.Card
+dbc_CardBody: Any = dbc.CardBody
+dbc_Row: Any = dbc.Row
+dbc_Col: Any = dbc.Col
+
 DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_top': project_selector.create_project_selector_block,
-    'width_top': 12,
-    'layout_navigation': navigation.create_navigator_buttons_default,
+    'width_top': 11,
+    'layout_navigation': navigation.create_navigation_component,
     'width_navigation': 1,
     'layout_map': maps.create_site_selector_map,
     'width_map': 11,
@@ -164,63 +174,93 @@ def create_model_configuration_layout(*args, **kwargs):
         )
 
     results_section = [
-        html.Div([
-            dcc.Loading([
+        result_group_containers.create_results_container(
+            [
                 config_dict['layout_results_header'](**kwargs),
                 html.Div([
                     config_dict['layout_configuration_selector'](),
+
                     dbc.Row(
                         results_subsections
                     ) # pyright: ignore[reportCallIssue]
                 ],
+
                 id = 'drawer-content',
                 className = 'drawer-content',
-                ),
-                # Stores for the -to-interface configurations of the models
-                # and finances that are in the current session.
-                # These should only really be necessary to draw from when
-                # recreating a model after a migration
-                # TODO: Get the reconstruction behaviour working.
-                #dcc.Store(id = 'store-model-interface-configurations'),
-                #dcc.Store(id = 'store-finance-interface-configurations'),
-
-                # Triggers
-                # Trigger after model configuration updates
-                dcc.Store(id = {'type': 'trigger', 'page': kwargs.get('page_type'), 'key': 'model-config'}),
-                dcc.Store(id = {'type': 'trigger', 'page': kwargs.get('page_type'), 'key': 'finance-config'}),
-
-                # Triggers for result table updates after postprocessing
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-gen'}, data = "[]"),
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-stor'}, data = "[]"),
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-cons'}, data = "[]"),
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'model-results', 'key': 'res-net'}, data = "[]"),
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-benefits'}, data = "[]"),
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-costs'}, data = "[]"),
-                dcc.Store(id={'type': 'result-statistics', 'supersection': 'finance-results', 'key': 'res-finance-so-value'}, data = "[]"),
-            ] + clayouts.user_action_components() + clayouts.model_run_components(**kwargs) + clayouts.finance_run_components(**kwargs) + clayouts.metamodel_process_components(),
-
-            overlay_style = {
-                'visibility': 'visible',
-                'filter': 'blur(2px)',
-                'display': 'block',
-            },
-            delay_show = 200,
-            delay_hide = 200,
-            id = 'loading-results',
-            parent_className = 'drawer-loading-container',
-
-            )
-        ],
-        id = 'drawer-container',
-        className = 'drawer-container',
+                ),        
+            ] + clayouts.user_action_components(),
+            section = 'deterministic-results',
+            supersection = 'deterministic',
+            className = 'drawer-container'
         ),
 
         html.Div(
             id = {'type':'post-drawer-attach', 'page': kwargs.get('page-type', 'None')},
-            #id = 'post-drawer-attach',
             style = {'display': 'none'}
-        ),   
+        ),
     ]
+
+    a1_contents = [
+        dbc_Row([
+            dbc_Col(
+                config_dict['layout_navigation'](config_dict.get('selected_model')),
+                width = 'auto',
+            ),
+            dbc_Col(
+                config_dict['layout_top'](**kwargs),
+                #width = config_dict['width_top'],
+                class_name = 'page-top',
+            ),
+        ],
+        class_name = 'align-items-start'
+        ),
+        
+    ]
+
+    a2_contents = [
+        dbc_Row(
+            config_dict['layout_map']()
+        )
+    ] + site_details
+
+    b1_contents = [
+         config_dict['layout_results_header'](**kwargs),
+    #     config_dict['layout_configuration_selector'](),
+    ]
+
+    b2_contents = [dbc_Container(dbc_Row(results_subsections))]
+    
+
+    return dbc_Container(
+        [
+            # Block A1: Left Pane Header
+            html.Div(
+                a1_contents,
+                className="pane-header header-a1 bg-light px-3 pt-0 pb-1 border-bottom d-flex justify-content-between align-items-start",
+            ),
+            # Block B1: Right Pane Header
+            html.Div(
+                b1_contents,
+                className="pane-header header-b1 bg-light px-3 pt-0 pb-1 border-bottom d-flex justify-content-between align-items-start",
+            ),
+            # Block A2: Left Pane Content (Scrollable)
+            html.Div(
+                a2_contents,
+                className="pane-content content-a2 p-3 bg-white",
+            ),
+            # Block B2: Right Pane Content (Scrollable)
+            html.Div(
+                result_group_containers.create_results_container(
+                    b2_contents,
+                    section = 'deterministic-results',
+                    supersection = 'deterministic',
+                ),
+                className="pane-content content-b2 p-3 bg-white",
+            ),
+        ],
+        fluid=True,
+        className="dash-container p-0",
+    )
     
     return dbc.Container(
         html.Div(
@@ -236,11 +276,9 @@ def create_model_configuration_layout(*args, **kwargs):
                     kwargs.get('page_type')
                 )
             ),
-            #id = 'main-content-pane',
             className = 'main-content-pane',
         ),
         fluid = False,
-        #id = 'app-layout-wrapper',
         class_name = 'app-layout-wrapper',
     ) # pyright: ignore[reportCallIssue]
 

@@ -49,3 +49,11 @@ def get_psa_layout_config(model_type):
         'page_type': 'psa',
         'autorun_model': False,
     }
+
+def get_layout_layout_config(model_type):
+    return {
+        'model_type': model_type,
+        'selected_model': model_type,
+        'page_type': 'layout',
+        'autorun_model': False,
+    }

@@ -449,3 +449,25 @@ def add_action_callbacks(app: NewsegsDash):
             ongoing_actions,
             len(ongoing_actions) == 0,
         )
+
+    # Loading overlays
+    @app.callback(
+        Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
+        Input('progress-poll-interval', 'n_intervals'),
+        State({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'id'),
+        prevent_initial_call = True
+    )
+    def set_loading_overlay(n_intervals, container_ids):
+        # Can switch to a MATCH if we don't want to cover all results.
+        stmt = (
+            sa.select(tbls.runs.c.status)
+            .where(tbls.runs.c.status == 'CALCULATING')
+        )
+
+        with db.get_engine().connect() as conn:
+            row = conn.execute(stmt).fetchone()
+
+            if not row:
+                return ['IDLE'] * len(container_ids)
+            return ['CALCULATING'] * len(container_ids)
+        

@@ -4,7 +4,7 @@ from dash import Input, Output, ALL, ctx, no_update
 
 from newsegsmodelapp.dash_extension import NewsegsDash
 
-def assign_callbacks(app: NewsegsDash) -> NewsegsDash:#, acm: NewsegsBrowserCacheManager):
+def assign_callbacks(app: NewsegsDash):
 
     @app.callback(
         Output('url', 'pathname'),
@@ -34,6 +34,4 @@ def assign_callbacks(app: NewsegsDash) -> NewsegsDash:#, acm: NewsegsBrowserCach
 
         print('Model selected - going to landing')
         
-        return f'/{selected_model}/landing'#, selected_model
-    
-    return app
+        return f'/{selected_model}/landing'
