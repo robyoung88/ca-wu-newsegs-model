@@ -20,22 +20,23 @@ def dsa_process_components(**kwargs):
                 dbc_ModalFooter([
                     dbc_Button(
                         'OK',
-                        id = {
-                            'type': 'action-button', 'purpose': 'request-process',
-                            'supersection': 'dsa', 'section': 'run',
-                            'key': 'dsa_run_metamodel', 'subindex': 0,
-                        },
+                        id = 'btn-action-dsa-run-metamodel',
+                        # id = {
+                        #     'type': 'action-button', 'purpose': 'request-process',
+                        #     'supersection': 'dsa', 'section': 'run',
+                        #     'key': 'dsa_run_metamodel', 'subindex': 0,
+                        # },
                         n_clicks = 0
                     ),
                     dbc_Button(
                         'Cancel', 
-                        id = {'type': 'modal-close-button', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-run-confirm'},
+                        id = 'btn-dsa-confirm-abort',
                         className = 'ms-auto',
                         n_clicks = 0
                     )
                 ]),
             ],
-            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-run-confirm'},
+            id = 'modal-dsa-confirm',
             is_open = False
         ),
         dbc_Modal(

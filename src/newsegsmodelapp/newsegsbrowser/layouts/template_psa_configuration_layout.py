@@ -7,7 +7,6 @@ import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
-from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 from newsegsmodelapp.components import results_header
@@ -176,7 +175,6 @@ def create_psa_layout(*args, **kwargs):
                 ),
             ]
             + psa_process_components(**kwargs)
-            + background_callback_error_handler_components()
             ),
             overlay_style = {
                 'visibility': 'visible',

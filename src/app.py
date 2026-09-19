@@ -1,5 +1,7 @@
 """NewSEGS model as a multi-page app.
 """
+import time
+t1 = time.time()
 import json
 import os
 from pathlib import Path
@@ -55,6 +57,9 @@ BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
 import threading
 import traceback
+
+t2 = time.time()
+print(f'Imports in {t2-t1}')
 
 def thread_exception_handler(args):
     print(f"Exception in thread {args.thread.name}: {args.exc_type}")
@@ -210,6 +215,8 @@ def create_app(external_stylesheets = None) -> Dash:
     Create the NewSEGS Dash App
     """
     print('Creating app')
+    t3 = time.time()
+    print(f'TTS: {t3-t1}')
 
     if external_stylesheets is None:
         external_stylesheets = BOOTSTRAP_STYLESHEETS
@@ -242,18 +249,18 @@ def create_app(external_stylesheets = None) -> Dash:
 
     # Bind callbacks
     add_display_callbacks(app)
-    # add_post_page_load_callbacks(app)
-    # add_input_container_callbacks(app)
-    # model_selection_callbacks.assign_callbacks(app)
+    add_post_page_load_callbacks(app)
+    add_input_container_callbacks(app)
+    model_selection_callbacks.assign_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
-    # map.add_site_selector_callbacks(app)
-    # add_configuration_selector_callbacks(app)
-    # add_action_callbacks(app)
-    # add_result_container_callbacks(app)
-    # add_result_timeseries_callbacks(app)
-    # add_dsa_run_callbacks(app)
-    # add_optim_run_callbacks(app)
-    # add_psa_run_callbacks(app)
+    map.add_site_selector_callbacks(app)
+    add_configuration_selector_callbacks(app)
+    add_action_callbacks(app)
+    add_result_container_callbacks(app)
+    add_result_timeseries_callbacks(app)
+    add_dsa_run_callbacks(app)
+    #add_optim_run_callbacks(app)
+    #add_psa_run_callbacks(app)
 
     return app
 

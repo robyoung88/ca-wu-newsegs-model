@@ -43,7 +43,7 @@ from functools import singledispatchmethod
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import pvlib
+from pvlib.modelchain import ModelChain as PVLibModelChain
 
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.core import SerialiseToDictMixin, newsegscomponent
@@ -1126,7 +1126,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
     def _create_modelchain(self):
         import newsegsmodelframework.core.generation.generation_utils as generation_utils
 
-        self._mc = pvlib.modelchain.ModelChain(
+        self._mc = PVLibModelChain(
             self._system,
             self._pvlib_location,
             transposition_model = 'isotropic',
@@ -1142,6 +1142,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         self,
         timespan: modtimespan.TimeSpan
     ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]:
+        from pvlib.irradiance import erbs as pvlib_erbs
 
         if self.model is None:
             raise ValueError("Electrical generator requires a model to serve environmental data")
@@ -1185,7 +1186,7 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         radiation_components = cast(
             pd.DataFrame,
             (
-                pvlib.irradiance.erbs(
+                pvlib_erbs(
                     global_horizontal_flux,
                     solarpos['zenith'].values,
                     rad_times_centered # for extraterrestrial radiation

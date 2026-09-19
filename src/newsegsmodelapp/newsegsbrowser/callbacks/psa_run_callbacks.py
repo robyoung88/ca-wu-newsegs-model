@@ -9,22 +9,18 @@ import os
 import random
 import tempfile
 import zipfile
-from typing import Any, MutableMapping, cast
+from typing import Any, cast
 
-from dash import ALL, Dash, Input, Output, State, no_update, Patch, ctx, dcc
+from dash import ALL, Input, Output, State, no_update, ctx
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.components import callback_utils, export
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser import common as browser
-from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
-from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import psa
-from newsegsmodelframework.util import jsonfuncs
 
 logger = logging.getLogger(__name__)
 

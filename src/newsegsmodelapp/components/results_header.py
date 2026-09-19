@@ -121,12 +121,15 @@ def create_results_header(**kwargs):
                     ]), # pyright: ignore[reportCallIssue]
                     dbc.Row(
                         [
-                            dcc.Graph(
-                                id = 'graph-timeseries',
-                                style = {
-                                    'height': '300px',
-                                }
+                            dcc.Loading(
+                                dcc.Graph(
+                                    id = 'graph-timeseries',
+                                    style = {
+                                        'height': '300px',
+                                    }
+                                ),
                             ),
+                            
                             
                         ],
                         id = 'timeseries-graph-container',
@@ -151,7 +154,7 @@ def create_results_header_dsa(**kwargs):
         dbc.Button(
             'Run DSA',
             color = 'primary',
-            id = {'type': 'dsa-prerun-button', 'page': kwargs.get('page_type', 'None')},
+            id = 'btn-dsa-prerun',
             title = 'Start DSA run',
             disabled = False,
         ), # pyright: ignore[reportCallIssue]

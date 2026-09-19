@@ -9,7 +9,6 @@ import dash_bootstrap_components as dbc
 from newsegsmodelapp.components.dsa_process_components import dsa_process_components
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser import STATICDATA
-from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
@@ -292,7 +291,6 @@ def create_dsa_layout(*args, **kwargs):
             + results_section
             + clayouts.user_action_components()
             + dsa_process_components(**kwargs)
-            + background_callback_error_handler_components()
             + create_post_page_load_components(
                 kwargs.get('selected_model'),
                 kwargs.get('page_type')

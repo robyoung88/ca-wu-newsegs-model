@@ -10,9 +10,8 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
-from newsegsmodelapp.newsegsbrowser.background_callback_errors import background_callback_error_handler_components
 from newsegsmodelapp.components import result_group_containers
-from newsegsmodelapp.components import project_selector_v2 as project_selector
+from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
 from newsegsmodelapp.components.feedback import indicative_net_energy
@@ -228,7 +227,10 @@ def create_model_configuration_layout(*args, **kwargs):
     #     config_dict['layout_configuration_selector'](),
     ]
 
-    b2_contents = [dbc_Container(dbc_Row(results_subsections))]
+    b2_contents = [
+        config_dict['layout_configuration_selector'](),
+        dbc_Container(dbc_Row(results_subsections))
+    ]
     
 
     return dbc_Container(

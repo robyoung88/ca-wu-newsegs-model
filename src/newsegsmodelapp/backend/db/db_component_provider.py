@@ -428,6 +428,7 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
     @override
     def _assign_updated_child_uids(self, obj, row):
+        super()._assign_updated_child_uids(obj, row)
         if isinstance(obj, NewsegsModelInterface):
             obj._component_ids['grid'] = row.grid_config_id
             obj._component_ids['generation'] = row.generation_config_id
@@ -529,6 +530,7 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
 
     @override
     def _assign_updated_child_uids(self, obj, row):
+        super()._assign_updated_child_uids(obj, row)
         if isinstance(obj, NewsegsFinanceInterface):
             obj._component_ids['finance_data'] = row.financedata_config_id
             obj._component_ids['table_config'] = row.table_config_id
@@ -631,6 +633,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
 
     @override
     def _assign_updated_child_uids(self, obj, row):
+        super()._assign_updated_child_uids(obj, row)
         if isinstance(obj, NewsegsMetaModel):
             obj._model_id = row.em_config_id
             obj._finance_id = row.fm_config_id
@@ -882,8 +885,11 @@ class FromDatabaseNewsegsProjectProvider(
 
     @override
     def _assign_updated_child_uids(self, obj, row):
+        super()._assign_updated_child_uids(obj, row)
         if isinstance(obj, NewsegsProject):
             obj._component_ids['table_config'] = row.table_config_id
+            obj._component_ids['dsa_config'] = row.dsa_component_config_id
+            obj._component_ids['psa_config'] = row.psa_component_config_id
             # No need to update the focussed metamodel - as this is
             # stored as an int, it should not be impacted so long
             # as the order of metamodels is consistent.

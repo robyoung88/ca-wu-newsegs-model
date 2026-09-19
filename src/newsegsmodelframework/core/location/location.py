@@ -19,7 +19,8 @@ from typing import Any, override, Type, TypeVar, SupportsFloat
 from functools import singledispatchmethod
 from pyproj import Transformer
 
-import pvlib
+from pvlib.location import Location as _PVLibLocation
+from pvlib.pvsystem import PVSystem as _PVSystem
 
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.util import classfuncs
@@ -736,14 +737,14 @@ def location_from_dict(input: dict[str, Any]) -> Location:
 
 class PVLibLocation(
     serialisation.SerialiseToDictMixin,
-    pvlib.location.Location
+    _PVLibLocation
 ):
     """Extends `pvlib.location.Location` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'
 
 class PVLibPVSystem(
     serialisation.SerialiseToDictMixin,
-    pvlib.pvsystem.PVSystem
+    _PVSystem
 ):
     """Extends `pvlib.pvsystem.PVSystem` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'

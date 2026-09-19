@@ -2,7 +2,6 @@ from typing import cast
 
 import dash
 from dash.exceptions import PreventUpdate
-import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.components.composite_input_components import generic_create_deterministic_input_container_contents

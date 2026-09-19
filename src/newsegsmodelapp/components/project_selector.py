@@ -1,15 +1,16 @@
-import datetime
+
 import json
 from typing import Any, cast
 
-from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
-import dash_bootstrap_components as dbc
+import dash
+from dash import ALL, Input, Output, State, dcc, html, ctx
+from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
-import sqlalchemy as sa
+import numpy as np
 
-from newsegsmodelapp.backend import db
-from newsegsmodelapp.backend.db import db_tables as tbls
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
@@ -19,9 +20,9 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 # -----------------------------------------------
 
 def fetch_project_options(
-        project_provider: NewsegsProjectProviderInterface,
-        model_type: str|None = None
-    ) -> list[dict[str, str]]:
+    project_provider: NewsegsProjectProviderInterface,
+    model_type: str|None = None
+) -> list[dict[str, Any]]:
     """Obtains available projects"""
     all_projects = project_provider.list_projects(model_type = model_type).to_dict(orient = 'list')
     if not all_projects:
@@ -29,9 +30,9 @@ def fetch_project_options(
     return [
         {
             'value' : str(all_projects['id'][i]),
-            'label': f'{all_projects['label'][i]} [{all_projects['created_at'][i]}]'
+            'label': f'{all_projects['label'][i]} [created: {all_projects['created_at'][i]}]'
         } 
-        for i in range(len(all_projects['id']))
+        for i in range(len(all_projects['id'])-1, -1, -1)
     ]
 
 def fetch_snapshot_options(
@@ -45,73 +46,129 @@ def fetch_snapshot_options(
     return [
         {
             'value': str(all_snapshots['snapshot_id'][i]),
-            'label': f'{all_snapshots['label'][i]} [{all_snapshots['created_at'][i]}]'
+            'label': f'{all_snapshots['label'][i]} [created: {all_snapshots['created_at'][i]}]'
         }
         for i in range(len(all_snapshots['snapshot_id']))
     ]
 
-def create_project(
+def rename_project(
     project_provider: NewsegsProjectProviderInterface,
-    current_project_id: str,
-    new_project_label: str,
-    model_type: str | None = None
-) -> NewsegsProject:
-    if current_project_id:
-        new_proj = cast(NewsegsProject, project_provider.duplicate_component(current_project_id))
-    else:
-        current_project_id = project_provider.get_session_project_id(model_type = model_type, on_missing = 'last')
-        new_proj = cast(NewsegsProject, project_provider.duplicate_component(current_project_id))
-    new_proj.name = new_project_label
-    new_proj.revision += 1
-    project_provider.upsert_component(new_proj)
-    return new_proj
+    project_id: str,
+    project_name: str,
+):
+    project_provider.set_component_metadata(
+        project_id,
+        'label',
+        project_name,
+    )
 
 def create_snapshot(
     project_provider: NewsegsProjectProviderInterface,
-    current_project_id: str,
-    snapshot_label: str | None,
+    project_id: str,
+    snapshot_name: str,
 ) -> int:
-    snapshot_label = snapshot_label if snapshot_label else str(datetime.datetime.now())
-    return project_provider.create_project_snapshot(current_project_id, snapshot_label)
+    return project_provider.create_project_snapshot(
+        project_id, snapshot_name
+    )
+
+def verify_project_exists(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str
+) -> bool:
+    try:
+        label = project_provider.get_component_metadata(
+            project_id, 'label'
+        )
+    except Exception as e:
+        print(f'Failed to retrieve project {project_id} - {e}')
+        return False
+    return label is not None
 
 def load_snapshot(
     project_provider: NewsegsProjectProviderInterface,
     current_project_id: str,
     snapshot_id: str
-) -> NewsegsProject:
+) -> str | None:
     int_snapshot_id = int(snapshot_id)
-    new_proj = project_provider.load_project_snapshot(current_project_id, int_snapshot_id)
-    new_proj.name = new_proj.name + ' from snapshot'
-    new_proj.revision += 1
+    all_snapshots = project_provider.list_project_snapshots(current_project_id)
+    if not np.any(all_snapshots['snapshot_id'] == int_snapshot_id):
+        return None
+    snapshot_label = all_snapshots.loc[all_snapshots['snapshot_id']==int_snapshot_id,'label'].iloc[0]
+    new_proj = project_provider.load_project_snapshot(
+        current_project_id, int_snapshot_id
+    )
+    rename_project(project_provider, new_proj.id, f'{new_proj.name} from {snapshot_label}')
+    return new_proj.id
+
+def new_project(
+    project_provider: NewsegsProjectProviderInterface,
+    model_type: str
+) -> str:
+    from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+                    
+    factory = PROJECT_FACTORIES.get(model_type, PROJECT_FACTORIES['default'])
+
+    proj = factory()
+    project_provider.upsert_component(proj)
+    return proj.id
+
+def duplicate_project(
+    project_provider: NewsegsProjectProviderInterface,
+    current_project_id: str,
+) -> str:
+    new_proj = cast(
+        NewsegsProject, 
+        project_provider.duplicate_component(current_project_id)
+    )
     project_provider.upsert_component(new_proj)
-    return new_proj
+    rename_project(
+        project_provider,
+        new_proj.id,
+        new_proj.name + ' - Copy'
+    )
+    return new_proj.id
+
+def rename_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    snapshot_id: str,
+    snapshot_name: str,
+):
+    if not isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
+        return
+    project_provider.rename_snapshot(int(snapshot_id), snapshot_name)
 
 def delete_project(
     project_provider: NewsegsProjectProviderInterface,
-    project_id: str,
+    delete_project_id: str,
+    active_project_id: str,
     model_type: str,
-):
-    returned = project_provider.delete_component(project_id)
+) -> str | None:
+    returned = project_provider.delete_component(delete_project_id)
     if returned:
         raise ValueError('Project could not be deleted')
+    if delete_project_id != active_project_id:
+        return active_project_id
+
     proj_options = fetch_project_options(project_provider, model_type)
     if proj_options:
         return proj_options[0].get('value')
+
     return None
 
-dbc_Button: Any = dbc.Button
-dbc_Input: Any = dbc.Input
-dbc_Label: Any = dbc.Label
-
+def delete_snapshot(
+    project_provider: NewsegsProjectProviderInterface,
+    project_id: str,
+    delete_snapshot_id: str
+):
+    int_dsi = int(delete_snapshot_id)
+    project_provider.delete_project_snapshot(project_id, int_dsi)
 
 # -----------------------------------------------
 # Layout component
 # -----------------------------------------------
-def create_project_selector():
-    def _stores_and_dialogs():
+def create_project_selector(**kwargs):
+    def stores_and_dialogs() -> list[dash.development.base_component.Component]:
         return [
-            dcc.Store(id="active-snapshot-id", storage_type="session"),
-            
             # Delete project confirmation dialog
             dcc.ConfirmDialog(
                 id = 'delete-project-confirm-dialog',
@@ -125,473 +182,694 @@ def create_project_selector():
             ),
         ]
 
-    def project_title():
-        return dbc_Label(html.H4('Project'), class_name = 'fw-bold')
+    def active_project_header() -> html.Div:
+        return html.Div(
+            [
+                html.Span(
+                    [
+                        html.Span("Project: ", className="text-muted me-2 fs-4"),
+                        html.H2(
+                            "Untitled Project",
+                            id="header-project-name",
+                            className="d-inline-block mb-0 me-3 fw-bold",
+                        )
+                    ],
+                    className = 'd-flex align-items-center'
+                ),
+                dbc.Button(
+                    DashIconify(icon="bi:list", width=18),
+                    id="btn-toggle-controls",
+                    color="light",
+                    size="sm",
+                    className="border toggle-controls",
+                )
+            ],
+            className="d-flex align-items-center justify-content-between header",
+        )
 
-    def project_label_input():
+    def project_operations() -> list[dash.development.base_component.Component]:
         return [
-            dcc.Input(
-                id = 'project-label-input',
-                type = 'text',
-                placeholder = 'Select or enter project name',
-                list = 'project-datalist-options',
-                className = 'fw-bold'
+            *project_operations_header(),
+            *project_operations_inputs()
+        ]
+
+    def project_operations_inputs() -> list[dash.development.base_component.Component]:
+        return [
+            *project_name_input(),
+            *project_load_input(),
+            *project_action_buttons(),
+        ]
+
+    def snapshot_operations() -> list[dash.development.base_component.Component]:
+        return [
+            *snapshot_operations_header(),
+            *snapshot_operations_inputs(),
+        ]
+
+    def project_operations_header() -> list[dash.development.base_component.Component]:
+            return [
+                html.H6("Project Management", className="fw-bold mb-3 border-bottom pb-1")
+            ]
+
+    def snapshot_operations_header() -> list[dash.development.base_component.Component]:
+        return [
+            html.H6("Snapshots", className="fw-bold mb-3 border-bottom pb-1"),
+        ]
+
+    def snapshot_operations_inputs() -> list[dash.development.base_component.Component]:
+        return [
+            *snapshot_name_input(),
+            *snapshot_load_input(),
+            *snapshot_action_buttons(),
+        ]
+
+    def project_name_input() -> list[dash.development.base_component.Component]:
+        return [
+            dbc.InputGroup(
+                [
+                    dbc.Input(
+                        id="input-project-name",
+                        placeholder="Project Name",
+                        type="text",
+                        size="sm",
+                    ),
+                    dbc.Button(
+                        [DashIconify(icon="bi:pencil", className="me-1"), "Rename"],
+                        id = {'type': 'action-button-ps', 'key': 'rename-project'},
+                        #id="btn-rename-project",
+                        color="primary",
+                        size="sm",
+                        outline=True,
+                        class_name = ACTION_BUTTON_CLASSNAME,
+                        disabled=True,
+                    ),
+                    
+                ],
+                className="mb-2",
             ),
-            html.Datalist(id = 'project-datalist-options')
         ]
 
-    def save_project_button():
-        return dbc_Button(
-            [DashIconify(icon = 'bi:floppy-fill', className = 'me-1'), 'Save New'],
-            id = 'btn-save-project',
-            color = 'primary',
-            disabled = True,
-            style = {'display': 'none'},
-        )
-
-    def load_project_button():
-        return dbc_Button(
-            [DashIconify(icon = 'bi:box-arrow-in-right', className = 'me-1'), 'Load'],
-            id = 'btn-load-project',
-            color = 'primary',
-            disabled = True,
-            style = {'display': 'none'},
-        )
-
-    def snapshot_title():
-        return html.H4('Snapshots')
-
-    def snapshot_label_input():
+    def snapshot_name_input() -> list[dash.development.base_component.Component]:
         return [
-            dbc_Label('Snapshot', class_name = 'fw-bold mb-1'),
-            dbc_Input(
-                id = 'snapshot-label-input',
-                type = 'text',
-                placeholder = 'Enter existing or new name',
-                value = '',
-                list = 'snapshot-datalist-options',
-            ), 
-            html.Datalist(id = 'snapshot-datalist-options'),
+            dbc.InputGroup(
+                [
+                    dbc.Input(
+                        id="input-snapshot-name",
+                        placeholder="Snapshot Name",
+                        type="text",
+                        size="sm",
+                    ),
+                    dbc.Button(
+                        [DashIconify(icon="bi:camera", className="me-1"), "Create"],
+                        id = {'type': 'action-button-ps', 'key': 'create-snapshot'},
+                        #id="btn-create-snapshot",
+                        color="primary",
+                        size="sm",
+                        outline=True,
+                        disabled=True,
+                    ),
+                ],
+                className="mb-2",
+            ),
         ]
 
-    def save_snapshot_button():
-        return dbc_Button(
-            [DashIconify(icon = 'bi:camera-fill', className = 'me-1'), 'Save Snapshot'],
-            id = 'btn-save-snapshot',
-            color = 'secondary',
-            size = 'sm',
-            disabled = False,
-        )
+    def project_load_input() -> list[dash.development.base_component.Component]:
+        return [
+            dbc.InputGroup(
+                [
+                    dbc.Select(
+                        id="select-load-project",
+                        placeholder="Select existing project...",
+                        size="sm",
+                    ),
+                    dbc.Button(
+                        [DashIconify(icon="bi:box-arrow-in-right", className="me-1"), "Load"],
+                        id = {'type': 'action-button-ps', 'key': 'load-project'},
+                        color="info",
+                        size="sm",
+                        disabled=True,
+                    ),
+                ],
+                className="mb-3",
+            ), 
+        ]
 
-    def load_snapshot_button():
-        return dbc_Button(
-            [DashIconify(icon = 'bi:download', className = 'me-1'), 'Load Snapshot'],
-            id = 'btn-load-snapshot',
-            color = 'secondary',
-            size = 'sm',
-            disabled = True,
-        )
+    def snapshot_load_input() -> list[dash.development.base_component.Component]:
+        return [
+            dbc.InputGroup(
+                [
+                    dbc.Select(
+                        id="select-load-snapshot",
+                        placeholder="Select snapshot...",
+                        size="sm",
+                    ),
+                    dbc.Button(
+                        [DashIconify(icon="bi:box-arrow-in-right", className="me-1"), "Load"],
+                        id = {'type': 'action-button-ps', 'key': 'load-snapshot'},
+                        color="info",
+                        size="sm",
+                        disabled=True,
+                    ),
+                ],
+                className="mb-2",
+            ),
+        ]
 
-    def delete_snapshot_button():
-        return dbc_Button(
-            [DashIconify(icon = 'bi:trash-fill', className = 'me-1'), 'Delete Snapshot'],
-            id = 'btn-delete-snapshot',
-            color = 'danger',
-            size = 'sm',
-            disabled = True,
-        )
+    ACTION_BUTTON_CLASSNAME = 'action-button'
 
-    def delete_project_button():
-        return dbc_Button(
-            [DashIconify(icon='bi:trash-fill', className = 'me-1'), 'Delete Current Project'],
-            id = 'btn-delete-project',
-            color = 'danger',
-            outline = True,
-            size = 'sm'
-        )
+    def project_action_buttons() -> list[dash.development.base_component.Component]:
+        return [
+            html.Div(
+                [
+                    html.Div(
+                        dbc.Button(
+                            [DashIconify(icon="bi:file-earmark-plus", className="me-1"), "Fresh Project"],
+                            id = {'type': 'action-button-ps', 'key': 'new-project'},
+                            color="success",
+                            size="sm",
+                            class_name = ACTION_BUTTON_CLASSNAME,
+                        ),
+                        className = 'auto-wrap-item',
+                    ),
+                    html.Div(
+                        dbc.Button(
+                            [DashIconify(icon="bi:copy", className="me-1"), "Duplicate Project"],
+                            id = {'type': 'action-button-ps', 'key': 'duplicate-project'},
+                            color="primary",
+                            size="sm",
+                            outline=True,
+                        ),
+                        className = 'auto-wrap-item',
+                    ),
+                    html.Div(
+                        dbc.Button(
+                            [DashIconify(icon="bi:trash", className="me-1"), "Delete Project"],
+                            id = {'type': 'action-button-ps', 'key': 'delete-project'},
+                            color="danger",
+                            size="sm",
+                            outline=True,
+                            disabled=True,
+                            class_name = ACTION_BUTTON_CLASSNAME,
+                        ),
+                        className = 'auto-wrap-item',
+                    )
+                ],
+                className="auto-wrap-row",
+            )
+        ]
+
+    def snapshot_action_buttons() -> list[dash.development.base_component.Component]:
+        return [
+            html.Div(
+                [
+                    html.Div(
+                        dbc.Button(
+                            [DashIconify(icon="bi:pencil", className="me-1"), "Rename Snapshot"],
+                            #id="btn-rename-snapshot",
+                            id = {'type': 'action-button-ps', 'key': 'rename-snapshot'},
+                            color="secondary",
+                            size="sm",
+                            outline=True,
+                            disabled=True,
+                            class_name = ACTION_BUTTON_CLASSNAME,
+                        ),
+                        className="auto-wrap-item",
+                    ),
+                    html.Div(
+                        dbc.Button(
+                            [DashIconify(icon="bi:trash", className="me-1"), "Delete Snapshot"],
+                            id = {'type': 'action-button-ps', 'key': 'delete-snapshot'},
+                            color="danger",
+                            size="sm",
+                            outline=True,
+                            disabled=True,
+                            class_name = ACTION_BUTTON_CLASSNAME,
+                        ),
+                        className="auto-wrap-item",
+                    ),
+                ],
+                className="auto-wrap-row",
+            )
+        ]
 
     return dbc.Container(
-        _stores_and_dialogs() + [
-            
-
-            dbc.Card(
-                dbc.CardBody(
+        [
+            dbc.Navbar(
+                dbc.Container(
                     [
-                        # 1. Main Row (always visible)
+                        # Left side: Active project header & collapsible toggle
+                        active_project_header()
+                    ],
+                    fluid = True,
+                ),
+                color="white",
+                class_name="border-bottom py-2 mb-3",
+            ),
+
+            # Hidden Controls Drawer (Accordion / Collapse)
+            dbc.Collapse(
+                dbc.Card(
+                    dbc.CardBody([
                         dbc.Row(
                             [
-                                dbc.Col([
-                                    dbc.Label(html.H4('Project'), class_name = 'fw-bold'), # pyright: ignore[reportCallIssue]
-                                    dcc.Input(
-                                        id = 'project-label-input',
-                                        type = 'text',
-                                        placeholder = 'Select or enter project name',
-                                        list = 'project-datalist-options',
-                                        className = 'fw-bold'
-                                    ),
-                                    html.Datalist(id = 'project-datalist-options')
-                                ],
-                                md = 6,
-                                class_name = 'align-middle',
-                                #width = True
-                                ), # pyright: ignore[reportCallIssue]
+                                # Left column: Project Operations
                                 dbc.Col(
-                                    [
-                                        # Save Button (Visible/Enabled when label is unused an non-empty)
-                                        save_project_button(),
-                                        # Load Button (Visible/Enabled when label matches another existing project)
-                                        load_project_button()
-                                    ],
-                                    width = 'auto',
-                                    class_name = 'd-flex align-items-end gap-2',
-                                ), # pyright: ignore[reportCallIssue]
-                                dbc.Col(
-                                    [
-                                        # Details Collapsible / Accordion
-                                        dbc.Accordion(
-                                            [
-                                                dbc.AccordionItem(
-                                                    title = html.H4('Snapshots'),
-                                                    children = [
-                                                        # Snapshot management row
-                                                        dbc.Row(
-                                                            [
-                                                                dbc.Row(
-                                                                    [
-                                                                        dbc.Label('Snapshot', class_name = 'fw-bold mb-1'), # pyright: ignore[reportCallIssue]
-                                                                        dbc.Input(
-                                                                            id = 'snapshot-label-input',
-                                                                            type = 'text',
-                                                                            placeholder = 'Leave blank for datetime',
-                                                                            value = '',
-                                                                            list = 'snapshot-datalist-options',
-                                                                        ), # pyright: ignore[reportCallIssue]
-                                                                        html.Datalist(id = 'snapshot-datalist-options'),
-                                                                    ],
-                                                                    #width = True,
-                                                                ), # pyright: ignore[reportCallIssue]
-                                                                dbc.Row(
-                                                                    dbc.Col(
-                                                                    [
-                                                                        # Save snapshot (Disabled if snapshot label exists)
-                                                                        save_snapshot_button(),
-                                                                        # Load snapshot (Enabled only if snapshot label exists)
-                                                                        load_snapshot_button(),
-                                                                        # Delete snapshot (Enabled only if snapshot label exists)
-                                                                        delete_snapshot_button()
-                                                                    ],
-                                                                    width = 'auto',
-                                                                    class_name = 'd-flex align-items-end gap-2',
-                                                                ), # pyright: ignore[reportCallIssue]
-                                                                )
-                                                            ],
-                                                            class_name = 'align-items-center border-bottom mb-2 pb-2',
-                                                        ), # pyright: ignore[reportCallIssue]
-                                                        
-                                                        # Project action row
-                                                        dbc.Row(
-                                                            [
-                                                                dbc.Col(
-                                                                    delete_project_button(),
-                                                                    width = 'auto',
-                                                                ) # pyright: ignore[reportCallIssue]
-                                                            ],
-                                                             
-                                                        ), # pyright: ignore[reportCallIssue]
-                                                    ],
-                                                    class_name = 'p-0 m-0',
-                                                ), # pyright: ignore[reportCallIssue]
-                                            ],
-                                            start_collapsed = True,
-                                            flush = True,
-                                        ), # pyright: ignore[reportCallIssue]
-                                    ]
-                                )
-                            ],
-                            className = 'align-items-center mb-2'
-                        ), # pyright: ignore[reportCallIssue]
+                                    [*project_operations()],
+                                    xl=6,
+                                    class_name="border-end pe-4" 
+                                ),
 
+                                # Right column: Snapshot Operations
+                                dbc.Col(
+                                    [*snapshot_operations()],
+                                    xl=6,
+                                    class_name="ps-4",
+                                )                                
+                            ],
+                        )
                         
                     ],
-                    class_name = 'p-1 m-0'
-                ), # pyright: ignore[reportCallIssue]
-                class_name = 'border-0 p-1 m-0'
-            ), # pyright: ignore[reportCallIssue]
+                    ),
+                    class_name = "shadow-sm mb-3",
+                ),
+                id = 'collapse-controls',
+                is_open = False,
+            ),
+            *stores_and_dialogs(),
         ],
         fluid = True,
-        class_name = 'p-0',
-    ) # pyright: ignore[reportCallIssue]
-
-def create_project_selector_block(**kwargs):
-    return html.Div(
-        create_project_selector()
+        class_name = 'newsegs-project-selector',
     )
 
-# -----------------------------------------------
-# Callbacks
-# -----------------------------------------------
+create_project_selector_block = create_project_selector
+
 def add_project_selector_callbacks(app: NewsegsDash):
+    @app.callback(
+        Output("collapse-controls", "is_open"),
+        Input("btn-toggle-controls", "n_clicks"),
+        State("collapse-controls", "is_open"),
+        prevent_initial_call=True,
+    )
+    def toggle_controls(n_clicks, is_open):
+        return not is_open if n_clicks else is_open
+
+    def _disable_project_load_buttons(state: bool, rval):
+        # As no project selected, disable the load and delete buttons
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'load-project'},
+            'disabled',
+            state,
+            rval
+        )
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'delete-project'},
+            'disabled',
+            state,
+            rval
+        )
+
+    def _disable_project_rename_button(state: bool, rval):
+        callback_utils.update_property_by_id(
+                {'type': 'action-button-ps', 'key': 'rename-project'},
+                'disabled',
+                state,
+                rval
+            )
+
+    def _disable_snapshot_rename_button(state: bool, rval):
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'rename-snapshot'},
+            'disabled',
+            state,
+            rval
+        )
+
+    def _disable_snapshot_load_buttons(state: bool, rval):
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'load-snapshot'},
+            'disabled',
+            state,
+            rval
+        )
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'delete-snapshot'},
+            'disabled',
+            state,
+            rval
+        )
+
+    def _disable_snapshot_create_button(state: bool, rval):
+        callback_utils.update_property_by_id(
+            {'type': 'action-button-ps', 'key': 'create-snapshot'},
+            'disabled',
+            state,
+            rval
+        )
 
     @app.callback(
-        Output('project-datalist-options', 'children'),
-        Output("snapshot-datalist-options", "children"),
-        Output('project-label-input', 'value'),
-
-        # Project Buttons logic
-        Output("btn-save-project", "style"),
-        Output("btn-save-project", "disabled"),
-        Output("btn-load-project", "style"),
-        Output("btn-load-project", "disabled"),
-        Output("btn-delete-project", "disabled"),
-
-        # Snapshot Buttons logic
-        Output("btn-save-snapshot", "disabled"),
-        Output("btn-load-snapshot", "disabled"),
-
-        # State Inputs
-        Input('active-project-id', 'data'),
-        Input('project-label-input', 'value'),
-        Input('snapshot-label-input', 'value'),
-        Input('app-state', 'data'),
+        output = dict(
+            header_project_name = Output('header-project-name', 'children'),
+            project_select = dict(
+                value = Output('select-load-project', 'value'),
+                options = Output('select-load-project', 'options')
+            ),
+            snapshot_select = dict(
+                value = Output('select-load-snapshot', 'value'),
+                options = Output('select-load-snapshot', 'options')
+            ),
+            input_project_name = dict(
+                value =  Output('input-project-name', 'value'),
+            ),
+            input_snapshot_name = dict(
+                value =  Output('input-snapshot-name', 'value'),
+            ),
+            buttons = dict (
+                button_disabled = Output({'type': 'action-button-ps', 'key': ALL}, 'disabled'),
+                button_class = Output({'type': 'action-button-ps', 'key': ALL}, 'class_name'),
+            )
+        ),
+        inputs = dict(
+            active_project_id = Input('active-project-id', 'data'),
+            app_state = Input('app-state', 'data'),
+            select_project = Input('select-load-project', 'value'),
+            select_snapshot = Input('select-load-snapshot', 'value'),
+            input_project_name = Input('input-project-name', 'value'),
+            input_snapshot_name = Input('input-snapshot-name', 'value'),
+            
+        ),
+        
+        prevent_initial_call = True
     )
     def update_ui_states(
         active_project_id,
-        current_project_label,
-        current_snapshot_label,
         app_state,
+        select_project,
+        select_snapshot,
+        input_project_name,
+        input_snapshot_name,
     ):
-        print('updating project selector ui')
-        app_state = json.loads(app_state) if app_state else {}
-        model_type = app_state.get('selected_model', 'default')
-        trig = ctx.triggered_id
 
-        # 1. Fetch Projects & Populate Datalist
-        all_projects = fetch_project_options(app.project_provider, model_type)
+        rval = callback_utils.create_noupdate_return()
 
-        project_map = {row['label']: row['value'] for row in all_projects if row.get('label')}
-        project_options = [
-            html.Option(value = x['label'], id = x['value']) for x in all_projects
-        ]
+        triggered_id = ctx.triggered_id
+        if isinstance(triggered_id, str) and triggered_id == 'active-project-id':
+            rval['header_project_name'] = app.project_provider.get_component_metadata(active_project_id, 'label')['label']
 
-        # Resolve active project label
-        active_project_label = next((p['label'] for p in all_projects if p['value'] == active_project_id), "")
-        force_label_update = trig is not None and isinstance(trig, str) and trig == 'active-project-id'
-        print(f'updating project label to {active_project_label} for id {active_project_id}')
-        print(f'current project label is {current_project_label} and force is {force_label_update}')
+            # Update snapshot selector
+            all_snapshots = fetch_snapshot_options(app.project_provider, active_project_id)
+            rval['snapshot_select']['options'] = all_snapshots
+            rval['snapshot_select']['value'] = None
 
-        # Sync input value if initialized from active-project store
-        if force_label_update:
-            input_text = active_project_label
-        else:
-            input_text = current_project_label if current_project_label is not None else active_project_label
+            # As no snapshot selected, disable the load, rename and delete buttons
+            _disable_snapshot_load_buttons(True, rval)
 
-        # 2. Compute Save/Load state for Project
-        has_text = bool(input_text and input_text.strip())
-        is_existing = input_text in project_map
-        is_active = (active_project_id is not None) and (project_map.get(input_text) == active_project_id)
+            # Also clear the name input
+            rval['input_snapshot_name']['value'] = None
+            _disable_snapshot_create_button(True, rval)
+            _disable_snapshot_rename_button(True, rval)
+            
+        if isinstance(triggered_id, str) and triggered_id in set(('active-project-id', 'app-state')):
+            # Update project selector
+            app_state = json.loads(app_state) if app_state else {}
+            model_type = app_state.get('selected_model', 'default')
+            all_projects = fetch_project_options(app.project_provider, model_type)
+            rval['project_select']['options'] = all_projects
+            rval['project_select']['value'] = None
 
-        # Save button: Visible and enabled only if label is non-empty and unused
-        show_save = has_text and not is_existing
-        save_style = {"display": "inline-block"} if show_save else {"display": "none"}
-        save_disabled = not show_save
+            # As no project selected, disable the load and delete buttons
+            _disable_project_load_buttons(True, rval)
 
-        # Load button: Visible and enabled only if label is used and doesn't match active project
-        show_load = is_existing and not is_active
-        load_style = {"display": "inline-block"} if show_load else {"display": "none"}
-        load_disabled = not show_load
+            # Also clear the name input
+            rval['input_project_name']['value'] = None
+            _disable_project_rename_button(True, rval)
 
-        # Delete button: Disabled if no project active or only one project exists
-        delete_disabled = active_project_id is None or len(project_options) < 2
+        if isinstance(triggered_id, str):
+            match triggered_id:
+                case 'select-load-project':
+                    project_nominated = select_project is not None
+                    _disable_project_load_buttons(not(project_nominated), rval)
 
-        # 3. Fetch Snapshots for active project
-        if active_project_id:
-            all_snapshots = fetch_snapshot_options(
-                app.project_provider,
-                active_project_id
-            )
-        else:
-            all_snapshots = []
-        snapshot_labels = {x['label'] for x in all_snapshots}
-        snapshot_options = [
-            html.Option(
-                value = x['label'],
-                id = x['value']
-            ) 
-            for x in all_snapshots
-        ]
+                case 'select-load-snapshot':
+                    snapshot_nominated = select_snapshot is not None
+                    _disable_snapshot_load_buttons(not(snapshot_nominated), rval)
+                    new_snapshot_name = input_snapshot_name is not None and input_snapshot_name != ''
+                    _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
 
-        # 4. Compute Save/Load state for Snapshot
-        snap_text_valid = bool(current_snapshot_label and current_snapshot_label.strip())
-        snap_exists = current_snapshot_label in snapshot_labels
+                case 'input-project-name':
+                    new_project_name = input_project_name
+                    _disable_project_rename_button((new_project_name is None or not new_project_name), rval)
 
-        save_snap_disabled = (not snap_text_valid) or snap_exists
-        load_snap_disabled = not snap_exists
+                case 'input-snapshot-name':
+                    new_snapshot_name = input_snapshot_name
+                    _disable_snapshot_create_button((new_snapshot_name is None or not new_snapshot_name), rval)
+                    snapshot_nominated = select_snapshot is not None
+                    _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
 
-        return (
-            project_options,
-            snapshot_options,
-            input_text,
-            save_style,
-            save_disabled,
-            load_style,
-            load_disabled,
-            delete_disabled,
-            save_snap_disabled,
-            load_snap_disabled,
-        )
+        return rval
 
     # -----------------------------------------------------------------------------
     # Event Action Callbacks (Create, Load, Delete, Snapshot)
     # -----------------------------------------------------------------------------
-
     @app.callback(
-        Output("active-project-id", "data"),
-        Output("active-snapshot-id", "data"),
-
+        output = dict(
+            active_project_id = Output("active-project-id", "data", allow_duplicate = True),
+        ),
         # Triggers
-        Input("btn-save-project", "n_clicks"),
-        Input("btn-load-project", "n_clicks"),
-        Input("delete-project-confirm-dialog", "submit_n_clicks"),
-        Input("btn-save-snapshot", "n_clicks"),
-        Input("btn-load-snapshot", "n_clicks"),
+        inputs = dict(
+            buttons = dict(
+                n_clicks = Input({'type': 'action-button-ps', 'key': ALL}, 'n_clicks')
+            ),
+            delete_project_confirm = Input('delete-project-confirm-dialog', 'submit_n_clicks'),
+            delete_snapshot_confirm = Input('delete-snapshot-confirm-dialog', 'submit_n_clicks'),
+        ),
 
-        # States
-        State("project-label-input", "value"),
-        State("snapshot-label-input", "value"),
-        State("active-project-id", "data"),
-        State('app-state', 'data'),
-        State("session-id", 'data'),
-
-        prevent_initial_call=True,
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            session_id = State('session-id', 'data'),
+            app_state = State('app-state', 'data'),
+            input_project_name = State('input-project-name', 'value'),
+            input_snapshot_name = State('input-snapshot-name', 'value'),
+            select_project = State('select-load-project', 'value'),
+            select_snapshot = State('select-load-snapshot', 'value'),
+        ),
+        prevent_initial_call = True
     )
     def handle_project_actions(
-        save_proj_click, load_proj_click, confirm_delete_click,
-        save_snap_click, load_snap_click,
-        project_label, snapshot_label, active_project_id, app_state, session_id
+        active_project_id,
+        **kwargs 
     ):
-        triggered = ctx.triggered_id
         trig_val = callback_utils.get_triggered_value()
         if not trig_val:
-            return no_update, no_update
-        print('project selector event: ',triggered)
-        print('project selector triggering value: ', trig_val)
+            raise PreventUpdate
 
-        # Save Project
-        if triggered == "btn-save-project" and project_label:
-            new_proj = create_project(
-                app.project_provider,
-                active_project_id,
-                project_label.strip())
-            app.project_provider.set_session_project_id(session_id, new_proj.id)
-            return new_proj.id, None
+        triggered = cast(dict, ctx.triggered_id)
 
-        # Load Project
-        if triggered == "btn-load-project" and project_label:
-            app_state = json.loads(app_state) if app_state else {}
-            model_type = app_state.get('selected_model', 'default')
-            all_projects = fetch_project_options(
-                app.project_provider,
-                model_type
-            )
-            matched_id = next((p['value'] for p in all_projects if p['label'] == project_label), None)
-            if matched_id:
-                print ('switching to project ', matched_id)
-                app.project_provider.set_session_project_id(session_id, matched_id)
-                return matched_id, None
-            return no_update, no_update
+        app_state = kwargs.get('app_state')
+        app_state = json.loads(app_state) if app_state else {}
 
-        # Delete Project
-        if triggered == "delete-project-confirm-dialog" and active_project_id and trig_val:
-            app_state = json.loads(app_state) if app_state else {}
-            model_type = app_state.get('selected_model', 'default')
-            new_selected_project_id = delete_project(
-                app.project_provider,
-                active_project_id,
-                model_type,
-            )
-            if new_selected_project_id:
-                app.project_provider.set_session_project_id(session_id, new_selected_project_id)
-            return new_selected_project_id, None
+        rval = callback_utils.create_noupdate_return()
 
-        # Create Snapshot
-        if triggered == "btn-save-snapshot" and active_project_id and snapshot_label:
-            snap_id = create_snapshot(
-                app.project_provider,
-                active_project_id, 
-                snapshot_label.strip()
-            )
-            return active_project_id, str(snap_id)
+        if isinstance(triggered, str):
+            match triggered:
+                case 'delete-project-confirm-dialog':
+                    project_id = kwargs['select_project']
+                    if project_id is not None:
+                        print (f'Deleting project {project_id}')
+                        try:
+                            active_project_id = delete_project(
+                                app.project_provider,
+                                project_id,
+                                active_project_id,
+                                app_state.get('selected_model', 'default')
+                            )
+                        except Exception as e:
+                            print(f'Could not delete project {project_id}: {e}')
 
-        # Load Snapshot
-        if triggered == "btn-load-snapshot" and active_project_id and snapshot_label:
-            all_snapshots = fetch_snapshot_options(app.project_provider, active_project_id)
-            snap_id = next((s['value'] for s in all_snapshots if s['label'] == snapshot_label), None)
-            if snap_id:
-                new_proj = load_snapshot(
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            active_project_id,
+                            rval
+                        )
+
+                case 'delete-snapshot-confirm-dialog':
+                    snapshot_id = kwargs['select_snapshot']
+                    if snapshot_id is not None:
+                        print (f'Deleting snapshot {snapshot_id}')
+                        delete_snapshot(
+                            app.project_provider,
+                            active_project_id,
+                            snapshot_id
+                        )
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            active_project_id,
+                            rval
+                        )
+                case _:
+                    print (f'Unknown trigger: {triggered}')
+
+            return rval
+
+        match triggered['key']:
+
+            case 'rename-project':
+                new_name = kwargs['input_project_name']
+                if new_name is not None:
+                    rename_project(
+                        app.project_provider,
+                        active_project_id,
+                        new_name.strip()
+                    )
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        active_project_id,
+                        rval
+                    )
+
+            case 'create-snapshot':
+                snapshot_name = kwargs['input_snapshot_name']
+                if snapshot_name is not None:
+                    s_id = create_snapshot(
+                        app.project_provider,
+                        active_project_id,
+                        snapshot_name.strip()
+                    )
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        active_project_id,
+                        rval
+                    )
+
+            case 'load-project':
+                project_id = kwargs['select_project']
+                if project_id is not None:
+                    can_load = verify_project_exists(
+                        app.project_provider, project_id
+                    )
+                    if can_load:
+                        if kwargs['session_id']:
+                            app.project_provider.set_session_project_id(
+                                kwargs['session_id'],
+                                project_id
+                            )
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            project_id,
+                            rval
+                        )
+
+
+            case 'load-snapshot':
+                snapshot_id = kwargs['select_snapshot']
+                if snapshot_id is not None:
+                    created_project_id = load_snapshot(
+                        app.project_provider,
+                        active_project_id,
+                        snapshot_id
+                    )
+                    if created_project_id is not None:
+                        if kwargs['session_id']:
+                            app.project_provider.set_session_project_id(
+                                kwargs['session_id'],
+                                created_project_id
+                            )
+
+                        callback_utils.update_property_by_id(
+                            'active-project-id',
+                            'data',
+                            created_project_id,
+                            rval
+                        )
+
+            case 'new-project':
+                model_type = app_state.get('selected_model', 'default')
+                created_project_id = new_project(
                     app.project_provider,
-                    active_project_id,
-                    snap_id,
+                    model_type
                 )
-                app.project_provider.set_session_project_id(session_id, new_proj.id)
-                return new_proj.id, snap_id
-            return no_update, no_update
+                if created_project_id is not None:
+                    if kwargs['session_id']:
+                        app.project_provider.set_session_project_id(
+                            kwargs['session_id'],
+                            created_project_id
+                        )
 
-        return active_project_id, None
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        created_project_id,
+                        rval
+                    )
+                
+            case 'duplicate-project':
+                created_project_id = duplicate_project(
+                    app.project_provider,
+                    active_project_id
+                )
+                if created_project_id is not None:
+                    if kwargs['session_id']:
+                        app.project_provider.set_session_project_id(
+                            kwargs['session_id'],
+                            created_project_id
+                        )
 
+                    callback_utils.update_property_by_id(
+                        'active-project-id',
+                        'data',
+                        created_project_id,
+                        rval
+                    )
+
+            case 'delete-project':
+                # Launches confirm via another callback.
+                pass
+
+            case 'rename-snapshot':
+                new_name = kwargs['input_snapshot_name']
+                snapshot_id = kwargs['select_snapshot']
+                if new_name is not None and snapshot_id is not None:
+                    rename_snapshot(app.project_provider, snapshot_id, new_name)
+
+                callback_utils.update_property_by_id(
+                    'active-project-id',
+                    'data',
+                    active_project_id,
+                    rval
+                )
+
+            case 'delete-snapshot':
+                # Launches confirm via another callback.
+                pass
+
+            case _:
+                print(f'Unknown trigger: {triggered}')
+        
+        return rval
 
     @app.callback(
         Output("delete-project-confirm-dialog", "displayed"),
-        Input("btn-delete-project", "n_clicks"),
+        Input({'type': 'action-button-ps', 'key': 'delete-project'}, 'n_clicks'),
         prevent_initial_call=True,
     )
-    def display_delete_confirm(n_clicks):
+    def display_delete_project_confirm(n_clicks):
         if n_clicks:
             return True
         return False
 
-
-    # @app.callback(
-    #     Output("project-input", "value"),
-    #     Input("active-project", "data"),
-    #     State("project-datalist-options", "children")
-    # )
-    # def sync_active_project_to_ui(active_data, options):
-    #     """Initializes input label when active-project changes."""
-    #     if not active_data or not options:
-    #         return ""
-        
-    #     # Match active_data (project_id) with corresponding option label
-    #     for opt in options:
-    #         if opt.get("props", {}).get("id", {}).get('key') == str(active_data):
-    #             return opt.get("props", {}).get("value")
-    #     return ""
+    @app.callback(
+        Output("delete-snapshot-confirm-dialog", "displayed"),
+        Input({'type': 'action-button-ps', 'key': 'delete-snapshot'}, 'n_clicks'),
+        prevent_initial_call=True,
+    )
+    def display_delete_snapshot_confirm(n_clicks):
+        if n_clicks:
+            return True
+        return False
     
-    # @app.callback(
-    #     Output("active-project", "data"),
-    #     Output("project-datalist-options", "children"),
-    #     Input("save-project-btn", "n_clicks"),
-    #     State("project-input", "value"),
-    #     State("project-datalist-options", "children"),
-    #     prevent_initial_call=True
-    # )
-    # def handle_project_selection_and_creation(n_clicks, typed_value, options):
-    #     """Saves typed text as a new SQLite row or matches existing project label."""
-    #     if not typed_value:
-    #         return None, options
-
-    #     # Check if typed text matches an existing project label
-    #     existing_map = {
-    #         opt["props"]["value"]: opt["props"]["id"] 
-    #         for opt in options if "props" in opt
-    #     }
-
-    #     if typed_value in existing_map:
-    #         return int(existing_map[typed_value]), options
-
-    #     # Create new project in SQLite if label doesn't exist
-    #     new_id = insert_new_project(label=typed_value)
-
-    #     updated_options = list(options)
-    #     updated_options.append(html.Option(value=typed_value, id=str(new_id)))
-
-    #     return new_id, updated_options

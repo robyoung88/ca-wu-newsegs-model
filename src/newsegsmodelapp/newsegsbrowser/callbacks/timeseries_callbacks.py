@@ -1,4 +1,3 @@
-import json
 import time
 
 from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
@@ -8,8 +7,8 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from plotly_resampler import FigureResampler
 
-from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
+
 
 resampler = FigureResampler(make_subplots(specs=[[{"secondary_y": True}]]))
 
@@ -18,7 +17,6 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
         app=app,
         graph_id="graph-timeseries",
     )
-
 
     @app.callback(
         Output('timeseries-graph-container', 'style'),
@@ -133,9 +131,7 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
             )
         )
 
-        fig = FigureResampler(
-            make_subplots(specs=[[{'secondary_y': True}]])
-        )
+        fig = resampler
 
         fig.register_update_graph_callback(app, 'graph-timeseries')
         df1_varnames = [

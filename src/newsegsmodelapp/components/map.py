@@ -9,10 +9,8 @@ from dash_bootstrap_components._components.Row import Row as dbc_Row
 from dash_bootstrap_components._components.Col import Col as dbc_Col
 
 from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelapp.newsegsbrowser.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
-from newsegsmodelapp.newsegsbrowser.common import get_icon
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 
@@ -203,7 +201,9 @@ def add_map_click_callback(app: NewsegsDash):
             if pos[0] == 0 and pos[1] == 0:
                 return []
         if not click_data is None:
-            coordinates = click_data['latlng']
+            coordinates = click_data.get('latlng')
+            if not coordinates:
+                raise PreventUpdate
             lat, lon = coordinates.values()
             easting,northing = _trans_togb.transform(lat, lon)
             return json.dumps({'lat':lat,'lon':lon, 'easting': easting, 'northing': northing, 'name': current_name})

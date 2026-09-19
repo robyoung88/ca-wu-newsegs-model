@@ -2,17 +2,9 @@
 Callbacks for handling optimisation requests
 """
 
-import json
 import logging
-from typing import Any, MutableMapping, cast
 
-from dash import ALL, Dash, Input, Output, Patch, State, ctx, no_update
-
-from newsegsmodelapp.newsegsbrowser import common as browser
-from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
-from newsegsmodelapp.newsegsbrowser.postprocess import postprocess_utils
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
-from newsegsmodelframework.newsegssensitivity import optim
+from dash import ALL, Dash, Input, Output, State, ctx, no_update
 
 logger = logging.getLogger(__name__)
 
