@@ -69,9 +69,11 @@ def n_samples_input(
 
     header_id = copy.copy(id)
     header_id.type = 'single-input-header'
+    header_id.purpose = 'header'
 
     trigger_id = copy.copy(id)
     trigger_id.type = 'input-group-config-update-trigger'
+    trigger_id.purpose = 'trigger'
 
     return html.Div([
         html.H4('Number of samples:', id = header_id.as_dict()),
@@ -103,9 +105,11 @@ def random_seed_input(
 
     header_id = copy.copy(id)
     header_id.type = 'single-input-header'
+    header_id.purpose = 'header'
 
     trigger_id = copy.copy(id)
     trigger_id.type = 'input-group-config-update-trigger'
+    trigger_id.purpose = 'trigger'
 
     return html.Div([
         html.H4('Random Seed:', id = header_id.as_dict()),
@@ -137,9 +141,11 @@ def return_draws_input(
 
     header_id = copy.copy(id)
     header_id.type = 'single-input-header'
+    header_id.purpose = 'header'
 
     trigger_id = copy.copy(id)
     trigger_id.type = 'input-group-config-update-trigger'
+    trigger_id.purpose = 'trigger'
 
     return html.Div([
         html.H4('Keep drawn parameters:', id = header_id.as_dict()),

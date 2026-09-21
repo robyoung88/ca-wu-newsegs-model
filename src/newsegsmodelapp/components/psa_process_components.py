@@ -16,22 +16,23 @@ def psa_process_components(**kwargs):
                 dbc_ModalFooter([
                     dbc_Button(
                         'OK',
-                        id = {
-                            'type': 'action-button', 'purpose': 'request-process',
-                            'supersection': 'psa', 'section': 'run',
-                            'key': 'psa_run_metamodel', 'subindex': 0,
-                        },
+                        id = 'btn-action-psa-run-metamodel',
+                        # id = {
+                        #     'type': 'action-button', 'purpose': 'request-process',
+                        #     'supersection': 'psa', 'section': 'run',
+                        #     'key': 'psa_run_metamodel', 'subindex': 0,
+                        # },
                         n_clicks = 0
                     ),
                     dbc_Button(
                         'Cancel', 
-                        id = {'type': 'modal-close-button', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-run-confirm'},
+                        id = 'btn-psa-confirm-abort',
                         className = 'ms-auto',
                         n_clicks = 0
                     )
                 ]),
             ],
-            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-run-confirm'},
+            id = 'modal-psa-confirm',
             is_open = False
         ),
         dbc_Modal(
@@ -45,7 +46,7 @@ def psa_process_components(**kwargs):
                             {'label': 'Results and model configuration', 'value': 'result_and_config'}
                         ],
                         'result',
-                        id = {'type': 'psa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'contents-option'}
+                        id = {'type': 'psa-result-download-option', 'key': 'contents-option'}
                     ),
                     html.H3('Result format:'),
                     dcc.RadioItems(
@@ -54,25 +55,28 @@ def psa_process_components(**kwargs):
                             {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
                         ],
                         'csv',
-                        id = {'type': 'psa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'format-option'}
+                        id = {'type': 'psa-result-download-option', 'key': 'format-option'}
                     )
                 ]),
                 dbc_ModalFooter([
                     dbc_Button(
                         'OK',
-                        id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+                        #id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+                        id = 'btn-psa-download-confirm-ok',
                         n_clicks = 0
                     ),
                     dbc_Button(
                         'Cancel', 
-                        id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-download-confirm'},
+                        #id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-download-confirm'},
+                        id = 'btn-psa-download-confirm-abort',
                         className = 'ms-auto',
                         n_clicks = 0
                     )
                 ]),
             ],
-            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-download-confirm'},
+            #id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-download-confirm'},
+            id = 'modal-psa-download-confirm',
             is_open = False
         ),
-        dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'})
+        dcc.Download(id = 'download-psa-result')
     ]

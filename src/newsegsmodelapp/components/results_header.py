@@ -40,11 +40,12 @@ def create_results_header(**kwargs):
                                             style={'display': 'inline'}
                                         ),
                                         color = 'primary',
-                                        id = {
-                                            'type': 'action-button', 'purpose': 'request-process',
-                                            'supersection': 'deterministic', 'section': 'run',
-                                            'key': 'deterministic_run_metamodel', 'subindex': 0,
-                                        },
+                                        id = 'btn-action-deterministic-run-metamodel',
+                                        # id = {
+                                        #     'type': 'action-button', 'purpose': 'request-process',
+                                        #     'supersection': 'deterministic', 'section': 'run',
+                                        #     'key': 'deterministic_run_metamodel', 'subindex': 0,
+                                        # },
                                         style = {
                                             'margin-left': '5px',
                                             'border-radius': '50%',
@@ -60,11 +61,12 @@ def create_results_header(**kwargs):
                                             style={'display': 'inline'}
                                         ),
                                         color = 'primary',
-                                        id = {
-                                            'type': 'action-button', 'purpose': 'request-process',
-                                            'supersection': 'deterministic', 'section': 'run',
-                                            'key': 'deterministic_run_project', 'subindex': 0,
-                                        },
+                                        id = 'btn-action-deterministic-run-project',
+                                        # id = {
+                                        #     'type': 'action-button', 'purpose': 'request-process',
+                                        #     'supersection': 'deterministic', 'section': 'run',
+                                        #     'key': 'deterministic_run_project', 'subindex': 0,
+                                        # },
                                         style = {
                                             'margin-left': '5px',
                                             'border-radius': '50%',
@@ -164,7 +166,7 @@ def create_results_header_dsa(**kwargs):
                 style = {'display': 'inline'}
             ),
             color = 'secondary',
-            id = {'type': 'results-predownload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
+            id = 'btn-dsa-result-predownload',
             outline = True,
             title = 'Download DSA results',
         ), # pyright: ignore[reportCallIssue]
@@ -174,13 +176,12 @@ def create_results_header_dsa(**kwargs):
                     className = icons.get_icon('config-upload', style_name = 'raw'),
                     style = {'display': 'inline'}       
                 ),
-            
                 color = 'secondary',
-                id = {'type': 'results-upload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
+                id = 'btn-upload-dsa-result',
                 outline = True,
                 title = 'Upload previous DSA results',
             ), # pyright: ignore[reportCallIssue]
-            id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
+            id = 'upload-dsa-result',
             multiple = False,
             enable_folder_selection = False,
             accept = '.csv,.xlsx,.zip',
@@ -227,7 +228,7 @@ def create_results_header_psa(**kwargs):
         dbc.Button(
             'Run PSA',
             color = 'primary',
-            id = {'type': 'psa-prerun-button', 'page': kwargs.get('page_type', 'None')},
+            id = 'btn-psa-prerun',
             disabled = False,
         ), # pyright: ignore[reportCallIssue]
         dbc.Button(
@@ -236,7 +237,8 @@ def create_results_header_psa(**kwargs):
                 style = {'display': 'inline'}
             ),
             color = 'secondary',
-            id = {'type': 'results-predownload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+            id = 'btn-psa-result-predownload',
+            #id = {'type': 'results-predownload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
             outline = True,
             title = 'Download PSA results',
         ), # pyright: ignore[reportCallIssue]
@@ -252,7 +254,8 @@ def create_results_header_psa(**kwargs):
                 outline = True,
                 title = 'Upload previous PSA results',
             ), # pyright: ignore[reportCallIssue]
-            id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
+            id = 'upload-psa-result',
+            #id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
             multiple = False,
             enable_folder_selection = False,
             accept = '.csv,.xlsx,.zip',

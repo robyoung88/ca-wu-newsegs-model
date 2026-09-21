@@ -28,36 +28,18 @@ def add_psa_run_callbacks(app: NewsegsDash):
     @app.callback(
         output = {
             'modal': {
-                'is_opens': Output(
-                    {'type': 'modal-confirm', 'page': ALL, 'key':'psa-run-confirm'},
-                    'is_open'
-                )
+                'is_opens': Output('modal-psa-confirm', 'is_open')
             }
         },
         inputs = {
-            'psa_run_button': Input({
-                'type': 'action-button', 'purpose': 'request-process',
-                'supersection': 'psa', 'section': 'run',
-                'key': 'psa_run_metamodel', 'subindex': ALL,
-            },'n_clicks'),
+            'psa_run_button': Input('btn-action-psa-run-metamodel','n_clicks'),
             'modal_close_button': {
-                'n_clicks': Input(
-                    {'type': 'modal-close-button', 'page': ALL, 'key': 'psa-run-confirm'},
-                    'n_clicks'
-                )
+                'n_clicks': Input('btn-psa-confirm-abort','n_clicks')
                 
             },
             'psa_prerun_button': {
-                'n_clicks': Input({'type': 'psa-prerun-button', 'page': ALL}, 'n_clicks'),
+                'n_clicks': Input('btn-psa-prerun', 'n_clicks'),
             },
-        },
-        state = {
-            'modal': {
-                'ids': State(
-                    {'type': 'modal-confirm', 'page': ALL, 'key':'psa-run-confirm'},
-                    'id'
-                )
-            }
         }
     )
     def confirm_psa_run(
@@ -66,55 +48,42 @@ def add_psa_run_callbacks(app: NewsegsDash):
         psa_prerun_button,
         modal,
     ):
-        n_modals = len(modal['ids'])
-        if n_modals == 0:
-            return dict(modal = dict(is_opens = []))
+        clicks = callback_utils.get_triggered_value()
+        if not clicks:
+            raise PreventUpdate
+        
         trig_id = ctx.triggered_id
         if trig_id is None:
-            return dict(modal = dict(is_opens = [no_update] * n_modals))
-        
-        if trig_id.get('type') == 'psa-prerun-button':
-            return dict(modal = dict(is_opens = [True] * n_modals))
+            raise PreventUpdate
+
+        rval = callback_utils.create_noupdate_return()
+        if trig_id == 'btn-psa-prerun':
+            rval['modal']['is_opens'] = True
         else:
-            return dict(modal = dict(is_opens = [False] * n_modals))
+            rval['modal']['is_opens'] = False
         
     @app.callback(
         output = {
             'modal': {
-                'is_opens': Output(
-                    {'type': 'modal-confirm', 'page': ALL, 'key':'psa-download-confirm'},
-                    'is_open'
-                )
+                'is_opens': Output('modal-psa-download-confirm', 'is_open')
             },
             'download': {
-                'datas': Output(
-                    {'type': 'results-download-component', 'page': ALL, 'key': 'psa'},
-                    'data'
-                )
+                'datas': Output('download-psa-result', 'data')
             },
         },
         inputs = {
             'results_download_button': {
-                'n_clicks': Input({'type': 'results-download-btn', 'page': ALL, 'key': 'psa'}, 'n_clicks'),
+                'n_clicks': Input('btn-psa-download-confirm-ok', 'n_clicks'),
             },
             'modal_close_button': {
-                'n_clicks': Input(
-                    {'type': 'modal-close-btn', 'page': ALL, 'key': 'psa-download-confirm'},
-                    'n_clicks'
-                )
+                'n_clicks': Input('btn-psa-download-confirm-abort', 'n_clicks')
                 
             },
             'results_predownload_button': {
-                'n_clicks': Input({'type': 'results-predownload-btn', 'page': ALL, 'key': 'psa'}, 'n_clicks'),
+                'n_clicks': Input('btn-psa-result-predownload', 'n_clicks'),
             },
         },
         state = {
-            'modal': {
-                'ids': State(
-                    {'type': 'modal-confirm', 'page': ALL, 'key':'psa-download-confirm'},
-                    'id'
-                )
-            },
             'options': {
                 'values': State(
                     {'type': 'psa-result-download-option', 'page': ALL, 'key': ALL},
@@ -122,12 +91,6 @@ def add_psa_run_callbacks(app: NewsegsDash):
                 ),
                 'ids': State(
                     {'type': 'psa-result-download-option', 'page': ALL, 'key': ALL},
-                    'id'
-                )
-            },
-            'download': {
-                'ids': State(
-                    {'type': 'results-download-component', 'page': ALL, 'key': 'psa'},
                     'id'
                 )
             },
@@ -139,50 +102,47 @@ def add_psa_run_callbacks(app: NewsegsDash):
         results_download_button,
         modal_close_button,
         results_predownload_button,
-        modal,
         options,
-        download,
         active_project_id,
     ):
-        n_modals = len(modal['ids'])
-        n_downloads = len(download['ids'])
         trig_id = ctx.triggered_id
-        rval: dict[str, Any] = dict(
-            modal = dict(is_opens = [no_update] * n_modals),
-            download = dict(datas =  [no_update] * n_downloads)
-        )
         if trig_id is None:
-            return rval
-        
-        match trig_id.get('type'):
-            case 'results-predownload-btn':
-                rval['modal']['is_opens'] = [True] * n_modals
-                return rval
-            case 'results-download-btn':
-                rval['modal']['is_opens'] = [False] * n_modals
-                page = trig_id.get('page')
-                opts = callback_utils.get_options(
-                    options['ids'],
-                    options['values'],
-                    page,
-                    ['contents-option', 'format-option']
-                )
+            raise PreventUpdate
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
 
-                to_export = export.export_results(
-                    'psa',
-                    app.project_provider,
-                    app.results_provider,
-                    active_project_id,
-                    opts.get('contents-option', 'result'),
-                    opts.get('format-option', 'csv')
-                )
-                
-                if to_export is not None:
-                    for idx, id in enumerate(download['ids']):
-                        if id['page'] == page:
-                            rval['download']['datas'][idx] = to_export
-            case _:
-                rval['modal']['is_opens'] = [False] * n_modals
+        rval = callback_utils.create_noupdate_return()
+        
+        if isinstance(trig_id, str):
+
+            match trig_id:
+                case 'btn-psa-download-confirm-ok':
+                    rval['modal']['is_opens'] = False
+                    opts = callback_utils.get_options_nopage(
+                        options['ids'],
+                        options['values'],
+                        ['contents-option', 'format-option']
+                    )
+
+                    to_export = export.export_results(
+                        'psa',
+                        app.project_provider,
+                        app.results_provider,
+                        active_project_id,
+                        opts.get('contents-option', 'result'),
+                        opts.get('format-option', 'csv')
+                    )
+                    
+                    if to_export is not None:
+                        rval['download']['datas'] = to_export
+
+                case 'results-predownload-btn':
+                    rval['modal']['is_opens'] = True
+                    return rval
+                    
+                case _:
+                    rval['modal']['is_opens'] = False
         return rval
     
     @app.callback(
@@ -198,10 +158,10 @@ def add_psa_run_callbacks(app: NewsegsDash):
             ),
         ),
         inputs = dict(
-            uploads = dict(
-                datas = Input({'type': 'results-upload', 'page': ALL, 'key': 'psa'}, 'contents'),
-                filenames = Input({'type': 'results-upload', 'page': ALL, 'key': 'psa'}, 'filename'),
-                ids = State({'type': 'results-upload', 'page': ALL, 'key': 'psa'}, 'id')
+            upload = dict(
+                data = Input('upload-psa-result', 'contents'),
+                filename = Input('upload-psa-result', 'filename'),
+                id = State('upload-psa-result', 'id')
             )
         ),
         state = dict(
@@ -210,29 +170,23 @@ def add_psa_run_callbacks(app: NewsegsDash):
         prevent_initial_call = True
     )
     def upload_psa_results(
-        uploads,
+        upload,
         active_project_id,
     ):
-        rval: dict[str, Any] = dict(
-            active_project_id = no_update,
-            trigger = dict(value = no_update)
-        )
 
         trig = ctx.triggered_id
         if trig is None:
-            return rval
+            raise PreventUpdate
+        if upload['data'] is None:
+            raise PreventUpdate
+
+        raw_data = upload['data']
+        raw_filename = upload['filename']
         
-        raw_data = None
-        raw_filename = None
-        for idx, id in enumerate(uploads['ids']):
-            if id['page'] == trig['page'] and id['key'] == trig['key']:
-                if uploads['datas'][idx] is None:
-                    return rval
-                raw_data = uploads['datas'][idx]
-                raw_filename = uploads['filenames'][idx]
-                break
         if raw_data is None:
-            return rval
+            raise PreventUpdate
+
+        rval = callback_utils.create_noupdate_return()
         
         ctype, cstr = raw_data.split(',')
         decoded = base64.b64decode(cstr)

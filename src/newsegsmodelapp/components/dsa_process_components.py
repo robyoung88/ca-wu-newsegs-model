@@ -50,7 +50,7 @@ def dsa_process_components(**kwargs):
                             {'label': 'Results and model configuration', 'value': 'result_and_config'}
                         ],
                         'result',
-                        id = {'type': 'dsa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'contents-option'}
+                        id = {'type': 'dsa-result-download-option', 'key': 'contents-option'}
                     ),
                     html.H3('Result format:'),
                     dcc.RadioItems(
@@ -59,25 +59,25 @@ def dsa_process_components(**kwargs):
                             {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
                         ],
                         'csv',
-                        id = {'type': 'dsa-result-download-option', 'page': kwargs.get('page_type', 'None'), 'key': 'format-option'}
+                        id = {'type': 'dsa-result-download-option', 'key': 'format-option'}
                     )
                 ]),
                 dbc_ModalFooter([
                     dbc_Button(
                         'OK',
-                        id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'},
+                        id = 'btn-dsa-download-confirm-ok',
                         n_clicks = 0
                     ),
                     dbc_Button(
                         'Cancel', 
-                        id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-download-confirm'},
+                        id = 'btn-dsa-download-confirm-abort',
                         className = 'ms-auto',
                         n_clicks = 0
                     )
                 ]),
             ],
-            id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'dsa-download-confirm'},
+            id = 'modal-dsa-download-confirm',
             is_open = False
         ),
-        dcc.Download(id = {'type': 'results-download-component', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa'})
+        dcc.Download(id = 'download-dsa-result')
     ]

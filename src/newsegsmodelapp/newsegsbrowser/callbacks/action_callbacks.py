@@ -179,16 +179,17 @@ def add_action_callbacks(app: NewsegsDash):
         Output('ongoing-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
 
-        Input({
-            'type': 'action-button', 'purpose': ALL, 
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'n_clicks'),
-        Input({
-            'type': 'postaction-trigger', 'purpose': 'trigger',
-            'supersection': 'global', 'section': ALL,
-            'key': ALL, 'subindex': 0
-        }, 'data'), # Generally, this won't feature as won't be triggered by feedback. However, there are a few external loaders which may set the postprocess sequence running.
+        # Input({
+        #     'type': 'action-button', 'purpose': ALL, 
+        #     'supersection': ALL, 'section': ALL,
+        #     'key': ALL, 'subindex': ALL
+        # }, 'n_clicks'),
+        Input('trigger-check-requests', 'data'),
+        # Input({
+        #     'type': 'postaction-trigger', 'purpose': 'trigger',
+        #     'supersection': 'global', 'section': ALL,
+        #     'key': ALL, 'subindex': 0
+        # }, 'data'), # Generally, this won't feature as won't be triggered by feedback. However, there are a few external loaders which may set the postprocess sequence running.
         Input('progress-poll-interval', 'n_intervals'),
 
         State('ongoing-actions', 'data'),
@@ -211,8 +212,9 @@ def add_action_callbacks(app: NewsegsDash):
         prevent_initial_call = True
     )
     def manage_actions(
-        action_button_clicks,
-        postaction_triggers,
+        #action_button_clicks,
+        check_requests,
+        #postaction_triggers,
         poll_intervals,
 
         ongoing_actions: list[int],

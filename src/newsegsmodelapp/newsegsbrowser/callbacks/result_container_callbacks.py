@@ -437,7 +437,7 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         Input({
             'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': ALL,
+            'supersection': ALL, 'purpose': 'trigger',
             'section': ALL, 'key': ALL, 'subindex': ALL,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'data'),

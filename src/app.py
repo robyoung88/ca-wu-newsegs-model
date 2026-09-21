@@ -110,6 +110,7 @@ def serve_layout():
         dcc.Store(id = 'active-project-id', data = '', storage_type = 'session'),
         dcc.Store(id = 'layout-update-trigger', data = '', storage_type = 'memory'),
         dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
+        dcc.Store(id = 'trigger-check-requests', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
     ] 
@@ -259,8 +260,8 @@ def create_app(external_stylesheets = None) -> Dash:
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)
     add_dsa_run_callbacks(app)
-    #add_optim_run_callbacks(app)
-    #add_psa_run_callbacks(app)
+    add_optim_run_callbacks(app)
+    add_psa_run_callbacks(app)
 
     return app
 

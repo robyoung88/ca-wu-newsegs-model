@@ -72,24 +72,23 @@ def optim_process_components(**kwargs):
             dbc_ModalFooter([
                 dbc_Button(
                     'OK',
-                     id = {
-                        'type': 'action-button', 'purpose': 'request-process',
-                        'supersection': 'optim', 'section': 'run',
-                        'key': 'optim_run_metamodel', 'subindex': 0,
-                    },
+                    id = 'btn-action-optim-run-metamodel',
+                    #  id = {
+                    #     'type': 'action-button', 'purpose': 'request-process',
+                    #     'supersection': 'optim', 'section': 'run',
+                    #     'key': 'optim_run_metamodel', 'subindex': 0,
+                    # },
                     n_clicks = 0
                 ), # pyright: ignore[reportCallIssue]
                 dbc_Button(
                     'Cancel',
-                    id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'optim-run-confirm'},
+                    id = 'btn-optim-confirm-abort',
                     className = 'ms-auto',
                     n_clicks = 0
                 ) # pyright: ignore[reportCallIssue]
             ])
         ],
-        id = {
-            'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'optim-run-confirm'
-        },
+        id = 'modal-optim-confirm',
         is_open = False,
         size = 'xl',
     ),

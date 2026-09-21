@@ -180,7 +180,7 @@ def create_value_reset_button(
     param_id: VariableInstanceParameterComponentID
 ):
     button_id = copy.copy(param_id)
-    button_id.type = 'action-button'
+    button_id.type = 'input-action-button'
     button_id.purpose = 'value-reset'
     #button_id.type = 'value-reset-button'
     
@@ -196,7 +196,7 @@ def create_value_reset_button(
         size = 'sm'
     )
 
-@register_input_handler('value-reset', 'action-button')
+@register_input_handler('value-reset', 'input-action-button')
 def _reset_value(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
@@ -239,7 +239,7 @@ def create_value_set_default_button(
     param_id: VariableInstanceParameterComponentID
 ):
     button_id = copy.copy(param_id)
-    button_id.type = 'action-button'
+    button_id.type = 'input-action-button'
     button_id.purpose = 'value-set-default'
     #button_id.type = 'value-set-default-button'
     
@@ -256,7 +256,7 @@ def create_value_set_default_button(
         class_name = 'set-default',
     )
 
-@register_input_handler('value-set-default', 'action-button')
+@register_input_handler('value-set-default', 'input-action-button')
 def _set_default_value(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
@@ -357,7 +357,7 @@ def create_variable_status_badge(
     colour: str = "success"
 ):
     badge_id = copy.copy(param_id)
-    badge_id.type = 'action-button'
+    badge_id.type = 'input-action-button'
     badge_id.purpose = 'variable-status-toggle'
 
     return html.Span([
@@ -368,10 +368,10 @@ def create_variable_status_badge(
             className = "ml-2 variable-status-badge",
             style = {"cursor": "pointer"}
         ),
-        create_input_group_config_update_trigger(param_id, purpose='variable-status-trigger')
+        #create_input_group_config_update_trigger(param_id, purpose='variable-status-trigger')
     ])
 
-@register_input_handler('variable-status-toggle', 'action-button')
+@register_input_handler('variable-status-toggle', 'input-action-button')
 def _toggle_variable_sharing(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
@@ -471,7 +471,7 @@ def _toggle_variable_sharing(
         
     return input_returns, header_returns, trigger_returns
 
-@register_input_handler('toggle-optim-active', 'toggle')
+@register_input_handler('toggle-optim-active', 'input-toggle')
 def _set_variable_optim_active(
     triggered_id: dict,
     input_ids: list[dict[str, str]],

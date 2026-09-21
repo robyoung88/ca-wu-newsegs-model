@@ -67,7 +67,7 @@ def create_optim_configuration_editor_header(**kwargs):
         dbc.Button(
             'Optimise',
             color = 'primary',
-            id = {'type': 'optim-prerun-btn', 'page': kwargs.get('page_type', 'None')},
+            id = 'btn-optim-prerun',
             title = 'Start optimisation',
             disabled = False
         ) # pyright: ignore[reportCallIssue]

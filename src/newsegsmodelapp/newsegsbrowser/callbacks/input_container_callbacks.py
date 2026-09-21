@@ -117,14 +117,21 @@ def add_input_container_callbacks(app: NewsegsDash):
         return text_values
 
     @app.callback(
-        Output({'type': 'input-section-header', 'supersection': MATCH, 'section': MATCH}, 'children'),
+        Output({
+            'type': 'input-section-header', 
+            'supersection': MATCH, 
+            'section': MATCH
+            },
+            'children'
+        ),
 
         Input({
             'type': 'input-group-config-update-trigger', 
-            'supersection': MATCH, 'purpose': ALL,
+            'supersection': MATCH, 'purpose': 'trigger',
             'section': MATCH, 'key': ALL, 'subindex': ALL,
             'parameter_index': ALL, 'vector_location': ALL
-        }, 'data'),
+        }, 
+        'data'),
         Input(CONFIGURATION_UPDATE_TRIGGER_ID, 'data'),
         Input('active-project-id', 'data'),
         State('app-state', 'data'),
@@ -176,13 +183,13 @@ def add_input_container_callbacks(app: NewsegsDash):
         }, 'value'),
         Output({
             'type': 'single-input-header', 
-            'supersection': ALL, 'purpose': ALL,
+            'supersection': ALL, 'purpose': 'header',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'children'),
         Output({
             'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': ALL,
+            'supersection': ALL, 'purpose': 'trigger',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'data'),
@@ -194,19 +201,19 @@ def add_input_container_callbacks(app: NewsegsDash):
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
         Input({
-            'type': 'dropdown',
+            'type': 'input-dropdown',
             'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
         Input({
-            'type': 'toggle',
+            'type': 'input-toggle',
             'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'value'),
         Input({
-            'type': 'action-button',
+            'type': 'input-action-button',
             'supersection': ALL, 'purpose': ALL,
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
@@ -220,13 +227,13 @@ def add_input_container_callbacks(app: NewsegsDash):
         }, 'id'),
         State({
             'type': 'single-input-header', 
-            'supersection': ALL, 'purpose': ALL,
+            'supersection': ALL, 'purpose': 'header',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'id'),
         State({
             'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': ALL,
+            'supersection': ALL, 'purpose': 'trigger',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL,
         }, 'id'),
@@ -558,7 +565,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         Output({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'figure'),
 
         Input({'type': 'input-group-config-update-trigger', 
-                'supersection': ALL, 'purpose': ALL,
+                'supersection': ALL, 'purpose': 'trigger',
                 'section': ALL, 'key': ALL, 'subindex': ALL,
                 'parameter_index': ALL, 'vector_location': ALL}, 
                 'data'),
@@ -593,13 +600,13 @@ def add_input_container_callbacks(app: NewsegsDash):
 
     @app.callback(
         Output({
-            'type': 'action-button', 
+            'type': 'input-action-button', 
             'supersection': MATCH, 'purpose': 'variable-status-toggle',
             'section': MATCH, 'key': MATCH, 'subindex': ALL,
             'parameter_index': ALL, 'vector_location': ALL
         }, 'children'),
         Output({
-            'type': 'action-button', 
+            'type': 'input-action-button', 
             'supersection': MATCH, 'purpose': 'variable-status-toggle',
             'section': MATCH, 'key': MATCH, 'subindex': ALL,
             'parameter_index': ALL, 'vector_location': ALL
@@ -607,13 +614,13 @@ def add_input_container_callbacks(app: NewsegsDash):
 
         Input({
             'type': 'input-group-config-update-trigger', 
-            'supersection': MATCH, 'purpose': 'variable-status-trigger',
+            'supersection': MATCH, 'purpose': 'trigger',
             'section': MATCH, 'key': MATCH, 'subindex': ALL,
             'parameter_index': ALL, 'vector_location': ALL
         }, 'data'),
 
         State({
-            'type': 'action-button', 
+            'type': 'input-action-button', 
             'supersection': MATCH, 'purpose': 'variable-status-toggle',
             'section': MATCH, 'key': MATCH, 'subindex': ALL,
             'parameter_index': ALL, 'vector_location': ALL

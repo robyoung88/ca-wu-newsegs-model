@@ -431,6 +431,22 @@ runs = sa.Table(
     sa.Column('children_spawned', sa.Boolean, default = False)
 )
 
+# -----------------------------------------------------------------------------
+# Requests
+# -----------------------------------------------------------------------------
+
+requests = sa.Table(
+    'requests',
+    metadata,
+    sa.Column('request_id', sa.Integer, primary_key = True, autoincrement = True),
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
+    sa.Column('payload', sa.String),
+    sa.Column('dispatched', sa.Boolean, default = False),
+    sa.Column('run_id', sa.Integer, nullable = True),
+    sa.Column('retry_number', sa.Integer, default = 0),
+    sa.Column('max_retries', sa.Integer, default = 5),
+    sa.Column('completed', sa.Boolean, default = False)
+)
 
 # -----------------------------------------------------------------------------
 # Sessions

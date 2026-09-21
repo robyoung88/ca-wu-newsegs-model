@@ -332,7 +332,7 @@ def create_dsa_bound_type_selector(
 ):
     id_ = VariableInstanceParameterComponentID.from_variable(
         var,
-        type = 'dropdown',
+        type = 'input-dropdown',
         supersection = 'dsa',
         purpose = 'dsaboundtype'
     )
@@ -362,7 +362,7 @@ def compose_dsa_input(
 
     toggle_id = VariableInstanceParameterComponentID.from_variable(
         var,
-        type = 'toggle',
+        type = 'input-toggle',
         supersection = 'dsa',
         purpose = 'dsa-active'
     )
@@ -648,7 +648,7 @@ def compose_psa_input(
 
     toggle_id = VariableInstanceParameterComponentID.from_variable(
         var,
-        type = 'toggle',
+        type = 'input-toggle',
         supersection = 'psa',
         purpose = 'psa-active',
     )
@@ -758,7 +758,7 @@ def compose_optim_input(
 ):
     toggle_id = VariableInstanceParameterComponentID.from_variable(
         var,
-        type = 'toggle',
+        type = 'input-toggle',
         supersection = 'optim',
         purpose = 'toggle-optim-active',
     )
@@ -904,7 +904,7 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
 def create_positive_toggle(var):
     toggleid = VariableInstanceParameterComponentID.from_variable(
         var,
-        type = 'toggle',
+        type = 'input-toggle',
         supersection = 'optim',
         purpose = 'variable-positive',
     )
@@ -925,7 +925,7 @@ def create_positive_toggle(var):
 def create_bounded_toggle(var):
     toggleid = VariableInstanceParameterComponentID.from_variable(
         var,
-        type = 'toggle',
+        type = 'input-toggle',
         supersection = 'optim',
         purpose = 'variable-bounded',
     )
