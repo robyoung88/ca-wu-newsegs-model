@@ -20,7 +20,7 @@ def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config
     mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return DSARunMetamodelRunRequest(
         project_id = project_id,
-        request_id = 'DSA run for single metamodel - ' + str(datetime.datetime.now()),
+        request_label = 'DSA run for single metamodel - ' + str(datetime.datetime.now()),
         payload = json.dumps({
             'metamodel_id': mm_id
         })

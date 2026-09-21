@@ -24,7 +24,7 @@ def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config
     config.update({'metamodel_id': mm_id})
     return OptimRunMetamodelRunRequest(
         project_id = project_id,
-        request_id = 'Optimisation run - ' + str(datetime.datetime.now()),
+        request_label = 'Optimisation run - ' + str(datetime.datetime.now()),
         payload = json.dumps(config)
     )
 

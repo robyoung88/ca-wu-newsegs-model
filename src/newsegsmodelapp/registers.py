@@ -110,10 +110,11 @@ be found in RUN_PROCEDURE_REGISTER.)
 
 @dataclass
 class RunRequest(SerialisableDataclass):
+    request_id: int = 0
     run_id: int = 0
     project_id: str = ''
     model_type: str = 'default'
-    request_id: str = ''
+    request_label: str = ''
     request_class: str = 'run'
     request_type: str = ''
     payload: str = ''
@@ -161,7 +162,7 @@ def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config
     config.update({'metamodel_id': mm_id})
     return RunRequest(
         project_id = project_id,
-        request_id = 'A dummy request',
+        request_label = 'A dummy request',
         payload = json.dumps(config)
     )
 

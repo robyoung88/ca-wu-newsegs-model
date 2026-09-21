@@ -296,7 +296,7 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         return rval
 
     @app.callback(
-        Output('trigger-check-requests', 'data'),
+        Output('trigger-check-requests', 'data', allow_duplicate = True),
         Input('btn-action-dsa-run-metamodel', 'n_clicks'),
         State('active-project-id', 'data'),
         prevent_initial_call = True
@@ -309,7 +309,12 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        # TODO: Create request, then update trigger.
+        request_id = app.request_handler.add_request(
+            'dsa_run_metamodel',
+            active_project_id,
+            app.project_provider,
+            'run',
+        )
 
-        return time.time_ns()
+        return request_id
     

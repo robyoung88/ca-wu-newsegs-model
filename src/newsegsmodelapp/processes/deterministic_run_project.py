@@ -19,7 +19,7 @@ class DeterministicRunProjectRunRequest(RunRequest):
 def request_deterministic_run_project(project_id: str, project_provider: NewsegsProjectProviderInterface, config: dict|None = None):
     return DeterministicRunProjectRunRequest(
         project_id = project_id,
-        request_id = 'Deterministic project run - ' + str(datetime.datetime.now())
+        request_label = 'Deterministic project run - ' + str(datetime.datetime.now())
     )
 
 @register_run_procedure(REQUEST_TYPE)

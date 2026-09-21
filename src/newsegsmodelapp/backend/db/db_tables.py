@@ -418,7 +418,8 @@ runs = sa.Table(
     sa.Column('run_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
     sa.Column('model_type', sa.String),
-    sa.Column('request_id', sa.String),
+    sa.Column('request_id', sa.Integer),
+    sa.Column('request_label', sa.String),
     sa.Column('request_class', sa.String),
     sa.Column('request_type', sa.String),
     sa.Column('payload', sa.String),
@@ -440,6 +441,8 @@ requests = sa.Table(
     metadata,
     sa.Column('request_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
+    sa.Column('request_class', sa.String),
+    sa.Column('request_type', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('dispatched', sa.Boolean, default = False),
     sa.Column('run_id', sa.Integer, nullable = True),
@@ -458,7 +461,6 @@ sessions = sa.Table(
     sa.Column('session_id', sa.String, primary_key = True),
     sa.Column('active_project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id')),
 )
-
 
 # -----------------------------------------------------------------------------
 # Table creation

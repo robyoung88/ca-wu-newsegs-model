@@ -1,6 +1,9 @@
 """NewSEGS model as a multi-page app.
 """
 import time
+
+from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
+from newsegsmodelapp.newsegsbrowser.callbacks.deterministic_run_callbacks import add_deterministic_run_callbacks
 t1 = time.time()
 import json
 import os
@@ -227,6 +230,7 @@ def create_app(external_stylesheets = None) -> Dash:
 
     project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
     results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
+    request_handler = FromDatabaseRequestHandler(db.get_engine)
 
     app = NewsegsDash(
         __name__,
@@ -235,6 +239,7 @@ def create_app(external_stylesheets = None) -> Dash:
         external_stylesheets = external_stylesheets,
         project_provider = project_provider,
         results_provider = results_provider,
+        request_handler = request_handler,
         #routing_callback_inputs = {
         #    'session-id': Input('session-id', 'data'),
         #    'app-state': Input('app-state', 'data'),
@@ -259,6 +264,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_action_callbacks(app)
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)
+    add_deterministic_run_callbacks(app)
     add_dsa_run_callbacks(app)
     add_optim_run_callbacks(app)
     add_psa_run_callbacks(app)

@@ -106,51 +106,19 @@ def local_run_table_draw(
     )
 
 def spawn_job(
-    procedure_name: str,
-    procedure_class: str,
-    
-    active_project_id: str,
+    request: registers.RunRequest,
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface,
-    triggering_request: registers.RunRequest | None,
-    config: dict | None = None,
 ) -> int | None:
-    print(f'spawning job type {procedure_name}')
-
-    config = {} if config is None else config
-
-    # 1. Make request
-    match procedure_class:
-        case 'run':
-            get_req = registers.RUN_REQUEST_REGISTER[procedure_name]
-            request = get_req(active_project_id, project_provider, config)
-        case 'postprocess':
-            if triggering_request is None:
-                triggering_request = registers.RUN_REQUEST_REGISTER['_dummyrequest'](active_project_id, project_provider, config)
-            get_req = registers.POSTPROCESS_REQUEST_REGISTER.get(procedure_name)
-            if get_req:
-                request = get_req(triggering_request, config)
-            else:
-                request = triggering_request
-        case 'tabledraw':
-            if triggering_request is None:
-                triggering_request = registers.RUN_REQUEST_REGISTER['_dummyrequest'](active_project_id, project_provider, config)
-            get_req = registers.TABLE_DRAW_REQUEST_REGISTER.get(procedure_name)
-            if get_req:
-                request = get_req(triggering_request, config)
-            else:
-                request = triggering_request
-        case _:
-            print(f'Procedure class not recognised: {procedure_class}')
-            return None
+    print(f'spawning job type {request.request_type} for request {request.request_id}')
 
     if request.background_procedure:
         run_info = send_to_dispatcher(request)
         return run_info['job_id']
     else:
-        match procedure_class:
+        match request.request_class:
             case 'run':
-                local_run = local_run_procedure    
+                local_run = local_run_procedure
             case 'postprocess':
                 local_run = local_run_postprocess
             case 'tabledraw':
@@ -159,14 +127,14 @@ def spawn_job(
                 return None
             
         run_id = local_run(
-            procedure_name, request, db.get_engine(),
+            request.request_type, request, db.get_engine(),
             project_provider,
             results_provider
         )
         if run_id is None:
-            print(f'Failed run - {procedure_name}')
+            print(f'Failed run - {request.request_type} {request.request_id}')
         else:
-            print(f'Success - {procedure_name}')
+            print(f'Success - {request.request_type} {request.request_id}')
         return run_id
     
 def add_action_callbacks(app: NewsegsDash):
@@ -224,99 +192,111 @@ def add_action_callbacks(app: NewsegsDash):
         active_project_id,
     ):
         trigger_id = ctx.triggered_id
+        print(f'ACTION TRIGGERED BY {trigger_id}')
         if trigger_id is None or len(ctx.triggered) > 1:
             raise PreventUpdate
         if not isinstance(trigger_id, str) and trigger_id['type'] == 'action-button' and callback_utils.get_triggered_value() == 0:
             raise PreventUpdate
-
         postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)
         failed_actions = []
         completed_actions = []
         spawned_actions = []
         spawn_ids: set[tuple] = set()
 
-        if not isinstance(trigger_id, str):
-            # An action button or ???
-            action_purpose = trigger_id.get('purpose')
-            if action_purpose == 'request-process':
-                # Handle new action creation.
-                action_class = trigger_id.get('section')
-                action_type = trigger_id.get('key')
-                match trigger_id.get('type'):
-                    case 'action-button':
-                        if not callback_utils.get_triggered_value():
-                            raise PreventUpdate
-                        print(f'handling action from {trigger_id.get('type')}: ', action_type)
-                        config = {k: v for k,v in trigger_id.items()}
-                        # Two ways of picking up configuration from result-table-option inputs:
-                        # Their value, and their subindex.
-                        for id, val in zip(option_ids, options):
-                            if id['key'] == action_type:
-                                config[id['purpose']] = val
-                                config[id['purpose']+'_subindex'] = id['subindex']
+        if isinstance(trigger_id, str):
+            if trigger_id == 'trigger-check-requests':
+                print('CHECKING NEW REQUESTS')
+                new_requests = app.request_handler.get_new_requests()
+                print(new_requests)
+                for req in new_requests:
+                    run_id = spawn_job(req, app.project_provider, app.results_provider)
+                    if run_id:
+                        ongoing_actions.append(run_id)
+                        req.run_id = run_id
+                        app.request_handler.mark_dispatched(req.request_id, req.run_id)
 
-                        run_id = spawn_job(
-                            action_type, action_class, active_project_id, 
-                            app.project_provider, app.results_provider, None,
-                            config = config
-                        )
-                        if run_id:
-                            ongoing_actions.append(run_id)
-            elif action_purpose == 'trigger':
-                # A postaction trigger from a non-feedback process
-                requests = callback_utils.get_triggered_value()
-                if not isinstance(requests, list):
-                    raise TypeError('postaction triggers should contain a list of jsonified requests - got {type(requests)}')
-                for req_json in requests:
-                    req_data = json.loads(req_json)
-                    action_type = req_data['request_type']
-                    print(f'handling postaction from {trigger_id.get('type')}: ', action_type)
-                    new_actions = registers.POST_ACTION_REGISTER.get(action_type)
-                    if new_actions:
-                        run_id = req_data.get('run_id', -random.randrange(1, 10000))
-                        for run_procedure in new_actions.run_procedures:
-                            # Prevent adding the same procedure twice in the same callback
-                            spawn_id = (run_procedure, run_id)
-                            if spawn_id in spawn_ids:
-                                continue
-                            spawn_ids.add(spawn_id)
+        # if not isinstance(trigger_id, str):
+        #     # An action button or ???
+        #     action_purpose = trigger_id.get('purpose')
+        #     if action_purpose == 'request-process':
+        #         # Handle new action creation.
+        #         action_class = trigger_id.get('section')
+        #         action_type = trigger_id.get('key')
+        #         match trigger_id.get('type'):
+        #             case 'action-button':
+        #                 if not callback_utils.get_triggered_value():
+        #                     raise PreventUpdate
+        #                 print(f'handling action from {trigger_id.get('type')}: ', action_type)
+        #                 config = {k: v for k,v in trigger_id.items()}
+        #                 # Two ways of picking up configuration from result-table-option inputs:
+        #                 # Their value, and their subindex.
+        #                 for id, val in zip(option_ids, options):
+        #                     if id['key'] == action_type:
+        #                         config[id['purpose']] = val
+        #                         config[id['purpose']+'_subindex'] = id['subindex']
+
+        #                 run_id = spawn_job(
+        #                     action_type, action_class, active_project_id, 
+        #                     app.project_provider, app.results_provider, None,
+        #                     config = config
+        #                 )
+        #                 if run_id:
+        #                     ongoing_actions.append(run_id)
+        #     elif action_purpose == 'trigger':
+        #         # A postaction trigger from a non-feedback process
+        #         requests = callback_utils.get_triggered_value()
+        #         if not isinstance(requests, list):
+        #             raise TypeError('postaction triggers should contain a list of jsonified requests - got {type(requests)}')
+        #         for req_json in requests:
+        #             req_data = json.loads(req_json)
+        #             action_type = req_data['request_type']
+        #             print(f'handling postaction from {trigger_id.get('type')}: ', action_type)
+        #             new_actions = registers.POST_ACTION_REGISTER.get(action_type)
+        #             if new_actions:
+        #                 run_id = req_data.get('run_id', -random.randrange(1, 10000))
+        #                 for run_procedure in new_actions.run_procedures:
+        #                     # Prevent adding the same procedure twice in the same callback
+        #                     spawn_id = (run_procedure, run_id)
+        #                     if spawn_id in spawn_ids:
+        #                         continue
+        #                     spawn_ids.add(spawn_id)
                             
-                            new_run_id = spawn_job(
-                                run_procedure, 'run',
-                                req_data['project_id'], 
-                                app.project_provider, app.results_provider,
-                                registers.RunRequest.from_dict(req_data)
-                            )
-                            if new_run_id:
-                                spawned_actions.append(new_run_id)
-                        for postproc_procedure in new_actions.postprocess_procedures:
-                            # Prevent adding the same procedure twice in the same callback
-                            spawn_id = (postproc_procedure[0], run_id)
-                            if spawn_id in spawn_ids:
-                                continue
-                            spawn_ids.add(spawn_id)
-                            new_run_id = spawn_job(
-                                postproc_procedure[0], 'postprocess',
-                                req_data['project_id'], 
-                                app.project_provider, app.results_provider,
-                                registers.RunRequest.from_dict(req_data)
-                            )
-                            if new_run_id:
-                                spawned_actions.append(new_run_id)
-                        for table_draw_procedure in new_actions.table_draw_artists:
-                            # Prevent adding the same procedure twice in the same callback
-                            spawn_id = (table_draw_procedure[0], run_id)
-                            if spawn_id in spawn_ids:
-                                continue
-                            spawn_ids.add(spawn_id)
-                            new_run_id = spawn_job(
-                                table_draw_procedure[0], 'tabledraw',
-                                req_data['project_id'], 
-                                app.project_provider, app.results_provider,
-                                registers.RunRequest.from_dict(req_data)
-                            )
-                            if new_run_id:
-                                spawned_actions.append(new_run_id)
+        #                     new_run_id = spawn_job(
+        #                         run_procedure, 'run',
+        #                         req_data['project_id'], 
+        #                         app.project_provider, app.results_provider,
+        #                         registers.RunRequest.from_dict(req_data)
+        #                     )
+        #                     if new_run_id:
+        #                         spawned_actions.append(new_run_id)
+        #                 for postproc_procedure in new_actions.postprocess_procedures:
+        #                     # Prevent adding the same procedure twice in the same callback
+        #                     spawn_id = (postproc_procedure[0], run_id)
+        #                     if spawn_id in spawn_ids:
+        #                         continue
+        #                     spawn_ids.add(spawn_id)
+        #                     new_run_id = spawn_job(
+        #                         postproc_procedure[0], 'postprocess',
+        #                         req_data['project_id'], 
+        #                         app.project_provider, app.results_provider,
+        #                         registers.RunRequest.from_dict(req_data)
+        #                     )
+        #                     if new_run_id:
+        #                         spawned_actions.append(new_run_id)
+        #                 for table_draw_procedure in new_actions.table_draw_artists:
+        #                     # Prevent adding the same procedure twice in the same callback
+        #                     spawn_id = (table_draw_procedure[0], run_id)
+        #                     if spawn_id in spawn_ids:
+        #                         continue
+        #                     spawn_ids.add(spawn_id)
+        #                     new_run_id = spawn_job(
+        #                         table_draw_procedure[0], 'tabledraw',
+        #                         req_data['project_id'], 
+        #                         app.project_provider, app.results_provider,
+        #                         registers.RunRequest.from_dict(req_data)
+        #                     )
+        #                     if new_run_id:
+        #                         spawned_actions.append(new_run_id)
                     
         # Check on ongoing actions
         if ongoing_actions:
@@ -377,7 +357,8 @@ def add_action_callbacks(app: NewsegsDash):
                         } for x in result
                     }
                     for run_id in completed_actions:
-                        req_data = completed_request_map.get(run_id)
+                        req_data = completed_request_map[run_id]
+                        original_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
                         if req_data is not None and not req_data['children_spawned']:
                             print(f'Handling the completion of job {run_id} of type {req_data["action_type"]} for project {req_data["project_id"]}')
                             action_type = req_data['action_type']
@@ -396,49 +377,65 @@ def add_action_callbacks(app: NewsegsDash):
                                     if spawn_id in spawn_ids:
                                         continue
                                     spawn_ids.add(spawn_id)
-                                    
-                                    new_run_id = spawn_job(
-                                        run_procedure, 'run',
-                                        req_data['project_id'], 
-                                        app.project_provider, app.results_provider,
-                                        registers.RunRequest.from_dict(json.loads(req_data['payload']))
+
+                                    # Add to requests, but then dispatch immediately
+                                    request_id = app.request_handler.add_request(
+                                        run_procedure, req_data['project_id'], 
+                                        app.project_provider, 'run',
+                                        triggering_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
                                     )
-                                    if new_run_id:
-                                        spawned_actions.append(new_run_id)
+                                    if request_id is not None:
+                                        new_request = app.request_handler.get_request(request_id)
+                                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
+                                        if new_run_id:
+                                            new_request.run_id = new_run_id
+                                            app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
+                                            spawned_actions.append(new_run_id)
                                 for postproc_procedure in new_actions.postprocess_procedures:
                                     # Prevent adding the same procedure twice in the same callback
                                     spawn_id = (postproc_procedure[0], run_id)
                                     if spawn_id in spawn_ids:
                                         continue
                                     spawn_ids.add(spawn_id)
-                                    new_run_id = spawn_job(
-                                        postproc_procedure[0], 'postprocess',
-                                        req_data['project_id'], 
-                                        app.project_provider, app.results_provider,
-                                        registers.RunRequest.from_dict(json.loads(req_data['payload']))
+
+                                    request_id = app.request_handler.add_request(
+                                        postproc_procedure[0], req_data['project_id'], 
+                                        app.project_provider, 'postprocess',
+                                        triggering_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
                                     )
-                                    if new_run_id:
-                                        spawned_actions.append(new_run_id)
+                                    if request_id is not None:
+                                        new_request = app.request_handler.get_request(request_id)
+                                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
+                                        if new_run_id:
+                                            new_request.run_id = new_run_id
+                                            app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
+                                            spawned_actions.append(new_run_id)
                                 for table_draw_procedure in new_actions.table_draw_artists:
                                     # Prevent adding the same procedure twice in the same callback
                                     spawn_id = (table_draw_procedure[0], run_id)
                                     if spawn_id in spawn_ids:
                                         continue
                                     spawn_ids.add(spawn_id)
-                                    new_run_id = spawn_job(
-                                        table_draw_procedure[0], 'tabledraw',
-                                        req_data['project_id'], 
-                                        app.project_provider, app.results_provider,
-                                        registers.RunRequest.from_dict(json.loads(req_data['payload']))
+                                    request_id = app.request_handler.add_request(
+                                        table_draw_procedure[0], req_data['project_id'], 
+                                        app.project_provider, 'tabledraw',
+                                        triggering_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
                                     )
-                                    if new_run_id:
-                                        spawned_actions.append(new_run_id)
+                                    if request_id is not None:
+                                        new_request = app.request_handler.get_request(request_id)
+                                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
+                                        if new_run_id:
+                                            new_request.run_id = new_run_id
+                                            app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
+                                            spawned_actions.append(new_run_id)
+                            app.request_handler.mark_completed(original_request.request_id)
                         with db.get_engine().begin() as conn:
                             conn.execute(
                                 sa.update(tbls.runs)
                                 .values(children_spawned = True)
                                 .where(tbls.runs.c.run_id.in_(completed_actions))
                             )
+                        
                         ongoing_actions.remove(run_id)
 
                 # By doing this once-through, we are forcing only one layer of child processes to get triggered 
