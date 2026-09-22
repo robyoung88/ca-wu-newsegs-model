@@ -1,18 +1,13 @@
 """
 Functions for creating a deterministic sensitivity analysis layout
 """
-from typing import cast
-
 from dash import dcc, html
 
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components.dsa_process_components import dsa_process_components
 from newsegsmodelapp.components.page_layouts import fourpane_layout
-from newsegsmodelapp.components.post_page_load import create_post_page_load_components
-from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelapp.components import navigation
-from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
+from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 
 from newsegsmodelapp.registers import register_page_layout
 from newsegsmodelframework.newsegssensitivity import optim
@@ -21,8 +16,6 @@ from newsegsmodelapp.components import  results_header
 from newsegsmodelapp.components.optim_process_components import optim_process_components
 from newsegsmodelframework.newsegssensitivity import common as sensitivity
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
-
-
 
 def create_dsa_header(**kwargs):
     return dbc.Container(
@@ -154,7 +147,6 @@ def create_optim_configuration_editor(**kwargs):
         
     ]) 
 
-
 DEFAULT_LAYOUT_DSA = {
     'layout_navigation': navigation.create_navigation_component,
     'width_navigation': 1,
@@ -182,22 +174,6 @@ def create_dsa_layout(*args, **kwargs):
         class_name = 'align-items-start'
         )
     ]
-
-    header = a1_contents[0]
-
-    # header = dbc.Row([
-    #     dbc.Col(
-    #         html.Div(
-    #             config_dict['layout_navigation'](config_dict.get('selected_model'))
-    #         ),
-    #         class_name = 'newsegs-navbar-vertical collapsed',
-    #         width = config_dict['width_navigation'],
-    #     ), # pyright: ignore[reportCallIssue]
-    #     dbc.Col(
-    #         config_dict['layout_head'](),
-    #         width = config_dict['width_head']
-    #     ) # pyright: ignore[reportCallIssue]
-    # ])
 
     dsa_config = create_dsa_configuration_editor()
 
