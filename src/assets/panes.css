@@ -5,8 +5,8 @@
 }
 
 .header-a1 { order: 1; }
-.header-b1 { order: 2; }
-.content-a2 { order: 3; }
+.header-b1 { order: 3; }
+.content-a2 { order: 2; }
 .content-b2 { order: 4; }
 
 /* Medium to Large Screens (>= 768px): Fixed 2-column layout */

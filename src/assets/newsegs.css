@@ -96,7 +96,6 @@ button.btn.set-default:active {
 
 .results-title-block {
     flex: 0 1 auto;
-    padding-right: 10px;
     float: 'left';
     width: 320px;
 }
@@ -107,17 +106,17 @@ button.btn.set-default:active {
     justify-content: center;
     align-items: center;
     padding: 10px;
-    width: 10%;
+    width: auto;
 }
 
 .annual-horizon-toggle-hdrcontainer {
     flex: 0 1 auto;
-    padding-left: 10px;
-    padding-right: 22px;
+    /* padding-left: 10px; */
+    /* padding-right: 22px; */
     display: inline-flex;
     justify-content: flex-end;
     align-items: center;
-    width: 380px;
+    width: 300px;
 }
 
 .configuration-selector-row-button-container {

@@ -1,10 +1,9 @@
 from dash import dcc, html
-import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.newsegsbrowser import icons
-from newsegsmodelframework.newsegssensitivity import common as sensitivity
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_results_header(**kwargs):
     """
@@ -23,7 +22,7 @@ def create_results_header(**kwargs):
                 'Results up-to-date',
                 id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
-            ), # pyright: ignore[reportCallIssue]
+            ), 
 
             html.Div(
                 dbc.Container([
@@ -53,7 +52,7 @@ def create_results_header(**kwargs):
                                             'display': 'inline',
                                         },
                                         title = 'Run single configuration',
-                                    ), # pyright: ignore[reportCallIssue]
+                                    ), 
 
                                     # Run project button
                                     dbc.Button(
@@ -74,7 +73,7 @@ def create_results_header(**kwargs):
                                             'display': 'inline',
                                         },
                                         title = 'Run all configurations',
-                                    ), # pyright: ignore[reportCallIssue]
+                                    ), 
                                 ],
                             ),
                             className = 'results-title-block'
@@ -92,7 +91,7 @@ def create_results_header(**kwargs):
                                 id = 'btn-show-timeseries',
                                 outline = True,
                                 style = {'margin-right': '10px'}
-                            ), # pyright: ignore[reportCallIssue]
+                            ), 
 
                             html.H5("Per year", style={'display': 'inline-block', 'verticalAlign': 'middle'}),
                             daq.ToggleSwitch(style={'display': 'inline-block',
@@ -105,7 +104,7 @@ def create_results_header(**kwargs):
                         className = 'annual-horizon-toggle-hdrcontainer'
 
                         ),
-                    ]), # pyright: ignore[reportCallIssue]
+                    ]),
                     dbc.Row(
                         [
                             dcc.Loading(
@@ -123,13 +122,13 @@ def create_results_header(**kwargs):
                         style = {
                             'display': 'none'
                             },
-                    ), # pyright: ignore[reportCallIssue]
+                    ), 
                     dcc.Store({
                         'type': 'postaction-trigger', 'purpose': 'manualtrigger',
                         'supersection': 'global', 'section': 'tabledraw',
                         'key': 'timeseriesupdate', 'subindex': 0
                     }, data = 0),
-                ]), # pyright: ignore[reportCallIssue]
+                ]), 
             className = 'drawer-title'
             ),
         ],
@@ -184,7 +183,7 @@ def create_results_header_dsa(**kwargs):
                 'Results up-to-date',
                 id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
-            ), # pyright: ignore[reportCallIssue]
+            ),
 
             html.Div(
                 dbc.Container([
@@ -199,9 +198,9 @@ def create_results_header_dsa(**kwargs):
                             button_container_children,
                             className = 'results-header-button-container'
                         )
-                    ]), # pyright: ignore[reportCallIssue]
+                    ]),
                     
-                ]), # pyright: ignore[reportCallIssue]
+                ]),
             className = 'drawer-title',
             )
         ],

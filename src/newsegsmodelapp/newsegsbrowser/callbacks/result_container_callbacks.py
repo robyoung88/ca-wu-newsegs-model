@@ -305,21 +305,17 @@ def add_result_container_callbacks(app: NewsegsDash):
                     print (f'getting from table {table_name} - subindex is {subindex}')
                     res, rev = app.results_provider.get_result(table_name, proj.table_config)
 
-            print(type(res))
-            if isinstance(res, list):
-                if ann_hori_toggle:
-                    res = Purify(html =res[1])
-                else:
-                    res = Purify(html=res[0])
-
-            print(type(res))
-
             # TODO: Feedback if result is stale
             if res is not None:
                 contents_by_section_subindex[ss] = [res]
                 return_contents[idx] = [res]
                 return_is_stale[idx] = rev != proj.table_config.revision
                 return_rendered_project_table_revision[idx] = rev
+            else:
+                contents_by_section_subindex[ss] = []
+                return_contents[idx] = []
+                return_is_stale[idx] = True
+                return_rendered_project_table_revision[idx] = -1
 
         return (
             return_contents, 

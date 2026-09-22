@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 from typing import Any, cast
 
-from dash import ALL, Input, Output, State, no_update, ctx
+from dash import ALL, Input, Output, State, no_update, ctx, html
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
@@ -40,13 +40,13 @@ def add_psa_run_callbacks(app: NewsegsDash):
             'psa_prerun_button': {
                 'n_clicks': Input('btn-psa-prerun', 'n_clicks'),
             },
-        }
+        },
+        prevent_initial_call = True,
     )
     def confirm_psa_run(
         psa_run_button,
         modal_close_button,
         psa_prerun_button,
-        modal,
     ):
         clicks = callback_utils.get_triggered_value()
         if not clicks:
@@ -61,6 +61,8 @@ def add_psa_run_callbacks(app: NewsegsDash):
             rval['modal']['is_opens'] = True
         else:
             rval['modal']['is_opens'] = False
+
+        return rval
         
     @app.callback(
         output = {
@@ -309,6 +311,7 @@ def add_psa_run_callbacks(app: NewsegsDash):
         },
 
         inputs = {
+            'active_project_id': Input('active-project-id', 'data'),
             'psa_table': {
                 'trigger': Input(
                     {
@@ -376,7 +379,6 @@ def add_psa_run_callbacks(app: NewsegsDash):
                     'id'
                 )
             },
-            'active_project_id': State('active-project-id', 'data'),
         },
 
         prevent_initial_call = True
@@ -390,12 +392,7 @@ def add_psa_run_callbacks(app: NewsegsDash):
         plot_container,
         active_project_id
     ):
-        null_return = dict(
-            plot_header = dict(children = no_update),
-            plot = dict(figures = no_update),
-            plot_container = dict(children = [no_update] * len(plot_container['ids'])),
-        )
-        rval = null_return
+        rval = callback_utils.create_noupdate_return()
         if len(plot_container['ids']) == 0 or len(graph_selection_dropdown['values']) == 0:
             raise PreventUpdate
         
@@ -408,14 +405,22 @@ def add_psa_run_callbacks(app: NewsegsDash):
 
         psa_raw_data, _ = app.results_provider.get_result('psa_single_metamodel', mm.table_config, False)
         if psa_raw_data is None:
-            raise PreventUpdate
+            rval['plot_header']['children'] = [html.Div(html.H3('No PSA Run'), className = 'd-flex justify-content-center w-100')]
+            graph_type = graph_selection_dropdown['values'][0]
+            plot_funcs = psa.psa_plots.get(graph_type)
+            if plot_funcs is None:
+                rval['plot']['figures'] = []
+            else:
+                rval['plot']['figures'] = plot_funcs['draw'](None)
+            return rval
         
         graph_type = None
         full_draw = False
-        if trig.get('purpose') == 'plot-type':
+        if isinstance(trig, str) or trig.get('purpose') == 'plot-type':
             # Need to do a full graph refresh
             full_draw = True
-            graph_type = callback_utils.get_triggered_value()
+            if not isinstance(trig, str):
+                graph_type = callback_utils.get_triggered_value()
         
         if graph_type is None:
             graph_type = graph_selection_dropdown['values'][0]

@@ -103,7 +103,8 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                 )
             },
             'active_project_id': State('active-project-id', 'data'),
-        }
+        },
+        prevent_initial_call = True,
     )
     def confirm_dsa_results_download(
         results_download_button,
