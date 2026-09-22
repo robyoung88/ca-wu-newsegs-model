@@ -445,3 +445,26 @@ def add_psa_run_callbacks(app: NewsegsDash):
             rval['plot']['figures'] = plot_funcs['update'](psa_raw_data, **plot_kwargs)
     
         return rval
+
+    @app.callback(
+        Output('trigger-check-requests', 'data', allow_duplicate = True),
+        Input('btn-action-psa-run-metamodel', 'n_clicks'),
+        State('active-project-id', 'data'),
+        prevent_initial_call = True
+    )
+    def request_psa_run_metamodel(
+        n_clicks,
+        active_project_id
+    ):
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
+
+        request_id = app.request_handler.add_request(
+            'psa_run_metamodel',
+            active_project_id,
+            app.project_provider,
+            'run',
+        )
+
+        return request_id

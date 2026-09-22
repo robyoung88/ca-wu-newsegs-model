@@ -24,28 +24,103 @@ def metamodel_to_config_file(mm: NewsegsMetaModel) -> dict[str, Any]:
     }
     return odict
 
+def _get_metamodel_deterministic_raw_data(metamodel: NewsegsMetaModel) -> pd.DataFrame | None:
+    
+    try:
+        gen_res = metamodel.model.get_generation_result()
+        grid_res = metamodel.model.get_grid_result()
+        cs_res = metamodel.model.get_consumption_storage_result()
+    except AttributeError:
+        return None
+    
+    all_frames = [
+        gen_res.meters_to_pandas(),
+        gen_res.dsm_to_pandas(),
+        grid_res.meters_to_pandas(),
+        grid_res.dsm_to_pandas(),
+        cs_res.meters_to_pandas(),
+        cs_res.dsm_to_pandas()
+    ]
+
+    all_frames = [x for x in all_frames if not x.empty]
+    if not len(all_frames):
+        return None
+    elif len(all_frames) == 1:
+        return all_frames[0]
+    else:
+        odf = all_frames[0]
+        for j in range(1, len(all_frames)):
+            odf = odf.join(all_frames[j])
+
+    return odf
+
 def export_results(
     result_type: Literal['dsa','psa','det'],
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
-    active_project_id: str,
-    selected_metamodel_index: Optional[int] = None,
+    project_id: str,
+    metamodel_id: Optional[str] = None,
     contents_option: str = 'result',
     format_option: str = 'csv',
+    result_level: Optional[str] = None,
 ):
-    result_level = 'project'
+    proj = project_provider.get_project(project_id)
     match result_type:
         case 'dsa':
-            result_data = pd.DataFrame([])#postprocess_utils.get_dsa_raw_data(selected_configuration, acm)
+            result_level = 'project' if result_level is None else result_level
+            match result_level:
+                case 'project':
+                    raise NotImplementedError(f'DSA at project level not yet supported')
+                case 'metamodel':
+                    if metamodel_id is None:
+                        metamodel_id = project_provider.get_focussed_metamodel_id(project_id)
+                    mm = proj.get_metamodel_by_id(metamodel_id)
+                    result_data, result_revision = result_provider.get_result(
+                        'dsa_single_metamodel', mm.table_config, True
+                    )
+                    if result_data is None:
+                        return None
+                    stale = result_revision != mm.table_config.revision
+                    assert isinstance(result_data, pd.DataFrame)
+                case _:
+                    raise ValueError(f'result_level not recognised: {result_level}')
         case 'psa':
-            result_data = pd.DataFrame([])#postprocess_utils.get_psa_raw_data(selected_configuration, acm)
+            result_level = 'project' if result_level is None else result_level
+            match result_level:
+                case 'project':
+                    raise NotImplementedError(f'PSA at project level not yet supported')
+                case 'metamodel':
+                    if metamodel_id is None:
+                        metamodel_id = project_provider.get_focussed_metamodel_id(project_id)
+                    mm = proj.get_metamodel_by_id(metamodel_id)
+                    result_data, result_revision = result_provider.get_result(
+                        'psa_single_metamodel', mm.table_config, True
+                    )
+                    if result_data is None:
+                        return None
+                    stale = result_revision != mm.table_config.revision
+                    assert isinstance(result_data, pd.DataFrame)
+                case _:
+                    raise ValueError(f'result_level not recognised: {result_level}')
         case 'det':
-            result_level = 'metamodel'
-            result_data = pd.DataFrame([])#postprocess_utils.get_det_raw_data(selected_configuration, acm)
+            result_level = 'metamodel' if result_level is None else result_level
+            match result_level:
+                case 'project':
+                    raise NotImplementedError('Deterministic results export for full project not yet supported')
+                case 'metamodel':
+                    if metamodel_id is None:
+                        metamodel_id = project_provider.get_focussed_metamodel_id(project_id)
+                    mm = proj.get_metamodel_by_id(metamodel_id)
+                    stale = mm.model.reattach_results(result_provider)
+
+                    result_data = _get_metamodel_deterministic_raw_data(mm)
+                    if result_data is None:
+                        return None
+                    assert isinstance(result_data, pd.DataFrame)
+                case _:
+                    raise ValueError(f'result_level not recognised: {result_level}')
         case _:
             raise ValueError(f'result_type not recognised: {result_type}')
-    if result_data is None:
-        return None
     
     def _strip_index_tz(df):
         index = df.index
@@ -55,14 +130,12 @@ def export_results(
         return df
 
     def _make_project_filename_stub():
-        proj_metadata = project_provider.get_component_metadata(active_project_id, 'label')
+        proj_metadata = project_provider.get_component_metadata(project_id, 'label')
         proj_name = proj_metadata.get('label')
         return f'{proj_name}-{result_type}-results'
 
-    def _make_metamodel_filename_stub(metamodel_index):
-        mm_ids = project_provider.list_project_metamodel_ids(active_project_id)
-        mm_id = mm_ids[metamodel_index]
-        mm_metadata = project_provider.metamodel_provider.get_component_metadata(mm_id, 'label')
+    def _make_metamodel_filename_stub(metamodel_id):
+        mm_metadata = project_provider.metamodel_provider.get_component_metadata(metamodel_id, 'label')
         mm_name = mm_metadata.get('label')
         return f'{mm_name}-{result_type}-results'
 
@@ -70,10 +143,7 @@ def export_results(
         case 'project':
             file_name_stub = _make_project_filename_stub()
         case 'metamodel':
-            if not selected_metamodel_index:
-                file_name_stub = _make_project_filename_stub()
-            else:
-                file_name_stub = _make_metamodel_filename_stub(selected_metamodel_index)
+            file_name_stub = _make_metamodel_filename_stub(metamodel_id)
 
     match contents_option:
         case 'result':
@@ -107,19 +177,13 @@ def export_results(
                 case _:
                     raise ValueError(f'format_option not recognised: {format_option}')
 
-            proj = project_provider.get_project(active_project_id)
             match result_level:
                 case 'project':
                     config_dict = proj.to_dict_repr()
                     config_file_name = f'{proj.name}-config.json'
                 case 'metamodel':
-                    if selected_metamodel_index is None:
-                        config_dict = proj.to_dict_repr()
-                        config_file_name = f'{proj.name}-config.json'
-                    else:
-                        mm = proj.metamodels[selected_metamodel_index]
-                        config_dict = mm.to_dict_repr()
-                        config_file_name = f'{mm.name}-config.json'
+                    config_dict = mm.to_dict_repr()
+                    config_file_name = f'{mm.name}-config.json'
                 case _:
                     raise ValueError(f'result_level not recognised: {result_level}')
             

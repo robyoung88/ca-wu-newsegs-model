@@ -358,6 +358,11 @@ class NewsegsModel(
         self.consumption_storage.model = self
 
     def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True) -> bool:
+        """
+        
+        Returns:
+            [bool] - True if any results are stale
+        """
         any_stale = False
         try:
             self._grid_result, self._grid_result_revision = results_provider.get_result(

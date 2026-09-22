@@ -12,6 +12,7 @@ import sqlalchemy as sa
 import zmq
 
 from config import settings
+from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestHandlerInterface
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelapp import registers
@@ -136,6 +137,53 @@ def spawn_job(
         else:
             print(f'Success - {request.request_type} {request.request_id}')
         return run_id
+
+def generate_post_action_requests(
+    original_request: registers.RunRequest,
+    request_handler: RequestHandlerInterface,
+    project_provider: NewsegsProjectProviderInterface,
+    already_generated: set[tuple[str, int]] | None = None
+) -> tuple[list[int], set[tuple[str, int]]]:
+    """Generate requests for processes triggered by an action completion.
+    
+    Returns:
+        list[int] - request_id of generated requests
+        set[tuple[str,str]] - set of post-action requests already generated to prevent duplication.
+    """
+    request_ids = []
+    r_already_generated = set() if already_generated is None else already_generated.copy()
+
+    action_type = original_request.request_type
+    orq_id = original_request.request_id
+    proj_id = original_request.project_id
+
+    new_actions = registers.POST_ACTION_REGISTER.get(action_type)
+
+    if not new_actions:
+        return request_ids, r_already_generated
+
+    procclasslist = (
+        ('run', new_actions.run_procedures),
+        ('postprocess', [x[0] for x in new_actions.postprocess_procedures]),
+        ('tabledraw', [x[0] for x in new_actions.table_draw_artists])
+    )
+
+    for procedure_class, procedure_list in procclasslist:
+        for procedure in procedure_list:
+            proc_id = (procedure, orq_id)
+            if proc_id in r_already_generated:
+                continue
+            r_already_generated.add(proc_id)
+    
+            request_ids.append(
+                request_handler.add_request(
+                    procedure, proj_id, 
+                    project_provider, procedure_class,
+                    triggering_request = original_request,
+                )
+            )
+
+    return request_ids, r_already_generated
     
 def add_action_callbacks(app: NewsegsDash):
     @app.callback(
@@ -328,7 +376,33 @@ def add_action_callbacks(app: NewsegsDash):
 
                 if failed_actions:
                     print (f'{len(failed_actions)} actions have failed.')
-                    # TODO: Retry or otherwise deal with failure.
+                    failed_actions_stmt = (
+                        sa.select(
+                            tbls.requests.c.run_id,
+                            tbls.requests.c.request_id,
+                        )
+                        .join(tbls.runs, tbls.requests.c.run_id == tbls.runs.c.run_id)
+                        .where(sa.and_(
+                            tbls.requests.c.run_id.in_(failed_actions),
+                            sa.not_(tbls.runs.c.cancel_requested)
+                            )
+                        )
+                    )
+                    with db.get_engine().connect() as conn:
+                        result = conn.execute(failed_actions_stmt)
+                    run_to_request_map = dict(result.tuples().all())
+                    for run_id, request_id in run_to_request_map.items():
+                        do_retry = app.request_handler.increment_failure(request_id)
+                        if do_retry:
+                            failed_request = app.request_handler.get_request(request_id)
+                            new_run_id = spawn_job(failed_request, app.project_provider, app.results_provider)
+                            if new_run_id:
+                                ongoing_actions.append(new_run_id)
+                                failed_request.run_id = new_run_id
+                                app.request_handler.mark_dispatched(
+                                    failed_request.request_id, failed_request.run_id
+                                )
+                    
                     for run_id in failed_actions:
                         ongoing_actions.remove(run_id)
 
@@ -359,7 +433,7 @@ def add_action_callbacks(app: NewsegsDash):
                     for run_id in completed_actions:
                         req_data = completed_request_map[run_id]
                         original_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
-                        if req_data is not None and not req_data['children_spawned']:
+                        if not req_data['children_spawned']:
                             print(f'Handling the completion of job {run_id} of type {req_data["action_type"]} for project {req_data["project_id"]}')
                             action_type = req_data['action_type']
                             for idx, id in enumerate(postaction_trigger_ids):
@@ -369,65 +443,22 @@ def add_action_callbacks(app: NewsegsDash):
                                         postaction_trigger_returns[idx] = [req_data['payload']]
                                     else:
                                         postaction_trigger_returns[idx].append(req_data['payload'])
-                            new_actions = registers.POST_ACTION_REGISTER.get(action_type)
-                            if new_actions:
-                                for run_procedure in new_actions.run_procedures:
-                                    # Prevent adding the same procedure twice in the same callback
-                                    spawn_id = (run_procedure, run_id)
-                                    if spawn_id in spawn_ids:
-                                        continue
-                                    spawn_ids.add(spawn_id)
 
-                                    # Add to requests, but then dispatch immediately
-                                    request_id = app.request_handler.add_request(
-                                        run_procedure, req_data['project_id'], 
-                                        app.project_provider, 'run',
-                                        triggering_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
-                                    )
-                                    if request_id is not None:
-                                        new_request = app.request_handler.get_request(request_id)
-                                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
-                                        if new_run_id:
-                                            new_request.run_id = new_run_id
-                                            app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
-                                            spawned_actions.append(new_run_id)
-                                for postproc_procedure in new_actions.postprocess_procedures:
-                                    # Prevent adding the same procedure twice in the same callback
-                                    spawn_id = (postproc_procedure[0], run_id)
-                                    if spawn_id in spawn_ids:
-                                        continue
-                                    spawn_ids.add(spawn_id)
+                            new_request_ids, spawn_ids = generate_post_action_requests(
+                                original_request,
+                                app.request_handler,
+                                app.project_provider,
+                                spawn_ids
+                            )
 
-                                    request_id = app.request_handler.add_request(
-                                        postproc_procedure[0], req_data['project_id'], 
-                                        app.project_provider, 'postprocess',
-                                        triggering_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
-                                    )
-                                    if request_id is not None:
-                                        new_request = app.request_handler.get_request(request_id)
-                                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
-                                        if new_run_id:
-                                            new_request.run_id = new_run_id
-                                            app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
-                                            spawned_actions.append(new_run_id)
-                                for table_draw_procedure in new_actions.table_draw_artists:
-                                    # Prevent adding the same procedure twice in the same callback
-                                    spawn_id = (table_draw_procedure[0], run_id)
-                                    if spawn_id in spawn_ids:
-                                        continue
-                                    spawn_ids.add(spawn_id)
-                                    request_id = app.request_handler.add_request(
-                                        table_draw_procedure[0], req_data['project_id'], 
-                                        app.project_provider, 'tabledraw',
-                                        triggering_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
-                                    )
-                                    if request_id is not None:
-                                        new_request = app.request_handler.get_request(request_id)
-                                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
-                                        if new_run_id:
-                                            new_request.run_id = new_run_id
-                                            app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
-                                            spawned_actions.append(new_run_id)
+                            for request_id in new_request_ids:
+                                new_request = app.request_handler.get_request(request_id)
+                                new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
+                                if new_run_id:
+                                    new_request.run_id = new_run_id
+                                    app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
+                                    spawned_actions.append(new_run_id)
+                            
                             app.request_handler.mark_completed(original_request.request_id)
                         with db.get_engine().begin() as conn:
                             conn.execute(

@@ -20,6 +20,7 @@ import pandas as pd
 from newsegsmodelapp import registers
 from newsegsmodelapp.components import callback_utils, export
 from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import generate_post_action_requests
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
@@ -135,8 +136,9 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                         app.project_provider,
                         app.results_provider,
                         active_project_id,
-                        opts.get('contents-option', 'result'),
-                        opts.get('format-option', 'csv')
+                        contents_option = opts.get('contents-option', 'result'),
+                        format_option = opts.get('format-option', 'csv'),
+                        result_level = 'metamodel',
                     )
                     
                     if to_export is not None:
@@ -161,12 +163,16 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         output = dict(
             active_project_id = Output('active-project-id', 'data', allow_duplicate = True),
 
-            trigger = dict(
-                value = Output({
+            postaction_trigger = dict(
+                data = Output({
                     'type': 'postaction-trigger', 'purpose': 'trigger',
                     'supersection': 'global', 'section': 'run',
                     'key': 'dsa_run_metamodel', 'subindex': 0
                 }, 'data', allow_duplicate = True)
+            ),
+
+            check_requests_trigger = dict(
+                data = Output('trigger-check-requests', 'data', allow_duplicate = True),
             ),
         ),
         inputs = dict(
@@ -185,17 +191,7 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         upload,
         active_project_id,
     ):
-        rval: dict[str, Any] = dict(
-            active_project_id = no_update,
-            trigger = dict(value = no_update)
-        )
 
-        trig = ctx.triggered_id
-        if trig is None:
-            return rval
-        
-        raw_data = None
-        raw_filename = None
         if upload['data'] is None:
             raise PreventUpdate
         raw_data = upload['data']
@@ -203,6 +199,8 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         
         if raw_data is None:
             raise PreventUpdate
+
+        rval = callback_utils.create_noupdate_return()
         
         ctype, cstr = raw_data.split(',')
         decoded = base64.b64decode(cstr)
@@ -274,7 +272,7 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                                 result_df = pd.read_excel(results_file)
         except Exception as e:
             logger.error(e)
-            return rval
+            raise PreventUpdate
         
         if result_df is None:
             # Should never be reached
@@ -284,14 +282,24 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         # Set the result_df as appropriate for a dsa result and trigger post-processing
         result_df = result_df.set_index(['variable', 'bound'])
         mm = proj.get_focussed_metamodel()
+        mm.table_config.revision += 1
         mark_stale = mm_new is None
         app.results_provider.upsert_result('dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale)
-        
-        rr_generator = registers.RUN_REQUEST_REGISTER['dsa_single_metamodel']
+
+        # Spoof a dsa run request to register requests for post dsa run procedures
+        rr_generator = registers.RUN_REQUEST_REGISTER['dsa_run_metamodel']
         request = rr_generator(active_project_id, app.project_provider)
         request.run_id = -random.randrange(1, 10000)
 
-        rval['trigger']['value'] = [json.dumps(request.as_dict())]
+        new_request_ids, request_keys = generate_post_action_requests(
+            request,
+            app.request_handler,
+            app.project_provider
+        )
+
+        rval['postaction_trigger']['data'] = [json.dumps(request.as_dict())]
+        if new_request_ids:
+            rval['check_requests_trigger']['data'] = new_request_ids
 
         return rval
 

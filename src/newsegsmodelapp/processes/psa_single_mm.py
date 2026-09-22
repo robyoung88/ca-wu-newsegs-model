@@ -36,8 +36,6 @@ def execute_dsa_single_mm_run(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     proj = project_provider.get_project(request.project_id)
-
-    # TODO: get dsa configuration from project dsa config
         
     run_config = json.loads(request.payload)
 
@@ -62,9 +60,9 @@ def execute_dsa_single_mm_run(
 
     psa_results = psa.run_psa(
         mm,
-        samples = run_config.get('samples', 10),
-        return_draws = run_config.get('return_draws', False),
-        seed = run_config.get('seed', None),
+        samples = proj.psa_config.samples,
+        return_draws = proj.psa_config.return_draws,
+        seed = proj.psa_config.seed,
         progress = internal_progress_callback
     )
 
@@ -73,5 +71,3 @@ def execute_dsa_single_mm_run(
     result_provider.upsert_result('psa_single_metamodel', mm.table_config, psa_results)
 
     return 'ok'
-
-
