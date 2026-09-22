@@ -6,7 +6,7 @@ from dash import dcc, html
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components.dsa_process_components import dsa_process_components
 from newsegsmodelapp.components.page_layouts import fourpane_layout
-from newsegsmodelapp.components import navigation
+from newsegsmodelapp.components import navigation, result_group_containers
 from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 
 from newsegsmodelapp.registers import register_page_layout
@@ -117,28 +117,35 @@ def create_optim_configuration_editor(**kwargs):
                     ),
                 ]),
                 
-                dbc.Row([
-                    dcc.Graph(
-                        id = {
-                            'type': 'result-figure', 'purpose': 'container',
-                            'supersection': 'optim', 'section': 'tabledraw',
-                            'key': 'table_optim_metamodel', 'subindex': 0
-                        },
-                        style= {
-                            'height': '590px',
-                            'border': '1px solid #dee2e6',
-                            'borderRadius': '0.5rem',
-                            'backgroundColor': 'transparent'
-                        }
-                    )
-                ]), 
-                html.Div(
-                    id = {
-                        'type': 'result-table', 'purpose': 'container',
-                        'supersection': 'optim', 'section': 'tabledraw',
-                        'key': 'table_postopt_metamodel', 'subindex': 0
-                    }
-                ), 
+                result_group_containers.create_results_container(
+                    [
+                        dbc.Row([
+                            dcc.Graph(
+                                id = {
+                                    'type': 'result-figure', 'purpose': 'container',
+                                    'supersection': 'optim', 'section': 'tabledraw',
+                                    'key': 'table_optim_metamodel', 'subindex': 0
+                                },
+                                style= {
+                                    'height': '590px',
+                                    'border': '1px solid #dee2e6',
+                                    'borderRadius': '0.5rem',
+                                    'backgroundColor': 'transparent'
+                                }
+                            )
+                        ]), 
+                        html.Div(
+                            id = {
+                                'type': 'result-table', 'purpose': 'container',
+                                'supersection': 'optim', 'section': 'tabledraw',
+                                'key': 'table_postopt_metamodel', 'subindex': 0
+                            }
+                        ), 
+                    ],
+                    section = 'tabledraw',
+                    supersection = 'optim'
+                ),
+                
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
                 ), 
@@ -185,26 +192,34 @@ def create_dsa_layout(*args, **kwargs):
     ]
 
     b1_contents = [
-        config_dict['layout_results_header'](**kwargs),
-        dbc.Row([
-            dcc.Dropdown(
-                options = [
-                    {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
-                ],
-                value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
-                id = {
-                    'type': 'result-table-option', 'purpose': 'statistic',
-                    'supersection': 'dsa', 'section': 'tabledraw',
-                    'key': 'table_dsa_metamodel', 'subindex': 0
-                },
-                searchable = False,
-                clearable = False,
-            )
-        ]),
+        dbc.Container(
+            [
+                dbc.Row(
+                    config_dict['layout_results_header'](**kwargs),
+                ),
+                
+                dbc.Row([
+                    dcc.Dropdown(
+                        options = [
+                            {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
+                        ],
+                        value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
+                        id = {
+                            'type': 'result-table-option', 'purpose': 'statistic',
+                            'supersection': 'dsa', 'section': 'tabledraw',
+                            'key': 'table_dsa_metamodel', 'subindex': 0
+                        },
+                        searchable = False,
+                        clearable = False,
+                    )
+                ]),
+            ]    
+        )
     ]
 
     b2_contents = [
-        dcc.Loading([
+        #dcc.Loading([
+        result_group_containers.create_results_container([
             html.Div([
                     dbc.Col(
                         [
@@ -252,15 +267,17 @@ def create_dsa_layout(*args, **kwargs):
                 className = 'drawer-content',
                 ),
             ],
-            overlay_style = {
-                'visibility': 'visible',
-                'filter': 'blur(2px)',
-                'display': 'block',
-            },
-            delay_show = 200,
-            delay_hide = 200,
-            id = 'loading-results',
-            parent_className = 'drawer-loading-container',
+            section = 'tabledraw',
+            supersection = 'dsa',
+            # overlay_style = {
+            #     'visibility': 'visible',
+            #     'filter': 'blur(2px)',
+            #     'display': 'block',
+            # },
+            # delay_show = 200,
+            # delay_hide = 200,
+            # id = 'loading-results',
+            # parent_className = 'drawer-loading-container',
             ),
             dbc.Button(
                 'Cancel DSA',

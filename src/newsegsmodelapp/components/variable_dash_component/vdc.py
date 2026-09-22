@@ -866,22 +866,19 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
             )
         ]
 
-    plot_button_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'action-button',
-        supersection = 'optim',
-        purpose = 'draw-marginal-plot',
-    )
     button_container_children = [
         dbc.Button(
             'Plot',
             color = 'primary',
             id = {
-                'type': 'action-button', 'purpose': 'request-process',
-                'supersection': 'optim', 'section': 'tabledraw',
-                'key': 'table_optim_metamodel', 'subindex': f'{section}.{var.interface_key}.{var.interface_subindex}',
-                #'type': 'optim-marginal-plot-button',
+                'type': 'btn-action-optim-create-marginalplot', 'varid': f'{section}.{var.interface_key}.{var.interface_subindex}'
             },
+            # id = {
+            #     'type': 'action-button', 'purpose': 'request-process',
+            #     'supersection': 'optim', 'section': 'tabledraw',
+            #     'key': 'table_optim_metamodel', 'subindex': f'{section}.{var.interface_key}.{var.interface_subindex}',
+            #     #'type': 'optim-marginal-plot-button',
+            # },
             title = 'Plot marginal statistic',
             disabled = False
         ) # pyright: ignore[reportCallIssue]

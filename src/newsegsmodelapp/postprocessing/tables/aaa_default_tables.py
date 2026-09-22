@@ -453,9 +453,9 @@ def _get_dsa_metamodel_table(
             mm = proj.get_focussed_metamodel()
             return result_provider.get_result(table_name, mm.table_config, True)
 
-TABLE_SECTION = 'table_optim_metamodel'
+TABLE_SECTION = 'table_optim_metamodel' # TODO: Improve this key
 _request_plot_marginal_optim = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_dsa_metamodel'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE,)
 def _trigger_plot_marginal_optim(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -473,7 +473,7 @@ def _trigger_plot_marginal_optim(
         raise ValueError('Metamodel ID not provided for single run.')
     mm = proj.get_metamodel_by_id(mm_id)
 
-    varid = run_config.get('subindex') # Custom use of subindex
+    varid = run_config.get('varid')
     if varid is None or varid not in mm.variables:
         return 'variable missing'
 
