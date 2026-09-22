@@ -4,9 +4,10 @@ Functions for creating a deterministic sensitivity analysis layout
 from typing import cast
 
 from dash import dcc, html
-import dash_bootstrap_components as dbc
 
+from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components.dsa_process_components import dsa_process_components
+from newsegsmodelapp.components.page_layouts import fourpane_layout
 from newsegsmodelapp.components.post_page_load import create_post_page_load_components
 from newsegsmodelapp.newsegsbrowser import STATICDATA
 from newsegsmodelapp.components import navigation
@@ -19,32 +20,48 @@ from newsegsmodelframework.newsegssensitivity import optim
 from newsegsmodelapp.components import  results_header
 from newsegsmodelapp.components.optim_process_components import optim_process_components
 from newsegsmodelframework.newsegssensitivity import common as sensitivity
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
-def create_dsa_header():
-    return html.Div([
-        dbc.Row([
-            dbc.Col(
-                html.H1(
-                    [
-                        'Deterministic Sensitivity Analysis',
-                        html.Br(),
-                        html.Span('Site: '),
-                        html.Span(id = {'type': 'generic_text', 'section': 'any', 'key': 'site-name'}),
-                    ]
+
+
+def create_dsa_header(**kwargs):
+    return dbc.Container(
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        [
+                            html.H3(
+                                'Deterministic Sensitivity Analysis',
+                                className='text-end mb-0',
+                            )
+                        ],
+                        width = 6,
+                        className='d-flex align-items-center justify-content-end pe-3 border-end border-2 border-secondary',
+                    ),
+                    dbc.Col(
+                        [
+                            html.H3(
+                                id = {'type': 'generic_text', 'section': 'any', 'key': 'project-name'},
+                                className='text-start mb-0',
+                            )
+                        ],
+                        width = 6,
+                        className='d-flex align-items-center justify-content-start ps-3',
+                    ),
+
+                ],
+            className='align-items-stretch',  # Stretches the columns to match height, allowing the vertical border to extend
+            ),
+            dbc.Row(
+                dbc.Col(
+                    create_header_metamodel_input_container('dsa'),
+                    class_name = 'align-items-center text-center'
                 )
-            ) # pyright: ignore[reportCallIssue]
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.H2(
-                    [
-                        html.Span('Configuration: '),
-                        html.Span(id = {'type': 'generic_text', 'section': 'any', 'key': 'configuration-name'})
-                    ]
-                )
-            ]) # pyright: ignore[reportCallIssue]
-        ])
-    ])
+            )
+        ],
+        fluid = True
+    )
 
 def create_dsa_configuration_editor():
     return dbc.Col([
@@ -60,7 +77,7 @@ def create_dsa_configuration_editor():
         html.Div(
             id = {'type': 'input-container', 'supersection': 'dsa', 'section': 'dsa'}
         )
-    ]) # pyright: ignore[reportCallIssue]
+    ])
 
 def create_optim_configuration_editor_header(**kwargs):
     button_container_children = [
@@ -70,7 +87,7 @@ def create_optim_configuration_editor_header(**kwargs):
             id = 'btn-optim-prerun',
             title = 'Start optimisation',
             disabled = False
-        ) # pyright: ignore[reportCallIssue]
+        )
     ]
 
     return dbc.Row([
@@ -84,7 +101,7 @@ def create_optim_configuration_editor_header(**kwargs):
         )
     ],
     class_name = 'configuration-header'
-    ) # pyright: ignore[reportCallIssue]
+    )
 
 def create_optim_configuration_editor(**kwargs):
     return dbc.Col([
@@ -105,7 +122,7 @@ def create_optim_configuration_editor(**kwargs):
                             'key': 'table_optim_metamodel', 'subindex': 0
                         },
                     ),
-                ]), # pyright: ignore[reportCallIssue]
+                ]),
                 
                 dbc.Row([
                     dcc.Graph(
@@ -121,27 +138,27 @@ def create_optim_configuration_editor(**kwargs):
                             'backgroundColor': 'transparent'
                         }
                     )
-                ]), # pyright: ignore[reportCallIssue]
+                ]), 
                 html.Div(
                     id = {
                         'type': 'result-table', 'purpose': 'container',
                         'supersection': 'optim', 'section': 'tabledraw',
                         'key': 'table_postopt_metamodel', 'subindex': 0
                     }
-                ), # pyright: ignore[reportCallIssue]
+                ), 
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
-                ), # pyright: ignore[reportCallIssue]
+                ), 
             ] + optim_process_components(**kwargs)
         )
         
-    ]) # pyright: ignore[reportCallIssue]
+    ]) 
+
 
 DEFAULT_LAYOUT_DSA = {
-    'layout_navigation': navigation.create_navigator_buttons_default,
+    'layout_navigation': navigation.create_navigation_component,
     'width_navigation': 1,
-    'layout_head': create_dsa_header,
-    'width_head': 11,
+    'layout_top': create_dsa_header,
 
     'layout_results_header': results_header.create_results_header_dsa,
 
@@ -151,45 +168,68 @@ def create_dsa_layout(*args, **kwargs):
     config_dict = DEFAULT_LAYOUT_DSA.copy()
     config_dict.update(kwargs)
 
-    header = dbc.Row([
-        dbc.Col(
-            html.Div(
-                config_dict['layout_navigation'](config_dict.get('selected_model'))
+    a1_contents = [
+        dbc.Row([
+            dbc.Col(
+                config_dict['layout_navigation'](config_dict.get('selected_model')),
+                width = 'auto',
             ),
-            class_name = 'newsegs-navbar-vertical collapsed',
-            width = config_dict['width_navigation'],
-        ), # pyright: ignore[reportCallIssue]
-        dbc.Col(
-            config_dict['layout_head'](),
-            width = config_dict['width_head']
-        ) # pyright: ignore[reportCallIssue]
-    ])
+            dbc.Col(
+                config_dict['layout_top'](**kwargs),
+                class_name = 'page-top'
+            ),
+        ],
+        class_name = 'align-items-start'
+        )
+    ]
+
+    header = a1_contents[0]
+
+    # header = dbc.Row([
+    #     dbc.Col(
+    #         html.Div(
+    #             config_dict['layout_navigation'](config_dict.get('selected_model'))
+    #         ),
+    #         class_name = 'newsegs-navbar-vertical collapsed',
+    #         width = config_dict['width_navigation'],
+    #     ), # pyright: ignore[reportCallIssue]
+    #     dbc.Col(
+    #         config_dict['layout_head'](),
+    #         width = config_dict['width_head']
+    #     ) # pyright: ignore[reportCallIssue]
+    # ])
 
     dsa_config = create_dsa_configuration_editor()
 
     optim_config = create_optim_configuration_editor(**kwargs)
 
-    results_section = [
-        html.Div([
-            dcc.Loading([
-                config_dict['layout_results_header'](**kwargs),
-                dbc.Row([
-                    dcc.Dropdown(
-                        options = [
-                            {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
-                        ],
-                        value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
-                        id = {
-                            'type': 'result-table-option', 'purpose': 'statistic',
-                            'supersection': 'dsa', 'section': 'tabledraw',
-                            'key': 'table_dsa_metamodel', 'subindex': 0
-                        },
-                        searchable = False,
-                        clearable = False,
-                    )
-                ]), # pyright: ignore[reportCallIssue]
-            
-                html.Div([
+    a2_contents = [
+        dsa_config,
+        optim_config,
+    ]
+
+    b1_contents = [
+        config_dict['layout_results_header'](**kwargs),
+        dbc.Row([
+            dcc.Dropdown(
+                options = [
+                    {'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()
+                ],
+                value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
+                id = {
+                    'type': 'result-table-option', 'purpose': 'statistic',
+                    'supersection': 'dsa', 'section': 'tabledraw',
+                    'key': 'table_dsa_metamodel', 'subindex': 0
+                },
+                searchable = False,
+                clearable = False,
+            )
+        ]),
+    ]
+
+    b2_contents = [
+        dcc.Loading([
+            html.Div([
                     dbc.Col(
                         [
                             html.H2("DSA Results Table"),
@@ -203,7 +243,7 @@ def create_dsa_layout(*args, **kwargs):
                             )
                         ],
                         width = 12
-                    ), # pyright: ignore[reportCallIssue]
+                    ),
                     html.Hr(),
                     dbc.Col(
                         [
@@ -228,7 +268,7 @@ def create_dsa_layout(*args, **kwargs):
                             )
                         ],
                         width = 12
-                    ), # pyright: ignore[reportCallIssue]
+                    ),
                     dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-run-postprocess'}, data = []),
                     dcc.Store(id={'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, data = []),
                 ],
@@ -246,12 +286,11 @@ def create_dsa_layout(*args, **kwargs):
             id = 'loading-results',
             parent_className = 'drawer-loading-container',
             ),
-
             dbc.Button(
                 'Cancel DSA',
                 id = {'type': 'metamodel-process-cancel', 'target': 'dsa_run_request'},
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
-            ), # pyright: ignore[reportCallIssue]
+            ), 
             html.Progress(
                 id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
                 className='resize-handle resize-handle-progress',
@@ -261,48 +300,16 @@ def create_dsa_layout(*args, **kwargs):
                 'DSA Running',
                 id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
-            ), # pyright: ignore[reportCallIssue]
-
-        ],
-        className = 'drawer-container',
-
-        ),
-
-        html.Div(
-            id = {'type':'post-drawer-attach', 'page': kwargs.get('page_type', 'None')},
-            style = {'display': 'none'}
-        ),
-    ]
-
-    return dbc.Container(
-        html.Div(
-            ([
-                header,
-                html.Hr(),
-                dbc.Row(
-                    dsa_config
-                ), # pyright: ignore[reportCallIssue]
-                html.Hr(),
-                dbc.Row(
-                    optim_config
-                ), # pyright: ignore[reportCallIssue]
-                html.Hr()
-            ] 
-            + results_section
-            + clayouts.user_action_components()
-            + dsa_process_components(**kwargs)
-            + create_post_page_load_components(
-                kwargs.get('selected_model'),
-                kwargs.get('page_type')
-                )
             ),
             
-            id = 'main-content-pane',
-            className = 'main-content-pane',
-        ),
-        fluid = True,
-        id = 'app-layout-wrapper',
-        class_name = 'app-layout-wrapper',
+        ] + dsa_process_components(**kwargs)
+
+    
+    return fourpane_layout(
+        a1_contents,
+        b1_contents,
+        a2_contents,
+        b2_contents,
     )
 
 @register_page_layout('dsa')

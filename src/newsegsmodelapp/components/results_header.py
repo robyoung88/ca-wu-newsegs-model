@@ -2,6 +2,7 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 
+from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.newsegsbrowser import icons
 from newsegsmodelframework.newsegssensitivity import common as sensitivity
 
@@ -78,25 +79,9 @@ def create_results_header(**kwargs):
                             ),
                             className = 'results-title-block'
                         ),
-                        html.Div([
-                            dbc.Button(
-                                html.I(
-                                    className = icons.get_icon('config-1', style_name = 'raw'),
-                                    style={'display': 'inline'}
-                                ),
-                                color='primary',
-                                id = {'type': 'config-hdrfocus-btn', 'index': 0},
-                                outline = False
-                            ) # pyright: ignore[reportCallIssue]
-                        ],
-                        id = {
-                            'type': 'metamodel-input-container', 'purpose': 'container',
-                            'supersection': 'configurations', 'section': 'configuration-header-selector',
-                            'key': 'results-header-metamodel-input-container', 'subindex': 0
-                            },
-                        className = 'configuration-selector-hdrcontainer'
-                        ),
 
+                        create_header_metamodel_input_container('configurations'),
+                        
                         html.Div([
                             dbc.Button(
                                 html.I(

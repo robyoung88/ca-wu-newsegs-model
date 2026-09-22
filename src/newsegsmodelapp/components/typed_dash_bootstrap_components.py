@@ -17,3 +17,4 @@ InputGroup: Any = dbc.InputGroup
 Navbar: Any = dbc.Navbar
 Row: Any = dbc.Row
 Select: Any = dbc.Select
+Tooltip: Any = dbc.Tooltip

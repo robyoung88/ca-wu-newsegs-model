@@ -6,30 +6,23 @@ the bespoke layout creation.
 """
 from typing import Any
 
-from dash import dcc, html
-import dash_bootstrap_components as dbc
+from dash import html
 
-from newsegsmodelapp.components.post_page_load import create_post_page_load_components
+from newsegsmodelapp.components.page_layouts import fourpane_layout
 from newsegsmodelapp.components import result_group_containers
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import navigation
+from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
 from newsegsmodelapp.components.feedback import indicative_net_energy
 from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
 
 from newsegsmodelapp.components import results_header
 from newsegsmodelapp.components import configuration_selector
 from newsegsmodelapp.newsegsbrowser.layouts.results import results_sections_sprake
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import results_tables_map
 from newsegsmodelapp.registers import register_page_layout
-
-dbc_Container: Any = dbc.Container
-dbc_Button: Any = dbc.Button
-dbc_Card: Any = dbc.Card
-dbc_CardBody: Any = dbc.CardBody
-dbc_Row: Any = dbc.Row
-dbc_Col: Any = dbc.Col
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_top': project_selector.create_project_selector_block,
@@ -86,26 +79,6 @@ def create_model_configuration_layout(*args, **kwargs):
 
     config_dict = DEFAULT_LAYOUT_CONFIGURATION.copy()
     config_dict.update(kwargs)
-    
-    header = [dbc.Row([
-        dbc.Col(
-            config_dict['layout_top'](**kwargs),
-            width = config_dict['width_top'],
-            class_name = 'page-top',
-        ), # pyright: ignore[reportCallIssue]
-        dbc.Col(
-            html.Div(
-                config_dict['layout_navigation'](config_dict.get('selected_model')),
-            ),
-            class_name = 'newsegs-navbar-vertical collapsed',
-            width = config_dict['width_navigation'],
-            
-        ), # pyright: ignore[reportCallIssue]
-        dbc.Col(
-            config_dict['layout_map'](),
-            width = config_dict['width_map']
-        ) # pyright: ignore[reportCallIssue]
-    ])] # pyright: ignore[reportCallIssue]
 
     model_input_sections = []
     for sec in [
@@ -121,7 +94,7 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict[f'layout_{sec}'](),
                 width = config_dict[f'width_{sec}']
-            ) # pyright: ignore[reportCallIssue]
+            )
         )
 
     finance_input_sections = []
@@ -136,7 +109,7 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict[f'layout_{sec}'](),
                 width = config_dict[f'width_{sec}']
-            ) # pyright: ignore[reportCallIssue]
+            )
         )
 
     site_details = [
@@ -144,17 +117,15 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict['layout_top_feedback'](),
                 width = config_dict['width_top_feedback']
-            ) # pyright: ignore[reportCallIssue]
-        ), # pyright: ignore[reportCallIssue]
+            )
+        ),
 
-        dbc.Row(model_input_sections), # pyright: ignore[reportCallIssue]
+        dbc.Row(model_input_sections), 
         
         html.Hr(),
 
-        dbc.Row(finance_input_sections), # pyright: ignore[reportCallIssue]
+        dbc.Row(finance_input_sections),
     ]
-
-    #results_table_functions = config_dict['results_table_functions']
 
     results_subsections = []
     for sec in [
@@ -169,45 +140,17 @@ def create_model_configuration_layout(*args, **kwargs):
             dbc.Col(
                 config_dict[f'layout_{sec}'](),
                 width = config_dict[f'width_{sec}']
-            ) # pyright: ignore[reportCallIssue]
+            )
         )
 
-    results_section = [
-        result_group_containers.create_results_container(
-            [
-                config_dict['layout_results_header'](**kwargs),
-                html.Div([
-                    config_dict['layout_configuration_selector'](),
-
-                    dbc.Row(
-                        results_subsections
-                    ) # pyright: ignore[reportCallIssue]
-                ],
-
-                id = 'drawer-content',
-                className = 'drawer-content',
-                ),        
-            ] + clayouts.user_action_components(),
-            section = 'deterministic-results',
-            supersection = 'deterministic',
-            className = 'drawer-container'
-        ),
-
-        html.Div(
-            id = {'type':'post-drawer-attach', 'page': kwargs.get('page-type', 'None')},
-            style = {'display': 'none'}
-        ),
-    ]
-
     a1_contents = [
-        dbc_Row([
-            dbc_Col(
+        dbc.Row([
+            dbc.Col(
                 config_dict['layout_navigation'](config_dict.get('selected_model')),
                 width = 'auto',
             ),
-            dbc_Col(
+            dbc.Col(
                 config_dict['layout_top'](**kwargs),
-                #width = config_dict['width_top'],
                 class_name = 'page-top',
             ),
         ],
@@ -217,72 +160,30 @@ def create_model_configuration_layout(*args, **kwargs):
     ]
 
     a2_contents = [
-        dbc_Row(
+        dbc.Row(
             config_dict['layout_map']()
         )
     ] + site_details
 
     b1_contents = [
          config_dict['layout_results_header'](**kwargs),
-    #     config_dict['layout_configuration_selector'](),
     ]
 
     b2_contents = [
         config_dict['layout_configuration_selector'](),
-        dbc_Container(dbc_Row(results_subsections))
+        result_group_containers.create_results_container(
+            dbc.Container(dbc.Row(results_subsections)),
+            section = 'deterministic-results',
+            supersection = 'deterministic',
+        )
     ]
-    
 
-    return dbc_Container(
-        [
-            # Block A1: Left Pane Header
-            html.Div(
-                a1_contents,
-                className="pane-header header-a1 bg-light px-3 pt-0 pb-1 border-bottom d-flex justify-content-between align-items-start",
-            ),
-            # Block B1: Right Pane Header
-            html.Div(
-                b1_contents,
-                className="pane-header header-b1 bg-light px-3 pt-0 pb-1 border-bottom d-flex justify-content-between align-items-start",
-            ),
-            # Block A2: Left Pane Content (Scrollable)
-            html.Div(
-                a2_contents,
-                className="pane-content content-a2 p-3 bg-white",
-            ),
-            # Block B2: Right Pane Content (Scrollable)
-            html.Div(
-                result_group_containers.create_results_container(
-                    b2_contents,
-                    section = 'deterministic-results',
-                    supersection = 'deterministic',
-                ),
-                className="pane-content content-b2 p-3 bg-white",
-            ),
-        ],
-        fluid=True,
-        className="dash-container p-0",
+    return fourpane_layout(
+        a1_contents,
+        b1_contents,
+        a2_contents,
+        b2_contents,
     )
-    
-    return dbc.Container(
-        html.Div(
-            (
-                header
-                + [html.Hr()]
-                + site_details
-                + [html.Hr()]
-                + results_section
-                + background_callback_error_handler_components()
-                + create_post_page_load_components(
-                    kwargs.get('selected_model'),
-                    kwargs.get('page_type')
-                )
-            ),
-            className = 'main-content-pane',
-        ),
-        fluid = False,
-        class_name = 'app-layout-wrapper',
-    ) # pyright: ignore[reportCallIssue]
 
 @register_page_layout('site-config')
 def _create_model_configuration_layout(app_state: dict):

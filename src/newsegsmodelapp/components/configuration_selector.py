@@ -3,9 +3,6 @@ import json
 from typing import Any, Sequence, cast
 
 from dash import ALL, Input, Output, State, ctx, dcc, html, no_update
-from dash_bootstrap_components._components.Button import Button as dbc_Button
-from dash_bootstrap_components._components.Row import Row as dbc_Row
-from dash_bootstrap_components._components.Col import Col as dbc_Col
 from dash.exceptions import PreventUpdate
 import pathvalidate
 
@@ -18,6 +15,7 @@ from newsegsmodelframework.core.constructors.constructors import find_constructo
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.util import jsonfuncs
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 # -----------------------------------------------
 # Layout
@@ -33,7 +31,7 @@ def create_config_selector_headerbutton(
     else:
         do_outline = True
     
-    contents = dbc_Button(
+    contents = dbc.Button(
         html.I(
             className = icons.get_icon('config-{}'.format(config_index+1), style_name = 'raw'),
             style={'display': 'inline'}
@@ -45,6 +43,27 @@ def create_config_selector_headerbutton(
     )
 
     return contents
+
+def create_header_metamodel_input_container(supersection: str) -> html.Div:
+    return html.Div(
+        [
+            dbc.Button(
+                html.I(
+                    className = icons.get_icon('config-1', style_name = 'raw'),
+                    style={'display': 'inline'}
+                ),
+                color='primary',
+                id = {'type': 'config-hdrfocus-btn', 'index': 0},
+                outline = False
+            )
+        ],
+        id = {
+            'type': 'metamodel-input-container', 'purpose': 'container',
+            'supersection': supersection, 'section': 'configuration-header-selector',
+            'key': 'results-header-metamodel-input-container', 'subindex': 0
+            },
+        className = 'configuration-selector-hdrcontainer'
+    )
 
 _PLACEHOLDER_NAMES = set('Configuration Name')
 
@@ -101,7 +120,7 @@ def create_single_configuration_selector_row(
     button_container_children = []
     
     button_container_children += [
-        dbc_Button(
+        dbc.Button(
             html.I(
                 className = icons.get_icon('config-focus', style_name = 'raw'),
                 style={'display': 'inline'}
@@ -112,7 +131,7 @@ def create_single_configuration_selector_row(
             title = 'Focus configuration',
         ),
 
-        dbc_Button(
+        dbc.Button(
             html.I(
                 className = icons.get_icon('config-duplicate', style_name = 'raw'),
                 style={'display': 'inline'}
@@ -123,7 +142,7 @@ def create_single_configuration_selector_row(
             title = 'Duplicate configuration'
         ),
 
-        dbc_Button(
+        dbc.Button(
             html.I(
                 className = icons.get_icon('config-download', style_name = 'raw'),
                 style = {'display': 'inline'}
@@ -135,7 +154,7 @@ def create_single_configuration_selector_row(
         ),
         
         dcc.Upload(
-            dbc_Button(
+            dbc.Button(
                 html.I(
                     className = icons.get_icon('config-upload', style_name = 'raw'),
                     style = {'display': 'inline'}
@@ -152,7 +171,7 @@ def create_single_configuration_selector_row(
             className = 'upload-button'
         ),
             
-        dbc_Button(
+        dbc.Button(
             html.I(
                 className = icons.get_icon('results-download', style_name = 'raw'),
                 style = {'display': 'inline'}
@@ -166,7 +185,7 @@ def create_single_configuration_selector_row(
 
     if show_remove:
         button_container_children.append(
-            dbc_Button(
+            dbc.Button(
                 html.I(
                     className = icons.get_icon('config-remove', style_name = 'raw'),
                     style={'display': 'inline'}
@@ -185,8 +204,8 @@ def create_single_configuration_selector_row(
     contents.append(button_container)
     
     return (
-        dbc_Row([
-            dbc_Col([
+        dbc.Row([
+            dbc.Col([
                 primary_container(
                     contents
                 )
@@ -257,7 +276,13 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         configuration_container_ids,
         configuration_header_ids,
     ):
-        if active_project_id is None or len(configuration_container_ids) == 0:
+        if (
+            active_project_id is None 
+            or (
+                len(configuration_container_ids) == 0
+                and len(configuration_header_ids) == 0
+            )
+        ):
             raise PreventUpdate
 
         proj = app.project_provider.get_project(active_project_id)
@@ -662,9 +687,9 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
                     app.project_provider,
                     app.results_provider,
                     active_project_id,
-                    config_index,
-                    opts.get('contents-option', 'result'),
-                    opts.get('format-option', 'csv')
+                    contents_option = opts.get('contents-option', 'result'),
+                    format_option = opts.get('format-option', 'csv'),
+                    result_level = 'metamodel'
                 )
 
                 if to_export is None:

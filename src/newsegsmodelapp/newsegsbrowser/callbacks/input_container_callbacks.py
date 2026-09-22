@@ -24,6 +24,7 @@ from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp.registers import get_input_handler
 
 def _create_text_field_values(
+    proj: NewsegsProject,
     mm: NewsegsMetaModel,
 
     generic_text_ids: list[dict[str, Any]],
@@ -31,6 +32,8 @@ def _create_text_field_values(
     text_values = []
     for text_id in generic_text_ids:
         match text_id.get('key'):
+            case 'project-name':
+                text_values.append(proj.name)
             case 'site-name':
                 text_values.append(mm.model.location.name)
             case 'configuration-name':
@@ -109,10 +112,11 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None:
             raise PreventUpdate
-        
-        mm = get_focussed_metamodel(active_project_id, app.project_provider)
 
-        text_values = _create_text_field_values(mm, generic_text_ids)
+        proj = app.project_provider.get_project(active_project_id)
+        mm = proj.get_focussed_metamodel()
+
+        text_values = _create_text_field_values(proj, mm, generic_text_ids)
 
         return text_values
 

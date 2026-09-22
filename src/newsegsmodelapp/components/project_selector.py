@@ -167,6 +167,10 @@ def delete_snapshot(
 # Layout component
 # -----------------------------------------------
 def create_project_selector(**kwargs):
+    # Don't draw the selector e.g. if generating the callback validation layout.
+    if not kwargs.get('project_selector', True):
+        return []
+    
     def stores_and_dialogs() -> list[dash.development.base_component.Component]:
         return [
             # Delete project confirmation dialog
