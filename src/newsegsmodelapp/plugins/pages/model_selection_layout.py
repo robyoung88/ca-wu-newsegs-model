@@ -1,5 +1,5 @@
-from dash import dcc, html
-import dash_bootstrap_components as dbc
+from dash import html
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 model_selection_layout = dbc.Container([
     html.Div([
@@ -10,8 +10,8 @@ model_selection_layout = dbc.Container([
                 ),
                 width = 12,
                 class_name = 'landing-title-container'
-            ) # pyright: ignore[reportCallIssue]
-        ]), # pyright: ignore[reportCallIssue]
+            )
+        ]),
         dbc.Row([
             dbc.Col(
                 html.H1(
@@ -19,8 +19,8 @@ model_selection_layout = dbc.Container([
                 ),
                 width = 12,
                 class_name = 'landing-name-container'
-            ) # pyright: ignore[reportCallIssue]
-        ]), # pyright: ignore[reportCallIssue]
+            )
+        ]),
     ],
     className = 'landing-header bg-primary text-white'
     ),
@@ -36,10 +36,10 @@ model_selection_layout = dbc.Container([
                         html.H3('Sprake Model')
                     ],
                     id = {'type': 'btn-model-type-selector', 'label': 'sprake'}
-                ), # pyright: ignore[reportCallIssue]
+                ),
                 width = 6,
                 align='center'
-            ), # pyright: ignore[reportCallIssue]
+            ),
             # dbc.Col(
             #     dbc.Button(
             #         [
@@ -51,13 +51,12 @@ model_selection_layout = dbc.Container([
             #         ],
             #         id = {'type': 'btn-model-type-selector', 'label': 'localised'},
             #         class_name = 'text-center'
-            #     ), # pyright: ignore[reportCallIssue]
+            #     ), 
             #     width = 6,
-            # ) # pyright: ignore[reportCallIssue]
-        ]), # pyright: ignore[reportCallIssue]
+            # ) 
+        ]),  
     ], 
     className = 'd-flex justify-content-center',
     )
-    
-    
-]) # pyright: ignore[reportCallIssue]
+       
+])

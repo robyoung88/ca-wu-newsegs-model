@@ -2,11 +2,11 @@
 Create a landing layout for an app.
 """
 from dash import dcc, html
-import dash_bootstrap_components as dbc
 
 from newsegsmodelapp.components import navigation
-from newsegsmodelapp.newsegsbrowser.layouts import common as clayouts, layout_registry
+from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 from newsegsmodelapp.registers import register_page_layout
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_landing_header(**kwargs):
     return html.H1(kwargs.get('head_text', ''))
@@ -35,18 +35,18 @@ def create_landing_layout(*args, **kwargs):
             config_dict['layout_navigation'](config_dict.get('selected_model','')),
             width = config_dict['width_navigation'],
             class_name = 'newsegs-navbar-vertical flex-shrink-1',
-        ), # pyright: ignore[reportCallIssue]
+        ),
         dbc.Col(
             config_dict['layout_head'](**kwargs),
             width = config_dict['width_head']
-        ) # pyright: ignore[reportCallIssue]
+        ) 
     ])
 
     body = dbc.Col([
         dcc.Markdown(config_dict['body_text']),
     ],
     width = config_dict['width_body']
-    ) # pyright: ignore[reportCallIssue]
+    )
     
     assumptions = dbc.Col([
         dbc.Row(html.H4('Model block diagram')), # pyright: ignore[reportCallIssue]
@@ -61,11 +61,11 @@ def create_landing_layout(*args, **kwargs):
                     'display': 'block'
                 }
             ),
-        ), # pyright: ignore[reportCallIssue]
+        ),
         dbc.Row(
             dcc.Markdown(config_dict['assumptions_text']),
-        ), # pyright: ignore[reportCallIssue]
-    ]) # pyright: ignore[reportCallIssue]
+        ),
+    ])
 
     return html.Div(
         [
@@ -76,10 +76,9 @@ def create_landing_layout(*args, **kwargs):
                     body,
                     
                     assumptions
-                ]), # pyright: ignore[reportCallIssue]
-            ]) # pyright: ignore[reportCallIssue]
+                ]),
+            ])
         ]
-        + clayouts.user_action_components()
     )
 
 @register_page_layout('landing')

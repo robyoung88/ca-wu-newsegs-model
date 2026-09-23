@@ -53,7 +53,7 @@ if not RESULTS_STORE.exists():
 
 
 # LAYOUTS
-from newsegsmodelapp.newsegsbrowser.layouts import model_selection_layout
+from newsegsmodelapp.plugins.pages import model_selection_layout
 
 AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 

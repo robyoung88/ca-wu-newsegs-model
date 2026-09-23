@@ -63,10 +63,3 @@ def create_fourpane_layout(*args, **kwargs):
         fluid=True,
         className="dash-container p-0",
     )
-
-@register_page_layout('layout')
-def _(app_state: dict):
-    selected_model = app_state.get('selected_model', 'default')
-    return create_fourpane_layout(
-        **layout_registry.get_layout_layout_config(selected_model)
-    )

@@ -2,11 +2,11 @@
 import importlib
 import pkgutil
 
-import newsegsmodelapp.newsegsbrowser.layouts as layouts
+import newsegsmodelapp.plugins.pages as layouts
 def load_layouts():
     layout_dict = {}
     for info in pkgutil.iter_modules(
-        layouts.__path__, prefix = 'newsegsmodelapp.newsegsbrowser.layouts.'
+        layouts.__path__, prefix = 'newsegsmodelapp.plugins.pages.'
     ):
         layout_dict[info.name] = importlib.import_module(info.name)
     return layout_dict

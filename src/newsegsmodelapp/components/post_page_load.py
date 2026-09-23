@@ -41,7 +41,7 @@ def create_post_page_load_components(
         })
     ]
 
-def add_post_page_load_callbacks(app: NewsegsDash) -> NewsegsDash:
+def add_post_page_load_callbacks(app: NewsegsDash):
     """
     Functions which are triggered immediately after page load.
     """
@@ -69,4 +69,4 @@ def add_post_page_load_callbacks(app: NewsegsDash) -> NewsegsDash:
         """
         print('Model configuration onload div constructed.')
         return [datetime.datetime.now().timestamp()] * len(config_watcher_ids)
-    
+        

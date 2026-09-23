@@ -15,7 +15,6 @@ from newsegsmodelapp.components import navigation
 from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 from newsegsmodelapp.newsegsbrowser.layouts.inputs import input_sections_sprake, maps
 from newsegsmodelapp.components.feedback import indicative_net_energy
-from newsegsmodelapp.newsegsbrowser.layouts.common import NULL_LAYOUT
 
 from newsegsmodelapp.components import results_header
 from newsegsmodelapp.components import configuration_selector
@@ -23,6 +22,8 @@ from newsegsmodelapp.newsegsbrowser.layouts.results import results_sections_spra
 from newsegsmodelapp.newsegsbrowser.postprocess.tables import results_tables_map
 from newsegsmodelapp.registers import register_page_layout
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+
+from .common import NULL_LAYOUT
 
 DEFAULT_LAYOUT_CONFIGURATION = {
     'layout_top': project_selector.create_project_selector_block,
