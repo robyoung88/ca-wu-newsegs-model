@@ -15,6 +15,10 @@ SUPERVISOR_INTERVAL_SECONDS = 5
 DEAD_CALCULATION_INTERVAL_SECONDS = 300
 HEARTBEAT_FILE = Path(str(settings['HEARTBEAT_FILE']))
 
+from newsegsmodelapp import APP_ROOT
+import os
+os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
+
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_tables import runs
 
@@ -29,6 +33,7 @@ def run_proxy(server = DISPATCHSERVER, frontendport = FRONTENDPORT, backendport 
     backend = context.socket(zmq.DEALER)
     backend.bind(f'tcp://{server}:{backendport}')
     zmq.proxy(frontend, backend)
+    print(f'Proxy established on {server} between {frontendport} and {backendport}')
 
 def run_dispatcher(
         num_workers = 4,
@@ -48,6 +53,8 @@ def run_dispatcher(
         }
     )
     proxy_process.start()
+
+    server = "127.0.0.1"
 
     # Start workers
     workers = {}

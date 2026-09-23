@@ -27,7 +27,7 @@ def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config
     )
 
 @register_run_procedure(REQUEST_TYPE)
-def execute_dsa_single_mm_run(
+def execute_psa_single_mm_run(
     request: PSARunMetamodelRunRequest,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
@@ -58,11 +58,14 @@ def execute_dsa_single_mm_run(
 
         progress_callback(step, total, 'Running PSA')
 
+    seed = proj.psa_config.seed
+    seed = int(seed) if seed is not None else seed
+
     psa_results = psa.run_psa(
         mm,
         samples = proj.psa_config.samples,
         return_draws = proj.psa_config.return_draws,
-        seed = proj.psa_config.seed,
+        seed = seed,
         progress = internal_progress_callback
     )
 

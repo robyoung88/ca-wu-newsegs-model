@@ -24,16 +24,17 @@ from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
 
 
-DISPATCHSERVER = 'zmq-dispatcher'#settings['DISPATCHSERVERS'][0]
+DISPATCHSERVER = settings['DISPATCHSERVERS'][1]#'zmq-dispatcher'#
 FRONTENDPORT = settings['FRONTENDPORT']
 
 def send_to_dispatcher(payload) -> dict:
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
-
+    print(f'sending to dispatcher on {DISPATCHSERVER}:{FRONTENDPORT}')
     socket.send_pyobj(payload)
 
+    print('Waiting for confirmation')
     return socket.recv_pyobj()
 
 def _local_run_any(
@@ -115,6 +116,7 @@ def spawn_job(
 
     if request.background_procedure:
         run_info = send_to_dispatcher(request)
+        print(f'created background job {run_info["job_id"]}')
         return run_info['job_id']
     else:
         match request.request_class:
@@ -359,6 +361,7 @@ def add_action_callbacks(app: NewsegsDash):
                 job_statuses = conn.execute(check_job_stmt).fetchall()
 
             if not job_statuses:
+                print('All jobs finished')
                 ongoing_actions = []
             else:
                 status_map = {x[0]: x[1] for x in job_statuses}

@@ -122,7 +122,7 @@ class RunRequest(SerialisableDataclass):
     progress: float = 0.0
     progress_message: str = ''
     cancel_requested: bool = False
-    background_procedure: bool = False # TODO: Set to default background once the dispatcher is enabled
+    background_procedure: bool = True #False # TODO: Set to default background once the dispatcher is enabled
 
 class RunRequestHandler(Protocol):
     def __call__(

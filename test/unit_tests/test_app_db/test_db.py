@@ -15,7 +15,6 @@ from sqlalchemy import inspect
 from newsegsmodelapp.backend.db import db_tables
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
-os.environ['DYNACONF_DB_PATH'] = ':memory:'
 from config import settings
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider

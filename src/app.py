@@ -2,6 +2,7 @@
 """
 import time
 
+from newsegsmodelapp.backend.db.db import init_db
 from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelapp.newsegsbrowser.callbacks.deterministic_run_callbacks import add_deterministic_run_callbacks
 t1 = time.time()
@@ -240,10 +241,6 @@ def create_app(external_stylesheets = None) -> Dash:
         project_provider = project_provider,
         results_provider = results_provider,
         request_handler = request_handler,
-        #routing_callback_inputs = {
-        #    'session-id': Input('session-id', 'data'),
-        #    'app-state': Input('app-state', 'data'),
-        #}
     )
 
     app.layout = serve_layout
@@ -276,6 +273,7 @@ def create_app(external_stylesheets = None) -> Dash:
 # -----------------------------------------------
 
 if __name__ == '__main__':
+    init_db()
     app = create_app()
     #try:
     app.run(debug = True, use_reloader = False)

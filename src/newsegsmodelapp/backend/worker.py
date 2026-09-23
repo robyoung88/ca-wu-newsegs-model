@@ -7,9 +7,6 @@ from pathlib import Path
 import sqlalchemy as sa
 
 from config import settings
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
-from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
@@ -18,15 +15,23 @@ BACKENDPORT = str(settings['BACKENDPORT'])
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_tables import runs
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
+from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
+
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
 import newsegsmodelapp.registers as registers
 
-def worker_process(worker_id: str, server: str = '127.0.0.1', port: str = BACKENDPORT):
+def worker_process(worker_id: str, server: str = DISPATCHSERVER, port: str = BACKENDPORT):
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.connect(f'tcp://{server}:{port}')
 
+    print(f'Worker listening on {server}:{port}')
+
     engine = db.get_engine()
+    print(db.db._connected_db_path)
+    print(engine.url)
 
     proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
     result_provider = FromDatabaseResultProvider(db.get_engine, RESULTS_STORE)

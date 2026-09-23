@@ -33,6 +33,7 @@ def get_engine(db_path: str | Path = DB_PATH):
     global _engine
     global _connected_db_path
     if _engine is None or (_connected_db_path is not None and _connected_db_path is not db_path):
+        print (f'first connection on {db_path}')
         _engine = sqlalchemy.create_engine(
             f'sqlite+pysqlite:///{db_path}',
             #connect_args = {'autocommit': False},
@@ -126,7 +127,8 @@ def run_migrations():
     Args:
         from_none (bool) - Ignore version number and apply full migration path.
     """
-    alembic_cfg = AlembicConfig('alembic.ini')
+    from newsegsmodelapp import APP_ROOT
+    alembic_cfg = AlembicConfig(APP_ROOT.parent / 'alembic.ini')
     command.upgrade(alembic_cfg, 'head')
 
 def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
