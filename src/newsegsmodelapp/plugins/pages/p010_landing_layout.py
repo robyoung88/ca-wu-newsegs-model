@@ -1,15 +1,15 @@
 """
 Create a landing layout for an app.
 """
-from dataclasses import asdict, dataclass
-from typing import Any, Callable, cast
+from dataclasses import dataclass
+from typing import Any, Callable
 
 from dash import dcc, html
 
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp import registers
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
-from newsegsmodelapp.newsegsbrowser import icons
+from newsegsmodelapp.components import icons
 from newsegsmodelapp.types import Page
 
 PAGE_TYPE = 'landing'
@@ -89,7 +89,7 @@ landing_page = Page(
         className = icons.get_icon('nav-landing', style_name = 'raw'),
         style = {'display': 'inline'}
     ),
-    layout = create_landing_layout,
+    layout = create_landing_layout, # type: ignore
     default_configuration = LandingLayoutConfiguration()
 )
 registers.add_page(landing_page)

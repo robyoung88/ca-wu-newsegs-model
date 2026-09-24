@@ -4,13 +4,11 @@ from pyproj import Transformer
 from dash import Dash, html, dcc, Input, Output, State, ALL, no_update
 from dash.exceptions import PreventUpdate
 import dash_leaflet as dl
-import dash_bootstrap_components as dbc
-from dash_bootstrap_components._components.Row import Row as dbc_Row
-from dash_bootstrap_components._components.Col import Col as dbc_Col
 
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser.icons import get_icon
+from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 
@@ -58,14 +56,14 @@ def create_site_selector_map(map_id='sitemap',
                              center=(53.165716, -3.728402)):
     elements = html.Div(
         [
-            dbc_Row([
-                dbc_Col(
+            dbc.Row([
+                dbc.Col(
                     create_map_layout(map_id, center),
                     width=12
                 )
             ]),
-            dbc_Row([
-                dbc_Col(
+            dbc.Row([
+                dbc.Col(
                     html.H1(
                         dcc.Input(
                             placeholder = 'Site Name',
@@ -87,8 +85,8 @@ def create_site_selector_map(map_id='sitemap',
                     width=12,
                     lg=6
                 ),
-                dbc_Col([
-                    dbc_Row(
+                dbc.Col([
+                    dbc.Row(
                         html.Div(
                             html.H4(create_latlon_input()),
                             style={"display": "flex", 
@@ -99,7 +97,7 @@ def create_site_selector_map(map_id='sitemap',
                         id='latlon-container',
                         align='start'
                     ),
-                    dbc_Row(
+                    dbc.Row(
                         html.Div(
                             html.H5(create_osgb_feedback()),
                             style={"display": "flex", 

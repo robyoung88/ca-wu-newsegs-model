@@ -12,17 +12,17 @@ import numpy as np
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID, VARIABLE_PARAMETER_KEYS
+from newsegsmodelapp.components.constants import VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
-from newsegsmodelapp.newsegsbrowser.icons import get_icon
+from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelapp.registers import register_input_handler
-from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
+from newsegsmodelapp.registers import get_single_input_header_content_creator
 
 def create_numeric_variable_parameter_input(
     param_id: VariableInstanceParameterComponentID,

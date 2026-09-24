@@ -12,7 +12,6 @@ import uuid
 
 from dash import Dash, Input, Output, State
 from dash import dcc, html, no_update
-from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
@@ -36,14 +35,12 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
-from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
 from newsegsmodelapp.components.callbacks.input_container_callbacks import add_input_container_callbacks
 from newsegsmodelapp.components import map
 
 RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
-
 
 # LAYOUTS
 from newsegsmodelapp.plugins.pages import p000_model_selection_layout
@@ -266,7 +263,6 @@ def create_app(external_stylesheets = None) -> Dash:
 
     # Bind callbacks
     add_display_callbacks(app)
-    add_post_page_load_callbacks(app)
     add_input_container_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
     map.add_site_selector_callbacks(app)
@@ -274,7 +270,6 @@ def create_app(external_stylesheets = None) -> Dash:
     add_action_callbacks(app)
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)
-    #add_psa_run_callbacks(app)
 
     for page in registers.PAGE_REGISTER.values():
         page.attach_callbacks(app)

@@ -1,25 +1,40 @@
 """
 Functions for creating a deterministic sensitivity analysis layout
 """
+import base64
 from dataclasses import asdict, dataclass
-from typing import Any, Callable
+import io
+import json
+import os
+import random
+import tempfile
+from typing import Any, Callable, cast
+import zipfile
 
-from dash import dcc, html
+from dash import ALL, Input, Output, State, ctx, dcc, html
+from dash.exceptions import PreventUpdate
+import pandas as pd
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.components.callbacks.action_callbacks import generate_post_action_requests
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
-from newsegsmodelapp.components.dsa_process_components import dsa_process_components
-from newsegsmodelapp.components.page_layouts import fourpane_layout
-from newsegsmodelapp.components import navigation, result_group_containers
 
-from newsegsmodelapp.newsegsbrowser import icons
+from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
+from newsegsmodelapp.components import callback_utils, export, navigation
+
+from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelapp.components import icons
 from newsegsmodelapp.types import Page
+from newsegsmodelframework.core.constructors.constructors import find_constructor
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import optim
 
-from newsegsmodelapp.components import  results_header
-from newsegsmodelapp.components.optim_process_components import optim_process_components
+from newsegsmodelapp.components.layouts import result_group_containers, results_header
 from newsegsmodelframework.newsegssensitivity import common as sensitivity
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+
+from .processes.dsa_process_components import dsa_process_components
+from .processes.optim_process_components import optim_process_components
 
 PAGE_TYPE = 'dsa'
 
@@ -299,6 +314,476 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
         b2_contents,
     )
 
+def add_dsa_run_callbacks(app: NewsegsDash):
+    if True:
+        @app.callback(
+            output = {
+                'modal': {
+                    'is_opens': Output('modal-dsa-confirm', 'is_open')
+                }
+            },
+            inputs = {
+                'dsa_run_button': {
+                    'n_clicks': Input(
+                        'btn-action-dsa-run-metamodel',
+                        'n_clicks'
+                    ),
+                },
+                'modal_close_button': {
+                    'n_clicks': Input('btn-dsa-confirm-abort', 'n_clicks'),
+                },
+                'dsa_prerun_button': {
+                    'n_clicks': Input('btn-dsa-prerun', 'n_clicks'),
+                },
+            },
+            prevent_initial_call = True
+        )
+        def confirm_dsa_run(
+            dsa_run_button,
+            modal_close_button,
+            dsa_prerun_button,
+        ):
+            clicks = callback_utils.get_triggered_value()
+            if not clicks:
+                raise PreventUpdate
+            
+            trig_id = ctx.triggered_id
+            if trig_id is None:
+                raise PreventUpdate
+
+            rval = callback_utils.create_noupdate_return()
+            if trig_id == 'btn-dsa-prerun':
+                rval['modal']['is_opens'] = True
+            else:
+                rval['modal']['is_opens'] = False
+            return rval
+        
+    @app.callback(
+        output = {
+            'modal': {
+                'is_opens': Output('modal-dsa-download-confirm', 'is_open')
+            },
+            'download': {
+                'datas': Output('download-dsa-result', 'data')
+            },
+        },
+        inputs = {
+            'results_download_button': {
+                'n_clicks': Input('btn-dsa-download-confirm-ok', 'n_clicks'),
+            },
+            'modal_close_button': {
+                'n_clicks': Input('btn-dsa-download-confirm-abort', 'n_clicks')
+                
+            },
+            'results_predownload_button': {
+                'n_clicks': Input('btn-dsa-result-predownload', 'n_clicks'),
+            },
+        },
+        state = {
+            'options': {
+                'values': State(
+                    {'type': 'dsa-result-download-option', 'key': ALL},
+                    'value'
+                ),
+                'ids': State(
+                    {'type': 'dsa-result-download-option', 'key': ALL},
+                    'id'
+                )
+            },
+            'active_project_id': State('active-project-id', 'data'),
+        },
+        prevent_initial_call = True,
+    )
+    def confirm_dsa_results_download(
+        results_download_button,
+        modal_close_button,
+        results_predownload_button,
+        options,
+        active_project_id,
+    ):
+        trig_id = ctx.triggered_id
+        if trig_id is None:
+            raise PreventUpdate
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
+
+        rval = callback_utils.create_noupdate_return()
+
+        if isinstance(trig_id, str):
+            match trig_id:
+                case 'btn-dsa-download-confirm-ok':
+                    rval['modal']['is_opens'] = False
+                    opts = callback_utils.get_options_nopage(
+                        options['ids'],
+                        options['values'],
+                        ['contents-option', 'format-option']
+                    )
+    
+                    to_export = export.export_results(
+                        'dsa',
+                        app.project_provider,
+                        app.results_provider,
+                        active_project_id,
+                        contents_option = opts.get('contents-option', 'result'),
+                        format_option = opts.get('format-option', 'csv'),
+                        result_level = 'metamodel',
+                    )
+                    
+                    if to_export is not None:
+                        rval['download']['datas'] = to_export
+
+                case 'btn-dsa-result-predownload':
+                    rval['modal']['is_opens'] = True
+
+                case _:
+                    rval['modal']['is_opens'] = False
+        else:
+            match trig_id.get('type'):
+                case 'results-predownload-btn':
+                    rval['modal']['is_opens'] = True
+                    return rval
+            
+                case _:
+                    rval['modal']['is_opens'] = False
+        return rval
+    
+    @app.callback(
+        output = dict(
+            active_project_id = Output('active-project-id', 'data', allow_duplicate = True),
+
+            postaction_trigger = dict(
+                data = Output({
+                    'type': 'postaction-trigger', 'purpose': 'trigger',
+                    'supersection': 'global', 'section': 'run',
+                    'key': 'dsa_run_metamodel', 'subindex': 0
+                }, 'data', allow_duplicate = True)
+            ),
+
+            check_requests_trigger = dict(
+                data = Output('trigger-check-requests', 'data', allow_duplicate = True),
+            ),
+        ),
+        inputs = dict(
+            upload = dict(
+                data = Input('upload-dsa-result', 'contents'),
+                filename = Input('upload-dsa-result', 'filename'),
+                id = State('upload-dsa-result', 'id')
+            )
+        ),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+        ),
+        prevent_initial_call = True
+    )
+    def upload_dsa_results(
+        upload,
+        active_project_id,
+    ):
+
+        if upload['data'] is None:
+            raise PreventUpdate
+        raw_data = upload['data']
+        raw_filename = upload['filename']
+        
+        if raw_data is None:
+            raise PreventUpdate
+
+        rval = callback_utils.create_noupdate_return()
+        
+        ctype, cstr = raw_data.split(',')
+        decoded = base64.b64decode(cstr)
+        split_fn = str(raw_filename).rsplit('.', 1)
+        if len(split_fn) == 2:
+            file_ext = split_fn[1]
+        else:
+            file_ext = 'csv'
+
+        proj = app.project_provider.get_project(active_project_id)
+        result_df = None
+        mm_new = None
+        try:
+            match file_ext:
+                case 'csv':
+                    result_df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+                case 'xlsx':
+                    result_df = pd.read_excel(io.BytesIO(decoded))
+                case 'zip':
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        with zipfile.ZipFile(io.BytesIO(decoded), 'r') as zip_ref:
+                            zip_ref.extractall(temp_dir)
+                        
+                        results_file = None
+                        for root, dirs, files in os.walk(temp_dir):
+                            for file in files:
+                                if file.endswith('dsa-results.csv') or file.endswith('dsa-results.xlsx'):
+                                    results_file = os.path.join(root, file)
+                                    break
+                        if results_file is None:
+                            return rval
+
+                        
+                        for root, dirs, files in os.walk(temp_dir):
+                            for file in files:
+                                if file.endswith('.json'):
+                                    json_file = os.path.join(root, file)
+                                    try:
+                                        with open(json_file, 'r') as f:
+                                            cfg = json.load(f)
+                                            constr = find_constructor(cfg['constructor_class'], cfg['class'])
+                                            if not constr:
+                                                raise PreventUpdate
+                                            mm_new = cast(NewsegsMetaModel, constr(cfg))
+                                            mm_new.anonymise_ids()
+
+                                            proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
+                                            proj.set_focussed_metamodel(mm_new.id)
+                                            proj.revision += 1
+                                            app.project_provider.upsert_component(proj)
+                                            
+                                    except ValueError as e:
+                                        print(e)
+                                        continue
+                        
+                        if mm_new:
+                            rval['active_project_id'] = active_project_id
+                        
+                        
+                        split_results_fn = str(results_file).rsplit('.', 1)
+                        if len(split_results_fn) == 2:
+                            result_file_ext = split_results_fn[1]
+                        else:
+                            result_file_ext = 'csv'
+                        match result_file_ext:
+                            case 'csv':
+                                result_df = pd.read_csv(results_file)
+                            case 'xlsx':
+                                result_df = pd.read_excel(results_file)
+        except Exception as e:
+            print(e)
+            raise PreventUpdate
+        
+        if result_df is None:
+            # Should never be reached
+            print('No results in archive, but initial results file check has passed')
+            return rval
+        
+        # Set the result_df as appropriate for a dsa result and trigger post-processing
+        result_df = result_df.set_index(['variable', 'bound'])
+        mm = proj.get_focussed_metamodel()
+        mm.table_config.revision += 1
+        mark_stale = mm_new is None
+        app.results_provider.upsert_result('dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale)
+
+        # Spoof a dsa run request to register requests for post dsa run procedures
+        rr_generator = registers.RUN_REQUEST_REGISTER['dsa_run_metamodel']
+        request = rr_generator(active_project_id, app.project_provider)
+        request.run_id = -random.randrange(1, 10000)
+
+        new_request_ids, request_keys = generate_post_action_requests(
+            request,
+            app.request_handler,
+            app.project_provider
+        )
+
+        rval['postaction_trigger']['data'] = [json.dumps(request.as_dict())]
+        if new_request_ids:
+            rval['check_requests_trigger']['data'] = new_request_ids
+
+        return rval
+
+    @app.callback(
+        Output('trigger-check-requests', 'data', allow_duplicate = True),
+        Input('btn-action-dsa-run-metamodel', 'n_clicks'),
+        State('active-project-id', 'data'),
+        prevent_initial_call = True
+    )
+    def request_dsa_run_metamodel(
+        n_clicks,
+        active_project_id
+    ):
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
+
+        request_id = app.request_handler.add_request(
+            'dsa_run_metamodel',
+            active_project_id,
+            app.project_provider,
+            'run',
+        )
+
+        return request_id
+
+def add_optim_run_callbacks(app: NewsegsDash):
+
+    # Pre-run modal control
+    @app.callback(
+        output = {
+            'modal': {
+                'is_open': Output('modal-optim-confirm','is_open')
+            }
+        },
+        inputs = {
+            'optim_run_button': {
+                'n_clicks':  Input('btn-action-optim-run-metamodel', 'n_clicks'),
+            },
+            'modal_close_button': {
+                'n_clicks': Input('btn-optim-confirm-abort', 'n_clicks')
+            },
+            'optim_prerun_button': {
+                'n_clicks': Input('btn-optim-prerun', 'n_clicks'),
+            }
+        },
+        prevent_initial_call = True
+    )
+    def confirm_optim_run(
+        optim_run_button,
+        modal_close_button,
+        optim_prerun_button,
+    ):
+        
+        trig_id = ctx.triggered_id
+        if trig_id is None:
+            raise PreventUpdate
+        
+        if trig_id == 'btn-optim-prerun':
+            return dict(modal = dict(is_open = True))
+        else:
+            return dict(modal = dict(is_open = False))
+
+    @app.callback(
+        output = dict(
+            trigger = Output('trigger-check-requests', 'data', allow_duplicate = True),
+        ),
+        inputs = dict(
+            n_clicks = Input('btn-action-optim-run-metamodel', 'n_clicks'),
+        ),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            statistic = State(
+                {
+                    'type': 'result-table-option', 'purpose': 'statistic',
+                    'supersection': 'optim', 'section': 'tabledraw',
+                    'key': 'table_optim_metamodel', 'subindex': ALL # If we don't include the wildcard, we get complaints navigating away from the page.
+                },
+                'value'
+            ),
+            optim_method = State(
+                {
+                    'type': 'result-table-option', 'purpose': 'optim-method',
+                    'supersection': 'optim', 'section': 'run',
+                    'key': 'optim_run_metamodel', 'subindex': 0
+                },
+                'value'
+            )
+        ),
+        prevent_initial_call = True
+    )
+    def request_optim_run_metamodel(
+        n_clicks,
+        active_project_id,
+        **kwargs
+    ):
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
+        stat = kwargs.get('statistic')
+        if stat is not None and not isinstance(stat, str) and len(stat):
+            kwargs['statistic'] = stat[0]
+
+        request_id = app.request_handler.add_request(
+            'optim_run_metamodel',
+            active_project_id,
+            app.project_provider,
+            'run',
+            kwargs
+        )
+
+        return dict(trigger = request_id)
+
+    # Marginal statistic plot draw
+    @app.callback(
+        output = dict(
+            trigger = Output('trigger-check-requests', 'data', allow_duplicate = True),
+        ),
+        inputs = dict(
+            n_clicks = Input(
+                {
+                    'type': 'btn-action-optim-create-marginalplot', 'varid': ALL
+                },
+                'n_clicks'
+            ),
+        ),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            statistic = State(
+                {
+                    'type': 'result-table-option', 'purpose': 'statistic',
+                    'supersection': 'optim', 'section': 'tabledraw',
+                    'key': 'table_optim_metamodel', 'subindex': ALL # If we don't include the wildcard, we get complaints navigating away from the page.
+                },
+                'value'
+            ),
+        ),
+        prevent_initial_call = True,
+    )
+    def request_marginal_plot(
+        n_clicks,
+        active_project_id,
+        statistic,
+    ):
+        triggered_id = ctx.triggered_id
+        if triggered_id is None or statistic is None:
+            raise PreventUpdate
+
+        if statistic is not None and not isinstance(statistic, str) and len(statistic):
+            statistic = statistic[0]
+        
+        if not isinstance(triggered_id, str) and triggered_id.get('type') == 'btn-action-optim-create-marginalplot':
+            clicks = callback_utils.get_triggered_value()
+            if not clicks:
+                raise PreventUpdate
+        if isinstance(triggered_id, str):
+            raise TypeError('Can only trigger with an object specifing the variable to plot')
+
+        request_id = app.request_handler.add_request(
+            'table_optim_metamodel', # TODO: Improve this key
+            active_project_id,
+            app.project_provider,
+            'tabledraw',
+            dict(
+                metamodel_id = app.project_provider.get_focussed_metamodel_id(active_project_id),
+                varid = triggered_id.get('varid'),
+                statistic = statistic,
+            )
+        )
+
+        return dict(trigger = request_id)
+
+    @app.callback(
+        Output('active-project-id', 'data'),
+        Input(
+            {
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': 'global', 'section': 'run',
+                'key': 'optim_run_metamodel', 'subindex': 0
+            },
+            'data'
+        ),
+        State('active-project-id', 'data'),
+        prevent_initial_call = True,
+    )
+    def update_project_after_optimisation(trigger, active_project_id):
+        trig_id = ctx.triggered_id
+        if trig_id is None:
+            raise PreventUpdate
+        return active_project_id
+
+def _add_page_callbacks(app: NewsegsDash):
+    add_dsa_run_callbacks(app)
+    add_optim_run_callbacks(app)
+
 dsa_configuration_page = Page(
     id = PAGE_TYPE,
     nav_label = 'Sensitivity analysis',
@@ -306,7 +791,8 @@ dsa_configuration_page = Page(
         className = icons.get_icon('nav-dsa-config', style_name = 'raw'),
         style = {'display': 'inline'}
     ),
-    layout = create_dsa_layout,
-    default_configuration = DSAConfigurationLayoutConfiguration()
+    layout = create_dsa_layout, # pyright: ignore[reportArgumentType]
+    default_configuration = DSAConfigurationLayoutConfiguration(),
+    attach_callbacks = _add_page_callbacks
 )
 registers.add_page(dsa_configuration_page)

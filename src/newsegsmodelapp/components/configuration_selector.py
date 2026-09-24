@@ -10,10 +10,9 @@ from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components import export
 from newsegsmodelapp.components.export import metamodel_to_config_file
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser import icons
+from newsegsmodelapp.components import icons
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.util import jsonfuncs
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 

@@ -18,7 +18,7 @@ from newsegsmodelframework.core.trackeddata import revision_dataclass
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.newsegscs import NewsegsCS, NewsegsCSConfig
 
-from newsegsmodelapp.newsegsbrowser import STATICDATA
+from newsegsmodelframework import STATICDATA
 from newsegsmodelframework.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 from newsegsmodelframework.newsegsvariable.variable import ScalarNumParam
 AnyNumber = Union[ScalarNumParam]#, Number]

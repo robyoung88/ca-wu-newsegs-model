@@ -3,24 +3,30 @@ Functions for creating a model configuration layout for an app.
 
 Many of these functions require configured sub-functions to actually perform
 the bespoke layout creation.
+
+The layout should provide:
+    btn-action-deterministic-run-metamodel
+    btn-action-deterministic-run-project
 """
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Sequence, cast
 
-from dash import html
+from dash import Input, Output, State, html
+from dash.exceptions import PreventUpdate
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.components.layouts.configurations import InputCardConfig, ResultCardConfig
-from newsegsmodelapp.components.page_layouts import fourpane_layout
-from newsegsmodelapp.components import result_group_containers
+from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import map
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp.components.feedback import indicative_net_energy
 
-from newsegsmodelapp.components import results_header
+from newsegsmodelapp.components.layouts import result_group_containers, results_header
 from newsegsmodelapp.components import configuration_selector
-from newsegsmodelapp.newsegsbrowser import icons
+from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelapp.components import icons
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelapp.types import ComponentType, LayoutConfiguration, Page
 
@@ -133,6 +139,53 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         b2_contents,
     )
 
+def add_deterministic_run_callbacks(app: NewsegsDash):
+    @app.callback(
+        Output('trigger-check-requests', 'data', allow_duplicate = True),
+        Input('btn-action-deterministic-run-metamodel', 'n_clicks'),
+        State('active-project-id', 'data'),
+        prevent_initial_call = True,
+    )
+    def request_deterministic_run_metamodel(
+        n_clicks,
+        active_project_id
+    ):
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
+
+        request_id = app.request_handler.add_request(
+            'deterministic_run_metamodel',
+            active_project_id,
+            app.project_provider,
+            'run',
+        )
+
+        return request_id
+
+    @app.callback(
+        Output('trigger-check-requests', 'data', allow_duplicate = True),
+        Input('btn-action-deterministic-run-project', 'n_clicks'),
+        State('active-project-id', 'data'),
+        prevent_initial_call = True,
+    )
+    def request_deterministic_run_project(
+        n_clicks,
+        active_project_id
+    ):
+        click = callback_utils.get_triggered_value()
+        if not click:
+            raise PreventUpdate
+
+        request_id = app.request_handler.add_request(
+            'deterministic_run_project',
+            active_project_id,
+            app.project_provider,
+            'run',
+        )
+
+        return request_id
+
 model_configuration_page = Page(
     id = PAGE_TYPE,
     nav_label = 'Site configuration',
@@ -140,7 +193,8 @@ model_configuration_page = Page(
         className = icons.get_icon('nav-system-config', style_name = 'raw'),
         style = {'display': 'inline'}
     ),
-    layout = create_model_configuration_layout,
-    default_configuration = ModelConfigurationLayoutConfiguration()
+    layout = create_model_configuration_layout, # pyright: ignore[reportArgumentType]
+    default_configuration = ModelConfigurationLayoutConfiguration(),
+    attach_callbacks = add_deterministic_run_callbacks
 )
 registers.add_page(model_configuration_page)

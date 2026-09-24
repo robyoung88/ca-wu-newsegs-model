@@ -1,34 +1,24 @@
 from functools import partial
 
 from dash import dcc, html
-import dash_bootstrap_components as dbc
-from dash_bootstrap_components._components.Card import Card as dbc_Card
-from dash_bootstrap_components._components.CardBody import CardBody as dbc_CardBody
-from dash_bootstrap_components._components.Row import Row as dbc_Row
-from dash_bootstrap_components._components.Col import Col as dbc_Col
 import plotly.express as px
 
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
-from newsegsmodelapp.components import energy_balance_estimation
-from newsegsmodelapp.plugins.models.default.utils.update_energy_balance_sprake import update_estimated_energy_balance
-from newsegsmodelapp.registers import register_feedback_graph_artist
-from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_indicative_net_energy_card():
     """
     A Bootstrap card holding plots to help with generation and consumption sizing.
     """
-    return dbc_Card([
-        dbc_CardBody([
+    return dbc.Card([
+        dbc.CardBody([
             html.Details([
                 html.Summary(
                     html.H5(
                         ['Indicative net energy']
                         ),
                 ),
-                dbc_Row([
-                    dbc_Col(
+                dbc.Row([
+                    dbc.Col(
                         dcc.Graph(
                             id={'type': 'feedback-graph', 'section': 'feedback', 'key': 'estimated-annual-energy'},
                             config={'displayModeBar': False},
@@ -40,7 +30,7 @@ def create_indicative_net_energy_card():
                             }
                         )
                     ),
-                    dbc_Col(
+                    dbc.Col(
                         dcc.Graph(
                             id={'type': 'feedback-graph', 'section': 'feedback', 'key': 'estimated-maximum-daily-energy'},
                             config={'displayModeBar': False},

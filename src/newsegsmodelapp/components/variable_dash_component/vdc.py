@@ -11,7 +11,6 @@ import dash_daq as daq
 from newsegsmodelapp.components.input_components import create_numeric_variable_parameter_input
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelframework.newsegsvariable import variable
-import newsegsmodelapp.newsegsbrowser.common as browser
 
 def _autoformat(val) -> str:
     if isinstance(val, float):
