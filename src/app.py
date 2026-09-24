@@ -4,7 +4,6 @@ import time
 
 from newsegsmodelapp.backend.db.db import init_db
 from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
-from newsegsmodelapp.components.callbacks.deterministic_run_callbacks import add_deterministic_run_callbacks
 t1 = time.time()
 import json
 import os
@@ -15,9 +14,6 @@ from dash import Dash, Input, Output, State
 from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
-
-from newsegsmodelapp.components.callbacks.optim_run_callbacks import add_optim_run_callbacks
-from newsegsmodelapp.components.callbacks.psa_run_callbacks import add_psa_run_callbacks
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -31,7 +27,6 @@ from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
 from newsegsmodelapp.components.callbacks.action_callbacks import add_action_callbacks
-from newsegsmodelapp.components.callbacks.dsa_run_callbacks import add_dsa_run_callbacks
 from newsegsmodelapp.components.callbacks.result_container_callbacks import add_result_container_callbacks
 from newsegsmodelapp.components.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
 
@@ -279,10 +274,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_action_callbacks(app)
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)
-    add_deterministic_run_callbacks(app)
-    add_dsa_run_callbacks(app)
-    add_optim_run_callbacks(app)
-    add_psa_run_callbacks(app)
+    #add_psa_run_callbacks(app)
 
     for page in registers.PAGE_REGISTER.values():
         page.attach_callbacks(app)
