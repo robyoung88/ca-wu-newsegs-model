@@ -1,15 +1,19 @@
 """
 Functions for creating a deterministic sensitivity analysis layout
 """
+from dataclasses import asdict, dataclass
+from typing import Any, Callable
+
 from dash import dcc, html
 
+from newsegsmodelapp import registers
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components.dsa_process_components import dsa_process_components
 from newsegsmodelapp.components.page_layouts import fourpane_layout
 from newsegsmodelapp.components import navigation, result_group_containers
-from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 
-from newsegsmodelapp.registers import register_page_layout
+from newsegsmodelapp.newsegsbrowser import icons
+from newsegsmodelapp.types import Page
 from newsegsmodelframework.newsegssensitivity import optim
 
 from newsegsmodelapp.components import  results_header
@@ -17,7 +21,9 @@ from newsegsmodelapp.components.optim_process_components import optim_process_co
 from newsegsmodelframework.newsegssensitivity import common as sensitivity
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
-def create_dsa_header(**kwargs):
+PAGE_TYPE = 'dsa'
+
+def create_dsa_header():
     return dbc.Container(
         [
             dbc.Row(
@@ -154,27 +160,25 @@ def create_optim_configuration_editor(**kwargs):
         
     ]) 
 
-DEFAULT_LAYOUT_DSA = {
-    'layout_navigation': navigation.create_navigation_component,
-    'width_navigation': 1,
-    'layout_top': create_dsa_header,
+@dataclass
+class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
+    page_type: str = PAGE_TYPE
 
-    'layout_results_header': results_header.create_results_header_dsa,
+    layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
+    width_navigation: int = 1
+    layout_top: Callable[[], Any] = create_dsa_header
+    layout_results_header: Callable = results_header.create_results_header_dsa
 
-}
-
-def create_dsa_layout(*args, **kwargs):
-    config_dict = DEFAULT_LAYOUT_DSA.copy()
-    config_dict.update(kwargs)
+def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
 
     a1_contents = [
         dbc.Row([
             dbc.Col(
-                config_dict['layout_navigation'](config_dict.get('selected_model')),
+                config.layout_navigation(config.model_type),
                 width = 'auto',
             ),
             dbc.Col(
-                config_dict['layout_top'](**kwargs),
+                config.layout_top(),
                 class_name = 'page-top'
             ),
         ],
@@ -184,7 +188,7 @@ def create_dsa_layout(*args, **kwargs):
 
     dsa_config = create_dsa_configuration_editor()
 
-    optim_config = create_optim_configuration_editor(**kwargs)
+    optim_config = create_optim_configuration_editor(**asdict(config))
 
     a2_contents = [
         dsa_config,
@@ -195,7 +199,7 @@ def create_dsa_layout(*args, **kwargs):
         dbc.Container(
             [
                 dbc.Row(
-                    config_dict['layout_results_header'](**kwargs),
+                    config.layout_results_header(**asdict(config)),
                 ),
                 
                 dbc.Row([
@@ -218,7 +222,6 @@ def create_dsa_layout(*args, **kwargs):
     ]
 
     b2_contents = [
-        #dcc.Loading([
         result_group_containers.create_results_container([
             html.Div([
                     dbc.Col(
@@ -255,12 +258,12 @@ def create_dsa_layout(*args, **kwargs):
                                     }
                                 ),
                                 style={'display':'block', 'height': '600px'},
-                                id = {'type': 'plot-container', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-tornado-plot'},
+                                id = {'type': 'plot-container', 'page': config.page_type, 'key': 'dsa-tornado-plot'},
                             )
                         ],
                         width = 12
                     ),
-                    dcc.Store(id={'type': 'trigger', 'page': kwargs.get('page_type', 'None'), 'key': 'dsa-run-postprocess'}, data = []),
+                    dcc.Store(id={'type': 'trigger', 'page': config.page_type, 'key': 'dsa-run-postprocess'}, data = []),
                     dcc.Store(id={'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, data = []),
                 ],
                 
@@ -269,15 +272,6 @@ def create_dsa_layout(*args, **kwargs):
             ],
             section = 'tabledraw',
             supersection = 'dsa',
-            # overlay_style = {
-            #     'visibility': 'visible',
-            #     'filter': 'blur(2px)',
-            #     'display': 'block',
-            # },
-            # delay_show = 200,
-            # delay_hide = 200,
-            # id = 'loading-results',
-            # parent_className = 'drawer-loading-container',
             ),
             dbc.Button(
                 'Cancel DSA',
@@ -285,17 +279,17 @@ def create_dsa_layout(*args, **kwargs):
                 class_name = 'background-callback-cancel-button background-callback-cancel-button-hidden'
             ), 
             html.Progress(
-                id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
+                id={'type': 'progress-bar', 'page': config.page_type},
                 className='resize-handle resize-handle-progress',
                 style = {'display': 'none'}
             ),
             dbc.Tooltip(
                 'DSA Running',
-                id = {'type': 'progress-tooltip', 'page': kwargs.get('page_type', 'None')},
-                target = {'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')}
+                id = {'type': 'progress-tooltip', 'page': config.page_type},
+                target = {'type': 'progress-bar', 'page': config.page_type}
             ),
             
-        ] + dsa_process_components(**kwargs)
+        ] + dsa_process_components(**asdict(config))
 
     
     return fourpane_layout(
@@ -305,11 +299,14 @@ def create_dsa_layout(*args, **kwargs):
         b2_contents,
     )
 
-@register_page_layout('dsa')
-def _create_dsa_configuration_layout(app_state: dict):
-    selected_model = app_state.get('selected_model', 'default')
-    return create_dsa_layout(
-        **layout_registry.get_dsa_layout_config(
-            selected_model
-        )
-    )
+dsa_configuration_page = Page(
+    id = PAGE_TYPE,
+    nav_label = 'Sensitivity analysis',
+    nav_icon = html.I(
+        className = icons.get_icon('nav-dsa-config', style_name = 'raw'),
+        style = {'display': 'inline'}
+    ),
+    layout = create_dsa_layout,
+    default_configuration = DSAConfigurationLayoutConfiguration()
+)
+registers.add_page(dsa_configuration_page)

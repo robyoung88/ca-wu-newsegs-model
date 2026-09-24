@@ -224,7 +224,6 @@ def create_configuration_selector():
             id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-selector'}
         ),
         dcc.Download(id='download-config-json'),
-        dcc.Store(id='n_active_conf', data = '{"n": 1}')
     ])
 
 # -----------------------------------------------

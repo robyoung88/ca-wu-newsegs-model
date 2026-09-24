@@ -1,5 +1,6 @@
 """Registers and associated for the various dispatch functions"""
-from dataclasses import dataclass, field
+import copy
+from dataclasses import asdict, dataclass, field
 import json
 from typing import Any, Callable, Optional, Protocol, Sequence, cast
 
@@ -8,6 +9,7 @@ import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
+from newsegsmodelapp.types import LayoutConfiguration, Page
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
@@ -15,28 +17,86 @@ from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectP
 # -------------------------------------------------------------------------
 # APP PAGE REGISTER
 # -------------------------------------------------------------------------
-PAGE_LAYOUT_REGISTER: dict[str, Callable[[dict], DashComponent]] = {}
-"""Register of functions to return page contents.
+PAGE_REGISTER: dict[str, Page] = {}
+"""Register of Page objects, containing layouts of app pages.
 
-Function arguments:
-    app_state [dict]
+Key:
+    page_id [str] - The last element of the page url (i.e. https://{site}/{model_type}/{page_id})
 """
 
-def register_page_layout(name: str):
-    """Add a page layout creation function to PAGE_LAYOUT_REGISTER
-    
-    The name should correspond to the page path (after the model specifier)
+def add_page(page: Page):
+    """
+    Add a Page to the PAGE_REGISTER
 
     Raises:
         KeyError - if name already present in register
     """
-    def decorated(func):
-        if name in PAGE_LAYOUT_REGISTER:
-            raise KeyError(f'A page layout function already exists for name {name}')
-        PAGE_LAYOUT_REGISTER[name] = func
-        return func
-    return decorated
+    page_id = page.id
+    if page_id in PAGE_REGISTER:
+        raise KeyError(f'A Page already exists for page_id {page_id}')
+    PAGE_REGISTER[page_id] = page
+    add_page_layout_configuration(page.default_configuration, page.id)
 
+def get_page(page_id: str):
+    page = PAGE_REGISTER.get(page_id)
+    if page is None:
+        raise KeyError(f'Page {page_id} is not present in register - available pages are {PAGE_REGISTER.keys()}')
+    return page
+
+PAGE_LAYOUT_CONFIGURATION_REGISTER: dict[tuple[str, str], LayoutConfiguration] = {}
+PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER: dict[str, type] = {}
+
+def add_page_layout_configuration_class(
+    configuration_class,
+    page_name: str,
+):
+    if page_name in PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER:
+        if configuration_class != PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER[page_name]:
+            raise TypeError(f'LayoutConfiguration class has already been set for page {page_name} and is incompatible with {configuration_class}')
+        else:
+            return
+    PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER[page_name] = configuration_class
+
+def add_page_layout_configuration(
+    configuration: LayoutConfiguration, 
+    page_name: str,
+    model_type: str = 'default'
+):
+    key = (page_name, model_type)
+    if model_type != 'default':
+        if key in PAGE_LAYOUT_CONFIGURATION_REGISTER:
+            raise KeyError(f'Page layout configuration already exists for key {key}')
+    add_page_layout_configuration_class(type(configuration), page_name)
+    PAGE_LAYOUT_CONFIGURATION_REGISTER[key] = copy.copy(configuration)
+    if model_type != 'default':
+        key_default = (page_name, 'default')
+        if key_default not in PAGE_LAYOUT_CONFIGURATION_REGISTER:
+            config = copy.copy(configuration)
+            config.model_type = 'default'
+            PAGE_LAYOUT_CONFIGURATION_REGISTER[key] = config
+
+def get_page_layout_configuration(
+    page_name: str,
+    model_type: str = 'default'
+):
+    key_default = (page_name, 'default')
+    default_config = PAGE_LAYOUT_CONFIGURATION_REGISTER.get(key_default)
+    if not default_config:
+        raise KeyError(f'No default page configuration for page {page_name} - available pages are {set(x[0] for x in PAGE_LAYOUT_CONFIGURATION_REGISTER.keys())}')
+    if model_type == 'default' :
+        return copy.copy(default_config)
+
+    key = (page_name, model_type)
+    specific_config = PAGE_LAYOUT_CONFIGURATION_REGISTER.get(key)
+
+    if not specific_config:
+        conf = copy.copy(default_config)
+        conf.model_type = model_type
+        return conf
+    return specific_config
+
+def get_page_layout_configuration_class(page_name: str):
+    return PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER.get(page_name, type(LayoutConfiguration))
 
 # -------------------------------------------------------------------------
 # INPUT HANDLERS

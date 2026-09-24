@@ -166,10 +166,7 @@ def delete_snapshot(
 # -----------------------------------------------
 # Layout component
 # -----------------------------------------------
-def create_project_selector(**kwargs):
-    # Don't draw the selector e.g. if generating the callback validation layout.
-    if not kwargs.get('project_selector', True):
-        return []
+def create_project_selector():
     
     def stores_and_dialogs() -> list[dash.development.base_component.Component]:
         return [
@@ -595,7 +592,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
         if isinstance(triggered_id, str) and triggered_id in set(('active-project-id', 'app-state')):
             # Update project selector
             app_state = json.loads(app_state) if app_state else {}
-            model_type = app_state.get('selected_model', 'default')
+            model_type = app_state.get('model_type', 'default')
             all_projects = fetch_project_options(app.project_provider, model_type)
             rval['project_select']['options'] = all_projects
             rval['project_select']['value'] = None
@@ -684,7 +681,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
                                 app.project_provider,
                                 project_id,
                                 active_project_id,
-                                app_state.get('selected_model', 'default')
+                                app_state.get('model_type', 'default')
                             )
                         except Exception as e:
                             print(f'Could not delete project {project_id}: {e}')
@@ -793,7 +790,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
                         )
 
             case 'new-project':
-                model_type = app_state.get('selected_model', 'default')
+                model_type = app_state.get('model_type', 'default')
                 created_project_id = new_project(
                     app.project_provider,
                     model_type

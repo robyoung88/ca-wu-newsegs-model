@@ -2,15 +2,36 @@
 import importlib
 import pkgutil
 
-import newsegsmodelapp.plugins.pages as layouts
-def load_layouts():
-    layout_dict = {}
-    for info in pkgutil.iter_modules(
-        layouts.__path__, prefix = 'newsegsmodelapp.plugins.pages.'
+def load_plugins_recursive(package):
+    """
+    Recursively loads all submodules under a root package.
+    Returns a dictionary mapping full module names to imported module objects.
+    """
+    discovered_plugins = {}
+    
+    # walk_packages scans the package path recursively
+    for module_info in pkgutil.walk_packages(
+        package.__path__, 
+        prefix=f"{package.__name__}."
     ):
-        layout_dict[info.name] = importlib.import_module(info.name)
-    return layout_dict
-load_layouts()
+        # Dynamically import each discovered submodule
+        module = importlib.import_module(module_info.name)
+        discovered_plugins[module_info.name] = module
+        
+    return discovered_plugins
+
+# Pages must be loaded before contents
+import newsegsmodelapp.plugins.pages as pages
+def load_pages_plugins():
+    return load_plugins_recursive(pages)
+
+import newsegsmodelapp.plugins.models as models
+def load_models_plugins():
+    return load_plugins_recursive(models)
+
+load_pages_plugins()
+load_models_plugins()
+
 
 import newsegsmodelapp.components as components
 def load_components():
@@ -54,29 +75,6 @@ def load_tables():
     return d
 
 load_tables()
-
-# This should cover both INPUT_CONTAINER_CONTENT_CREATORS and INPUT_SECTION_HEADER_CONTENT_CREATORS
-import newsegsmodelapp.newsegsbrowser.layouts.inputs as input_layouts
-def load_input_container_content_creators():
-    d = {}
-    for info in pkgutil.iter_modules(
-        input_layouts.__path__, prefix = 'newsegsmodelapp.newsegsbrowser.layouts.inputs.'
-    ):
-        d[info.name] = importlib.import_module(info.name)
-    return d
-
-load_input_container_content_creators()
-
-import newsegsmodelapp.newsegsbrowser.layouts.results as result_layouts
-def load_result_container_content_creators():
-    d = {}
-    for info in pkgutil.iter_modules(
-        result_layouts.__path__, prefix = 'newsegsmodelapp.newsegsbrowser.layouts.results.'
-    ):
-        d[info.name] = importlib.import_module(info.name)
-    return d
-
-load_result_container_content_creators()
 
 import newsegsmodelapp.components.feedback as feedback
 

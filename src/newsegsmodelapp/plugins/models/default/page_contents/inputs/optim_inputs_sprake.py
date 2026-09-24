@@ -1,3 +1,4 @@
+"""Register input container and input header container content creators for optim supersection"""
 import dash
 
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface

@@ -1,4 +1,6 @@
 
+"""Register input container and input header container content creators for dsa supersection"""
+
 import dash
 
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel

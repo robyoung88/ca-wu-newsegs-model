@@ -2,17 +2,23 @@
 Functions for creating a probabilistic sensitivity analysis layout
 """
 
+from dataclasses import asdict, dataclass
+from typing import Any, Callable
+
 from dash import dcc, html
 
+from newsegsmodelapp import registers
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components.page_layouts import fourpane_layout
 from newsegsmodelapp.components import navigation, result_group_containers
-from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
+from newsegsmodelapp.newsegsbrowser import icons
 from newsegsmodelapp.components import results_header
 from newsegsmodelapp.components.psa_process_components import psa_process_components
-from newsegsmodelapp.registers import register_page_layout
+from newsegsmodelapp.types import Page
 from newsegsmodelframework.newsegssensitivity import psa
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+
+PAGE_TYPE = 'psa'
 
 def create_psa_header(**kwargs):
     return dbc.Container(
@@ -77,30 +83,28 @@ def create_psa_configuration_editor():
         html.Div(
             id = {'type': 'input-container', 'supersection': 'psa', 'section': 'psa'}
         )
-    ]) # pyright: ignore[reportCallIssue]
+    ])
 
-DEFAULT_LAYOUT_PSA = {
-    'layout_navigation': navigation.create_navigation_component,
-    'width_navigation': 1,
-    'layout_top': create_psa_header,
-    'width_head': 11,
+@dataclass
+class PSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
+    page_type: str = PAGE_TYPE
 
-    'layout_results_header': results_header.create_results_header_psa,
+    layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
+    width_navigation: int = 1
+    layout_top: Callable[[], Any] = create_psa_header
+    layout_results_header: Callable = results_header.create_results_header_psa
 
-}
-
-def create_psa_layout(*args, **kwargs):
-    config_dict = DEFAULT_LAYOUT_PSA.copy()
-    config_dict.update(kwargs)
-
+def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
+    kwargs = asdict(config)
+   
     a1_contents = [
         dbc.Row([
             dbc.Col(
-                config_dict['layout_navigation'](config_dict.get('selected_model')),
+                config.layout_navigation(config.model_type),
                 width = 'auto',
             ),
             dbc.Col(
-                config_dict['layout_top'](**kwargs),
+                config.layout_top(**kwargs),
                 class_name = 'page-top'
             ),
         ],
@@ -118,7 +122,7 @@ def create_psa_layout(*args, **kwargs):
         dbc.Container(
             [
                 dbc.Row(
-                    config_dict['layout_results_header'](**kwargs)
+                    config.layout_results_header(**kwargs)
                 )
             ]
         )
@@ -224,11 +228,14 @@ def create_psa_layout(*args, **kwargs):
         b2_contents,
     )
 
-@register_page_layout('psa')
-def _create_psa_configuration_layout(app_state: dict):
-    selected_model = app_state.get('selected_model', 'default')
-    return create_psa_layout(
-        **layout_registry.get_psa_layout_config(
-            selected_model
-        )
-    )
+psa_configuration_page = Page(
+    id = PAGE_TYPE,
+    nav_label = 'Probabilistic analysis',
+    nav_icon = html.I(
+        className = icons.get_icon('nav-psa-config', style_name = 'raw'),
+        style = {'display': 'inline'}
+    ),
+    layout = create_psa_layout,
+    default_configuration = PSAConfigurationLayoutConfiguration()
+)
+registers.add_page(psa_configuration_page)

@@ -1,26 +1,18 @@
 from typing import Any
 
 import dash
-import dash_bootstrap_components as dbc
 from dash import html
 
-from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
-from newsegsmodelapp.registers import register_page_layout
-
-dbc_Container: Any = dbc.Container
-dbc_Button: Any = dbc.Button
-dbc_Card: Any = dbc.Card
-dbc_CardBody: Any = dbc.CardBody
-Div: Any = html.Div
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_fourpane_layout(*args, **kwargs):
-    return dbc_Container(
+    return dbc.Container(
         [
             # Block A1: Left Pane Header
             html.Div(
                 [
                     html.H4("Config Header", className="m-0"),
-                    dbc_Button("Apply", color="primary", size="sm"),
+                    dbc.Button("Apply", color="primary", size="sm"),
                 ],
                 className="pane-header header-a1 bg-light p-3 border-bottom d-flex justify-content-between align-items-center",
             ),
@@ -28,7 +20,7 @@ def create_fourpane_layout(*args, **kwargs):
             html.Div(
                 [
                     html.H4("Results Header", className="m-0"),
-                    dbc_Button("Export", color="secondary", outline=True, size="sm"),
+                    dbc.Button("Export", color="secondary", outline=True, size="sm"),
                 ],
                 className="pane-header header-b1 bg-light p-3 border-bottom d-flex justify-content-between align-items-center",
             ),
@@ -37,8 +29,8 @@ def create_fourpane_layout(*args, **kwargs):
                 [
                     html.H6("Configuration Options"),
                     *[
-                        dbc_Card(
-                            dbc_CardBody(f"Configuration Option {i}"),
+                        dbc.Card(
+                            dbc.CardBody(f"Configuration Option {i}"),
                             className="mb-3",
                         )
                         for i in range(1, 25)
@@ -51,8 +43,8 @@ def create_fourpane_layout(*args, **kwargs):
                 [
                     html.H6("Generated Results"),
                     *[
-                        dbc_Card(
-                            dbc_CardBody(f"Result Item {i}"), className="mb-3"
+                        dbc.Card(
+                            dbc.CardBody(f"Result Item {i}"), className="mb-3"
                         )
                         for i in range(1, 25)
                     ],

@@ -29,14 +29,14 @@ def create_post_page_load_components(
         # which cannot be used without prevent_initial_call
         dcc.Store(id = {
             'type': 'firstload-config-watcher',
-            'selected_model': model_type, 
+            'model_type': model_type, 
             'page_type': page_type
         }),
 
         # Used as a trigger for events on load.
         html.Div(id = {
             'type': 'onload-div',
-            'selected_model': model_type, 
+            'model_type': model_type, 
             'page_type': page_type
         })
     ]
@@ -54,14 +54,14 @@ def add_post_page_load_callbacks(app: NewsegsDash):
         ),
         Output({'type': 'post-drawer-attach', 'page': ALL}, 'children'),
         
-        Input({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'children')
+        Input({'type' : 'onload-div', 'model_type': ALL, 'page_type': ALL}, 'children')
     )
 
     @app.callback(
-        Output({'type' : 'firstload-config-watcher', 'selected_model': ALL, 'page_type': ALL}, 'data'),
+        Output({'type' : 'firstload-config-watcher', 'model_type': ALL, 'page_type': ALL}, 'data'),
         
-        Input({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'children'),
-        State({'type' : 'onload-div', 'selected_model': ALL, 'page_type': ALL}, 'id'),
+        Input({'type' : 'onload-div', 'model_type': ALL, 'page_type': ALL}, 'children'),
+        State({'type' : 'onload-div', 'model_type': ALL, 'page_type': ALL}, 'id'),
     )
     def sync_config_init(_, config_watcher_ids):
         """

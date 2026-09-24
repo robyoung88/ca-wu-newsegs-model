@@ -80,14 +80,14 @@ def add_input_container_callbacks(app: NewsegsDash):
         
         input_supersection = container_id.get('supersection')
         input_section = container_id.get('section')
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
 
         if not input_supersection or not input_section:
             raise PreventUpdate
 
         try:
             content_creator = get_input_container_content_creator(
-                input_supersection, input_section, selected_model
+                input_supersection, input_section, model_type
             )
         except KeyError as e:
             print('Content creator not found for ', str(container_id))
@@ -155,7 +155,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                 
         supersection = container_id.get('supersection')
         section = container_id.get('section')
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
 
         if not supersection or not section:
             raise PreventUpdate
@@ -168,7 +168,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         
         try:
             content_creator = get_input_section_header_content_creator(
-                supersection, section, selected_model
+                supersection, section, model_type
             )
         except KeyError as e:
             return _not_found(e)
@@ -411,7 +411,7 @@ def add_input_container_callbacks(app: NewsegsDash):
 
             case _:
                 try:
-                    handler = get_input_handler(trigger_id['purpose'], trigger_id['type'], json.loads(app_state).get('selected_model', 'default'))
+                    handler = get_input_handler(trigger_id['purpose'], trigger_id['type'], json.loads(app_state).get('model_type', 'default'))
                 except KeyError:
                     print(f'No handlers for purpose {trigger_id["purpose"]}')
                     raise PreventUpdate
@@ -587,13 +587,13 @@ def add_input_container_callbacks(app: NewsegsDash):
         app_state
     ):
         app_state = json.loads(app_state) if app_state else {}
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
 
         figure_returns: list[Any] = [no_update] * len(figure_ids)
 
         for idx, id in enumerate(figure_ids):
             try:
-                artist = get_feedback_graph_artist(id['key'], selected_model)
+                artist = get_feedback_graph_artist(id['key'], model_type)
             except KeyError:
                 artist = None
             if artist:

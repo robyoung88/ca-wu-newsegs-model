@@ -38,11 +38,11 @@ from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 
 from newsegsmodelapp.newsegsbrowser.app_cache_manager import NewsegsBrowserCacheManager
 
-from newsegsmodelapp.newsegsbrowser.layouts import template_psa_configuration_layout
-from newsegsmodelapp.newsegsbrowser.layouts import template_landing_layout
-from newsegsmodelapp.newsegsbrowser.layouts import template_model_configuration_layout
-from newsegsmodelapp.newsegsbrowser.layouts import template_dsa_configuration_layout
-from newsegsmodelapp.newsegsbrowser.layouts import layout_registry, model_selection_layout
+from newsegsmodelapp.plugins.pages import psa_configuration_layout
+from newsegsmodelapp.plugins.pages import landing_layout, model_selection_layout
+from newsegsmodelapp.plugins.pages import model_configuration_layout
+from newsegsmodelapp.plugins.pages import dsa_configuration_layout
+from newsegsmodelapp.newsegsbrowser.layouts import layout_registry
 
 from newsegsmodelapp.newsegsbrowser.callbacks import psa_run_callbacks
 from newsegsmodelapp.newsegsbrowser.callbacks import model_configuration_callbacks, model_selection_callbacks, optim_run_callbacks
@@ -225,25 +225,25 @@ def add_display_callbacks(app: Dash, acm: NewsegsBrowserCacheManager) -> Dash:
         acm.sts['n_bgp'] = 0
 
         if pagename == 'landing':
-            return template_landing_layout.create_landing_layout(
+            return landing_layout.create_landing_layout(
                 **layout_registry.get_landing_layout_config(
                     selected_model
                 )
             )
         elif pagename == 'site-config':
-            return template_model_configuration_layout.create_model_configuration_layout(
+            return model_configuration_layout.create_model_configuration_layout(
                 **layout_registry.get_model_configuration_layout_config(
                     selected_model
                 )
             )
         elif pagename == 'dsa':
-            return template_dsa_configuration_layout.create_dsa_layout(
+            return dsa_configuration_layout.create_dsa_layout(
                 **layout_registry.get_dsa_layout_config(
                     selected_model
                 )
             )
         elif pagename == 'psa':
-            return template_psa_configuration_layout.create_psa_layout(
+            return psa_configuration_layout.create_psa_layout(
                 **layout_registry.get_psa_layout_config(
                     selected_model
                 )
@@ -468,22 +468,22 @@ def create_app(external_stylesheets = None) -> Dash:
     app.layout = serve_layout
     app.validation_layout = html.Div([
         serve_layout(),
-        template_landing_layout.create_landing_layout(
+        landing_layout.create_landing_layout(
             **layout_registry.get_landing_layout_config(
                 'sprake'
             )
         ),
-        template_model_configuration_layout.create_model_configuration_layout(
+        model_configuration_layout.create_model_configuration_layout(
             **layout_registry.get_model_configuration_layout_config(
                 'sprake'
             )
         ),
-        template_dsa_configuration_layout.create_dsa_layout(
+        dsa_configuration_layout.create_dsa_layout(
             **layout_registry.get_dsa_layout_config(
                 'sprake'
             )
         ),
-        template_psa_configuration_layout.create_psa_layout(
+        psa_configuration_layout.create_psa_layout(
             **layout_registry.get_psa_layout_config(
                 'sprake'
             )

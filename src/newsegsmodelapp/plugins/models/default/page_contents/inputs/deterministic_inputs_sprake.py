@@ -1,4 +1,4 @@
-from typing import cast
+"""Register input container and input header container content creators for deterministic supersection"""
 
 import dash
 from dash.exceptions import PreventUpdate

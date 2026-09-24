@@ -5,23 +5,21 @@ from newsegsmodelapp.components.configuration_selector import create_header_meta
 from newsegsmodelapp.newsegsbrowser import icons
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
-def create_results_header(**kwargs):
+def create_results_header(page_type, **kwargs):
     """
     HTML separating the results and providing controls for setting result format per annum or
     to horizon
     """
-    autorun = kwargs.get('autorun_model', True)
-    autorun_icon = 'autorun-true' if autorun else 'autorun-stop'
     return html.Div(
         [
             html.Div(
-                id={'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}, 
+                id={'type': 'resize-handle', 'page': page_type}, 
                 className='resize-handle resize-handle-ok'
             ),
             dbc.Tooltip(
                 'Results up-to-date',
-                id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
-                target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
+                id = {'type': 'result-tooltip', 'page': page_type},
+                target = {'type': 'resize-handle', 'page': page_type}
             ), 
 
             html.Div(
@@ -41,11 +39,6 @@ def create_results_header(**kwargs):
                                         ),
                                         color = 'primary',
                                         id = 'btn-action-deterministic-run-metamodel',
-                                        # id = {
-                                        #     'type': 'action-button', 'purpose': 'request-process',
-                                        #     'supersection': 'deterministic', 'section': 'run',
-                                        #     'key': 'deterministic_run_metamodel', 'subindex': 0,
-                                        # },
                                         style = {
                                             'margin-left': '5px',
                                             'border-radius': '50%',
@@ -62,11 +55,6 @@ def create_results_header(**kwargs):
                                         ),
                                         color = 'primary',
                                         id = 'btn-action-deterministic-run-project',
-                                        # id = {
-                                        #     'type': 'action-button', 'purpose': 'request-process',
-                                        #     'supersection': 'deterministic', 'section': 'run',
-                                        #     'key': 'deterministic_run_project', 'subindex': 0,
-                                        # },
                                         style = {
                                             'margin-left': '5px',
                                             'border-radius': '50%',
@@ -97,7 +85,7 @@ def create_results_header(**kwargs):
                             daq.ToggleSwitch(style={'display': 'inline-block',
                                                     'verticalAlign': 'middle',
                                                     'padding': "10px"},
-                                            id={'type': 'annual-horizon-toggle', 'page': kwargs.get('page_type', 'None')},),
+                                            id={'type': 'annual-horizon-toggle', 'page': page_type},),
                             html.H5('To horizon',style={'display': 'inline-block', 'verticalAlign': 'middle'})
                         ],
                         id = 'annual-horizon-toggle-container',
@@ -143,7 +131,7 @@ def create_results_header_dsa(**kwargs):
             id = 'btn-dsa-prerun',
             title = 'Start DSA run',
             disabled = False,
-        ), # pyright: ignore[reportCallIssue]
+        ), 
         dbc.Button(
             html.I(
                 className = icons.get_icon('results-download', style_name = 'raw'),
@@ -153,7 +141,7 @@ def create_results_header_dsa(**kwargs):
             id = 'btn-dsa-result-predownload',
             outline = True,
             title = 'Download DSA results',
-        ), # pyright: ignore[reportCallIssue]
+        ), 
         dcc.Upload(
             dbc.Button(
                 html.I(
@@ -164,7 +152,7 @@ def create_results_header_dsa(**kwargs):
                 id = 'btn-upload-dsa-result',
                 outline = True,
                 title = 'Upload previous DSA results',
-            ), # pyright: ignore[reportCallIssue]
+            ), 
             id = 'upload-dsa-result',
             multiple = False,
             enable_folder_selection = False,
@@ -214,7 +202,7 @@ def create_results_header_psa(**kwargs):
             color = 'primary',
             id = 'btn-psa-prerun',
             disabled = False,
-        ), # pyright: ignore[reportCallIssue]
+        ), 
         dbc.Button(
             html.I(
                 className = icons.get_icon('results-download', style_name = 'raw'),
@@ -225,7 +213,7 @@ def create_results_header_psa(**kwargs):
             #id = {'type': 'results-predownload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
             outline = True,
             title = 'Download PSA results',
-        ), # pyright: ignore[reportCallIssue]
+        ), 
         dcc.Upload(
             dbc.Button(
                 html.I(
@@ -237,7 +225,7 @@ def create_results_header_psa(**kwargs):
                 id = {'type': 'results-upload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
                 outline = True,
                 title = 'Upload previous PSA results',
-            ), # pyright: ignore[reportCallIssue]
+            ), 
             id = 'upload-psa-result',
             #id = {'type': 'results-upload', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
             multiple = False,
@@ -258,7 +246,7 @@ def create_results_header_psa(**kwargs):
                 'Results up-to-date',
                 id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
                 target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
-            ), # pyright: ignore[reportCallIssue]
+            ),
             
             html.Div([
                 dbc.Container([
@@ -273,8 +261,8 @@ def create_results_header_psa(**kwargs):
                             button_container_children,
                             className = 'results-header-button-container'
                         )
-                    ]),     # pyright: ignore[reportCallIssue]
-                ]), # pyright: ignore[reportCallIssue]
+                    ]),
+                ]),
             ],
             className = 'drawer-title',
             )

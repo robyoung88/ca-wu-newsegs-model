@@ -71,14 +71,14 @@ def add_result_container_callbacks(app: NewsegsDash):
                 
         section = container_id.get('section')
         key_ = container_id.get('key')
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
 
         if not key_ or not section:
             raise PreventUpdate
 
         try:
             content_creator = get_result_container_content_creator(
-                key_, section, selected_model
+                key_, section, model_type
             )
         except KeyError as e:
             print('Content creator not found for ', str(container_id))
@@ -129,7 +129,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         contents_by_section = {}
 
         app_state = json.loads(app_state) if app_state else {}
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
         for idx, cid in enumerate(container_ids):
             section = cid.get('section')
             if section in contents_by_section:
@@ -141,7 +141,7 @@ def add_result_container_callbacks(app: NewsegsDash):
                 continue
 
             content_creator = get_result_section_header_content_creator(
-                key, section, selected_model
+                key, section, model_type
             )
             if content_creator is None:
                 continue
@@ -259,7 +259,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         contents_by_section_subindex = {}
 
         app_state = json.loads(app_state) if app_state else {}
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
 
         table_options = {}
         for optid, optval in zip(option_ids, result_table_options):
@@ -283,7 +283,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             table_name = key
             table_getter = None
             try:
-                table_getter = registers.get_table_getter(table_name, selected_model)
+                table_getter = registers.get_table_getter(table_name, model_type)
             except KeyError:
                 pass
             if table_getter is not None:
@@ -293,7 +293,7 @@ def add_result_container_callbacks(app: NewsegsDash):
                 res, rev = table_getter(active_project_id, table_options, app.project_provider, app.results_provider)
             else:
                 if subindex > 0:
-                    subindex_map = registers.get_table_subindex_map(key, selected_model)
+                    subindex_map = registers.get_table_subindex_map(key, model_type)
                     if subindex_map:
                         table_name = subindex_map[subindex]
                 
@@ -384,7 +384,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         contents_by_section_subindex = {}
 
         app_state = json.loads(app_state) if app_state else {}
-        selected_model = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
 
         table_options = {}
         for optid, optval in zip(option_ids, result_table_options):
@@ -407,7 +407,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             table_name = key
             table_getter = None
             try:
-                figure_getter = registers.get_table_getter(table_name, selected_model)
+                figure_getter = registers.get_table_getter(table_name, model_type)
             except KeyError:
                 continue
             if figure_getter is not None:

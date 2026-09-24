@@ -1,3 +1,5 @@
+"""Register restult container and result header container content creators"""
+
 import dash
 from dash import html
 import pandas as pd
@@ -32,7 +34,6 @@ def _create_results_details(
                 'supersection': supersection, 'section': triggering_action_class,
                 'key': triggering_action_type, 'subindex': subindex
             })
-            #      'section': triggering_action_class, 'purpose': triggering_action_type})
     ])
 
 MODEL_TYPE = 'sprake'

@@ -26,12 +26,12 @@ def assign_callbacks(app: NewsegsDash):
         pid = json.loads(trig['prop_id'].rstrip('.n_clicks'))
         match pid['label']:
             case 'sprake':
-                selected_model = 'sprake'
+                model_type = 'sprake'
             case 'localised':
-                selected_model = 'sprake-localised'
+                model_type = 'sprake-localised'
             case _:
                 raise ValueError(f'Unknown prop has called update_model_type: {pid}')
 
         print('Model selected - going to landing')
         
-        return f'/{selected_model}/landing'
+        return f'/{model_type}/landing'

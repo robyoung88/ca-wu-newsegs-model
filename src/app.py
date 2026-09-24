@@ -26,7 +26,6 @@ from config import settings
 # PLUGINS
 import newsegsmodelframework.register_plugins
 import newsegsmodelapp.register_plugins # MUST be imported
-from newsegsmodelapp.registers import PAGE_LAYOUT_REGISTER
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
@@ -53,7 +52,7 @@ if not RESULTS_STORE.exists():
 
 
 # LAYOUTS
-from newsegsmodelapp.plugins.pages import model_selection_layout
+from newsegsmodelapp.plugins.pages import p000_model_selection_layout
 
 AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
@@ -170,23 +169,33 @@ def add_display_callbacks(app: NewsegsDash):
             '/',
             '/model_selection'
         ):
-            return model_selection_layout.model_selection_layout, return_app_state(app_state)
+            return p000_model_selection_layout.model_selection_layout, return_app_state(app_state)
 
         splitname = str(pathname).lstrip('/').split("/")
-        selected_model = splitname[0]
 
-        if not selected_model in AVAILABLE_MODELS:
-            return model_selection_layout.model_selection_layout
+        # If model not supported, route to model selection
+        model_type = splitname[0]
 
-        app_state['selected_model'] = selected_model
+        if not model_type in AVAILABLE_MODELS:
+            app_state['current_page'] = '/model_selection'
+            return model_selection_layout.model_selection_layout, return_app_state(app_state)
+
+        app_state['model_type'] = model_type
         rval = [no_update, return_app_state(app_state)]
         pagename = '/'.join(splitname[1:])
 
-        layout_function = PAGE_LAYOUT_REGISTER.get(pagename)
-        if layout_function is None:
+        page = None
+        try:
+            page = registers.get_page(pagename)
+        except KeyError as e:
+            print (e)
+
+        if page is None:
             rval[0] = '404'
         else:
-            rval[0] = layout_function(app_state)
+            layout_function = page.layout
+            config = registers.get_page_layout_configuration(pagename, model_type)
+            rval[0] = layout_function(config)
 
         return tuple(rval)
 
@@ -195,7 +204,7 @@ def add_display_callbacks(app: NewsegsDash):
         Output('active-project-id', 'data', allow_duplicate = True),
 
         Input('session-id', 'data'), # Changed session trigger
-        Input('app-state', 'data'), # Changed app state (e.g. page, selected_model)
+        Input('app-state', 'data'), # Changed app state (e.g. page, model_type)
         prevent_initial_call = True
     )
     def fetch_active_project_id(
@@ -203,7 +212,7 @@ def add_display_callbacks(app: NewsegsDash):
         app_state
     ):
         app_state = json.loads(app_state) if app_state else {}
-        model_type = app_state.get('selected_model', 'default')
+        model_type = app_state.get('model_type', 'default')
         proj_id = app.project_provider.get_session_project_id(
             session_id,
             model_type,
@@ -247,7 +256,7 @@ def create_app(external_stylesheets = None) -> Dash:
     default_app_state = {'model_selection': 'default'} 
     app.validation_layout = html.Div([
         serve_layout(),
-        *[f(default_app_state) for f in PAGE_LAYOUT_REGISTER.values()]
+        [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()]
     ])
 
     # Bind callbacks
@@ -265,6 +274,9 @@ def create_app(external_stylesheets = None) -> Dash:
     add_dsa_run_callbacks(app)
     add_optim_run_callbacks(app)
     add_psa_run_callbacks(app)
+
+    for page in registers.PAGE_REGISTER.values():
+        page.attach_callbacks(app)
 
     return app
 
