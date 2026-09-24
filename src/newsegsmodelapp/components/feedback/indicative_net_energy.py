@@ -10,7 +10,7 @@ import plotly.express as px
 
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.components import energy_balance_estimation
-from newsegsmodelapp.components.update_energy_balance_sprake import update_estimated_energy_balance
+from newsegsmodelapp.plugins.models.default.utils.update_energy_balance_sprake import update_estimated_energy_balance
 from newsegsmodelapp.registers import register_feedback_graph_artist
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
@@ -78,49 +78,3 @@ _feedback_graph_layout = dict(
     plot_bgcolor='rgba(0,0,0,0)',
     bargap=0.75
 )
-
-
-@register_feedback_graph_artist('estimated-annual-energy', 'default')
-def _(
-    project_id: str, 
-    project_provider: NewsegsProjectProviderInterface,
-    eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
-):
-    mm = get_focussed_metamodel(project_id, project_provider)
-    if not eb:
-        eb = energy_balance_estimation.EstimatedEnergyBalance()
-
-    eb = update_estimated_energy_balance(mm, eb)
-
-    df = eb.estimated_annual_energy_balance
-
-    fig_ann = _feedback_graph_bar(df, y = 'type')
-    fig_ann.update_layout(**_feedback_graph_layout) # pyright: ignore[reportArgumentType]
-    fig_ann.update_layout(title = {'text': 'Annual'})
-    fig_ann.update_traces(width=0.35, marker_line_width=0)
-    fig_ann.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
-    fig_ann.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
-
-    return fig_ann
-
-@register_feedback_graph_artist('estimated-maximum-daily-energy', 'default')
-def _(
-    project_id: str, 
-    project_provider: NewsegsProjectProviderInterface,
-    eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
-):
-    mm = get_focussed_metamodel(project_id, project_provider)
-    if not eb:
-        eb = energy_balance_estimation.EstimatedEnergyBalance()
-
-    eb = update_estimated_energy_balance(mm, eb)
-
-    df = eb.estimated_maximum_daily_balance
-    fig_max = _feedback_graph_bar(df, y = 'label')
-    fig_max.update_layout(**_feedback_graph_layout) # pyright: ignore[reportArgumentType]
-    fig_max.update_layout(title = {'text': '(Max) Daily'})
-    fig_max.update_traces(width=0.35, marker_line_width=0)
-    fig_max.update_xaxes(showticklabels=False, title_text=None, showgrid=False, zeroline=False)
-    fig_max.update_yaxes(showticklabels=True, title_text=None, showgrid=False, zeroline=False)
-
-    return fig_max

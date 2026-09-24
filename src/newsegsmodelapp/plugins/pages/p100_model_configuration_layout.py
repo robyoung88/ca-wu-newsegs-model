@@ -22,7 +22,7 @@ from newsegsmodelapp.components import results_header
 from newsegsmodelapp.components import configuration_selector
 from newsegsmodelapp.newsegsbrowser import icons
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
-from newsegsmodelapp.types import LayoutConfiguration, Page
+from newsegsmodelapp.types import ComponentType, LayoutConfiguration, Page
 
 PAGE_TYPE = 'site-config'
 
@@ -47,7 +47,7 @@ class ModelConfigurationLayoutConfiguration(LayoutConfiguration):
 
     results_sections: Sequence[ResultCardConfig] = field(default_factory=list)
 
-def create_model_configuration_layout(config: ModelConfigurationLayoutConfiguration):
+def create_model_configuration_layout(config: ModelConfigurationLayoutConfiguration) -> ComponentType:
 
     model_input_sections = []
     for sec in config.model_input_sections:

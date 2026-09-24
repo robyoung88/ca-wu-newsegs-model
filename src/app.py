@@ -4,7 +4,7 @@ import time
 
 from newsegsmodelapp.backend.db.db import init_db
 from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
-from newsegsmodelapp.newsegsbrowser.callbacks.deterministic_run_callbacks import add_deterministic_run_callbacks
+from newsegsmodelapp.components.callbacks.deterministic_run_callbacks import add_deterministic_run_callbacks
 t1 = time.time()
 import json
 import os
@@ -16,8 +16,8 @@ from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from newsegsmodelapp.newsegsbrowser.callbacks.optim_run_callbacks import add_optim_run_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.psa_run_callbacks import add_psa_run_callbacks
+from newsegsmodelapp.components.callbacks.optim_run_callbacks import add_optim_run_callbacks
+from newsegsmodelapp.components.callbacks.psa_run_callbacks import add_psa_run_callbacks
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -30,20 +30,19 @@ import newsegsmodelapp.register_plugins # MUST be imported
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.action_callbacks import add_action_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.dsa_run_callbacks import add_dsa_run_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.result_container_callbacks import add_result_container_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
+from newsegsmodelapp.components.callbacks.action_callbacks import add_action_callbacks
+from newsegsmodelapp.components.callbacks.dsa_run_callbacks import add_dsa_run_callbacks
+from newsegsmodelapp.components.callbacks.result_container_callbacks import add_result_container_callbacks
+from newsegsmodelapp.components.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.dash_extension import NewsegsDash
-from newsegsmodelapp.newsegsbrowser.callbacks import model_selection_callbacks
 
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.post_page_load import add_post_page_load_callbacks
-from newsegsmodelapp.newsegsbrowser.callbacks.input_container_callbacks import add_input_container_callbacks
+from newsegsmodelapp.components.callbacks.input_container_callbacks import add_input_container_callbacks
 from newsegsmodelapp.components import map
 
 RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
@@ -167,9 +166,15 @@ def add_display_callbacks(app: NewsegsDash):
 
         if pathname in (
             '/',
-            '/model_selection'
+            '/model-selection'
         ):
-            return p000_model_selection_layout.model_selection_layout, return_app_state(app_state)
+            page = registers.get_page('model-selection')
+            if page is None:
+                return '404', return_app_state(app_state)
+            layout_function = page.layout
+            config = registers.get_page_layout_configuration('model-selection', 'default')
+
+            return layout_function(config), return_app_state(app_state)
 
         splitname = str(pathname).lstrip('/').split("/")
 
@@ -177,8 +182,14 @@ def add_display_callbacks(app: NewsegsDash):
         model_type = splitname[0]
 
         if not model_type in AVAILABLE_MODELS:
-            app_state['current_page'] = '/model_selection'
-            return model_selection_layout.model_selection_layout, return_app_state(app_state)
+            app_state['current_page'] = '/model-selection'
+            page = registers.get_page('model-selection')
+            if page is None:
+                return '404', return_app_state(app_state)
+            layout_function = page.layout
+            config = registers.get_page_layout_configuration('model-selection', 'default')
+
+            return layout_function(config), return_app_state(app_state)            
 
         app_state['model_type'] = model_type
         rval = [no_update, return_app_state(app_state)]
@@ -254,16 +265,14 @@ def create_app(external_stylesheets = None) -> Dash:
 
     app.layout = serve_layout
     default_app_state = {'model_selection': 'default'} 
-    app.validation_layout = html.Div([
-        serve_layout(),
-        [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()]
-    ])
+    app.validation_layout = html.Div(
+        [serve_layout()] + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
+    )
 
     # Bind callbacks
     add_display_callbacks(app)
     add_post_page_load_callbacks(app)
     add_input_container_callbacks(app)
-    model_selection_callbacks.assign_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
     map.add_site_selector_callbacks(app)
     add_configuration_selector_callbacks(app)

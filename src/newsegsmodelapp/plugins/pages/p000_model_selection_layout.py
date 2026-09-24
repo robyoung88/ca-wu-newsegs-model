@@ -1,5 +1,13 @@
-from dash import html
+import json
+
+from dash import ALL, Input, Output, ctx, html
+from dash.exceptions import PreventUpdate
+
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+from newsegsmodelapp.dash_extension import NewsegsDash
+from newsegsmodelapp.types import ComponentType, LayoutConfiguration, Page
+from newsegsmodelapp import registers
+
 
 model_selection_layout = dbc.Container([
     html.Div([
@@ -60,3 +68,46 @@ model_selection_layout = dbc.Container([
     )
        
 ])
+
+def create_model_selection_layout(config: LayoutConfiguration) -> ComponentType:
+    return model_selection_layout
+
+def assign_callbacks(app: NewsegsDash):
+
+    @app.callback(
+        Output('url', 'pathname'),
+        Input({'type': 'btn-model-type-selector', 'label': ALL}, 'n_clicks'),
+        prevent_initial_call = True,
+    )
+    def update_model_type(btn_click):
+        trig = ctx.triggered
+        if len(trig) > 1:
+            # Can only set one model at a time
+            raise PreventUpdate
+        trig = trig[0]
+
+        if trig['value'] is None:
+            raise PreventUpdate
+        
+        pid = json.loads(trig['prop_id'].rstrip('.n_clicks'))
+        match pid['label']:
+            case 'sprake':
+                model_type = 'sprake'
+            case 'localised':
+                model_type = 'sprake-localised'
+            case _:
+                raise ValueError(f'Unknown prop has called update_model_type: {pid}')
+
+        print('Model selected - going to landing')
+        
+        return f'/{model_type}/landing'
+
+model_selection_page = Page( # Note this is not indended to be routed to conventionally - the model section of the URL should not be present.
+    id = 'model-selection',
+    nav_label = 'Model selection',
+    nav_icon = 'M',
+    layout = create_model_selection_layout,
+    default_configuration = LayoutConfiguration('model-selection'),
+    attach_callbacks = assign_callbacks
+)
+registers.add_page(model_selection_page)
