@@ -31,7 +31,12 @@ SEED_TABLES = False
 class TestDatabaseStart(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        #os.environ['DYNACONF_DB_PATH'] = ':memory:'
+        cls.db_dir = tempfile.TemporaryDirectory()
+        cls.db_path = Path(cls.db_dir.name) / 'tempdb.db'
+
+        os.environ['DYNACONF_DB_PATH'] = str(cls.db_path)
+        settings.reload()
+
         from newsegsmodelapp.backend import db
         from newsegsmodelapp.backend.db import tables as tbls
         metadata = tbls.metadata
@@ -80,7 +85,7 @@ class TestDatabaseStart(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        ...
+        cls.db_dir.cleanup()
 
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -851,11 +856,11 @@ class TestDatabaseStart(unittest.TestCase):
         self.assertGreater(len(generation_res.meters_to_pandas()), 8760) # pyright: ignore[reportOptionalMemberAccess]
 
         postprocess_list = [
-            'postproc_model_grid',
-            'postproc_model_generation',
-            'postproc_model_consumption',
-            'postproc_model_storage',
-            'postproc_model_net',
+            'postproc_grid',
+            'postproc_generation',
+            'postproc_consumption',
+            'postproc_storage',
+            'postproc_net',
             'postproc_finance_benefits',
             'postproc_finance_costs',
             'postproc_finance_value'
@@ -910,39 +915,39 @@ class TestDatabaseStart(unittest.TestCase):
                     table_draws_done.add(td_artist_name[0])
         
         result_getters = [
-            (x, proj.metamodels[0].model.table_config if 'model' in x else proj.metamodels[0].finance.table_config) for x in postprocess_list
+            (x, proj.metamodels[0].finance.table_config if 'finance' in x else proj.metamodels[0].model.table_config) for x in postprocess_list
         ]
 
         for rg in result_getters:
-            if rg[0] == 'postproc_model_grid':
+            if rg[0] == 'postproc_grid':
                 # No result expected
                 continue
             res, rev = result_provider.get_result(rg[0], rg[1], True)
             self.assertIsNotNone(res, msg = f'No result for {rg[0]}, {rg[1]}')
 
         table_section_list = [
-            'grid',
-            'generation',
-            'consumption',
-            'storage',
-            'net',
-            'finance'
+            'table_grid',
+            'table_generation',
+            'table_consumption',
+            'table_storage',
+            'table_net',
+            'table_finance'
         ]
         self.assertTrue(all(x in table_section_list for x in table_draws_done))
         self.assertTrue(all(x in table_draws_done for x in table_section_list))
 
         project_tables = [
-            'table_model_generation_wind',
-            'table_model_generation_pv',
-            'table_model_generation_combined',
-            'table_model_consumption',
-            'table_model_consumption_seasonal',
-            'table_model_storage',
-            'table_model_net_energy',
-            'table_model_net_energy_seasonal',
-            'table_finance_so_benefits',
-            'table_finance_so_costs',
-            'table_finance_so_value',
+            'table_generation_wind_ann',
+            'table_generation_pv_ann',
+            'table_generation_combined_ann',
+            'table_consumption_ann',
+            'table_consumption_seasonal_ann',
+            'table_storage_ann',
+            'table_net_ann',
+            'table_net_seasonal_ann',
+            'table_finance_so_benefits_ann',
+            'table_finance_so_costs_ann',
+            'table_finance_so_value_ann',
         ]
         for tbl in project_tables:
             res, rev = result_provider.get_result(tbl, proj.table_config, False)

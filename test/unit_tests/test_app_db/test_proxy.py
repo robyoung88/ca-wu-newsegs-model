@@ -13,7 +13,6 @@ import sqlalchemy as sa
 import zmq
 
 from config import settings
-print(f'On first load DB_PATH: {settings['DB_PATH']}')
 from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 DISPATCHSERVER = settings['DISPATCHSERVERS'][0]
 FRONTENDPORT = settings['FRONTENDPORT']

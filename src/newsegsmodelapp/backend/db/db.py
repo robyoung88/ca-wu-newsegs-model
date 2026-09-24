@@ -28,10 +28,13 @@ class DependentObjectsExistError(ValueError):
 
 _engine: sqlalchemy.Engine|None = None
 _connected_db_path: str | None = None
-def get_engine(db_path: str | Path = DB_PATH):
+def get_engine(db_path: str | Path | None = None):
     """Get the sqlalchemy engine for the database."""
     global _engine
     global _connected_db_path
+
+    db_path = DB_PATH if db_path is None else db_path
+
     if _engine is None or (_connected_db_path is not None and _connected_db_path is not db_path):
         print (f'first connection on {db_path}')
         _engine = sqlalchemy.create_engine(
