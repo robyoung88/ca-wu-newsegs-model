@@ -66,7 +66,8 @@ def execute_psa_single_mm_run(
         samples = proj.psa_config.samples,
         return_draws = proj.psa_config.return_draws,
         seed = seed,
-        progress = internal_progress_callback
+        progress = internal_progress_callback,
+        cancel_status = check_cancel_status,
     )
 
     # Connect this result to the metamodel table config, rather than the project dsa config

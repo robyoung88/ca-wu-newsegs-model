@@ -74,6 +74,7 @@ def run_dsa(
     mm: NewsegsMetaModel,
     statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC),
     progress: Callable[[int, int], None] | None = None,
+    cancel_status: Callable[[], bool] | None = None,
 ) -> pd.DataFrame:
     """_summary_
 
@@ -97,6 +98,12 @@ def run_dsa(
     if progress is not None:
         progress(prog_i, n_calcs)
 
+    if cancel_status is None:
+        cancel_status = lambda: False
+
+    if cancel_status():
+        raise InterruptedError('PSA job cancelled')
+    
     results = []
 
     # Run 0 - deterministic
@@ -122,6 +129,8 @@ def run_dsa(
             v.dsa_focussed = True
 
             try:
+                if cancel_status():
+                    raise InterruptedError('PSA job cancelled')
                 for bound in ['lower', 'upper']:
                     bound = cast(DSA_BOUND, bound)
                     v.update_model_dsa(mdl, bound)

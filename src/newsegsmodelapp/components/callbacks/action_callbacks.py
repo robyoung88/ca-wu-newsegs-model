@@ -207,6 +207,7 @@ def add_action_callbacks(app: NewsegsDash):
         Output('ongoing-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
         Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
+        Output({'type': 'results-overlay-text', 'section': ALL, 'supersection': ALL}, 'children', allow_duplicate = True),
 
         Input('trigger-check-requests', 'data'),
         Input('progress-poll-interval', 'n_intervals'),
@@ -255,6 +256,7 @@ def add_action_callbacks(app: NewsegsDash):
         completed_actions = []
         spawned_actions = []
         spawn_ids: set[tuple] = set()
+        new_jobs = False
 
         if isinstance(trigger_id, str):
             if trigger_id == 'trigger-check-requests':
@@ -267,6 +269,7 @@ def add_action_callbacks(app: NewsegsDash):
                         ongoing_actions.append(run_id)
                         req.run_id = run_id
                         app.request_handler.mark_dispatched(req.request_id, req.run_id)
+                        new_jobs = True
                     
         # Check on ongoing actions
         if ongoing_actions:
@@ -395,12 +398,39 @@ def add_action_callbacks(app: NewsegsDash):
                 # By doing this once-through, we are forcing only one layer of child processes to get triggered 
                 # - provided that the interval brings us back fast enough, this is a reasonable compromise to 
                 # keep responsiveness.
-                ongoing_actions.extend(spawned_actions)        
+                ongoing_actions.extend(spawned_actions)
+
+        new_jobs = new_jobs or len(spawned_actions) 
 
         return (
             postaction_trigger_returns,
             ongoing_actions,
             len(ongoing_actions) == 0,
-            (['CALCULATING'] if len(ongoing_actions) > 0 else ['IDLE']) * len(container_ids)
+            (['CALCULATING'] if len(ongoing_actions) > 0 else ['IDLE']) * len(container_ids),
+            (['Computing...'] if new_jobs else [no_update]) * len(container_ids),
         )
-    
+
+    @app.callback(
+        Output({'type': 'results-overlay-text', 'section': ALL, 'supersection': ALL}, 'children', allow_duplicate = True),
+        Input({'type': 'cancel-job-button', 'section': ALL, 'supersection': ALL}, 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def cancel_job(n_clicks):
+        clicks = callback_utils.get_triggered_value()
+        if not clicks:
+            raise PreventUpdate
+
+        print ('Requesting cancel of all jobs.')
+
+        cancel_all_jobs = (
+            sa.update(tbls.runs)
+            .where(tbls.runs.c.status.not_in(['SUCCESS', 'FAILED']))
+            .values(cancel_requested = True)
+        )
+
+        with db.get_engine().begin() as conn:
+            conn.execute(cancel_all_jobs)
+
+        rval = callback_utils.create_noupdate_return()
+        return ['Cancelling...'] * len(rval)
+        

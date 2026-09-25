@@ -155,6 +155,7 @@ def run_psa(
     rng: np.random.Generator | None = None,
     return_draws: bool = False,
     progress: Callable[[int, int], None] | None = None,
+    cancel_status: Callable[[], bool] | None = None,
     include_deterministic: bool = True,
 ) -> pd.DataFrame:
     """_summary_
@@ -182,6 +183,12 @@ def run_psa(
     if progress is not None:
         progress(prog_i, n_calcs)
 
+    if cancel_status is None:
+        cancel_status = lambda: False
+
+    if cancel_status():
+        raise InterruptedError('PSA job cancelled')
+    
     if include_deterministic:
         for v in variables:
             v.psa_active = False
@@ -195,8 +202,8 @@ def run_psa(
         res['draw'] = 0
         results.append(res)
         if progress is not None:
-                prog_i += 1
-                progress(prog_i, n_calcs)
+            prog_i += 1
+            progress(prog_i, n_calcs)
     
     if samples <= 0:
         return pd.DataFrame(results)
@@ -211,6 +218,9 @@ def run_psa(
     
     try:
         for i in range(samples):
+            if cancel_status():
+                raise InterruptedError('PSA job cancelled')
+            
             for v in variables:
                 v.draw_psa(rng)
                 v.update_model_psa(mdl)
@@ -1029,7 +1039,7 @@ def psa_convergence_data(
             )
         case 'First Decile':
             q = 0.1
-            final_stat = raw_frame[statistic].quantile(q)
+            final_stat = float(raw_frame[statistic].quantile(q))
             stat_data = (
                 raw_frame
                 .assign(
@@ -1039,7 +1049,7 @@ def psa_convergence_data(
             )
         case 'First Quartile':
             q = 0.25
-            final_stat = raw_frame[statistic].quantile(q)
+            final_stat = float(raw_frame[statistic].quantile(q))
             stat_data = (
                 raw_frame
                 .assign(
@@ -1049,7 +1059,7 @@ def psa_convergence_data(
             )
         case 'Third Quartile':
             q = 0.75
-            final_stat = raw_frame[statistic].quantile(q)
+            final_stat = float(raw_frame[statistic].quantile(q))
             stat_data = (
                 raw_frame
                 .assign(
@@ -1059,7 +1069,7 @@ def psa_convergence_data(
             )
         case 'Ninth Decile':
             q = 0.9
-            final_stat = raw_frame[statistic].quantile(q)
+            final_stat = float(raw_frame[statistic].quantile(q))
             stat_data = (
                 raw_frame
                 .assign(

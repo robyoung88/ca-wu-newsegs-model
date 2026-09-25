@@ -71,6 +71,9 @@ def execute_optim_single_mm_run(
     if len(optim_vars) == 0:
         return 'Optimisation not run - no variables selected with valid bounds'
 
+    if check_cancel_status():
+        raise InterruptedError(f'Optimisation process {run_id} has been cancelled.')
+
     stat = run_config.get('statistic', 'net_present_value_discounted')
     method = run_config.get('optim-method')
 
@@ -88,12 +91,17 @@ def execute_optim_single_mm_run(
         varid = k.varid
         var = project_provider.variable_provider.duplicate_variable(mm_copy.variables[varid].id)
         mm_copy.variables[varid] = var
+
+    if check_cancel_status():
+        raise InterruptedError(f'Optimisation process {run_id} has been cancelled.')
     
     opt = optim.run_optimisation(
         mm_copy,
         vars,
         target = stat,
-        method = method
+        method = method,
+        progress = lambda x, y: progress_callback(x,y, 'Optimisation underway'),
+        cancel_status = check_cancel_status,
     )
     if opt.success:
         mm_copy.name = mm.name + ' - Opt'

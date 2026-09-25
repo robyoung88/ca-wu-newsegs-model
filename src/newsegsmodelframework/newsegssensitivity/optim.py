@@ -84,6 +84,7 @@ def run_optimisation(
     variables: Sequence[OptimVariable],
     target: _OPTIM_TARGET_STATISTIC = 'net_present_value_discounted',
     progress: Callable[[int, int], None] | None = None,
+    cancel_status: Callable[[], bool] | None = None,
     method: str = 'Nelder-Mead'
 ):
     """_summary_
@@ -95,6 +96,12 @@ def run_optimisation(
         progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
         method (str, optional): _description_. Defaults to 'Nelder-Mead'.
     """
+
+    if progress is None:
+        progress = lambda x, y: None
+    if cancel_status is None:
+        cancel_status = lambda: False
+
      # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
 
@@ -132,6 +139,14 @@ def run_optimisation(
         mm.model.run()
         mm.finance.run()
         return _optim_float_statistic_mapper(target, mm.model, mm.finance)
+
+    cback_count = 0
+    def cback(intermediate_result: scipy_opt.OptimizeResult):
+        nonlocal cback_count
+        if cancel_status():
+            raise InterruptedError(f'Optimisation process has been cancelled.')
+        cback_count += 1
+        progress(cback_count, cback_count + 2)
     
     if do_bound:
         bounds = []
@@ -140,9 +155,9 @@ def run_optimisation(
                 bounds.append((trans(var.lower), trans(var.upper)))
             else:
                 bounds.append((None, None))
-        opt = scipy_opt.minimize(optfunc, x0, method = method, bounds = bounds)
+        opt = scipy_opt.minimize(optfunc, x0, method = method, bounds = bounds, callback = cback)
     else:
-        opt = scipy_opt.minimize(optfunc, x0, method = method)
+        opt = scipy_opt.minimize(optfunc, x0, method = method, callback = cback)
 
     if opt.success:
         setpars(opt.x, mm)

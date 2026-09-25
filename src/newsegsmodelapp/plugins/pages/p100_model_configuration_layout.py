@@ -11,7 +11,7 @@ The layout should provide:
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from dash import Input, Output, State, html
+from dash import Input, Output, State, dcc, html
 from dash.exceptions import PreventUpdate
 
 from newsegsmodelapp import registers
@@ -117,7 +117,11 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         dbc.Row(
             config.layout_map()
         )
-    ] + site_details
+    ] + [
+        dcc.Loading(
+            site_details
+        )
+    ]
 
     b1_contents = [
         config.layout_results_header()
