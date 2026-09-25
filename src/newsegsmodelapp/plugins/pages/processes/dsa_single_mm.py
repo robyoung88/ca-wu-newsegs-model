@@ -60,7 +60,11 @@ def execute_dsa_single_mm_run(
 
         progress_callback(step, total, 'Running DSA')
 
-    dsa_results_frame = newsegssensitivity.run_dsa(mm, progress = internal_progress_callback)
+    dsa_results_frame = newsegssensitivity.run_dsa(
+        mm, 
+        progress = internal_progress_callback, 
+        cancel_status = check_cancel_status
+    )
 
     # Connect this result to the metamodel table config, rather than the project dsa config
     project_provider.upsert_component(proj)

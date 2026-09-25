@@ -47,10 +47,10 @@ def execute_deterministic_run_project(
         progress_callback(step, n_steps, f'Setting model variables - metamodel {i+1} of {n_mm}')
         step += 1
 
-        mm.sync_model_with_changed_variables_deterministic()
-
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
+
+        mm.sync_model_with_changed_variables_deterministic()
 
         progress_callback(step, n_steps, f'Running model - metamodel {i+1} of {n_mm}')
         step += 1

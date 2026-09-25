@@ -1,5 +1,7 @@
 from dash import html
 
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+
 def create_results_container(
     children = [],
     section: str = 'results',
@@ -33,8 +35,20 @@ def create_results_container(
                     html.Div(className="spinner"),
                     html.P(
                         "Computing...",
-                        id = {'type': 'results-overlay-text', 'section': section, 'supersection': supersection}
-                    )
+                        id = {
+                            'type': 'results-overlay-text',
+                            'section': section,
+                            'supersection': supersection
+                        }
+                    ),
+                    dbc.Button(
+                        "Cancel Jobs",
+                        id = {
+                            'type': 'cancel-job-button',
+                            'section': section,
+                            'supersection': supersection,
+                        }
+                    ),
                 ],
                 className="results-overlay"
             )
@@ -42,18 +56,3 @@ def create_results_container(
         # Default data attribute state
         **{"data-status": "IDLE"}, # type: ignore
     )
-
-# def result_group_container(
-#     section: str,
-#     supersection: str
-# ):
-#     return (
-#         html.Div(id = {'type': 'result-options-container', 'section': section, 'supersection': supersection}),
-#         html.Div(id = {'type': ''})
-#     )
-
-# def figure_container(
-#     triggering_section: str,
-#     triggering_key: str,
-# ):
-#     ...

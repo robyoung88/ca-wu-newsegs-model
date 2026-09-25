@@ -6,6 +6,7 @@ from typing import cast
 import dash
 from dash import html
 from dash.exceptions import PreventUpdate
+from cachetools import LRUCache
 
 from newsegsmodelapp.components import energy_balance_estimation
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
@@ -40,6 +41,8 @@ sections_by_supersection = {
     )
 }
 
+_cache = LRUCache(maxsize = 50)
+
 for supersection, section_tuple in sections_by_supersection.items():
     for section in section_tuple:
         @register_input_container_content_creator(supersection, section, MODEL_TYPE)
@@ -50,9 +53,16 @@ for supersection, section_tuple in sections_by_supersection.items():
         ) -> list[dash.development.base_component.Component]:
             proj = proj_provider.get_project(proj_id)
             mm = proj.get_focussed_metamodel()
-            return generic_create_deterministic_input_container_contents(
+            key = (_section, proj.id, mm.id)
+            if key in _cache:
+                return _cache[key]
+
+            component = generic_create_deterministic_input_container_contents(
                 _section, proj, mm
             )
+            _cache[key] = component
+
+            return component
 
 
 #################################################
