@@ -4,9 +4,6 @@ Unit tests for newsegsgrid/sprakegrid
 import unittest
 import json
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
-
 from newsegsmodelframework.newsegsgrid import sprakegrid
 from newsegsmodelframework.newsegsgrid import constructors as gridconstructors
 

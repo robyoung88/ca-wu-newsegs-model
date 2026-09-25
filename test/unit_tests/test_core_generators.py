@@ -8,8 +8,7 @@ import json
 import numpy as np
 import numpy.testing
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
+
 
 from newsegsmodelframework.core import location
 from newsegsmodelframework.core.generation import generators

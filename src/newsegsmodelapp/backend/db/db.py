@@ -33,13 +33,13 @@ def get_engine(db_path: str | Path | None = None):
     global _engine
     global _connected_db_path
 
-    db_path = DB_PATH if db_path is None else db_path
+    db_path = str(settings['DB_PATH']) if db_path is None else db_path
 
     if _engine is None or (_connected_db_path is not None and _connected_db_path is not db_path):
-        print (f'first connection on {db_path}')
+        engine_url = f'sqlite+pysqlite:///{db_path}'
+        print(f'Creating engine: {engine_url}')
         _engine = sqlalchemy.create_engine(
-            f'sqlite+pysqlite:///{db_path}',
-            #connect_args = {'autocommit': False},
+            engine_url,
             echo = False
         )
         _connected_db_path = str(db_path)

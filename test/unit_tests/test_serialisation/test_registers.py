@@ -3,8 +3,7 @@ Unit tests for constructor registry
 """
 import unittest
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
+
 
 from newsegsmodelframework.core.constructors import registers
 

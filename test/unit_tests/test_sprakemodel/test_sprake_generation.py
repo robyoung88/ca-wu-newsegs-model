@@ -7,9 +7,6 @@ import json
 from typing import cast
 import unittest
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
-
 from newsegsmodelframework.util import jsonfuncs
 from newsegsmodelframework.core import location
 from newsegsmodelframework.newsegsgeneration import sprakegeneration

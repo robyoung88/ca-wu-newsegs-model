@@ -4,8 +4,7 @@ Unit tests for newsegsfinance/sprakefinance
 import unittest
 import json
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
+
 
 from newsegsmodelframework.newsegsfinance import sprakefinance
 

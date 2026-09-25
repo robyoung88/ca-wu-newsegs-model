@@ -20,6 +20,9 @@ NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/
 DiskcacheCache = 'C:\\scratch\\appdiskcache'
 
 PROGRESS_POLL_INTERVAL = 1000
+JOB_DISPATCH_TIMEOUT_MS = 10000
+WORKER_RECEIVE_TIMEOUT_MS = 3000
+WORKER_SHUTDOWN_TIMEOUT_S = 5
 
 [spraketest]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"

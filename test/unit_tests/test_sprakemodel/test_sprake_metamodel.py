@@ -8,8 +8,6 @@ import unittest
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
 from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
-from test.unit_tests.common import setup_test_env
-setup_test_env()
 
 from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import sprakefinance

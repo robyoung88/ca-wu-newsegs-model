@@ -5,8 +5,7 @@ from typing import cast
 import unittest
 import json
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
+
 
 from newsegsmodelframework.util import jsonfuncs
 from newsegsmodelframework.newsegscs import sprakecs

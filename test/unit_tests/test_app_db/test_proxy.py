@@ -3,7 +3,7 @@ Unit tests for the ZeroMQ proxy
 """
 import os
 from pathlib import Path
-import random
+import pickle
 import tempfile
 import threading
 import time
@@ -13,12 +13,10 @@ import sqlalchemy as sa
 import zmq
 
 from config import settings
-from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
-DISPATCHSERVER = settings['DISPATCHSERVERS'][0]
-FRONTENDPORT = settings['FRONTENDPORT']
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend import dispatcher
+from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 
 APP_ROOT = Path(__file__).parent.parent.parent.parent.resolve() / 'src'
@@ -26,6 +24,12 @@ APP_ROOT = Path(__file__).parent.parent.parent.parent.resolve() / 'src'
 class TestProxy(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls.db_dir = tempfile.TemporaryDirectory()
+        cls.db_path = Path(cls.db_dir.name) / 'tempdb.db'
+
+        os.environ['DYNACONF_DB_PATH'] = str(cls.db_path)
+        settings.reload()
+
         # Create the database
         from newsegsmodelapp.backend import db
         from newsegsmodelapp.backend.db import tables as tbls
@@ -46,13 +50,6 @@ class TestProxy(unittest.TestCase):
         frontend_socket.close(linger=0)
         backend_socket.close(linger=0)
 
-        # # As won't do the bind until later, let's just try random ports.
-        # cls.frontend_port =  '8555'#str(random.randrange(8500, 8600))#'8555'
-        # while True:
-        #     cls.backend_port = '8556'#str(random.randrange(8500, 8600))
-        #     if cls.backend_port != cls.frontend_port:
-        #         break
-
         # Start proxy in a daemon thread
         cls.stop_dispatcher_event = threading.Event()
         
@@ -69,13 +66,22 @@ class TestProxy(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         """Clean up proxy threads"""
+        from newsegsmodelapp.backend import db
+        print('Setting stop event for supervisor.')
         cls.stop_dispatcher_event.set()
 
         # Wait for the thread and its underlying multiprocessing children to terminate
-        cls.dispatcher_thread.join(timeout=3.0)
+        cls.dispatcher_thread.join(timeout=10.0)
         cls.context.term()
 
+        engine = db.get_engine(cls.db_path)
+        engine.dispose()
+
+        cls.db_dir.cleanup()
+
     def setUp(self) -> None:
+        os.environ['DYNACONF_DB_PATH'] = str(self.db_path)
+        settings.reload()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = Path(self.temp_dir.name)
 
@@ -92,6 +98,7 @@ class TestProxy(unittest.TestCase):
                 server = '127.0.0.1',
                 frontendport = frontendport,
                 backendport = backendport,
+                db_path = str(settings['DB_PATH']),
                 stop_event = stop_event
             )
         except zmq.ZMQError:
@@ -102,9 +109,16 @@ class TestProxy(unittest.TestCase):
         socket = context.socket(zmq.REQ)
         socket.connect(f'tcp://{"127.0.0.1"}:{self.frontend_port}')
 
-        socket.send_pyobj(payload)
+        payload_bytes = pickle.dumps(payload)
+        socket.send(payload_bytes)
+        
+        reply_bytes = socket.recv()
+        reply_data = pickle.loads(reply_bytes)
 
-        return socket.recv_pyobj()
+        socket.close()
+        context.term()
+
+        return reply_data
 
     def test_dispatched_process(self):
         import newsegsmodelapp.register_plugins

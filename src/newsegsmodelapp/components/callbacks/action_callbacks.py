@@ -1,12 +1,10 @@
 """Callbacks resulting in some processing being undertaken."""
 
-import copy
 import json
-import random
+import pickle
 from typing import Any
-import warnings
 
-from dash import ALL, MATCH, Input, NoUpdate, Output, State, ctx, no_update
+from dash import ALL, Input, NoUpdate, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 import sqlalchemy as sa
 import zmq
@@ -19,7 +17,7 @@ from newsegsmodelapp import registers
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
 from newsegsmodelapp.backend.db import db_tables as tbls
-from newsegsmodelapp.backend.worker import _set_status_completed, _set_status_failed
+from newsegsmodelapp.backend.worker import set_status_completed, set_status_failed
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
 
@@ -30,12 +28,24 @@ FRONTENDPORT = settings['FRONTENDPORT']
 def send_to_dispatcher(payload) -> dict:
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
-    print(f'sending to dispatcher on {DISPATCHSERVER}:{FRONTENDPORT}')
-    socket.send_pyobj(payload)
 
-    print('Waiting for confirmation')
-    return socket.recv_pyobj()
+    socket.setsockopt(zmq.RCVTIMEO, settings.get('JOB_DISPATCH_TIMEOUT_MS', -1))
+    socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
+    
+    payload_bytes = pickle.dumps(payload)
+    socket.send(payload_bytes)
+
+    try:
+        reply_bytes = socket.recv()
+    except zmq.Again:
+        raise ValueError('Job dispatch timed out.')
+    finally:
+        socket.close()
+        context.term()
+
+    reply_data = pickle.loads(reply_bytes)
+
+    return reply_data
 
 def _local_run_any(
     runner, request, engine, project_provider, results_provider
@@ -51,11 +61,11 @@ def _local_run_any(
             lambda: False
         )
 
-        _set_status_completed(engine, job_id)
+        set_status_completed(engine, job_id)
         return job_id
     except Exception as e:
         print(e)
-        _set_status_failed(engine, job_id, str(e))
+        set_status_failed(engine, job_id, str(e))
         return job_id
 
 def local_run_procedure(

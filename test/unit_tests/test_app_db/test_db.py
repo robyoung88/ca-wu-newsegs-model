@@ -8,7 +8,6 @@ import tempfile
 from typing import cast
 import unittest
 
-import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -23,10 +22,8 @@ from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProv
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
-from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider, RecoverableInMemoryVariableProvider
+from newsegsmodelframework.newsegsvariable.variableprovider import RecoverableInMemoryVariableProvider
 from test.unit_tests import variable_helpers
-
-SEED_TABLES = False
 
 class TestDatabaseStart(unittest.TestCase):
     @classmethod
@@ -38,50 +35,10 @@ class TestDatabaseStart(unittest.TestCase):
         settings.reload()
 
         from newsegsmodelapp.backend import db
-        from newsegsmodelapp.backend.db import tables as tbls
-        metadata = tbls.metadata
-        sorted_tables = metadata.sorted_tables
-
-        seed_table_file = os.path.join(
-            settings.get('SprakeDataLoc', ''),
-            'test_app_database_tables.xlsx'
-        )
-
+        
         # Create all tables
         db_tables.create_all_tables(db.get_engine())
-        #metadata.create_all(db.get_engine())
-
-        if SEED_TABLES:
-            # Load sheet names from Excel file
-            xl_file = pd.ExcelFile(seed_table_file)
-            sheet_names = xl_file.sheet_names
-
-            # Create a mapping of sheet names (case-insensitive) for quick lookup
-            sheet_name_map = {str(name).lower(): name for name in sheet_names}
-
-            # Insert data from matching sheets into corresponding tables
-            with db.get_engine().connect() as conn:
-                for table in sorted_tables:
-                    table_name = table.name.lower()
-                    
-                    # Check if a matching sheet exists
-                    if table_name in sheet_name_map:
-                        actual_sheet_name = sheet_name_map[table_name]
-                        
-                        # Read data from the matching sheet
-                        df = pd.read_excel(seed_table_file, sheet_name=actual_sheet_name)
-                        
-                        # Insert the data into the table
-                        if not df.empty:
-                            # Convert appropriate columns to uuid
-                            dtype_spec = {}
-                            #for id_col in ['variable_config_id']:
-                            #    if id_col in df.columns:
-                            #        df[id_col] = df[id_col].apply(uuid.UUID) # type: ignore
-                            #        dtype_spec[id_col] = sa.Uuid()
-                            df.to_sql(table.name, conn, if_exists='append', index=False, dtype = dtype_spec)
-                
-                conn.commit()
+        
 
     @classmethod
     def tearDownClass(cls):

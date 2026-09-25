@@ -5,6 +5,7 @@ Unit tests for newsegsbrowser/variable.
 import copy
 from functools import partial
 import json
+from pathlib import Path
 from typing import cast
 import unittest
 
@@ -15,12 +16,14 @@ from scipy.stats import gamma as gamma_dist
 from scipy.stats import beta as beta_dist
 import scipy.integrate as integrate
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
-
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import sprakefinance
+
+from test.unit_tests.common import get_data_dir
+
+_CWD = Path().resolve()
+_DATA_DIR = get_data_dir(_CWD)
 
 class TestParameterisations(unittest.TestCase):
 
@@ -1639,7 +1642,7 @@ class TestVariableConstructionFromJSON(unittest.TestCase):
     """
 
     def test_sprake_json_construction(self):
-        with open('data/sprake-variable-config-novalues.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
         
         self.assertIsInstance(var_conf_list, list)
@@ -1653,7 +1656,7 @@ class TestVariableSynchronisation(unittest.TestCase):
     """
 
     def load_sprake_variables(self):
-        with open('data/sprake-variable-config-novalues.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
         return [variable.Variable(**x) for x in var_conf_list] # pyright: ignore[reportAbstractUsage]
     
@@ -1815,7 +1818,7 @@ class TestVariableSerialisation(unittest.TestCase):
     # NB - using from_dict form here, not direct construction.
     # This allows us to hold onto e.g. raw_parameters
     def load_sprake_variables(self):
-        with open('data/sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
     
@@ -2532,7 +2535,7 @@ from dataclasses import dataclass, field
 
 class TestVariableListManagement(unittest.TestCase):
     def load_sprake_variables(self):
-        with open('data/sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
 

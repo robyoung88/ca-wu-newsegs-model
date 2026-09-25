@@ -7,9 +7,6 @@ import numpy as np
 import numpy.testing as nptest
 from scipy.stats import dirichlet
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
-
 from newsegsmodelframework.newsegsstats.dirichlet import fit_dirichlet
 
 class TestDirichletFitting(unittest.TestCase):
