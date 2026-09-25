@@ -70,7 +70,12 @@
 /* Input fields */
 input.dynamic-step-field {
     float: right;
-    width: 100px;
+    width: 100px !important;
+}
+
+input.numeric-input {
+    width: 100px !important;
+    flex: 0 0 100px !important;
 }
 
 div.numeric-card-input details {

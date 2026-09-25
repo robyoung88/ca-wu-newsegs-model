@@ -8,8 +8,8 @@ The layout should provide:
     btn-action-deterministic-run-metamodel
     btn-action-deterministic-run-project
 """
-from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Sequence, cast
+from dataclasses import dataclass, field
+from typing import Any, Callable, Sequence
 
 from dash import Input, Output, State, html
 from dash.exceptions import PreventUpdate

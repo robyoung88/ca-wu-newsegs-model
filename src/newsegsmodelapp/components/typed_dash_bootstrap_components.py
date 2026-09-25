@@ -6,6 +6,7 @@ from typing import Any
 
 import dash_bootstrap_components as dbc
 
+Badge: Any = dbc.Badge
 Button: Any = dbc.Button
 Card: Any = dbc.Card
 CardBody: Any = dbc.CardBody

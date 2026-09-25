@@ -39,7 +39,11 @@ def create_results_header(page_type, **kwargs):
                                         ),
                                         color = 'primary',
                                         id = 'btn-action-deterministic-run-metamodel',
+                                        className = 'p-2',
                                         style = {
+                                            "boxSizing": "border-box",
+                                            "width": "42px",
+                                            "height": "42px",
                                             'margin-left': '5px',
                                             'border-radius': '50%',
                                             'display': 'inline',
@@ -55,7 +59,11 @@ def create_results_header(page_type, **kwargs):
                                         ),
                                         color = 'primary',
                                         id = 'btn-action-deterministic-run-project',
+                                        className = 'p-2',
                                         style = {
+                                            "boxSizing": "border-box",
+                                            "width": "42px",
+                                            "height": "42px",
                                             'margin-left': '5px',
                                             'border-radius': '50%',
                                             'display': 'inline',
