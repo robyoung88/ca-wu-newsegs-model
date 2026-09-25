@@ -2,6 +2,7 @@
 from dash import dcc, html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+from newsegsmodelframework.newsegssensitivity import optim
 
 def optim_process_components(**kwargs):
     return [

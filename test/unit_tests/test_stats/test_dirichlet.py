@@ -20,7 +20,7 @@ class TestDirichletFitting(unittest.TestCase):
         vcv = dirichlet.cov(alphas)
 
         fit = fit_dirichlet(mean, vcv)
-        nptest.assert_array_almost_equal(alphas, fit)
+        nptest.assert_array_almost_equal(alphas, fit) # pyright: ignore[reportArgumentType]
         nptest.assert_array_almost_equal(mean, dirichlet.mean(fit))
     
     def test_fit_sampled_dirichlet(self):
@@ -32,5 +32,5 @@ class TestDirichletFitting(unittest.TestCase):
         vcv = np.cov(data, rowvar = False)
 
         fit = fit_dirichlet(mean, vcv)
-        nptest.assert_array_almost_equal(alphas, fit, decimal=2)
+        nptest.assert_array_almost_equal(alphas, fit, decimal=2) # pyright: ignore[reportArgumentType]
         

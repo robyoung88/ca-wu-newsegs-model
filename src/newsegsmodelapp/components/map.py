@@ -9,6 +9,7 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 
@@ -19,6 +20,7 @@ def create_map_layout(map_id='sitemap',
             id=map_id,
             children=[
                 dl.TileLayer(),
+                dl.LayerGroup(id='other-metamodels-container'),
                 dl.LayerGroup(id='site-marker-container'),
                 dl.LayerGroup(id='site-confirm-container'),
             ],
@@ -52,8 +54,10 @@ def create_osgb_feedback():
         html.Span(")", style={'marginLeft': '0.2rem'})
     ]
 
-def create_site_selector_map(map_id='sitemap',
-                             center=(53.165716, -3.728402)):
+def create_site_selector_map(
+    map_id='sitemap',
+    center=(53.165716, -3.728402)
+):
     elements = html.Div(
         [
             dbc.Row([
@@ -211,7 +215,7 @@ def add_map_click_callback(app: NewsegsDash):
 
 def add_potential_site_change_callback(app: NewsegsDash):
     @app.callback(
-        Output('site-confirm-container', 'children',allow_duplicate=True),
+        Output('site-confirm-container', 'children', allow_duplicate=True),
 
         Input('potential-site-location', 'data'),
         prevent_initial_call=True
@@ -272,22 +276,58 @@ def add_site_change_callback(app) -> Dash:
         Output('site-marker-container', 'children'),
         Output('site-osgb-easting-text', 'children'),
         Output('site-osgb-northing-text', 'children'),
+        Output('other-metamodels-container', 'children'),
 
         Input('site-location', 'data'),
-        prevent_initial_call=True
+        State('active-project-id', 'data'),
+        prevent_initial_call = True
     )
-    def add_site_marker(json_latlon):
+    def add_site_marker(json_latlon, active_project_id):
         coords = json.loads(json_latlon)
         pos = [float(coords['lat']), float(coords['lon'])]
         easting = coords.get('easting', None)
         northing = coords.get('northing', None)
         if not easting:
             easting, northing = _trans_togb.transform(pos[0], pos[1])
-        return ([dl.Marker(id='site-marker',
-                          position=pos,
-                          children=[dl.Tooltip("Site Location")])], 
-                          f"{float(easting):,.0f}",
-                          f"{float(northing):,.0f}")
+
+        # Active focused marker
+        focussed_marker = [
+            dl.Marker(
+                id='site-marker',
+                position=pos,
+                children=[dl.Tooltip("Site Location")]
+            )
+        ]
+
+        # Non-focused metamodel markers (translucent)
+        other_markers = []
+        if active_project_id:
+            try:
+                proj = app.project_provider.get_project(active_project_id)
+                focussed_mm = proj.get_focussed_metamodel()
+                
+                for mm in proj.metamodels:
+                    if mm != focussed_mm and mm.model and mm.model.location:
+                        loc = mm.model.location
+                        other_markers.append(
+                            dl.Marker(
+                                position=[loc.lat, loc.lon],
+                                opacity=0.4,
+                                children=[
+                                    dl.Tooltip(getattr(loc, 'name', None) or getattr(mm, 'name', 'Other Configuration'))
+                                ]
+                            )
+                        )
+            except Exception as e:
+                print(e)
+                pass
+        
+        return (
+            focussed_marker,
+            f"{float(easting):,.0f}",
+            f"{float(northing):,.0f}",
+            other_markers
+        )
     return app
 
 def add_site_selector_callbacks(app: NewsegsDash):
