@@ -3,25 +3,42 @@ Abstract base class for NewSEGS model
 """
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
-import copy
-from typing import Any, Type, override
-import re
-import datetime
-import uuid
+from abc import abstractmethod
+from typing import Any, Optional, override
 
 from newsegsmodelframework.core import newsegscomponent
-from newsegsmodelframework.core import environmentserverinterface
-from newsegsmodelframework.core import resultsserverinterface
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.core import TimeSpan, TimedeltaScalar
+from newsegsmodelframework.core import TimeSpan
+from newsegsmodelframework.core.newsegsmodule import NewsegsModule
+from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.core.serialisation import T
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from newsegsmodelframework.newsegsgrid import NewsegsGrid
 from newsegsmodelframework.newsegscs import NewsegsCS
-from newsegsmodelframework.util import classfuncs
 
 from newsegsmodelframework.core import newsegsmodelinterface
+
+class NewsegsModelProperty(newsegscomponent.ComponentProperty):
+    @override
+    def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'): # pyright: ignore[reportIncompatibleMethodOverride]
+        if not isinstance(instance, NewsegsModel):
+            raise TypeError(f'Property accessing {self.name} should only be applied to a NewsegsModel, is attribute of {type(instance)}')
+        if not isinstance(value, NewsegsModule):
+            raise TypeError(f'Property assigned to {self.name} should be a NewsegsModule, is {type(value)}')
+        super().__set__(instance, value)
+        getattr(instance, self.name).model = instance
+
+
+class NewsegsModelData(newsegscomponent.NewsegsComponent):
+    """
+    Holds data relating to the model configuration
+    """
+    component_type = 'energy_model'
+
+@revision_dataclass
+class NewsegsModelConfig(DataWithRevision):
+    ...
 
 class NewsegsModel(
     newsegsmodelinterface.NewsegsModelInterface
@@ -50,26 +67,40 @@ class NewsegsModel(
     When restoring state from dictionary, then the configuration of the submodules should be
     passed down
     """
-
-    _dirty = False
     
-    _name = 'NewSEGS Model'
+    _name = 'NewSEGS Energy Model'
     _version = '0.0.1'
     _id_prefix = 'm'
+
+    model_data = newsegscomponent.ComponentProperty(default = NewsegsModelData)
+    table_config = newsegscomponent.ComponentProperty(default = newsegscomponent.TableConfigNewsegsComponent)
 
     _last_hash = 1
 
     checked_out: bool = False
+    
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+    def _generate_config(self, *args, **kwargs) -> NewsegsModelConfig:
+        return NewsegsModelConfig(*args, **kwargs)
 
+    def __init__(
+        self,
+        *args,
+        model_data: Optional[NewsegsModelData] = None,
+        table_config: Optional[newsegscomponent.TableConfigNewsegsComponent] = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.model_data = model_data or NewsegsModelData()
+        self.table_config = table_config or newsegscomponent.TableConfigNewsegsComponent()
+            
     @property
     def model_version(self) -> str:
         return self.version
 
     @abstractmethod
-    def set_run_period(self, timespan:TimeSpan):
+    def set_run_period(self, timespan: TimeSpan):
         """
         Define the timespan of simulation
         """
@@ -243,18 +274,6 @@ class NewsegsModel(
     @abstractmethod
     def location(self, loc: modlocation.Location) -> None:
         ...
-
-    @property
-    def dirty(self) -> bool:
-        """
-        Is the model aware of config changes since last run?
-        """
-        return (
-            self.generation.dirty or
-            self.grid.dirty or
-            self.consumption_storage.dirty or
-            self._dirty
-        )
     
     @override
     def update(self, config: dict[str, Any] | type[T]):
@@ -262,19 +281,19 @@ class NewsegsModel(
             super().update(config)
             return
         
-        for mod_name in ('mod_gen', '_mod_gen'):
+        for mod_name in ('mod_gen', '_mod_gen', 'generation'):
             generation = config.pop(mod_name, None)
             if generation:
                 self.update_generation(generation)
                 break
 
-        for mod_name in ('mod_grid', '_mod_grid'):
+        for mod_name in ('mod_grid', '_mod_grid', 'grid'):
             grid = config.pop(mod_name, None)
             if grid:
                 self.update_grid(grid)
                 break
         
-        for mod_name in ('mod_cs', '_mod_cs'):
+        for mod_name in ('mod_cs', '_mod_cs', 'consumption_storage'):
             cs = config.pop(mod_name, None)
             if cs:
                 self.update_consumption_storage(cs)
@@ -282,7 +301,105 @@ class NewsegsModel(
         
         return super().update(config)
 
+    def reattach_grid(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('grid', '') == '':
+            raise AttributeError('This Energy Model has no grid module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('grid', ''))
+        if not isinstance(comp, NewsegsGrid):
+            raise TypeError(f'component_provider did not provide a grid module for key {self._component_ids.get('grid', '')}')
+        self.grid = comp
+
+    def reattach_generation(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('generation', '') == '':
+            raise AttributeError('This Energy Model has no generation module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('generation',''))
+        if not isinstance(comp, NewsegsGeneration):
+            raise TypeError(f'component_provider did not provide a generation module for key {self._component_ids.get('generation','')}')
+        self.generation = comp
+
+    def reattach_consumption_storage(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('consumption_storage', '') == '':
+            raise AttributeError('This Energy Model has no consumption_storage module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('consumption_storage', ''))
+        if not isinstance(comp, NewsegsCS):
+            raise TypeError(f'component_provider did not provide a consumption_storage module for key {self._component_ids.get('consumption_storage', '')}')
+        self.consumption_storage = comp
+
+    def reattach_table_config(
+        self,
+        component_provider: newsegscomponent.NewsegsComponentProviderInterface
+    ):
+        if not hasattr(self, '_component_ids') or self._component_ids.get('table_config', '') == '':
+            raise AttributeError('This Energy Model has no table_config module to reattach.')
+        comp = component_provider.get_component(self._component_ids.get('table_config', ''))
+        if not isinstance(comp, newsegscomponent.TableConfigNewsegsComponent):
+            raise TypeError(f'component_provider did not provide a table_config module for key {self._component_ids.get('table_config', '')}')
+        self.table_config = comp
+
+    @override
+    def get_component_attributes(self) -> tuple[str, ...]:
+        atts = super().get_component_attributes()
+        return ('grid', 'generation', 'consumption_storage', 'table_config', 'model_data', *atts)
+
+    @override
+    def reattach_components(self, component_provider: newsegscomponent.NewsegsComponentProviderInterface):
+        super().reattach_components(component_provider)
+        self.grid.model = self
+        self.generation.model = self
+        self.consumption_storage.model = self
+
+    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True) -> bool:
+        """
+        
+        Returns:
+            [bool] - True if any results are stale
+        """
+        any_stale = False
+        try:
+            self._grid_result, self._grid_result_revision = results_provider.get_result(
+                'deterministic_grid', self.grid, allow_stale
+            )
+            any_stale = any_stale or self._grid_result_revision != self.grid.revision
+        except Exception as e:
+            print (e)
+            any_stale = True
+
+        try:
+            self._generation_result, self._generation_result_revision = results_provider.get_result(
+                'deterministic_generation', self.generation, allow_stale
+            )
+            any_stale = any_stale or self._generation_result_revision != self.generation.revision
+        except Exception as e:
+            print (e)
+            any_stale = True
+
+        try:
+            self._cs_result, self._cs_result_revision = results_provider.get_result(
+                'deterministic_consumption_storage', self.consumption_storage, allow_stale
+            )
+            any_stale = any_stale or self._cs_result_revision != self.consumption_storage.revision
+        except Exception as e:
+            print(e)
+            any_stale = True
+            
+        return any_stale
+        
     def __hash__(self) -> int:
         return self._last_hash
 
-NewsegsModel._excluded_attributes = tuple(newsegscomponent.NewsegsComponent._excluded_attributes) + ('_generation_result', '_grid_result', '_cs_result')
+NewsegsModel._excluded_attributes = tuple(
+    newsegscomponent.NewsegsComponent._excluded_attributes
+) + (
+    '_grid', '_generation', '_consumption_storage',
+    '_generation_result', '_grid_result', '_cs_result',
+    '_table_config'
+)

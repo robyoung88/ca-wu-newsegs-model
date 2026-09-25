@@ -6,6 +6,7 @@ from typing import get_args
 
 import pandas as pd
 
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsfinance import NewsegsFinance
@@ -144,3 +145,20 @@ def run_dsa(
     
     results = pd.DataFrame(results)
     return results
+
+class DSAComponent(NewsegsComponent):
+    """A container for DSA settings"""
+
+    component_type = 'dsa'
+
+    statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC)
+
+    def __init__(
+        self,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+                

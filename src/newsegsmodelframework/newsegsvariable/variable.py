@@ -5,7 +5,8 @@ from abc import abstractmethod
 from collections.abc import Mapping
 import copy
 from functools import partial
-from typing import Any, cast, Callable, Literal, Sequence, Sized, get_args, Union, overload, override
+import json
+from typing import Any, Iterable, cast, Callable, Literal, Sequence, Sized, get_args, Union, overload, override
 import warnings
 
 from matplotlib.pylab import Generator
@@ -16,8 +17,10 @@ from useful_types import SequenceNotStr
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.core import newsegscomponent
+from newsegsmodelframework.core import NewsegsComponent
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsstats.dirichlet import fit_dirichlet
+from newsegsmodelframework.util import jsonfuncs
 
 ScalarParam = Union[str | int | float]
 ScalarNumParam = Union[int | float]
@@ -298,7 +301,7 @@ class Distribution(metaclass = Singleton):
         """
         When a parameter changes in a user interface, trial that change down into the variable
         """
-        current_params = var._raw_parameters
+        current_params = var.raw_parameters
         change_param = current_params[parameter_index]
         prm = cls.parameterisations[var.parameterisation_index]
         if isinstance(change_param, str) or not isinstance(change_param, Sequence) or not isinstance(change_param, np.ndarray):
@@ -2576,6 +2579,15 @@ class MultivariateLogNormalParameterisationExpected(
         n_means = len(mean)
         vcv = vcv.reshape((n_means, n_means))
 
+        if len(transform) < len(mean):
+            extended_transforms = ['identity'] * len(mean)
+            for i in range(len(mean)):
+                if i < len(transform):
+                    extended_transforms[i] = str(transform[i])
+                else:
+                    extended_transforms[i] = str(transform[-1])
+            transform = extended_transforms
+
         for i, trans in enumerate(transform):
             if trans == 'ln':
                 sigma_squared = vcv[i,i]
@@ -2814,7 +2826,7 @@ class DirichletParameterisationExpected(
         n_means = len(mean)
         vcv = vcv.reshape((n_means, n_means))
 
-        alpha = fit_dirichlet(mean, vcv)
+        alpha = np.asarray(fit_dirichlet(mean, vcv))
         checksum = np.sum(np.abs(mean - (alpha/np.sum(alpha))))
         if checksum > 1e-6:
             raise ArithmeticError(f'Dirichlet fitting unable to recover means - {alpha/np.sum(alpha)}.')
@@ -3146,8 +3158,28 @@ def update_model_with_value(
     last_dict[model_parameter] = value
     model.update(update_dict)
 
+@revision_dataclass
+class VariableConfig(DataWithRevision):
+    parameters: ParamList | None = None
+    raw_parameters: ParamList | None = None
+
+    dsa_selected: bool = False
+    """
+    If possible and selectable, has variable been selected?
+    """
+    dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute'
+    psa_selected: bool = False
+    """
+    If possible and selectable, has variable been selected for PSA?
+    """
+    optim_selected: bool = False
+    """
+    Is the variable selected for variation in optimisation?
+    """
+
+
 class Variable(
-    newsegscomponent.NewsegsComponent
+    NewsegsComponent
 ):
     """
     A single unit of variation in a model.
@@ -3176,7 +3208,7 @@ class Variable(
     """
     If possible, is variable selectable as candidate for DSA?
     """
-    dsa_selected: bool = False
+    #dsa_selected: bool = False
     """
     If possible and selectable, has variable been selected?
     """
@@ -3195,13 +3227,13 @@ class Variable(
     Variable must also be dsa_possible and dsa_selectable.
     """
 
-    dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute'
+    #dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute'
 
     psa_selectable: bool = False
     """
     If possible, is variable selectable as part of PSA?
     """
-    psa_selected: bool = False
+    #psa_selected: bool = False
     """
     If possible and selectable, has variable been selected for PSA?
     """
@@ -3222,7 +3254,7 @@ class Variable(
 
     (Current implementations will vary the first parameter of scalar variables in optimisation)
     """
-    optim_selected: bool = False
+    #optim_selected: bool = False
     """
     Is the variable selected for variation in optimisation?
     """
@@ -3238,6 +3270,11 @@ class Variable(
     _id_prefix = 'v'
     # SerialiseToDictMixin constants
     _constructor_class = 'Variable'
+
+    @override
+    def _generate_config(self, *args, **kwargs) -> VariableConfig:
+        return VariableConfig(*args, **kwargs)
+    _config: VariableConfig # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __new__(
         cls,
@@ -3267,6 +3304,7 @@ class Variable(
     def __init__(
         self,
         name: str,
+        *args,
         label: str | None = None,
         unit: str = "",
         icon_name: str | SequenceNotStr[str] = "",
@@ -3279,31 +3317,36 @@ class Variable(
         distribution: VARIABLE_DISTRIBUTION = 'constant',
         transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM] = 'identity',
         parameterisation_index: int | None = None,
-        parameters: ParamList | None = None,
+        #parameters: ParamList | None = None,
         default_parameters: ParamList | None = None,
         value_name: Sequence[str]| None = None,
         configuration_show: bool = True,
         dsa_show: bool = False,
         psa_show: bool = False,
-        dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute',
+        #dsa_bounds_type: DSA_BOUNDS_TYPE = 'absolute',
         dsa_lower: Value | None = None,
         dsa_upper: Value | None = None,
         dsa_selectable: bool = False,
-        dsa_selected: bool = False,
+        #dsa_selected: bool = False,
         dsa_active: bool = False,
         dsa_focussed: bool = False,
         psa_selectable: bool = False,
-        psa_selected: bool = False,
+        #psa_selected: bool = False,
         psa_active: bool = False,
         interface_min: float | None = None,
         interface_max: float | None = None,
         interface_step: float | None = None,
         formatter_dp: int | None = None,
         optim_selectable: bool = False,
-        optim_selected: bool = False,
-        optim_show: bool = False
+        #optim_selected: bool = False,
+        optim_show: bool = False,
+        **kwargs
     ):
-        super().__init__()
+        if 'parameters' in kwargs:
+            if not 'raw_parameters' in kwargs:
+                kwargs['raw_parameters'] = kwargs.pop('parameters')
+
+        super().__init__(*args, **kwargs)
         self.name = name
     
         if label is not None:
@@ -3344,15 +3387,15 @@ class Variable(
             else:
                 parameterisation_index = 0
         self.parameterisation_index = parameterisation_index
-        self.dsa_bounds_type = dsa_bounds_type
+        #self.dsa_bounds_type = dsa_bounds_type
 
-        if parameters is None:
+        if self.raw_parameters is None:
             self._set_initial_parameters()
         else:
-            if isinstance(parameters, str) or not isinstance(parameters, Sequence):
-                self.set_parameters(parameters)
+            if isinstance(self.raw_parameters, str) or not isinstance(self.raw_parameters, Sequence):
+                self.set_parameters(self.raw_parameters)
             else:
-                self.set_parameters(*parameters)
+                self.set_parameters(*self.raw_parameters)
 
         if default_parameters is None:
             self.replace_default_parameters()
@@ -3378,7 +3421,7 @@ class Variable(
             self.dsa_upper = dsa_upper
 
         self.dsa_selectable = dsa_selectable
-        self.dsa_selected = dsa_selected
+        #self.dsa_selected = dsa_selected
         self.dsa_active = dsa_active
         self.dsa_focussed = dsa_focussed
         self._dsa_show = dsa_show
@@ -3389,12 +3432,12 @@ class Variable(
             self.value_name = value_name
 
         self.psa_selectable = psa_selectable
-        self.psa_selected = psa_selected
+        #self.psa_selected = psa_selected
         self.psa_active = psa_active
         self._psa_show = psa_show
 
         self.optim_selectable = optim_selectable
-        self.optim_selected = optim_selected
+        #self.optim_selected = optim_selected
         self._optim_show = optim_show
 
         self.configuration_show = configuration_show
@@ -3421,19 +3464,34 @@ class Variable(
             raise AttributeError('No parameterisation index set')
         return self.distribution.parameterisations[self.parameterisation_index]
 
+    def _get_native_parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
+        p = self._config.parameters
+        if p is not None:
+            if isinstance(p, Iterable):
+                return tuple(p)
+            else:
+                return (p,)
+        raise AttributeError('Parameters not yet set')
+
+    def _set_native_parameters(self, parameters: ParamList) -> None:
+        self._config.parameters = parameters
+
     @property
-    @abstractmethod
     def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
-        ...
-    
+        return self._get_native_parameters()
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
+
     def set_parameters(self, *parameters: Param):
         raw_parameters = copy.copy(parameters)
         
         native_params = self.distribution.parameterisations[self.parameterisation_index].generator(*parameters)
         self.distribution.parameter_validation(self, *native_params)
 
-        self._raw_parameters = raw_parameters
-        self._parameters = native_params
+        self.raw_parameters = raw_parameters # The part which is stored in the config
+        self.parameters = native_params
 
     def set_single_parameter(
         self,
@@ -3449,11 +3507,11 @@ class Variable(
             raw_parameters, native_parameters = self.distribution.change_single_scalar_param(
                 self, parameter_value, parameter_index, parameter_vector_index, autoscale
             )
-            self._raw_parameters = raw_parameters
-            self._parameters = native_parameters
+            self.raw_parameters = raw_parameters
+            self.parameters = native_parameters
         except (ValueError, TypeError):
-            return False, self._raw_parameters
-        return True, self._raw_parameters
+            return False, self.raw_parameters
+        return True, self.raw_parameters
     
     @property
     @abstractmethod
@@ -3590,7 +3648,7 @@ class Variable(
         if parameter_index is None:
             self.set_parameters(*self._default_parameters)
         else:
-            p0 = list(copy.copy(self._parameters))
+            p0 = list(copy.copy(self.parameters))
             if parameter_index >= 0 and parameter_index <= len(p0):
                 p0[parameter_index] = self._default_parameters[parameter_index]
             elif parameter_index < 0 and -parameter_index < len(p0):
@@ -3601,10 +3659,10 @@ class Variable(
         """
         Set the current parameters as defaults
         """
-        if isinstance(self._raw_parameters, str) or not isinstance(self._raw_parameters, Sequence):
-            self._set_default_parameters(self._raw_parameters)
+        if isinstance(self.raw_parameters, str) or not isinstance(self.raw_parameters, Sequence):
+            self._set_default_parameters(self.raw_parameters)
         else:
-            self._set_default_parameters(*self._raw_parameters)
+            self._set_default_parameters(*self.raw_parameters)
 
     @property
     def n_values(self) -> int:
@@ -3789,11 +3847,13 @@ class Variable(
         super().update(config)
         # Convert required attributes to tuple in case they have come from json
         if isinstance(config, dict):
-            if '_raw_parameters' in config.keys():
-                self._raw_parameters = tuple(self._raw_parameters)
-            if '_parameters' in config.keys():
-                self._parameters = tuple(self._parameters)
-            if '_transform' in config.keys():
+            if '_config' in config:
+                cfg = config.get('_config',{})
+                if 'raw_parameters' in cfg:
+                    self.raw_parameters = tuple(self.raw_parameters)
+                if 'parameters' in cfg:
+                    self.parameters = tuple(self.parameters)
+            if '_transform' in config:
                 self._transform = tuple(self._transform)
 
     def __deepcopy__(self, memo):
@@ -3807,6 +3867,10 @@ class Variable(
             (self.name, self.distribution.distribution), # Args for initial construction
             self.__dict__,
         )
+
+    @override
+    def json_dumps(self) -> str:
+        return json.dumps(self.to_dict(), cls = jsonfuncs.NumpyEncoder)
 
 def _recover_variable(name, dist):
     """
@@ -3894,7 +3958,6 @@ class ScalarVariable(Variable):
 
 class NumericScalarVariable(ScalarVariable):
     distribution: NumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
-    _parameters : tuple[ScalarNumParam, ...]
 
     formatter_dp = 1
     @property
@@ -3906,8 +3969,13 @@ class NumericScalarVariable(ScalarVariable):
         return fstring.format
 
     @property
+    @override
     def parameters(self) -> tuple[ScalarNumParam, ...]:
-        return self._parameters
+        return cast(tuple[ScalarNumParam, ...], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
 
     @property
     def deterministic_value(self) -> ScalarNumParam:
@@ -3919,11 +3987,16 @@ class NumericScalarVariable(ScalarVariable):
 
 class TwoParamNumericScalarVariable(NumericScalarVariable):
     distribution: TwoParamNumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
-    _parameters : tuple[ScalarNumParam, ScalarNumParam]
 
     @property
+    @override
     def parameters(self) -> tuple[ScalarNumParam, ScalarNumParam]:
-        return self._parameters
+        return cast(tuple[ScalarNumParam, ScalarNumParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
+    
 
 class VectorVariable(Variable):
 
@@ -3934,14 +4007,23 @@ class VectorVariable(Variable):
 
     variable_type = 'vector'
 
+    @property
+    @override
+    def parameters(self) -> tuple[VectorParam | MatrixParam, ...]:
+        return cast(tuple[VectorParam, ...], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
+
     def set_parameters(
         self, 
         *parameters: Param,
     ):
         super().set_parameters(*parameters)
-        if len(self._parameters) == 0:
+        if len(self.parameters) == 0:
             return
-        p1 = self._parameters[0]
+        p1 = self.parameters[0]
         if not isinstance(p1, Sized):
             return
         if len(self.transform) > len(p1):
@@ -4046,6 +4128,32 @@ class NumericVectorVariable(VectorVariable):
     dsa_value_index = 1
     """Which Value is of interest in DSA?"""
 
+    @property
+    @override
+    def parameters(self) -> tuple[NumericVectorParam | MatrixNumParam, ...]:
+        return cast(tuple[NumericVectorParam, ...], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
+
+    @override
+    def _set_native_parameters(self, parameters: ParamList) -> None:
+        # Ensure that array types are recovered on deserialisation
+        if not isinstance(parameters, Iterable):
+            px: list[Any] = [parameters, ]
+        else:
+            px: list[Any] = list(parameters)
+        if not isinstance(px[0], np.ndarray):
+            px[0] = np.asarray(px[0])
+        #nd = len(px[0])
+        if len(px) > 1:
+            if not isinstance(px[1], np.ndarray):
+                # Assume should be square matrix
+                px[1] = np.asarray(px[1])
+
+        return super()._set_native_parameters(px)
+
     formatter_dp = 1
     @property
     def value_formatter(self) -> Callable[[NumericVectorParam], Sequence[str]]:        
@@ -4096,14 +4204,20 @@ class NumericVectorVariable(VectorVariable):
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> NumericVectorParam:
         return cast(NumericVectorParam, super().get_dsa_value(bound, force))
 
+    
+
 
 class ConstantVariable(ScalarVariable):
     distribution = ConstantDistribution()
-    _parameters : tuple[ScalarParam]
 
     @property
+    @override
     def parameters(self) -> tuple[ScalarParam]:
-        return self._parameters
+        return cast(tuple[ScalarParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
     
     def synchronise_from_model(
         self, 
@@ -4140,11 +4254,15 @@ class ConstantVariable(ScalarVariable):
 
 class NumericConstantVariable(NumericScalarVariable):
     distribution = NumericConstantDistribution()
-    _parameters : tuple[ScalarNumParam]
 
     @property
+    @override
     def parameters(self) -> tuple[ScalarNumParam]:
-        return self._parameters
+        return cast(tuple[ScalarNumParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        return self._set_native_parameters(parameters)
     
     def synchronise_from_model(
         self, 
@@ -4216,7 +4334,7 @@ class BinomialVariable(TwoParamNumericScalarVariable):
             # If we are here, this means the variable is set to probability, trial form
             # and so we should over-write the raw parameters so they can be read to the
             # interface
-            self._raw_parameters = copy.copy(self.parameters)
+            self.raw_parameters = copy.copy(self.parameters)
 
 
 class NormalVariable(TwoParamNumericScalarVariable):
@@ -4259,7 +4377,7 @@ class NormalVariable(TwoParamNumericScalarVariable):
             # If we are here, this means the variable is set to mu, sigma form
             # and so we should over-write the raw parameters so they can be read to the
             # interface
-            self._raw_parameters = copy.copy(self.parameters)
+            self.raw_parameters = copy.copy(self.parameters)
 
 
 class BetaVariable(TwoParamNumericScalarVariable):
@@ -4306,7 +4424,7 @@ class BetaVariable(TwoParamNumericScalarVariable):
             # If we are here, this means the variable is set to a,b form
             # and so we should over-write the raw parameters so they can be read to the
             # interface
-            self._raw_parameters = copy.copy(self.parameters)
+            self.raw_parameters = copy.copy(self.parameters)
 
 
 class GammaVariable(TwoParamNumericScalarVariable):
@@ -4349,17 +4467,20 @@ class GammaVariable(TwoParamNumericScalarVariable):
             # If we are here, this means the variable is set to shape, scale form
             # and so we should over-write the raw parameters so they can be read to the
             # interface
-            self._raw_parameters = copy.copy(self.parameters)
+            self.raw_parameters = copy.copy(self.parameters)
 
 
 class ConstantVectorVariable(VectorVariable):
     distribution = ConstantVectorDistribution()
-    _parameters: tuple[VectorParam] = ([1],)
-
+    
     @property
     def parameters(self) -> tuple[VectorParam]:
-        return self._parameters
-    
+        return cast(tuple[VectorParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
+
     def synchronise_from_model(
         self, 
         model: ModelType
@@ -4389,11 +4510,18 @@ class ConstantVectorVariable(VectorVariable):
 
 class MultivariateNormalVariable(NumericVectorVariable):
     distribution = MultivariateNormalDistribution()
-    _parameters: tuple[NumericVectorParam, MatrixNumParam] = (np.asarray([0,0]), np.asarray([[1,0],[0,1]]))
 
     @property
     def parameters(self) -> tuple[NumericVectorParam, MatrixNumParam]:
-        return self._parameters
+        return cast(
+            tuple[NumericVectorParam, MatrixNumParam],
+            self._get_native_parameters()
+        )
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
+    
     
     def set_parameters(self, *parameters: Param):
         if 'transform' in self.parameterisation.names and len(parameters) < 3:
@@ -4438,16 +4566,19 @@ class MultivariateNormalVariable(NumericVectorVariable):
             # If we are here, this means the variable is set to mu, vcv form
             # and so we should over-write the raw parameters so they can be read to the
             # interface
-            self._raw_parameters = copy.copy(self.parameters)
+            self.raw_parameters = copy.copy(self.parameters)
 
 
 class DirichletVariable(NumericVectorVariable):
     distribution = DirichletDistribution()
-    _parameters: tuple[NumericVectorParam] = (np.asarray([1,1]),)
 
     @property
     def parameters(self) -> tuple[NumericVectorParam]:
-        return self._parameters
+        return cast(tuple[NumericVectorParam], self._get_native_parameters())
+
+    @parameters.setter
+    def parameters(self, parameters: ParamList) -> None:
+        self._set_native_parameters(parameters)
     
     def synchronise_from_model(
         self, 

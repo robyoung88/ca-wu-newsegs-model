@@ -5,6 +5,7 @@ Unit tests for newsegsbrowser/variable.
 import copy
 from functools import partial
 import json
+from pathlib import Path
 from typing import cast
 import unittest
 
@@ -15,12 +16,14 @@ from scipy.stats import gamma as gamma_dist
 from scipy.stats import beta as beta_dist
 import scipy.integrate as integrate
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
-
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import sprakefinance
+
+from test.unit_tests.common import get_data_dir
+
+_CWD = Path().resolve()
+_DATA_DIR = get_data_dir(_CWD)
 
 class TestParameterisations(unittest.TestCase):
 
@@ -1639,7 +1642,7 @@ class TestVariableConstructionFromJSON(unittest.TestCase):
     """
 
     def test_sprake_json_construction(self):
-        with open('data/sprake-variable-config-novalues.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
         
         self.assertIsInstance(var_conf_list, list)
@@ -1653,7 +1656,7 @@ class TestVariableSynchronisation(unittest.TestCase):
     """
 
     def load_sprake_variables(self):
-        with open('data/sprake-variable-config-novalues.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config-novalues.json') as f:
             var_conf_list = json.load(f)
         return [variable.Variable(**x) for x in var_conf_list] # pyright: ignore[reportAbstractUsage]
     
@@ -1663,9 +1666,9 @@ class TestVariableSynchronisation(unittest.TestCase):
 
         vbl = [x for x in vars if x.model_parameter == 'storage_capacity'][0]
         self.assertEqual(vbl.model_parameter, 'storage_capacity')
-        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
         vbl.synchronise_from_model(mdl)
-        self.assertEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_capacity'])
+        self.assertEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
 
     def test_synchronisation_scalar_beta(self):
         vars = self.load_sprake_variables()
@@ -1673,9 +1676,9 @@ class TestVariableSynchronisation(unittest.TestCase):
 
         vbl = [x for x in vars if x.model_parameter == 'storage_rte'][0]
         self.assertEqual(vbl.model_parameter, 'storage_rte')
-        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_rte'])
         vbl.synchronise_from_model(mdl)
-        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.storage_params['storage_rte'])
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_rte'])
     
     def test_synchronisation_scalar_normal(self):
         vars = self.load_sprake_variables()
@@ -1683,9 +1686,9 @@ class TestVariableSynchronisation(unittest.TestCase):
 
         vbl = [x for x in vars if x.model_parameter == 'hlp'][0]
         self.assertEqual(vbl.model_parameter, 'hlp')
-        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
+        self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_sh_params()['hlp'])
         vbl.synchronise_from_model(mdl)
-        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.spaceheat_params['hlp'])
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.get_sh_params()['hlp'])
 
     def test_synchronisation_scalar_gamma(self):
         vars = self.load_sprake_variables()
@@ -1703,29 +1706,29 @@ class TestVariableSynchronisation(unittest.TestCase):
         """
         mdl = sprakemodel.SprakeModel.from_none()
         self.assertNotEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'],
+            mdl.consumption_storage.get_storage_params()['storage_capacity'],
             100.0
         )
         variable.update_model_with_value(
             100.0,
             mdl,
-            'mod_cs._storage_params',
+            'consumption_storage',
             'storage_capacity'
         )
         self.assertEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'],
+            mdl.consumption_storage.get_storage_params()['storage_capacity'],
             100.0
         )
 
         fnc = sprakefinance.SprakeFinance.from_none()
         self.assertNotEqual(
-            fnc.unit_costs['grid_import_sc_per_day'],
+            fnc.grid_import_sc_per_day,
             25
         )
         variable.update_model_with_value(
             25,
             fnc,
-            '_unit_costs',
+            None,
             'grid_import_sc_per_day'
         )
         self.assertEqual(
@@ -1741,13 +1744,13 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'storage_capacity')
         vbl.synchronise_from_model(mdl)
         self.assertNotEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'], 
+            mdl.consumption_storage.get_storage_params()['storage_capacity'], 
             100
         )
         vbl.set_parameters(100)
         vbl.update_model(mdl)
         self.assertEqual(
-            mdl.consumption_storage.storage_params['storage_capacity'], 
+            mdl.consumption_storage.get_storage_params()['storage_capacity'], 
             100
         )
         
@@ -1759,14 +1762,14 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'storage_rte')
         vbl.synchronise_from_model(mdl)
         self.assertNotEqual(
-            mdl.consumption_storage.storage_params['storage_rte'], 
+            mdl.consumption_storage.get_storage_params()['storage_rte'], 
             0.8
         )
         self.assertEqual(vbl.parameterisation_index, 1)
         vbl.set_parameters(0.8, 0.1)
         vbl.update_model(mdl)
         self.assertEqual(
-            mdl.consumption_storage.storage_params['storage_rte'], 
+            mdl.consumption_storage.get_storage_params()['storage_rte'], 
             0.8
         )
     
@@ -1778,13 +1781,13 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'hlp')
         vbl.synchronise_from_model(mdl)
         self.assertNotEqual(
-            mdl.consumption_storage.spaceheat_params['hlp'], 
+            mdl.consumption_storage.get_sh_params()['hlp'], 
             0.5
         )
         vbl.set_parameters(0.5, 0.02)
         vbl.update_model(mdl)
         self.assertEqual(
-            mdl.consumption_storage.spaceheat_params['hlp'],
+            mdl.consumption_storage.get_sh_params()['hlp'],
             0.5
         )
     
@@ -1796,14 +1799,14 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'resident_var_per_unit')
         vbl.synchronise_from_model(fnc)
         self.assertNotEqual(
-            fnc.unit_costs['resident_var_per_unit'], 
+            fnc.resident_var_per_unit, 
             0.33
         )
         self.assertEqual(vbl.parameterisation_index, 1)
         vbl.set_parameters(0.33, 0.05)
         vbl.update_model(fnc)
         self.assertEqual(
-            fnc.unit_costs['resident_var_per_unit'],
+            fnc.resident_var_per_unit,
             0.33
         )
 
@@ -1815,7 +1818,7 @@ class TestVariableSerialisation(unittest.TestCase):
     # NB - using from_dict form here, not direct construction.
     # This allows us to hold onto e.g. raw_parameters
     def load_sprake_variables(self):
-        with open('data/sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
     
@@ -1826,7 +1829,7 @@ class TestVariableSerialisation(unittest.TestCase):
         self.assertEqual(vbl.distribution.distribution, 'numeric_constant')
         self.assertEqual(vbl.name, 'Storage capacity')
         
-        self.assertTupleEqual(vbl._raw_parameters, (4000,))
+        self.assertTupleEqual(vbl.raw_parameters, (4000,))
     
 class TestVariableCopy(unittest.TestCase):
     """
@@ -2348,8 +2351,8 @@ class TestVariableValidation(unittest.TestCase):
         var1 = cast(variable.NumericScalarVariable, var1)
 
         var1.dsa_bounds_type = 'offset'
-        var1.dsa_lower = -(1.96 * float(var1.parameters[1]))
-        var1.dsa_upper = 1.96 * float(var1.parameters[1])
+        var1.dsa_lower = -(1.96 * float(var1.parameters[1])) # pyright: ignore[reportArgumentType]
+        var1.dsa_upper = 1.96 * float(var1.parameters[1]) # pyright: ignore[reportArgumentType]
 
         self.assertEqual(
             var1.get_dsa_value('lower'),
@@ -2524,5 +2527,121 @@ class TestVariableValidation(unittest.TestCase):
 
     def test_gamma_deterministic(self):
         ...
-        
-    
+
+from collections import OrderedDict        
+from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider
+from newsegsmodelframework.core.newsegscomponent import ObservableComponentOrderedDict
+from dataclasses import dataclass, field
+
+class TestVariableListManagement(unittest.TestCase):
+    def load_sprake_variables(self):
+        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
+            var_conf_list = json.load(f)
+        return [variable.variable_from_dict(x) for x in var_conf_list]
+
+    def test_jointly_owned_variables(self):
+        variableprovider = InMemoryVariableProvider(
+            self.load_sprake_variables()
+        )
+
+        @dataclass
+        class VariableConsumer:
+            variable_ids: OrderedDict = field(default_factory=OrderedDict)
+            variables: ObservableComponentOrderedDict = field(default_factory=ObservableComponentOrderedDict)
+
+        varlist = [
+            'gen_input.wind_capacity.0',
+            'gen_input.pv_capacity.0',
+            'stor_input.storage_capacity.0',
+            'stor_input.storage_rte.0',
+            'bc_input.n_units.0',
+            'bc_input.hlp.0',
+            'bc_input.gfa.0'
+        ]
+        consumer1 = VariableConsumer()
+        for varname in varlist:
+            consumer1.variables[varname] = variableprovider.get_default_variable(varname)
+            consumer1.variable_ids[varname] = consumer1.variables[varname].id
+
+        consumer2 = VariableConsumer()
+        for varname in varlist:
+            consumer2.variables[varname] = variableprovider.get_default_variable(varname)
+            consumer2.variable_ids[varname] = consumer2.variables[varname].id
+
+        for varname in varlist:
+            self.assertEqual(
+                consumer1.variables[varname].deterministic_value,
+                consumer2.variables[varname].deterministic_value,
+            )
+
+        # Check the revision status of the variables
+        for varname in varlist:
+            self.assertEqual(
+                consumer1.variables[varname]._config.revision,
+                consumer2.variables[varname]._config.revision,
+            )
+
+        self.assertEqual(
+            consumer1.variables.chain_modified,
+            True
+        )
+
+        consumer1.variables._chain_syncronise()
+        # NB - only syncronising the container object as children should not be modified
+        consumer2.variables._syncronise()
+
+        self.assertEqual(
+            consumer1.variables.chain_modified,
+            False
+        )
+        self.assertEqual(
+            consumer2.variables.chain_modified,
+            False
+        )
+
+        # Modify one of the variables and check its chained status
+        v = consumer1.variables[varlist[0]]
+        cur_param = v.raw_parameters
+        new_param = tuple(x+10 for x in cur_param)
+        v.set_parameters(new_param)
+        new_val = v.deterministic_value
+        self.assertTrue(v._config.modified)
+        self.assertTrue(consumer1.variables.chain_modified)
+        self.assertTrue(consumer2.variables.chain_modified)
+        self.assertEqual(consumer2.variables[varlist[0]].deterministic_value, new_val)
+
+        consumer2.variables._chain_syncronise()
+        self.assertFalse(consumer1.variables.chain_modified)
+        self.assertFalse(consumer2.variables.chain_modified)
+
+        # Replace a variable in consumer 2
+        vname = varlist[1]
+        vid = consumer2.variable_ids[vname]
+        v = variableprovider.duplicate_variable(vid)
+        consumer2.variables[vname] = v
+        consumer2.variable_ids[vname] = v.id
+
+        self.assertNotEqual(
+            consumer1.variable_ids[vname],
+            consumer2.variable_ids[vname]
+        )
+        self.assertEqual(
+            consumer1.variables[vname].deterministic_value,
+            consumer2.variables[vname].deterministic_value,
+        )
+        self.assertFalse(consumer2.variables[vname]._config.modified)
+        self.assertTrue(consumer2.variables.chain_modified)
+        self.assertFalse(consumer1.variables.chain_modified)
+
+        consumer2.variables._chain_syncronise()
+        # Modifye the replaced variable
+        cur_param = v.raw_parameters
+        new_param = tuple(x + 2 for x in cur_param) # pyright: ignore[reportOperatorIssue]
+        v.set_parameters(new_param) # pyright: ignore[reportArgumentType]
+        self.assertTrue(consumer2.variables[vname]._config.modified)
+        self.assertTrue(consumer2.variables.chain_modified)
+        self.assertFalse(consumer1.variables.chain_modified)
+        self.assertNotEqual(
+            consumer1.variables[vname].deterministic_value,
+            consumer2.variables[vname].deterministic_value,
+        )

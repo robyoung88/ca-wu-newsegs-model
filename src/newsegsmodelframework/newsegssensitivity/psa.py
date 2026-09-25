@@ -12,6 +12,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsfinance import NewsegsFinance
@@ -235,6 +236,27 @@ def run_psa(
     
     results = pd.DataFrame(results)
     return results
+
+class PSAComponent(NewsegsComponent):
+    """A container for PSA settings"""
+
+    component_type = 'psa'
+
+    samples: int = 100
+    seed: int | None = None
+    return_draws: bool = False
+    include_deterministic: bool = False
+    statistics: Sequence[PSA_FLOAT_STATISTIC] = get_args(PSA_FLOAT_STATISTIC)
+    
+    def __init__(
+        self,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+            
 
 def basic_psa_stats(
     psa_results: pd.DataFrame,

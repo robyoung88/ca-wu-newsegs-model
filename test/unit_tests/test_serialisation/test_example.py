@@ -3,8 +3,7 @@ Unit tests for constructor example code
 """
 import unittest
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
+
 
 from newsegsmodelframework.core.serialisation import SerialiseToDictMixin
 

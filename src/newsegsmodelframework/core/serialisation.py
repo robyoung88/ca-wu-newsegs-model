@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import copy
 from datetime import tzinfo, datetime
+import json
 from typing import Any, Protocol, Sequence, Type, TypeAlias, TypeVar
 
 import pandas as pd
@@ -164,6 +165,15 @@ class SerialiseToDictMixin:
             }
         )
         return odict
+
+    def json_dumps(self) -> str:
+        """
+        A json representation of the object dictionary
+
+        Returns:
+            str: String which may be converted to a dictionary representation of the object with json.loads
+        """
+        return json.dumps(self.to_dict())
     
     def _represent(self, value):
         if isinstance(value, object):

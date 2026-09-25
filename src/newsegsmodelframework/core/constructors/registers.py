@@ -84,6 +84,35 @@ def register_constructor_class(cc_name: str):
         return func
     return decorated
 
+@register_constructor_class('DataWithRevision')
+def get_datawithrevision_register():
+    """
+    Configuration data classes
+    """
+    from newsegsmodelframework.core import newsegscomponent
+    import newsegsmodelframework.newsegsmodel as newsegsmodel
+    import newsegsmodelframework.newsegsfinance as newsegsfinance
+    import newsegsmodelframework.core.generation as generation
+    import newsegsmodelframework.newsegsgrid as newsegsgrid
+    import newsegsmodelframework.newsegsgeneration as newsegsgeneration
+    import newsegsmodelframework.newsegscs as newsegscs
+    import newsegsmodelframework.newsegsvariable as newsegsvariable
+    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
+    import newsegsmodelframework.newsegsproject as newsegsproject
+    import newsegsmodelframework.core.trackeddata as trackeddata
+    CONSTRUCTORS = {}
+    for pymod in [
+        newsegscomponent, newsegsmodel, newsegsfinance, 
+        generation, newsegsgrid, newsegsgeneration, 
+        newsegscs, newsegsvariable, newsegsmetamodel, 
+        newsegsproject, trackeddata
+    ]:
+        CONSTRUCTORS.update(
+            get_subclasses_in_module(pymod, newsegscomponent.DataWithRevision)
+        )
+
+    return CONSTRUCTORS
+
 @register_constructor_class('NewsegsComponent')
 def get_newsegscomponent_register():
     """
@@ -93,9 +122,12 @@ def get_newsegscomponent_register():
     import newsegsmodelframework.newsegsmodel as newsegsmodel
     import newsegsmodelframework.newsegsfinance as newsegsfinance
     import newsegsmodelframework.newsegsvariable as newsegsvariable
+    import newsegsmodelframework.newsegssensitivity as newsegssensitivity
+    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
+    import newsegsmodelframework.newsegsproject as newsegsproject
     
     COMPONENT_CONSTRUCTORS = {}
-    for pymod in [newsegsmodel, newsegsfinance]:
+    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent, newsegssensitivity, newsegsmetamodel, newsegsproject]:
         COMPONENT_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.NewsegsComponent)
         )
@@ -236,37 +268,40 @@ def get_pvlib_register():
 def get_variable_register():
     return CONSTRUCTOR_CLASS_REGISTER['NewsegsComponent']()
 
+# Storage for classes dynamically added at runtime
+EXTRA_CLASS_REGISTER: dict[str, dict[str, type]] = {}
+
+def register_custom_class(constructor_class: str, cls: type):
+    """
+    Appends a new class definition at runtime to a specified constructor category.
+    
+    Args:
+        constructor_class (str): The category name (e.g., 'NewsegsComponent', 'Generator')
+        cls (type): The class definition to add.
+    """
+    if constructor_class not in EXTRA_CLASS_REGISTER:
+        EXTRA_CLASS_REGISTER[constructor_class] = {}
+    
+    # Register by class name
+    EXTRA_CLASS_REGISTER[constructor_class][cls.__name__] = cls
+
 def get_register(constructor_class: str) -> dict[str, object] | dict[str, NakedConstructor]:
     """
-    A dictionary of classes indexed by name for construction
+    Returns a dictionary of classes indexed by name for construction, 
+    combining static module-inspected classes with dynamically added classes.
     """
-    reg = CONSTRUCTOR_CLASS_REGISTER.get(constructor_class, None)
-    if reg is None:
-        raise ValueError(f'constructor_class not recognised: {constructor_class}; available values are {CONSTRUCTOR_CLASS_REGISTER.keys()}')
+    reg_func = CONSTRUCTOR_CLASS_REGISTER.get(constructor_class, None)
+    if reg_func is None:
+        raise ValueError(
+            f'constructor_class not recognised: {constructor_class}; '
+            f'available values are {list(CONSTRUCTOR_CLASS_REGISTER.keys())}'
+        )
 
-    return reg()
-    # match constructor_class:
-    #     case 'NewsegsComponent':
-    #         return get_newsegscomponent_register()
-    #     case 'NewsegsModule':
-    #         return get_newsegsmodule_register()
-    #     case 'Environment':
-    #         return get_environment_register()
-    #     case 'Generator':
-    #         return get_generator_register()
-    #     case 'Location':
-    #         return get_location_register()
-    #     case 'TimeSpan':
-    #         return get_timespan_register()
-    #     case 'Timestamp':
-    #         return get_timestamp_register()
-    #     case 'Timedelta':
-    #         return get_timedelta_register()
-    #     case 'datetime':
-    #         return get_datetime_register()
-    #     case 'PVLib':
-    #         return get_pvlib_register()
-    #     case 'Variable':
-    #         return get_newsegscomponent_register()
-    #     case _:
-    #         raise ValueError(f'constructor_class not recognised: {constructor_class}')
+    # 1. Fetch static/module-based constructors
+    constructors = reg_func()
+
+    # 2. Append dynamically registered classes at runtime
+    if constructor_class in EXTRA_CLASS_REGISTER:
+        constructors.update(EXTRA_CLASS_REGISTER[constructor_class])  # type: ignore
+        
+    return constructors

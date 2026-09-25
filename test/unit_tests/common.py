@@ -1,26 +1,12 @@
 """
 Functionality and imports common to all unit tests
 """
-import sys
-import re
-import os
+from pathlib import Path
 
-def setup_test_env():
-    """
-    Modify environment variables, e.g. path, to run tests.
-    """
+def get_data_dir(path: Path, root: str = 'ca-wu-newsegs-model'):
+    parts = path.parts
+    if root not in parts:
+        raise ValueError(f"Directory '{root}' not found in path {path}")
 
-    # Add src folder to path
-    curdir = os.path.dirname(__file__)
-    clean_path = os.path.normpath(curdir)
-    marker = os.sep + 'test' + os.sep
-    marker_index = clean_path.find(marker)
-    if marker_index != -1:
-        proj_path = clean_path[:marker_index]
-    else:
-        proj_path = os.path.dirname(os.path.dirname(curdir))
-    src_path = os.path.join(
-        proj_path,
-        'src'
-    )
-    sys.path.append(src_path)
+    idx = parts. index(root)
+    return Path(*parts[: idx + 1]) / 'data'

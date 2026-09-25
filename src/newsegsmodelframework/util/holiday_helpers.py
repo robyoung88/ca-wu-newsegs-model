@@ -3,7 +3,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from newsegsmodelapp.newsegsbrowser import STATICDATA
+from newsegsmodelframework import STATICDATA
 
 _loaded_holidays = {}
 

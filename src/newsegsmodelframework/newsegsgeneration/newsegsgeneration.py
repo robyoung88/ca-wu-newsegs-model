@@ -1,34 +1,50 @@
 """Provides abstract base class for NewSEGS Generation Module."""
 
 from abc import abstractmethod
-from typing import Sequence
+from dataclasses import field
+from typing import Mapping, Sequence, override
 
 import pandas as pd
 
-from newsegsmodelframework.core import NewsegsModule
+from newsegsmodelframework.core import NewsegsModule, newsegscomponent
+from newsegsmodelframework.core import generation
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core.newsegsmoduleresult import filter_meters
 from newsegsmodelframework.core import location as modlocation
+from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, revision_dataclass
+
+
+@revision_dataclass
+class NewsegsGenerationConfig(DataWithRevision):
+    location: modlocation.Location | list[modlocation.Location] = field(default_factory = modlocation.Location.from_none)
+    """The location of the generators / power plants.
+    
+    Generally, the location will itself be an attribute of the generator
+    and so cannot be accessed until a generator is assigned.
+
+    Returns:
+        Location or sequence of locations of the generators / power plants.
+    """
+
 
 class NewsegsGeneration(NewsegsModule):
     """Abstract base class for NewSEGS Generation Module."""
-    
-    @property
-    @abstractmethod
-    def location(self) -> modlocation.Location | Sequence[modlocation.Location]:
-        """Read back the location of the generators / power plants.
+    component_type = 'generation'
 
-        Generally, the location will itself be an attribute of the generator
-        and so cannot be accessed until a generator is assigned.
+    @override
+    def _generate_config(self, *args, **kwargs) -> NewsegsGenerationConfig:
+        return NewsegsGenerationConfig(*args, **kwargs)
+    _config: NewsegsGenerationConfig # pyright: ignore[reportIncompatibleVariableOverride]
 
-        Returns:
-            Location or sequence of locations of the generators / power plants.
-        """
-    
-    @location.setter
-    @abstractmethod
-    def location(self, loc: modlocation.Location) -> None:
-        ...
+    @override
+    def update(self, config):
+        super().update(config)
+        # After updating, trigger any logic on location
+        if isinstance(config, Mapping):
+            if '_config' in config.keys():
+                if 'location' in config['_config'].keys():
+                    self.location = self._config.location
+
     
 def get_generation_meters(
     gen_results: NewsegsModuleResult

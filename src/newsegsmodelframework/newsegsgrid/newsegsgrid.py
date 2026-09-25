@@ -4,4 +4,4 @@ from newsegsmodelframework.core import NewsegsModule
 
 class NewsegsGrid(NewsegsModule):
     """Abstract base class for NewSEGS Grid Module"""
-    ...
+    component_type = 'grid'

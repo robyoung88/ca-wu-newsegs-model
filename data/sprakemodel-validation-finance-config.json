@@ -1,8 +1,13 @@
 {
     "class": "SprakeFinance",
     "constructor_class": "NewsegsComponent",
-    "uuid": "84f05e0f-080b-4b18-bb3b-20e658612161",
-    "_unit_costs": {
+    "_config": {
+        "class": "SprakeFinanceConfig",
+        "constructor_class": "DataWithRevision",
+        "_last_syncronised": 0,
+        "_revision": 5,
+        "benefit_discount_rate": 0.035,
+        "cost_discount_rate": 0.035,
         "wind_capex_per_kw": 1500.0,
         "wind_om_per_kw_year": 46.0,
         "pv_capex_per_kw": 1000.0,
@@ -15,13 +20,9 @@
         "grid_import_sc_per_day": 0.0,
         "grid_import_var_per_unit": 0.35
     },
-    "last_update": {
-        "class": "datetime",
-        "constructor_class": "datetime",
-        "value": "2026-06-19T16:22:22.539499"
-    },
-    "_dirty": true,
-    "_benefit_discount_rate": 0.035,
-    "_cost_discount_rate": 0.035,
+    "uuid": "f134aae4-c3fa-4ff1-ba34-03093b3ce352",
+    "_component_ids": {},
+    "_finance_data_id": "cmp-c08161ca-102f-4cfd-bb4a-e49e5c4912f7",
+    "_table_config_id": "cmp-0912487d-c9f3-4e6d-b6d4-7a20b86330d1",
     "horizon": -1
 }

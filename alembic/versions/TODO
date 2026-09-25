@@ -1,0 +1,14 @@
+Ensure that this goes in the upgrade once the Alembic autorevision is created
+    # ### end Alembic commands ###
+    # 2. Create the auto-update timestamp trigger
+    op.execute("""
+        CREATE TRIGGER IF NOT EXISTS runs_updated_at
+        AFTER UPDATE ON runs
+        FOR EACH ROW
+        WHEN OLD.last_updated IS NOT CURRENT_TIMESTAMP
+        BEGIN
+            UPDATE runs
+            SET last_updated = CURRENT_TIMESTAMP
+            WHERE run_id = NEW.run_id;
+        END;
+    """)

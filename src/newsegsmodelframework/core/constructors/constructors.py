@@ -54,7 +54,7 @@ def find_constructor(
 
     constr = reg.get(classname, None)
     if constr is None:
-        raise ValueError(f'classname not found in constructor register: {classname}')
+        raise ValueError(f'classname not found in constructor register: {classname} in {constructor_class}; available keys are: {list(reg.keys())}')
 
     if isinstance(constr, functools.partial):
         constr = _deferred_constructor_update_from_dict(constr)

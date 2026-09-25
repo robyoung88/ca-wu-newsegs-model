@@ -3,12 +3,21 @@ Representations of energy converters for use in [NewsegsGeneration][/newsegsgene
 """
 from .generators import *
 __all__ = [
+    'NewsegsGeneratorProperty',
     'ABCElecGenerator',
+    'ABCElecGeneratorConfig',
     'ABCScalingPowerPlant',
+    'ABCScalingPowerPlantConfig',
     'WindTurbineElecGenerator', 
+    'WindTurbineElecGeneratorConfig',
     'PowerPlantHomogeneousWind',
+    'PowerPlantHomogeneousWindConfig',
     'ABCPVElecGenerator',
+    'ABCPVElecGeneratorConfig',
     'SprakePVGISElecGenerator',
+    'SprakePVGISElecGeneratorConfig',
     'PowerPlantHomogeneousPV',
-    'PowerPlantHeterogeneousGenerators'
+    'PowerPlantHomogeneousPVConfig',
+    'PowerPlantHeterogeneousGenerators',
+    'PowerPlantHeterogeneousGeneratorsConfig',
     ]

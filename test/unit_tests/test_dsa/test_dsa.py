@@ -4,8 +4,7 @@ Unit tests for newsegssensitivity/dsa
 import json
 import unittest
 
-from test.unit_tests.common import setup_test_env
-setup_test_env()
+from pathlib import Path
 
 from newsegsmodelframework.newsegsmodel import SprakeModel
 from newsegsmodelframework.newsegsfinance import SprakeFinance
@@ -13,13 +12,19 @@ from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import dsa
 
+from test.unit_tests.common import get_data_dir
+
+_CWD = Path().resolve()
+_DATA_DIR = get_data_dir(_CWD)
+
+
 class TestDSA(unittest.TestCase):
     """
     Test behaviour of dsa
     """
 
     def load_sprake_variables(self):
-        with open('data/sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
     

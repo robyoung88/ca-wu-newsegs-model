@@ -25,5 +25,5 @@ For a psa run, a (small) number of statistics must be nominated to be held in a
 dataframe which will be accessible after completion; each row will correspond
 to a sample across all enabled PSA variables.
 """
-from .newsegsmetamodel import NewsegsMetaModel
-__all__ = ['NewsegsMetaModel']
+from .newsegsmetamodel import NewsegsMetaModel, NewsegsMetaModelConfig
+__all__ = ['NewsegsMetaModel', 'NewsegsMetaModelConfig']
