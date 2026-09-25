@@ -85,7 +85,7 @@ def create_numeric_card_variable_parameter_input(
         html.H5(
             [
                 get_icon(icon_name, None, 'default'),
-                html.Span(label+":", className='mr-3'),
+                html.Span(label+":", className='me-2'),
                 create_variable_status_badge(param_id, status_text = status_text, colour = status_colour),
             ],
             style={'display':'inline'}
@@ -360,16 +360,13 @@ def create_variable_status_badge(
     badge_id.type = 'input-action-button'
     badge_id.purpose = 'variable-status-toggle'
 
-    return html.Span([
-        dbc_Badge(
-            status_text,
-            id = badge_id.as_dict(),
-            color = colour,
-            className = "ml-2 variable-status-badge",
-            style = {"cursor": "pointer"}
-        ),
-        #create_input_group_config_update_trigger(param_id, purpose='variable-status-trigger')
-    ])
+    return dbc_Badge(
+        status_text,
+        id = badge_id.as_dict(),
+        color = colour,
+        className = "me-2 variable-status-badge",
+        style = {"cursor": "pointer"}
+    )
 
 @register_input_handler('variable-status-toggle', 'input-action-button')
 def _toggle_variable_sharing(

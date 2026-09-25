@@ -650,9 +650,7 @@ def _get_psa_metamodel_table(
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface
 ):
-    #stat = table_options.get('statistic')
     subindex = table_options['subindex']
-    plot_type = table_options.get('plot-type')
 
     proj = project_provider.get_project(active_project_id)
     mm = proj.get_focussed_metamodel()
@@ -660,28 +658,6 @@ def _get_psa_metamodel_table(
     match int(subindex):
         case 1:
             return None, None
-            # plot_type = psa.PSA_PLOT_TYPES[0] if plot_type is None else plot_type
-            # plot_funcs = psa.psa_plots.get(plot_type)
-            # if plot_funcs is None:
-            #     return None, None
-            # plot_kwargs = plot_funcs['arguments'](table_options)
-
-
-
-            # #Tornado!
-            # dsa_df, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config)
-            # #dsa_df, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config)
-            # if dsa_df is None:
-            #     return None, None
-            # index_vars = ['variable', 'statistic']
-            # if not set(dsa_df.index.names) == set(index_vars):
-            #     dsa_df = dsa_df.set_index(index_vars)
-
-            # label_df, _ = result_provider.get_result('postproc_dsa_single_metamodel_labels', mm.table_config)
-
-            # stat = 'net_present_value_undiscounted' if not stat else stat
-            # plot = tornado_plot(dsa_df, label_df, stat)
-            # return plot, rev
         case _:
             
             table_name = 'table_psa_metamodel'

@@ -221,7 +221,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             'supersection': ALL, 'section': MATCH,
             'key': MATCH, 'subindex': ALL
         }, 'data-rendered-ann-hori-state'),
-        prevent_initial_call = True
+        #prevent_initial_call = True
     )
     def update_result_section_contents(
         postaction_triggers,

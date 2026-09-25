@@ -439,3 +439,12 @@ div.optim-configuration-summaryinfo-optim-live-values {
 .background-callback-cancel-button-hidden {
     display: none !important;
 }
+
+.result-header-single-config.unfocussed{
+    font-size: 0.75em;
+}
+
+.result-header-single-config.stale{
+    filter: saturate(0.25);
+    color: #999;
+}

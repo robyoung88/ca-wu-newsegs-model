@@ -1,6 +1,7 @@
 from functools import partial
 
 from dash import dcc, html
+from dash_iconify import DashIconify
 import plotly.express as px
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
@@ -14,8 +15,17 @@ def create_indicative_net_energy_card():
             html.Details([
                 html.Summary(
                     html.H5(
-                        ['Indicative net energy']
-                        ),
+                        [
+                            DashIconify(icon = 'bi:bar-chart', width = 24, className = 'd-inline-flex m-1'), 
+                            html.H3('Indicative net energy', className = 'd-inline-flex')],
+                        className = 'd-flex align-content-center flex-wrap m-0',
+                    ),
+                    style={
+                        'listStyle': 'none',  # Removes marker in modern browsers
+                        'cursor': 'pointer',
+                        'userSelect': 'none',
+                    },
+                    className='summary-no-caret', # Hook for browser-specific caret hiding
                 ),
                 dbc.Row([
                     dbc.Col(
@@ -42,9 +52,13 @@ def create_indicative_net_energy_card():
                             }
                         )
                     )
-                ])
+                ],
+                className = 'mt-3', # Adds spacing between title and graphs when expanded
+                ),
             ])
-        ])
+        ],
+        className = 'p-2', # Tightens CardBody padding
+        )
     ])
 
 _feedback_graph_bar = partial(

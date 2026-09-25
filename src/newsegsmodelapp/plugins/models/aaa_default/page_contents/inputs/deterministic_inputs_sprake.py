@@ -66,11 +66,11 @@ def _create_generation_header_summary(mm):
     pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
     return [
         'Total generation: ',
-        icons.get_icon('gen-wind','p-1 my-1, ml-1', 'unpadded'),
+        icons.get_icon('gen-wind','p-1 my-1 ms-1', 'unpadded'),
         " = ",
         html.Span(f"{wind_cap:,.1f}"),
         " kW; ",
-        icons.get_icon('gen-pv','p-1 my-1, ml-1', 'unpadded'),
+        icons.get_icon('gen-pv','p-1 my-1 ms-1', 'unpadded'),
         " = ",
         html.Span(f"{pv_cap:,.1f}",),
         " kWp"
