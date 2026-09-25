@@ -3,9 +3,6 @@ import time
 from typing import Any, Optional
 
 from dash import dcc, html, no_update
-from dash_bootstrap_components._components.Input import Input as dbc_Input # Bit of a faff to get around the pyright behaviour https://github.com/microsoft/pyright/issues/3131
-from dash_bootstrap_components._components.Button import Button as dbc_Button
-from dash_bootstrap_components._components.Badge import Badge as dbc_Badge
 from dash.exceptions import PreventUpdate
 import numpy as np
 
@@ -23,6 +20,7 @@ from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelapp.registers import register_input_handler
 from newsegsmodelapp.registers import get_single_input_header_content_creator
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_numeric_variable_parameter_input(
     param_id: VariableInstanceParameterComponentID,
@@ -40,7 +38,7 @@ def create_numeric_variable_parameter_input(
     else:
         cn = f'dynamic-step-field step-val-{step:f}'
 
-    return dbc_Input(
+    return dbc.Input(
         id = input_id,
         type = 'number',
         value = value,
@@ -85,7 +83,7 @@ def create_numeric_card_variable_parameter_input(
         html.H5(
             [
                 get_icon(icon_name, None, 'default'),
-                html.Span(label+":", className='mr-3'),
+                html.Span(label+":", className='me-2'),
                 create_variable_status_badge(param_id, status_text = status_text, colour = status_colour),
             ],
             style={'display':'inline'}
@@ -184,7 +182,7 @@ def create_value_reset_button(
     button_id.purpose = 'value-reset'
     #button_id.type = 'value-reset-button'
     
-    return dbc_Button(
+    return dbc.Button(
         html.I(
             className = get_icon('value-reset', style_name = 'raw'),
             style = {'display': 'inline'}
@@ -243,7 +241,7 @@ def create_value_set_default_button(
     button_id.purpose = 'value-set-default'
     #button_id.type = 'value-set-default-button'
     
-    return dbc_Button(
+    return dbc.Button(
         html.I(
             className = get_icon('value-set-default', style_name = 'raw'),
             style = {'display': 'inline'}
@@ -360,16 +358,13 @@ def create_variable_status_badge(
     badge_id.type = 'input-action-button'
     badge_id.purpose = 'variable-status-toggle'
 
-    return html.Span([
-        dbc_Badge(
-            status_text,
-            id = badge_id.as_dict(),
-            color = colour,
-            className = "ml-2 variable-status-badge",
-            style = {"cursor": "pointer"}
-        ),
-        #create_input_group_config_update_trigger(param_id, purpose='variable-status-trigger')
-    ])
+    return dbc.Badge(
+        status_text,
+        id = badge_id.as_dict(),
+        color = colour,
+        className = "me-2 variable-status-badge",
+        style = {"cursor": "pointer"}
+    )
 
 @register_input_handler('variable-status-toggle', 'input-action-button')
 def _toggle_variable_sharing(

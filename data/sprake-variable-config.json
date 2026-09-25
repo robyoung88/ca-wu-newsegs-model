@@ -507,11 +507,11 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "parameters": [
-                22.399999999999995,
-                201.59999999999997
+                22.4,
+                201.6
             ],
             "raw_parameters": [
-                0.09999999999999999,
+                0.1,
                 0.02
             ],
             "optim_selected": false
@@ -621,12 +621,12 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "parameters": [
-                24.999999999999993,
-                0.008000000000000002
+                25,
+                0.008
             ],
             "raw_parameters": [
                 0.2,
-                0.04000000000000001
+                0.04
             ],
             "optim_selected": false
         },
@@ -792,12 +792,12 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "parameters": [
-                24.999999999999993,
-                1.8400000000000005
+                25.0,
+                1.84
             ],
             "raw_parameters": [
                 46.0,
-                9.200000000000001
+                9.2
             ],
             "optim_selected": false
         },
@@ -1034,7 +1034,7 @@
             ],
             "raw_parameters": [
                 16.719,
-                3.3438000000000003
+                3.3438
             ],
             "optim_selected": false
         },
@@ -1145,7 +1145,7 @@
             "dsa_bounds_type": "interval",
             "parameters": [
                 25.0,
-                0.011899999999999999
+                0.0119
             ],
             "raw_parameters": [
                 0.2975,
@@ -1201,12 +1201,12 @@
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "parameters": [
-                24.999999999999993,
-                0.004000000000000001
+                25.0,
+                0.004
             ],
             "raw_parameters": [
                 0.1,
-                0.020000000000000004
+                0.02
             ],
             "psa_selected": false,
             "optim_selected": false
@@ -1317,11 +1317,11 @@
             "psa_selected": true,
             "parameters": [
                 25.0,
-                0.013999999999999999
+                0.014
             ],
             "raw_parameters": [
                 0.35,
-                0.06999999999999999
+                0.07
             ],
             "optim_selected": false
         },

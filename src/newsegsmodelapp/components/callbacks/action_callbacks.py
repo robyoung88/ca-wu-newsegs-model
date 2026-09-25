@@ -206,18 +206,9 @@ def add_action_callbacks(app: NewsegsDash):
         }, 'data', allow_duplicate = True),
         Output('ongoing-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
+        Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
 
-        # Input({
-        #     'type': 'action-button', 'purpose': ALL, 
-        #     'supersection': ALL, 'section': ALL,
-        #     'key': ALL, 'subindex': ALL
-        # }, 'n_clicks'),
         Input('trigger-check-requests', 'data'),
-        # Input({
-        #     'type': 'postaction-trigger', 'purpose': 'trigger',
-        #     'supersection': 'global', 'section': ALL,
-        #     'key': ALL, 'subindex': 0
-        # }, 'data'), # Generally, this won't feature as won't be triggered by feedback. However, there are a few external loaders which may set the postprocess sequence running.
         Input('progress-poll-interval', 'n_intervals'),
 
         State('ongoing-actions', 'data'),
@@ -237,6 +228,7 @@ def add_action_callbacks(app: NewsegsDash):
             'key': ALL, 'subindex': ALL
         }, 'id'),
         State('active-project-id', 'data'),
+        State({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'id'),
         prevent_initial_call = True
     )
     def manage_actions(
@@ -250,6 +242,7 @@ def add_action_callbacks(app: NewsegsDash):
         options: list,
         option_ids: list,
         active_project_id,
+        container_ids,
     ):
         trigger_id = ctx.triggered_id
         print(f'ACTION TRIGGERED BY {trigger_id}')
@@ -274,89 +267,6 @@ def add_action_callbacks(app: NewsegsDash):
                         ongoing_actions.append(run_id)
                         req.run_id = run_id
                         app.request_handler.mark_dispatched(req.request_id, req.run_id)
-
-        # if not isinstance(trigger_id, str):
-        #     # An action button or ???
-        #     action_purpose = trigger_id.get('purpose')
-        #     if action_purpose == 'request-process':
-        #         # Handle new action creation.
-        #         action_class = trigger_id.get('section')
-        #         action_type = trigger_id.get('key')
-        #         match trigger_id.get('type'):
-        #             case 'action-button':
-        #                 if not callback_utils.get_triggered_value():
-        #                     raise PreventUpdate
-        #                 print(f'handling action from {trigger_id.get('type')}: ', action_type)
-        #                 config = {k: v for k,v in trigger_id.items()}
-        #                 # Two ways of picking up configuration from result-table-option inputs:
-        #                 # Their value, and their subindex.
-        #                 for id, val in zip(option_ids, options):
-        #                     if id['key'] == action_type:
-        #                         config[id['purpose']] = val
-        #                         config[id['purpose']+'_subindex'] = id['subindex']
-
-        #                 run_id = spawn_job(
-        #                     action_type, action_class, active_project_id, 
-        #                     app.project_provider, app.results_provider, None,
-        #                     config = config
-        #                 )
-        #                 if run_id:
-        #                     ongoing_actions.append(run_id)
-        #     elif action_purpose == 'trigger':
-        #         # A postaction trigger from a non-feedback process
-        #         requests = callback_utils.get_triggered_value()
-        #         if not isinstance(requests, list):
-        #             raise TypeError('postaction triggers should contain a list of jsonified requests - got {type(requests)}')
-        #         for req_json in requests:
-        #             req_data = json.loads(req_json)
-        #             action_type = req_data['request_type']
-        #             print(f'handling postaction from {trigger_id.get('type')}: ', action_type)
-        #             new_actions = registers.POST_ACTION_REGISTER.get(action_type)
-        #             if new_actions:
-        #                 run_id = req_data.get('run_id', -random.randrange(1, 10000))
-        #                 for run_procedure in new_actions.run_procedures:
-        #                     # Prevent adding the same procedure twice in the same callback
-        #                     spawn_id = (run_procedure, run_id)
-        #                     if spawn_id in spawn_ids:
-        #                         continue
-        #                     spawn_ids.add(spawn_id)
-                            
-        #                     new_run_id = spawn_job(
-        #                         run_procedure, 'run',
-        #                         req_data['project_id'], 
-        #                         app.project_provider, app.results_provider,
-        #                         registers.RunRequest.from_dict(req_data)
-        #                     )
-        #                     if new_run_id:
-        #                         spawned_actions.append(new_run_id)
-        #                 for postproc_procedure in new_actions.postprocess_procedures:
-        #                     # Prevent adding the same procedure twice in the same callback
-        #                     spawn_id = (postproc_procedure[0], run_id)
-        #                     if spawn_id in spawn_ids:
-        #                         continue
-        #                     spawn_ids.add(spawn_id)
-        #                     new_run_id = spawn_job(
-        #                         postproc_procedure[0], 'postprocess',
-        #                         req_data['project_id'], 
-        #                         app.project_provider, app.results_provider,
-        #                         registers.RunRequest.from_dict(req_data)
-        #                     )
-        #                     if new_run_id:
-        #                         spawned_actions.append(new_run_id)
-        #                 for table_draw_procedure in new_actions.table_draw_artists:
-        #                     # Prevent adding the same procedure twice in the same callback
-        #                     spawn_id = (table_draw_procedure[0], run_id)
-        #                     if spawn_id in spawn_ids:
-        #                         continue
-        #                     spawn_ids.add(spawn_id)
-        #                     new_run_id = spawn_job(
-        #                         table_draw_procedure[0], 'tabledraw',
-        #                         req_data['project_id'], 
-        #                         app.project_provider, app.results_provider,
-        #                         registers.RunRequest.from_dict(req_data)
-        #                     )
-        #                     if new_run_id:
-        #                         spawned_actions.append(new_run_id)
                     
         # Check on ongoing actions
         if ongoing_actions:
@@ -491,26 +401,6 @@ def add_action_callbacks(app: NewsegsDash):
             postaction_trigger_returns,
             ongoing_actions,
             len(ongoing_actions) == 0,
+            (['CALCULATING'] if len(ongoing_actions) > 0 else ['IDLE']) * len(container_ids)
         )
-
-    # Loading overlays
-    @app.callback(
-        Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
-        Input('progress-poll-interval', 'n_intervals'),
-        State({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'id'),
-        prevent_initial_call = True
-    )
-    def set_loading_overlay(n_intervals, container_ids):
-        # Can switch to a MATCH if we don't want to cover all results.
-        stmt = (
-            sa.select(tbls.runs.c.status)
-            .where(tbls.runs.c.status == 'CALCULATING')
-        )
-
-        with db.get_engine().connect() as conn:
-            row = conn.execute(stmt).fetchone()
-
-            if not row:
-                return ['IDLE'] * len(container_ids)
-            return ['CALCULATING'] * len(container_ids)
-        
+    

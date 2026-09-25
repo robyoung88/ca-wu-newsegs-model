@@ -38,7 +38,8 @@ def generic_create_deterministic_input_container_contents(
                         var.icon_name,
                         f'{var.label} ({var.unit})',
                         paramid,
-                        value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
+                        value = var.raw_parameters[0], # pyright: ignore[reportArgumentType]
+                        #value = var.get_deterministic_value(), # pyright: ignore[reportArgumentType]
                         min = var.interface_min,
                         max = var.interface_max,
                         step = var.interface_step if var.interface_step else 1,

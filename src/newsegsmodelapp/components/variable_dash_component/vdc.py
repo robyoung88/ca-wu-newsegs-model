@@ -118,7 +118,7 @@ def create_dsa_input_vector_parameter_input(
         param_class = parameter_names
 
     def make_input(placeholder: Any):
-        return dbc.Input(type = 'number', debounce = True, placeholder = placeholder) # pyright: ignore[reportCallIssue]
+        return dbc.Input(type = 'number', debounce = True, placeholder = placeholder, class_name = 'numeric-input') # pyright: ignore[reportCallIssue]
 
     def make_inputgroup(label: str, placeholder: Any):
         return dbc.InputGroup([

@@ -26,6 +26,13 @@ from newsegsmodelapp.components import icons
 from newsegsmodelapp.components.layouts import results_table
 from newsegsmodelapp.components import stats as newsegsbrowser_stats
 
+def _apply_header_style(df):
+    return (
+        df.style
+        .set_table_styles([{"selector": "th", "props": [("text-align", "left")]}])
+        .set_properties(**{"text-align": "left"})
+    )
+
 def create_wind_results(wind_data=None, annual=True) -> dbc.Table:
     """
     Create and format the wind generation results table
@@ -626,7 +633,7 @@ def create_net_results(net_data=None, annual=True):
     out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
-    return Purify(html = icons.unescape_html_icons(out_table.to_html(classes='table', border=False)))
+    return Purify(html = icons.unescape_html_icons(out_table.pipe(_apply_header_style).to_html(classes='table', border=False)))
 
 def create_seasonal_net_results(net_data=None, annual=True):
     if net_data is None:
@@ -697,7 +704,7 @@ def create_seasonal_net_results(net_data=None, annual=True):
     out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
-    return Purify(html = icons.unescape_html_icons(out_table.to_html(classes='table', border=False)))
+    return Purify(html = icons.unescape_html_icons(out_table.pipe(_apply_header_style).to_html(classes='table', border=False)))
 
 def create_so_benefits_results(econ_data=None, annual=True):
     if econ_data is None:
@@ -764,7 +771,7 @@ def create_so_benefits_results(econ_data=None, annual=True):
     out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
-    return Purify(html = icons.unescape_html_icons(out_table.to_html(classes='table', border=False)))
+    return Purify(html = icons.unescape_html_icons(out_table.pipe(_apply_header_style).to_html(classes='table', border=False)))
 
 def create_so_costs_results(econ_data=None, annual=True):
     if econ_data is None:
@@ -850,7 +857,7 @@ def create_so_costs_results(econ_data=None, annual=True):
     out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
-    return Purify(html = icons.unescape_html_icons(out_table.to_html(classes='table', border=False)))
+    return Purify(html = icons.unescape_html_icons(out_table.pipe(_apply_header_style).to_html(classes='table', border=False)))
     
 def create_so_value_results(econ_data=None, annual=True):
     if econ_data is None:
@@ -901,4 +908,4 @@ def create_so_value_results(econ_data=None, annual=True):
     out_table.index.names = [None] * len(out_table.index.names)
     out_table.columns = ['<i class="' + icons.get_icon(x, style_name='raw') + ' p-1 m-2 ' + icons.ICON_COLOUR_CLASSES[(int(str(x).lstrip('config-'))-1) % len(icons.ICON_COLOUR_CLASSES)] + '"></i>' for x in out_table.columns]
 
-    return Purify(html = icons.unescape_html_icons(out_table.to_html(classes='table', border=False)))
+    return Purify(html = icons.unescape_html_icons(out_table.pipe(_apply_header_style).to_html(classes='table', border=False)))

@@ -1,5 +1,7 @@
 """Register restult container and result header container content creators"""
 
+from typing import Callable
+
 import dash
 from dash import html
 import pandas as pd
@@ -7,7 +9,10 @@ import pandas as pd
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.registers import register_result_container_content_creator, register_result_section_header_content_creator, register_table_subindex_map
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
+
+import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 # -----------------------------------------------
 # Contents
@@ -209,6 +214,54 @@ def _(
 # Header content
 # -----------------------------------------------
 
+RESULT_HEADER_SINGLE_CONFIG_CLASS = 'result-header-single-config'
+
+def _make_headers_for_multiple_configs(
+    proj: NewsegsProject,
+    result_provider: NewsegsResultProviderInterface,
+    result_key,
+    content_generator: Callable,
+    table_identifier: str = 'model',
+    ann_hori_toggle: bool = True,
+):
+    rval = []
+    focussed_mm = proj.get_focussed_metamodel()
+    for idx, mm in enumerate(proj.metamodels):
+        match table_identifier:
+            case 'model':
+                mod = mm.model.table_config
+            case 'finance':
+                mod = mm.finance.table_config
+            case _:
+                mod = mm.table_config
+        
+        
+        mm_icon = icons.get_icon(
+            f'config-{idx + 1}',
+            icon_class = icons.ICON_COLOUR_CLASSES[idx % len(icons.ICON_COLOUR_CLASSES)]
+        )
+
+        res, rev = result_provider.get_result(result_key, mod)
+
+        if res is not None:
+            cntnt = [mm_icon] + content_generator(res, ann_hori_toggle)
+        else:
+            cntnt = [mm_icon] + ['- No data']
+        
+        cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
+        if rev != mod.revision:
+            cn += ' stale'
+        if mm != focussed_mm:
+            cn += ' unfocussed'
+        
+        rval.append(html.Div(cntnt, className = cn, id = {
+            'type':'result-header-single-config',
+            'table': result_key,
+            'metamodel': mm.id
+        }))
+
+    return rval
+
 SECTION = 'postprocess'
 KEY = 'postproc_generation'
 
@@ -265,11 +318,17 @@ def _(
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
     proj = proj_provider.get_project(proj_id)
-    mm = proj.get_focussed_metamodel()
-    mod = mm.model.table_config
 
-    res, rev = result_provider.get_result(key_, mod)
-    return _make_generation_result_header(res, ann_hori_toggle)
+    rval = _make_headers_for_multiple_configs(
+        proj,
+        result_provider,
+        key_,
+        _make_generation_result_header,
+        'model',
+        ann_hori_toggle
+    )
+
+    return rval
 
 SECTION = 'postprocess'
 KEY = 'postproc_storage'
@@ -318,6 +377,17 @@ def _(
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
     proj = proj_provider.get_project(proj_id)
+
+    rval = _make_headers_for_multiple_configs(
+        proj,
+        result_provider,
+        key_,
+        _make_storage_result_header,
+        'model',
+        ann_hori_toggle
+    )
+
+    return rval
     mm = proj.get_focussed_metamodel()
     mod = mm.model.table_config
 
@@ -369,6 +439,18 @@ def _(
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
     proj = proj_provider.get_project(proj_id)
+
+    rval = _make_headers_for_multiple_configs(
+        proj,
+        result_provider,
+        key_,
+        _make_consumption_result_header,
+        'model',
+        ann_hori_toggle
+    )
+
+    return rval
+
     mm = proj.get_focussed_metamodel()
     mod = mm.model.table_config
 
@@ -427,6 +509,18 @@ def _(
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
     proj = proj_provider.get_project(proj_id)
+    rval = _make_headers_for_multiple_configs(
+        proj,
+        result_provider,
+        key_,
+        _make_net_result_header,
+        'model',
+        ann_hori_toggle
+    )
+
+    return rval
+
+
     mm = proj.get_focussed_metamodel()
     mod = mm.model.table_config
 
@@ -449,7 +543,9 @@ def _make_finance_result_header(
         npv= 0.0,
     ):
         return [
-            'Total benefits (',
+            'NPV = ',
+            html.Span(f'£{npv:,.2f}'),
+            '; Total benefits (',
             html.Span(f'{dr_benefits:,.1%}'),
             ') = ',
             html.Span(f'£{prval_benefits:,.2f}'),
@@ -457,8 +553,6 @@ def _make_finance_result_header(
             html.Span(f'{dr_costs:,.1%}'),
             ') = ',
             html.Span(f'£{prval_costs:,.2f}'),
-            '; NPV = ',
-            html.Span(f'£{npv:,.2f}'),
         ]
     if res_benefits is None or res_costs is None or res_value is None:
         return _content_function()
@@ -481,12 +575,37 @@ def _(
     proj_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     ann_hori_toggle: bool = True,
+    key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
     proj = proj_provider.get_project(proj_id)
-    mm = proj.get_focussed_metamodel()
-    mod = mm.finance.table_config
 
-    res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod)
-    res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod)
-    res_value, rev_value = result_provider.get_result('postproc_finance_value', mod)
-    return _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
+    # This one needs to be bespoke, as header is constructed from multiple postprocess keys
+    rval = []
+    focussed_mm = proj.get_focussed_metamodel()
+    for idx, mm in enumerate(proj.metamodels):
+        mod = mm.finance.table_config
+        
+        mm_icon = icons.get_icon(
+            f'config-{idx + 1}',
+            icon_class = icons.ICON_COLOUR_CLASSES[idx % len(icons.ICON_COLOUR_CLASSES)]
+        )
+
+        res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod)
+        res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod)
+        res_value, rev_value = result_provider.get_result('postproc_finance_value', mod)
+
+        cntnt = [mm_icon] + _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
+
+        cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
+        if rev_benefits != mod.revision or rev_costs != mod.revision or rev_value != mod.revision:
+            cn += ' stale'
+        if mm != focussed_mm:
+            cn += ' unfocussed'
+
+        rval.append(html.Div(cntnt, className = cn, id = {
+            'type':'result-header-single-config',
+            'table': key_,
+            'metamodel': mm.id
+        }))
+
+    return rval
