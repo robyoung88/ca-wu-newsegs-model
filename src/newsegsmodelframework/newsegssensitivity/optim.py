@@ -143,10 +143,12 @@ def run_optimisation(
     cback_count = 0
     def cback(intermediate_result: scipy_opt.OptimizeResult):
         nonlocal cback_count
-        if cancel_status():
-            raise InterruptedError(f'Optimisation process has been cancelled.')
+        
         cback_count += 1
         progress(cback_count, cback_count + 2)
+        if cancel_status():
+            return True
+            #raise StopIteration(f'Optimisation process has been cancelled.')
     
     if do_bound:
         bounds = []
@@ -158,6 +160,9 @@ def run_optimisation(
         opt = scipy_opt.minimize(optfunc, x0, method = method, bounds = bounds, callback = cback)
     else:
         opt = scipy_opt.minimize(optfunc, x0, method = method, callback = cback)
+
+    if cancel_status:
+        raise InterruptedError('Optimisation cancelled')
 
     if opt.success:
         setpars(opt.x, mm)
