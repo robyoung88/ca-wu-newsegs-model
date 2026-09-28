@@ -24,6 +24,12 @@ def _deferred_constructor_update_from_dict(
     def from_dict(config: dict[str, Any]):
         var = constructor_func('Placeholder')
         var.update(config)
+
+        # The update will have messed with the revision number, so reset that
+        revis = config.get('_config', {}).get('_revision')
+        if revis is not None:
+            var.revision = revis
+            
         return var
     return from_dict
 

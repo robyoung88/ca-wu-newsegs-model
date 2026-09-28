@@ -28,6 +28,11 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
     def _reconstruct_variable(self, row) -> Variable:
         v = _variable_from_json(row.payload)
         v.id = row.id # ID may have been reassigned in database
+        r0 = v.revision
+        if r0 != row.revision:
+            raise ValueError(f'Mismatch between variable payload and row revisions - Payload = {r0}, row = {row.revision}')
+        if v.modified:
+            raise ValueError(f'Variable has been reconstructed in modified form - Item revision = {v.revision}, last synced = {v._config._last_syncronised}')
         return v
     
     @overload

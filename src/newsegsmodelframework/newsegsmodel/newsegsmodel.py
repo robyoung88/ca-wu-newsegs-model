@@ -352,10 +352,16 @@ class NewsegsModel(
 
     @override
     def reattach_components(self, component_provider: newsegscomponent.NewsegsComponentProviderInterface):
+        r0 = self.revision
         super().reattach_components(component_provider)
+        if self.revision != r0:
+            raise ValueError('Revision incremented during component reattachment: from {r0} to {self.revision}')
         self.grid.model = self
         self.generation.model = self
         self.consumption_storage.model = self
+        if self.revision != r0:
+            raise ValueError('Revision incremented during model set: from {r0} to {self.revision}')
+
 
     def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True) -> bool:
         """

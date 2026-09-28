@@ -493,9 +493,12 @@ class NewsegsComponent(
         component_provider: NewsegsComponentProviderInterface
     ):
         """Using the component_provider, find all components for reattachment."""
+        r0 = self.revision
         for att_name, comp_id in self._component_ids.items():
             comp = component_provider.get_component(comp_id)
             setattr(self, att_name, comp)
+        # Ensure that revision is not incremented due to reattachment
+        self.revision = r0
 
     @property
     def dirty(self):

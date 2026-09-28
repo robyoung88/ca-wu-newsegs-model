@@ -368,7 +368,7 @@ class ConfigurationMixin:
     @revision.setter
     def revision(self, revision: int):
         """Use with caution - direct setting of the revision number"""
-        self._config.revision += 1
+        self._config._revision = revision
     
     @property
     def revision_string(self) -> str:

@@ -3004,9 +3004,9 @@ class DirichletDistribution(NumericVectorValuedDistribution):
             if a < 0 or a > 1:
                 raise ValueError(f'All values are expected within [0, 1], {i} is {a}')
         
-        checksum = np.abs(np.sum(val) - 1)
+        checksum = np.abs(np.sum(val) - 1) # type: ignore
         if checksum > 1e-12:
-            raise ValueError(f'Dirichlet values should sum to 1, these sum to {np.sum(val)}')
+            raise ValueError(f'Dirichlet values should sum to 1, these sum to {np.sum(val)}') # type: ignore
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
@@ -4649,6 +4649,12 @@ def variable_from_dict(config: dict[str, Any]) -> Variable:
         raise ValueError(f'Constructor not found for {classname}')
     var = constructor('Placeholder')
     var.update(config)
+
+    # The update will have messed with the revision number, so reset that
+    revis = config.get('_config', {}).get('_revision')
+    if revis is not None:
+        var.revision = revis
+    
     return var
 
 def variable_uid(variable: Variable) -> str | list[str]:

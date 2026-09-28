@@ -147,6 +147,7 @@ class NewsegsMetaModel(NewsegsComponent):
         """Reattach the associated NewsegsModel instance after metamodel reconstruction.
         
         """
+        r0 = self.revision
         if not hasattr(self, '_model_id') or self._model_id == '':
             raise AttributeError('This MetaModel has no associated model to reattach.')
         mdl = em_provider.get_component(self._model_id)
@@ -158,6 +159,7 @@ class NewsegsMetaModel(NewsegsComponent):
                 self.finance.set_model(self.model)
         except AttributeError:
             pass
+        self.revision = r0
 
     def reattach_finance(self, finance_provider: Mapping[str, newsegsfinance.NewsegsFinance]) -> None:
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
@@ -170,6 +172,7 @@ class NewsegsMetaModel(NewsegsComponent):
             ValueError: If finance_provider cannot provide the finance.
             TypeError: If the provided object is not a NewsegsFinance.
         """
+        r0 = self.revision
         if not hasattr(self, '_finance_id') or self._finance_id == '':
             raise AttributeError('this MetaModel has no associated finance to reattach.')
         fnc = finance_provider.get(self._finance_id)
@@ -180,11 +183,13 @@ class NewsegsMetaModel(NewsegsComponent):
         self.finance = fnc
         if self.model is not None:
             self.finance.set_model(self.model, dirty = False)
+        self.revision = r0
 
     def reattach_fm(self, fm_provider: NewsegsComponentProviderInterface):
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
         
         """
+        r0 = self.revision
         if not hasattr(self, '_finance_id') or self._finance_id == '':
             raise AttributeError('This MetaModel has no associated finance to reattach.')
         fnc = fm_provider.get_component(self._finance_id)
@@ -193,9 +198,10 @@ class NewsegsMetaModel(NewsegsComponent):
         self.finance = fnc
         try:
             if self.model is not None:
-                self.finance.set_model(self.model)
+                self.finance.set_model(self.model, False)
         except AttributeError:
             pass
+        self.revision = r0
 
     def get_component_attributes(self) -> tuple[str, ...]:
         atts = super().get_component_attributes()

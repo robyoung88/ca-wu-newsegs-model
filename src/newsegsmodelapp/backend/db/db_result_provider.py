@@ -14,6 +14,7 @@ from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 
+from cachetools import LRUCache
 
 class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     def __init__(
@@ -24,7 +25,6 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         self._get_engine = get_engine
         self._result_store = result_store
         self._table = tbls.results
-
     
     def _result_to_table_data(
             self, 
@@ -68,12 +68,15 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         with self._get_engine().begin() as conn:
             conn.execute(stmt)
 
+        print (f'SAVED RESULT of type {result_details['result_type']} attached to {result_details['component_type']} with id {result_details['component_config_id']}, revision {result_details['component_config_revision']}')
+
     def get_result(
         self,
         result_type: str,
         parent_component: NewsegsComponent,
         allow_stale: bool = True
     ) -> tuple[Any, int] | tuple[None, None]:
+        
         stmt = (
             sa.select(
                 self._table.c.result_id,
@@ -108,6 +111,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 with self._get_engine().begin() as conn:
                     conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
                 return None, None
+            
             return (obj, rrs)
 
         return None, None
@@ -133,7 +137,7 @@ class CachedFromDatabaseResultProvider(
         if obj is None:
             print(f'NOT ADDING TO CACHE AS NO RESULT - {result_key}')
         if rrs is None or rrs != result_key[2]:
-            print(f'NOT ADDING TO CACHE AS STALE - {result_key} - current value {rrs}')
+            print(f'NOT ADDING TO CACHE AS STALE - {result_key} - available revision is {rrs}')
         if obj is not None and rrs == result_key[2]:
             print(f'ADDING TO CACHE - {result_key}')
             self._result_cache[result_key] = obj

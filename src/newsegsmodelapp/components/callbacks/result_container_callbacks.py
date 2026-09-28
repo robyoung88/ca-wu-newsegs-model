@@ -473,10 +473,14 @@ def add_result_container_callbacks(app: NewsegsDash):
                 results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
             if not results_stale:
                 table_revision = proj.table_config.revision
+                print(f'Checking against project table revision {table_revision}')
+                print(f'Rendered table revisions are {rendered_project_table_revisions}')
                 results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
+                
         else:
             if data_stale is None:
                 raise PreventUpdate
+            print(f'Checking against data-is-stale {data_stale}')
             results_stale = any(x for x in data_stale)
 
         if results_stale:

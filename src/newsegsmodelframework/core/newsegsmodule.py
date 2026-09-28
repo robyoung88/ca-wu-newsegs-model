@@ -3,24 +3,16 @@ Abstract base class for NewsegsResult-returning NewsegsComponents within a Newse
 """
 from __future__ import annotations
 
-from abc import ABC, ABCMeta, abstractmethod
-import copy
+from abc import abstractmethod
 import datetime
-from collections.abc import Sequence
-import uuid
-from functools import lru_cache
-from typing import Any, Optional
+
+from typing import Optional
 import warnings
 
-import numpy as np
-import pandas as pd
-
 from newsegsmodelframework.core import newsegscomponent
-from newsegsmodelframework.core import environmentserverinterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.core.timespan import TimeSpan, RegTimeSpan
+from newsegsmodelframework.core.timespan import TimeSpan
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
-from newsegsmodelframework.util import classfuncs
 
 class NewsegsModule(newsegscomponent.NewsegsComponent):
     """

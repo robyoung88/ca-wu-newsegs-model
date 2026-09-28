@@ -314,6 +314,7 @@ def variable_to_raw_table_data(
     odict = dict(
         id = variable.id,
         varid = variable_uid(variable),
+        revision = variable.revision,
         component_type = model_sec,
         label = variable.name
     )

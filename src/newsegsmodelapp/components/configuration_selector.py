@@ -419,8 +419,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         mm.sync_model_with_changed_variables_deterministic()
 
         proj.set_focussed_metamodel_index(mm_index)
-        proj.revision += 1
-        app.project_provider.upsert_component(proj)
+        app.project_provider.upsert_component(proj, force = True)
 
         # Trigger interface update
         # Could be a bit more elegant, but may have to rebuild inputs for some configurations anyway so brute force for now.

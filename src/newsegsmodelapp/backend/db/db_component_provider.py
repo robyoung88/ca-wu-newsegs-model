@@ -50,12 +50,22 @@ class FromDatabaseNewsegsComponentProvider(
 
     def _reconstruct_component(self, json_payload, row) -> NewsegsComponent:
         obj = self._component_from_json(json_payload)
+        r0 = obj.revision
         obj.id = row.id # The ID may have changed from the payload - set it now
         obj = self._assign_updated_child_uids(obj, row)
         obj = self._reattach_children(obj)
+        r1 = obj.revision
+        if r0 != row.revision:
+            raise ValueError(f'Mismatch between payload and row revisions - Payload = {r0}, row = {row.revision}')
+        if r1 != r0:
+            raise ValueError('Revision has incremented during component reconstruction - from {r0} to {r1}')
+        if obj.chain_modified:
+            raise ValueError('Component has been reconstructed with modified children.')
         return obj
 
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return component_to_raw_table_data(component)
 
     @overload
@@ -438,15 +448,19 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
     @override
     def _reattach_children(self, obj):
+        r0 = obj.revision
         obj = super()._reattach_children(obj)
         obj.reattach_components(self._component_provider)
+        if obj.revision != r0:
+            raise ValueError('Model revision incremented during subcomponent attachment - from {r0} to {obj.revision}')
         return obj
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsModelInterface):
             return super()._component_to_table_data(component)
-
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return energy_model_to_raw_table_data(component)
         
     @override
@@ -546,7 +560,8 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsFinanceInterface):
             return super()._component_to_table_data(component)
-
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return finance_model_to_raw_table_data(component) # pyright: ignore[reportArgumentType]
 
     @override
@@ -704,6 +719,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsMetaModel):
             return super()._component_to_table_data(component)
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return metamodel_to_raw_table_data(component)
 
     def _set_metamodel_variable_junction(self, metamodel: NewsegsMetaModel):
@@ -979,6 +996,8 @@ class FromDatabaseNewsegsProjectProvider(
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsProject):
             return super()._component_to_table_data(component)
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return project_to_raw_table_data(component)
 
     def _upsert_project(
@@ -995,6 +1014,8 @@ class FromDatabaseNewsegsProjectProvider(
             project.table_config.revision += 1
         self.metamodel_provider.upsert_component(list(project.metamodels))
         super().upsert_component(project, force, tbl)
+
+        # TODO: Improve this logic and keep track of addition of variables to the project
 
         # Project - Variable junction
         new_variable_entries = [
@@ -1411,11 +1432,14 @@ class CachedFromDatabaseNewsegsProjectProvider(
             and (new_modkey == self._project_last_accessed[project_id])
             and (project_id in self._project_cache)
         ):
-            print(f'RETURNING PROJECT FROM CACHE {project_id}')
-            return self._project_cache[project_id]
+            proj = self._project_cache[project_id]
+            print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+            return proj
 
         proj = super().get_project(project_id)
-        print(f'ADDING PROJECT TO CACHE {project_id} - modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+        print(f'ADDING PROJECT TO CACHE AFTER LOAD {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+        if proj.chain_modified:
+            print('Project has been loaded in a modified state')
         self._project_last_accessed[project_id] = new_modkey
         self._project_cache[project_id] = proj
         return proj
@@ -1425,7 +1449,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
         super().upsert_component(component, force, tbl)
         if isinstance(component, NewsegsProject):
             project_id = component.id
-            print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - modified is {component.chain_modified} and table revision is {component.table_config.revision}')
+            print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - revision is {component.revision}, modified is {component.chain_modified} and table revision is {component.table_config.revision}')
             modkey = self._get_project_modification_key(project_id)
             self._project_last_accessed[project_id] = modkey
             self._project_cache[project_id] = component
