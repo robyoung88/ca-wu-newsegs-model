@@ -42,9 +42,6 @@ RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
 
-# LAYOUTS
-from newsegsmodelapp.plugins.pages import p000_model_selection_layout
-
 AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]

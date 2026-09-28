@@ -3968,6 +3968,15 @@ class NumericScalarVariable(ScalarVariable):
         fstring = '{:,.' + f'{self.formatter_dp:d}'+'f}'   
         return fstring.format
 
+    @override
+    def _validate_bound(self, value: Value) -> ScalarNumParam:
+        v = super()._validate_bound(value)
+        if v is None:
+            raise TypeError(f'DSA bound should be a numeric value, got None')
+        if not isinstance(v, ScalarNumParam):
+            raise TypeError(f'DSA bound should be a numeric value, is type{v}')
+        return v
+
     @property
     @override
     def parameters(self) -> tuple[ScalarNumParam, ...]:

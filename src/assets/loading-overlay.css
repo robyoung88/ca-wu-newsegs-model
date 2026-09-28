@@ -40,9 +40,24 @@
 }
 
 /* Style for feedback text */
-.results-overlay p {
-    margin-top: 12px;
-    font-weight: bold;
+.results-overlay-title {
+    margin-top: 14px;
+    margin-bottom: 2px;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.results-overlay-subtext {
+    color: #64748b;
+    margin-bottom: 12px;
+}
+
+/* Progress Bar Styling */
+.results-progress {
+    width: 60%;
+    max-width: 320px;
+    height: 10px;
+    border-radius: 6px;
 }
 
 /* Show overlay during calculating state */

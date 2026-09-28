@@ -453,3 +453,10 @@ div.optim-configuration-summaryinfo-optim-live-values {
     filter: saturate(0.25);
     color: #999;
 }
+
+/* Results tables */
+
+/* Override the unavoidable tr default with pd.DataFrame.to_html */
+table.dataframe tr {
+    text-align: left !important;
+}

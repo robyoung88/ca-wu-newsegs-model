@@ -110,6 +110,7 @@ def create_results_header(page_type, **kwargs):
                                         'height': '300px',
                                     }
                                 ),
+                                delay_show = 300,
                             ),
                             
                             
