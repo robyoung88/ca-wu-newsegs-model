@@ -348,11 +348,12 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         )
         new_mm.name = new_mm.name + ' - Copy'
         new_mm.reattach_variables(proj)
-        new_mm.revision += 1
         proj.metamodels.append(new_mm) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         proj.set_focussed_metamodel(new_mm.id)
         
-        app.project_provider.upsert_component(proj)
+        proj.revision += 1
+        
+        app.project_provider.upsert_component(proj, force = True)
 
         # Trigger interface update
         return active_project_id

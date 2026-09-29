@@ -18,7 +18,9 @@ from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
+from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSING_OPTION, NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -50,15 +52,15 @@ class FromDatabaseNewsegsComponentProvider(
 
     def _reconstruct_component(self, json_payload, row) -> NewsegsComponent:
         obj = self._component_from_json(json_payload)
-        r0 = obj.revision
         obj.id = row.id # The ID may have changed from the payload - set it now
         obj = self._assign_updated_child_uids(obj, row)
         obj = self._reattach_children(obj)
-        r1 = obj.revision
-        if r0 != row.revision:
-            raise ValueError(f'Mismatch between payload and row revisions - Payload = {r0}, row = {row.revision}')
-        if r1 != r0:
-            raise ValueError('Revision has incremented during component reconstruction - from {r0} to {r1}')
+        if obj.revision != row.revision:
+            if obj.revision > row.revision:
+                print(f'WARNING - Component has been constructed with revision greater than stored in row: Payload = {obj.revision}, Row = {row.revision}')
+            print(f'Syncronising Component revision ({obj.id}): {obj.revision} -> {row.revision}')
+            obj.revision = row.revision
+            obj._config._last_syncronised = obj.revision
         if obj.chain_modified:
             raise ValueError('Component has been reconstructed with modified children.')
         return obj
@@ -122,6 +124,7 @@ class FromDatabaseNewsegsComponentProvider(
         else:
             orig = component_id
         comp2 = self._create_duplicate_component(orig)
+        comp2.revision = orig.revision
         self.upsert_component(comp2, force = False)
         
         return comp2
@@ -708,10 +711,10 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
         new =  super()._create_duplicate_component(original)
         if isinstance(original, NewsegsMetaModel):
-            new.model = self._em_provider.duplicate_component(new._model_id)
-            new.finance = self._fm_provider.duplicate_component(new._finance_id)
+            new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._model_id))
+            new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._finance_id))
             # Worth double checking that model is set on finance
-            new.finance.set_model(new.model)
+            new.finance.set_model(new.model, dirty = False)
             new.variables = {k: v for k, v in original.variables.items()}
         return new
 
@@ -1447,12 +1450,12 @@ class CachedFromDatabaseNewsegsProjectProvider(
     @override
     def upsert_component(self, component: NewsegsComponent | SequenceNotStr[NewsegsComponent], force: bool = False, tbl: sa.Table | None = None) -> None:
         super().upsert_component(component, force, tbl)
-        if isinstance(component, NewsegsProject):
-            project_id = component.id
-            print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - revision is {component.revision}, modified is {component.chain_modified} and table revision is {component.table_config.revision}')
-            modkey = self._get_project_modification_key(project_id)
-            self._project_last_accessed[project_id] = modkey
-            self._project_cache[project_id] = component
+        # if isinstance(component, NewsegsProject):
+        #     project_id = component.id
+        #     print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - revision is {component.revision}, modified is {component.chain_modified} and table revision is {component.table_config.revision}')
+        #     modkey = self._get_project_modification_key(project_id)
+        #     self._project_last_accessed[project_id] = modkey
+        #     self._project_cache[project_id] = component
 
     @override
     def delete_component(self, component_id: str | SequenceNotStr[str], ignore_ids: list[str] = []) -> list[str]:

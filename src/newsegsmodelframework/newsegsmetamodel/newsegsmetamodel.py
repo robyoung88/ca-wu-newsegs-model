@@ -225,6 +225,7 @@ class NewsegsMetaModel(NewsegsComponent):
             variable_provider: Instance of VariableProviderInterface (typically a Project).
         """
         these_vars = self.variable_ids
+        r0 = self.revision
         if not hasattr(self, '_variables'):
             self.variables = {}
         for var_identifiers in these_vars:
@@ -233,6 +234,8 @@ class NewsegsMetaModel(NewsegsComponent):
             except KeyError:
                 v = variable_provider.get_default_variable(var_identifiers['varid'])
             self.variables[var_identifiers['varid']] = v
+        if self.revision != r0:
+            self.revision = r0
 
     def reattach_table_config(self, component_provider: Mapping[str, NewsegsComponent]):
         """Reattach the associated TableConfig instance after metamodel reconstruction.

@@ -172,6 +172,7 @@ be found in RUN_PROCEDURE_REGISTER.)
 class RunRequest(SerialisableDataclass):
     request_id: int = 0
     run_id: int = 0
+    trigger_run_id: int = -1
     project_id: str = ''
     model_type: str = 'default'
     request_label: str = ''
@@ -182,7 +183,7 @@ class RunRequest(SerialisableDataclass):
     progress: float = 0.0
     progress_message: str = ''
     cancel_requested: bool = False
-    background_procedure: bool = True #False # TODO: Set to default background once the dispatcher is enabled
+    background_procedure: bool =  False #True #False # TODO: Set to default background once the dispatcher is enabled
 
 class RunRequestHandler(Protocol):
     def __call__(
@@ -375,6 +376,7 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 class TableDrawRequest(RunRequest):
     request_class: str = 'tabledraw'
     trigger_request_type: str = ''
+    
     ann_hori_toggle: bool = False
 
 class TableDrawRequestHandler(Protocol):
@@ -846,25 +848,3 @@ def get_feedback_graph_artist(figure_key: str, model_type: str = 'default'):
     key = (figure_key, 'default')
     return FEEDBACK_GRAPH_ARTISTS[key]
 
-# FIGURE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
-# """Register of functions to create figures given a tuple of live results.
-
-# Function arguments:
-#     tuple of ResultMeta objects
-
-# Function returns:
-#     Figures as dash components.
-
-# Notes:
-#     The function is memoised, so results should not re-use the same path.
-# """
-
-# def register_figure_draw(name: str):
-#     """Add a figure draw function to the register.
-    
-#     The name should respond the the key of the graph id.
-#     """
-#     def decorated(func):
-#         FIGURE_DRAW_REGISTER[name] = func
-#         return func
-#     return decorated

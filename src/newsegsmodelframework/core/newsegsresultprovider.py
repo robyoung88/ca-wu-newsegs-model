@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 
@@ -10,6 +10,7 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
         parent_component: NewsegsComponent,
         result_object: object,
         mark_stale: bool = False,
+        request: Optional[Any] = None,
     ):
         """Add or update a result to the provider."""
 
@@ -18,12 +19,30 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
         self,
         result_type: str,
         parent_component: NewsegsComponent,
-        allow_stale: bool = True
+        allow_stale: bool = True,
     ) -> tuple[Any, int] | tuple[None, None]:
         """Retrieve a result from the provider. 
         
         If allow_stale is true, will return the latest result if none matching the revision are found.
         
+        Returns:
+            tuple[object, int] - The result and the revision of the component generating the result.
+            None if no applicable results are found.
+        """
+
+    @abstractmethod
+    def get_run_result(
+        self,
+        result_type: str,
+        run_id: int,
+        parent_component: NewsegsComponent | None = None
+    ) -> tuple[Any, int] | tuple[None, None]:
+        """Retrieve a result from a specific run.
+
+        For single results per run, no need to specify a parent_component;
+        If results are one per metamodel, include the parent component or a ValueError will be
+        thrown for multiple returned results.
+
         Returns:
             tuple[object, int] - The result and the revision of the component generating the result.
             None if no applicable results are found.

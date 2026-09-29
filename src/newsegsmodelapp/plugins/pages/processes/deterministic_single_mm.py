@@ -47,7 +47,7 @@ def execute_deterministic_single_mm_run(
         raise KeyError(f'Metamodel {mm_id} not found for project {proj.id} - available values are {[x.id for x in proj.metamodels]}.')
 
     # Ensure that the output tables get updated
-    proj.table_config.revision += 1
+    #proj.table_config.revision += 1
 
     n_steps = 3
     step = 0
@@ -63,7 +63,7 @@ def execute_deterministic_single_mm_run(
 
     mm.model.run()
     # TODO: May want to pull this into the run
-    mm.model.table_config.revision += 1
+    #mm.model.table_config.revision += 1
 
     if check_cancel_status():
         raise InterruptedError(f'Process {run_id} has been cancelled.')
@@ -73,7 +73,7 @@ def execute_deterministic_single_mm_run(
 
     mm.finance.run()
     # TODO: May want to pull this into the run
-    mm.finance.table_config.revision += 1
+    #mm.finance.table_config.revision += 1
 
     if check_cancel_status():
         raise InterruptedError(f'Deterministic single configuration process {run_id} has been cancelled.')
@@ -81,9 +81,9 @@ def execute_deterministic_single_mm_run(
     step += 1
     progress_callback(step, n_steps, f'Saving results.')
 
-    project_provider.upsert_component(proj)
-    result_provider.upsert_result('deterministic_grid', mm.model.grid, mm.model.get_grid_result())
-    result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result())
-    result_provider.upsert_result('deterministic_consumption_storage', mm.model.consumption_storage, mm.model.get_consumption_storage_result())
+    #project_provider.upsert_component(proj)
+    result_provider.upsert_result('deterministic_grid', mm.model.grid, mm.model.get_grid_result(), request = request)
+    result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result(), request = request)
+    result_provider.upsert_result('deterministic_consumption_storage', mm.model.consumption_storage, mm.model.get_consumption_storage_result(), request = request)
 
     return 'ok'

@@ -1,5 +1,6 @@
 """Callbacks resulting in some processing being undertaken."""
 
+import copy
 import json
 import pickle
 from typing import Any
@@ -52,8 +53,10 @@ def _local_run_any(
 ):
     job_id = generate_claim_ticket(engine, request)
     try:
+        rq = copy.copy(request)
+        rq.run_id = job_id
         is_ok = runner(
-            request,
+            rq,
             project_provider,
             results_provider,
             job_id,
@@ -363,6 +366,7 @@ def add_action_callbacks(app: NewsegsDash):
                     for run_id in completed_actions:
                         req_data = completed_request_map[run_id]
                         original_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
+                        original_request.run_id = run_id
                         if not req_data['children_spawned']:
                             print(f'Handling the completion of job {run_id} of type {req_data["action_type"]} for project {req_data["project_id"]}')
                             action_type = req_data['action_type']

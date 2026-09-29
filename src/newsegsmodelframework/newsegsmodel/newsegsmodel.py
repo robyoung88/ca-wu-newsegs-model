@@ -363,36 +363,73 @@ class NewsegsModel(
             raise ValueError('Revision incremented during model set: from {r0} to {self.revision}')
 
 
-    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True) -> bool:
+    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True, run_id: int = -1) -> bool:
         """
         
         Returns:
             [bool] - True if any results are stale
         """
         any_stale = False
+    
         try:
-            self._grid_result, self._grid_result_revision = results_provider.get_result(
-                'deterministic_grid', self.grid, allow_stale
-            )
-            any_stale = any_stale or self._grid_result_revision != self.grid.revision
+            res_ = None
+            rev_ = None
+            if run_id != -1:
+                res_, rev_ = results_provider.get_run_result(
+                    'deterministic_grid', run_id, self.grid
+                )
+            
+            if res_ is None:
+                res_, rev_ = results_provider.get_result(
+                    'deterministic_grid', self.grid, allow_stale
+                )
+
+            self._grid_result = res_
+            self._grid_result_revision = rev_
+
+            any_stale = any_stale or res_ is None or self._grid_result_revision != self.grid.revision
         except Exception as e:
             print (e)
             any_stale = True
 
         try:
-            self._generation_result, self._generation_result_revision = results_provider.get_result(
-                'deterministic_generation', self.generation, allow_stale
-            )
-            any_stale = any_stale or self._generation_result_revision != self.generation.revision
+            res_ = None
+            rev_ = None
+            if run_id != -1:
+                res_, rev_ = results_provider.get_run_result(
+                    'deterministic_generation', run_id, self.generation
+                )
+            
+            if res_ is None:
+                res_, rev_ = results_provider.get_result(
+                    'deterministic_generation', self.generation, allow_stale
+                )
+
+            self._generation_result = res_
+            self._generation_result_revision = rev_
+
+            any_stale = any_stale or res_ is None or self._generation_result_revision != self.generation.revision
         except Exception as e:
             print (e)
             any_stale = True
 
         try:
-            self._cs_result, self._cs_result_revision = results_provider.get_result(
-                'deterministic_consumption_storage', self.consumption_storage, allow_stale
-            )
-            any_stale = any_stale or self._cs_result_revision != self.consumption_storage.revision
+            res_ = None
+            rev_ = None
+            if run_id != -1:
+                res_, rev_ = results_provider.get_run_result(
+                    'deterministic_consumption_storage', run_id, self.consumption_storage
+                )
+            
+            if res_ is None:
+                res_, rev_ = results_provider.get_result(
+                    'deterministic_consumption_storage', self.consumption_storage, allow_stale
+                )
+
+            self._cs_result = res_
+            self._cs_result_revision = rev_
+
+            any_stale = any_stale or res_ is None or self._cs_result_revision != self.consumption_storage.revision
         except Exception as e:
             print(e)
             any_stale = True

@@ -1,4 +1,5 @@
 """A worker process for performing background computations."""
+import copy
 import pickle
 from typing import cast
 
@@ -101,9 +102,12 @@ def worker_process(
                             return True
                         else:
                             return get_cancel_status(engine, job_id)
-                        
+
+                    rq = copy.copy(request)
+                    rq.run_id = job_id
+                    
                     is_ok = runner(
-                        request,
+                        rq,
                         proj_provider,
                         result_provider,
                         job_id,

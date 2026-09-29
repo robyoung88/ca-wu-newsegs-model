@@ -257,6 +257,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         return_ann_hori_state = [ann_hori_toggle] * len(rendered_ann_hori_state)
 
         contents_by_section_subindex = {}
+        """Local store for contents to prevent redrawing within single call"""
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
@@ -269,6 +270,8 @@ def add_result_container_callbacks(app: NewsegsDash):
         print(table_options)
 
         for idx, cid in enumerate(container_ids):
+
+            # Check if already drawn
             section = cid.get('section')
             subindex = int(cid.get('subindex'))
             ss = (section, subindex)
@@ -280,28 +283,35 @@ def add_result_container_callbacks(app: NewsegsDash):
             if not section or not key:
                 continue
 
+            # Find any custom table providers for this table / model
             table_name = key
             table_getter = None
             try:
                 table_getter = registers.get_table_getter(table_name, model_type)
             except KeyError:
                 pass
+
             if table_getter is not None:
                 print(f'Found getter for {table_name}')
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
                 res, rev = table_getter(active_project_id, table_options, app.project_provider, app.results_provider)
+
             else:
+                # Conventional table lookup
                 if subindex > 0:
+                    # Optionally vary the table name from default if subindex != 0
                     subindex_map = registers.get_table_subindex_map(key, model_type)
                     if subindex_map:
                         table_name = subindex_map[subindex]
-                
+
+                # Try with annual or to horizon subtable suffix
                 sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
                 print (f'getting from table {sub_table_name} - subindex is {subindex}')
                 res, rev = app.results_provider.get_result(sub_table_name, proj.table_config)
+                
                 if res is None:
-                    # Retry without the subtable
+                    # Retry without the subtable suffix
                     print (f'getting from table {table_name} - subindex is {subindex}')
                     res, rev = app.results_provider.get_result(table_name, proj.table_config)
 

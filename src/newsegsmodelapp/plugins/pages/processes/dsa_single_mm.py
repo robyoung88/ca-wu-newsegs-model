@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import datetime
 import json
+import time
 from typing import Callable
 
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
@@ -51,14 +52,24 @@ def execute_dsa_single_mm_run(
         raise KeyError(f'Metamodel {mm_id} not found for project {proj.id} - available values are {[x.id for x in proj.metamodels]}.')
 
     # Ensure that the output tables get updated
-    proj.table_config.revision += 1
-    mm.table_config.revision += 1
+    #proj.table_config.revision += 1
+    #mm.table_config.revision += 1
+
+    t0 = time.time_ns()
 
     def internal_progress_callback(step, total):
         if check_cancel_status():
             raise InterruptedError(f'DSA process {run_id} has been cancelled.')
 
-        progress_callback(step, total, 'Running DSA')
+        t1 = time.time_ns()
+        tot_secs = (t1 - t0) * 1e-9
+        if step > 0:
+            per_iter = tot_secs / step
+            msg = f'DSA: Run {step} of {total}, {per_iter:.1f} sec/run. Elapsed time: {tot_secs:.0f} seconds.'
+        else:
+            msg = f'DSA: Run {step} of {total}. Elapsed time: {tot_secs:.0f} seconds.'
+
+        progress_callback(step, total, msg)
 
     dsa_results_frame = newsegssensitivity.run_dsa(
         mm, 
@@ -67,7 +78,7 @@ def execute_dsa_single_mm_run(
     )
 
     # Connect this result to the metamodel table config, rather than the project dsa config
-    project_provider.upsert_component(proj)
-    result_provider.upsert_result('dsa_single_metamodel', mm.table_config, dsa_results_frame)
+    #project_provider.upsert_component(proj)
+    result_provider.upsert_result('dsa_single_metamodel', mm.table_config, dsa_results_frame, request = request)
 
     return 'ok'

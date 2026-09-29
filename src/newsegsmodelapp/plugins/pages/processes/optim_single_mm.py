@@ -80,8 +80,8 @@ def execute_optim_single_mm_run(
     vars = [x for x in optim_vars.values()]
 
     # Upsert now just in case modifications go wrong.
-    proj.table_config.revision += 1
-    project_provider.upsert_component(proj)
+    #proj.table_config.revision += 1
+    #project_provider.upsert_component(proj)
 
     original_parameters = {k.varid:mm.variables[k.varid].parameters for k in vars}
 
@@ -121,7 +121,7 @@ def execute_optim_single_mm_run(
         'varids': [k.varid for k in vars]
     }
     
-    result_provider.upsert_result('optimisation_result', proj.table_config, rval)
+    result_provider.upsert_result('optimisation_result', proj.table_config, rval, request = request)
     if isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         project_provider.delete_orphan_variables()
 
