@@ -163,7 +163,7 @@ def _find_output_locations(
     id: str | dict,
     property: str,
     search_object
-):
+) -> list:
     return_locs = []
     if isinstance(search_object, dash._utils.AttributeDict):
         for k, v in search_object.items():
@@ -207,6 +207,10 @@ def update_property_by_id(
     update_value: Any,
     out: Any | None
 ) -> Any:
+    """Update an output by providing an exact id and property
+    
+    Provide `out` to modify an existing return list or dictionary
+"""
     if not out:
         out = create_noupdate_return()
 

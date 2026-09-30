@@ -388,11 +388,6 @@ def _(
     )
 
     return rval
-    mm = proj.get_focussed_metamodel()
-    mod = mm.model.table_config
-
-    res, rev = result_provider.get_result(key_, mod)
-    return _make_storage_result_header(res, ann_hori_toggle)
 
 SECTION = 'postprocess'
 KEY = 'postproc_consumption'
@@ -450,12 +445,6 @@ def _(
     )
 
     return rval
-
-    mm = proj.get_focussed_metamodel()
-    mod = mm.model.table_config
-
-    res, rev = result_provider.get_result(key_, mod)
-    return _make_consumption_result_header(res, ann_hori_toggle)
 
 SECTION = 'postprocess'
 KEY = 'postproc_net'

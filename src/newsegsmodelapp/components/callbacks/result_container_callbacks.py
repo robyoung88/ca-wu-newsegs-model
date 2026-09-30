@@ -6,6 +6,7 @@ from dash import ALL, MATCH, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 from dash_extensions import Purify
 
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp import registers
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_result_container_content_creator, get_result_section_header_content_creator
@@ -432,36 +433,65 @@ def add_result_container_callbacks(app: NewsegsDash):
         return return_contents 
         
     @app.callback(
-        Output({'type': 'resize-handle', 'page': ALL}, 'className'),
-        Output({'type': 'result-tooltip', 'page': ALL}, 'children'),
-
-        Input({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'data-is-stale'),
-
-        Input({
-            'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': 'trigger',
-            'section': ALL, 'key': ALL, 'subindex': ALL,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'data'),
-
-        State('active-project-id', 'data'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'data-rendered-project-id'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'data-rendered-project-table-revision'),
-
-        State({'type': 'resize-handle', 'page': ALL}, 'className'),
-        State({'type': 'result-tooltip', 'page': ALL}, 'children'),
+        output = dict(
+            indicator_class = Output(
+                {'type': 'resize-handle', 'page': ALL},
+                'className',
+            ),
+            tooltip_children = Output(
+                {'type': 'result-tooltip', 'page': ALL}, 
+                'children',
+            ),
+            
+        ),
+        inputs = dict(
+            data_stale = Input(
+                {
+                    'type': 'result-table', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 
+                'data-is-stale',
+            ),
+            config_update = Input(
+                {
+                    'type': 'input-group-config-update-trigger', 
+                    'supersection': ALL, 'purpose': 'trigger',
+                    'section': ALL, 'key': ALL, 'subindex': ALL,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'data'
+            ),
+        ),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            rendered_project_ids = State(
+                {
+                    'type': 'result-table', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 
+                'data-rendered-project-id'
+            ),
+            rendered_project_table_revisions = State(
+                {
+                    'type': 'result-table', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                },
+                'data-rendered-project-table-revision'
+            ),
+            trigger_ids = State(
+                {
+                    'type': 'postaction-trigger', 'purpose': 'trigger',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                },
+                'id'
+            ),
+            #indicator_class = State({'type': 'resize-handle', 'page': ALL}, 'className'),
+            #tooltip_children = State({'type': 'result-tooltip', 'page': ALL}, 'children'),
+        ),
     )
     def update_stale_indicators(
         data_stale,
@@ -469,8 +499,9 @@ def add_result_container_callbacks(app: NewsegsDash):
         active_project_id,
         rendered_project_ids,
         rendered_project_table_revisions,
-        handle_ids,
-        tooltip_ids,
+        #indicator_class,
+        #tooltip_children,
+        **kwargs
     ):
         triggered_id = ctx.triggered_id
         print(f'checking staleness - triggered by {triggered_id}')
@@ -493,6 +524,8 @@ def add_result_container_callbacks(app: NewsegsDash):
             print(f'Checking against data-is-stale {data_stale}')
             results_stale = any(x for x in data_stale)
 
+        rval = callback_utils.create_noupdate_return()
+
         if results_stale:
             handle_class = 'resize-handle resize-handle-warning'
             tooltip_text = 'Results require refreshing.'
@@ -500,4 +533,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             handle_class = 'resize-handle resize-handle-ok'
             tooltip_text = 'Results up to date.'
 
-        return [handle_class] * len(handle_ids), [tooltip_text] * len(tooltip_ids)
+        rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
+        rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
+
+        return rval
