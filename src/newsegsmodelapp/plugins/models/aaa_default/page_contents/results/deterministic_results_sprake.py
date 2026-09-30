@@ -315,7 +315,7 @@ def _(
     proj_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     ann_hori_toggle: bool = True,
-    key_: str = KEY # Using default argument trick to force evaluation of section
+    key_: str = KEY # Using default argument trick to force evaluation of key
 ) -> list[dash.development.base_component.Component]:
     proj = proj_provider.get_project(proj_id)
 

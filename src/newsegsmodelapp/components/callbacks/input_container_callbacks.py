@@ -179,85 +179,117 @@ def add_input_container_callbacks(app: NewsegsDash):
         return content_creator(active_project_id, app.project_provider)
 
     @app.callback(
-        Output({
-            'type': 'single-input-config', 
-            'supersection': ALL, 'purpose': ALL,
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'value'),
-        Output({
-            'type': 'single-input-header', 
-            'supersection': ALL, 'purpose': 'header',
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'children'),
-        Output({
-            'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': 'trigger',
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'data'),
+        output = dict(
+            input_values = Output(
+                {
+                    'type': 'single-input-config', 
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'value',
+            ),
+            header_children = Output(
+                {
+                    'type': 'single-input-header', 
+                    'supersection': ALL, 'purpose': 'header',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'children',
+            ),
+            trigger_data = Output(
+                {
+                    'type': 'input-group-config-update-trigger', 
+                    'supersection': ALL, 'purpose': 'trigger',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'data',
+            ),
+        ),
+        
+        inputs = dict(
+            changed_input_values = Input(
+                {
+                    'type': 'single-input-config', 
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'value',
+            ),
+            changed_dropdown_values = Input(
+                {
+                    'type': 'input-dropdown',
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'value',
+            ),
+            changed_toggle_values = Input(
+                {
+                    'type': 'input-toggle',
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'value',
+            ),
+            changed_action_button_n_clicks = Input(
+                {
+                    'type': 'input-action-button',
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'n_clicks',
+            )
+        ),
 
-        Input({
-            'type': 'single-input-config', 
-            'supersection': ALL, 'purpose': ALL,
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'value'),
-        Input({
-            'type': 'input-dropdown',
-            'supersection': ALL, 'purpose': ALL,
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'value'),
-        Input({
-            'type': 'input-toggle',
-            'supersection': ALL, 'purpose': ALL,
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'value'),
-        Input({
-            'type': 'input-action-button',
-            'supersection': ALL, 'purpose': ALL,
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'n_clicks'),
-
-        State({
-            'type': 'single-input-config', 
-            'supersection': ALL, 'purpose': ALL,
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'id'),
-        State({
-            'type': 'single-input-header', 
-            'supersection': ALL, 'purpose': 'header',
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'id'),
-        State({
-            'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': 'trigger',
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'id'),
-
-        State('active-project-id', 'data'),
-        State('app-state', 'data'),
+        state = dict(
+            input_ids = State(
+                {
+                    'type': 'single-input-config', 
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'id'
+            ),
+            header_ids = State(
+                {
+                    'type': 'single-input-header', 
+                    'supersection': ALL, 'purpose': 'header',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'id'
+            ),
+            trigger_ids = State(
+                {
+                    'type': 'input-group-config-update-trigger', 
+                    'supersection': ALL, 'purpose': 'trigger',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'id'
+            ),
+            active_project_id = State('active-project-id', 'data'),
+            app_state = State('app-state', 'data'),
+        ),
 
         prevent_initial_call = True
     )
     def react_to_input_change(
-        changed_input_values,
-        changed_dropdown_values,
-        changed_toggle_values,
-        changed_action_button_values,
         input_ids,
         header_ids,
         trigger_ids,
 
         active_project_id,
-        app_state
+        app_state,
+        **kwargs
     ):
         
         print('Triggering object was ', ctx.triggered_id, type(ctx.triggered_id))
@@ -270,9 +302,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         if trigger_id is None or active_project_id is None:
             raise PreventUpdate
 
-        input_returns: list[Any] = [no_update] * len(input_ids)
-        header_returns: list[Any] = [no_update] * len(header_ids)
-        trigger_returns: list[Any] = [no_update] * len(trigger_ids)
+        rval = callback_utils.create_noupdate_return()
 
         now = time.time_ns()
         
@@ -308,13 +338,13 @@ def add_input_container_callbacks(app: NewsegsDash):
                                     content_creator = None
                                 if content_creator:
                                     varid =  make_varid(**trigger_id)
-                                    header_returns[idx] = content_creator(varid, mm)
+                                    rval['header_children'][idx] = content_creator(varid, mm)
 
                             # Update triggers
                             for idx, id in enumerate(trigger_ids):
                                 match id['supersection']:
                                     case 'dsa':
-                                        trigger_returns[idx] = now
+                                        rval['trigger_data'][idx] = now
 
                             # Sync project to store
                             app.project_provider.upsert_component(proj)
@@ -356,9 +386,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 # Update inputs
                 for idx, id in enumerate(input_ids):
                     if id['purpose'] == 'bound-lower':
-                        input_returns[idx] = dsa_lower
+                        rval['input_values'][idx] = dsa_lower
                     if id['purpose'] == 'bound-upper':
-                        input_returns[idx] = dsa_upper
+                        rval['input_values'][idx] = dsa_upper
 
                 # Update headers
                 for idx, id in enumerate(header_ids):
@@ -370,7 +400,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                         content_creator = None
                     if content_creator:
                         varid =  make_varid(**trigger_id)
-                        header_returns[idx] = content_creator(varid, mm)
+                        rval['header_children'][idx] = content_creator(varid, mm)
                 
                 # Update triggers with a dictionary, not an integer
                 trig_val = json.dumps({
@@ -380,7 +410,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                 for idx, id in enumerate(trigger_ids):
                     match id['supersection']:
                         case 'dsa':
-                            trigger_returns[idx] = trig_val
+                            rval['trigger_data'][idx] = trig_val
 
                  # Sync project to store
                 app.project_provider.upsert_component(proj)
@@ -404,7 +434,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                 for idx, id in enumerate(trigger_ids):
                     match id['supersection']:
                         case 'dsa':
-                            trigger_returns[idx] = trig_val
+                            rval['trigger_data'][idx] = trig_val
 
                 # Sync project to store
                 app.project_provider.upsert_component(proj)
@@ -419,17 +449,18 @@ def add_input_container_callbacks(app: NewsegsDash):
                     return handler(
                         trigger_id,
                         input_ids,
-                        changed_input_values,
                         header_ids,
                         trigger_ids,
+                        kwargs,
                         active_project_id,
-                        app.project_provider
+                        app.project_provider,
+                        return_dict = rval
                     )
                 else:
                     print(f'No handlers for purpose {trigger_id["purpose"]}')
                     raise PreventUpdate
 
-        return (input_returns, header_returns, trigger_returns)
+        return rval
 
     @app.callback(
         Output({

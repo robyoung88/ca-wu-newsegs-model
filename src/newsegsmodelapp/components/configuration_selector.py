@@ -353,7 +353,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         
         proj.revision += 1
         
-        app.project_provider.upsert_component(proj, force = True)
+        app.project_provider.upsert_component(proj)
 
         # Trigger interface update
         return active_project_id

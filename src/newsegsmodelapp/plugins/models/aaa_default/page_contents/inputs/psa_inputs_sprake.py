@@ -165,11 +165,12 @@ def return_draws_input(
 def handle_psa_settings(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
+    return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ):
     if new_val is None:
@@ -178,10 +179,6 @@ def handle_psa_settings(
             new_val = 0
 
     proj = project_provider.get_project(active_project_id)
-
-    input_returns: list[Any] = [no_update] * len(input_ids)
-    header_returns: list[Any] = [no_update] * len(header_ids)
-    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
 
     now = time.time_ns()
 
@@ -208,33 +205,34 @@ def handle_psa_settings(
 
 
     if not modified:
-        raise PreventUpdate
+        return return_dict
 
     # Feed back current parameters
     for idx, id in enumerate(input_ids):
         if id['purpose'] == 'psa-settings':
-            input_returns[idx] = new_val
+            return_dict['input_values'][idx] = new_val
 
      # Update triggers
     for idx, id in enumerate(trigger_ids):
-        trigger_returns[idx] = now
+        return_dict['trigger_data'][idx] = now
   
     # Sync project to store
     project_provider.upsert_component(proj)
 
-    return input_returns, header_returns, trigger_returns
+    return return_dict
 
 @register_input_handler('psa-active')
 def handle_psa_active(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
+    return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
-):
+) -> dict[str, Any]:
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
 
@@ -243,13 +241,9 @@ def handle_psa_active(
     varid =  make_varid(**triggered_id)
     var = mm.variables.get(varid)
     if not var or new_val == var.psa_selected:
-        raise PreventUpdate
+        return return_dict
 
     var.psa_selected = new_val
-
-    input_returns: list[Any] = [no_update] * len(input_ids)
-    header_returns: list[Any] = [no_update] * len(header_ids)
-    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
 
     now = time.time_ns()
     # Update triggers with a dictionary, not an integer
@@ -260,9 +254,9 @@ def handle_psa_active(
     for idx, id in enumerate(trigger_ids):
         match id['supersection']:
             case 'psa':
-                trigger_returns[idx] = trig_val
+                return_dict['trigger_data'][idx] = trig_val
 
     # Sync project to store
     project_provider.upsert_component(proj)
     
-    return input_returns, header_returns, trigger_returns
+    return return_dict
