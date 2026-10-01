@@ -33,38 +33,22 @@
                 "value": "0 days 01:00:00"
             },
             "_n": 87648
-        },
-        "timestep": {
-            "class": "Timedelta",
-            "constructor_class": "Timedelta",
-            "value": "0 days 01:00:00"
         }
     },
-    "uuid": "508bb59b-f492-437b-8312-64cdaafb087c",
+    "uuid": "f95544e1-1999-49ff-9faa-43f0ccd6fb1e",
     "_name": "Sprake Energy Model",
     "_component_ids": {
-        "grid": "cmp-c0443941-5acb-4a8c-9065-a438bb1c29ce",
-        "generation": "cmp-586115e9-cc57-4c30-991b-ad72afc35731",
-        "consumption_storage": "cmp-d12713da-d900-4fcc-8c09-6120fbf4c127",
-        "table_config": "cmp-82c084d0-b6f8-44ac-b77e-7770adc5a757"
+        "grid": "cmp-a2b0e9c9-5420-4b28-8dbd-cea773768c41",
+        "generation": "cmp-03b7f7b8-2c66-4133-a99c-c5e6cadc087b",
+        "consumption_storage": "cmp-ece7ddd3-852d-4ebf-9cbb-21825c592b3a",
+        "table_config": "cmp-4b4dd423-35ae-4b30-a890-6e5af7aa0a9e",
+        "model_data": "cmp-a130c789-b6fb-4c38-b62c-946d57c8411b"
     },
-    "_model_data": {
-        "class": "NewsegsModelData",
-        "constructor_class": "NewsegsComponent",
-        "_config": {
-            "class": "NoConfig",
-            "constructor_class": "DataWithRevision",
-            "_last_syncronised": 0,
-            "_revision": 0
-        },
-        "uuid": "8cfbd53e-a2d5-4a7a-95c4-798dd9c571e0",
-        "_component_ids": {}
-    },
-    "_model_data_id": "cmp-8cfbd53e-a2d5-4a7a-95c4-798dd9c571e0",
-    "_table_config_id": "cmp-82c084d0-b6f8-44ac-b77e-7770adc5a757",
-    "_generation_id": "cmp-586115e9-cc57-4c30-991b-ad72afc35731",
-    "_grid_id": "cmp-c0443941-5acb-4a8c-9065-a438bb1c29ce",
-    "_consumption_storage_id": "cmp-d12713da-d900-4fcc-8c09-6120fbf4c127",
+    "_model_data_id": "cmp-a130c789-b6fb-4c38-b62c-946d57c8411b",
+    "_table_config_id": "cmp-4b4dd423-35ae-4b30-a890-6e5af7aa0a9e",
+    "_generation_id": "cmp-03b7f7b8-2c66-4133-a99c-c5e6cadc087b",
+    "_grid_id": "cmp-a2b0e9c9-5420-4b28-8dbd-cea773768c41",
+    "_consumption_storage_id": "cmp-ece7ddd3-852d-4ebf-9cbb-21825c592b3a",
     "local_environment_server": "InMemoryLocalEnv v0.0.1; name: Local environment",
     "wider_environment_server": "DummyWiderEnv v0.0.1",
     "grid": {
@@ -75,10 +59,9 @@
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
             "_revision": 0,
-            "import_per_unit": 0.2,
-            "export_per_unit": 0.07
+            "import_per_unit": 0.2
         },
-        "uuid": "c0443941-5acb-4a8c-9065-a438bb1c29ce",
+        "uuid": "a2b0e9c9-5420-4b28-8dbd-cea773768c41",
         "_component_ids": {}
     },
     "generation": {
@@ -100,7 +83,7 @@
             "wind_capacity": 200.0,
             "pv_capacity": 200.0
         },
-        "uuid": "586115e9-cc57-4c30-991b-ad72afc35731",
+        "uuid": "03b7f7b8-2c66-4133-a99c-c5e6cadc087b",
         "_component_ids": {},
         "wind_capacity": 200.0,
         "pv_capacity": 200.0
@@ -120,30 +103,11 @@
                 "_lon": -3.477,
                 "_name": "St Asaph V72"
             },
-            "n_units": 100.0,
-            "ev_per_unit": 0.2,
-            "efficiency_reduction": 0.1,
-            "annual_residential_consumption_per_ev": 1314.72,
-            "ref_daily_consumption": 4.5,
-            "seasonal_variance": 0.2,
-            "hlp": 0.3,
-            "gfa": 105.0,
-            "timeseries_hdd_start": {
-                "class": "Timestamp",
-                "constructor_class": "Timestamp",
-                "ts_input": "2000-01-01 00:00:00+00:00",
-                "tz": "UTC"
-            },
-            "timeseries_model_start": {
-                "class": "Timestamp",
-                "constructor_class": "Timestamp",
-                "ts_input": "2000-01-01 00:00:00+00:00",
-                "tz": "UTC"
-            },
             "storage_capacity": 4000.0,
-            "storage_rte": 0.88
+            "hlp": 0.3,
+            "ev_per_unit": 0.2
         },
-        "uuid": "d12713da-d900-4fcc-8c09-6120fbf4c127",
+        "uuid": "ece7ddd3-852d-4ebf-9cbb-21825c592b3a",
         "_component_ids": {}
     },
     "table_config": {
@@ -155,7 +119,19 @@
             "_last_syncronised": 0,
             "_revision": 0
         },
-        "uuid": "82c084d0-b6f8-44ac-b77e-7770adc5a757",
+        "uuid": "4b4dd423-35ae-4b30-a890-6e5af7aa0a9e",
+        "_component_ids": {}
+    },
+    "model_data": {
+        "class": "NewsegsModelData",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "a130c789-b6fb-4c38-b62c-946d57c8411b",
         "_component_ids": {}
     }
 }

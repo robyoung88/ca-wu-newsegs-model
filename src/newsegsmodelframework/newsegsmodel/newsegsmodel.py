@@ -9,17 +9,18 @@ from typing import Any, Optional, override
 from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import location as modlocation
 from newsegsmodelframework.core import TimeSpan
+from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.newsegsmodule import NewsegsModule
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.core.serialisation import T
-from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from newsegsmodelframework.newsegsgrid import NewsegsGrid
 from newsegsmodelframework.newsegscs import NewsegsCS
 
 from newsegsmodelframework.core import newsegsmodelinterface
 
-class NewsegsModelProperty(newsegscomponent.ComponentProperty):
+class NewsegsModelProperty(ComponentProperty):
     @override
     def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'): # pyright: ignore[reportIncompatibleMethodOverride]
         if not isinstance(instance, NewsegsModel):
@@ -72,8 +73,8 @@ class NewsegsModel(
     _version = '0.0.1'
     _id_prefix = 'm'
 
-    model_data = newsegscomponent.ComponentProperty(default = NewsegsModelData)
-    table_config = newsegscomponent.ComponentProperty(default = newsegscomponent.TableConfigNewsegsComponent)
+    model_data = ComponentProperty(default = NewsegsModelData)
+    table_config = ComponentProperty(default = newsegscomponent.TableConfigNewsegsComponent)
 
     _last_hash = 1
 
@@ -280,6 +281,24 @@ class NewsegsModel(
         if not isinstance(config, dict):
             super().update(config)
             return
+        
+        type_ = type(self)
+
+        # If config exists in the dict, it has to be the first thing out
+        inst_config = config.pop('_config', None)
+        if inst_config:
+            if isinstance(inst_config, dict):
+                child_cc = inst_config.get('constructor_class', None)
+                child_classname = inst_config.get('class', None)
+                if child_cc is not None and child_classname is not None:
+                    inst_config = find_constructor(child_cc, child_classname)(inst_config)
+                else:
+                    inst_config = type_.unserialise_dict(inst_config)
+            
+            setattr(self, '_config', inst_config)
+        elif not hasattr(self, '_config'):
+            # Need to generate a fresh config
+            setattr(self, '_config', self._generate_config())
         
         for mod_name in ('mod_gen', '_mod_gen', 'generation'):
             generation = config.pop(mod_name, None)

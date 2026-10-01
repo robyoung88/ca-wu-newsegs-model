@@ -10,7 +10,6 @@ import pandas as pd
 
 from newsegsmodelframework.core.environment.dummy_env_servers import DummyWiderEnv
 from newsegsmodelframework.core.location.location import RaisedLocation
-from newsegsmodelframework.core.newsegscomponent import ComponentProperty
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location as modlocation

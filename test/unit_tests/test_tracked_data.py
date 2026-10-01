@@ -39,9 +39,9 @@ class TestRevisionIncrements(unittest.TestCase):
         parent, child = create_parent_and_child()
 
         self.assertEqual(child.revision, 0)
-        self.assertEqual(child.revision_string, '0.0.0.0.0') # Parent + 2 observable list + 2 observable dict
+        
         self.assertEqual(parent.revision, 0)
-        self.assertEqual(parent.revision_string, '0.0.0.0.0.0.0.0.0.0.0.0.0.0.0')
+        
 
         self.assertFalse(parent.modified)
 

@@ -6,23 +6,40 @@
         "constructor_class": "DataWithRevision",
         "_last_syncronised": 0,
         "_revision": 5,
-        "benefit_discount_rate": 0.035,
-        "cost_discount_rate": 0.035,
-        "wind_capex_per_kw": 1500.0,
-        "wind_om_per_kw_year": 46.0,
-        "pv_capex_per_kw": 1000.0,
-        "pv_om_per_kw_year": 10.5,
-        "bess_capex_per_kwh": 191.772,
-        "bess_om_per_kwh_year": 16.719,
-        "resident_sc_per_unit_day": 0.0,
         "resident_var_per_unit": 0.2975,
-        "grid_export_var_per_unit": 0.1,
-        "grid_import_sc_per_day": 0.0,
-        "grid_import_var_per_unit": 0.35
+        "benefit_discount_rate": 0.035,
+        "cost_discount_rate": 0.035
     },
-    "uuid": "f134aae4-c3fa-4ff1-ba34-03093b3ce352",
-    "_component_ids": {},
-    "_finance_data_id": "cmp-c08161ca-102f-4cfd-bb4a-e49e5c4912f7",
-    "_table_config_id": "cmp-0912487d-c9f3-4e6d-b6d4-7a20b86330d1",
-    "horizon": -1
+    "uuid": "d77f941e-d9d9-4699-b207-ef9fc476273a",
+    "_component_ids": {
+        "finance_data": "cmp-6ab7f83d-33ad-4434-b761-14a3b9d79c77",
+        "table_config": "cmp-e959bea8-890e-4628-871a-cd21dad210e6"
+    },
+    "_finance_data_id": "cmp-6ab7f83d-33ad-4434-b761-14a3b9d79c77",
+    "_table_config_id": "cmp-e959bea8-890e-4628-871a-cd21dad210e6",
+    "horizon": -1,
+    "finance_data": {
+        "class": "NewsegsFinanceData",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "6ab7f83d-33ad-4434-b761-14a3b9d79c77",
+        "_component_ids": {}
+    },
+    "table_config": {
+        "class": "TableConfigNewsegsComponent",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "e959bea8-890e-4628-871a-cd21dad210e6",
+        "_component_ids": {}
+    }
 }

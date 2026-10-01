@@ -4,14 +4,13 @@ A container and controller for metamodels and variables.
 Provides a class which encapsulates multiple NewSEGS metamodels, for multi-way
 sensitivity analysis.
 """
-from collections import OrderedDict
 from typing import Any, Iterable, Optional, Sequence, override
 from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
-from newsegsmodelframework.core.newsegscomponent import ComponentListProperty, ComponentProperty, NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface
+from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable

@@ -5,16 +5,14 @@ from dataclasses import asdict
 import os
 import copy
 import datetime
-from typing import Any, Type, cast, override, Mapping, Sequence
+from typing import Any, override, Mapping
 from functools import singledispatchmethod
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 
-from newsegsmodelframework.core.newsegscomponent import ComponentProperty
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import revision_dataclass
 from .newsegsgeneration import NewsegsGeneration, NewsegsGenerationConfig
 from newsegsmodelframework.core import location
 from newsegsmodelframework.core import generation

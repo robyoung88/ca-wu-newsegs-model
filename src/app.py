@@ -102,6 +102,7 @@ def serve_layout():
         dcc.Store(id = 'layout-update-trigger', data = '', storage_type = 'memory'),
         dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
         dcc.Store(id = 'trigger-check-requests', data = 0, storage_type = 'memory'),
+        dcc.Store(id = 'trigger-check-stale', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
     ] 

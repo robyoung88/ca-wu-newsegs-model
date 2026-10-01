@@ -25,14 +25,13 @@ For a psa run, a (small) number of statistics must be nominated to be held in a
 dataframe which will be accessible after completion; each row will correspond
 to a sample across all enabled PSA variables.
 """
-from collections import OrderedDict
 import datetime
 import logging
-from typing import Any, Mapping, MutableSequence, Optional, Sequence, override
+from typing import Any, Mapping, MutableSequence, Optional, override
 
 from newsegsmodelframework.core import serialisation
-from newsegsmodelframework.core.newsegscomponent import ComponentOrderedDictProperty, ComponentProperty, NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import DataWithRevision
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface
+from newsegsmodelframework.core.trackeddata import ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
@@ -63,10 +62,9 @@ def make_varid(
         section = 'None'
     return f'{section}.{key}.{subindex}'
 
-
+@revision_dataclass
 class NewsegsMetaModelConfig(DataWithRevision):
     ...
-
 
 class NewsegsMetaModel(NewsegsComponent):
     """A container and controller for models and variables."""
@@ -358,7 +356,7 @@ class NewsegsMetaModel(NewsegsComponent):
             var.update_model(self.finance)
         else:
             var.update_model(self.model)
-        self._variables_last_model_sync[varid] = var.revision_string
+        self._variables_last_model_sync[varid] = var.revision
         return var.configuration_type
     
     def sync_model_with_changed_variables_deterministic(
@@ -366,7 +364,7 @@ class NewsegsMetaModel(NewsegsComponent):
     ) -> set[str]:
         affected_models = set()
         for varid, var in self.variables.items():
-            if self._variables_last_model_sync.get(varid, '0') != var.revision_string:
+            if self._variables_last_model_sync.get(varid, 0) != var.revision:
                 try:
                     if isinstance(varid, str):
                         affected_models.add(self.update_model_from_variable_deterministic(varid)) 

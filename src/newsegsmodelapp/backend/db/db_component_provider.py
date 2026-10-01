@@ -1014,6 +1014,7 @@ class FromDatabaseNewsegsProjectProvider(
         vars_modified = any(x.modified for x in v_to_sync)
         self.variable_provider.upsert_variable(v_to_sync)
         if vars_modified:
+            project.revision += 1
             project.table_config.revision += 1
         self.metamodel_provider.upsert_component(list(project.metamodels))
         super().upsert_component(project, force, tbl)

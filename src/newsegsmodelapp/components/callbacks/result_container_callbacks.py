@@ -1,5 +1,6 @@
 
 import json
+import time
 from typing import Any
 
 from dash import ALL, MATCH, Input, Output, State, ctx, no_update
@@ -106,6 +107,7 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
         Input('active-project-id', 'data'),
+        Input('trigger-check-stale', 'data'),
         State('app-state', 'data'),
 
         State({
@@ -118,6 +120,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         postaction_triggers,
         ann_hori_toggle,
         active_project_id,
+        check_stale,
         app_state,
         container_ids,
     ):
@@ -442,7 +445,9 @@ def add_result_container_callbacks(app: NewsegsDash):
                 {'type': 'result-tooltip', 'page': ALL}, 
                 'children',
             ),
-            
+            trigger_check_stale_data = Output(
+                'trigger-check-stale', 'data'
+            ),
         ),
         inputs = dict(
             data_stale = Input(
@@ -535,5 +540,6 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
         rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
+        rval['trigger_check_stale_data'] = time.time_ns()
 
         return rval

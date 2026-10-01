@@ -46,13 +46,13 @@ import pandas as pd
 from pvlib.modelchain import ModelChain as PVLibModelChain
 
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.core import SerialiseToDictMixin, newsegscomponent
+from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location
 from newsegsmodelframework.core.newsegsmodule import NewsegsModule
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
-from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, revision_dataclass
 from newsegsmodelframework.util import jsonfuncs
 
 T = TypeVar('T')
@@ -184,7 +184,7 @@ class ABCElecGenerator(
 ABCElecGenerator._excluded_attributes = super(ABCElecGenerator,ABCElecGenerator)._excluded_attributes + ('_model',)
 
 
-class NewsegsGeneratorProperty(newsegscomponent.ComponentProperty):
+class NewsegsGeneratorProperty(ComponentProperty):
     """Assign a property as a generator, so that it is assigned the current model on attachment."""
     @override
     def __set__(self, instance: ConfigurationMixin, value: ConfigurationMixin):
@@ -1493,76 +1493,56 @@ def _wrap_generator_value(val: Any, parent: ABCElecGenerator) -> Any:
     elif isinstance(val, list) and not isinstance(val, ObservableGeneratorList):
         return ObservableGeneratorList(val, parent = parent) # pyright: ignore[reportArgumentType]
 
-from newsegsmodelframework.core.trackeddata import wrap_value as default_wrap_value
-def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
-    if isinstance(val, SerialisedConfigurationMixin):
-        parent._add_child(val._config)
-        return val
-    return default_wrap_value(val, parent)
-
 class ObservableGeneratorList(ObservableList):
+    ...
 
-    @classmethod
-    @override
-    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
-        return wrap_value(val, parent)
+    # def __setitem__(self, index, value):
+    #     old_val = super().__getitem__(index)
+    #     new_val = value
+    #     if isinstance(new_val, ABCElecGenerator):
+    #         new_val._config = self._wrap_value(new_val._config, self)
+    #     else:
+    #         new_val = wrap_value(new_val, self)
+    #     if old_val != new_val:
+    #         if isinstance(old_val, ABCElecGenerator):
+    #             self._remove_child(old_val._config)
+    #         if isinstance(old_val, RevisionNotifierMixin):
+    #             self._remove_child(old_val)
+    #         elif isinstance(old_val, Iterable):
+    #             for x in old_val:
+    #                 if isinstance(x, RevisionNotifierMixin):
+    #                     self._remove_child(x)
 
-    def __init__(self, iterable = (), parent: Optional['RevisionNotifierMixin | ABCElecGenerator'] = None):
-        if parent:
-            if isinstance(parent, ABCElecGenerator):
-                super().__init__(iterable, parent = parent._config)
-            else:
-                super().__init__(iterable, parent)
-        else:
-            super().__init__(iterable)
+    #         list.__setitem__(self, index, new_val)
+    #         self._notify_change()
 
-    def __setitem__(self, index, value):
-        old_val = super().__getitem__(index)
-        new_val = value
-        if isinstance(new_val, ABCElecGenerator):
-            new_val._config = self._wrap_value(new_val._config, self)
-        else:
-            new_val = wrap_value(new_val, self)
-        if old_val != new_val:
-            if isinstance(old_val, ABCElecGenerator):
-                self._remove_child(old_val._config)
-            if isinstance(old_val, RevisionNotifierMixin):
-                self._remove_child(old_val)
-            elif isinstance(old_val, Iterable):
-                for x in old_val:
-                    if isinstance(x, RevisionNotifierMixin):
-                        self._remove_child(x)
+    # def pop(self, index: SupportsIndex = -1):
+    #     item = super().pop(index)
+    #     if isinstance(item, ABCElecGenerator):
+    #         self._remove_child(item._config)
 
-            list.__setitem__(self, index, new_val)
-            self._notify_change()
+    #     # Notify is handled by ObservableList
+    #     return item
 
-    def pop(self, index: SupportsIndex = -1):
-        item = super().pop(index)
-        if isinstance(item, ABCElecGenerator):
-            self._remove_child(item._config)
+    # def remove(self, value):
+    #     try:
+    #         idx = self.index(value)
+    #         item = self[idx]
+    #     except ValueError:
+    #         # Let the standard error be raised
+    #         list.remove(self, value)
+    #         return
 
-        # Notify is handled by ObservableList
-        return item
-
-    def remove(self, value):
-        try:
-            idx = self.index(value)
-            item = self[idx]
-        except ValueError:
-            # Let the standard error be raised
-            list.remove(self, value)
-            return
-
-        if isinstance(item, RevisionNotifierMixin):
-            self._remove_child(item)
-        elif isinstance(item, ABCElecGenerator):
-            self._remove_child(item._config)
+    #     if isinstance(item, RevisionNotifierMixin):
+    #         self._remove_child(item)
+    #     elif isinstance(item, ABCElecGenerator):
+    #         self._remove_child(item._config)
         
-        list.remove(self, value)
-        self._notify_change()
+    #     list.remove(self, value)
+    #     self._notify_change()
 
 
-class NewsegsGeneratorListProperty(newsegscomponent.ComponentProperty):
+class NewsegsGeneratorListProperty(ComponentProperty):
     """Assign a property as a list of generators."""
     @override
     def __set__(self, instance: ConfigurationMixin, value: ObservableGeneratorList): # type: ignore
@@ -1573,15 +1553,11 @@ class NewsegsGeneratorListProperty(newsegscomponent.ComponentProperty):
         #if not isinstance(value, ObservableGeneratorList):
             
         # Do not call super, as we need to add the list as a child, not a _config attribute
-        #super().__set__(instance, value)
 
         old_val = getattr(instance, self.name, None)
         if old_val is not None and old_val is not value:
             instance._config._remove_child(old_val)
 
-        #instance._config._add_child(value)
-        #for item in value:
-        #    _wrap_generator_value(item, instance) # pyright: ignore[reportArgumentType]
         instance._config._notify_change()
 
         setattr(instance, self.name, value)

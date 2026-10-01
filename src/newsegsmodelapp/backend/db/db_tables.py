@@ -81,7 +81,6 @@ component_configs = sa.Table(
     sa.Column('component_version', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
-    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('last_result_id', sa.Integer, nullable = True),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
@@ -110,7 +109,7 @@ results = sa.Table(
     sa.Column('component_class', sa.String),
     sa.Column('component_version', sa.String),
     sa.Column('component_config_revision', sa.Integer, default = 0),
-    #sa.Column('component_config_revision_string', sa.String, default = ''),
+    
     sa.Column('result_type', sa.String, nullable = False),
     sa.Column('result_file', sa.String),
     sa.Column('retain', sa.Boolean, default = False),
@@ -148,7 +147,6 @@ em_configs = sa.Table(
     sa.Column('model_version', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
-    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
 )
@@ -201,7 +199,6 @@ fm_configs = sa.Table(
     sa.Column('model_version', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
-    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
 )
@@ -238,7 +235,6 @@ metamodels = sa.Table(
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
-    #sa.Column('revision_string', sa.String, default = ''),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
     sa.Column('lat', sa.Float, default = 53.0),
@@ -286,7 +282,6 @@ projects = sa.Table(
     sa.Column('model_version', sa.String, nullable = False),
     sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
-    #sa.Column('revision_string', sa.String, default = ''),
 
     # TODO: Implement these groups
     #sa.Column('read_group_id', sa.Integer, sa.ForeignKey('groups.group_id'))

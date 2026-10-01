@@ -7,10 +7,10 @@ from typing import Optional
 import pandas as pd
 
 from newsegsmodelframework.core import NewsegsComponent
-from newsegsmodelframework.core.newsegscomponent import ComponentProperty, TableConfigNewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core import newsegsmodelinterface
-from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, revision_dataclass
 
 class NewsegsFinanceData(NewsegsComponent):
     """
@@ -502,13 +502,13 @@ class NewsegsFinance(NewsegsFinanceInterface):
             return hash(
                 (
                     self.id,
-                    self.revision_string,
+                    self.revision,
                 )
             )
         return hash(
             (
                 self.id,
-                self.revision_string,
+                self.revision,
                 mdl.id,
                 mdl.last_run
             )

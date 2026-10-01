@@ -167,7 +167,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 v.syncronise()
 
         vardata = {v.id: variable_to_raw_table_data(v) for v in var if v.id in requires_data}
-        revdata = {v.id: {'id': v.id, 'revision': v.revision, 'revision_string': v.revision_string} for v in var if v.id in requires_revision_increment}
+        revdata = {v.id: {'id': v.id, 'revision': v.revision} for v in var if v.id in requires_revision_increment}
 
         update_payload = [vardata[x] for x in requires_update]
         insert_payload = [vardata[x] for x in new_inserts]

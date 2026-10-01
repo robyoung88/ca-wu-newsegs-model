@@ -1,8 +1,9 @@
 import copy
-from typing import Any, Type, override
+from typing import Any, Sequence, override
 
+from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.serialisation import SerialiseToDictMixin
-from newsegsmodelframework.core.trackeddata import ConfigurationMixin
+from newsegsmodelframework.core.trackeddata import ComponentPropertyInterface, ConfigurationMixin
 
 
 class SerialisedConfigurationMixin(
@@ -30,7 +31,10 @@ class SerialisedConfigurationMixin(
         if not isinstance(config, dict):
             vars(self).update(copy.copy(vars(config)))
             return
+        
         config = config.copy()
+
+        # Type Guardrails        
         classname = config.pop('class', None)
         if not classname is None:
             if self.__class__.__name__ != classname:
@@ -39,40 +43,78 @@ class SerialisedConfigurationMixin(
         # Get rid of constructor class string for this instance
         config.pop('constructor_class', None)
 
-        config = type_.unserialise_dict(config)
-        
-        conf_keys = config.keys()
-        has_update = {}
-        is_tracked = {}
-        for k, v in vars(self).items():
-            if k in conf_keys:
-                if hasattr(v, 'update'):
-                    has_update[k] = config[k]
-
-        for k, v in vars(self._config).items():
-            if k in conf_keys:
-                if hasattr(v, 'update'):
-                    has_update[k] = config[k]
+        # If config exists in the dict, it has to be the first thing out
+        inst_config = config.pop('_config', None)
+        if inst_config:
+            if isinstance(inst_config, dict):
+                child_cc = inst_config.get('constructor_class', None)
+                child_classname = inst_config.get('class', None)
+                if child_cc is not None and child_classname is not None:
+                    inst_config = find_constructor(child_cc, child_classname)(inst_config)
                 else:
-                    is_tracked[k] = config[k]    
+                    inst_config = type_.unserialise_dict(inst_config)
+            
+            setattr(self, '_config', inst_config)
+        elif not hasattr(self, '_config'):
+            # Need to generate a fresh config
+            setattr(self, '_config', self._generate_config())
 
-        for k in has_update.keys():
+        # We want to be able to accept property updates, but need to strip
+        # them out of the update dict and apply them after other updates
+        property_updates = {}
+        for k in config.keys():
+            # (Writable) properties are expected to be attributes on the class which either implement ComponentPropertyInterface or have a valid fset
+            if hasattr(type_, k):
+                prop = getattr(type_, k)
+                if (
+                    isinstance(prop, ComponentPropertyInterface) 
+                    or hasattr(prop, 'fset') and getattr(prop, 'fset') is not None
+                ):
+                    v = config.get(k)
+                    if isinstance(v, dict):
+                        child_cc = v.get('constructor_class', None)
+                        child_classname = v.get('class', None)
+                        if child_cc is not None and child_classname is not None:
+                            v = find_constructor(child_cc, child_classname)(v)
+                        else:
+                            v = type_.unserialise_dict(v)
+                    elif not isinstance(v, str) and isinstance(v, Sequence):
+                        requiresupdate = False
+                        for childv in v:
+                            if isinstance(childv, dict):
+                                requiresupdate = True
+                                break
+                        if requiresupdate:
+                            templist = list(v)
+                            for i, childv in enumerate(v):
+                                if isinstance(childv, dict):
+                                    child_cc = childv.get('constructor_class', None)
+                                    child_classname = childv.get('class', None)
+                                    if child_cc is not None and child_classname is not None:
+                                        templist[i] = find_constructor(child_cc, child_classname)(childv)
+                                    else:
+                                        templist[i] = type_.unserialise_dict(childv)
+                            v = type(v)(templist) # pyright: ignore[reportCallIssue]
+                    
+                    property_updates[k] = v
+
+        # Remove items which update properties
+        for k in property_updates.keys():
             config.pop(k)
 
-        for k, v in is_tracked.items():
-            setattr(self._config, k, v)
-            config.pop(k)
+        # Remainder do a standard update
+        super().update(config)
 
-        vars(self).update(config)
-
-        for k, v in has_update.items():
-            getattr(self, k).update(v)
+        # Not all properties have a valid fset; if so, we are going to overwrite it
+        for k, v in property_updates.items():
+            try:
+                prop = getattr(type_, k)
+                getattr(prop, 'fset')(self, v)
+            except AttributeError:
+                setattr(self, k, v)
 
     @override
     def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
-        #if '_config' in odict:
-        #    odict.update(odict['_config'])
-        #    odict.pop('_config')
         return odict
     

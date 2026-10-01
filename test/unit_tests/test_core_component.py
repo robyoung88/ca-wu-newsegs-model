@@ -6,8 +6,8 @@ from typing import Optional, cast, override
 import unittest
 
 from newsegsmodelframework.core.constructors.constructors import find_constructor
-from newsegsmodelframework.core.trackeddata import revision_dataclass, DataWithRevision
-from newsegsmodelframework.core.newsegscomponent import ComponentProperty, NewsegsComponent
+from newsegsmodelframework.core.trackeddata import ComponentProperty, revision_dataclass, DataWithRevision
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 from newsegsmodelframework import register_plugins
 from newsegsmodelframework.core.constructors import registers
 
