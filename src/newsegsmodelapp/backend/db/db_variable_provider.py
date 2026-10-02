@@ -28,6 +28,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
     def _reconstruct_variable(self, row) -> Variable:
         v = _variable_from_json(row.payload)
         v.id = row.id # ID may have been reassigned in database
+        v.soft_dirty = False
         if v.revision != row.revision:
             if v.revision > row.revision:
                 print(f'WARNING - Variable has been constructed with revision greater than stored in row: Payload = {v.revision}, Row = {row.revision}')
@@ -126,6 +127,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             var = [var, ]
 
         current_revisions = {x.id: x.revision for x in var}
+        soft_dirty = {x.id: x.soft_dirty for x in var}
         uids = list(current_revisions.keys())
 
         # Get saved revision if exists
@@ -145,7 +147,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         new_inserts = [str(x) for x in uids if x not in existing_uids]
         requires_revision_increment = []
         if not force:
-            requires_update = [x for x in existing_uids if current_revisions[x] != saved_revisions[x]]
+            requires_update = [x for x in existing_uids if (current_revisions[x] != saved_revisions[x]) or soft_dirty[x]]
             for x in var:
                 if x.id not in new_inserts and x.id not in requires_update:
                     if x.chain_modified:

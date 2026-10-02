@@ -489,21 +489,18 @@ class TestChildComponentRevisions(unittest.TestCase):
         child.simple_prop = 2
         self.assertTrue(child.modified)
         self.assertEqual(child.revision, r0_c + 1)
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified) # Subscription works!
         self.assertTrue(parent.chain_modified)
         
         parent.chain_syncronise()
         self.assertFalse(child.modified)
         self.assertFalse(parent.chain_modified)
 
-        # ObservableList - basic type
-        x = 5
-
         child.obj_prop['alice'] = 'bob'
         self.assertTrue(child.modified)
         self.assertEqual(child.revision, r0_c + 2)
         self.assertTrue(len(child._config._children), 2)
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
         
         parent.chain_syncronise()
@@ -514,7 +511,7 @@ class TestChildComponentRevisions(unittest.TestCase):
         self.assertTrue(child.modified)
         self.assertEqual(child.revision, r0_c + 3)
         self.assertTrue(len(child._config._children), 3)
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
         
         parent.chain_syncronise()
@@ -525,7 +522,7 @@ class TestChildComponentRevisions(unittest.TestCase):
         parent.child = newchild
         self.assertFalse(parent.child.modified)
         self.assertTrue(parent.modified)
-        self.assertEqual(parent.revision, r0_p + 1)
+        self.assertEqual(parent.revision, r0_p + 4)
         self.assertTrue(len(parent._config._children), 1)
 
         parent.chain_syncronise()

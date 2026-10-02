@@ -76,6 +76,8 @@ def get_sprake_ned100():
         loc = tloc,
         cp_curve=cpcurve.to_numpy().T
     )
+    turbine.revision = 0
+    turbine._config._last_syncronised = -1
 
     return turbine
 
@@ -188,6 +190,8 @@ class SprakeGeneration(NewsegsGeneration):
             self.location = self._config.location # pyright: ignore[reportAttributeAccessIssue]
 
         self.generator.generators[1].location.height_agl = 2. # pyright: ignore[reportAttributeAccessIssue]
+        # Once constructed, the generator is not saved out so we can syncronise it now
+        self.generator.chain_syncronise()
 
     @__init__.register(generation.PowerPlantHeterogeneousGenerators)
     def _from_PowerPlantHeterogeneousGenerators(
@@ -198,6 +202,7 @@ class SprakeGeneration(NewsegsGeneration):
     ) -> None:
         super().__init__(*args, **kwargs)
         self._generator = copy.deepcopy(generator)
+        self.generator.chain_syncronise()
 
         # Set the capacities again
         self.pv_capacity = self._config.pv_capacity
@@ -221,6 +226,7 @@ class SprakeGeneration(NewsegsGeneration):
     def model(self, model: NewsegsModelInterface) -> None:
         try:
             self.generator.model = model
+            self.generator.chain_syncronise()
         except AttributeError:
             pass
         model_setter = NewsegsGeneration.model.fset
@@ -241,6 +247,7 @@ class SprakeGeneration(NewsegsGeneration):
         loc = location.Location(loc)
         try:
             self.generator.location = loc
+            self.generator.chain_syncronise()
         except AttributeError:
             pass
         self._config.location = loc # pyright: ignore[reportAttributeAccessIssue]
@@ -273,6 +280,7 @@ class SprakeGeneration(NewsegsGeneration):
         wind_cap = self._config.wind_capacity
         if self.generator and not self.generator.generators[0].nameplate_capacity == wind_cap:
             self.generator.generators[0].set_nameplate_capacity(wind_cap)
+            self.generator.chain_syncronise()
         return wind_cap
     
     @wind_capacity.setter
@@ -281,6 +289,7 @@ class SprakeGeneration(NewsegsGeneration):
             self._config.wind_capacity = capacity
         if self.generator:
             self.generator.generators[0].set_nameplate_capacity(capacity)
+            self.generator.chain_syncronise()
     
     @property
     def pv_capacity(self) -> float:
@@ -290,6 +299,7 @@ class SprakeGeneration(NewsegsGeneration):
         pv_cap = self._config.pv_capacity
         if self.generator and not self.generator.generators[1].nameplate_capacity == pv_cap:
             self.generator.generators[1].set_nameplate_capacity(pv_cap)
+            self.generator.chain_syncronise()
         return pv_cap
     
     @pv_capacity.setter
@@ -298,16 +308,21 @@ class SprakeGeneration(NewsegsGeneration):
             self._config.pv_capacity = capacity
         if self.generator:
             self.generator.generators[1].set_nameplate_capacity(capacity)
+            self.generator.chain_syncronise()
 
     @override
     def update(self, config):
         super().update(config)
+        r0 = self.revision
         if isinstance(config, Mapping):
             if '_config' in config.keys():
                 if 'pv_capacity' in config['_config'].keys():
                     self.pv_capacity = self._config.pv_capacity
                 if 'wind_capacity' in config['_config'].keys():
                     self.wind_capacity = self._config.wind_capacity
+        self.generator.chain_syncronise()
+        self.revision = r0
+        
     
     @override
     def to_dict(self) -> dict[str, Any]:
@@ -348,6 +363,7 @@ def _SprakeGeneration_from_other(
         setattr(self, k, copy.copy(getattr(other, k)))
 
     self.generator = copy.deepcopy(other.generator)
+    self.generator.chain_syncronise()
 
 # Exclude generator as not necessary - add it back in afterwards
 SprakeGeneration._excluded_attributes = (

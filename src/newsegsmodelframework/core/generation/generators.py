@@ -168,18 +168,18 @@ class ABCElecGenerator(
         The total nameplate capacity in kW.
         """
 
-    @classmethod
-    @override
-    def from_dict(cls, config):
-        config = config.copy()
-        #cfg = config.pop('_config', None)
-        inst = cls.__new__(cls)
-        inst._config = inst._generate_config()
-        inst.update(config)
-        #if cfg:
-        #    for k, v in cfg.items():
-        #        setattr(inst, k, v)
-        return inst
+    # @classmethod
+    # @override
+    # def from_dict(cls, config):
+    #     config = config.copy()
+    #     #cfg = config.pop('_config', None)
+    #     inst = cls.__new__(cls)
+    #     inst._config = inst._generate_config()
+    #     inst.update(config)
+    #     #if cfg:
+    #     #    for k, v in cfg.items():
+    #     #        setattr(inst, k, v)
+    #     return inst
 
 ABCElecGenerator._excluded_attributes = super(ABCElecGenerator,ABCElecGenerator)._excluded_attributes + ('_model',)
 
@@ -259,7 +259,7 @@ class WindTurbineElecGeneratorConfig(ABCElecGeneratorConfig):
         return json.dumps(self.to_dict(), cls = jsonfuncs.NumpyEncoder)
 
     @override
-    def update(self, config: dict[str, Any] | type[serialisation.T]):
+    def update(self, config: dict[str, Any] | type[serialisation.T]): # pyright: ignore[reportIncompatibleMethodOverride]
         super().update(config)
         if isinstance(config, dict) and '_cp_curve' in config.keys():
             self.set_cp_curve(np.asarray(self._cp_curve))
@@ -331,7 +331,7 @@ class WindTurbineElecGeneratorConfig(ABCElecGeneratorConfig):
         """
         State for pickling.
         """
-        odict = self.__dict__.copy()
+        odict = super().__getstate__()
         odict.pop('cp', None)
         return odict
 
@@ -342,7 +342,7 @@ class WindTurbineElecGeneratorConfig(ABCElecGeneratorConfig):
         Essentially copies over the state to the __dict__ then
         forces creation of the _cp_func.
         """
-        vars(self).update(state)
+        super().__setstate__(state)
         self.set_cp_curve(self._cp_curve)
 
 

@@ -140,6 +140,35 @@ class NewsegsComponent(
         # Ensure that revision is not incremented due to reattachment
         self.revision = r0
 
+    def _get_component_properties(self):
+        # Stage 1 - strip out the dunders
+        comp_props = [x for x in dir(self) if not x.startswith('__')]
+        # Stage 2 - check has attribute
+        comp_props = [x for x in comp_props if hasattr(self, x)]
+        # Stage 3 - check has '_last_syncronised'
+        comp_props = [x for x in comp_props if hasattr(getattr(self, x), '_last_syncronised')]
+        # Stage 4 - keep only the single underscore versions
+        comp_props.sort()
+        r_props = set()
+        for x in comp_props:
+            if not '_' + x in r_props:
+                r_props.add(x)
+        return r_props
+
+    def reset_revision(self, chain: bool = True):
+        """Set the revision to 0 and _last_syncronised to -1
+        
+        If chain, also perform this for all ComponentProperties
+    """
+        if chain:
+            comp_props = self._get_component_properties()
+            for propname in comp_props:
+                att = getattr(self, propname)
+                att.revision = 0
+                att._last_syncronised = -1
+        self.revision = 0
+        self._last_syncronised = -1        
+
     @property
     def dirty(self):
         return self.chain_modified

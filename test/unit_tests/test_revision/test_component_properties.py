@@ -92,7 +92,7 @@ class TestChildComponentProperties(unittest.TestCase):
 
         child1.simple_prop += 1
 
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
         self.assertTrue(parent.components_children[0].modified)
 
@@ -109,7 +109,7 @@ class TestChildComponentProperties(unittest.TestCase):
         parent.chain_syncronise()
 
         child3.simple_prop += 1
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
 
         parent.chain_syncronise()
@@ -128,7 +128,7 @@ class TestChildComponentProperties(unittest.TestCase):
         parent.chain_syncronise()
 
         child1.simple_prop += 1
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
 
 
@@ -145,7 +145,7 @@ class TestChildComponentProperties(unittest.TestCase):
 
         child1.simple_prop += 1
         
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
         self.assertTrue(list(parent.variables.values())[0].modified)
 
@@ -162,7 +162,7 @@ class TestChildComponentProperties(unittest.TestCase):
         parent.chain_syncronise()
         
         child3.simple_prop += 1
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
 
         parent.chain_syncronise()
@@ -181,5 +181,5 @@ class TestChildComponentProperties(unittest.TestCase):
         parent.chain_syncronise()
 
         child1.simple_prop += 1
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)

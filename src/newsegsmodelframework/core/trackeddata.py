@@ -133,7 +133,7 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
 
     def new_init(self, *args, **kwargs):
         # Initialize internal revision tracking before dataclass assigns fields
-        RevisionNotifierMixin.__init__(self)
+        SubscriptionRevisionNotifierMixin.__init__(self)
 
         # Run standard dataclass initializer
         orig_init(self, *args, **kwargs)
@@ -184,10 +184,99 @@ class RevisionDataMeta(type):
         return super().__call__(*args, **kwargs)
 
 
-class DataWithRevision(RevisionNotifierMixin, serialisation.SerialiseToDictMixin, metaclass = RevisionDataMeta):
+def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
+    """Wraps mutable structures or assigns children to parent objects."""
+    if isinstance(val, RevisionNotifierMixin):
+        parent._add_child(val)
+        return val
+    elif isinstance(val, ConfigurationMixin):
+        val.subscribe(parent)
+        return val
+    elif isinstance(val, list):
+        if isinstance(val, ObservableList):
+            val.subscribe(parent)
+            return val
+        else:
+            return ObservableList(val, subscribers = parent)
+    elif isinstance(val, dict):
+        if isinstance(val, ObservableDict):
+            val.subscribe(parent)
+            return val
+        else:
+            return ObservableDict(val, subscribers = parent)
+    elif isinstance(val, str):
+        return val        
+    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierMixin):
+        for x in val:
+            if isinstance(x, RevisionNotifierMixin):
+                parent._add_child(x)
+    return val
+
+
+class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
+    """Extends RevisionNotifierMixin to increment subscriber revisions when change occurs"""
+
+    @classmethod
+    def _wrap_value(cls, val: Any, subscribers: Iterable[RevisionNotifierMixin]) -> Any:
+        for subscriber in subscribers:
+            val = wrap_value(val, subscriber)
+        return val
+
+    def __init__(
+        self, 
+        *args,
+        subscribers: Optional[RevisionNotifierMixin | Iterable[RevisionNotifierMixin]] = None,
+        **kwargs
+        ):
+        if subscribers is not None:
+            if isinstance(subscribers, RevisionNotifierMixin):
+                self._subscribers = [subscribers,]
+            else:
+                self._subscribers = list(subscribers)
+        else:
+            self._subscribers = []
+        super().__init__(*args, **kwargs)
+
+    @override
+    def _notify_change(self, broadcast: bool = True):
+        super()._notify_change()
+        if broadcast:
+            for subscriber in self._subscribers:
+                subscriber._notify_change()
+
+    def subscribe(self, subscriber: 'RevisionNotifierMixin | ConfigurationMixin'):
+        # Addition to subscriber list occurs in _add_child
+        if isinstance(subscriber, ConfigurationMixin):
+            subscriber._config._add_child(self, subscribe = True)
+        else:
+            subscriber._add_child(self, subscribe = True)
+
+    def unsubscribe(self, subscriber: 'RevisionNotifierMixin | ConfigurationMixin'):
+        if isinstance(subscriber, ConfigurationMixin):
+            search_subscriber = subscriber._config
+        else:
+            search_subscriber = subscriber
+        for idx, x in enumerate(self._subscribers):
+            if x is search_subscriber:
+                # Pop the first, then stop. If multiple entries for subscriber, that's OK.
+                self._subscribers.pop(idx)
+                return
+
+    def __setstate__(self, state):
+        
+        object.__setattr__(self, "_subscribers", state.pop("_subscribers", []))
+        super().__setstate__(state)
+
+    def __getstate__(self) -> dict:
+        odict =  super().__getstate__()
+        del odict['_subscribers']
+        return odict
+
+
+class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin, metaclass = RevisionDataMeta):
     """Base class for all revision-tracked dataclasses."""
     _constructor_class = 'DataWithRevision'
-    _excluded_attributes = ('_children', )
+    _excluded_attributes = ('_children', '_subscribers' )
 
     @override
     def update(self, config: dict[str, Any] | type[T]):
@@ -239,6 +328,7 @@ class DataWithRevision(RevisionNotifierMixin, serialisation.SerialiseToDictMixin
     def from_dict(cls, config):
         inst = cls.__new__(cls)
         inst._children = []
+        inst._subscribers = []
         inst.update(config)
         return inst
 
@@ -353,97 +443,6 @@ class ConfigurationMixin:
 
     def chain_syncronise(self):
         self._config._chain_syncronise()
-
-
-
-
-
-def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
-    """Wraps mutable structures or assigns children to parent objects."""
-    if isinstance(val, RevisionNotifierMixin):
-        parent._add_child(val)
-        return val
-    elif isinstance(val, ConfigurationMixin):
-        parent._add_child(val._config)
-        return val
-    elif isinstance(val, list):
-        if isinstance(val, ObservableList):
-            val.subscribe(parent)
-            return val
-        else:
-            return ObservableList(val, subscribers = parent)
-    elif isinstance(val, dict):
-        if isinstance(val, ObservableDict):
-            val.subscribe(parent)
-            return val
-        else:
-            return ObservableDict(val, subscribers = parent)
-    elif isinstance(val, str):
-        return val        
-    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierMixin):
-        for x in val:
-            if isinstance(x, RevisionNotifierMixin):
-                parent._add_child(x)
-    return val
-
-
-class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
-    """Extends RevisionNotifierMixin to increment subscriber revisions when change occurs"""
-
-    @classmethod
-    def _wrap_value(cls, val: Any, subscribers: Iterable[RevisionNotifierMixin]) -> Any:
-        for subscriber in subscribers:
-            val = wrap_value(val, subscriber)
-        return val
-
-    def __init__(
-        self, 
-        *args,
-        subscribers: Optional[RevisionNotifierMixin | Iterable[RevisionNotifierMixin]] = None,
-        **kwargs
-        ):
-        if subscribers is not None:
-            if isinstance(subscribers, RevisionNotifierMixin):
-                self._subscribers = [subscribers,]
-            else:
-                self._subscribers = list(subscribers)
-        else:
-            self._subscribers = []
-        super().__init__(*args, **kwargs)
-
-    @override
-    def _notify_change(self):
-        super()._notify_change()
-        for subscriber in self._subscribers:
-            subscriber._notify_change()
-
-    def subscribe(self, subscriber: RevisionNotifierMixin | ConfigurationMixin):
-        # Addition to subscriber list occurs in _add_child
-        if isinstance(subscriber, ConfigurationMixin):
-            subscriber._config._add_child(self, subscribe = True)
-        else:
-            subscriber._add_child(self, subscribe = True)
-
-    def unsubscribe(self, subscriber: RevisionNotifierMixin | ConfigurationMixin):
-        if isinstance(subscriber, ConfigurationMixin):
-            search_subscriber = subscriber._config
-        else:
-            search_subscriber = subscriber
-        for idx, x in enumerate(self._subscribers):
-            if x is search_subscriber:
-                # Pop the first, then stop. If multiple entries for subscriber, that's OK.
-                self._subscribers.pop(idx)
-                return
-
-    def __setstate__(self, state):
-        
-        object.__setattr__(self, "_subscribers", state.pop("_subscribers", []))
-        super().__setstate__(state)
-
-    def __getstate__(self) -> dict:
-        odict =  super().__getstate__()
-        del odict['_subscribers']
-        return odict
     
 
 class ObservableList(list, SubscriptionRevisionNotifierMixin):
@@ -757,9 +756,10 @@ class ComponentListProperty(ComponentPropertyInterface):
     def __get__(self, instance: Optional[ConfigurationMixin], owner: type) -> Any:
         if instance is None:
             return self
-        att = getattr(instance, self.name, None)#
+        att = getattr(instance, self.name, None)
         if att is None:
             att = ObservableList(subscribers = instance)
+            setattr(instance, self.name, att)
         return att
 
     def __set__(self, instance: ConfigurationMixin, value: Iterable):
@@ -774,9 +774,12 @@ class ComponentListProperty(ComponentPropertyInterface):
             
         if old_val and not old_val == value:
             recursive_remove_children(instance._config, old_val)
-            #instance._config._remove_child(old_val)
             if not is_wrapped:
-                value = ObservableList(value, instance)
+                if isinstance(value, ObservableList):
+                    subscribers = [instance._config]
+                    value._wrap_value(value, subscribers)
+                else:
+                    value = ObservableList(value, instance)
 
             instance._config._notify_change()
 
@@ -797,7 +800,8 @@ class ComponentOrderedDictProperty(ComponentPropertyInterface):
             return self
         att = getattr(instance, self.name, None)
         if att is None:
-            att = ObservableOrderedDict(parent = instance)
+            att = ObservableOrderedDict(subscribers = [instance])
+            setattr(instance, self.name, att)
         return att
 
     def __set__(self, instance: ConfigurationMixin, value: Mapping):

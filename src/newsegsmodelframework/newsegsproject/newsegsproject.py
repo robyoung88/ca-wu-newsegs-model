@@ -10,7 +10,7 @@ from useful_types import SequenceNotStr
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, recursive_remove_children, revision_dataclass
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -21,51 +21,82 @@ class NewsegsProjectConfig(DataWithRevision):
     model_type: str = ''
     model_version: str = ''
 
-class TableModifyingObservableComponentList(ObservableList):
+class TableModifyingObservableList(ObservableList):
     """A list which modifies the revision of the table_config on the parent when changed."""
 
-    def __init__(self, iterable=(), parent: 'NewsegsProject | ConfigurationMixin | RevisionNotifierMixin | None' = None):
-        if parent and isinstance(parent, NewsegsProject):
-            super().__init__(iterable, parent._config)
-            self._table = parent.table_config
-        elif isinstance (parent, ConfigurationMixin):
-            super().__init__(iterable, parent._config)
-            self._table = None
-        else:
-            super().__init__(iterable, parent)
-            self._table = None
+    def __init__(
+        self, 
+        iterable=(),
+        subscribers: Optional[
+            RevisionNotifierMixin 
+            | ConfigurationMixin 
+            | Iterable[RevisionNotifierMixin | ConfigurationMixin]
+        ] = None,
+        **kwargs
+    ):
+        if subscribers is None:
+            subscribers = []
+        elif isinstance(subscribers, RevisionNotifierMixin) or isinstance(subscribers, ConfigurationMixin):
+            subscribers = [subscribers]
 
-    @override
-    def _notify_change(self):
-        super()._notify_change()
-        if self._table:
-            self._table.revision += 1
+        # Subscribers should be both the _config and the table_config for eligible types
+        working_subscribers = []
+        for subscriber in subscribers:
+            if isinstance(subscriber, ConfigurationMixin):
+                # Only subscribe to the table if available, under the assumption that the config will be subscribed to the table.
+                #working_subscribers.append(subscriber._config)
+                if hasattr(subscriber, 'table_config'):
+                    working_subscribers.append(getattr(subscriber, 'table_config'))
+                else:
+                    working_subscribers.append(subscriber._config)
+            else:
+                working_subscribers.append(subscriber)
+
+        super().__init__(iterable, subscribers = working_subscribers)
+
 
 class TableModifyingComponentListProperty(ComponentListProperty):
     """A component list which modifies the revision of the table_config on the parent when changed."""
 
     @override
-    def __get__(self, instance: ConfigurationMixin | None, owner: type) -> Any:
+    def __get__(
+        self, instance: ConfigurationMixin | None, owner: type
+    ) -> TableModifyingObservableList:
         if instance is None:
-            return self
-        att = getattr(instance, self.name, TableModifyingObservableComponentList(parent = instance))
+            return self # pyright: ignore[reportReturnType]
+        att = getattr(instance, self.name, None)
+        if att is None:
+            att = TableModifyingObservableList(subscribers = instance)
+            setattr(instance, self.name, att)
         return att
 
     @override
     def __set__(self, instance: ConfigurationMixin, value: Iterable):
-        if not isinstance(instance, NewsegsComponent):
-            raise TypeError(f'Component list properties should only be applied to NewsegsComponents, is applied to {type(instance)}')
+        if not isinstance(instance, ConfigurationMixin):
+            raise TypeError(f'ComponentList properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
         
         old_val = getattr(instance, self.name, None)
         is_wrapped = False
-        if not isinstance(value, TableModifyingObservableComponentList):    
-            value = TableModifyingObservableComponentList(value, instance)
+        if not isinstance(value, TableModifyingObservableList):    
+            value = TableModifyingObservableList(value, instance)
             is_wrapped = True
             
         if old_val and not old_val == value:
-            instance._config._remove_child(old_val)
+            recursive_remove_children(instance._config, old_val)
+            if hasattr(instance, '_table_config'):
+                recursive_remove_children(getattr(instance, '_table_config'), old_val)
+            
             if not is_wrapped:
-                value = TableModifyingObservableComponentList(value, instance)
+                if isinstance(value, TableModifyingObservableList):
+                    #subscribers = [instance._config]
+                    subscribers = []
+                    if hasattr(instance, '_table_config'):
+                        subscribers.append(getattr(instance, '_table_config'))
+                    else:
+                        subscribers.append(instance._config)
+                    value._wrap_value(value, subscribers)
+                else:
+                    value = TableModifyingObservableList(value, instance)
 
             instance._config._notify_change()
 
@@ -79,6 +110,7 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     _version = 'v0.0.1'
     _id_prefix = 'proj'
 
+    
     metamodels = TableModifyingComponentListProperty(oftype = newsegsmetamodel.NewsegsMetaModel)
     dsa_config = ComponentProperty(oftype = DSAComponent)
     psa_config = ComponentProperty(oftype = PSAComponent)
@@ -104,6 +136,10 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
         super().__init__(*args, **kwargs)
         InMemoryVariableProvider.__init__(self, default_variables)
 
+        self.dsa_config = dsa_config or DSAComponent()
+        self.psa_config = psa_config or PSAComponent()
+        self.table_config = table_config or TableConfigNewsegsComponent()
+
         self.metamodels = metamodels or []
         if len(self.metamodels):
             if not self.model_type == self.metamodels[0].model.model_type:
@@ -116,10 +152,6 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
                     self.model_version = self.metamodels[0].model.version
                 else:
                     raise TypeError(f'First metamodel of incompatible version; Expected: {self.model_version}; received: {self.metamodels[0].model.version}')
-
-        self.dsa_config = dsa_config or DSAComponent()
-        self.psa_config = psa_config or PSAComponent()
-        self.table_config = table_config or TableConfigNewsegsComponent()
 
     @property
     def metamodel_ids(self) -> tuple[str, ...]:

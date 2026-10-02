@@ -757,13 +757,16 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     ) -> None:
         if isinstance(component, NewsegsComponent):
             if isinstance(component, NewsegsMetaModel):
+                # First sync the variables so that the OrderedDict can be syncronised prior to upsert
+                for v in component.variables.values():
+                    self.variable_provider.upsert_variable(v)
+                component.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+                
                 rval = super().upsert_component(component, force, tbl)
                 if component.model:
                     self._em_provider.upsert_component(component.model, force)
                 if component.finance:
                     self._fm_provider.upsert_component(component.finance, force)
-                for v in component.variables.values():
-                    self.variable_provider.upsert_variable(v)
                 self._set_metamodel_variable_junction(component)
                 return rval
             elif isinstance(component, NewsegsModelInterface):
@@ -1011,12 +1014,21 @@ class FromDatabaseNewsegsProjectProvider(
     ) -> None:
         # Unlike other upsertions, projects require junction tables to be sorted.
         v_to_sync = list(project._variables_by_uid.values())
-        vars_modified = any(x.modified for x in v_to_sync)
+        vars_modified = any(x.modified or x.soft_dirty for x in v_to_sync)
         self.variable_provider.upsert_variable(v_to_sync)
-        if vars_modified:
-            project.revision += 1
-            project.table_config.revision += 1
-        self.metamodel_provider.upsert_component(list(project.metamodels))
+
+        # As variables have all been upserted, we can sync all the metamodel variable lists
+        for mm in project.metamodels:
+            mm.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+        
+        #if vars_modified:
+        #    project.revision += 1
+        #    project.table_config.revision += 1
+        
+        self.metamodel_provider.upsert_component(project.metamodels) # pyright: ignore[reportArgumentType]
+        # At this point, the metamodel list can be syncronised
+        project.metamodels._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+        
         super().upsert_component(project, force, tbl)
 
         # TODO: Improve this logic and keep track of addition of variables to the project

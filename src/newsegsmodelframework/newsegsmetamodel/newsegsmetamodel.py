@@ -224,14 +224,17 @@ class NewsegsMetaModel(NewsegsComponent):
         """
         these_vars = self.variable_ids
         r0 = self.revision
-        if not hasattr(self, '_variables'):
-            self.variables = {}
+        #if not hasattr(self, '_variables'):
+        #    self.variables = {}
+        rv0 = self.variables.revision # type: ignore
         for var_identifiers in these_vars:
             try:
                 v = variable_provider.get_variable(var_identifiers['uid'])
             except KeyError:
                 v = variable_provider.get_default_variable(var_identifiers['varid'])
             self.variables[var_identifiers['varid']] = v
+        self.variables.revision = rv0 # type: ignore
+        self.variables._syncronise() # type: ignore
         if self.revision != r0:
             self.revision = r0
 
@@ -457,7 +460,7 @@ class NewsegsMetaModel(NewsegsComponent):
         config = config.copy()
         inst = cls.__new__(cls)
         inst._config = inst._generate_config()
-        inst.variables = {}
+        # inst.variables = {}
         inst.update(config)
         return inst
     

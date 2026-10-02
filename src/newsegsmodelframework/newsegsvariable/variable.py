@@ -3160,7 +3160,8 @@ def update_model_with_value(
 
 @revision_dataclass
 class VariableConfig(DataWithRevision):
-    parameters: ParamList | None = None
+    # Don't include parameters as well as raw, or update will trigger two revisions
+    #parameters: ParamList | None = None
     raw_parameters: ParamList | None = None
 
     dsa_selected: bool = False
@@ -3270,6 +3271,9 @@ class Variable(
     _id_prefix = 'v'
     # SerialiseToDictMixin constants
     _constructor_class = 'Variable'
+
+    soft_dirty: bool = False
+    """Soft indicator to flag the variable for upsert to storage without dirtying dependent components."""
 
     @override
     def _generate_config(self, *args, **kwargs) -> VariableConfig:
@@ -3465,7 +3469,8 @@ class Variable(
         return self.distribution.parameterisations[self.parameterisation_index]
 
     def _get_native_parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
-        p = self._config.parameters
+        #p = self._config.parameters
+        p = self._parameters
         if p is not None:
             if isinstance(p, Iterable):
                 return tuple(p)
@@ -3474,7 +3479,8 @@ class Variable(
         raise AttributeError('Parameters not yet set')
 
     def _set_native_parameters(self, parameters: ParamList) -> None:
-        self._config.parameters = parameters
+        #self._config.parameters = parameters
+        self._parameters = parameters
 
     @property
     def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
