@@ -6,7 +6,7 @@ from collections import OrderedDict
 import copy
 from dataclasses import dataclass, fields, asdict
 import re
-from typing import Any, Callable, Collection, Iterable, Mapping, Optional, SupportsIndex, Type, TypeVar, dataclass_transform, override
+from typing import Any, Callable, Collection, Iterable, Mapping, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
 from typing_extensions import Self
 import warnings
 import uuid as mod_uuid
@@ -24,7 +24,14 @@ __all__ = [
     'NoConfig',
 ]
 
-class RevisionNotifierMixin():
+@runtime_checkable
+class RevisionNotifierProtocol(Protocol):
+    def _add_child(self, child: 'RevisionNotifierProtocol', subscribe: bool = True): ...
+    def _remove_child(self, child: 'RevisionNotifierProtocol'): ...
+    def _notify_change(self, trigger: Any | None = None, **kwargs): ...
+    
+
+class RevisionNotifierMixin(RevisionNotifierProtocol):
     """Handles part-child notifications and revision counts"""
     
     def __init__(
@@ -38,7 +45,7 @@ class RevisionNotifierMixin():
             for x in children:
                 self._add_child(x)
 
-    def _add_child(self, child: 'RevisionNotifierMixin', subscribe: bool = True):
+    def _add_child(self, child: RevisionNotifierProtocol, subscribe: bool = True):
         
         if child is self:
             raise ValueError('Circular reference - cannot add self as child.')
@@ -49,7 +56,7 @@ class RevisionNotifierMixin():
         if subscribe and isinstance(child, SubscriptionRevisionNotifierMixin):
             child._subscribers.append(self)
 
-    def _remove_child(self, child: 'RevisionNotifierMixin'):
+    def _remove_child(self, child: RevisionNotifierProtocol):
         # Don't use remove, need to check for instance equality
         for idx, inlist in enumerate(self._children):
             if inlist is child:
@@ -70,10 +77,11 @@ class RevisionNotifierMixin():
     def revision(self, revision: int):
         self._revision = revision
 
-    def _notify_change(self):
+    def _notify_change(self, trigger: Any | None = None, **kwargs):
         if not hasattr(self, '_revision'):
             self._revision = 0
-        self._revision += 1
+        if not self.modified:
+            self._revision += 1
 
     def _syncronise(self):
         """Use after saving status (to database)"""
@@ -163,7 +171,7 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
                 recursive_remove_children(self, old_val)
 
             object.__setattr__(self, name, new_val)
-            self._notify_change()
+            self._notify_change(self)
 
     # Override methods on class
     cls.__init__ = new_init
@@ -172,21 +180,22 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
     return cls
 
 
-class RevisionDataMeta(type):
-    """Metaclass to enforce `@revision_dataclass` decoration."""
-    def __call__(cls, *args, **kwargs):
-        # Enforce check on first instantiation/usage of the class
-        if not getattr(cls, "_is_revision_dataclass", False):
-            raise TypeError(
-                f"Class '{cls.__name__}' inherits from DataWithRevision "
-                f"but is missing the @revision_dataclass decorator."
-            )
-        return super().__call__(*args, **kwargs)
+# Disabling this check for now, as it causes a conflict with the Protocol definition
+# class RevisionDataMeta(type):
+#     """Metaclass to enforce `@revision_dataclass` decoration."""
+#     def __call__(cls, *args, **kwargs):
+#         # Enforce check on first instantiation/usage of the class
+#         if not getattr(cls, "_is_revision_dataclass", False):
+#             raise TypeError(
+#                 f"Class '{cls.__name__}' inherits from DataWithRevision "
+#                 f"but is missing the @revision_dataclass decorator."
+#             )
+#         return super().__call__(*args, **kwargs)
 
 
-def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
+def wrap_value(val: Any, parent: RevisionNotifierProtocol) -> Any:
     """Wraps mutable structures or assigns children to parent objects."""
-    if isinstance(val, RevisionNotifierMixin):
+    if isinstance(val, RevisionNotifierProtocol):
         parent._add_child(val)
         return val
     elif isinstance(val, ConfigurationMixin):
@@ -206,9 +215,9 @@ def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
             return ObservableDict(val, subscribers = parent)
     elif isinstance(val, str):
         return val        
-    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierMixin):
+    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierProtocol):
         for x in val:
-            if isinstance(x, RevisionNotifierMixin):
+            if isinstance(x, RevisionNotifierProtocol):
                 parent._add_child(x)
     return val
 
@@ -217,7 +226,7 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
     """Extends RevisionNotifierMixin to increment subscriber revisions when change occurs"""
 
     @classmethod
-    def _wrap_value(cls, val: Any, subscribers: Iterable[RevisionNotifierMixin]) -> Any:
+    def _wrap_value(cls, val: Any, subscribers: Iterable[RevisionNotifierProtocol]) -> Any:
         for subscriber in subscribers:
             val = wrap_value(val, subscriber)
         return val
@@ -225,11 +234,11 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
     def __init__(
         self, 
         *args,
-        subscribers: Optional[RevisionNotifierMixin | Iterable[RevisionNotifierMixin]] = None,
+        subscribers: Optional[RevisionNotifierProtocol | Iterable[RevisionNotifierProtocol]] = None,
         **kwargs
         ):
         if subscribers is not None:
-            if isinstance(subscribers, RevisionNotifierMixin):
+            if isinstance(subscribers, RevisionNotifierProtocol):
                 self._subscribers = [subscribers,]
             else:
                 self._subscribers = list(subscribers)
@@ -238,20 +247,21 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
         super().__init__(*args, **kwargs)
 
     @override
-    def _notify_change(self, broadcast: bool = True):
-        super()._notify_change()
+    def _notify_change(self, trigger: Any | None = None, broadcast: bool = True, **kwargs):
+        trigger = self if trigger is None else trigger
+        super()._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
         if broadcast:
             for subscriber in self._subscribers:
-                subscriber._notify_change()
+                subscriber._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
 
-    def subscribe(self, subscriber: 'RevisionNotifierMixin | ConfigurationMixin'):
+    def subscribe(self, subscriber: 'RevisionNotifierProtocol | ConfigurationMixin'):
         # Addition to subscriber list occurs in _add_child
         if isinstance(subscriber, ConfigurationMixin):
             subscriber._config._add_child(self, subscribe = True)
         else:
             subscriber._add_child(self, subscribe = True)
 
-    def unsubscribe(self, subscriber: 'RevisionNotifierMixin | ConfigurationMixin'):
+    def unsubscribe(self, subscriber: 'RevisionNotifierProtocol | ConfigurationMixin'):
         if isinstance(subscriber, ConfigurationMixin):
             search_subscriber = subscriber._config
         else:
@@ -273,7 +283,7 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
         return odict
 
 
-class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin, metaclass = RevisionDataMeta):
+class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin):#, metaclass = RevisionDataMeta):
     """Base class for all revision-tracked dataclasses."""
     _constructor_class = 'DataWithRevision'
     _excluded_attributes = ('_children', '_subscribers' )
@@ -452,15 +462,15 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
         self, 
         iterable = (), 
         subscribers: Optional[
-            RevisionNotifierMixin 
+            RevisionNotifierProtocol
             | ConfigurationMixin 
-            | Iterable[RevisionNotifierMixin | ConfigurationMixin]
+            | Iterable[RevisionNotifierProtocol| ConfigurationMixin]
         ] = None,
         **kwargs
     ):
         if subscribers is None:
             subscribers = []
-        elif isinstance(subscribers, RevisionNotifierMixin) or isinstance(subscribers, ConfigurationMixin):
+        elif isinstance(subscribers, RevisionNotifierProtocol) or isinstance(subscribers, ConfigurationMixin):
             subscribers = [subscribers]
 
         subscribers = [
@@ -539,7 +549,7 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
 def recursive_remove_children(obj, child_item):
     if child_item is None:
         return
-    if isinstance(child_item, RevisionNotifierMixin):
+    if isinstance(child_item, RevisionNotifierProtocol):
         obj._remove_child(child_item)
     elif isinstance(child_item, ConfigurationMixin):
         obj._remove_child(child_item._config)
@@ -557,15 +567,15 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
         self,
         mapping = (),
         subscribers: Optional[
-            RevisionNotifierMixin 
+            RevisionNotifierProtocol 
             | ConfigurationMixin 
-            | Iterable[RevisionNotifierMixin | ConfigurationMixin]
+            | Iterable[RevisionNotifierProtocol | ConfigurationMixin]
         ] = None,
         **kwargs
     ):
         if subscribers is None:
             subscribers = []
-        elif isinstance(subscribers, RevisionNotifierMixin) or isinstance(subscribers, ConfigurationMixin):
+        elif isinstance(subscribers, RevisionNotifierProtocol) or isinstance(subscribers, ConfigurationMixin):
             subscribers = [subscribers]
 
         subscribers = [
@@ -659,15 +669,15 @@ class ObservableOrderedDict(ObservableDict, OrderedDict):
         self,
         mapping = (),
         subscribers: Optional[
-            RevisionNotifierMixin 
+            RevisionNotifierProtocol
             | ConfigurationMixin 
-            | Iterable[RevisionNotifierMixin | ConfigurationMixin]
+            | Iterable[RevisionNotifierProtocol| ConfigurationMixin]
         ] = None,
         **kwargs
     ):
         if subscribers is None:
             subscribers = []
-        elif isinstance(subscribers, RevisionNotifierMixin) or isinstance(subscribers, ConfigurationMixin):
+        elif isinstance(subscribers, RevisionNotifierProtocol) or isinstance(subscribers, ConfigurationMixin):
             subscribers = [subscribers]
 
         subscribers = [
@@ -697,6 +707,41 @@ class ObservableOrderedDict(ObservableDict, OrderedDict):
             return item
         return super().pop(key, *args, **kwargs)
 
+
+class TableModifyingObservableOrderedDict(ObservableOrderedDict):
+    
+    def __init__(
+        self, 
+        mapping=(), 
+        subscribers: Optional[
+            RevisionNotifierProtocol
+            | ConfigurationMixin 
+            | Iterable[RevisionNotifierProtocol| ConfigurationMixin] 
+        ] = None, 
+        **kwargs
+    ):
+        if subscribers is None:
+            subscribers = []
+        elif isinstance(subscribers, RevisionNotifierProtocol) or isinstance(subscribers, ConfigurationMixin):
+            subscribers = [subscribers]
+
+        # Subscribers should be both the _config and the table_config for eligible types
+        working_subscribers = []
+        for subscriber in subscribers:
+            if isinstance(subscriber, ConfigurationMixin):
+                # Only subscribe to the table if available, under the assumption that the config will be subscribed to the table.
+                if hasattr(subscriber, 'watcher'):
+                    working_subscribers.append(subscriber.watcher)
+                if hasattr(subscriber, 'table_config'):
+                    working_subscribers.append(getattr(subscriber, 'table_config'))
+                else:
+                    working_subscribers.append(subscriber._config)
+            else:
+                working_subscribers.append(subscriber)
+
+        super().__init__(mapping, subscribers = working_subscribers)
+
+
 class ComponentPropertyInterface(metaclass = ABCMeta):
     """All component properties should inherit this"""
 
@@ -724,6 +769,7 @@ class ComponentProperty(ComponentPropertyInterface):
             default_val = self.default()
         else:
             default_val = self.default
+        setattr(instance, self.name, default_val)
         return getattr(instance, self.name, default_val)
 
     def __set__(self, instance: 'ConfigurationMixin', value: 'ConfigurationMixin'):
@@ -822,6 +868,144 @@ class ComponentOrderedDictProperty(ComponentPropertyInterface):
 
         setattr(instance, self.name, value)
 
+
+class TableModifyingComponentOrderedDictProperty(ComponentOrderedDictProperty):
+    
+    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
+        if instance is None:
+            return self
+        att = getattr(instance, self.name, None)
+        if att is None:
+            att = TableModifyingObservableOrderedDict(subscribers = [instance])
+            setattr(instance, self.name, att)
+        return att
+
+    def __set__(self, instance: ConfigurationMixin, value: Mapping):
+        if not isinstance(instance, ConfigurationMixin):
+            raise TypeError(f'ComponentOrderedDict properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
+
+        old_val = getattr(instance, self.name, None)
+        is_wrapped = False
+        if not isinstance(value, ObservableOrderedDict):
+            value = TableModifyingObservableOrderedDict(value, instance)
+            is_wrapped = True
+
+        if old_val and not old_val == value:
+            recursive_remove_children(instance._config, old_val)
+            if hasattr(instance, '_table_config'):
+                recursive_remove_children(getattr(instance, '_table_config'), old_val)
+            if hasattr(instance, 'watcher'):
+                recursive_remove_children(instance.watcher, old_val)
+            
+            instance._config._remove_child(old_val)
+            if not is_wrapped:
+                if isinstance(value, TableModifyingObservableOrderedDict):
+                    subscribers = []
+                    if hasattr(instance, '_table_config'):
+                        subscribers.append(getattr(instance, '_table_config'))
+                        
+                    else:
+                        subscribers.append(instance._config)
+                    if hasattr(instance, 'watcher'):
+                        subscribers.append(instance.watcher)
+                    value._wrap_value(value, subscribers)
+                else:
+                    value = TableModifyingObservableOrderedDict(value, instance)
+            
+            instance._config._notify_change()
+
+        setattr(instance, self.name, value)
+
+
+class TableModifyingObservableList(ObservableList):
+    """A list which modifies the revision of the table_config on the parent when changed.
+    
+    ALSO adds any NewsegsProjects watchers as direct subscribers
+    """
+
+    def __init__(
+        self, 
+        iterable=(),
+        subscribers: Optional[
+            RevisionNotifierMixin 
+            | ConfigurationMixin 
+            | Iterable[RevisionNotifierMixin | ConfigurationMixin]
+        ] = None,
+        **kwargs
+    ):
+        if subscribers is None:
+            subscribers = []
+        elif isinstance(subscribers, RevisionNotifierMixin) or isinstance(subscribers, ConfigurationMixin):
+            subscribers = [subscribers]
+
+        # Subscribers should be both the _config and the table_config for eligible types
+        working_subscribers = []
+        for subscriber in subscribers:
+            if isinstance(subscriber, ConfigurationMixin):
+                # Only subscribe to the table if available, under the assumption that the config will be subscribed to the table.
+                if hasattr(subscriber, 'table_config'):
+                    working_subscribers.append(getattr(subscriber, 'table_config'))
+                else:
+                    working_subscribers.append(subscriber._config)
+                if hasattr(subscriber, 'watcher'):
+                    # ALSO subscribe watcher
+                    working_subscribers.append(subscriber.watcher)
+            else:
+                working_subscribers.append(subscriber)
+
+        super().__init__(iterable, subscribers = working_subscribers)
+
+
+class TableModifyingComponentListProperty(ComponentListProperty):
+    """A component list which modifies the revision of the table_config on the parent when changed."""
+
+    @override
+    def __get__(
+        self, instance: ConfigurationMixin | None, owner: type
+    ) -> TableModifyingObservableList:
+        if instance is None:
+            return self # pyright: ignore[reportReturnType]
+        att = getattr(instance, self.name, None)
+        if att is None:
+            att = TableModifyingObservableList(subscribers = instance)
+            setattr(instance, self.name, att)
+        return att
+
+    @override
+    def __set__(self, instance: ConfigurationMixin, value: Iterable):
+        if not isinstance(instance, ConfigurationMixin):
+            raise TypeError(f'ComponentList properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
+        
+        old_val = getattr(instance, self.name, None)
+        is_wrapped = False
+        if not isinstance(value, TableModifyingObservableList):    
+            value = TableModifyingObservableList(value, instance)
+            is_wrapped = True
+            
+        if old_val and not old_val == value:
+            recursive_remove_children(instance._config, old_val)
+            if hasattr(instance, '_table_config'):
+                recursive_remove_children(getattr(instance, '_table_config'), old_val)
+            if hasattr(instance, 'watcher'):
+                recursive_remove_children(instance.watcher, old_val)
+            
+            if not is_wrapped:
+                if isinstance(value, TableModifyingObservableList):
+                    #subscribers = [instance._config]
+                    subscribers = []
+                    if hasattr(instance, '_table_config'):
+                        subscribers.append(getattr(instance, '_table_config'))
+                        if hasattr(instance, 'watcher'):
+                            subscribers.append(instance.watcher)
+                    else:
+                        subscribers.append(instance._config)
+                    value._wrap_value(value, subscribers)
+                else:
+                    value = TableModifyingObservableList(value, instance)
+
+            instance._config._notify_change()
+
+        setattr(instance, self.name, value)
 
 @revision_dataclass
 class NoConfig(DataWithRevision):

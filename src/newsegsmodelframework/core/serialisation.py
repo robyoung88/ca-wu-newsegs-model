@@ -241,7 +241,10 @@ class SerialiseToDictMixin:
         for k in has_update.keys():
             config.pop(k)
 
-        vars(self).update(config)
+        # Don't just update the dict, as this will prevent revision notifiers firing
+        for k, v in config.items():
+            setattr(self, k, v)
+        #vars(self).update(config)
 
         for k, v in has_update.items():
             getattr(self, k).update(v)

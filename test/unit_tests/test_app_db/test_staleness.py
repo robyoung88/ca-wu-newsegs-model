@@ -9,6 +9,7 @@ from config import settings
 
 from newsegsmodelapp.backend.db import db_tables
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 class TestStalenessUpdates(unittest.TestCase):
     @classmethod
@@ -26,6 +27,11 @@ class TestStalenessUpdates(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        from newsegsmodelapp.backend import db
+        
+        engine = db.get_engine(cls.db_path)
+        engine.dispose()
+
         cls.db_dir.cleanup()
 
     def setUp(self) -> None:
@@ -34,7 +40,52 @@ class TestStalenessUpdates(unittest.TestCase):
 
     def tearDown(self):
         """Clean up temporary directory after each test."""
+        from newsegsmodelapp.backend import db
+        engine = db.get_engine()
+        engine.dispose()
         self.temp_dir.cleanup()
+
+    @staticmethod
+    def get_revision_details(obj):
+        return dict(
+            revision = obj.revision,
+            n_children = len(obj._children)
+        )
+
+    @staticmethod
+    def get_project_revision_dict(proj: NewsegsProject):
+        grd = TestStalenessUpdates.get_revision_details
+        odict = {}
+        odict['project'] = grd(proj)
+        odict['project_table'] = grd(proj.table_config)
+        odict['metamodel_container'] = grd(proj.metamodels)
+        metamodel_revisions = []
+        for mm in proj.metamodels:
+            mm_dict = {}
+            mm_dict['metamodel'] = grd(mm)
+            mm_dict['metamodel_table'] = grd(mm.table_config)
+            mm_dict['variable_container'] = grd(mm.variables)
+            var_revisions = {}
+            for varid, var in mm.variables.items():
+                var_revisions[varid] = grd(var)
+            mm_dict['variables'] = var_revisions
+
+            mdl = mm.model
+            mm_dict['model'] = grd(mdl)
+            mm_dict['model_table'] = grd(mdl.table_config)
+            mm_dict['model_grid'] = grd(mdl.grid)
+            mm_dict['model_generation'] = grd(mdl.generation)
+            mm_dict['model_consumption_storage'] = grd(mdl.consumption_storage)
+
+            fnc = mm.finance
+            mm_dict['finance'] = grd(fnc)
+            mm_dict['finance_table'] = grd(fnc.table_config)
+
+            metamodel_revisions.append(mm_dict)
+
+        odict['dsa'] = grd(proj.dsa_config)
+        odict['psa'] = grd(proj.psa_config)
+
 
     def test_variable_updates(self):
         from newsegsmodelapp.backend import db
@@ -46,6 +97,8 @@ class TestStalenessUpdates(unittest.TestCase):
 
         projid = proj.id
 
+        rev_0 = self.get_revision_details(proj)
+
         r0 = proj.revision
         self.assertEqual(r0, 0)
         
@@ -55,30 +108,9 @@ class TestStalenessUpdates(unittest.TestCase):
         self.assertFalse(proj.chain_modified)
 
         proj_r = proj_provider.get_project(projid)
-        self.assertEqual(proj_r.revision, r0)
 
-        self.assertEqual(proj_r.revision, proj.revision)
-        self.assertEqual(len(proj_r._children), len(proj._children))
-        self.assertEqual(proj_r.metamodels.revision, proj.metamodels.revision) # pyright: ignore[reportAttributeAccessIssue]
-        self.assertEqual(len(proj_r.metamodels._children), len(proj.metamodels._children)) # pyright: ignore[reportAttributeAccessIssue]
-        self.assertEqual(proj_r.metamodels[0].revision, proj.metamodels[0].revision)
-        self.assertEqual(len(proj_r.metamodels[0]._children), len(proj.metamodels[0]._children))
-
-        self.assertEqual(len(proj_r.metamodels[0].variables), len(proj.metamodels[0].variables))
-        self.assertEqual(proj_r.metamodels[0].variables.revision, proj.metamodels[0].variables.revision)
-
-        for varid in proj_r.metamodels[0].variables.keys():
-            self.assertEqual(proj_r.metamodels[0].variables[varid].revision, proj.metamodels[0].variables[varid].revision)
-
-        self.assertEqual(proj_r.metamodels[0].model.revision, proj.metamodels[0].model.revision)
-        self.assertEqual(len(proj_r.metamodels[0].model._children), len(proj.metamodels[0].model._children))
-        
-        self.assertEqual(proj_r.metamodels[0].finance.revision, proj.metamodels[0].finance.revision)
-        self.assertEqual(len(proj_r.metamodels[0].finance._children), len(proj.metamodels[0].finance._children))
-
-        self.assertEqual(proj_r.metamodels[0].model.grid.revision, proj.metamodels[0].model.grid.revision)
-        self.assertEqual(proj_r.metamodels[0].model.generation.revision, proj.metamodels[0].model.generation.revision)
-        self.assertEqual(proj_r.metamodels[0].model.consumption_storage.revision, proj.metamodels[0].model.consumption_storage.revision)
+        rev_postload = self.get_revision_details(proj_r)
+        self.assertDictEqual(rev_postload, rev_0)
 
         # Does a variable modification chain through?
         mm_r = proj_r.metamodels[0]
@@ -102,4 +134,27 @@ class TestStalenessUpdates(unittest.TestCase):
         # Project should also be modified due to modification of the metamodel
         self.assertTrue(proj_r.chain_modified)
         self.assertTrue(proj_r.modified)
-        self.assertEqual(proj_r.revision, r0 + 1)      
+        self.assertEqual(proj_r.revision, r0 + 1)
+
+        # Check revisions survive an upload
+        rev_preup = self.get_revision_details(proj_r)
+        with self.assertRaises(AssertionError):
+            self.assertDictEqual(rev_preup, rev_postload)
+        proj_provider.upsert_component(proj_r)
+        proj_r2 = proj_provider.get_component(projid)
+        rev_postload_modified = self.get_revision_details(proj_r2)
+        self.assertDictEqual(rev_postload_modified, rev_preup)
+
+    def test_upsert_parsimony(self):
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        projid = proj.id
+        
+        proj_provider.add_component(proj)
+
+        

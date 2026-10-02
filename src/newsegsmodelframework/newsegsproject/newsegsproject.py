@@ -5,12 +5,13 @@ Provides a class which encapsulates multiple NewSEGS metamodels, for multi-way
 sensitivity analysis.
 """
 from typing import Any, Iterable, Optional, Sequence, override
+import warnings
 from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, recursive_remove_children, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentListProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, recursive_remove_children, revision_dataclass
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -21,86 +22,43 @@ class NewsegsProjectConfig(DataWithRevision):
     model_type: str = ''
     model_version: str = ''
 
-class TableModifyingObservableList(ObservableList):
-    """A list which modifies the revision of the table_config on the parent when changed."""
 
-    def __init__(
-        self, 
-        iterable=(),
-        subscribers: Optional[
-            RevisionNotifierMixin 
-            | ConfigurationMixin 
-            | Iterable[RevisionNotifierMixin | ConfigurationMixin]
-        ] = None,
-        **kwargs
-    ):
-        if subscribers is None:
-            subscribers = []
-        elif isinstance(subscribers, RevisionNotifierMixin) or isinstance(subscribers, ConfigurationMixin):
-            subscribers = [subscribers]
+class ProjVarWatcher(RevisionNotifierProtocol):
+    
+    def __init__(self, project: 'NewsegsProject'):
+        self._project = project
 
-        # Subscribers should be both the _config and the table_config for eligible types
-        working_subscribers = []
-        for subscriber in subscribers:
-            if isinstance(subscriber, ConfigurationMixin):
-                # Only subscribe to the table if available, under the assumption that the config will be subscribed to the table.
-                #working_subscribers.append(subscriber._config)
-                if hasattr(subscriber, 'table_config'):
-                    working_subscribers.append(getattr(subscriber, 'table_config'))
-                else:
-                    working_subscribers.append(subscriber._config)
-            else:
-                working_subscribers.append(subscriber)
-
-        super().__init__(iterable, subscribers = working_subscribers)
-
-
-class TableModifyingComponentListProperty(ComponentListProperty):
-    """A component list which modifies the revision of the table_config on the parent when changed."""
-
-    @override
-    def __get__(
-        self, instance: ConfigurationMixin | None, owner: type
-    ) -> TableModifyingObservableList:
-        if instance is None:
-            return self # pyright: ignore[reportReturnType]
-        att = getattr(instance, self.name, None)
-        if att is None:
-            att = TableModifyingObservableList(subscribers = instance)
-            setattr(instance, self.name, att)
-        return att
-
-    @override
-    def __set__(self, instance: ConfigurationMixin, value: Iterable):
-        if not isinstance(instance, ConfigurationMixin):
-            raise TypeError(f'ComponentList properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
-        
-        old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, TableModifyingObservableList):    
-            value = TableModifyingObservableList(value, instance)
-            is_wrapped = True
-            
-        if old_val and not old_val == value:
-            recursive_remove_children(instance._config, old_val)
-            if hasattr(instance, '_table_config'):
-                recursive_remove_children(getattr(instance, '_table_config'), old_val)
-            
-            if not is_wrapped:
-                if isinstance(value, TableModifyingObservableList):
-                    #subscribers = [instance._config]
-                    subscribers = []
-                    if hasattr(instance, '_table_config'):
-                        subscribers.append(getattr(instance, '_table_config'))
-                    else:
-                        subscribers.append(instance._config)
-                    value._wrap_value(value, subscribers)
-                else:
-                    value = TableModifyingObservableList(value, instance)
-
-            instance._config._notify_change()
-
-        setattr(instance, self.name, value)
+    def _add_child(self, child: 'RevisionNotifierProtocol', subscribe: bool = True): 
+        # Only need to receive notifications of change, don't need to check on revision status
+        if subscribe and isinstance(child, SubscriptionRevisionNotifierMixin):
+            child._subscribers.append(self)
+    
+    def _remove_child(self, child: 'RevisionNotifierProtocol'):
+        if isinstance(child, SubscriptionRevisionNotifierMixin):
+            child.unsubscribe(self)
+    
+    def _notify_change(self, trigger: Any | None = None, **kwargs):
+        if isinstance(trigger, (TableModifyingObservableList, TableModifyingObservableOrderedDict)):
+            proj = self._project
+            # Something has happened to the metamodels table, check we have all variables
+            var_uids = set(proj._variables_by_uid.keys())
+            found_uids = set()
+            for mm in proj.metamodels:
+                for var in mm.variables.values():
+                    vid = var.id
+                    if not vid in var_uids:
+                        added_uid = proj.add_variable(var)
+                        if not vid == added_uid:
+                            warnings.warn(f'Change of variable id on add - {vid} to {added_uid}')
+                            vid = added_uid
+                            var.id = vid
+                        var_uids.add(vid)
+                    found_uids.add(vid)
+            lost_vars = var_uids - found_uids
+            if lost_vars:
+                print(f'Removing variables from project: {lost_vars}')
+                proj.delete_variable(list(lost_vars))
+        # Otherwise, do nothing
 
 
 class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
@@ -117,6 +75,7 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
 
     _focussed_metamodel: int = 0
+    _watcher: RevisionNotifierProtocol | None = None
 
     @override
     def _generate_config(self, *args, **kwargs) -> NewsegsProjectConfig:
@@ -136,9 +95,10 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
         super().__init__(*args, **kwargs)
         InMemoryVariableProvider.__init__(self, default_variables)
 
+        self.table_config = table_config or TableConfigNewsegsComponent()
+        self.watcher = ProjVarWatcher(self)
         self.dsa_config = dsa_config or DSAComponent()
         self.psa_config = psa_config or PSAComponent()
-        self.table_config = table_config or TableConfigNewsegsComponent()
 
         self.metamodels = metamodels or []
         if len(self.metamodels):
@@ -156,6 +116,16 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
     @property
     def metamodel_ids(self) -> tuple[str, ...]:
         return tuple(mm.id for mm in self.metamodels)
+
+    @property
+    def watcher(self) -> RevisionNotifierProtocol:
+        if self._watcher is None:
+            self._watcher = ProjVarWatcher(self)
+        return self._watcher
+
+    @watcher.setter
+    def watcher(self, watcher: RevisionNotifierProtocol):
+        self._watcher = watcher
 
     def get_focussed_metamodel_index(self) -> int:
         if self._focussed_metamodel >= len(self.metamodels):
@@ -242,8 +212,9 @@ class NewsegsProject(NewsegsComponent, RecoverableInMemoryVariableProvider):
 
         vars = [self.get_variable(x) for x in variable_id]
         store_interface.upsert_variable(vars, force)
+
             
 NewsegsProject._excluded_attributes = (
     super(NewsegsProject, NewsegsProject)._excluded_attributes 
-    + ('_metamodels', '_variables_by_uid', '_variables_by_varid', '_table_config')
+    + ('_metamodels', '_variables_by_uid', '_variables_by_varid', '_table_config', '_watcher')
 )

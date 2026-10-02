@@ -25,13 +25,14 @@ For a psa run, a (small) number of statistics must be nominated to be held in a
 dataframe which will be accessible after completion; each row will correspond
 to a sample across all enabled PSA variables.
 """
+import copy
 import datetime
 import logging
 from typing import Any, Mapping, MutableSequence, Optional, override
 
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
@@ -61,6 +62,53 @@ def make_varid(
     if section is None:
         section = 'None'
     return f'{section}.{key}.{subindex}'
+   
+
+class MMVarWatcher(RevisionNotifierProtocol):
+    def __init__(self, metamodel: 'NewsegsMetaModel'):
+        self._metamodel = metamodel
+        self._held_ids = {}
+
+    def update_held_ids(self):
+        mm = self._metamodel
+        previous_varids = set(self._held_ids.keys())
+        extant_varids = set(mm.variables.keys())
+
+        new_varids = extant_varids - previous_varids
+        removed_varids = previous_varids - extant_varids
+        continuing_varids = extant_varids & previous_varids
+
+        changed_varids = set(self._held_ids[x] != mm.variables[x].id for x in continuing_varids)
+
+        for varid in removed_varids:
+            if varid in mm._variables_last_model_sync:
+                del mm._variables_last_model_sync[varid]
+
+        for varid in new_varids:
+            # Set to require sync
+            mm._variables_last_model_sync[varid] = -1
+
+        for varid in changed_varids:
+            # Set to require sync
+            mm._variables_last_model_sync[varid] = -1 
+
+        self._held_ids = {x: mm.variables[x].id for x in extant_varids}
+        
+    def _add_child(self, child: 'RevisionNotifierProtocol', subscribe: bool = True): 
+        # Only need to receive notifications of change, don't need to check on revision status
+        if subscribe and isinstance(child, SubscriptionRevisionNotifierMixin):
+            child._subscribers.append(self)
+    
+    def _remove_child(self, child: 'RevisionNotifierProtocol'):
+        if isinstance(child, SubscriptionRevisionNotifierMixin):
+            child.unsubscribe(self)
+    
+    def _notify_change(self, trigger: Any | None = None, **kwargs):
+        if isinstance(trigger, (TableModifyingObservableOrderedDict)):
+            self.update_held_ids()
+            
+        # Otherwise, do nothing
+
 
 @revision_dataclass
 class NewsegsMetaModelConfig(DataWithRevision):
@@ -82,11 +130,11 @@ class NewsegsMetaModel(NewsegsComponent):
     last_psa_run: float = 0.
     last_optim_run: float = 0.
 
-    model = ComponentProperty(oftype = newsegsmodel.NewsegsModel)
-    finance = ComponentProperty(oftype = newsegsfinance.NewsegsFinance)
-    table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
+    model = ComponentProperty(default = None, oftype = newsegsmodel.NewsegsModel)
+    finance = ComponentProperty(default = None, oftype = newsegsfinance.NewsegsFinance)
+    table_config = ComponentProperty(default = TableConfigNewsegsComponent, oftype = TableConfigNewsegsComponent)
 
-    variables = ComponentOrderedDictProperty(oftype = variable.Variable)
+    variables = TableModifyingComponentOrderedDictProperty(oftype = variable.Variable)
     _variables_last_model_sync: dict
     """The revision number of the variable at last deterministic sync."""
 
@@ -105,14 +153,25 @@ class NewsegsMetaModel(NewsegsComponent):
     ):
         super().__init__(**kwargs)
         
+        self.table_config = table_config or TableConfigNewsegsComponent()
+        self.watcher = MMVarWatcher(self)
+
         self.model = model
         self.finance = finance
 
         self.variables = {variable.variable_uid(x):x for x in variables}
         self._variables_last_model_sync = {}
 
-        self.table_config = table_config or TableConfigNewsegsComponent()
+    @property
+    def watcher(self) -> RevisionNotifierProtocol:
+        if self._watcher is None:
+            self._watcher = MMVarWatcher(self)
+        return self._watcher
 
+    @watcher.setter
+    def watcher(self, watcher: RevisionNotifierProtocol):
+        self._watcher = watcher
+        
     def reattach_model(
         self,
         model_provider: Mapping[str, newsegsmodel.NewsegsModel]
@@ -207,6 +266,10 @@ class NewsegsMetaModel(NewsegsComponent):
 
     @property
     def variable_ids(self) -> tuple[dict[str, str], ...]:
+        # As variables cannot exist until table_config has been reattached,
+        # only search for _variable_ids during child uid update
+        if self.table_config is None:
+            return getattr(self, '_variable_ids', ())
         if len(self.variables) == 0 and hasattr(self, '_variable_ids'):
             return self._variable_ids
         return tuple(
@@ -224,19 +287,19 @@ class NewsegsMetaModel(NewsegsComponent):
         """
         these_vars = self.variable_ids
         r0 = self.revision
-        #if not hasattr(self, '_variables'):
-        #    self.variables = {}
-        rv0 = self.variables.revision # type: ignore
+        tr0 = self.table_config.revision
+        vr0 = self.variables.revision # type: ignore
         for var_identifiers in these_vars:
             try:
                 v = variable_provider.get_variable(var_identifiers['uid'])
             except KeyError:
                 v = variable_provider.get_default_variable(var_identifiers['varid'])
             self.variables[var_identifiers['varid']] = v
-        self.variables.revision = rv0 # type: ignore
-        self.variables._syncronise() # type: ignore
-        if self.revision != r0:
-            self.revision = r0
+        self.variables.revision = vr0 # type: ignore
+        #self.variables._syncronise() # type: ignore
+        self.revision = r0
+        self.table_config.revision = tr0
+        
 
     def reattach_table_config(self, component_provider: Mapping[str, NewsegsComponent]):
         """Reattach the associated TableConfig instance after metamodel reconstruction.
@@ -374,17 +437,17 @@ class NewsegsMetaModel(NewsegsComponent):
                 except ValueError as e:
                     logger.error(e)
                 
-                self._variables_last_model_sync[varid] = var._config.revision
+                self._variables_last_model_sync[varid] = var.revision
   
         return affected_models
 
     @override
     def to_dict(self) -> dict[str, Any]:
         odict = super().to_dict()
+        odict['_table_config_id'] = self.table_config.id
         odict['_model_id'] = self.model.id
         odict['_finance_id'] = self.finance.id
         odict['_variable_ids'] = self.variable_ids
-        odict['_table_config_id'] = self.table_config.id
         return odict
 
     @override
@@ -408,8 +471,7 @@ class NewsegsMetaModel(NewsegsComponent):
         super().anonymise_ids()
         self.model.anonymise_ids()
         self.finance.anonymise_ids()
-        for v in self.variables.values():
-            v.anonymise_ids()
+        # Do not anonymise variables! Remember, the metamodel does not own its variables.
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
@@ -428,6 +490,37 @@ class NewsegsMetaModel(NewsegsComponent):
     # We will also not use a custom pickler, because we don't want to switch out picklers
     # depending on what is being pickled, and ultimately we do want models and finances to be
     # picklable in other circumstances.
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        state = self.__getstate__()
+        cfg = state.pop('_config', None)
+        if cfg:
+            setattr(result, '_config', copy.deepcopy(cfg, memo))
+        
+        r0 = result.revision
+
+        tblcfg = state.pop('_table_config', None)
+        if tblcfg:
+            result.table_config = copy.deepcopy(tblcfg)
+        
+        tr0 = result.table_config.revision
+        
+        for k, v in state.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        # Need to generate a new container, but the contents must be identical
+        result.variables = {k: v for k, v in self.variables.items()}
+        result.variables.revision = self.variables.revision # pyright: ignore[reportAttributeAccessIssue]
+
+        result.model = copy.deepcopy(self.model)
+        result.finance = copy.deepcopy(self.finance)
+        result.finance.set_model(result.model, dirty = False)
+        result.revision = r0
+        result.table_config.revision = tr0
+        return result
 
     def to_config(self) -> dict[str, str|int|float]:
         """
@@ -475,5 +568,5 @@ class NewsegsMetaModel(NewsegsComponent):
     
 
 NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
-    '_model', '_finance', '_variables', '_table_config'
+    '_model', '_finance', '_variables', '_table_config', '_watcher'
 )

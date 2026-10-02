@@ -37,6 +37,13 @@ class VariableProviderInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def add_variable(self, var: Variable) -> str:
+        """Add a variable to the VariableProvider
+        
+        Add an instance of a variable such that it is gettable by both instance id and variable id
+
+        Returns:
+            The uid of the variable
+        """
         ...
 
     @abstractmethod

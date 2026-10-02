@@ -313,15 +313,15 @@ class SprakeGeneration(NewsegsGeneration):
     @override
     def update(self, config):
         super().update(config)
-        r0 = self.revision
+        #r0 = self.revision
         if isinstance(config, Mapping):
             if '_config' in config.keys():
                 if 'pv_capacity' in config['_config'].keys():
                     self.pv_capacity = self._config.pv_capacity
                 if 'wind_capacity' in config['_config'].keys():
                     self.wind_capacity = self._config.wind_capacity
-        self.generator.chain_syncronise()
-        self.revision = r0
+        #self.generator.chain_syncronise()
+        #self.revision = r0
         
     
     @override

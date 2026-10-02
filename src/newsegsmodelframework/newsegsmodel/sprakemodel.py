@@ -388,7 +388,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         return inst
 
-    def __getstate__(self) -> object:
+    def __getstate__(self) -> dict:
         attributes = self.__dict__.copy()
         del attributes['_local_environment_server']
         del attributes['_wider_environment_server']
@@ -398,6 +398,41 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self.__dict__ = copy.copy(state) # pyright: ignore[reportAttributeAccessIssue, reportGeneralTypeIssues]
         self.local_env =  get_sprake_environment_server()
         self.wider_env = get_sprake_wider_env_server()
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        state = self.__getstate__()
+        cfg = state.pop('_config', None)
+        if cfg:
+            setattr(result, '_config', copy.deepcopy(cfg, memo))
+        r0 = result.revision
+
+        tblcfg = state.pop('_table_config', None)
+        if tblcfg:
+            result.table_config = copy.deepcopy(tblcfg)
+        tr0 = result.table_config.revision
+
+        grdcfg = state.pop('_grid')
+        if grdcfg:
+            result.grid = copy.deepcopy(grdcfg)
+
+        gencfg = state.pop('_generation')
+        if gencfg:
+            result.generation = copy.deepcopy(gencfg)
+
+        cscfg = state.pop('_consumption_storage')
+        if cscfg:
+            result.consumption_storage = copy.deepcopy(cscfg)
+
+        for k, v in state.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        result.revision = r0
+        result.table_config.revision = tr0
+        return result
+        
 
 SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_attributes) + (
     '_local_environment_server',

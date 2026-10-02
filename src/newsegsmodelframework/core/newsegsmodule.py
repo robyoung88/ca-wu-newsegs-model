@@ -78,4 +78,11 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
             self._config._revision = self._config._last_syncronised
         self._dirty = val
 
+    def __getstate__(self) -> dict:
+        odict = self.__dict__.copy()
+        for attname in self._excluded_attributes:
+            if attname in odict:
+                del odict[attname]
+        return odict
+
 NewsegsModule._excluded_attributes = super(NewsegsModule, NewsegsModule)._excluded_attributes + ('_model',)

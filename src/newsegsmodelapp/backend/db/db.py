@@ -35,7 +35,7 @@ def get_engine(db_path: str | Path | None = None):
 
     db_path = str(settings['DB_PATH']) if db_path is None else db_path
 
-    if _engine is None or (_connected_db_path is not None and _connected_db_path is not db_path):
+    if _engine is None or (_connected_db_path is not None and _connected_db_path != db_path):
         engine_url = f'sqlite+pysqlite:///{db_path}'
         print(f'Creating engine: {engine_url}')
         _engine = sqlalchemy.create_engine(
