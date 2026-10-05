@@ -61,9 +61,9 @@ class TestRevisionIncrements(unittest.TestCase):
         child.tags[0] = 'ham'
         self.assertListEqual(child.tags, ['ham', 'eggs'])
         self.assertEqual(child.tags.revision, 1) # pyright: ignore[reportAttributeAccessIssue]
-        self.assertEqual(parent.revision, 1)
+        self.assertEqual(parent.revision, 2)
         self.assertTrue(child.tags.modified) # pyright: ignore[reportAttributeAccessIssue]
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
         parent._chain_syncronise()
         self.assertFalse(parent.chain_modified)

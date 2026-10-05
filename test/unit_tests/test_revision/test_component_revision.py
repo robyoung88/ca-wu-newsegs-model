@@ -49,9 +49,9 @@ class DummyParentComponent(NewsegsComponent):
         self.child = child
         self.revision = 0
 
-DummyParentComponent._excluded_attributes = super(DummyParentComponent, DummyParentComponent)._excluded_attributes + (
-    '_child',
-)
+# DummyParentComponent._excluded_attributes = super(DummyParentComponent, DummyParentComponent)._excluded_attributes + (
+#     '_child',
+# )
 
 registers.register_custom_class(ChildConfig._constructor_class, ChildConfig)
 registers.register_custom_class(DummyChildComponent._constructor_class, DummyChildComponent)

@@ -158,17 +158,22 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
 
         has_old = hasattr(self, name)
         old_val = getattr(self, name, None)
-        new_val = wrap_value(value, self)
-        
-        
         try:
-            equal = np.all(old_val == new_val)
+            if isinstance(
+                value, 
+                IMMUTABLE_TYPES#(int, float, str, bool, bytes, complex, type(None))
+            ):
+                equal = np.all(old_val == value)
+            else:
+                equal = value is old_val
         except ValueError:
             equal = False
-        
+
         if not has_old or not equal:
             if has_old:
                 recursive_remove_children(self, old_val)
+
+            new_val = wrap_value(value, self)
 
             object.__setattr__(self, name, new_val)
             self._notify_change(self)
@@ -286,7 +291,7 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
 class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin):#, metaclass = RevisionDataMeta):
     """Base class for all revision-tracked dataclasses."""
     _constructor_class = 'DataWithRevision'
-    _excluded_attributes = ('_children', '_subscribers' )
+    _excluded_attributes = serialisation.SerialiseToDictMixin._excluded_attributes.union({'_children', '_subscribers'})
 
     @override
     def update(self, config: dict[str, Any] | type[T]):
@@ -751,26 +756,35 @@ class ComponentProperty(ComponentPropertyInterface):
 
     def __init__(self, default: Any = None, oftype: Optional[type | tuple[type, ...]] = None):
         self.default = default
+        self._propname = ""
         self.name = ""
-        self.id = ""
         self.oftype = oftype
 
     def __set_name__(self, owner: type, name: str):
         self.name = f'_{name}' # Name as stored on object instance
-        self.id = f'_{name}_id'
 
     def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
         if instance is None:
             return self
         att = getattr(instance, self.name, None)
+        
         if att is not None:
             return att
+        
         if isinstance(self.default, Callable):
             default_val = self.default()
         else:
             default_val = self.default
-        setattr(instance, self.name, default_val)
-        return getattr(instance, self.name, default_val)
+
+        # Note to set the value on the propname, so that it gets wrapped.
+        if self.oftype and isinstance(default_val, self.oftype):
+            # Perform a special set so that notification is not fired.
+            # Make clear that subscription is requested, so that we know
+            # who to remove from when the property is deleted or exchanged.
+            instance._config._add_child(default_val._config, subscribe = True)
+            setattr(instance, self.name, default_val) 
+
+        return getattr(instance, self.name, default_val) 
 
     def __set__(self, instance: 'ConfigurationMixin', value: 'ConfigurationMixin'):
         if self.oftype:
@@ -778,21 +792,48 @@ class ComponentProperty(ComponentPropertyInterface):
                 raise TypeError(f'"{self.name}" is expected as one of {self.oftype}, is {type(value)}')
         old_val = getattr(instance, self.name, None)
 
-        if old_val is not None and old_val._config is not value._config:
-            instance._config._remove_child(old_val._config)
-            setattr(instance, self.id, None)
+        if old_val is not None:
+            if old_val._config is not value._config:
+                # A ComponentProperty should only be subscribed to by the _config
+                # of its parent Components.
+                instance._remove_child(old_val._config)
+
+
+                #old_subscribers = [x for x in old_val._subscribers]
+                #for subscriber in old_subscribers:
+                #    subscriber._remove_child(old_val._config)
+
+            else:
+                # No real need to do anything
+                setattr(instance, self.name, value)
+                return
+
+            #for subscriber in old_subscribers:
+                # Form a revision loop with the old subscribers
+                #subscriber._add_child(value._config, subscribe = True)
         
-        instance._config._add_child(value._config)
-        instance._config._notify_change()
+        # Form a revision loop with the parent Component config    
+        instance._add_child(value._config, subscribe = True)
+
+        # Only notify the last added subscriber
+        value._config._subscribers[-1]._notify_change()
+        #for subscriber in value._config._subscribers:
+        #    subscriber._notify_change()
 
         setattr(instance, self.name, value)
-        if isinstance(value, ConfigurationMixin):
-            setattr(instance, self.id, value.id)
 
 
-class ComponentListProperty(ComponentPropertyInterface):
-    """Descriptor for attributes which are lists of Components (i.e. inherit ConfigurationMixin)"""
-    def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
+class ComponentSubscriptionRevisionNotifierProperty(ComponentPropertyInterface):
+    """Descriptor for attributes which are SubscriptionRevisionNotifiers
+    """
+    def __init__(
+        self,
+        default: Callable,
+        type_: Type,
+        oftype: Type | tuple[Type, ...] | None = None
+    ):
+        self.default = default
+        self.type_ = type_
         self.name = ""
         self.oftype = oftype
 
@@ -803,118 +844,184 @@ class ComponentListProperty(ComponentPropertyInterface):
         if instance is None:
             return self
         att = getattr(instance, self.name, None)
-        if att is None:
-            att = ObservableList(subscribers = instance)
-            setattr(instance, self.name, att)
-        return att
-
-    def __set__(self, instance: ConfigurationMixin, value: Iterable):
-        if not isinstance(instance, ConfigurationMixin):
-            raise TypeError(f'ComponentList properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
         
+        if att is not None:
+            return att
+        
+        default_val = self.default()
+        # Perform a special set so that notification is not fired.
+        instance._add_child(default_val, subscribe = True)
+        setattr(instance, self.name, default_val) 
+
+        return getattr(instance, self.name, default_val)
+
+    def __set__(self, instance: ConfigurationMixin, value: Any):
+        # TODO: Handle oftype
+
         old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, ObservableList):    
-            value = ObservableList(value, instance)
-            is_wrapped = True
-            
-        if old_val and not old_val == value:
-            recursive_remove_children(instance._config, old_val)
-            if not is_wrapped:
-                if isinstance(value, ObservableList):
-                    subscribers = [instance._config]
-                    value._wrap_value(value, subscribers)
-                else:
-                    value = ObservableList(value, instance)
+        if old_val is value:
+            # Nothing to do
+            return
+        
+        if not isinstance(value, self.type_):
+            value = self.type_(value)
 
-            instance._config._notify_change()
+        if old_val is not None:
+            instance._remove_child(old_val)
+        # Form a revision loop with the parent Component config    
+        instance._add_child(value, subscribe = True)
 
-        setattr(instance, self.name, value)
+        # Only notify the last added subscriber
+        value._subscribers[-1]._notify_change()
+
+        setattr(instance, self.name, value)  
 
 
-class ComponentOrderedDictProperty(ComponentPropertyInterface):
+class ComponentListProperty(ComponentSubscriptionRevisionNotifierProperty):
+    """Descriptor for attributes which are ObservableLists
+    """
+    def __init__(
+        self,
+        oftype: Type | tuple[Type, ...] | None = None
+    ):
+        super().__init__(default = ObservableList, type_ = ObservableList, oftype = oftype)
+
+
+class ComponentOrderedDictProperty(ComponentSubscriptionRevisionNotifierProperty):
     """Descriptor for attributes which are ordered dictionaries of Components (i.e. inherit ConfigurationMixin, e.g. Variables)"""
-    def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
-        self.name = ""
-        self.oftype = oftype
+    def __init__(
+        self,
+        oftype: Optional[type | tuple[type, ...]] = None
+    ):
+        super().__init__(default = ObservableOrderedDict, type_ = ObservableOrderedDict, oftype = oftype)
+        
 
-    def __set_name__(self, owner: type, name: str):
-        self.name = f'_{name}' # Name as stored on object instance
-
-    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
-        if instance is None:
-            return self
-        att = getattr(instance, self.name, None)
-        if att is None:
-            att = ObservableOrderedDict(subscribers = [instance])
-            setattr(instance, self.name, att)
-        return att
-
-    def __set__(self, instance: ConfigurationMixin, value: Mapping):
-        if not isinstance(instance, ConfigurationMixin):
-            raise TypeError(f'ComponentOrderedDict properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
-
+class TableModifyingComponentSRNProperty(ComponentSubscriptionRevisionNotifierProperty):
+    @override
+    def __set__(self, instance: ConfigurationMixin, value: Any):
         old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, ObservableOrderedDict):
-            value = ObservableOrderedDict(value, instance)
-            is_wrapped = True
+        if old_val is value:
+            # Nothing to do
+            return
 
-        if old_val and not old_val == value:
-            instance._config._remove_child(old_val)
-            if not is_wrapped:
-                value = ObservableOrderedDict(value, instance)
-            instance._config._notify_change()
+        if not isinstance(value, self.type_):
+            value = self.type_(value)
 
-        setattr(instance, self.name, value)
-
-
-class TableModifyingComponentOrderedDictProperty(ComponentOrderedDictProperty):
-    
-    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
-        if instance is None:
-            return self
-        att = getattr(instance, self.name, None)
-        if att is None:
-            att = TableModifyingObservableOrderedDict(subscribers = [instance])
-            setattr(instance, self.name, att)
-        return att
-
-    def __set__(self, instance: ConfigurationMixin, value: Mapping):
-        if not isinstance(instance, ConfigurationMixin):
-            raise TypeError(f'ComponentOrderedDict properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
-
-        old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, ObservableOrderedDict):
-            value = TableModifyingObservableOrderedDict(value, instance)
-            is_wrapped = True
-
-        if old_val and not old_val == value:
-            recursive_remove_children(instance._config, old_val)
-            if hasattr(instance, '_table_config'):
-                recursive_remove_children(getattr(instance, '_table_config'), old_val)
+        if old_val is not None:
+            if hasattr(instance, 'table_config'):
+                instance.table_config._remove_child(old_val)
+            else:
+                instance._remove_child(old_val)
             if hasattr(instance, 'watcher'):
-                recursive_remove_children(instance.watcher, old_val)
-            
-            instance._config._remove_child(old_val)
-            if not is_wrapped:
-                if isinstance(value, TableModifyingObservableOrderedDict):
-                    subscribers = []
-                    if hasattr(instance, '_table_config'):
-                        subscribers.append(getattr(instance, '_table_config'))
-                        
-                    else:
-                        subscribers.append(instance._config)
-                    if hasattr(instance, 'watcher'):
-                        subscribers.append(instance.watcher)
-                    value._wrap_value(value, subscribers)
-                else:
-                    value = TableModifyingObservableOrderedDict(value, instance)
-            
-            instance._config._notify_change()
+                instance.watcher._remove_child(old_val)
+
+        n_subscribers = 0
+        if hasattr(instance, 'table_config'):
+            instance.table_config._add_child(value, subscribe = True)
+            n_subscribers += 1
+        else:
+            instance._add_child(value, subscribe = True)
+            n_subscribers += 1
+        if hasattr(instance, 'watcher'):
+            instance.watcher._add_child(value, subscribe = True)
+            n_subscribers += 1
+
+        # Notify new subscribers
+        for idx in range(-n_subscribers, 0, 1):
+            value._subscribers[idx]._notify_change()
 
         setattr(instance, self.name, value)
+
+
+class TableModifyingComponentOrderedDictProperty(TableModifyingComponentSRNProperty):
+
+    def __init__(
+        self,
+        oftype: Type | tuple[Type, ...] | None = None
+    ):
+        super().__init__(
+            default = TableModifyingObservableOrderedDict, 
+            type_ = TableModifyingObservableOrderedDict, 
+            oftype = oftype
+        )
+
+    # @override
+    # def __get__(
+    #     self, instance: Optional[ConfigurationMixin], owner: type
+    # ) -> Any:
+    #     if instance is None:
+    #         return self
+    #     att = getattr(instance, self.name, None)
+    #     if att is None:
+    #         att = TableModifyingObservableOrderedDict(subscribers = [instance])
+    #         setattr(instance, self.name, att)
+    #     return att
+
+    # @override
+    # def __set__(self, instance: ConfigurationMixin, value: Mapping):
+    #     if not isinstance(instance, ConfigurationMixin):
+    #         raise TypeError(f'ComponentOrderedDict properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
+
+    #     old_val = getattr(instance, self.name, None)
+
+    #     if old_val is value:
+    #         return
+
+    #     if old_val:
+    #         subscribers = old_val._subscribers
+    #     else:
+    #         subscribers = []
+    #         if hasattr(instance, 'table_config'):
+    #             subscribers.append(getattr(instance, 'table_config'))
+    #         else:
+    #             subscribers.append(instance._config)
+    #         if hasattr(instance, 'watcher'):
+    #             subscribers.append(instance.watcher)
+
+    #     if isinstance(value, TableModifyingObservableOrderedDict):
+    #         for subscriber in value._subscribers:
+    #             value.unsubscribe(subscriber)
+    #         for subscriber in subscribers:
+    #             value.subscribe(subscriber)
+
+    #     else:
+    #         value = TableModifyingObservableOrderedDict(value, subscribers)
+
+    #     instance._config._notify_change()
+                
+    #     setattr(instance, self.name, value)
+        
+    #     # subscribers = [instance]
+    #     # is_wrapped = False
+    #     # if not isinstance(value, ObservableOrderedDict):
+    #     #     value = TableModifyingObservableOrderedDict(value, instance)
+    #     #     is_wrapped = True
+
+    #     # if old_val and not old_val == value:
+    #     #     recursive_remove_children(instance._config, old_val)
+    #     #     if hasattr(instance, '_table_config'):
+    #     #         recursive_remove_children(getattr(instance, '_table_config'), old_val)
+    #     #     if hasattr(instance, 'watcher'):
+    #     #         recursive_remove_children(instance.watcher, old_val)
+            
+    #     #     instance._config._remove_child(old_val)
+    #     #     if not is_wrapped:
+    #     #         if isinstance(value, TableModifyingObservableOrderedDict):
+    #     #             subscribers = []
+    #     #             if hasattr(instance, '_table_config'):
+    #     #                 subscribers.append(getattr(instance, '_table_config'))
+                        
+    #     #             else:
+    #     #                 subscribers.append(instance._config)
+    #     #             if hasattr(instance, 'watcher'):
+    #     #                 subscribers.append(instance.watcher)
+    #     #             value._wrap_value(value, subscribers)
+    #     #         else:
+    #     #             value = TableModifyingObservableOrderedDict(value, instance)
+            
+    #     #     instance._config._notify_change()
+
+    #     # setattr(instance, self.name, value)
 
 
 class TableModifyingObservableList(ObservableList):
@@ -956,59 +1063,98 @@ class TableModifyingObservableList(ObservableList):
         super().__init__(iterable, subscribers = working_subscribers)
 
 
-class TableModifyingComponentListProperty(ComponentListProperty):
-    """A component list which modifies the revision of the table_config on the parent when changed."""
+class TableModifyingComponentListProperty(TableModifyingComponentSRNProperty):
 
-    @override
-    def __get__(
-        self, instance: ConfigurationMixin | None, owner: type
-    ) -> TableModifyingObservableList:
-        if instance is None:
-            return self # pyright: ignore[reportReturnType]
-        att = getattr(instance, self.name, None)
-        if att is None:
-            att = TableModifyingObservableList(subscribers = instance)
-            setattr(instance, self.name, att)
-        return att
+    def __init__(
+        self,
+        oftype: Type | tuple[Type, ...] | None = None
+    ):
+        super().__init__(
+            default = TableModifyingObservableList, 
+            type_ = TableModifyingObservableList, 
+            oftype = oftype
+        )
 
-    @override
-    def __set__(self, instance: ConfigurationMixin, value: Iterable):
-        if not isinstance(instance, ConfigurationMixin):
-            raise TypeError(f'ComponentList properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
+# class TableModifyingComponentListProperty(ComponentListProperty):
+#     """A component list which modifies the revision of the table_config on the parent when changed."""
+
+#     @override
+#     def __get__(
+#         self, instance: ConfigurationMixin | None, owner: type
+#     ) -> TableModifyingObservableList:
+#         if instance is None:
+#             return self # pyright: ignore[reportReturnType]
+#         att = getattr(instance, self.name, None)
+#         if att is None:
+#             att = TableModifyingObservableList(subscribers = instance)
+#             setattr(instance, self.name, att)
+#         return att
+
+#     @override
+#     def __set__(self, instance: ConfigurationMixin, value: Iterable):
+#         if not isinstance(instance, ConfigurationMixin):
+#             raise TypeError(f'ComponentList properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
         
-        old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, TableModifyingObservableList):    
-            value = TableModifyingObservableList(value, instance)
-            is_wrapped = True
-            
-        if old_val and not old_val == value:
-            recursive_remove_children(instance._config, old_val)
-            if hasattr(instance, '_table_config'):
-                recursive_remove_children(getattr(instance, '_table_config'), old_val)
-            if hasattr(instance, 'watcher'):
-                recursive_remove_children(instance.watcher, old_val)
-            
-            if not is_wrapped:
-                if isinstance(value, TableModifyingObservableList):
-                    #subscribers = [instance._config]
-                    subscribers = []
-                    if hasattr(instance, '_table_config'):
-                        subscribers.append(getattr(instance, '_table_config'))
-                        if hasattr(instance, 'watcher'):
-                            subscribers.append(instance.watcher)
-                    else:
-                        subscribers.append(instance._config)
-                    value._wrap_value(value, subscribers)
-                else:
-                    value = TableModifyingObservableList(value, instance)
+#         old_val = getattr(instance, self.name, None)
+        
+#         if old_val is value:
+#             return
 
-            instance._config._notify_change()
+#         if old_val:
+#             subscribers = old_val._subscribers
+#         else:
+#             subscribers = []
+#             if hasattr(instance, 'table_config'):
+#                 subscribers.append(getattr(instance, 'table_config'))
+#             else:
+#                 subscribers.append(instance._config)
+#             if hasattr(instance, 'watcher'):
+#                 subscribers.append(instance.watcher)
 
-        setattr(instance, self.name, value)
+#         if isinstance(value, TableModifyingObservableList):
+#             for subscriber in value._subscribers:
+#                 value.unsubscribe(subscriber)
+#             for subscriber in subscribers:
+#                 value.subscribe(subscriber)
+
+#         else:
+#             value = TableModifyingObservableList(value, subscribers)
+
+#         instance._config._notify_change()
+                
+#         setattr(instance, self.name, value)
+        
+#         # is_wrapped = False
+#         # if not isinstance(value, TableModifyingObservableList):    
+#         #     value = TableModifyingObservableList(value, instance)
+#         #     is_wrapped = True
+            
+#         # if old_val and not old_val == value:
+#         #     recursive_remove_children(instance._config, old_val)
+#         #     if hasattr(instance, '_table_config'):
+#         #         recursive_remove_children(getattr(instance, '_table_config'), old_val)
+#         #     if hasattr(instance, 'watcher'):
+#         #         recursive_remove_children(instance.watcher, old_val)
+            
+#         #     if not is_wrapped:
+#         #         if isinstance(value, TableModifyingObservableList):
+#         #             #subscribers = [instance._config]
+#         #             subscribers = []
+#         #             if hasattr(instance, '_table_config'):
+#         #                 subscribers.append(getattr(instance, '_table_config'))
+#         #                 if hasattr(instance, 'watcher'):
+#         #                     subscribers.append(instance.watcher)
+#         #             else:
+#         #                 subscribers.append(instance._config)
+#         #             value._wrap_value(value, subscribers)
+#         #         else:
+#         #             value = TableModifyingObservableList(value, instance)
+
+#         #     instance._config._notify_change()
+
+#         # setattr(instance, self.name, value)
 
 @revision_dataclass
 class NoConfig(DataWithRevision):
     """A placeholder configuration object"""
-    ...
 

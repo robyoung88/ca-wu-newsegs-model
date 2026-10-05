@@ -73,7 +73,8 @@ def get_sprake_environment_server():
     server.set_wind_speed(
         wind_data['wind_speed'].values, # pyright: ignore[reportArgumentType]
         windloc,
-                          wind_ts)
+        wind_ts
+    )
     
     ### Solar
     pv_data = (
@@ -138,18 +139,23 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     model_type = 'sprake'
     _version = '0.0.1'
 
+    _excluded_attributes = newsegsmodel.NewsegsModel._excluded_attributes.union({
+        '_local_environment_server',
+        '_wider_environment_server'
+    })
+
     generation = newsegsmodel.NewsegsModelProperty(
-        default = sprakegeneration.SprakeGeneration, 
+        default = sprakegeneration.SprakeGeneration.from_none, 
         oftype = sprakegeneration.SprakeGeneration
     ) # pyright: ignore[reportAssignmentType]
 
     grid = newsegsmodel.NewsegsModelProperty(
-        default = sprakegrid.SprakeGrid,
+        default = sprakegrid.SprakeGrid.from_none,
         oftype = sprakegrid.SprakeGrid
     ) # pyright: ignore[reportAssignmentType]
 
     consumption_storage = newsegsmodel.NewsegsModelProperty(
-        default = sprakecs.SprakeCS,
+        default = sprakecs.SprakeCS.from_none,
         oftype = sprakecs.SprakeCS
     ) # pyright: ignore[reportAssignmentType]
 
@@ -206,7 +212,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
             else:
                 self.wider_env = wider_environment_server
         else:
-            self._wider_environment_server = get_sprake_wider_env_server()
+            self.wider_env = get_sprake_wider_env_server()
 
         if not isinstance(generation, sprakegeneration.SprakeGeneration):
             raise TypeError(f'"generation" must be of type SprakeGeneration, is {type(generation)}')
@@ -325,15 +331,17 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     @override
     def run(self):
         super().run()
-        self._generation_result = cast(
-            sprakegeneration.SprakeGenerationResult,
-            self.generation.run(self.run_period)
-        )
+        
         self._grid_result = cast(
             sprakegrid.SprakeGridResult,
             self.grid.run(self.run_period)
         )
-
+        
+        self._generation_result = cast(
+            sprakegeneration.SprakeGenerationResult,
+            self.generation.run(self.run_period)
+        )
+        
         self._cs_result = cast(
             sprakecs.SprakeCSResult,
             self.consumption_storage.run(self.run_period)
@@ -341,103 +349,103 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
-    
-    @override
-    def to_dict(self) -> dict[str, Any]:
-        odict = super().to_dict()
-        
-        odict['local_environment_server'] = str(self._local_environment_server)
-        odict['wider_environment_server'] = str(self._wider_environment_server)
 
-        return odict
-    
-    @classmethod
     @override
-    def from_dict(cls: type[SprakeModel], config: dict[str, Any]) -> SprakeModel:
-        config = config.copy()
+    def _prepare_object_state(self):
+        super()._prepare_object_state()
+        self._local_environment_server_str = str(self._local_environment_server)
+        self._wider_environment_server_str = str(self._wider_environment_server)
+    
+    # @override
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = super().to_dict()
+        
+    #     odict['local_environment_server'] = str(self._local_environment_server)
+    #     odict['wider_environment_server'] = str(self._wider_environment_server)
+
+    #     return odict
+
+    @override
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
+        
         local_environment_server = config.pop('local_environment_server', None)
-        wider_environment_server = config.pop('wider_environment_server', None)
-
-        inst = super().from_dict(config)
-
-        if local_environment_server:
-            if isinstance(local_environment_server, str):
+        if local_environment_server and not isinstance(local_environment_server, str):
+            self.local_env = local_environment_server
+        else:
+            les_str = config.pop('_local_environment_server_str', None)
+            if les_str:
                 testenv = get_sprake_environment_server()
-                if str(testenv) != local_environment_server:
+                if str(testenv) != les_str:
                     raise ValueError('Mismatched local environments')
-                inst.local_env = testenv
-            else:
-                inst.local_env = local_environment_server
+                self.local_env = testenv
+        try:
+            _ = self.local_env
+        except AttributeError:
+            self.local_env = get_sprake_environment_server()
+
+        wider_environment_server = config.pop('wider_environment_server', None)
+        if wider_environment_server and not isinstance(wider_environment_server, str):
+            self.wider_env = wider_environment_server
         else:
-            inst.local_env = get_sprake_environment_server()
-        
-        if wider_environment_server:
-            if isinstance(wider_environment_server, str):
+            wes_str = config.pop('_wider_environment_server_str', None)
+            if wes_str:
                 testenv = get_sprake_wider_env_server()
-                if str(testenv) != wider_environment_server:
+                if str(testenv) != wes_str:
                     raise ValueError('Mismatched wider environments')
-                inst._wider_environment_server = testenv
-            else:
-                inst.wider_env = wider_environment_server
-        else:
-            inst._wider_environment_server = get_sprake_wider_env_server()
+                self.wider_env = testenv
+        try:
+            _ = self.wider_env
+        except AttributeError:
+            self.wider_env = get_sprake_wider_env_server()
 
-        #inst.grid.model = inst
-        #inst.generation.model = inst
-        #inst.consumption_storage.model = inst
-        
-        return inst
+    # def __getstate__(self) -> dict:
+    #     attributes = self.__dict__.copy()
+    #     del attributes['_local_environment_server']
+    #     del attributes['_wider_environment_server']
+    #     return attributes
 
-    def __getstate__(self) -> dict:
-        attributes = self.__dict__.copy()
-        del attributes['_local_environment_server']
-        del attributes['_wider_environment_server']
-        return attributes
+    # def __setstate__(self, state):
+    #     self.__dict__ = copy.copy(state) # pyright: ignore[reportAttributeAccessIssue, reportGeneralTypeIssues]
+    #     self.local_env =  get_sprake_environment_server()
+    #     self.wider_env = get_sprake_wider_env_server()
 
-    def __setstate__(self, state):
-        self.__dict__ = copy.copy(state) # pyright: ignore[reportAttributeAccessIssue, reportGeneralTypeIssues]
-        self.local_env =  get_sprake_environment_server()
-        self.wider_env = get_sprake_wider_env_server()
+    # def __deepcopy__(self, memo):
+    #     cls = self.__class__
+    #     result = cls.__new__(cls)
+    #     memo[id(self)] = result
+    #     state = self.__getstate__()
+    #     cfg = state.pop('_config', None)
+    #     if cfg:
+    #         setattr(result, '_config', copy.deepcopy(cfg, memo))
+    #     r0 = result.revision
 
-    def __deepcopy__(self, memo):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        state = self.__getstate__()
-        cfg = state.pop('_config', None)
-        if cfg:
-            setattr(result, '_config', copy.deepcopy(cfg, memo))
-        r0 = result.revision
+    #     tblcfg = state.pop('_table_config', None)
+    #     if tblcfg:
+    #         result.table_config = copy.deepcopy(tblcfg)
+    #     tr0 = result.table_config.revision
 
-        tblcfg = state.pop('_table_config', None)
-        if tblcfg:
-            result.table_config = copy.deepcopy(tblcfg)
-        tr0 = result.table_config.revision
+    #     grdcfg = state.pop('_grid')
+    #     if grdcfg:
+    #         result.grid = copy.deepcopy(grdcfg)
 
-        grdcfg = state.pop('_grid')
-        if grdcfg:
-            result.grid = copy.deepcopy(grdcfg)
+    #     gencfg = state.pop('_generation')
+    #     if gencfg:
+    #         result.generation = copy.deepcopy(gencfg)
 
-        gencfg = state.pop('_generation')
-        if gencfg:
-            result.generation = copy.deepcopy(gencfg)
+    #     cscfg = state.pop('_consumption_storage')
+    #     if cscfg:
+    #         result.consumption_storage = copy.deepcopy(cscfg)
 
-        cscfg = state.pop('_consumption_storage')
-        if cscfg:
-            result.consumption_storage = copy.deepcopy(cscfg)
+    #     for k, v in state.items():
+    #         setattr(result, k, copy.deepcopy(v, memo))
 
-        for k, v in state.items():
-            setattr(result, k, copy.deepcopy(v, memo))
+    #     result.local_env = self._local_environment_server
+    #     result.wider_env = self._wider_environment_server
 
-        result.revision = r0
-        result.table_config.revision = tr0
-        return result
-        
-
-SprakeModel._excluded_attributes = tuple(newsegsmodel.NewsegsModel._excluded_attributes) + (
-    '_local_environment_server',
-    '_wider_environment_server'
-)
+    #     result.revision = r0
+    #     result.table_config.revision = tr0
+    #     return result
 
 # SprakeModel copy constructor
 @SprakeModel.__init__.register(SprakeModel) # pyright: ignore[reportFunctionMemberAccess]

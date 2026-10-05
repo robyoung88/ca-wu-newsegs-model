@@ -17,16 +17,14 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import copy
 import json
-import re
 import time
-from typing import Any, Optional, Sequence, overload, override
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Optional, Protocol, Sequence, overload, override
 import uuid as mod_uuid
 
 from useful_types import SequenceNotStr
 
-from newsegsmodelframework.core import serialisation, SerialisedConfigurationMixin
-from newsegsmodelframework.core import find_constructor
-from newsegsmodelframework.core.trackeddata import ComponentPropertyInterface, DataWithRevision
+from newsegsmodelframework.core import SerialisedConfigurationMixin
+from newsegsmodelframework.core.trackeddata import ComponentProperty, ComponentPropertyInterface, DataWithRevision
 from newsegsmodelframework.util import jsonfuncs
 
 __all__ = [
@@ -34,6 +32,10 @@ __all__ = [
     'DataWithRevision'
 ]
 
+_STATE_EXCLUDES = Literal[
+    'excluded',
+    'excluded_and_components'
+]
 
 class NewsegsComponent(
     SerialisedConfigurationMixin,
@@ -52,10 +54,18 @@ class NewsegsComponent(
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsComponent'
 
+    _serialisation_settings = dict(
+        state_excludes = 'excluded_and_components'
+    )
+
     _component_ids: dict[str, str]
     """IDs of subcomponents for reconstruction of component."""
 
     # NB - all ID generating attributes are now in ConfigurationMixin   
+
+    @classmethod
+    def set_state_exclusion_policy(cls, excludes: _STATE_EXCLUDES = 'excluded_and_components'):
+        cls._serialisation_settings['state_excludes'] = excludes
 
     def __init__(self, *args, name: Optional[str] = None, **kwargs):
         super().__init__(*args, **kwargs) 
@@ -81,19 +91,30 @@ class NewsegsComponent(
         return self._config
 
     @override
-    def to_dict(self) -> dict[str, Any]:
+    def get_excluded_attributes(self) -> set[str]:
+        excluded = super().get_excluded_attributes()
+        if self._serialisation_settings['state_excludes'] == 'excluded_and_components':
+            component_property_names = self.get_component_attributes()
+            excluded = excluded.union({'_' + x for x in component_property_names})        
+        return excluded
+
+    @override
+    def _prepare_object_state(self):
+        super()._prepare_object_state()
         self.update_component_id_dict()
-        return super().to_dict()
 
     def to_dict_repr(self) -> dict[str, Any]:
         """A dictionary reproduction of the component including child components (not references)."""
+        type_ = type(self)
+        type_.set_state_exclusion_policy('excluded')
         odict = self.to_dict()
-        att_names = self.get_component_attributes()
-        for att in att_names:
-            odict[att] = self._repr_represent(getattr(self, att))
-            attunder = '_' + att
-            if attunder in odict:
-                del odict[attunder]
+        # att_names = self.get_component_attributes()
+        # for att in att_names:
+        #     odict[att] = self._repr_represent(getattr(self, att))
+        #     attunder = '_' + att
+        #     if attunder in odict:
+        #         del odict[attunder]
+        type_.set_state_exclusion_policy('excluded_and_components')
         return odict
 
     def json_dumps_repr(self) -> str:
@@ -101,19 +122,44 @@ class NewsegsComponent(
     
     def _repr_represent(self, value):
         if isinstance(value, object) and hasattr(value, 'to_dict_repr'):
-                return value.to_dict_repr() # pyright: ignore[reportAttributeAccessIssue]
+            return value.to_dict_repr() # pyright: ignore[reportAttributeAccessIssue]
         return self._represent(value)
 
     @override
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        state = copy.copy(state)
+        compnames = self.get_component_attributes()
+        for cn in compnames:
+            if '_'+ cn in state and not cn in state:
+                print(f'Renaming from {'_'+cn} to {cn} in state')
+                state[cn] = state['_' + cn]
+                del state['_' + cn]
+
+        super().__setstate__(state)
+
+    @staticmethod
+    def _anonymise_id_sequence(seq: SequenceNotStr):
+        for x in seq:
+            if isinstance(x, NewsegsComponent):
+                x.id = x.generate_new_id()
+            elif isinstance(x, Mapping):
+                NewsegsComponent._anonymise_id_sequence(tuple(x.values()))
+            elif not isinstance(x, str) and isinstance(x, Sequence):
+                NewsegsComponent._anonymise_id_sequence(x) # pyright: ignore[reportArgumentType]
+        
+    @override
     def anonymise_ids(self):
         super().anonymise_ids()
-        for comp in self.get_components():
-            if comp is not None:
-                comp.id = comp.generate_new_id()
+        self._anonymise_id_sequence(self.get_components())            
 
     def get_component_attributes(self) -> tuple['str', ...]:
         """A tuple of all the attributes of the object that are themselves NewsegsComponents"""
-        return ()
+        type_ = type(self)
+
+        # Strip out dunders and single unders - the properties will not have a leading underscore
+        atts = tuple(k for k in dir(type_) if not k.startswith('_'))
+        atts = tuple(k for k in atts if isinstance(getattr(type_, k), ComponentPropertyInterface))
+        return atts
 
     def get_components(self) -> tuple['NewsegsComponent', ...]:
         """A tuple of all subcomponents that would require saving to store and reattaching after deserialisation."""
@@ -272,3 +318,124 @@ class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
 
 class NewsegsComponentManagerInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
     ...
+
+
+class DictionaryComponentProvider(NewsegsComponentProviderInterface):
+    def __init__(
+        self,
+        comp_dict: dict
+    ) -> None:
+        self.comp_dict = comp_dict
+
+    @overload
+    def get_component(self, component_id: str) -> NewsegsComponent:
+        ...
+
+    @overload
+    def get_component(self, component_id: SequenceNotStr[str]) -> SequenceNotStr[NewsegsComponent]:
+        ...
+
+    def get_component(
+        self, 
+        component_id: str | SequenceNotStr[str]
+    ) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        if isinstance(component_id, str):
+            return self.comp_dict[component_id]
+        else:
+            return[self.comp_dict[x] for x in component_id]
+
+    def duplicate_component(
+        self, 
+        component_id: str | NewsegsComponent
+    ) -> NewsegsComponent:
+        if isinstance(component_id, str):
+            return copy.deepcopy(self.comp_dict[component_id])
+        else:
+            return copy.deepcopy(component_id)
+
+    def add_component(
+        self,
+        component: NewsegsComponent
+    ) -> str:
+        self.comp_dict[component.id] = component
+        return component.id
+
+    def get_default_component(
+        self, 
+        component_type: str, 
+        index: int = -1
+    ) -> NewsegsComponent:
+        return next(iter(self.comp_dict.values()))
+    
+    def get_component_metadata(
+        self, 
+        component_id: str | SequenceNotStr[str], 
+        metadata_ids: str | SequenceNotStr[str]
+    ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        return {'message': 'No metadata'}
+
+    def set_component_metadata(
+        self, component_id: str, metadata_id: str, metadata_value: Any
+    ):
+        ...
+
+
+if TYPE_CHECKING:
+    # During type checking, treat TableOwningMixin as a NewsegsComponent subclass
+    _Base = NewsegsComponent
+else:
+    # At runtime, keep it as a pure lightweight mixin base
+    _Base = object
+
+
+class TableOwningMixin(_Base):
+    """Mixin that adds table_config behavior to any NewsegsComponent subclass."""
+
+    table_config = ComponentProperty(default = TableConfigNewsegsComponent)
+
+    @override
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
+        # Table needs to be created early, for attachment by tablemodifyingproperties
+
+        table_config_exists = hasattr(self, '_table_config')
+        full_update = False
+
+        inst_table = config.pop('_table_config', None)
+        if inst_table:
+            if isinstance(inst_table, NewsegsComponent):
+                self.table_config = inst_table
+                table_config_exists = True
+                full_update = True
+            elif isinstance(inst_table, Mapping):
+                if not table_config_exists:
+                    full_update = True
+                    table_config_exists = True
+                tc = self.table_config # Should generate a default if not present
+                for k, v in inst_table.items():
+                    setattr(tc, k, v)
+            else:
+                raise TypeError(f'Unsupported type for table config update: {type(inst_table)}')
+        
+        # If the table config doesn't actually exist yet, force it to so we can reset the revision
+        # after configuration completes
+        if not table_config_exists:
+            full_update = True
+
+        if full_update:
+            object.__setattr__(self, '_table_config_revis_0', self.table_config.revision)
+
+    @override
+    def _post_update_from_dict(self):
+        if hasattr(self, '_table_config_revis_0'):
+            self.table_config.revision = self._table_config_revis_0
+            delattr(self, '_table_config_revis_0')
+        super()._post_update_from_dict()
+
+
+class TableOwningNewsegsComponent(TableOwningMixin, NewsegsComponent):
+    """Component that owns a table_config."""
+
+
+class TableOwningRunnableNewsegsComponent(TableOwningMixin, RunnableNewsegsComponent):
+    """Runnable component that owns a table config."""

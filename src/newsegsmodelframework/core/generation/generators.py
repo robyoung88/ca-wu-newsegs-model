@@ -105,6 +105,7 @@ class ABCElecGenerator(
     _model: NewsegsModelInterface
 
     _constructor_class = 'Generator'
+    _excluded_attributes = SerialisedConfigurationMixin._excluded_attributes.union({'_model'})
 
     @override
     def _generate_config(self, *args, **kwargs) -> ABCElecGeneratorConfig:
@@ -167,21 +168,6 @@ class ABCElecGenerator(
         """
         The total nameplate capacity in kW.
         """
-
-    # @classmethod
-    # @override
-    # def from_dict(cls, config):
-    #     config = config.copy()
-    #     #cfg = config.pop('_config', None)
-    #     inst = cls.__new__(cls)
-    #     inst._config = inst._generate_config()
-    #     inst.update(config)
-    #     #if cfg:
-    #     #    for k, v in cfg.items():
-    #     #        setattr(inst, k, v)
-    #     return inst
-
-ABCElecGenerator._excluded_attributes = super(ABCElecGenerator,ABCElecGenerator)._excluded_attributes + ('_model',)
 
 
 class NewsegsGeneratorProperty(ComponentProperty):
@@ -252,7 +238,7 @@ class WindTurbineElecGeneratorConfig(ABCElecGeneratorConfig):
     """
     _cp_curve: np.ndarray = field(default_factory = lambda: copy.copy(_wteg_default_cp_curve))
 
-    _excluded_attributes = ('cp',)
+    _excluded_attributes = ABCElecGeneratorConfig._excluded_attributes.union({'cp',})
     
     @override
     def json_dumps(self) -> str:
@@ -369,6 +355,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     """
 
     _name = "Wind Turbine"
+    _excluded_attributes = ABCElecGenerator._excluded_attributes.union({'_model',})
 
     @override
     def _generate_config(self, *args, **kwargs) -> WindTurbineElecGeneratorConfig:
@@ -594,7 +581,7 @@ class WindTurbineElecGenerator(ABCElecGenerator):
 
         return o
     
-    _excluded_attributes = ('_model',)
+    
 
     @override
     def json_dumps(self) -> str:
@@ -1043,6 +1030,16 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
     _config: SprakePVGISElecGeneratorConfig # pyright: ignore[reportIncompatibleVariableOverride]
 
+    _excluded_attributes = ABCElecGenerator._excluded_attributes.union({
+        '_pvlib_location',
+        '_module_parameters',
+        '_temperature_module_parameters',
+        '_losses_parameters',
+        '_inverter_parameters',
+        '_system',
+        '_mc',
+    })
+
     @singledispatchmethod
     def __init__(
         self,
@@ -1261,17 +1258,6 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         o.update(a)
 
         return o
-
-SprakePVGISElecGenerator._excluded_attributes = tuple(super(SprakePVGISElecGenerator, SprakePVGISElecGenerator)._excluded_attributes) + (
-    '_pvlib_location',
-    '_module_parameters',
-    '_temperature_module_parameters',
-    '_losses_parameters',
-    '_inverter_parameters',
-    '_system',
-    '_mc',
-
-)
 
 # SprakePVGISElecGenerator copy constructor
 @SprakePVGISElecGenerator.__init__.register(SprakePVGISElecGenerator) # pyright: ignore[reportFunctionMemberAccess]
@@ -1496,51 +1482,6 @@ def _wrap_generator_value(val: Any, parent: ABCElecGenerator) -> Any:
 class ObservableGeneratorList(ObservableList):
     ...
 
-    # def __setitem__(self, index, value):
-    #     old_val = super().__getitem__(index)
-    #     new_val = value
-    #     if isinstance(new_val, ABCElecGenerator):
-    #         new_val._config = self._wrap_value(new_val._config, self)
-    #     else:
-    #         new_val = wrap_value(new_val, self)
-    #     if old_val != new_val:
-    #         if isinstance(old_val, ABCElecGenerator):
-    #             self._remove_child(old_val._config)
-    #         if isinstance(old_val, RevisionNotifierMixin):
-    #             self._remove_child(old_val)
-    #         elif isinstance(old_val, Iterable):
-    #             for x in old_val:
-    #                 if isinstance(x, RevisionNotifierMixin):
-    #                     self._remove_child(x)
-
-    #         list.__setitem__(self, index, new_val)
-    #         self._notify_change()
-
-    # def pop(self, index: SupportsIndex = -1):
-    #     item = super().pop(index)
-    #     if isinstance(item, ABCElecGenerator):
-    #         self._remove_child(item._config)
-
-    #     # Notify is handled by ObservableList
-    #     return item
-
-    # def remove(self, value):
-    #     try:
-    #         idx = self.index(value)
-    #         item = self[idx]
-    #     except ValueError:
-    #         # Let the standard error be raised
-    #         list.remove(self, value)
-    #         return
-
-    #     if isinstance(item, RevisionNotifierMixin):
-    #         self._remove_child(item)
-    #     elif isinstance(item, ABCElecGenerator):
-    #         self._remove_child(item._config)
-        
-    #     list.remove(self, value)
-    #     self._notify_change()
-
 
 class NewsegsGeneratorListProperty(ComponentProperty):
     """Assign a property as a list of generators."""
@@ -1738,12 +1679,13 @@ def PowerPlantHeterogeneousGenerators_from_other(
     except AttributeError:
         pass
 
-    for k in asdict(other._config).keys():
-        setattr(self, k, copy.copy(getattr(other, k)))
-
     self.generators = []
     for gen in other.generators:
         self.generators.append(copy.deepcopy(gen))
+
+    for k in asdict(other._config).keys():
+        setattr(self, k, copy.copy(getattr(other, k)))
+
     self.location = self._config.location
 
 

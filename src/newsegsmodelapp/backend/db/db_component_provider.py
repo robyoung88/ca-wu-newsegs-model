@@ -1,6 +1,6 @@
 import copy
 import json
-from typing import Any, Callable, Literal, Optional, Sequence, cast, overload, override
+from typing import Any, Callable, Literal, Mapping, Optional, Sequence, cast, overload, override
 
 from cachetools import LRUCache
 import pandas as pd
@@ -108,13 +108,28 @@ class FromDatabaseNewsegsComponentProvider(
     def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
         comp1 = original
         comp2 = copy.deepcopy(comp1)
-        comp2.id = comp2.generate_new_id()
-        for childattr in comp2.get_component_attributes():
-            setattr(
-                comp2,
-                childattr,
-                self.duplicate_component(getattr(comp2, childattr))
-            )
+        comp2.anonymise_ids()
+        #comp2.id = comp2.generate_new_id()
+        # for childattr in comp2.get_component_attributes():
+        #     att = getattr(comp2, childattr)
+        #     if isinstance(att, NewsegsComponent):
+        #         setattr(
+        #             comp2,
+        #             childattr,
+        #             self.duplicate_component(att)
+        #         )
+        #     elif isinstance(att, Mapping):
+        #         newval = {k: self.duplicate_component(v) for k, v in att.items()}
+        #         setattr(
+        #             comp2,
+        #             childattr,
+        #             newval
+        #         )
+        #     elif not isinstance(att, str) and isinstance(att, Sequence):
+        #         newval = [self.duplicate_component(v) for v in att]
+        #         setattr(comp2, childattr, newval)
+        #     else:
+        #         raise TypeError(f'Unsupported component type for duplication: {type(original)} - {original}')
         return comp2
     
     @override
@@ -154,6 +169,24 @@ class FromDatabaseNewsegsComponentProvider(
         row = rows[index]
         return self._reconstruct_component(row.payload, row)
 
+    def _expand_component_sequence(self, component) -> list:
+        components = []
+        if isinstance(component, NewsegsComponent) and not isinstance(component, Variable):
+            components.append(component)
+        elif isinstance(component, Mapping):
+            for v in component.values():
+                if isinstance(v, NewsegsComponent) and not isinstance(v, Variable):
+                    components.append(v)
+                elif isinstance(v, Mapping) or (not isinstance(v, str) and isinstance(v, Sequence)):
+                    components.extend(self._expand_component_sequence(v))
+        elif not isinstance(component, str) and isinstance(component, Sequence):
+            for v in component:
+                if isinstance(v, NewsegsComponent) and not isinstance(v, Variable):
+                    components.append(v)
+                elif isinstance(v, Mapping) or (not isinstance(v, str) and isinstance(v, Sequence)):
+                    components.extend(self._expand_component_sequence(v))
+        return components               
+        
     @override
     def upsert_component(
         self, 
@@ -163,8 +196,7 @@ class FromDatabaseNewsegsComponentProvider(
     ) -> None:
         if tbl is None:
             tbl = self._table
-        if isinstance(component, NewsegsComponent):
-            component = [component, ]
+        component = self._expand_component_sequence(component)
 
         current_revisions = {x.id: x.revision for x in component}
         uids = list(current_revisions.keys())
@@ -216,7 +248,7 @@ class FromDatabaseNewsegsComponentProvider(
                 #### Save out all child components ####
                 children = cmp.get_components()
                 if children:
-                    self.upsert_component(children)
+                    self.upsert_component(children, force = force)
 
                 cmp.syncronise()
 
@@ -247,6 +279,10 @@ class FromDatabaseNewsegsComponentProvider(
             if insert_payload:
                 insert_stmt = tbl.insert()
                 conn.execute(insert_stmt, insert_payload)
+
+        print(f'Inserted {len(insert_payload)} components: {[x['id'] for x in insert_payload]}')
+        print(f'Updated {len(update_payload)} components: {[x['id'] for x in update_payload]}')
+        print(f'Revised {len(rev_payload)} components: {[x['id'] for x in rev_payload]}')
 
     def _delete_one_component(
             self, 
@@ -701,21 +737,21 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     @override
     def _reattach_children(self, obj):
         obj = super()._reattach_children(obj)
+        obj.reattach_components(self._component_provider)
         obj.reattach_em(self._em_provider)
         obj.reattach_fm(self._fm_provider)
-        obj.reattach_components(self._component_provider)
         # Do not reattach variables here - wait until the project does it.
         return obj
 
     @override
     def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
         new =  super()._create_duplicate_component(original)
-        if isinstance(original, NewsegsMetaModel):
-            new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._model_id))
-            new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._finance_id))
-            # Worth double checking that model is set on finance
-            new.finance.set_model(new.model, dirty = False)
-            new.variables = {k: v for k, v in original.variables.items()}
+        # if isinstance(original, NewsegsMetaModel):
+        #     new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._component_ids['model']))
+        #     new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._component_ids['finance']))
+        #     # Worth double checking that model is set on finance
+        #     new.finance.set_model(new.model, dirty = False)
+        #     new.variables = {k: v for k, v in original.variables.items()}
         return new
 
     @override

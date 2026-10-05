@@ -9,16 +9,15 @@ from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import environmentserverinterface
 from newsegsmodelframework.core import resultsserverinterface
-from newsegsmodelframework.core import RunnableNewsegsComponent
+from newsegsmodelframework.core import RunnableNewsegsComponent, NewsegsComponent
 from newsegsmodelframework.core import newsegsmodeltimeinterface
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface, TableOwningRunnableNewsegsComponent
 
 class NewsegsModelInterface(
     environmentserverinterface.EnvironmentServerInterface,
     resultsserverinterface.ResultServerInterface,
     newsegsmodeltimeinterface.NewsegsModelTimeInterface,
-    RunnableNewsegsComponent,
-    
+    TableOwningRunnableNewsegsComponent,
 ):
     ...
 
@@ -38,7 +37,7 @@ class NewsegsModelProviderInterface(NewsegsComponentProviderInterface):
         ...
 
     @abstractmethod
-    def duplicate_component(self, component_id: str) -> NewsegsModelInterface:
+    def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsModelInterface:
         ...
 
     @abstractmethod

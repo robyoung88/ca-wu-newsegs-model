@@ -1,5 +1,5 @@
 from .constructors.constructors import find_constructor
-from .serialisation import SerialiseToDictMixin
+from .serialisation import SerialiseToDictMixin, StateSerialiseToDictMixin
 from .serialisedtrackeddata import SerialisedConfigurationMixin
 from .constructors.registers import register_constructor_class
 from .location import Location,RaisedLocation,AspectLocation,location_from_dict
@@ -16,5 +16,6 @@ __all__ = [
     'find_constructor',
     'register_constructor_class',
     'SerialiseToDictMixin',
-    'SerialisedConfigurationMixin'
+    'StateSerialiseToDictMixin',
+    'SerialisedConfigurationMixin',
 ]

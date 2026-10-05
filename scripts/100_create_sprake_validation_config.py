@@ -23,6 +23,8 @@ if __name__ == '__main__':
         json.dump(d1, f, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4)
 
     with open('data/sprakemodel-validation-config.pickle', 'wb') as f:
+        mdl.set_state_exclusion_policy('excluded')
         pickle.dump(mdl, f)
+        mdl.set_state_exclusion_policy('excluded_and_components')
     
 

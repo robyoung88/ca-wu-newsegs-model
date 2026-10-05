@@ -40,8 +40,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
     
     def test_copy_construction(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 0.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
@@ -61,8 +61,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
     
     def test_serialisation(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 0.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
@@ -86,8 +86,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
     
     def test_json_serialisation(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 0.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 

@@ -31,7 +31,8 @@ import logging
 from typing import Any, Mapping, MutableSequence, Optional, override
 
 from newsegsmodelframework.core import serialisation
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
+from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
@@ -114,7 +115,7 @@ class MMVarWatcher(RevisionNotifierProtocol):
 class NewsegsMetaModelConfig(DataWithRevision):
     ...
 
-class NewsegsMetaModel(NewsegsComponent):
+class NewsegsMetaModel(TableOwningNewsegsComponent):
     """A container and controller for models and variables."""
 
     model_id: str
@@ -126,13 +127,14 @@ class NewsegsMetaModel(NewsegsComponent):
     _id_prefix = 'metam'
     _last_modified: datetime.datetime = datetime.datetime.now()
 
+    _excluded_attributes = NewsegsComponent._excluded_attributes.union({'_watcher'})
+
     last_dsa_run: float = 0.
     last_psa_run: float = 0.
     last_optim_run: float = 0.
 
     model = ComponentProperty(default = None, oftype = newsegsmodel.NewsegsModel)
     finance = ComponentProperty(default = None, oftype = newsegsfinance.NewsegsFinance)
-    table_config = ComponentProperty(default = TableConfigNewsegsComponent, oftype = TableConfigNewsegsComponent)
 
     variables = TableModifyingComponentOrderedDictProperty(oftype = variable.Variable)
     _variables_last_model_sync: dict
@@ -260,9 +262,9 @@ class NewsegsMetaModel(NewsegsComponent):
             pass
         self.revision = r0
 
-    def get_component_attributes(self) -> tuple[str, ...]:
-        atts = super().get_component_attributes()
-        return ('table_config', *atts)
+    # def get_component_attributes(self) -> tuple[str, ...]:
+    #     atts = super().get_component_attributes()
+    #     return ('table_config', *atts)
 
     @property
     def variable_ids(self) -> tuple[dict[str, str], ...]:
@@ -442,48 +444,53 @@ class NewsegsMetaModel(NewsegsComponent):
         return affected_models
 
     @override
-    def to_dict(self) -> dict[str, Any]:
-        odict = super().to_dict()
-        odict['_table_config_id'] = self.table_config.id
-        odict['_model_id'] = self.model.id
-        odict['_finance_id'] = self.finance.id
-        odict['_variable_ids'] = self.variable_ids
-        return odict
+    def _prepare_object_state(self):
+        super()._prepare_object_state()
+        self._variable_ids = self.variable_ids
 
-    @override
-    def to_dict_repr(self) -> dict[str, Any]:
-        odict = super().to_dict_repr()
+    # @override
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = super().to_dict()
+    #     odict['_table_config_id'] = self.table_config.id
+    #     odict['_model_id'] = self.model.id
+    #     odict['_finance_id'] = self.finance.id
+    #     odict['_variable_ids'] = self.variable_ids
+    #     return odict
+
+    # @override
+    # def to_dict_repr(self) -> dict[str, Any]:
+    #     odict = super().to_dict_repr()
         
-        odict['model'] = self.model.to_dict_repr()
-        del odict['_model_id']
-        odict['finance'] = self.finance.to_dict_repr()
-        del odict['_finance_id']
+    #     odict['model'] = self.model.to_dict_repr()
+    #     del odict['_model_id']
+    #     odict['finance'] = self.finance.to_dict_repr()
+    #     del odict['_finance_id']
 
-        vars = {k: v.to_dict() for k, v in self.variables.items()}
-        odict['variables'] = vars
-        # Clear the old variable ids, as don't want to get confused when we reconstruct
-        odict['_variable_ids'] = []
+    #     vars = {k: v.to_dict() for k, v in self.variables.items()}
+    #     odict['variables'] = vars
+    #     # Clear the old variable ids, as don't want to get confused when we reconstruct
+    #     odict['_variable_ids'] = []
 
-        return odict
+    #     return odict
 
-    @override
-    def anonymise_ids(self):
-        super().anonymise_ids()
-        self.model.anonymise_ids()
-        self.finance.anonymise_ids()
-        # Do not anonymise variables! Remember, the metamodel does not own its variables.
+    # @override
+    # def anonymise_ids(self):
+    #     super().anonymise_ids()
+    #     self.model.anonymise_ids()
+    #     self.finance.anonymise_ids()
+    #     # Do not anonymise variables! Remember, the metamodel does not own its variables.
 
-    def __getstate__(self) -> dict[str, Any]:
-        state = self.__dict__.copy()
-        for dontpickle in ['_model', '_finance', '_variables']:
-            if dontpickle in state:
-                del state[dontpickle]
-        if self.model:
-            state['_model_id'] = self.model.id
-        if self.finance:
-            state['_finance_id'] = self.finance.id
-        state['_variable_ids'] = self.variable_ids
-        return state
+    # def __getstate__(self) -> dict[str, Any]:
+    #     state = self.__dict__.copy()
+    #     for dontpickle in ['_model', '_finance', '_variables']:
+    #         if dontpickle in state:
+    #             del state[dontpickle]
+    #     if self.model:
+    #         state['_model_id'] = self.model.id
+    #     if self.finance:
+    #         state['_finance_id'] = self.finance.id
+    #     state['_variable_ids'] = self.variable_ids
+    #     return state
     
     # Will have no explicit setstate - require using 'reattach_' methods
     # to recover the missing components using external mappings.
@@ -491,25 +498,61 @@ class NewsegsMetaModel(NewsegsComponent):
     # depending on what is being pickled, and ultimately we do want models and finances to be
     # picklable in other circumstances.
 
+    @override
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
+        # Set the watcher prior to property attachment
+        if self._watcher is None:
+            self.watcher = MMVarWatcher(self)
+
+    @override
+    def _post_update_from_dict(self):
+        try:
+            if self.finance.model is None or self.finance.model is not self.model:
+                self.finance.set_model(self.model, dirty = False)
+        except AttributeError:
+            pass
+        super()._post_update_from_dict()
+
+    @override
+    def anonymise_ids(self, include_variables = False):
+        if include_variables:
+            return super().anonymise_ids()
+        else:
+            SerialisedConfigurationMixin.anonymise_ids(self)
+            att_names = self.get_component_attributes()
+            att_names = (x for x in att_names if x not in set('variables'))
+            atts = []
+            for nm in att_names:
+                try:
+                    atts.append(getattr(self, nm))
+                except AttributeError:
+                    pass
+            self._anonymise_id_sequence(atts)
+
     def __deepcopy__(self, memo):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        state = self.__getstate__()
-        cfg = state.pop('_config', None)
-        if cfg:
-            setattr(result, '_config', copy.deepcopy(cfg, memo))
+        state = copy.deepcopy(self.__getstate__())
+
+        result.update(state)
+
+        # cfg = state.pop('_config', None)
+        # if cfg:
+        #     setattr(result, '_config', copy.deepcopy(cfg, memo))
+        # result.watcher = MMVarWatcher(result)
         
         r0 = result.revision
 
-        tblcfg = state.pop('_table_config', None)
-        if tblcfg:
-            result.table_config = copy.deepcopy(tblcfg)
+        # tblcfg = state.pop('_table_config', None)
+        # if tblcfg:
+        #     result.table_config = copy.deepcopy(tblcfg)
         
         tr0 = result.table_config.revision
         
-        for k, v in state.items():
-            setattr(result, k, copy.deepcopy(v, memo))
+        # for k, v in state.items():
+        #     setattr(result, k, copy.deepcopy(v, memo))
 
         # Need to generate a new container, but the contents must be identical
         result.variables = {k: v for k, v in self.variables.items()}
@@ -547,15 +590,15 @@ class NewsegsMetaModel(NewsegsComponent):
             'last_modified': datetime.datetime.now().isoformat()
         }
 
-    @classmethod
-    @override
-    def from_dict(cls, config):
-        config = config.copy()
-        inst = cls.__new__(cls)
-        inst._config = inst._generate_config()
-        # inst.variables = {}
-        inst.update(config)
-        return inst
+    # @classmethod
+    # @override
+    # def from_dict(cls, config):
+    #     config = config.copy()
+    #     inst = cls.__new__(cls)
+    #     inst._config = inst._generate_config()
+    #     inst.watcher = MMVarWatcher(inst)
+    #     inst.update(config)
+    #     return inst
     
     @override
     def update(self, config: dict[str, Any] | type[serialisation.T]):
@@ -567,6 +610,6 @@ class NewsegsMetaModel(NewsegsComponent):
 
     
 
-NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
-    '_model', '_finance', '_variables', '_table_config', '_watcher'
-)
+# NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
+#     '_model', '_finance', '_variables', '_table_config', '_watcher'
+# )

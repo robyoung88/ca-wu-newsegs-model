@@ -7,10 +7,19 @@ occur at runtime.
 """
 import inspect
 from types import ModuleType
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Type
+
+from newsegsmodelframework.core.serialisation import T
 
 class NakedConstructor:
-    def from_dict(self, config: dict[str, Any]) -> object:
+    def to_dict(self) -> dict[str, Any]: ...
+    def update(self, config: dict[str, Any]): ...
+
+    @classmethod
+    def unserialise_dict(cls, config: dict[str, Any]) -> dict[str, Any]: ...
+
+    @classmethod
+    def from_dict(cls: Type[T], config: dict[str, Any]) -> T:
         ...
 
 def get_subclasses_in_module(

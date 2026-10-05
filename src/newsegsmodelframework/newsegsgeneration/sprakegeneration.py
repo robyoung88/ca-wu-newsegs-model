@@ -147,10 +147,15 @@ class SprakeGeneration(NewsegsGeneration):
 
     _name = "Sprake Generation Module"
 
+    _turbine: generation.WindTurbineElecGenerator
+
     @override
     def _generate_config(self, *args, **kwargs) -> SprakeGenerationConfig:
         return SprakeGenerationConfig(*args, **kwargs)
     _config: SprakeGenerationConfig # pyright: ignore[reportIncompatibleVariableOverride]
+
+    # Exclude generator even under repr as not necessary - add it back in afterwards
+    _excluded_attributes = NewsegsGeneration._excluded_attributes.union({'_generator'})
 
     generator = generation.NewsegsGeneratorProperty(
         default = None,
@@ -166,6 +171,15 @@ class SprakeGeneration(NewsegsGeneration):
     
     # Copy constructor is registered underneath class definition for late-bind.
 
+    def _create_generator(self):
+        pv_generator = generation.SprakePVGISElecGenerator.from_none()
+        #pv_generator.location.height_agl = 2
+        self.generator = generation.PowerPlantHeterogeneousGenerators([
+            generation.PowerPlantHomogeneousWind(self._turbine),
+            generation.PowerPlantHomogeneousPV(pv_generator)
+        ])
+        self.generator.generators[1].location.height_agl = 2
+
     @__init__.register(generation.WindTurbineElecGenerator)
     def _from_WindTurbineElecGenerator(
         self,
@@ -175,12 +189,9 @@ class SprakeGeneration(NewsegsGeneration):
     ) -> None:
         super().__init__(*args, **kwargs)
 
-        self.generator = generation.PowerPlantHeterogeneousGenerators([
-            generation.PowerPlantHomogeneousWind(turbine),
-            generation.PowerPlantHomogeneousPV(
-                generation.SprakePVGISElecGenerator.from_none()
-            )
-        ])
+        self._turbine = turbine
+
+        self._create_generator()
 
         # Set the capacities again
         self.pv_capacity = self._config.pv_capacity
@@ -189,7 +200,8 @@ class SprakeGeneration(NewsegsGeneration):
         if 'location' in kwargs.keys():
             self.location = self._config.location # pyright: ignore[reportAttributeAccessIssue]
 
-        self.generator.generators[1].location.height_agl = 2. # pyright: ignore[reportAttributeAccessIssue]
+        #self.generator.generators[1].location.height_agl = 2. # pyright: ignore[reportAttributeAccessIssue]
+        
         # Once constructed, the generator is not saved out so we can syncronise it now
         self.generator.chain_syncronise()
 
@@ -201,8 +213,9 @@ class SprakeGeneration(NewsegsGeneration):
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
-        self._generator = copy.deepcopy(generator)
-        self.generator.chain_syncronise()
+        self._turbine = copy.deepcopy(generator.generators[0]) # pyright: ignore[reportAttributeAccessIssue]
+
+        self._create_generator()
 
         # Set the capacities again
         self.pv_capacity = self._config.pv_capacity
@@ -236,20 +249,17 @@ class SprakeGeneration(NewsegsGeneration):
     @property
     # @override # This is technically an override, but pylance doesn't know it
     def location(self) -> location.Location:
-        try:
-            return self.generator.location
-        except AttributeError:
-            return super().location # type: ignore
+        #try:
+        #    return self.generator.location
+        #except AttributeError:
+        # No need to pass location to the actual generator, as sprake model uses only a single location
+        return super().location # type: ignore
     
     @location.setter
     def location(self, loc: location.Location):
         # Ensure location is only a location, i.e. not an elevated or aspect location
         loc = location.Location(loc)
-        try:
-            self.generator.location = loc
-            self.generator.chain_syncronise()
-        except AttributeError:
-            pass
+        # No need to pass location to the actual generator, as sprake model uses only a single location
         self._config.location = loc # pyright: ignore[reportAttributeAccessIssue]
 
     def run(
@@ -311,41 +321,24 @@ class SprakeGeneration(NewsegsGeneration):
             self.generator.chain_syncronise()
 
     @override
-    def update(self, config):
-        super().update(config)
-        #r0 = self.revision
-        if isinstance(config, Mapping):
-            if '_config' in config.keys():
-                if 'pv_capacity' in config['_config'].keys():
-                    self.pv_capacity = self._config.pv_capacity
-                if 'wind_capacity' in config['_config'].keys():
-                    self.wind_capacity = self._config.wind_capacity
-        #self.generator.chain_syncronise()
-        #self.revision = r0
-        
-    
-    @override
-    def to_dict(self) -> dict[str, Any]:
-        odict = super().to_dict()
-        odict['wind_capacity'] = self.wind_capacity
-        odict['pv_capacity'] = self.pv_capacity
-        #odict['location'] = self.location.to_dict() # pyright: ignore[reportAttributeAccessIssue]
-        return odict
-    
-    @override
-    @classmethod
-    def from_dict(
-        cls: type[SprakeGeneration], 
-        config: dict[str, Any]
-    ) -> SprakeGeneration:
-        inst = cls.from_none()
-        inst.update(config)
-        inst.wind_capacity = inst.wind_capacity
-        inst.pv_capacity = inst.pv_capacity
-        inst.location = inst._config.location # pyright: ignore[reportAttributeAccessIssue]
-        #cast(RaisedLocation, inst.generator.generators[1].location).height_agl = 2.
-        return inst
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
 
+        turbine = config.pop('_turbine', None)
+        if turbine is not None:
+            self._turbine = turbine
+
+            self._create_generator()
+            self.wind_capacity = self.wind_capacity
+            self.pv_capacity = self.pv_capacity
+
+        try:
+            if self.generator.model is not self.model:
+                self.generator.model = self.model
+        except AttributeError:
+            pass
+
+    
 # SprakeGeneration copy constructor
 @SprakeGeneration.__init__.register(SprakeGeneration) # pyright: ignore[reportFunctionMemberAccess]
 def _SprakeGeneration_from_other(
@@ -364,10 +357,3 @@ def _SprakeGeneration_from_other(
 
     self.generator = copy.deepcopy(other.generator)
     self.generator.chain_syncronise()
-
-# Exclude generator as not necessary - add it back in afterwards
-SprakeGeneration._excluded_attributes = (
-    super(SprakeGeneration, SprakeGeneration)._excluded_attributes
-    + ('_generator',)
-)
-    

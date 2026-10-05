@@ -4,7 +4,7 @@ Abstract base class for NewSEGS model
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Optional, override
+from typing import Any, Optional, Type, override
 
 from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import location as modlocation
@@ -37,9 +37,11 @@ class NewsegsModelData(newsegscomponent.NewsegsComponent):
     """
     component_type = 'energy_model'
 
+
 @revision_dataclass
 class NewsegsModelConfig(DataWithRevision):
     ...
+
 
 class NewsegsModel(
     newsegsmodelinterface.NewsegsModelInterface
@@ -73,14 +75,16 @@ class NewsegsModel(
     _version = '0.0.1'
     _id_prefix = 'm'
 
+    _excluded_attributes = newsegsmodelinterface.NewsegsModelInterface._excluded_attributes.union({
+        '_grid_result', '_generation_result', '_cs_result',
+    })
+
     model_data = ComponentProperty(default = NewsegsModelData)
-    table_config = ComponentProperty(default = newsegscomponent.TableConfigNewsegsComponent)
 
     _last_hash = 1
 
     checked_out: bool = False
     
-
     def _generate_config(self, *args, **kwargs) -> NewsegsModelConfig:
         return NewsegsModelConfig(*args, **kwargs)
 
@@ -275,50 +279,86 @@ class NewsegsModel(
     @abstractmethod
     def location(self, loc: modlocation.Location) -> None:
         ...
-    
+
     @override
     def update(self, config: dict[str, Any] | type[T]):
-        if not isinstance(config, dict):
-            super().update(config)
-            return
-        
-        type_ = type(self)
+        if isinstance(config, dict):
+            attach_grid = '_grid' in config
+            attach_generation = '_generation' in config
+            attach_cs = '_consumption_storage' in config
+        else:
+            attach_grid = True
+            attach_generation = True
+            attach_cs = True
+        super().update(config)
 
-        # If config exists in the dict, it has to be the first thing out
-        inst_config = config.pop('_config', None)
-        if inst_config:
-            if isinstance(inst_config, dict):
-                child_cc = inst_config.get('constructor_class', None)
-                child_classname = inst_config.get('class', None)
-                if child_cc is not None and child_classname is not None:
-                    inst_config = find_constructor(child_cc, child_classname)(inst_config)
-                else:
-                    inst_config = type_.unserialise_dict(inst_config)
+        if attach_grid:
+            self.grid.model = self
+        if attach_generation:
+            self.generation.model = self
+        if attach_cs:
+            self.consumption_storage.model = self
+
+    # @override
+    # def __setstate__(self, state: dict[str, Any]) -> None:
+    #     super().__setstate__(state)
+    #     # Not sure why these don't seem to be triggering NewsegsModelProperty; probably because they are stored on the underscore
+    #     try:
+    #         self.grid.model = self
+    #     except AttributeError:
+    #         pass
+    #     try:
+    #         self.generation.model = self
+    #     except AttributeError:
+    #         pass
+    #     try:
+    #         self.consumption_storage.model = self
+    #     except AttributeError:
+    #         pass
+
+    # @override
+    # def update(self, config: dict[str, Any] | type[T]):
+    #     if not isinstance(config, dict):
+    #         super().update(config)
+    #         return
+        
+    #     type_ = type(self)
+
+    #     # If config exists in the dict, it has to be the first thing out
+    #     inst_config = config.pop('_config', None)
+    #     if inst_config:
+    #         if isinstance(inst_config, dict):
+    #             child_cc = inst_config.get('constructor_class', None)
+    #             child_classname = inst_config.get('class', None)
+    #             if child_cc is not None and child_classname is not None:
+    #                 inst_config = find_constructor(child_cc, child_classname)(inst_config)
+    #             else:
+    #                 inst_config = type_.unserialise_dict(inst_config)
             
-            setattr(self, '_config', inst_config)
-        elif not hasattr(self, '_config'):
-            # Need to generate a fresh config
-            setattr(self, '_config', self._generate_config())
+    #         setattr(self, '_config', inst_config)
+    #     elif not hasattr(self, '_config'):
+    #         # Need to generate a fresh config
+    #         setattr(self, '_config', self._generate_config())
         
-        for mod_name in ('mod_gen', '_mod_gen', 'generation'):
-            generation = config.pop(mod_name, None)
-            if generation:
-                self.update_generation(generation)
-                break
+    #     for mod_name in ('mod_gen', '_mod_gen', 'generation'):
+    #         generation = config.pop(mod_name, None)
+    #         if generation:
+    #             self.update_generation(generation)
+    #             break
 
-        for mod_name in ('mod_grid', '_mod_grid', 'grid'):
-            grid = config.pop(mod_name, None)
-            if grid:
-                self.update_grid(grid)
-                break
+    #     for mod_name in ('mod_grid', '_mod_grid', 'grid'):
+    #         grid = config.pop(mod_name, None)
+    #         if grid:
+    #             self.update_grid(grid)
+    #             break
         
-        for mod_name in ('mod_cs', '_mod_cs', 'consumption_storage'):
-            cs = config.pop(mod_name, None)
-            if cs:
-                self.update_consumption_storage(cs)
-                break
+    #     for mod_name in ('mod_cs', '_mod_cs', 'consumption_storage'):
+    #         cs = config.pop(mod_name, None)
+    #         if cs:
+    #             self.update_consumption_storage(cs)
+    #             break
         
-        return super().update(config)
+    #     return super().update(config)
 
     def reattach_grid(
         self,
@@ -364,10 +404,11 @@ class NewsegsModel(
             raise TypeError(f'component_provider did not provide a table_config module for key {self._component_ids.get('table_config', '')}')
         self.table_config = comp
 
-    @override
-    def get_component_attributes(self) -> tuple[str, ...]:
-        atts = super().get_component_attributes()
-        return ('grid', 'generation', 'consumption_storage', 'table_config', 'model_data', *atts)
+    # @override
+    # def get_component_attributes(self) -> tuple[str, ...]:
+    #     atts = super().get_component_attributes()
+    #     return atts
+    #     #return ('grid', 'generation', 'consumption_storage', 'table_config', 'model_data', *atts)
 
     @override
     def reattach_components(self, component_provider: newsegscomponent.NewsegsComponentProviderInterface):
@@ -458,10 +499,10 @@ class NewsegsModel(
     def __hash__(self) -> int:
         return self._last_hash
 
-NewsegsModel._excluded_attributes = tuple(
-    newsegscomponent.NewsegsComponent._excluded_attributes
-) + (
-    '_grid', '_generation', '_consumption_storage',
-    '_generation_result', '_grid_result', '_cs_result',
-    '_table_config'
-)
+# NewsegsModel._excluded_attributes = tuple(
+#     newsegscomponent.NewsegsComponent._excluded_attributes
+# ) + (
+#     '_grid', '_generation', '_consumption_storage',
+#     '_generation_result', '_grid_result', '_cs_result',
+#     '_table_config'
+# )

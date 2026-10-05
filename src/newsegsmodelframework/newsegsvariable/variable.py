@@ -239,15 +239,30 @@ class Distribution(metaclass = Singleton):
 
     @classmethod
     def n_values(cls, var: Variable) -> int:
-        if (
-            isinstance(var.parameters, str) 
-            or not isinstance(var.parameters, Sequence)
-        ):
+        try:
+            if (
+                isinstance(var.parameters, str) 
+                or not isinstance(var.parameters, Sequence)
+            ):
+                return 1
+            p0 = var.parameters[0]
+            if isinstance(p0, str) or not isinstance(p0, Sized):
+                return 1
+            return len(p0)
+        except AttributeError:
+            pass
+        try:
+            if (
+                isinstance(var.raw_parameters, str) 
+                or not isinstance(var.raw_parameters, Sequence)
+            ):
+                return 1
+            p0 = var.raw_parameters[0]
+            if isinstance(p0, str) or not isinstance(p0, Sized):
+                return 1
+            return len(p0)
+        except AttributeError:
             return 1
-        p0 = var.parameters[0]
-        if isinstance(p0, str) or not isinstance(p0, Sized):
-            return 1
-        return len(p0)
 
     @classmethod
     @abstractmethod
@@ -2699,6 +2714,9 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
         for i, trans in enumerate(var.transform):
             if trans == 'ln':
+                if not isinstance(vcv, np.ndarray):
+                    vcv = np.reshape(np.array(vcv), (len(oarray), len(oarray)))
+
                 oarray[i] = np.exp(oarray[i] + 0.5 * vcv[i,i])
         return oarray
     

@@ -28,7 +28,7 @@ from newsegsmodelframework.util import classfuncs
 T = TypeVar('T')
 Real = SupportsFloat
 
-class Location(serialisation.SerialiseToDictMixin):
+class Location(serialisation.StateSerialiseToDictMixin):
     """
     A point geographic location with valid latitude and longitude.
 
@@ -736,14 +736,14 @@ def location_from_dict(input: dict[str, Any]) -> Location:
     return constructor.from_dict(input)
 
 class PVLibLocation(
-    serialisation.SerialiseToDictMixin,
+    serialisation.StateSerialiseToDictMixin,
     _PVLibLocation
 ):
     """Extends `pvlib.location.Location` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'
 
 class PVLibPVSystem(
-    serialisation.SerialiseToDictMixin,
+    serialisation.StateSerialiseToDictMixin,
     _PVSystem
 ):
     """Extends `pvlib.pvsystem.PVSystem` with `SerialiseToDictMixin`"""

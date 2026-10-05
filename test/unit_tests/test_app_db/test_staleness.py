@@ -58,13 +58,13 @@ class TestStalenessUpdates(unittest.TestCase):
         odict = {}
         odict['project'] = grd(proj)
         odict['project_table'] = grd(proj.table_config)
-        odict['metamodel_container'] = grd(proj.metamodels)
+        #odict['metamodel_container'] = grd(proj.metamodels) # Don't care about the metamodel container, as it is never saved
         metamodel_revisions = []
         for mm in proj.metamodels:
             mm_dict = {}
             mm_dict['metamodel'] = grd(mm)
             mm_dict['metamodel_table'] = grd(mm.table_config)
-            mm_dict['variable_container'] = grd(mm.variables)
+            #mm_dict['variable_container'] = grd(mm.variables) # Also don't care about the variable container for same reason as mm container
             var_revisions = {}
             for varid, var in mm.variables.items():
                 var_revisions[varid] = grd(var)
@@ -85,6 +85,7 @@ class TestStalenessUpdates(unittest.TestCase):
 
         odict['dsa'] = grd(proj.dsa_config)
         odict['psa'] = grd(proj.psa_config)
+        return odict
 
 
     def test_variable_updates(self):
@@ -97,7 +98,7 @@ class TestStalenessUpdates(unittest.TestCase):
 
         projid = proj.id
 
-        rev_0 = self.get_revision_details(proj)
+        rev_0 = self.get_project_revision_dict(proj)
 
         r0 = proj.revision
         self.assertEqual(r0, 0)
@@ -109,7 +110,7 @@ class TestStalenessUpdates(unittest.TestCase):
 
         proj_r = proj_provider.get_project(projid)
 
-        rev_postload = self.get_revision_details(proj_r)
+        rev_postload = self.get_project_revision_dict(proj_r)
         self.assertDictEqual(rev_postload, rev_0)
 
         # Does a variable modification chain through?
@@ -137,12 +138,12 @@ class TestStalenessUpdates(unittest.TestCase):
         self.assertEqual(proj_r.revision, r0 + 1)
 
         # Check revisions survive an upload
-        rev_preup = self.get_revision_details(proj_r)
+        rev_preup = self.get_project_revision_dict(proj_r)
         with self.assertRaises(AssertionError):
             self.assertDictEqual(rev_preup, rev_postload)
         proj_provider.upsert_component(proj_r)
-        proj_r2 = proj_provider.get_component(projid)
-        rev_postload_modified = self.get_revision_details(proj_r2)
+        proj_r2 = proj_provider.get_project(projid)
+        rev_postload_modified = self.get_project_revision_dict(proj_r2)
         self.assertDictEqual(rev_postload_modified, rev_preup)
 
     def test_upsert_parsimony(self):
@@ -157,4 +158,3 @@ class TestStalenessUpdates(unittest.TestCase):
         
         proj_provider.add_component(proj)
 
-        
