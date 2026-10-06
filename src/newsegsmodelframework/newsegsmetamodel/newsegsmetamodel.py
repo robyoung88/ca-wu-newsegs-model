@@ -489,6 +489,15 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         if not hasattr(self, '_watcher') or self._watcher is None:
             self.watcher = MMVarWatcher(self)
 
+        if 'model' in config:
+            self.model = config.pop('model')
+        if 'finance' in config:
+            self.finance = config.pop('finance')
+            try:
+                self.finance.set_model(self.model)
+            except AttributeError:
+                pass
+
     @override
     def _post_update_from_dict(self):
         try:
@@ -522,10 +531,6 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         # Need to generate a new container, but the contents must be identical
         result.variables = {k: v for k, v in self.variables.items()}
         result.variables.revision = self.variables.revision # pyright: ignore[reportAttributeAccessIssue]
-
-        # result.model = copy.deepcopy(self.model)
-        # result.finance = copy.deepcopy(self.finance)
-        # result.finance.set_model(result.model, dirty = False)
 
         result.revision = self.revision
         result.table_config.revision = self.table_config.revision

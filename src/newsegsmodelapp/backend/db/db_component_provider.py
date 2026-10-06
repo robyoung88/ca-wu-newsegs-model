@@ -109,27 +109,6 @@ class FromDatabaseNewsegsComponentProvider(
         comp1 = original
         comp2 = copy.deepcopy(comp1)
         comp2.anonymise_ids()
-        #comp2.id = comp2.generate_new_id()
-        # for childattr in comp2.get_component_attributes():
-        #     att = getattr(comp2, childattr)
-        #     if isinstance(att, NewsegsComponent):
-        #         setattr(
-        #             comp2,
-        #             childattr,
-        #             self.duplicate_component(att)
-        #         )
-        #     elif isinstance(att, Mapping):
-        #         newval = {k: self.duplicate_component(v) for k, v in att.items()}
-        #         setattr(
-        #             comp2,
-        #             childattr,
-        #             newval
-        #         )
-        #     elif not isinstance(att, str) and isinstance(att, Sequence):
-        #         newval = [self.duplicate_component(v) for v in att]
-        #         setattr(comp2, childattr, newval)
-        #     else:
-        #         raise TypeError(f'Unsupported component type for duplication: {type(original)} - {original}')
         return comp2
     
     @override
@@ -751,16 +730,16 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         # Do not reattach variables here - wait until the project does it.
         return obj
 
-    @override
-    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
-        new =  super()._create_duplicate_component(original)
-        # if isinstance(original, NewsegsMetaModel):
-        #     new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._component_ids['model']))
-        #     new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._component_ids['finance']))
-        #     # Worth double checking that model is set on finance
-        #     new.finance.set_model(new.model, dirty = False)
-        #     new.variables = {k: v for k, v in original.variables.items()}
-        return new
+    # @override
+    # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+    #     new =  super()._create_duplicate_component(original)
+    #     # if isinstance(original, NewsegsMetaModel):
+    #     #     new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._component_ids['model']))
+    #     #     new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._component_ids['finance']))
+    #     #     # Worth double checking that model is set on finance
+    #     #     new.finance.set_model(new.model, dirty = False)
+    #     #     new.variables = {k: v for k, v in original.variables.items()}
+    #     return new
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
@@ -1013,32 +992,32 @@ class FromDatabaseNewsegsProjectProvider(
         obj.reattach_metamodels(self.metamodel_provider)
         return obj
 
-    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
-        new = super()._create_duplicate_component(original)
-        if isinstance(new, NewsegsProject):
-            new._variables_by_uid.clear()
-            var_mapping = {} 
-            for var_uid in original._variables_by_uid.keys():
-                new_var = self.variable_provider.duplicate_variable(var_uid)
-                var_mapping[var_uid] = new_var.id
-                new.add_variable(new_var)
-            new.metamodels = [self.metamodel_provider.duplicate_component(x) for x in new._metamodel_ids]
-            for mm in new.metamodels:
-                old_variables = mm.variable_ids
-                new_variables = tuple(
-                    (
-                        {
-                            'varid': x['varid'],
-                            'uid': var_mapping[x['uid']]
-                        }
-                        for x in old_variables
-                    )
-                )
-                mm.variables = {} # Just in case
-                mm._variable_ids = new_variables
-                mm.reattach_variables(new)
+    # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+    #     new = super()._create_duplicate_component(original)
+    #     if isinstance(new, NewsegsProject):
+    #         new._variables_by_uid.clear()
+    #         var_mapping = {} 
+    #         for var_uid in original._variables_by_uid.keys():
+    #             new_var = self.variable_provider.duplicate_variable(var_uid)
+    #             var_mapping[var_uid] = new_var.id
+    #             new.add_variable(new_var)
+    #         new.metamodels = [self.metamodel_provider.duplicate_component(x) for x in new._metamodel_ids]
+    #         for mm in new.metamodels:
+    #             old_variables = mm.variable_ids
+    #             new_variables = tuple(
+    #                 (
+    #                     {
+    #                         'varid': x['varid'],
+    #                         'uid': var_mapping[x['uid']]
+    #                     }
+    #                     for x in old_variables
+    #                 )
+    #             )
+    #             mm.variables = {} # Just in case
+    #             mm._variable_ids = new_variables
+    #             mm.reattach_variables(new)
             
-        return new
+    #     return new
     
     @override
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:

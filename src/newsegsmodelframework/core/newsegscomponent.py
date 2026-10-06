@@ -149,7 +149,7 @@ class NewsegsComponent(
     def _anonymise_id_sequence(seq: SequenceNotStr):
         for x in seq:
             if isinstance(x, NewsegsComponent):
-                x.id = x.generate_new_id()
+                x.anonymise_ids()
             elif isinstance(x, Mapping):
                 NewsegsComponent._anonymise_id_sequence(tuple(x.values()))
             elif not isinstance(x, str) and isinstance(x, Sequence):

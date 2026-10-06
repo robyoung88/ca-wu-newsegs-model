@@ -27,6 +27,8 @@ from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
 from newsegsmodelframework.newsegsvariable.variableprovider import RecoverableInMemoryVariableProvider
 from test.unit_tests import variable_helpers
 
+
+
 class TestDatabaseStart(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -62,6 +64,36 @@ class TestDatabaseStart(unittest.TestCase):
         engine.dispose()
 
         self.temp_dir.cleanup()
+
+    def component_ids_unequal(self, mdl1, mdl2):
+        self.assertNotEqual(mdl1.id, mdl2.id)
+        component_names_1 = mdl1.get_component_attributes()
+        component_names_2 = mdl2.get_component_attributes()
+        self.assertSetEqual(set(component_names_1), set(component_names_2))
+        #self.assertEqual(len(component_names_1), 5)
+        for cmpname in component_names_1:
+            if hasattr(getattr(mdl1, cmpname), 'id'):
+                comp1 = getattr(mdl1, cmpname)
+                comp2 = getattr(mdl2, cmpname)
+                self.assertIsNotNone(comp2, f'{cmpname}, {type(mdl1)}')
+                self.assertNotEqual(getattr(mdl1, cmpname).id, getattr(mdl2, cmpname).id, cmpname)
+
+    def metamodel_ids_unequal(self, mm1, mm2, include_variables = False):
+        self.component_ids_unequal(mm1, mm2)
+        #self.assertNotEqual(mm1.id, mm2.id)
+
+        self.component_ids_unequal(mm1.model, mm2.model)
+        self.component_ids_unequal(mm1.finance, mm2.finance)
+
+        if include_variables:
+            for nm, var1 in mm1.variables.items():
+                var2 = mm2.variables[nm]
+                self.assertNotEqual(var1.id, var2.id, nm)
+        else:
+            for nm, var1 in mm1.variables.items():
+                var2 = mm2.variables[nm]
+                self.assertEqual(var1.id, var2.id, nm)
+
 
     def test_tables_exist(self):
         from newsegsmodelapp.backend import db
@@ -136,15 +168,30 @@ class TestDatabaseStart(unittest.TestCase):
             proj_2.metamodels[0].finance.id
         )
 
+        with db.get_engine().connect() as conn:
+            nrow_components_pre = conn.execute(
+                sa.select(sa.func.count())
+                .select_from(tbls.component_configs)
+            ).scalar()
+        
+        proj_provider.upsert_component(proj)
+
         proj_provider.add_component(proj)
         mm2 = proj_provider.metamodel_provider.duplicate_component(proj.metamodels[0])
         mm2.name = 'Second mm'
         mm2.revision += 1
         proj.metamodels.append(mm2) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         proj.revision += 1
-        proj_provider.upsert_component(proj)
-        
+        proj_provider.upsert_component(proj)        
 
+        with db.get_engine().connect() as conn:
+            nrow_components_post = conn.execute(
+                sa.select(sa.func.count())
+                .select_from(tbls.component_configs)
+            ).scalar()
+
+        self.assertEqual(nrow_components_post - nrow_components_pre, 19)
+        
         project_id = proj.id
 
         snapshot_id = db_snapshot.generic_snapshot_entity(
@@ -188,19 +235,31 @@ class TestDatabaseStart(unittest.TestCase):
             )
             self.assertEqual(len(result.fetchall()), 2)
 
+            mm1 = proj.metamodels[0]
+            mm2 = proj.metamodels[1]
+            self.assertEqual(len(mm1.get_component_attributes()), len(mm2.get_component_attributes()))
+            self.assertEqual(len(mm1.get_component_attributes()), 4) # table_config + model + finance + variable OrderedDict
+
+            self.assertEqual(len(mm1.model.get_component_attributes()), len(mm2.model.get_component_attributes()))
+            self.assertEqual(len(mm1.model.get_component_attributes()), 5) # model_data + table_config + grid + generation + consumption_storage
+
+            self.assertEqual(len(mm1.finance.get_component_attributes()), len(mm2.finance.get_component_attributes()))
+            self.assertEqual(len(mm1.finance.get_component_attributes()), 3) # finance_data + table_config + model
+
+            self.assertEqual(len(proj.get_component_attributes()), 4) # table_config + dsa_config + psa_config + metamodels
+
             n_components = (
-                3 * 2 # Modules in model
-                + 2 * 2 # model_data and table_config in model
+                5 * 2 # Modules in model
                 + 2 * 2 # finance_data and table_config in finance
                 + 1 * 2 # table_config in metamodel
                 + 3 # dsa_config, psa_config and table_config in finance
             )
+            # Based on this, we expect 19 components
             result = conn.execute(
                 tbls.snapshot_component_configs.select()
                 .where(tbls.snapshot_component_configs.c.snapshot_id == snapshot_id)
             )
-            #self.assertEqual(len(result.fetchall()), 19)
-            self.assertEqual(len(result.fetchall()), 14)
+            self.assertEqual(len(result.fetchall()), 19)
 
             result = conn.execute(
                 tbls.snapshot_variable_configs.select()
@@ -763,12 +822,8 @@ class TestDatabaseStart(unittest.TestCase):
         n_proj_metamodels = len(proj.metamodels)
 
         mm_dup = mm_provider.duplicate_component(proj.metamodels[0].id)
-        self.assertNotEqual(mm1.id, mm_dup.id)
-        # Variables, however, should be maintained on a metamodel duplication
-        self.assertEqual(
-            list(mm1.variables.values())[0].id,
-            list(mm_copy.variables.values())[0].id
-        )
+        mm_dup.reattach_variables(proj)
+        self.metamodel_ids_unequal(proj.metamodels[0], mm_dup, False)
 
         # Check if the metamodel has NOT been connected to the project
         proj = proj_provider.get_project(proj.id)
@@ -777,13 +832,9 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_dup = proj_provider.duplicate_component(proj.id)
         self.assertNotEqual(proj.id, proj_dup.id)
-        self.assertNotEqual(proj.metamodels[0].id, proj_dup.metamodels[0].id)
-        # Critically, the variables should have been duplicated and are nonequal
-        self.assertNotEqual(
-            list(proj.metamodels[0].variables.values())[0].id,
-            list(proj_dup.metamodels[0].variables.values())[0].id
-        )
-
+        for mm1, mm2 in zip(proj.metamodels, proj_dup.metamodels):
+            self.metamodel_ids_unequal(mm1, mm2, True)
+       
         all_projects = proj_provider.list_projects()
         n_proj = len(all_projects)
         proj_provider.delete_component(proj_dup.id)

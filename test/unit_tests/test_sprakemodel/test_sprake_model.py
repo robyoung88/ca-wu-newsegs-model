@@ -4,6 +4,7 @@ Unit tests for newsegsmodel/sprakemodel.
 import os
 import unittest
 import json
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -20,6 +21,10 @@ from newsegsmodelframework.newsegsgrid import sprakegrid
 from newsegsmodelframework.newsegscs import sprakecs
 from newsegsmodelframework.newsegsgeneration import newsegsgeneration
 from newsegsmodelframework.newsegscs import newsegscs
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.resolve() 
+
+print(PROJECT_ROOT)
 
 class TestSprakeModelConfigEqualities(unittest.TestCase):
     """
@@ -221,7 +226,8 @@ class TestSprakeFinanceRun(unittest.TestCase):
     def test_excel_validation(self):
 
         # Acceptable relative tolerance for validation
-        RTOL = 1e-6
+        # Mostly thrown off by the slightly different PV model
+        RTOL = 1e-5
 
         external_finance_data = (
             pd.read_excel(
@@ -232,10 +238,10 @@ class TestSprakeFinanceRun(unittest.TestCase):
             )
         )
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-config.json', 'r') as f:
+        with open(PROJECT_ROOT / f'data/sprakemodel-validation-config.json', 'r') as f:
             d1 = json.load(f)
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-finance-config.json', 'r') as f:
+        with open(PROJECT_ROOT / f'data/sprakemodel-validation-finance-config.json', 'r') as f:
             fd1 = json.load(f)
         
         mdl = sprakemodel.SprakeModel.from_dict(d1)

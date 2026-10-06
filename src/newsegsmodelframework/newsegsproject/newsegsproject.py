@@ -167,6 +167,49 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         self.metamodels.append(mm2) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         return mm2 # pyright: ignore[reportReturnType]
 
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        
+        cls.set_state_exclusion_policy('excluded')
+        state = self.__getstate__()
+        cls.set_state_exclusion_policy('excluded_and_components')
+
+        state = {k:copy.deepcopy(v, memo) for k, v in state.items()}
+
+        result.__setstate__(state)
+
+        # Reattach the metamodel variables from self, then add them to result,
+        # then duplicate and reattach
+        for mm in result.metamodels:
+            mm.reattach_variables(self)
+
+        #for var in mm.variables.values():
+        #    self.add_variable(var)
+
+        new_vars = []
+        for varid, varlist in self._variables_by_varid.items():
+            for uid, var in varlist.items():
+                old_id = var.id
+                new_var = copy.deepcopy(var)
+                new_var.anonymise_ids()
+                new_vars.append(new_var)
+                for mm in result.metamodels:
+                    if mm.variables[varid].id == old_id:
+                        mm.variables[varid] = new_var
+        result._variables_by_varid.clear()
+        result._variables_by_uid.clear()
+        for var in new_vars:
+            result.add_variable(var)
+
+        result.revision = self.revision
+        result.table_config.revision = self.table_config.revision
+
+        # Other id anonymisation should take place outside of the copy
+
+        return result
+
     def reattach_metamodels(self, provider: NewsegsComponentProviderInterface):
         if not hasattr(self, '_metamodel_ids') or not self._metamodel_ids:
             return
