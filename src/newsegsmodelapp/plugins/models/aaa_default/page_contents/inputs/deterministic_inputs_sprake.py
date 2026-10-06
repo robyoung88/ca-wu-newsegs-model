@@ -41,7 +41,8 @@ sections_by_supersection = {
     )
 }
 
-_cache = LRUCache(maxsize = 50)
+# Removing cache, as the variable badge status doesn't update on project / metamodel switch otherwise
+#_cache = LRUCache(maxsize = 50)
 
 for supersection, section_tuple in sections_by_supersection.items():
     for section in section_tuple:
@@ -53,14 +54,14 @@ for supersection, section_tuple in sections_by_supersection.items():
         ) -> list[dash.development.base_component.Component]:
             proj = proj_provider.get_project(proj_id)
             mm = proj.get_focussed_metamodel()
-            key = (_section, proj.id, mm.id)
-            if key in _cache:
-                return _cache[key]
+            #key = (_section, proj.id, mm.id)
+            #if key in _cache:
+            #    return _cache[key]
 
             component = generic_create_deterministic_input_container_contents(
                 _section, proj, mm
             )
-            _cache[key] = component
+            #_cache[key] = component
 
             return component
 

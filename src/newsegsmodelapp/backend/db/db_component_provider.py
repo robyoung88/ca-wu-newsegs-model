@@ -1,6 +1,6 @@
 import copy
 import json
-from typing import Any, Callable, Literal, Optional, Sequence, cast, overload, override
+from typing import Any, Callable, Literal, Mapping, Optional, Sequence, cast, overload, override
 
 from cachetools import LRUCache
 import pandas as pd
@@ -18,7 +18,9 @@ from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
+from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSING_OPTION, NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -53,9 +55,19 @@ class FromDatabaseNewsegsComponentProvider(
         obj.id = row.id # The ID may have changed from the payload - set it now
         obj = self._assign_updated_child_uids(obj, row)
         obj = self._reattach_children(obj)
+        if obj.revision != row.revision:
+            if obj.revision > row.revision:
+                print(f'WARNING - Component has been constructed with revision greater than stored in row: Payload = {obj.revision}, Row = {row.revision}')
+            print(f'Syncronising Component revision ({obj.id}): {obj.revision} -> {row.revision}')
+            obj.revision = row.revision
+            obj._config._last_syncronised = obj.revision
+        if obj.chain_modified:
+            raise ValueError('Component has been reconstructed with modified children.')
         return obj
 
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return component_to_raw_table_data(component)
 
     @overload
@@ -96,13 +108,7 @@ class FromDatabaseNewsegsComponentProvider(
     def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
         comp1 = original
         comp2 = copy.deepcopy(comp1)
-        comp2.id = comp2.generate_new_id()
-        for childattr in comp2.get_component_attributes():
-            setattr(
-                comp2,
-                childattr,
-                self.duplicate_component(getattr(comp2, childattr))
-            )
+        comp2.anonymise_ids()
         return comp2
     
     @override
@@ -112,6 +118,7 @@ class FromDatabaseNewsegsComponentProvider(
         else:
             orig = component_id
         comp2 = self._create_duplicate_component(orig)
+        comp2.revision = orig.revision
         self.upsert_component(comp2, force = False)
         
         return comp2
@@ -141,6 +148,31 @@ class FromDatabaseNewsegsComponentProvider(
         row = rows[index]
         return self._reconstruct_component(row.payload, row)
 
+    def _expand_component_sequence(self, component) -> list:
+        components = []
+        if isinstance(component, NewsegsComponent) and not isinstance(component, Variable):
+            components.append(component)
+        elif isinstance(component, Mapping):
+            for v in component.values():
+                if isinstance(v, NewsegsComponent) and not isinstance(v, Variable):
+                    components.append(v)
+                elif isinstance(v, Mapping) or (not isinstance(v, str) and isinstance(v, Sequence)):
+                    components.extend(self._expand_component_sequence(v))
+        elif not isinstance(component, str) and isinstance(component, Sequence):
+            for v in component:
+                if isinstance(v, NewsegsComponent) and not isinstance(v, Variable):
+                    components.append(v)
+                elif isinstance(v, Mapping) or (not isinstance(v, str) and isinstance(v, Sequence)):
+                    components.extend(self._expand_component_sequence(v))
+        return components
+
+    def upsert_children(self, component: NewsegsComponent, force: bool = False):
+        # Expect to override this for different types of component
+        # to deal with different tables
+        component_children = component.get_components(component_group= 'component_configs')
+        if component_children:
+            self.upsert_component(component_children, force = force)
+        
     @override
     def upsert_component(
         self, 
@@ -150,8 +182,10 @@ class FromDatabaseNewsegsComponentProvider(
     ) -> None:
         if tbl is None:
             tbl = self._table
-        if isinstance(component, NewsegsComponent):
-            component = [component, ]
+        component = self._expand_component_sequence(component)
+
+        if len(component) == 0:
+            return
 
         current_revisions = {x.id: x.revision for x in component}
         uids = list(current_revisions.keys())
@@ -201,9 +235,7 @@ class FromDatabaseNewsegsComponentProvider(
                 # TODO: Consider whether to set a rollback here in case we can't access DB
                 
                 #### Save out all child components ####
-                children = cmp.get_components()
-                if children:
-                    self.upsert_component(children)
+                self.upsert_children(cmp, force = force)
 
                 cmp.syncronise()
 
@@ -234,6 +266,10 @@ class FromDatabaseNewsegsComponentProvider(
             if insert_payload:
                 insert_stmt = tbl.insert()
                 conn.execute(insert_stmt, insert_payload)
+
+        print(f'Inserted {len(insert_payload)} components: {[x.get('id', str(x)) for x in insert_payload]}')
+        print(f'Updated {len(update_payload)} components: {[x.get('b_id', str(x)) for x in update_payload]}')
+        print(f'Revised {len(rev_payload)} components: {[x.get('b_id', str(x)) for x in rev_payload]}')
 
     def _delete_one_component(
             self, 
@@ -438,15 +474,19 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
     @override
     def _reattach_children(self, obj):
+        r0 = obj.revision
         obj = super()._reattach_children(obj)
         obj.reattach_components(self._component_provider)
+        if obj.revision != r0:
+            raise ValueError('Model revision incremented during subcomponent attachment - from {r0} to {obj.revision}')
         return obj
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsModelInterface):
             return super()._component_to_table_data(component)
-
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return energy_model_to_raw_table_data(component)
         
     @override
@@ -546,7 +586,8 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsFinanceInterface):
             return super()._component_to_table_data(component)
-
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return finance_model_to_raw_table_data(component) # pyright: ignore[reportArgumentType]
 
     @override
@@ -683,27 +724,29 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     @override
     def _reattach_children(self, obj):
         obj = super()._reattach_children(obj)
+        obj.reattach_components(self._component_provider)
         obj.reattach_em(self._em_provider)
         obj.reattach_fm(self._fm_provider)
-        obj.reattach_components(self._component_provider)
         # Do not reattach variables here - wait until the project does it.
         return obj
 
-    @override
-    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
-        new =  super()._create_duplicate_component(original)
-        if isinstance(original, NewsegsMetaModel):
-            new.model = self._em_provider.duplicate_component(new._model_id)
-            new.finance = self._fm_provider.duplicate_component(new._finance_id)
-            # Worth double checking that model is set on finance
-            new.finance.set_model(new.model)
-            new.variables = {k: v for k, v in original.variables.items()}
-        return new
+    # @override
+    # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+    #     new =  super()._create_duplicate_component(original)
+    #     # if isinstance(original, NewsegsMetaModel):
+    #     #     new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._component_ids['model']))
+    #     #     new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._component_ids['finance']))
+    #     #     # Worth double checking that model is set on finance
+    #     #     new.finance.set_model(new.model, dirty = False)
+    #     #     new.variables = {k: v for k, v in original.variables.items()}
+    #     return new
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsMetaModel):
             return super()._component_to_table_data(component)
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return metamodel_to_raw_table_data(component)
 
     def _set_metamodel_variable_junction(self, metamodel: NewsegsMetaModel):
@@ -727,6 +770,20 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                     self._metamodel_variable_jct.insert(),
                     new_variable_entries
                 )
+
+    @override
+    def upsert_children(self, component, force = False):
+        component_children = component.get_components(component_group= 'component_configs')
+        if component_children:
+            self._component_provider.upsert_component(component_children, force = force)
+        
+        em_children = component.get_components(component_group = 'em_configs')
+        if em_children:
+            self._em_provider.upsert_component(em_children, force = force)
+
+        fm_children = component.get_components(component_group = 'fm_configs')
+        if fm_children:
+            self._fm_provider.upsert_component(fm_children, force = force)
         
     @override
     def upsert_component(
@@ -737,13 +794,16 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     ) -> None:
         if isinstance(component, NewsegsComponent):
             if isinstance(component, NewsegsMetaModel):
-                rval = super().upsert_component(component, force, tbl)
-                if component.model:
-                    self._em_provider.upsert_component(component.model, force)
-                if component.finance:
-                    self._fm_provider.upsert_component(component.finance, force)
+                # First sync the variables so that the OrderedDict can be syncronised prior to upsert
                 for v in component.variables.values():
                     self.variable_provider.upsert_variable(v)
+                component.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+                
+                rval = super().upsert_component(component, force, tbl)
+                # if component.model:
+                #     self._em_provider.upsert_component(component.model, force)
+                # if component.finance:
+                #     self._fm_provider.upsert_component(component.finance, force)
                 self._set_metamodel_variable_junction(component)
                 return rval
             elif isinstance(component, NewsegsModelInterface):
@@ -932,32 +992,32 @@ class FromDatabaseNewsegsProjectProvider(
         obj.reattach_metamodels(self.metamodel_provider)
         return obj
 
-    def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
-        new = super()._create_duplicate_component(original)
-        if isinstance(new, NewsegsProject):
-            new._variables_by_uid.clear()
-            var_mapping = {}
-            for var_uid in original._variables_by_uid.keys():
-                new_var = self.variable_provider.duplicate_variable(var_uid)
-                var_mapping[var_uid] = new_var.id
-                new.add_variable(new_var)
-            new.metamodels = [self.metamodel_provider.duplicate_component(x) for x in new._metamodel_ids]
-            for mm in new.metamodels:
-                old_variables = mm.variable_ids
-                new_variables = tuple(
-                    (
-                        {
-                            'varid': x['varid'],
-                            'uid': var_mapping[x['uid']]
-                        }
-                        for x in old_variables
-                    )
-                )
-                mm.variables = {} # Just in case
-                mm._variable_ids = new_variables
-                mm.reattach_variables(new)
+    # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
+    #     new = super()._create_duplicate_component(original)
+    #     if isinstance(new, NewsegsProject):
+    #         new._variables_by_uid.clear()
+    #         var_mapping = {} 
+    #         for var_uid in original._variables_by_uid.keys():
+    #             new_var = self.variable_provider.duplicate_variable(var_uid)
+    #             var_mapping[var_uid] = new_var.id
+    #             new.add_variable(new_var)
+    #         new.metamodels = [self.metamodel_provider.duplicate_component(x) for x in new._metamodel_ids]
+    #         for mm in new.metamodels:
+    #             old_variables = mm.variable_ids
+    #             new_variables = tuple(
+    #                 (
+    #                     {
+    #                         'varid': x['varid'],
+    #                         'uid': var_mapping[x['uid']]
+    #                     }
+    #                     for x in old_variables
+    #                 )
+    #             )
+    #             mm.variables = {} # Just in case
+    #             mm._variable_ids = new_variables
+    #             mm.reattach_variables(new)
             
-        return new
+    #     return new
     
     @override
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
@@ -979,7 +1039,19 @@ class FromDatabaseNewsegsProjectProvider(
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsProject):
             return super()._component_to_table_data(component)
+        if component.modified:
+            raise ValueError(f'{component.id} is being upserted in a modified state')
         return project_to_raw_table_data(component)
+
+    @override
+    def upsert_children(self, component, force = False):
+        component_children = component.get_components(component_group= 'component_configs')
+        if component_children:
+            self._component_provider.upsert_component(component_children, force = force)
+
+        metamodel_children = component.get_components(component_group = 'metamodels')
+        if metamodel_children:
+            self.metamodel_provider.upsert_component(metamodel_children, force = force)
 
     def _upsert_project(
         self,
@@ -989,12 +1061,25 @@ class FromDatabaseNewsegsProjectProvider(
     ) -> None:
         # Unlike other upsertions, projects require junction tables to be sorted.
         v_to_sync = list(project._variables_by_uid.values())
-        vars_modified = any(x.modified for x in v_to_sync)
+        vars_modified = any(x.modified or x.soft_dirty for x in v_to_sync)
         self.variable_provider.upsert_variable(v_to_sync)
-        if vars_modified:
-            project.table_config.revision += 1
-        self.metamodel_provider.upsert_component(list(project.metamodels))
+
+        # As variables have all been upserted, we can sync all the metamodel variable lists
+        for mm in project.metamodels:
+            mm.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+        
+        #if vars_modified:
+        #    project.revision += 1
+        #    project.table_config.revision += 1
+        
+        # Metamodel upsert happens as part of upsert_children
+        #self.metamodel_provider.upsert_component(project.metamodels) # pyright: ignore[reportArgumentType]
+        # At this point, the metamodel list can be syncronised
+        project.metamodels._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+        
         super().upsert_component(project, force, tbl)
+
+        # TODO: Improve this logic and keep track of addition of variables to the project
 
         # Project - Variable junction
         new_variable_entries = [
@@ -1411,11 +1496,14 @@ class CachedFromDatabaseNewsegsProjectProvider(
             and (new_modkey == self._project_last_accessed[project_id])
             and (project_id in self._project_cache)
         ):
-            print(f'RETURNING PROJECT FROM CACHE {project_id}')
-            return self._project_cache[project_id]
+            proj = self._project_cache[project_id]
+            print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+            return proj
 
         proj = super().get_project(project_id)
-        print(f'ADDING PROJECT TO CACHE {project_id} - modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+        print(f'ADDING PROJECT TO CACHE AFTER LOAD {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+        if proj.chain_modified:
+            print('Project has been loaded in a modified state')
         self._project_last_accessed[project_id] = new_modkey
         self._project_cache[project_id] = proj
         return proj
@@ -1423,12 +1511,12 @@ class CachedFromDatabaseNewsegsProjectProvider(
     @override
     def upsert_component(self, component: NewsegsComponent | SequenceNotStr[NewsegsComponent], force: bool = False, tbl: sa.Table | None = None) -> None:
         super().upsert_component(component, force, tbl)
-        if isinstance(component, NewsegsProject):
-            project_id = component.id
-            print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - modified is {component.chain_modified} and table revision is {component.table_config.revision}')
-            modkey = self._get_project_modification_key(project_id)
-            self._project_last_accessed[project_id] = modkey
-            self._project_cache[project_id] = component
+        # if isinstance(component, NewsegsProject):
+        #     project_id = component.id
+        #     print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - revision is {component.revision}, modified is {component.chain_modified} and table revision is {component.table_config.revision}')
+        #     modkey = self._get_project_modification_key(project_id)
+        #     self._project_last_accessed[project_id] = modkey
+        #     self._project_cache[project_id] = component
 
     @override
     def delete_component(self, component_id: str | SequenceNotStr[str], ignore_ids: list[str] = []) -> list[str]:

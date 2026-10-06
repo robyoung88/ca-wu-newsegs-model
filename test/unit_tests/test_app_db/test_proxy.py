@@ -75,6 +75,7 @@ class TestProxy(unittest.TestCase):
         cls.context.term()
 
         engine = db.get_engine(cls.db_path)
+        print(engine.url)
         engine.dispose()
 
         cls.db_dir.cleanup()
@@ -87,6 +88,7 @@ class TestProxy(unittest.TestCase):
 
     def tearDown(self):
         """Clean up temporary directory after each test."""
+        
         self.temp_dir.cleanup()
 
     @staticmethod

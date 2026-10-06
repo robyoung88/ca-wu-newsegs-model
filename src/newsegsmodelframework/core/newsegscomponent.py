@@ -15,300 +15,28 @@ These components require the following common behaviour:
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 import copy
 import json
-import re
 import time
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, SupportsIndex, Type, overload, override
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Optional, Protocol, Sequence, overload, override
 import uuid as mod_uuid
 
 from useful_types import SequenceNotStr
 
-from newsegsmodelframework.core import serialisation, SerialisedConfigurationMixin
-from newsegsmodelframework.core import find_constructor
-from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, revision_dataclass
-from newsegsmodelframework.core.trackeddata import wrap_value as default_wrap_value
-from newsegsmodelframework.util import classfuncs, jsonfuncs
+from newsegsmodelframework.constants.framework_constants import PREFIX_GROUP_KEY, PREFIX_GROUPS
+from newsegsmodelframework.core import SerialisedConfigurationMixin
+from newsegsmodelframework.core.trackeddata import ComponentProperty, ComponentPropertyInterface, DataWithRevision
+from newsegsmodelframework.util import jsonfuncs
 
 __all__ = [
     'NewsegsComponent', 'RunnableNewsegsComponent', 'TableConfigNewsegsComponent',
     'DataWithRevision'
 ]
 
-class ComponentPropertyInterface(metaclass = ABCMeta):
-    """All component properties should inherit this"""
-
-class ComponentProperty(ComponentPropertyInterface):
-    """Descriptor for attributes which are Components"""
-
-    def __init__(self, default: Any = None, oftype: Optional[type | tuple[type, ...]] = None):
-        self.default = default
-        self.name = ""
-        self.id = ""
-        self.oftype = oftype
-
-    def __set_name__(self, owner: type, name: str):
-        self.name = f'_{name}' # Name as stored on object instance
-        self.id = f'_{name}_id'
-
-    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
-        if instance is None:
-            return self
-        att = getattr(instance, self.name, None)
-        if att is not None:
-            return att
-        if isinstance(self.default, Callable):
-            default_val = self.default()
-        else:
-            default_val = self.default
-        return getattr(instance, self.name, default_val)
-
-    def __set__(self, instance: 'ConfigurationMixin', value: 'ConfigurationMixin'):
-        if self.oftype:
-            if not isinstance(value, self.oftype):
-                raise TypeError(f'"{self.name}" is expected as one of {self.oftype}, is {type(value)}')
-        old_val = getattr(instance, self.name, None)
-
-        if old_val is not None and old_val is not value._config:
-            instance._config._remove_child(old_val)
-            setattr(instance, self.id, None)
-        
-        instance._config._add_child(value._config)
-        instance._config._notify_change()
-
-        setattr(instance, self.name, value)
-        if isinstance(value, NewsegsComponent):
-            setattr(instance, self.id, value.id)
-
-
-def wrap_value(val: Any, parent: RevisionNotifierMixin) -> Any:
-    if isinstance(val, NewsegsComponent):
-        parent._add_child(val._config)
-        return val
-    return default_wrap_value(val, parent)
-
-
-class ObservableComponentList(ObservableList):
-    @classmethod
-    @override
-    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
-        return wrap_value(val, parent)
-
-    def __init__(self, iterable = (), parent: Optional['RevisionNotifierMixin | NewsegsComponent'] = None):
-        if parent:
-            if isinstance(parent, NewsegsComponent):
-                super().__init__(iterable, parent = parent._config)
-            else:
-                super().__init__(iterable, parent)
-        else:
-            super().__init__(iterable)
-
-    def __setitem__(self, index, value):
-        old_val = super().__getitem__(index)
-        new_val = value
-        if isinstance(new_val, NewsegsComponent):
-            new_val._config = self._wrap_value(new_val._config, self)
-        else:
-            new_val = wrap_value(new_val, self)
-        if old_val != new_val:
-            if isinstance(old_val, NewsegsComponent):
-                self._remove_child(old_val._config)
-            if isinstance(old_val, RevisionNotifierMixin):
-                self._remove_child(old_val)
-            elif isinstance(old_val, Iterable):
-                for x in old_val:
-                    if isinstance(x, RevisionNotifierMixin):
-                        self._remove_child(x)
-
-            list.__setitem__(self, index, new_val)
-            self._notify_change()
-
-    def pop(self, index: SupportsIndex = -1):
-        item = super().pop(index)
-        if isinstance(item, NewsegsComponent):
-            self._remove_child(item._config)
-
-        # Notify is handled by ObservableList
-        return item
-
-    def remove(self, value):
-        try:
-            idx = self.index(value)
-            item = self[idx]
-        except ValueError:
-            # Let the standard error be raised
-            list.remove(self, value)
-            return
-
-        if isinstance(item, RevisionNotifierMixin):
-            self._remove_child(item)
-        elif isinstance(item, NewsegsComponent):
-            self._remove_child(item._config)
-        
-        list.remove(self, value)
-        self._notify_change()
-
-
-class ComponentListProperty(ComponentPropertyInterface):
-    """Descriptor for attributes which are lists of Components"""
-    def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
-        self.name = ""
-        self.oftype = oftype
-
-    def __set_name__(self, owner: type, name: str):
-        self.name = f'_{name}' # Name as stored on object instance
-
-    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
-        if instance is None:
-            return self
-        att = getattr(instance, self.name, ObservableComponentList(parent = instance._config))
-        return att
-
-    def __set__(self, instance: 'ConfigurationMixin', value: Iterable):
-        if not isinstance(instance, NewsegsComponent):
-            raise TypeError(f'Component list properties should only be applied to NewsegsComponents, is applied to {type(instance)}')
-        
-        old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, ObservableComponentList):    
-            value = ObservableComponentList(value, instance)
-            is_wrapped = True
-            
-        if old_val and not old_val == value:
-            instance._config._remove_child(old_val)
-            if not is_wrapped:
-                value = ObservableComponentList(value, instance)
-
-            instance._config._notify_change()
-
-        setattr(instance, self.name, value)
-
-
-class ObservableComponentOrderedDict(OrderedDict, RevisionNotifierMixin):
-    """Ordered dictionary wrapper that triggers a revision increment on mutation of child components."""
-    @classmethod
-    def _wrap_value(cls, val: Any, parent: RevisionNotifierMixin) -> Any:
-        return wrap_value(val, parent)
-
-    def __init__(
-        self,
-        mapping = (),
-        parent: Optional['RevisionNotifierMixin | NewsegsComponent'] = None,
-        **kwargs
-    ):
-        RevisionNotifierMixin.__init__(self)
-        initial = OrderedDict(mapping, **kwargs)
-        wrapped = {k: self._wrap_value(v, self) for k, v in initial.items()}
-        super().__init__(wrapped)
-        if isinstance(parent, NewsegsComponent):
-            parent._config._add_child(self)
-        elif parent:
-            parent._add_child(self)
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        exists = key in self
-        old_val = self.get(key) if exists else None
-        new_val = self._wrap_value(value, self)
-
-        if not exists or old_val != new_val:
-            super().__setitem__(key, new_val)
-            self._notify_change()
-            if old_val is not None:
-                if isinstance(old_val, NewsegsComponent):
-                    self._remove_child(old_val._config)
-                elif isinstance(old_val, RevisionNotifierMixin):
-                    self._remove_child(old_val)
-            
-    def __delitem__(self, key):
-        old_val = self.get(key)
-        if  old_val is not None:
-            if isinstance(old_val, NewsegsComponent):
-                self._remove_child(old_val._config)
-            elif isinstance(old_val, RevisionNotifierMixin):
-                self._remove_child(old_val)
-
-        super().__delitem__(key)
-        self._notify_change()
-
-    def update(self, *args, **kwargs):
-        other = dict(*args, **kwargs)
-        changed = False
-        for k, v in other.items():
-            wrapped_v = wrap_value(v, self)
-            if k not in self or self[k] != wrapped_v:
-                old_val = self.get(k)
-                if old_val is not None:
-                    if isinstance(old_val, NewsegsComponent):
-                        self._remove_child(old_val._config)
-                    elif isinstance(old_val, RevisionNotifierMixin):
-                        self._remove_child(old_val)
-                
-                super().__setitem__(k, wrapped_v)
-                changed = True
-        if changed:
-            self._notify_change()
-    
-    def pop(self, key, *args, **kwargs):
-        if key in self:
-            item = super().pop(key)
-            self._notify_change()
-            if isinstance(item, NewsegsComponent):
-                self._remove_child(item._config)
-            elif isinstance(item, RevisionNotifierMixin):
-                self._remove_child(item)
-            return item
-        return super().pop(key, *args, **kwargs)
-
-    def popitem(self, last: bool = True) -> tuple:
-        item = super().popitem(last)
-        self._notify_change()
-        if isinstance(item, NewsegsComponent):
-            self._remove_child(item._config)
-        elif isinstance(item, RevisionNotifierMixin):
-            self._remove_child(item)
-        return item
-
-    def clear(self):
-        if len(self) > 0:
-            super().clear()
-            self._children = []
-            self._notify_change()
-
-
-class ComponentOrderedDictProperty(ComponentPropertyInterface):
-    """Descriptor for attributes which are ordered dictionaries of Components (e.g. Variables)"""
-    def __init__(self, oftype: Optional[type | tuple[type, ...]] = None):
-        self.name = ""
-        self.oftype = oftype
-
-    def __set_name__(self, owner: type, name: str):
-        self.name = f'_{name}' # Name as stored on object instance
-
-    def __get__(self, instance: Optional['ConfigurationMixin'], owner: type) -> Any:
-        if instance is None:
-            return self
-        att = getattr(instance, self.name, ObservableComponentOrderedDict(parent = instance._config))
-        return att
-
-    def __set__(self, instance: 'ConfigurationMixin', value: Mapping):
-        if not isinstance(instance, SerialisedConfigurationMixin):
-            raise TypeError(f'ComponentOrderedDict properties should only be applied to inheritors of SerialisedConfigurationMixin (e.g. NewsegsComponents), is applied to {type(instance)}')
-
-        old_val = getattr(instance, self.name, None)
-        is_wrapped = False
-        if not isinstance(value, ObservableComponentOrderedDict):
-            value = ObservableComponentOrderedDict(value, instance._config)
-            is_wrapped = True
-
-        if old_val and not old_val == value:
-            instance._config._remove_child(old_val)
-            if not is_wrapped:
-                value = ObservableComponentOrderedDict(value, instance._config)
-            instance._config._notify_change()
-
-        setattr(instance, self.name, value)
-
+_STATE_EXCLUDES = Literal[
+    'excluded',
+    'excluded_and_components'
+]
 
 class NewsegsComponent(
     SerialisedConfigurationMixin,
@@ -323,24 +51,22 @@ class NewsegsComponent(
     
     _name: str = 'Model component'
     _version: str = '0.0.1'
-    _id_prefix: str = 'cmp'
-
-    uuid: str = '1'
-    component_type = 'abstract'
-
+    
     # Override of SerialiseToDictMixin _constructor_class
     _constructor_class = 'NewsegsComponent'
+
+    _serialisation_settings = dict(
+        state_excludes = 'excluded_and_components'
+    )
 
     _component_ids: dict[str, str]
     """IDs of subcomponents for reconstruction of component."""
 
+    # NB - all ID generating attributes are now in ConfigurationMixin   
+
     @classmethod
-    def _make_id_regex(cls):
-        return re.compile(rf'^{re.escape(cls._id_prefix)}' + r'-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')
-    
-    @classmethod
-    def generate_new_id(cls) -> str:
-        return cls._id_prefix + '-' + str(mod_uuid.uuid4())
+    def set_state_exclusion_policy(cls, excludes: _STATE_EXCLUDES = 'excluded_and_components'):
+        cls._serialisation_settings['state_excludes'] = excludes
 
     def __init__(self, *args, name: Optional[str] = None, **kwargs):
         super().__init__(*args, **kwargs) 
@@ -362,90 +88,28 @@ class NewsegsComponent(
         return self._version
 
     @property
-    def id(self) -> str:
-        return self._id_prefix + '-' + self.uuid
-    
-    @id.setter
-    def id(self, id: str) -> None:
-        uid = self._make_id_regex().search(id)
-        if uid is None:
-            raise ValueError(f'id: {id} is not a valid {type(self)} identifier')
-        uid = uid.group(1)
-        self.uuid = uid
-
-    @property
     def config(self) -> DataWithRevision:
         return self._config
 
     @override
-    def update(self, config: dict[str, Any] | type[serialisation.T]):
-        type_ = type(self)
-        if not isinstance(config, dict):
-            vars(self).update(copy.copy(vars(config)))
-            return
-        
-        config = config.copy()
-        
-        # We want to be able to accept property updates, but need to strip
-        # them out of the update dict and apply them after other updates
-        property_updates = {}
-        for k in config.keys():
-            if hasattr(type_, k):
-                prop = getattr(type_, k)
-                if isinstance(prop, ComponentPropertyInterface) or (hasattr(prop, 'fset') and getattr(prop, 'fset') is not None):
-                    v = config.get(k)
-                    if isinstance(v, dict):
-                        child_cc = v.get('constructor_class', None)
-                        child_classname = v.get('class', None)
-                        if child_cc is not None and child_classname is not None:
-                            v = find_constructor(child_cc, child_classname)(v)
-                        else:
-                            v = type_.unserialise_dict(v.copy())
-                    elif not isinstance(v, str) and isinstance (v, Sequence):
-                        requiresupdate = False
-                        for childv in v:
-                            if isinstance(childv, dict):
-                                requiresupdate = True
-                                break
-                        if requiresupdate:
-                            templist = list(v)
-                            for i, childv in enumerate(v):
-                                if isinstance(childv, dict):
-                                    child_cc = childv.get('constructor_class', None)
-                                    child_classname = childv.get('class', None)
-                                    if child_cc is not None and child_classname is not None:
-                                        templist[i] = find_constructor(child_cc, child_classname)(childv)
-                                    else:
-                                        templist[i] = type_.unserialise_dict(childv)
-                            v = type(v)(templist) # pyright: ignore[reportCallIssue]
-                    property_updates[k] = v
-
-        for k in property_updates.keys():
-            config.pop(k)
-        
-        super().update(config)
-        # Not all properties with a valid fset; if so, we are going to overwrite it
-        for k, v in property_updates.items():
-            try:
-                prop = getattr(type_, k)
-                getattr(prop, 'fset')(self, v)
-            except AttributeError:
-                setattr(self, k, v)
+    def get_excluded_attributes(self) -> set[str]:
+        excluded = super().get_excluded_attributes()
+        if self._serialisation_settings['state_excludes'] == 'excluded_and_components':
+            component_property_names = self.get_component_attributes()
+            excluded = excluded.union({'_' + x for x in component_property_names})        
+        return excluded
 
     @override
-    def to_dict(self) -> dict[str, Any]:
+    def _prepare_object_state(self):
+        super()._prepare_object_state()
         self.update_component_id_dict()
-        return super().to_dict()
 
     def to_dict_repr(self) -> dict[str, Any]:
         """A dictionary reproduction of the component including child components (not references)."""
+        type_ = type(self)
+        type_.set_state_exclusion_policy('excluded')
         odict = self.to_dict()
-        att_names = self.get_component_attributes()
-        for att in att_names:
-            odict[att] = self._repr_represent(getattr(self, att))
-            attunder = '_' + att
-            if attunder in odict:
-                del odict[attunder]
+        type_.set_state_exclusion_policy('excluded_and_components')
         return odict
 
     def json_dumps_repr(self) -> str:
@@ -453,31 +117,100 @@ class NewsegsComponent(
     
     def _repr_represent(self, value):
         if isinstance(value, object) and hasattr(value, 'to_dict_repr'):
-                return value.to_dict_repr() # pyright: ignore[reportAttributeAccessIssue]
+            return value.to_dict_repr() # pyright: ignore[reportAttributeAccessIssue]
         return self._represent(value)
 
-    def anonymise_ids(self):
-        self.id = self.generate_new_id()
-        for comp in self.get_components():
-            if comp is not None:
-                comp.id = comp.generate_new_id()
-
-    @classmethod
     @override
-    def from_dict(cls, config):
-        config = config.copy()
-        inst = cls.__new__(cls)
-        inst._config = inst._generate_config()
-        inst.update(config)
-        return inst
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        state = copy.copy(state)
+        compnames = self.get_component_attributes()
+        for cn in compnames:
+            if '_'+ cn in state and not cn in state:
+                #print(f'Renaming from {'_'+cn} to {cn} in state')
+                state[cn] = state['_' + cn]
+                del state['_' + cn]
+
+        super().__setstate__(state)
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        cls.set_state_exclusion_policy('excluded')
+        state = copy.deepcopy(self.__getstate__())
+        cls.set_state_exclusion_policy('excluded_and_components')
+
+        result.__setstate__(state)
+
+        return result
+
+    @staticmethod
+    def _anonymise_id_sequence(seq: SequenceNotStr):
+        for x in seq:
+            if isinstance(x, NewsegsComponent):
+                x.anonymise_ids()
+            elif isinstance(x, Mapping):
+                NewsegsComponent._anonymise_id_sequence(tuple(x.values()))
+            elif not isinstance(x, str) and isinstance(x, Sequence):
+                NewsegsComponent._anonymise_id_sequence(x) # pyright: ignore[reportArgumentType]
+        
+    @override
+    def anonymise_ids(self):
+        super().anonymise_ids()
+        self._anonymise_id_sequence(self.get_components())            
 
     def get_component_attributes(self) -> tuple['str', ...]:
         """A tuple of all the attributes of the object that are themselves NewsegsComponents"""
-        return ()
+        type_ = type(self)
 
-    def get_components(self) -> tuple['NewsegsComponent', ...]:
+        # Strip out dunders and single unders - the properties will not have a leading underscore
+        atts = tuple(k for k in dir(type_) if not k.startswith('_'))
+        atts = tuple(k for k in atts if isinstance(getattr(type_, k), ComponentPropertyInterface))
+        return atts
+
+    @staticmethod
+    def _recursive_get_component(atts: NewsegsComponent | Iterable) -> list['NewsegsComponent']:
+        rlist = []
+            
+        if isinstance(atts, NewsegsComponent):
+            rlist.append(atts)
+        elif isinstance(atts, Mapping):
+            for x in atts.values():
+                rlist.extend(NewsegsComponent._recursive_get_component(x))
+            #(rlist.extend(NewsegsComponent._recursive_get_component(x)) for x in atts.values())
+        elif isinstance(atts, Iterable):
+            for x in atts:
+                rlist.extend(NewsegsComponent._recursive_get_component(x))
+            #(rlist.extend(NewsegsComponent._recursive_get_component(x)) for x in atts)
+        return rlist                
+
+    def get_components(self, component_group: Optional[PREFIX_GROUP_KEY] = None) -> tuple['NewsegsComponent', ...]:
         """A tuple of all subcomponents that would require saving to store and reattaching after deserialisation."""
-        return tuple(getattr(self, nm) for nm in self.get_component_attributes())
+        attnames = self.get_component_attributes()
+        excl = self._excluded_attributes
+        attnames = (x for x in attnames if '_'+x not in excl)
+
+        atts = []
+        for nm in attnames:
+            try:
+                atts.append(getattr(self, nm))
+            except AttributeError:
+                pass
+
+        components = self._recursive_get_component(atts)
+        
+        if component_group is not None:
+            prefixes = set(x+'-' for x in PREFIX_GROUPS[component_group])
+            # Creatig a generator function doesn't seem to work
+            sublist = []
+            for x in components:
+                if any(x.id.startswith(y) for y in prefixes):
+                    sublist.append(x)
+            components = sublist
+            #components = (x for x in components if not any(x.id.startswith(y) for y in prefixes))
+        
+        return tuple(components)
 
     def update_component_id_dict(self):
         """Update ._component_ids prior to serialisation."""
@@ -493,9 +226,43 @@ class NewsegsComponent(
         component_provider: NewsegsComponentProviderInterface
     ):
         """Using the component_provider, find all components for reattachment."""
+        r0 = self.revision
+        prefixes = tuple(x+'-' for x in PREFIX_GROUPS['component_configs'])
         for att_name, comp_id in self._component_ids.items():
-            comp = component_provider.get_component(comp_id)
-            setattr(self, att_name, comp)
+            if any(comp_id.startswith(y) for y in prefixes):
+                comp = component_provider.get_component(comp_id)
+                setattr(self, att_name, comp)
+        # Ensure that revision is not incremented due to reattachment
+        self.revision = r0
+
+    def _get_component_properties(self):
+        # Stage 1 - strip out the dunders
+        comp_props = [x for x in dir(self) if not x.startswith('__')]
+        # Stage 2 - check has attribute
+        comp_props = [x for x in comp_props if hasattr(self, x)]
+        # Stage 3 - check has '_last_syncronised'
+        comp_props = [x for x in comp_props if hasattr(getattr(self, x), '_last_syncronised')]
+        # Stage 4 - keep only the single underscore versions
+        comp_props.sort()
+        r_props = set()
+        for x in comp_props:
+            if not '_' + x in r_props:
+                r_props.add(x)
+        return r_props
+
+    def reset_revision(self, chain: bool = True):
+        """Set the revision to 0 and _last_syncronised to -1
+        
+        If chain, also perform this for all ComponentProperties
+    """
+        if chain:
+            comp_props = self._get_component_properties()
+            for propname in comp_props:
+                att = getattr(self, propname)
+                att.revision = 0
+                att._last_syncronised = -1
+        self.revision = 0
+        self._last_syncronised = -1        
 
     @property
     def dirty(self):
@@ -600,3 +367,124 @@ class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
 
 class NewsegsComponentManagerInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
     ...
+
+
+class DictionaryComponentProvider(NewsegsComponentProviderInterface):
+    def __init__(
+        self,
+        comp_dict: dict
+    ) -> None:
+        self.comp_dict = comp_dict
+
+    @overload
+    def get_component(self, component_id: str) -> NewsegsComponent:
+        ...
+
+    @overload
+    def get_component(self, component_id: SequenceNotStr[str]) -> SequenceNotStr[NewsegsComponent]:
+        ...
+
+    def get_component(
+        self, 
+        component_id: str | SequenceNotStr[str]
+    ) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        if isinstance(component_id, str):
+            return self.comp_dict[component_id]
+        else:
+            return[self.comp_dict[x] for x in component_id]
+
+    def duplicate_component(
+        self, 
+        component_id: str | NewsegsComponent
+    ) -> NewsegsComponent:
+        if isinstance(component_id, str):
+            return copy.deepcopy(self.comp_dict[component_id])
+        else:
+            return copy.deepcopy(component_id)
+
+    def add_component(
+        self,
+        component: NewsegsComponent
+    ) -> str:
+        self.comp_dict[component.id] = component
+        return component.id
+
+    def get_default_component(
+        self, 
+        component_type: str, 
+        index: int = -1
+    ) -> NewsegsComponent:
+        return next(iter(self.comp_dict.values()))
+    
+    def get_component_metadata(
+        self, 
+        component_id: str | SequenceNotStr[str], 
+        metadata_ids: str | SequenceNotStr[str]
+    ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        return {'message': 'No metadata'}
+
+    def set_component_metadata(
+        self, component_id: str, metadata_id: str, metadata_value: Any
+    ):
+        ...
+
+
+if TYPE_CHECKING:
+    # During type checking, treat TableOwningMixin as a NewsegsComponent subclass
+    _Base = NewsegsComponent
+else:
+    # At runtime, keep it as a pure lightweight mixin base
+    _Base = object
+
+
+class TableOwningMixin(_Base):
+    """Mixin that adds table_config behavior to any NewsegsComponent subclass."""
+
+    table_config = ComponentProperty(default = TableConfigNewsegsComponent)
+
+    @override
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
+        # Table needs to be created early, for attachment by tablemodifyingproperties
+
+        table_config_exists = hasattr(self, '_table_config')
+        full_update = False
+
+        inst_table = config.pop('_table_config', config.pop('table_config', None))
+        if inst_table:
+            if isinstance(inst_table, NewsegsComponent):
+                self.table_config = inst_table
+                table_config_exists = True
+                full_update = True
+            elif isinstance(inst_table, Mapping):
+                if not table_config_exists:
+                    full_update = True
+                    table_config_exists = True
+                tc = self.table_config # Should generate a default if not present
+                for k, v in inst_table.items():
+                    setattr(tc, k, v)
+            else:
+                raise TypeError(f'Unsupported type for table config update: {type(inst_table)}')
+        
+        # If the table config doesn't actually exist yet, force it to so we can reset the revision
+        # after configuration completes
+        if not table_config_exists:
+            full_update = True
+
+        if full_update:
+            object.__setattr__(self, '_table_config_revis_0', self.table_config.revision)
+
+    @override
+    def _post_update_from_dict(self):
+        if hasattr(self, '_table_config_revis_0'):
+            self.table_config.revision = self._table_config_revis_0
+            delattr(self, '_table_config_revis_0')
+        super()._post_update_from_dict()
+
+
+class TableOwningNewsegsComponent(TableOwningMixin, NewsegsComponent):
+    """Component that owns a table_config."""
+
+
+class TableOwningRunnableNewsegsComponent(TableOwningMixin, RunnableNewsegsComponent):
+    """Runnable component that owns a table config."""

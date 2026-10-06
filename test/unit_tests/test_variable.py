@@ -16,6 +16,7 @@ from scipy.stats import gamma as gamma_dist
 from scipy.stats import beta as beta_dist
 import scipy.integrate as integrate
 
+from newsegsmodelframework.core.trackeddata import ObservableOrderedDict
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import sprakefinance
@@ -1732,7 +1733,7 @@ class TestVariableSynchronisation(unittest.TestCase):
             'grid_import_sc_per_day'
         )
         self.assertEqual(
-            fnc.unit_costs['grid_import_sc_per_day'],
+            fnc.grid_import_sc_per_day,
             25
         )
 
@@ -2530,7 +2531,6 @@ class TestVariableValidation(unittest.TestCase):
 
 from collections import OrderedDict        
 from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVariableProvider
-from newsegsmodelframework.core.newsegscomponent import ObservableComponentOrderedDict
 from dataclasses import dataclass, field
 
 class TestVariableListManagement(unittest.TestCase):
@@ -2547,7 +2547,7 @@ class TestVariableListManagement(unittest.TestCase):
         @dataclass
         class VariableConsumer:
             variable_ids: OrderedDict = field(default_factory=OrderedDict)
-            variables: ObservableComponentOrderedDict = field(default_factory=ObservableComponentOrderedDict)
+            variables: ObservableOrderedDict = field(default_factory=ObservableOrderedDict)
 
         varlist = [
             'gen_input.wind_capacity.0',
@@ -2611,8 +2611,11 @@ class TestVariableListManagement(unittest.TestCase):
         self.assertEqual(consumer2.variables[varlist[0]].deterministic_value, new_val)
 
         consumer2.variables._chain_syncronise()
-        self.assertFalse(consumer1.variables.chain_modified)
+        # Because the variables container will have been modified, consumer1.variables.chain_modified will be true
+        self.assertTrue(consumer1.variables.chain_modified)
+        self.assertFalse(any(x.chain_modified for x in consumer1.variables.values()))
         self.assertFalse(consumer2.variables.chain_modified)
+        consumer1.variables._chain_syncronise()
 
         # Replace a variable in consumer 2
         vname = varlist[1]

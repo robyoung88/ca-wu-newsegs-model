@@ -6,11 +6,12 @@ from typing import Optional
 
 import pandas as pd
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import NewsegsComponent
-from newsegsmodelframework.core.newsegscomponent import ComponentProperty, TableConfigNewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core import newsegsmodelinterface
-from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, revision_dataclass
 
 class NewsegsFinanceData(NewsegsComponent):
     """
@@ -34,10 +35,11 @@ class NewsegsFinance(NewsegsFinanceInterface):
 
     _name = 'NewSEGS Finance Model'
     _finance_version = '0.0.1'
-    _id_prefix = 'f'
+    _id_prefix = COMPONENT_PREFIXES['fm']
+
+    _excluded_attributes = NewsegsFinanceInterface._excluded_attributes.union({'_model'})
 
     finance_data = ComponentProperty(default = NewsegsFinanceData)
-    table_config = ComponentProperty(default = TableConfigNewsegsComponent)
 
     model = ComponentProperty(default = None)
     
@@ -111,10 +113,6 @@ class NewsegsFinance(NewsegsFinanceInterface):
             argdict.update(kwdrs)
             self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate) or 0.0
             self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate) or 0.0
-
-    def get_component_attributes(self) -> tuple[str, ...]:
-        atts = super().get_component_attributes()
-        return ('finance_data', 'table_config', *atts)
     
     # Benefits
     @property
@@ -490,31 +488,20 @@ class NewsegsFinance(NewsegsFinanceInterface):
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
         ...
 
-    def __getstate__(self) -> object:
-        attributes = self.__dict__.copy()
-        if '_model' in attributes:
-            del attributes['_model']
-        return attributes
-
     def __hash__(self):
         mdl = self.model
         if mdl is None:
             return hash(
                 (
                     self.id,
-                    self.revision_string,
+                    self.revision,
                 )
             )
         return hash(
             (
                 self.id,
-                self.revision_string,
+                self.revision,
                 mdl.id,
                 mdl.last_run
             )
         )
-
-NewsegsFinance._excluded_attributes = (
-    super(NewsegsFinance, NewsegsFinance)._excluded_attributes 
-    + ('_model', '_finance_data', '_table_config')
-)

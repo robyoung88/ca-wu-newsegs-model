@@ -68,7 +68,7 @@ class TestWindTurbineElecGenerator(unittest.TestCase):
         self.assertNotEqual(turb.hub_height, turb2.hub_height)
 
         d1 = turb2.to_dict()
-        turb.update(d1)
+        turb.update(turb.unserialise_dict(d1))
         self.assertEqual(turb.location, turb2.location)
         self.assertEqual(turb.hub_height, turb2.hub_height)
 
@@ -130,7 +130,7 @@ class TestPowerPlantHomogeneousWind(unittest.TestCase):
         sd1 = json.dumps(d1, cls=jsonfuncs.NumpyEncoder)
         d2 = json.loads(sd1)
 
-        pp.update(d2)
+        pp.update(pp.unserialise_dict(d2))
         self.assertEqual(pp.location, pp3.location)
         self.assertEqual(pp.turbine.location, pp3.turbine.location)
 
@@ -166,7 +166,7 @@ class TestSprakePVGISElecGenerator(unittest.TestCase):
         sd1 = json.dumps(d1)
         d2 = json.loads(sd1)
 
-        gen.update(d2)
+        gen.update(gen.unserialise_dict(d2))
         self.assertEqual(gen.location, gen2.location)
         self.assertEqual(gen.nameplate_capacity, gen2.nameplate_capacity)
 
@@ -214,7 +214,7 @@ class TestPowerPlantHomogeneousPV(unittest.TestCase):
         sd1 = json.dumps(d1)
         d2 = json.loads(sd1)
 
-        pp.update(d2)
+        pp.update(pp.unserialise_dict(d2))
         self.assertEqual(pp.location, pp3.location)
         self.assertEqual(pp.pv_array.location, pp3.pv_array.location)
 
@@ -273,7 +273,7 @@ class TestPowerPlantHeterogeneousGenerators(unittest.TestCase):
         sd1 = json.dumps(d1, cls = jsonfuncs.NumpyEncoder)
         d2 = json.loads(sd1)
 
-        pp.update(d2)
+        pp.update(pp.unserialise_dict(d2))
         self.assertEqual(pp.nameplate_capacity, pp3.nameplate_capacity)
         self.assertEqual(pp.location, pp3.location)
     

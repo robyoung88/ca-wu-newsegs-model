@@ -5,6 +5,7 @@ import functools
 from typing import Any, Callable
 
 from newsegsmodelframework.core.constructors import registers
+from newsegsmodelframework.core.serialisation import SerialiseToDictProtocol
 
 def _deferred_constructor_update_from_dict(
     constructor_func: functools.partial
@@ -24,6 +25,12 @@ def _deferred_constructor_update_from_dict(
     def from_dict(config: dict[str, Any]):
         var = constructor_func('Placeholder')
         var.update(config)
+
+        # The update will have messed with the revision number, so reset that
+        revis = config.get('_config', {}).get('_revision')
+        if revis is not None:
+            var.revision = revis
+            
         return var
     return from_dict
 
@@ -60,10 +67,10 @@ def find_constructor(
         constr = _deferred_constructor_update_from_dict(constr)
         return constr
 
-    if not hasattr(constr, 'from_dict'):
+    if not isinstance(constr, SerialiseToDictProtocol):
         if not hasattr(constr, '__name__'):
-            raise AttributeError(f'class {type(constr)} does not implement SerialiseToDictMixin (no from_dict classmethod)')
+            raise AttributeError(f'class {type(constr)} does not implement SerialiseToDictProtocol')
         else:
-            raise AttributeError(f'class {constr.__name__} does not implement SerialiseToDictMixin (no from_dict classmethod)') # pyright: ignore[reportAttributeAccessIssue]
+            raise AttributeError(f'class {constr.__name__} does not implement SerialiseToDictProtocol') # pyright: ignore[reportAttributeAccessIssue]
 
-    return constr.from_dict # pyright: ignore[reportAttributeAccessIssue]
+    return constr.from_dict

@@ -14,6 +14,7 @@ import numpy as np
 import numpy.typing as npt
 from useful_types import SequenceNotStr
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
@@ -239,15 +240,30 @@ class Distribution(metaclass = Singleton):
 
     @classmethod
     def n_values(cls, var: Variable) -> int:
-        if (
-            isinstance(var.parameters, str) 
-            or not isinstance(var.parameters, Sequence)
-        ):
+        try:
+            if (
+                isinstance(var.parameters, str) 
+                or not isinstance(var.parameters, Sequence)
+            ):
+                return 1
+            p0 = var.parameters[0]
+            if isinstance(p0, str) or not isinstance(p0, Sized):
+                return 1
+            return len(p0)
+        except AttributeError:
+            pass
+        try:
+            if (
+                isinstance(var.raw_parameters, str) 
+                or not isinstance(var.raw_parameters, Sequence)
+            ):
+                return 1
+            p0 = var.raw_parameters[0]
+            if isinstance(p0, str) or not isinstance(p0, Sized):
+                return 1
+            return len(p0)
+        except AttributeError:
             return 1
-        p0 = var.parameters[0]
-        if isinstance(p0, str) or not isinstance(p0, Sized):
-            return 1
-        return len(p0)
 
     @classmethod
     @abstractmethod
@@ -2699,6 +2715,9 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
         for i, trans in enumerate(var.transform):
             if trans == 'ln':
+                if not isinstance(vcv, np.ndarray):
+                    vcv = np.reshape(np.array(vcv), (len(oarray), len(oarray)))
+
                 oarray[i] = np.exp(oarray[i] + 0.5 * vcv[i,i])
         return oarray
     
@@ -3004,9 +3023,9 @@ class DirichletDistribution(NumericVectorValuedDistribution):
             if a < 0 or a > 1:
                 raise ValueError(f'All values are expected within [0, 1], {i} is {a}')
         
-        checksum = np.abs(np.sum(val) - 1)
+        checksum = np.abs(np.sum(val) - 1) # type: ignore
         if checksum > 1e-12:
-            raise ValueError(f'Dirichlet values should sum to 1, these sum to {np.sum(val)}')
+            raise ValueError(f'Dirichlet values should sum to 1, these sum to {np.sum(val)}') # type: ignore
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
@@ -3160,7 +3179,8 @@ def update_model_with_value(
 
 @revision_dataclass
 class VariableConfig(DataWithRevision):
-    parameters: ParamList | None = None
+    # Don't include parameters as well as raw, or update will trigger two revisions
+    #parameters: ParamList | None = None
     raw_parameters: ParamList | None = None
 
     dsa_selected: bool = False
@@ -3267,9 +3287,12 @@ class Variable(
     _label: str | None = None
 
     # NewsegsComponent constants
-    _id_prefix = 'v'
+    _id_prefix = COMPONENT_PREFIXES['variable']
     # SerialiseToDictMixin constants
     _constructor_class = 'Variable'
+
+    soft_dirty: bool = False
+    """Soft indicator to flag the variable for upsert to storage without dirtying dependent components."""
 
     @override
     def _generate_config(self, *args, **kwargs) -> VariableConfig:
@@ -3465,7 +3488,8 @@ class Variable(
         return self.distribution.parameterisations[self.parameterisation_index]
 
     def _get_native_parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
-        p = self._config.parameters
+        #p = self._config.parameters
+        p = self._parameters
         if p is not None:
             if isinstance(p, Iterable):
                 return tuple(p)
@@ -3474,7 +3498,8 @@ class Variable(
         raise AttributeError('Parameters not yet set')
 
     def _set_native_parameters(self, parameters: ParamList) -> None:
-        self._config.parameters = parameters
+        #self._config.parameters = parameters
+        self._parameters = parameters
 
     @property
     def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
@@ -3967,6 +3992,15 @@ class NumericScalarVariable(ScalarVariable):
         """
         fstring = '{:,.' + f'{self.formatter_dp:d}'+'f}'   
         return fstring.format
+
+    @override
+    def _validate_bound(self, value: Value) -> ScalarNumParam:
+        v = super()._validate_bound(value)
+        if v is None:
+            raise TypeError(f'DSA bound should be a numeric value, got None')
+        if not isinstance(v, ScalarNumParam):
+            raise TypeError(f'DSA bound should be a numeric value, is type{v}')
+        return v
 
     @property
     @override
@@ -4640,6 +4674,12 @@ def variable_from_dict(config: dict[str, Any]) -> Variable:
         raise ValueError(f'Constructor not found for {classname}')
     var = constructor('Placeholder')
     var.update(config)
+
+    # The update will have messed with the revision number, so reset that
+    revis = config.get('_config', {}).get('_revision')
+    if revis is not None:
+        var.revision = revis
+    
     return var
 
 def variable_uid(variable: Variable) -> str | list[str]:

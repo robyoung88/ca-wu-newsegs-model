@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import copy
 from typing import Any, override, Type, TypeVar, SupportsFloat
-from functools import singledispatchmethod
+from functools import singledispatchmethod, lru_cache
 from pyproj import Transformer
 
 from pvlib.location import Location as _PVLibLocation
@@ -28,7 +28,7 @@ from newsegsmodelframework.util import classfuncs
 T = TypeVar('T')
 Real = SupportsFloat
 
-class Location(serialisation.SerialiseToDictMixin):
+class Location(serialisation.StateSerialiseToDictMixin):
     """
     A point geographic location with valid latitude and longitude.
 
@@ -736,15 +736,32 @@ def location_from_dict(input: dict[str, Any]) -> Location:
     return constructor.from_dict(input)
 
 class PVLibLocation(
-    serialisation.SerialiseToDictMixin,
+    serialisation.StateSerialiseToDictMixin,
     _PVLibLocation
 ):
     """Extends `pvlib.location.Location` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'
 
+    @override
+    def get_solarposition(self, times, pressure=None, temperature=12, **kwargs):
+        #method = kwargs.get('method', 'nrel_numba')
+        method = 'nrel_numba'
+        t0 = times[0]
+        periods = len(times)
+        freq = (times[1] - times[0])
+
+        return cached_get_solarposition(t0, periods, freq, self.latitude, self.longitude, method)
+
 class PVLibPVSystem(
-    serialisation.SerialiseToDictMixin,
+    serialisation.StateSerialiseToDictMixin,
     _PVSystem
 ):
     """Extends `pvlib.pvsystem.PVSystem` with `SerialiseToDictMixin`"""
     _constructor_class = 'PVLib'
+
+@lru_cache
+def cached_get_solarposition(t0, periods, freq, lat, lon, method: str = 'nrel_numba'):
+    from pvlib.solarposition import get_solarposition
+    import pandas as pd
+    times = pd.date_range(start = t0, periods = periods, freq = freq)
+    return get_solarposition(times, lat, lon, method = method)

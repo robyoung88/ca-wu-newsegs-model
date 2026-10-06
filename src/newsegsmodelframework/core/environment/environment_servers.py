@@ -34,7 +34,7 @@ WIDER_ENVIRONMENT_MEASURE = Literal[
 ]
 
 class NewsegsLocalEnvironment(
-    serialisation.SerialiseToDictMixin,
+    serialisation.StateSerialiseToDictMixin,
     metaclass = ABCMeta
 ):
     """Abstract base class for site-specific environmental data providers.
@@ -217,7 +217,7 @@ class NewsegsLocalEnvironment(
         return self.__class__.__name__ + ' v' + str(self._version)
 
 class NewsegsWiderEnvironment(
-    serialisation.SerialiseToDictMixin,
+    serialisation.StateSerialiseToDictMixin,
     metaclass = ABCMeta
 ):
     """Abstract base class for grid-wide environmental data providers.

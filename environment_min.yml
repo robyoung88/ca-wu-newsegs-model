@@ -3,10 +3,13 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - alembic
+  - cachetools
   - dash
   - dash-bootstrap-components
   - dash-daq
   - dash-extensions
+  - dash-iconify
   - dash-leaflet
   - dash-mantine-components
   - dynaconf
@@ -28,7 +31,9 @@ dependencies:
   - quarto
   - scipy
   - seaborn
+  - sqlalchemy
   - sf-hamilton
+  - uuid6
   - xarray
   - pip:
     - dash-ag-grid

@@ -25,6 +25,13 @@ There are a small number of `pip` dependencies that must be installed after crea
 - `diskcache`
 - `useful-types`
 
+## Environment variables
+
+It is suggested that the following variables are set in a .env file:
+
+- PYTHONPATH = ./src
+- PVLIB_USE_NUMBA = "1"
+
 ## Running calculations
 
 **TODO**

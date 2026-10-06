@@ -22,6 +22,8 @@ def _table_draw_request_factory(postproc_request_type: str, **kwargs):
         _ = rdict.pop('request_class', '')
         rdict['request_type'] = postproc_request_type
         rdict['trigger_request_type'] = request_type
+        # The trigger should be carried forward from the inciting event
+        rdict['trigger_run_id'] = request.trigger_run_id if request.trigger_run_id != -1 else rdict.pop('run_id', -1)
         if config:
             payload = rdict.get('payload', '{}')
             try:
@@ -78,13 +80,15 @@ def _make_generation_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         wind_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         wind_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     pv_results = [
@@ -97,13 +101,15 @@ def _make_generation_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         pv_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         pv_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     combined_generation_results = [
@@ -116,13 +122,15 @@ def _make_generation_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         combined_generation_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         combined_generation_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     return 'ok'
@@ -152,13 +160,15 @@ def _make_consumption_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         consumption_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         consumption_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     seasonal_consumption_results = [
@@ -170,13 +180,15 @@ def _make_consumption_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         seasonal_consumption_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         seasonal_consumption_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     return 'ok'
 
@@ -205,13 +217,15 @@ def _make_storage_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         storage_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         storage_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     return 'ok'
@@ -241,13 +255,15 @@ def _make_net_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         net_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         net_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     seasonal_net_results = [
@@ -259,13 +275,15 @@ def _make_net_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         seasonal_net_results[0],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         seasonal_net_results[1],
-        mark_stale = stale
+        mark_stale = stale,
+        request = request
     )
 
     return 'ok'
@@ -299,13 +317,15 @@ def _make_finance_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         benefits_results[0],
-        mark_stale = b_stale
+        mark_stale = b_stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         benefits_results[1],
-        mark_stale = b_stale
+        mark_stale = b_stale,
+        request = request
     )
     
     costs, c_stale = get_result_list(
@@ -321,13 +341,15 @@ def _make_finance_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         costs_results[0],
-        mark_stale = c_stale
+        mark_stale = c_stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         costs_results[1],
-        mark_stale = c_stale
+        mark_stale = c_stale,
+        request = request
     )
 
     value, v_stale = get_result_list(
@@ -343,13 +365,15 @@ def _make_finance_tables_sprake(
         table_name + '_ann',
         proj.table_config,
         value_results[0],
-        mark_stale = v_stale
+        mark_stale = v_stale,
+        request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
         proj.table_config,
         value_results[1],
-        mark_stale = v_stale
+        mark_stale = v_stale,
+        request = request
     )
 
     return 'ok'
@@ -407,7 +431,8 @@ def _make_dsa_tables_sprake(
             table_name + '_' + stat,
             mm.table_config,
             res,
-            mark_stale = stale
+            mark_stale = stale,
+            request = request
         )
     
     return 'ok'
@@ -508,10 +533,10 @@ def _trigger_plot_marginal_optim(
 
     fig = optim.statistic_across_margin_plot(plot_df, mm)
 
-    proj.table_config.revision += 1
-    project_provider.upsert_component(proj)
+    #proj.table_config.revision += 1
+    #project_provider.upsert_component(proj)
 
-    result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig)
+    result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig, request = request)
 
     return 'ok'
     
@@ -564,7 +589,7 @@ def _make_postopt_tables_sprake(
             str(opt),
         ]
 
-        result_provider.upsert_result('table_postopt_metamodel', proj.table_config, table_data)
+        result_provider.upsert_result('table_postopt_metamodel', proj.table_config, table_data, request=request)
 
     return 'ok'
 
@@ -639,7 +664,7 @@ def _make_psa_tables_sprake(
     ]
     rval.extend(pnpv)
 
-    result_provider.upsert_result('table_psa_metamodel', mm.table_config, html.Div(rval), mark_stale = any_stale)
+    result_provider.upsert_result('table_psa_metamodel', mm.table_config, html.Div(rval), mark_stale = any_stale, request=request)
     
     return 'ok'
 
@@ -665,3 +690,4 @@ def _get_psa_metamodel_table(
             proj = project_provider.get_project(active_project_id)
             mm = proj.get_focussed_metamodel()
             return result_provider.get_result(table_name, mm.table_config, True)
+        

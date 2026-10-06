@@ -119,7 +119,8 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         )
     ] + [
         dcc.Loading(
-            site_details
+            site_details,
+            delay_show = 300,
         )
     ]
 

@@ -1,5 +1,6 @@
 """Callbacks resulting in some processing being undertaken."""
 
+import copy
 import json
 import pickle
 from typing import Any
@@ -52,8 +53,10 @@ def _local_run_any(
 ):
     job_id = generate_claim_ticket(engine, request)
     try:
+        rq = copy.copy(request)
+        rq.run_id = job_id
         is_ok = runner(
-            request,
+            rq,
             project_provider,
             results_provider,
             job_id,
@@ -208,6 +211,8 @@ def add_action_callbacks(app: NewsegsDash):
         Output('progress-poll-interval', 'disabled'),
         Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
         Output({'type': 'results-overlay-text', 'section': ALL, 'supersection': ALL}, 'children', allow_duplicate = True),
+        Output({'type': 'results-progress-bar', 'section': ALL, 'supersection': ALL}, 'value'),
+        Output({'type': 'results-overlay-subtext', 'section': ALL, 'supersection': ALL}, 'children'),
 
         Input('trigger-check-requests', 'data'),
         Input('progress-poll-interval', 'n_intervals'),
@@ -218,31 +223,29 @@ def add_action_callbacks(app: NewsegsDash):
             'supersection': 'global', 'section': ALL,
             'key': ALL, 'subindex': 0
         }, 'id'),
-        State({
-            'type': 'result-table-option', 'purpose': ALL,
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'value'),
-        State({
-            'type': 'result-table-option', 'purpose': ALL,
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'id'),
-        State('active-project-id', 'data'),
+        # State({
+        #     'type': 'result-table-option', 'purpose': ALL,
+        #     'supersection': ALL, 'section': ALL,
+        #     'key': ALL, 'subindex': ALL
+        # }, 'value'),
+        # State({
+        #     'type': 'result-table-option', 'purpose': ALL,
+        #     'supersection': ALL, 'section': ALL,
+        #     'key': ALL, 'subindex': ALL
+        # }, 'id'),
+        # State('active-project-id', 'data'),
         State({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'id'),
         prevent_initial_call = True
     )
     def manage_actions(
-        #action_button_clicks,
         check_requests,
-        #postaction_triggers,
         poll_intervals,
 
         ongoing_actions: list[int],
         postaction_trigger_ids,
-        options: list,
-        option_ids: list,
-        active_project_id,
+        # options: list,
+        # option_ids: list,
+        # active_project_id,
         container_ids,
     ):
         trigger_id = ctx.triggered_id
@@ -257,6 +260,8 @@ def add_action_callbacks(app: NewsegsDash):
         spawned_actions = []
         spawn_ids: set[tuple] = set()
         new_jobs = False
+        prog_ = no_update
+        mess_ = no_update
 
         if isinstance(trigger_id, str):
             if trigger_id == 'trigger-check-requests':
@@ -277,6 +282,8 @@ def add_action_callbacks(app: NewsegsDash):
                 sa.select(
                     tbls.runs.c.run_id,
                     tbls.runs.c.status,
+                    tbls.runs.c.progress,
+                    tbls.runs.c.progress_message,
                 ).where(tbls.runs.c.run_id.in_(ongoing_actions))
             )
 
@@ -359,6 +366,7 @@ def add_action_callbacks(app: NewsegsDash):
                     for run_id in completed_actions:
                         req_data = completed_request_map[run_id]
                         original_request = registers.RunRequest.from_dict(json.loads(req_data['payload']))
+                        original_request.run_id = run_id
                         if not req_data['children_spawned']:
                             print(f'Handling the completion of job {run_id} of type {req_data["action_type"]} for project {req_data["project_id"]}')
                             action_type = req_data['action_type']
@@ -400,7 +408,20 @@ def add_action_callbacks(app: NewsegsDash):
                 # keep responsiveness.
                 ongoing_actions.extend(spawned_actions)
 
-        new_jobs = new_jobs or len(spawned_actions) 
+            if ongoing_actions:
+                progress_map = {x.run_id: {'progress': x.progress, 'message': x.progress_message} for x in job_statuses}
+
+                ongoing_progress = {k: v for k, v in progress_map.items() if k in ongoing_actions}
+                mess_ = f'{len(ongoing_progress)} jobs underway.\n'
+
+                if len(ongoing_progress):
+
+                    prog_ = 100. * sum([x['progress'] for x in ongoing_progress.values()]) / len(ongoing_progress)
+                    mess_ += ' | '.join([x['message'] for x in ongoing_progress.values()])
+                else:
+                    prog_ = 0.
+
+        new_jobs = new_jobs or len(spawned_actions)
 
         return (
             postaction_trigger_returns,
@@ -408,6 +429,8 @@ def add_action_callbacks(app: NewsegsDash):
             len(ongoing_actions) == 0,
             (['CALCULATING'] if len(ongoing_actions) > 0 else ['IDLE']) * len(container_ids),
             (['Computing...'] if new_jobs else [no_update]) * len(container_ids),
+            [prog_] * len(container_ids),
+            [mess_] * len(container_ids),
         )
 
     @app.callback(

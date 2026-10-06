@@ -21,6 +21,7 @@ ModalFooter: Any = dbc.ModalFooter
 ModalHeader: Any = dbc.ModalHeader
 ModalTitle: Any = dbc.ModalTitle
 Navbar: Any = dbc.Navbar
+Progress: type[dbc._components.Progress]  = dbc.Progress
 Row: Any = dbc.Row
 Select: Any = dbc.Select
 Toast: Any = dbc.Toast

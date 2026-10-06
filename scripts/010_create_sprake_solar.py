@@ -35,9 +35,16 @@ if __name__ == '__main__':
 
     location = pvlib.location.Location(lat, lon)
 
-    solarpos = location.get_solarposition(pvg_data.index)
+    solarpos = location.get_solarposition(pvg_data.index, method = 'nrel_numba')
 
     odata = pvg_data.join(solarpos)
+
+    print(
+        os.path.join(
+            settings.get('SprakeDataLoc'),
+            'default_irradiance.csv'
+        )
+    )
 
     odata.to_csv(
         os.path.join(

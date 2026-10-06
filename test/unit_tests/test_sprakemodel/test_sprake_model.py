@@ -4,6 +4,7 @@ Unit tests for newsegsmodel/sprakemodel.
 import os
 import unittest
 import json
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -20,6 +21,10 @@ from newsegsmodelframework.newsegsgrid import sprakegrid
 from newsegsmodelframework.newsegscs import sprakecs
 from newsegsmodelframework.newsegsgeneration import newsegsgeneration
 from newsegsmodelframework.newsegscs import newsegscs
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.resolve() 
+
+print(PROJECT_ROOT)
 
 class TestSprakeModelConfigEqualities(unittest.TestCase):
     """
@@ -40,8 +45,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
     
     def test_copy_construction(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 0.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
@@ -61,8 +66,8 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
     
     def test_serialisation(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 0.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
@@ -86,16 +91,15 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
     
     def test_json_serialisation(self):
         mdl = sprakemodel.SprakeModel.from_none()
-        mdl.generation.generator.generators[0].set_nameplate_capacity(200.)
-        mdl.generation.generator.generators[1].set_nameplate_capacity(0.)
+        mdl.generation.wind_capacity = 200.
+        mdl.generation.pv_capacity = 0.
         mdl.grid.import_rate = 0.5
         mdl.consumption_storage.efficiency_reduction = 0.5
 
         sd1 = mdl.json_dumps_repr()
         d2 = json.loads(sd1)
 
-        mdl2 = sprakemodel.SprakeModel.from_none()
-        mdl2.update(d2)
+        mdl2 = sprakemodel.SprakeModel.from_dict(d2)
 
         self.assertEqual(
             mdl.generation.generator.nameplate_capacity,
@@ -222,7 +226,8 @@ class TestSprakeFinanceRun(unittest.TestCase):
     def test_excel_validation(self):
 
         # Acceptable relative tolerance for validation
-        RTOL = 1e-6
+        # Mostly thrown off by the slightly different PV model
+        RTOL = 1e-5
 
         external_finance_data = (
             pd.read_excel(
@@ -233,10 +238,10 @@ class TestSprakeFinanceRun(unittest.TestCase):
             )
         )
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-config.json', 'r') as f:
+        with open(PROJECT_ROOT / f'data/sprakemodel-validation-config.json', 'r') as f:
             d1 = json.load(f)
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-finance-config.json', 'r') as f:
+        with open(PROJECT_ROOT / f'data/sprakemodel-validation-finance-config.json', 'r') as f:
             fd1 = json.load(f)
         
         mdl = sprakemodel.SprakeModel.from_dict(d1)

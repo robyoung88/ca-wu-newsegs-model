@@ -104,8 +104,17 @@ def get_page_layout_configuration_class(page_name: str):
 INPUT_HANDLERS: dict[
     tuple[str, str, str],
     Callable[
-        [dict, list[dict[str,str]], list[Any], list[dict[str,str]], list[dict[str,str]], str, NewsegsProjectProviderInterface],
-        tuple[list[DashComponent], list[DashComponent], list[DashComponent]]
+        [
+            dict, 
+            list[dict[str,str]], 
+            list[dict[str,str]], 
+            list[dict[str,str]],
+            dict[str, Any],
+            str,
+            NewsegsProjectProviderInterface,
+            dict[str, Any],
+        ],
+        dict[str, Any],
     ]
 ] = {}
 """Register of functions to handle changes in inputs.
@@ -118,16 +127,18 @@ Keyed by a tuple of:
 Handler functions take:
     triggered_id [dict] - the id of the triggering component
     input_ids [list[dict]] - a list of the ids of the associated Input html elements
-    input_values [list] - a llist of the values of the associated Input html elements
     header_ids [list[dict]] - a list of the ids of the associated header container html elements
     trigger_ids [list[dict]] - a list of the ids of the associated trigger dcc.Store elements
+    calling_dict [dict[str, Any]] - a dict of other keyword arguments to the calling function
     active_project_id [str]
     project_provider [NewsegsProjectProviderInterface]
+    return_dict [dict[str, Any]] - A dict of updates to output components of input_container_callbacks.react_to_input_change
 
-They should return a tuple of three lists:
-    updates for Input values
-    updates for header children
-    updates for trigger data
+It should return (modified) return_dict including:
+    input_values
+    header_children
+    trigger_data
+and any other elements that are included in the call.
 """
 
 def register_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
@@ -172,6 +183,7 @@ be found in RUN_PROCEDURE_REGISTER.)
 class RunRequest(SerialisableDataclass):
     request_id: int = 0
     run_id: int = 0
+    trigger_run_id: int = -1
     project_id: str = ''
     model_type: str = 'default'
     request_label: str = ''
@@ -182,7 +194,7 @@ class RunRequest(SerialisableDataclass):
     progress: float = 0.0
     progress_message: str = ''
     cancel_requested: bool = False
-    background_procedure: bool = True #False # TODO: Set to default background once the dispatcher is enabled
+    background_procedure: bool = True 
 
 class RunRequestHandler(Protocol):
     def __call__(
@@ -375,6 +387,7 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 class TableDrawRequest(RunRequest):
     request_class: str = 'tabledraw'
     trigger_request_type: str = ''
+    
     ann_hori_toggle: bool = False
 
 class TableDrawRequestHandler(Protocol):
@@ -846,25 +859,3 @@ def get_feedback_graph_artist(figure_key: str, model_type: str = 'default'):
     key = (figure_key, 'default')
     return FEEDBACK_GRAPH_ARTISTS[key]
 
-# FIGURE_DRAW_REGISTER: dict[str, Callable[[tuple[ResultMeta, ...]], Any]] = {}
-# """Register of functions to create figures given a tuple of live results.
-
-# Function arguments:
-#     tuple of ResultMeta objects
-
-# Function returns:
-#     Figures as dash components.
-
-# Notes:
-#     The function is memoised, so results should not re-use the same path.
-# """
-
-# def register_figure_draw(name: str):
-#     """Add a figure draw function to the register.
-    
-#     The name should respond the the key of the graph id.
-#     """
-#     def decorated(func):
-#         FIGURE_DRAW_REGISTER[name] = func
-#         return func
-#     return decorated

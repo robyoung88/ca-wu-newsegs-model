@@ -42,9 +42,6 @@ RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
 
-# LAYOUTS
-from newsegsmodelapp.plugins.pages import p000_model_selection_layout
-
 AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
@@ -105,6 +102,7 @@ def serve_layout():
         dcc.Store(id = 'layout-update-trigger', data = '', storage_type = 'memory'),
         dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
         dcc.Store(id = 'trigger-check-requests', data = 0, storage_type = 'memory'),
+        dcc.Store(id = 'trigger-check-stale', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
     ] 

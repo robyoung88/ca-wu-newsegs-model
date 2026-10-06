@@ -43,7 +43,6 @@ def project_to_raw_table_data(
         model_version = proj.model_version,
         label = proj.name,
         revision = proj.revision,
-        #revision_string = proj.revision_string,
         dsa_component_config_id = proj.dsa_config.id,
         psa_component_config_id = proj.psa_config.id,
         table_config_id = proj.table_config.id,
@@ -314,6 +313,7 @@ def variable_to_raw_table_data(
     odict = dict(
         id = variable.id,
         varid = variable_uid(variable),
+        revision = variable.revision,
         component_type = model_sec,
         label = variable.name
     )
@@ -464,7 +464,6 @@ def metamodel_to_raw_table_data(
     odict = dict(
         id = metamodel.id,
         revision = metamodel.revision,
-        #revision_string = metamodel.revision_string,
         label = metamodel.name,
         lat = metamodel.model.location.lat,
         lon = metamodel.model.location.lon,
@@ -602,8 +601,7 @@ def energy_model_to_raw_table_data(
         id = energy_model.id,
         model_class = energy_model.__class__.__name__,
         model_version = energy_model.version,
-        revision = energy_model.revision,
-        #revision_string = energy_model.revision_string,
+        revision = energy_model.revision,        
         label = energy_model.name,
         grid_config_id = energy_model.grid.id,
         generation_config_id = energy_model.generation.id,
@@ -741,7 +739,6 @@ def finance_model_to_raw_table_data(
         model_class = finance_model.__class__.__name__,
         model_version = finance_model.version,
         revision = finance_model.revision,
-        #revision_string = finance_model.revision_string,
         label = finance_model.name,
         financedata_config_id = finance_model.finance_data.id,
         table_config_id = finance_model.table_config.id,
@@ -858,7 +855,6 @@ def component_to_raw_table_data(
         component_class = component.__class__.__name__,
         component_version = component.version,
         revision = component.revision,
-        #revision_string = component.revision_string,
         label = component.name,
     )
 

@@ -1,11 +1,13 @@
 
 import json
+import time
 from typing import Any
 
 from dash import ALL, MATCH, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 from dash_extensions import Purify
 
+from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp import registers
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_result_container_content_creator, get_result_section_header_content_creator
@@ -105,6 +107,7 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
         Input('active-project-id', 'data'),
+        Input('trigger-check-stale', 'data'),
         State('app-state', 'data'),
 
         State({
@@ -117,6 +120,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         postaction_triggers,
         ann_hori_toggle,
         active_project_id,
+        check_stale,
         app_state,
         container_ids,
     ):
@@ -257,6 +261,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         return_ann_hori_state = [ann_hori_toggle] * len(rendered_ann_hori_state)
 
         contents_by_section_subindex = {}
+        """Local store for contents to prevent redrawing within single call"""
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
@@ -269,6 +274,8 @@ def add_result_container_callbacks(app: NewsegsDash):
         print(table_options)
 
         for idx, cid in enumerate(container_ids):
+
+            # Check if already drawn
             section = cid.get('section')
             subindex = int(cid.get('subindex'))
             ss = (section, subindex)
@@ -280,28 +287,35 @@ def add_result_container_callbacks(app: NewsegsDash):
             if not section or not key:
                 continue
 
+            # Find any custom table providers for this table / model
             table_name = key
             table_getter = None
             try:
                 table_getter = registers.get_table_getter(table_name, model_type)
             except KeyError:
                 pass
+
             if table_getter is not None:
                 print(f'Found getter for {table_name}')
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
                 res, rev = table_getter(active_project_id, table_options, app.project_provider, app.results_provider)
+
             else:
+                # Conventional table lookup
                 if subindex > 0:
+                    # Optionally vary the table name from default if subindex != 0
                     subindex_map = registers.get_table_subindex_map(key, model_type)
                     if subindex_map:
                         table_name = subindex_map[subindex]
-                
+
+                # Try with annual or to horizon subtable suffix
                 sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
                 print (f'getting from table {sub_table_name} - subindex is {subindex}')
                 res, rev = app.results_provider.get_result(sub_table_name, proj.table_config)
+                
                 if res is None:
-                    # Retry without the subtable
+                    # Retry without the subtable suffix
                     print (f'getting from table {table_name} - subindex is {subindex}')
                     res, rev = app.results_provider.get_result(table_name, proj.table_config)
 
@@ -422,36 +436,67 @@ def add_result_container_callbacks(app: NewsegsDash):
         return return_contents 
         
     @app.callback(
-        Output({'type': 'resize-handle', 'page': ALL}, 'className'),
-        Output({'type': 'result-tooltip', 'page': ALL}, 'children'),
-
-        Input({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'data-is-stale'),
-
-        Input({
-            'type': 'input-group-config-update-trigger', 
-            'supersection': ALL, 'purpose': 'trigger',
-            'section': ALL, 'key': ALL, 'subindex': ALL,
-            'parameter_index': ALL, 'vector_location': ALL,
-        }, 'data'),
-
-        State('active-project-id', 'data'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'data-rendered-project-id'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': ALL,
-            'key': ALL, 'subindex': ALL
-        }, 'data-rendered-project-table-revision'),
-
-        State({'type': 'resize-handle', 'page': ALL}, 'className'),
-        State({'type': 'result-tooltip', 'page': ALL}, 'children'),
+        output = dict(
+            indicator_class = Output(
+                {'type': 'resize-handle', 'page': ALL},
+                'className',
+            ),
+            tooltip_children = Output(
+                {'type': 'result-tooltip', 'page': ALL}, 
+                'children',
+            ),
+            trigger_check_stale_data = Output(
+                'trigger-check-stale', 'data'
+            ),
+        ),
+        inputs = dict(
+            data_stale = Input(
+                {
+                    'type': 'result-table', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 
+                'data-is-stale',
+            ),
+            config_update = Input(
+                {
+                    'type': 'input-group-config-update-trigger', 
+                    'supersection': ALL, 'purpose': 'trigger',
+                    'section': ALL, 'key': ALL, 'subindex': ALL,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'data'
+            ),
+        ),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            rendered_project_ids = State(
+                {
+                    'type': 'result-table', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 
+                'data-rendered-project-id'
+            ),
+            rendered_project_table_revisions = State(
+                {
+                    'type': 'result-table', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                },
+                'data-rendered-project-table-revision'
+            ),
+            trigger_ids = State(
+                {
+                    'type': 'postaction-trigger', 'purpose': 'trigger',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                },
+                'id'
+            ),
+            #indicator_class = State({'type': 'resize-handle', 'page': ALL}, 'className'),
+            #tooltip_children = State({'type': 'result-tooltip', 'page': ALL}, 'children'),
+        ),
     )
     def update_stale_indicators(
         data_stale,
@@ -459,8 +504,9 @@ def add_result_container_callbacks(app: NewsegsDash):
         active_project_id,
         rendered_project_ids,
         rendered_project_table_revisions,
-        handle_ids,
-        tooltip_ids,
+        #indicator_class,
+        #tooltip_children,
+        **kwargs
     ):
         triggered_id = ctx.triggered_id
         print(f'checking staleness - triggered by {triggered_id}')
@@ -473,11 +519,17 @@ def add_result_container_callbacks(app: NewsegsDash):
                 results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
             if not results_stale:
                 table_revision = proj.table_config.revision
+                print(f'Checking against project table revision {table_revision}')
+                print(f'Rendered table revisions are {rendered_project_table_revisions}')
                 results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
+                
         else:
             if data_stale is None:
                 raise PreventUpdate
+            print(f'Checking against data-is-stale {data_stale}')
             results_stale = any(x for x in data_stale)
+
+        rval = callback_utils.create_noupdate_return()
 
         if results_stale:
             handle_class = 'resize-handle resize-handle-warning'
@@ -486,4 +538,8 @@ def add_result_container_callbacks(app: NewsegsDash):
             handle_class = 'resize-handle resize-handle-ok'
             tooltip_text = 'Results up to date.'
 
-        return [handle_class] * len(handle_ids), [tooltip_text] * len(tooltip_ids)
+        rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
+        rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
+        rval['trigger_check_stale_data'] = time.time_ns()
+
+        return rval

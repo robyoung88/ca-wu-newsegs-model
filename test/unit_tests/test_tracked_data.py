@@ -39,9 +39,9 @@ class TestRevisionIncrements(unittest.TestCase):
         parent, child = create_parent_and_child()
 
         self.assertEqual(child.revision, 0)
-        self.assertEqual(child.revision_string, '0.0.0.0.0') # Parent + 2 observable list + 2 observable dict
+        
         self.assertEqual(parent.revision, 0)
-        self.assertEqual(parent.revision_string, '0.0.0.0.0.0.0.0.0.0.0.0.0.0.0')
+        
 
         self.assertFalse(parent.modified)
 
@@ -61,9 +61,9 @@ class TestRevisionIncrements(unittest.TestCase):
         child.tags[0] = 'ham'
         self.assertListEqual(child.tags, ['ham', 'eggs'])
         self.assertEqual(child.tags.revision, 1) # pyright: ignore[reportAttributeAccessIssue]
-        self.assertEqual(parent.revision, 1)
+        self.assertEqual(parent.revision, 2)
         self.assertTrue(child.tags.modified) # pyright: ignore[reportAttributeAccessIssue]
-        self.assertFalse(parent.modified)
+        self.assertTrue(parent.modified)
         self.assertTrue(parent.chain_modified)
         parent._chain_syncronise()
         self.assertFalse(parent.chain_modified)

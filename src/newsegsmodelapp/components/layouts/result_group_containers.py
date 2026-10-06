@@ -39,8 +39,31 @@ def create_results_container(
                             'type': 'results-overlay-text',
                             'section': section,
                             'supersection': supersection
-                        }
+                        },
+                        className="results-overlay-title"
                     ),
+                    html.Small(
+                        '',
+                        id = {
+                            'type': 'results-overlay-subtext',
+                            'section': section,
+                            'supersection': supersection
+                        },
+                        className="results-overlay-subtext"
+                    ),
+
+                    dbc.Progress(
+                        id={
+                            'type': 'results-progress-bar',
+                            'section': section,
+                            'supersection': supersection
+                        },
+                        value=100,
+                        animated=True,
+                        striped=True,
+                        className="results-progress"
+                    ),
+
                     dbc.Button(
                         "Cancel Jobs",
                         id = {

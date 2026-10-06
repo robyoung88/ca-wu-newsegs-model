@@ -28,6 +28,16 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
     def _reconstruct_variable(self, row) -> Variable:
         v = _variable_from_json(row.payload)
         v.id = row.id # ID may have been reassigned in database
+        v.soft_dirty = False
+        if v.revision != row.revision:
+            if v.revision > row.revision:
+                print(f'WARNING - Variable has been constructed with revision greater than stored in row: Payload = {v.revision}, Row = {row.revision}')
+            print(f'Syncronising Variable revision ({v.id}): {v.revision} -> {row.revision}')
+            v.revision = row.revision
+            v._config._last_syncronised = v.revision
+        
+        if v.modified:
+            raise ValueError(f'Variable has been reconstructed in modified form - Item revision = {v.revision}, last synced = {v._config._last_syncronised}')
         return v
     
     @overload
@@ -117,6 +127,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             var = [var, ]
 
         current_revisions = {x.id: x.revision for x in var}
+        soft_dirty = {x.id: x.soft_dirty for x in var}
         uids = list(current_revisions.keys())
 
         # Get saved revision if exists
@@ -136,7 +147,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         new_inserts = [str(x) for x in uids if x not in existing_uids]
         requires_revision_increment = []
         if not force:
-            requires_update = [x for x in existing_uids if current_revisions[x] != saved_revisions[x]]
+            requires_update = [x for x in existing_uids if (current_revisions[x] != saved_revisions[x]) or soft_dirty[x]]
             for x in var:
                 if x.id not in new_inserts and x.id not in requires_update:
                     if x.chain_modified:
@@ -158,7 +169,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 v.syncronise()
 
         vardata = {v.id: variable_to_raw_table_data(v) for v in var if v.id in requires_data}
-        revdata = {v.id: {'id': v.id, 'revision': v.revision, 'revision_string': v.revision_string} for v in var if v.id in requires_revision_increment}
+        revdata = {v.id: {'id': v.id, 'revision': v.revision} for v in var if v.id in requires_revision_increment}
 
         update_payload = [vardata[x] for x in requires_update]
         insert_payload = [vardata[x] for x in new_inserts]

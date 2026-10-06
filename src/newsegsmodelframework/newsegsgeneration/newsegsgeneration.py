@@ -8,6 +8,7 @@ import pandas as pd
 
 from newsegsmodelframework.core import NewsegsModule, newsegscomponent
 from newsegsmodelframework.core import generation
+from newsegsmodelframework.core.generation.generators import NewsegsGeneratorProperty
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core.newsegsmoduleresult import filter_meters
 from newsegsmodelframework.core import location as modlocation
@@ -38,14 +39,27 @@ class NewsegsGeneration(NewsegsModule):
 
     @override
     def update(self, config):
+        if isinstance(config, dict):
+            has_location = ('_config' in config.keys())
+        else:
+            has_location = True
         super().update(config)
         # After updating, trigger any logic on location
-        if isinstance(config, Mapping):
-            if '_config' in config.keys():
-                if 'location' in config['_config'].keys():
-                    self.location = self._config.location
+        if has_location:
+            self.location = self._config.location
 
-    
+    @override
+    def get_component_attributes(self) -> tuple[str, ...]:
+        """A tuple of all the attributes of the object that are themselves NewsegsComponents
+
+        Excludes the generators, as these are not handled in the component database.
+        Returns:
+            tuple[str, ...]: Names of attributes which are NewsegsComponents
+        """
+        atts = super().get_component_attributes()
+        type_ = type(self)
+        return tuple(x for x in atts if not isinstance(getattr(type_, x), NewsegsGeneratorProperty))
+
 def get_generation_meters(
     gen_results: NewsegsModuleResult
 ) -> pd.DataFrame:

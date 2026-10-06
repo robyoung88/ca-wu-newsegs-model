@@ -25,14 +25,16 @@ For a psa run, a (small) number of statistics must be nominated to be held in a
 dataframe which will be accessible after completion; each row will correspond
 to a sample across all enabled PSA variables.
 """
-from collections import OrderedDict
+import copy
 import datetime
 import logging
-from typing import Any, Mapping, MutableSequence, Optional, Sequence, override
+from typing import Any, Mapping, MutableSequence, Optional, override
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
-from newsegsmodelframework.core.newsegscomponent import ComponentOrderedDictProperty, ComponentProperty, NewsegsComponentProviderInterface
-from newsegsmodelframework.core.trackeddata import DataWithRevision
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
+from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
+from newsegsmodelframework.core.trackeddata import ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
@@ -62,13 +64,59 @@ def make_varid(
     if section is None:
         section = 'None'
     return f'{section}.{key}.{subindex}'
+   
+
+class MMVarWatcher(RevisionNotifierProtocol):
+    def __init__(self, metamodel: 'NewsegsMetaModel'):
+        self._metamodel = metamodel
+        self._held_ids = {}
+
+    def update_held_ids(self):
+        mm = self._metamodel
+        previous_varids = set(self._held_ids.keys())
+        extant_varids = set(mm.variables.keys())
+
+        new_varids = extant_varids - previous_varids
+        removed_varids = previous_varids - extant_varids
+        continuing_varids = extant_varids & previous_varids
+
+        changed_varids = set(self._held_ids[x] != mm.variables[x].id for x in continuing_varids)
+
+        for varid in removed_varids:
+            if varid in mm._variables_last_model_sync:
+                del mm._variables_last_model_sync[varid]
+
+        for varid in new_varids:
+            # Set to require sync
+            mm._variables_last_model_sync[varid] = -1
+
+        for varid in changed_varids:
+            # Set to require sync
+            mm._variables_last_model_sync[varid] = -1 
+
+        self._held_ids = {x: mm.variables[x].id for x in extant_varids}
+        
+    def _add_child(self, child: 'RevisionNotifierProtocol', subscribe: bool = True): 
+        # Only need to receive notifications of change, don't need to check on revision status
+        if subscribe and isinstance(child, SubscriptionRevisionNotifierMixin):
+            child._subscribers.append(self)
+    
+    def _remove_child(self, child: 'RevisionNotifierProtocol'):
+        if isinstance(child, SubscriptionRevisionNotifierMixin):
+            child.unsubscribe(self)
+    
+    def _notify_change(self, trigger: Any | None = None, **kwargs):
+        if isinstance(trigger, (TableModifyingObservableOrderedDict)):
+            self.update_held_ids()
+            
+        # Otherwise, do nothing
 
 
+@revision_dataclass
 class NewsegsMetaModelConfig(DataWithRevision):
     ...
 
-
-class NewsegsMetaModel(NewsegsComponent):
+class NewsegsMetaModel(TableOwningNewsegsComponent):
     """A container and controller for models and variables."""
 
     model_id: str
@@ -77,18 +125,19 @@ class NewsegsMetaModel(NewsegsComponent):
 
     _name = 'NewSEGS MetaModel'
     _version = '0.0.1'
-    _id_prefix = 'metam'
+    _id_prefix = COMPONENT_PREFIXES['metamodel']
     _last_modified: datetime.datetime = datetime.datetime.now()
+
+    _excluded_attributes = NewsegsComponent._excluded_attributes.union({'_watcher'})
 
     last_dsa_run: float = 0.
     last_psa_run: float = 0.
     last_optim_run: float = 0.
 
-    model = ComponentProperty(oftype = newsegsmodel.NewsegsModel)
-    finance = ComponentProperty(oftype = newsegsfinance.NewsegsFinance)
-    table_config = ComponentProperty(oftype = TableConfigNewsegsComponent)
+    model = ComponentProperty(default = None, oftype = newsegsmodel.NewsegsModel)
+    finance = ComponentProperty(default = None, oftype = newsegsfinance.NewsegsFinance)
 
-    variables = ComponentOrderedDictProperty(oftype = variable.Variable)
+    variables = TableModifyingComponentOrderedDictProperty(oftype = variable.Variable)
     _variables_last_model_sync: dict
     """The revision number of the variable at last deterministic sync."""
 
@@ -107,14 +156,25 @@ class NewsegsMetaModel(NewsegsComponent):
     ):
         super().__init__(**kwargs)
         
+        self.table_config = table_config or TableConfigNewsegsComponent()
+        self.watcher = MMVarWatcher(self)
+
         self.model = model
         self.finance = finance
 
         self.variables = {variable.variable_uid(x):x for x in variables}
         self._variables_last_model_sync = {}
 
-        self.table_config = table_config or TableConfigNewsegsComponent()
+    @property
+    def watcher(self) -> RevisionNotifierProtocol:
+        if self._watcher is None:
+            self._watcher = MMVarWatcher(self)
+        return self._watcher
 
+    @watcher.setter
+    def watcher(self, watcher: RevisionNotifierProtocol):
+        self._watcher = watcher
+        
     def reattach_model(
         self,
         model_provider: Mapping[str, newsegsmodel.NewsegsModel]
@@ -147,6 +207,7 @@ class NewsegsMetaModel(NewsegsComponent):
         """Reattach the associated NewsegsModel instance after metamodel reconstruction.
         
         """
+        r0 = self.revision
         if not hasattr(self, '_model_id') or self._model_id == '':
             raise AttributeError('This MetaModel has no associated model to reattach.')
         mdl = em_provider.get_component(self._model_id)
@@ -158,6 +219,7 @@ class NewsegsMetaModel(NewsegsComponent):
                 self.finance.set_model(self.model)
         except AttributeError:
             pass
+        self.revision = r0
 
     def reattach_finance(self, finance_provider: Mapping[str, newsegsfinance.NewsegsFinance]) -> None:
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
@@ -170,6 +232,7 @@ class NewsegsMetaModel(NewsegsComponent):
             ValueError: If finance_provider cannot provide the finance.
             TypeError: If the provided object is not a NewsegsFinance.
         """
+        r0 = self.revision
         if not hasattr(self, '_finance_id') or self._finance_id == '':
             raise AttributeError('this MetaModel has no associated finance to reattach.')
         fnc = finance_provider.get(self._finance_id)
@@ -180,11 +243,13 @@ class NewsegsMetaModel(NewsegsComponent):
         self.finance = fnc
         if self.model is not None:
             self.finance.set_model(self.model, dirty = False)
+        self.revision = r0
 
     def reattach_fm(self, fm_provider: NewsegsComponentProviderInterface):
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
         
         """
+        r0 = self.revision
         if not hasattr(self, '_finance_id') or self._finance_id == '':
             raise AttributeError('This MetaModel has no associated finance to reattach.')
         fnc = fm_provider.get_component(self._finance_id)
@@ -193,16 +258,21 @@ class NewsegsMetaModel(NewsegsComponent):
         self.finance = fnc
         try:
             if self.model is not None:
-                self.finance.set_model(self.model)
+                self.finance.set_model(self.model, False)
         except AttributeError:
             pass
+        self.revision = r0
 
-    def get_component_attributes(self) -> tuple[str, ...]:
-        atts = super().get_component_attributes()
-        return ('table_config', *atts)
+    # def get_component_attributes(self) -> tuple[str, ...]:
+    #     atts = super().get_component_attributes()
+    #     return ('table_config', *atts)
 
     @property
     def variable_ids(self) -> tuple[dict[str, str], ...]:
+        # As variables cannot exist until table_config has been reattached,
+        # only search for _variable_ids during child uid update
+        if self.table_config is None:
+            return getattr(self, '_variable_ids', ())
         if len(self.variables) == 0 and hasattr(self, '_variable_ids'):
             return self._variable_ids
         return tuple(
@@ -219,14 +289,19 @@ class NewsegsMetaModel(NewsegsComponent):
             variable_provider: Instance of VariableProviderInterface (typically a Project).
         """
         these_vars = self.variable_ids
-        if not hasattr(self, '_variables'):
-            self.variables = {}
+        r0 = self.revision
+        tr0 = self.table_config.revision
+        vr0 = self.variables.revision # type: ignore
         for var_identifiers in these_vars:
             try:
                 v = variable_provider.get_variable(var_identifiers['uid'])
             except KeyError:
                 v = variable_provider.get_default_variable(var_identifiers['varid'])
             self.variables[var_identifiers['varid']] = v
+        self.variables.revision = vr0 # type: ignore
+        self.revision = r0
+        self.table_config.revision = tr0
+        
 
     def reattach_table_config(self, component_provider: Mapping[str, NewsegsComponent]):
         """Reattach the associated TableConfig instance after metamodel reconstruction.
@@ -349,7 +424,7 @@ class NewsegsMetaModel(NewsegsComponent):
             var.update_model(self.finance)
         else:
             var.update_model(self.model)
-        self._variables_last_model_sync[varid] = var.revision_string
+        self._variables_last_model_sync[varid] = var.revision
         return var.configuration_type
     
     def sync_model_with_changed_variables_deterministic(
@@ -357,67 +432,109 @@ class NewsegsMetaModel(NewsegsComponent):
     ) -> set[str]:
         affected_models = set()
         for varid, var in self.variables.items():
-            if self._variables_last_model_sync.get(varid, '0') != var.revision_string:
+            if self._variables_last_model_sync.get(varid, -1) != var.revision:
                 try:
                     if isinstance(varid, str):
                         affected_models.add(self.update_model_from_variable_deterministic(varid)) 
                 except ValueError as e:
                     logger.error(e)
                 
-                self._variables_last_model_sync[varid] = var._config.revision
+                self._variables_last_model_sync[varid] = var.revision
   
         return affected_models
 
     @override
-    def to_dict(self) -> dict[str, Any]:
-        odict = super().to_dict()
-        odict['_model_id'] = self.model.id
-        odict['_finance_id'] = self.finance.id
-        odict['_variable_ids'] = self.variable_ids
-        odict['_table_config_id'] = self.table_config.id
-        return odict
+    def _prepare_object_state(self):
+        super()._prepare_object_state()
+        self._variable_ids = self.variable_ids
 
-    @override
-    def to_dict_repr(self) -> dict[str, Any]:
-        odict = super().to_dict_repr()
+    # @override
+    # def to_dict(self) -> dict[str, Any]:
+    #     odict = super().to_dict()
+    #     odict['_table_config_id'] = self.table_config.id
+    #     odict['_model_id'] = self.model.id
+    #     odict['_finance_id'] = self.finance.id
+    #     odict['_variable_ids'] = self.variable_ids
+    #     return odict
+
+    # @override
+    # def to_dict_repr(self) -> dict[str, Any]:
+    #     odict = super().to_dict_repr()
         
-        odict['model'] = self.model.to_dict_repr()
-        del odict['_model_id']
-        odict['finance'] = self.finance.to_dict_repr()
-        del odict['_finance_id']
+    #     odict['model'] = self.model.to_dict_repr()
+    #     del odict['_model_id']
+    #     odict['finance'] = self.finance.to_dict_repr()
+    #     del odict['_finance_id']
 
-        vars = {k: v.to_dict() for k, v in self.variables.items()}
-        odict['variables'] = vars
-        # Clear the old variable ids, as don't want to get confused when we reconstruct
-        odict['_variable_ids'] = []
+    #     vars = {k: v.to_dict() for k, v in self.variables.items()}
+    #     odict['variables'] = vars
+    #     # Clear the old variable ids, as don't want to get confused when we reconstruct
+    #     odict['_variable_ids'] = []
 
-        return odict
+    #     return odict
+
+    # @override
+    # def anonymise_ids(self):
+    #     super().anonymise_ids()
+    #     self.model.anonymise_ids()
+    #     self.finance.anonymise_ids()
+    #     # Do not anonymise variables! Remember, the metamodel does not own its variables.
+
+    
+   
+    @override
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
+        # Set the watcher prior to property attachment
+        if not hasattr(self, '_watcher') or self._watcher is None:
+            self.watcher = MMVarWatcher(self)
+
+        if 'model' in config:
+            self.model = config.pop('model')
+        if 'finance' in config:
+            self.finance = config.pop('finance')
+            try:
+                self.finance.set_model(self.model)
+            except AttributeError:
+                pass
 
     @override
-    def anonymise_ids(self):
-        super().anonymise_ids()
-        self.model.anonymise_ids()
-        self.finance.anonymise_ids()
-        for v in self.variables.values():
-            v.anonymise_ids()
+    def _post_update_from_dict(self):
+        try:
+            if self.finance.model is None or self.finance.model is not self.model:
+                self.finance.set_model(self.model, dirty = False)
+        except AttributeError:
+            pass
+        super()._post_update_from_dict()
 
-    def __getstate__(self) -> dict[str, Any]:
-        state = self.__dict__.copy()
-        for dontpickle in ['_model', '_finance', '_variables']:
-            if dontpickle in state:
-                del state[dontpickle]
-        if self.model:
-            state['_model_id'] = self.model.id
-        if self.finance:
-            state['_finance_id'] = self.finance.id
-        state['_variable_ids'] = self.variable_ids
-        return state
-    
-    # Will have no explicit setstate - require using 'reattach_' methods
-    # to recover the missing components using external mappings.
-    # We will also not use a custom pickler, because we don't want to switch out picklers
-    # depending on what is being pickled, and ultimately we do want models and finances to be
-    # picklable in other circumstances.
+    @override
+    def anonymise_ids(self, include_variables = False):
+        if include_variables:
+            return super().anonymise_ids()
+        else:
+            SerialisedConfigurationMixin.anonymise_ids(self)
+            self._anonymise_id_sequence(self.get_components(component_group = 'exclude_variables'))
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        
+        cls.set_state_exclusion_policy('excluded')
+        state = self.__getstate__()
+        cls.set_state_exclusion_policy('excluded_and_components')
+
+        state = {k:copy.deepcopy(v, memo) for k, v in state.items() if k != '_variables'}
+
+        result.__setstate__(state)
+        
+        # Need to generate a new container, but the contents must be identical
+        result.variables = {k: v for k, v in self.variables.items()}
+        result.variables.revision = self.variables.revision # pyright: ignore[reportAttributeAccessIssue]
+
+        result.revision = self.revision
+        result.table_config.revision = self.table_config.revision
+        return result
 
     def to_config(self) -> dict[str, str|int|float]:
         """
@@ -444,15 +561,15 @@ class NewsegsMetaModel(NewsegsComponent):
             'last_modified': datetime.datetime.now().isoformat()
         }
 
-    @classmethod
-    @override
-    def from_dict(cls, config):
-        config = config.copy()
-        inst = cls.__new__(cls)
-        inst._config = inst._generate_config()
-        inst.variables = {}
-        inst.update(config)
-        return inst
+    # @classmethod
+    # @override
+    # def from_dict(cls, config):
+    #     config = config.copy()
+    #     inst = cls.__new__(cls)
+    #     inst._config = inst._generate_config()
+    #     inst.watcher = MMVarWatcher(inst)
+    #     inst.update(config)
+    #     return inst
     
     @override
     def update(self, config: dict[str, Any] | type[serialisation.T]):
@@ -464,6 +581,6 @@ class NewsegsMetaModel(NewsegsComponent):
 
     
 
-NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
-    '_model', '_finance', '_variables', '_table_config'
-)
+# NewsegsMetaModel._excluded_attributes = super(NewsegsMetaModel, NewsegsMetaModel)._excluded_attributes + (
+#     '_model', '_finance', '_variables', '_table_config', '_watcher'
+# )

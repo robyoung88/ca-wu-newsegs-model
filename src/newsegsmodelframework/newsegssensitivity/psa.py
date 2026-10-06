@@ -212,6 +212,8 @@ def run_psa(
         rng = np.random.default_rng(seed)
     elif seed is not None:
         warnings.warn('Both a seed and a random generator are provided - existing generator will be used without reseeding')
+
+    variables = [v for v in variables if v.psa_selected]
     
     for v in variables:
         v.psa_active = True

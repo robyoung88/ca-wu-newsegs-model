@@ -1,4 +1,5 @@
 """A worker process for performing background computations."""
+import copy
 import pickle
 from typing import cast
 
@@ -16,9 +17,9 @@ BACKENDPORT = str(settings['BACKENDPORT'])
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_tables import runs
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_status, update_calculation_progress, get_cancel_status, set_status_completed, set_status_failed
-from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
+from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
 import newsegsmodelapp.registers as registers
@@ -41,8 +42,8 @@ def worker_process(
 
     engine = db.get_engine(db_path)
 
-    proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
-    result_provider = FromDatabaseResultProvider(db.get_engine, RESULTS_STORE)
+    proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+    result_provider = CachedFromDatabaseResultProvider(db.get_engine, RESULTS_STORE)
 
     try: # Alive try - ensure that 'finally' runs even if we don't go into the while
         while stop_event is None or not stop_event.is_set():
@@ -101,9 +102,12 @@ def worker_process(
                             return True
                         else:
                             return get_cancel_status(engine, job_id)
-                        
+
+                    rq = copy.copy(request)
+                    rq.run_id = job_id
+                    
                     is_ok = runner(
-                        request,
+                        rq,
                         proj_provider,
                         result_provider,
                         job_id,

@@ -19,6 +19,9 @@ with open(_CONST_FILE, 'r') as f:
 
 MODEL_TYPE = 'sprake'
 
+def _reset_revision(comp):
+    comp.reset_revision(chain = True)
+
 def _create_default_model() -> newsegsmodel.NewsegsModel:
     # Load model
     with open(
@@ -29,6 +32,9 @@ def _create_default_model() -> newsegsmodel.NewsegsModel:
     'rb') as f:
         mdl_conf = cast(newsegsmodel.NewsegsModel, pickle.load(f))
         mdl_conf.anonymise_ids()
+        _reset_revision(mdl_conf)
+        mdl_conf.generation.generator.chain_syncronise()
+        
     return mdl_conf
     #return sprakemodel.SprakeModel.from_dict(mdl_conf)
 
@@ -42,6 +48,7 @@ def _create_default_finance() -> newsegsfinance.NewsegsFinance:
     'rb') as f:
         fnc_conf = cast(newsegsfinance.NewsegsFinance, pickle.load(f))
         fnc_conf.anonymise_ids()
+        _reset_revision(fnc_conf)
     return fnc_conf
     #return sprakefinance.SprakeFinance.from_dict(fnc_conf)
 
@@ -51,6 +58,7 @@ def _create_default_variables() -> list[variable.Variable]:
     def _make_var_from_dict(d):
         v = variable.variable_from_dict(d)
         v.id = v.generate_new_id()
+        _reset_revision(v)
         return v
     return [_make_var_from_dict(x) for x in var_conf_list]
 
@@ -76,7 +84,10 @@ def sprake_project_factory():
         fnc,
         variables = [proj.get_default_variable(x) for x in varids]
     )
+    _reset_revision(mm)
 
     proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]
+
+    _reset_revision(proj)
 
     return proj

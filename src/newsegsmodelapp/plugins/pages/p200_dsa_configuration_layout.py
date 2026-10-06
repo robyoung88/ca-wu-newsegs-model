@@ -170,7 +170,8 @@ def create_optim_configuration_editor(**kwargs):
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
                 ), 
-            ] + optim_process_components(**kwargs)
+            ] + optim_process_components(**kwargs),
+            delay_show = 300, 
         )
         
     ]) 

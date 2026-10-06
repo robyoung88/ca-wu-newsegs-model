@@ -348,9 +348,10 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         )
         new_mm.name = new_mm.name + ' - Copy'
         new_mm.reattach_variables(proj)
-        new_mm.revision += 1
         proj.metamodels.append(new_mm) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         proj.set_focussed_metamodel(new_mm.id)
+        
+        proj.revision += 1
         
         app.project_provider.upsert_component(proj)
 
@@ -419,8 +420,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         mm.sync_model_with_changed_variables_deterministic()
 
         proj.set_focussed_metamodel_index(mm_index)
-        proj.revision += 1
-        app.project_provider.upsert_component(proj)
+        app.project_provider.upsert_component(proj, force = True)
 
         # Trigger interface update
         # Could be a bit more elegant, but may have to rebuild inputs for some configurations anyway so brute force for now.

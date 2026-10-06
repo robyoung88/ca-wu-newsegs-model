@@ -16,8 +16,8 @@ import pandas as pd
 from pandas.core.tools.datetimes import DatetimeScalar
 import pytz
 
+from newsegsmodelframework.core.serialisation import StateSerialiseToDictMixin
 from newsegsmodelframework.util import classfuncs
-from newsegsmodelframework.core import SerialiseToDictMixin
 
 SECONDS_IN_DAY = (24 * 3600)
 """int - number of seconds in 24 hours"""
@@ -64,7 +64,7 @@ TimeZoneScalar: TypeAlias = str|tzinfo
 TIndex = TypeVar("TIndex", bound=npt.NDArray[np.integer])
 TTimeSpan = TypeVar("TTimeSpan", bound="TimeSpan")
 
-class TimeSpan(SerialiseToDictMixin):
+class TimeSpan(StateSerialiseToDictMixin):
     """Represents a range of time between a start and an end datetime.
 
     This class wraps datetime handling and timezone rationalization for a

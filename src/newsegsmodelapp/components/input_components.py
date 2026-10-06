@@ -104,13 +104,14 @@ def create_numeric_card_variable_parameter_input(
 def update_single_parameter(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
+    return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
-):
+) -> dict[str, Any]:
 
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
@@ -119,10 +120,6 @@ def update_single_parameter(
     proj = project_provider.get_project(active_project_id)
     mm = proj.get_focussed_metamodel()
     variable_keys = {k: triggered_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
-
-    input_returns: list[Any] = [no_update] * len(input_ids)
-    header_returns: list[Any] = [no_update] * len(header_ids)
-    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
 
     now = time.time_ns()
     
@@ -136,11 +133,11 @@ def update_single_parameter(
             pi = id['parameter_index']
             new_param = raw_params[pi] # pyright: ignore[reportCallIssue, reportArgumentType]
             if not isinstance(new_param, np.ndarray):
-                input_returns[idx] = new_param
+                return_dict['input_values'][idx] = new_param
             else:
                 vi = id['vector_location']
                 new_val = new_param.flat[vi] # pyright: ignore[reportArgumentType, reportCallIssue]
-                input_returns[idx] = new_val
+                return_dict['input_values'][idx] = new_val
 
     # Update headers
     for idx, id in enumerate(header_ids):
@@ -152,27 +149,27 @@ def update_single_parameter(
             content_creator = None
         if content_creator:
             varid =  make_varid(**triggered_id)
-            header_returns[idx] = content_creator(varid, mm)
+            return_dict['header_children'][idx] = content_creator(varid, mm)
 
     # Update triggers
     for idx, id in enumerate(trigger_ids):
         match id['supersection']:
             case 'deterministic':
                 if deterministic_changed:
-                    trigger_returns[idx] = now
+                    return_dict['trigger_data'][idx] = now
             case 'dsa':
                 if dsa_changed:
-                    trigger_returns[idx] = now
+                    return_dict['trigger_data'][idx] = now
             case 'psa':
                 if psa_changed:
-                    trigger_returns[idx] = now
+                    return_dict['trigger_data'][idx] = now
 
     # Sync project to store
     project_provider.upsert_component(proj)
 
     # TODO: Feed back to inputs if the update is not ok (set invalid)
 
-    return input_returns, header_returns, trigger_returns
+    return return_dict
 
 def create_value_reset_button(
     param_id: VariableInstanceParameterComponentID
@@ -198,11 +195,12 @@ def create_value_reset_button(
 def _reset_value(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
+    return_dict: dict[str, Any],
 ):
     val = callback_utils.get_triggered_value()
     if val is None:
@@ -216,8 +214,6 @@ def _reset_value(
     if var is None:
         raise PreventUpdate
 
-    input_returns: list[Any] = [no_update] * len(input_ids)
-
     parameter_index = triggered_id.get('parameter_index', 0)
     reset_value = var._default_parameters[parameter_index]
 
@@ -225,12 +221,13 @@ def _reset_value(
     return update_single_parameter(
         triggered_id,
         input_ids,
-        input_values,
         header_ids,
         trigger_ids,
+        calling_dict,
         active_project_id,
         project_provider,
-        reset_value
+        return_dict,
+        new_val = reset_value
     )
 
 def create_value_set_default_button(
@@ -258,11 +255,12 @@ def create_value_set_default_button(
 def _set_default_value(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
+    return_dict: dict[str, Any]
 ):
     val = callback_utils.get_triggered_value()
     if val is None:
@@ -281,13 +279,8 @@ def _set_default_value(
     project_provider.upsert_component(proj)
 
     # No need for anything to happen
-    raise PreventUpdate
+    return return_dict
 
-    input_returns: list[Any] = [no_update] * len(input_ids)
-    header_returns: list[Any] = [no_update] * len(header_ids)
-    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
-
-    return input_returns, header_returns, trigger_returns
 
 def create_blank_single_input_header_element(
     param_id: VariableInstanceParameterComponentID
@@ -370,15 +363,16 @@ def create_variable_status_badge(
 def _toggle_variable_sharing(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
-):
+    return_dict: dict[str, Any],
+) -> dict:
     val = callback_utils.get_triggered_value()
     if val is None:
-        raise PreventUpdate
+        return return_dict
 
     proj = project_provider.get_project(active_project_id)
     mm = proj.get_focussed_metamodel()
@@ -387,7 +381,7 @@ def _toggle_variable_sharing(
     groups = get_metamodel_groups_for_var(proj, varid)
     print(varid, ' ' , groups)
     if not groups or len(groups) < 1 or (len(groups) == 1 and len(groups[0]) <= 1):
-        raise PreventUpdate
+        return return_dict
     
     current_mm_idx = proj.metamodels.index(mm) + 1
     
@@ -429,9 +423,6 @@ def _toggle_variable_sharing(
         project_provider.delete_orphan_variables()
 
     # Return update signals to refresh input card headers and values
-    input_returns: list[Any] = [no_update] * len(input_ids)
-    header_returns: list[Any] = [no_update] * len(header_ids)
-    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
 
     # Feed back current parameters
     raw_params = mm.variables[varid].raw_parameters
@@ -440,11 +431,11 @@ def _toggle_variable_sharing(
             pi = id['parameter_index']
             new_param = raw_params[pi] # pyright: ignore[reportCallIssue, reportArgumentType]
             if not isinstance(new_param, np.ndarray):
-                input_returns[idx] = new_param
+                return_dict['input_values'][idx] = new_param
             else:
                 vi = id['vector_location']
                 new_val = new_param.flat[vi] # pyright: ignore[reportArgumentType, reportCallIssue]
-                input_returns[idx] = new_val
+                return_dict['input_values'][idx] = new_val
 
     # Update headers
     for idx, id in enumerate(header_ids):
@@ -456,26 +447,27 @@ def _toggle_variable_sharing(
             content_creator = None
         if content_creator:
             varid =  make_varid(**triggered_id)
-            header_returns[idx] = content_creator(varid, mm)
+            return_dict['header_children'][idx] = content_creator(varid, mm)
 
     now = time.time_ns()
 
     # Update triggers
     for idx, id in enumerate(trigger_ids):
-        trigger_returns[idx] = now
+        return_dict['trigger_data'][idx] = now
         
-    return input_returns, header_returns, trigger_returns
+    return return_dict
 
 @register_input_handler('toggle-optim-active', 'input-toggle')
 def _set_variable_optim_active(
     triggered_id: dict,
     input_ids: list[dict[str, str]],
-    input_values: list[Any],
     header_ids: list[dict[str, str]],
     trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
     active_project_id: str,
     project_provider: NewsegsProjectProviderInterface,
-):
+    return_dict: dict[str, Any],
+) -> dict[str, Any]:
     val = callback_utils.get_triggered_value()
     if val is None:
         raise PreventUpdate
@@ -496,13 +488,10 @@ def _set_variable_optim_active(
     project_provider.upsert_component(proj)
 
     # Return update signals to refresh input card headers and values
-    input_returns: list[Any] = [no_update] * len(input_ids)
-    header_returns: list[Any] = [no_update] * len(header_ids)
-    trigger_returns: list[Any] = [no_update] * len(trigger_ids)
-
+    
     now = time.time_ns()
     # Update triggers in case there is any formatting that needs to be done.
     for idx, id in enumerate(trigger_ids):
-        trigger_returns[idx] = now
+        return_dict['trigger_data'][idx] = now
 
-    return input_returns, header_returns, trigger_returns
+    return return_dict

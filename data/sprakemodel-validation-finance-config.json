@@ -5,24 +5,39 @@
         "class": "SprakeFinanceConfig",
         "constructor_class": "DataWithRevision",
         "_last_syncronised": 0,
-        "_revision": 5,
-        "benefit_discount_rate": 0.035,
-        "cost_discount_rate": 0.035,
-        "wind_capex_per_kw": 1500.0,
-        "wind_om_per_kw_year": 46.0,
-        "pv_capex_per_kw": 1000.0,
-        "pv_om_per_kw_year": 10.5,
-        "bess_capex_per_kwh": 191.772,
-        "bess_om_per_kwh_year": 16.719,
-        "resident_sc_per_unit_day": 0.0,
+        "_revision": 1,
         "resident_var_per_unit": 0.2975,
-        "grid_export_var_per_unit": 0.1,
-        "grid_import_sc_per_day": 0.0,
-        "grid_import_var_per_unit": 0.35
+        "benefit_discount_rate": 0.035,
+        "cost_discount_rate": 0.035
     },
-    "uuid": "f134aae4-c3fa-4ff1-ba34-03093b3ce352",
-    "_component_ids": {},
-    "_finance_data_id": "cmp-c08161ca-102f-4cfd-bb4a-e49e5c4912f7",
-    "_table_config_id": "cmp-0912487d-c9f3-4e6d-b6d4-7a20b86330d1",
+    "uuid": "6e134491-e799-4f5a-9c90-0c0212788e60",
+    "_component_ids": {
+        "finance_data": "cmp-800020c3-924e-4116-9907-94ae10d02ea6",
+        "table_config": "cmp-967f79d6-759a-4441-ab25-709cd36e859f"
+    },
+    "_finance_data": {
+        "class": "NewsegsFinanceData",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "800020c3-924e-4116-9907-94ae10d02ea6",
+        "_component_ids": {}
+    },
+    "_table_config": {
+        "class": "TableConfigNewsegsComponent",
+        "constructor_class": "NewsegsComponent",
+        "_config": {
+            "class": "NoConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 0
+        },
+        "uuid": "967f79d6-759a-4441-ab25-709cd36e859f",
+        "_component_ids": {}
+    },
     "horizon": -1
 }

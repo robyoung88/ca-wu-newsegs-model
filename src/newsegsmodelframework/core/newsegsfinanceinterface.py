@@ -7,11 +7,11 @@ from typing import overload
 
 from useful_types import SequenceNotStr
 
-from newsegsmodelframework.core import RunnableNewsegsComponent
+from newsegsmodelframework.core.newsegscomponent import TableOwningRunnableNewsegsComponent, NewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
 
 class NewsegsFinanceInterface(
-    RunnableNewsegsComponent,
+    TableOwningRunnableNewsegsComponent,
 ):
     ...
 
@@ -31,7 +31,7 @@ class NewsegsFinanceProviderInterface(NewsegsComponentProviderInterface):
         ...
 
     @abstractmethod
-    def duplicate_component(self, component_id: str) -> NewsegsFinanceInterface:
+    def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsFinanceInterface:
         ...
 
     @abstractmethod

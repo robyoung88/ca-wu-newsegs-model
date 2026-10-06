@@ -137,9 +137,7 @@ class TestSprakeGenerationConfigEqualities(unittest.TestCase):
         d2 = json.loads(sd1)
 
         # No 'from none' for SprakeGeneration as always need a turbine
-        mod_gen2 = sprakegeneration.SprakeGeneration(turbine)
-
-        mod_gen2.update(d2)
+        mod_gen2 = sprakegeneration.SprakeGeneration.from_dict(d2)
         
         self.assertEqual(mod_gen1.generator.location, mod_gen2.generator.location)
         self.assertEqual(

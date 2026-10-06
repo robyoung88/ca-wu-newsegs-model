@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import datetime
+import time
 import json
 from typing import Callable
 
@@ -49,14 +50,24 @@ def execute_psa_single_mm_run(
         raise KeyError(f'Metamodel {mm_id} not found for project {proj.id} - available values are {[x.id for x in proj.metamodels]}.')
 
     # Ensure that the output tables get updated
-    proj.table_config.revision += 1
-    mm.table_config.revision += 1
+    #proj.table_config.revision += 1
+    #mm.table_config.revision += 1
+
+    t0 = time.time_ns()
 
     def internal_progress_callback(step, total):
         if check_cancel_status():
             raise InterruptedError(f'PSA process {run_id} has been cancelled.')
 
-        progress_callback(step, total, 'Running PSA')
+        t1 = time.time_ns()
+        tot_secs = (t1 - t0) * 1e-9
+        if step > 0:
+            per_iter = tot_secs / step
+            msg = f'PSA: Run {step} of {total}, {per_iter:.1f} sec/run. Elapsed time: {tot_secs:.0f} seconds.'
+        else:
+            msg = f'PSA: Run {step} of {total}. Elapsed time: {tot_secs:.0f} seconds.'
+
+        progress_callback(step, total, msg)
 
     seed = proj.psa_config.seed
     seed = int(seed) if seed is not None else seed
@@ -71,7 +82,7 @@ def execute_psa_single_mm_run(
     )
 
     # Connect this result to the metamodel table config, rather than the project dsa config
-    project_provider.upsert_component(proj)
-    result_provider.upsert_result('psa_single_metamodel', mm.table_config, psa_results)
+    #project_provider.upsert_component(proj)
+    result_provider.upsert_result('psa_single_metamodel', mm.table_config, psa_results, request = request)
 
     return 'ok'

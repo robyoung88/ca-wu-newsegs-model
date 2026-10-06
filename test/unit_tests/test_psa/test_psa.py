@@ -83,7 +83,7 @@ class TestPSA(unittest.TestCase):
         )
 
         self.assertEqual(
-            len(set(psa_results.loc[:, 'net_present_value_undiscounted'].to_numpy())),
+            len(set(psa_results.loc[:, 'total_present_costs_undiscounted'].to_numpy())),
             11
         )
 

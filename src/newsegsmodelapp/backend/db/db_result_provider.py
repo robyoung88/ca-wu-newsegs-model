@@ -14,6 +14,7 @@ from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 
+from cachetools import LRUCache
 
 class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     def __init__(
@@ -24,7 +25,6 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         self._get_engine = get_engine
         self._result_store = result_store
         self._table = tbls.results
-
     
     def _result_to_table_data(
             self, 
@@ -41,7 +41,11 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             result_type = result_type
         )
         if request:
-            odict['run_id'] = request.run_id
+            if request.trigger_run_id != -1:
+                # By default, store results with the inciting run id of the chain
+                odict['run_id'] = request.trigger_run_id
+            else:
+                odict['run_id'] = request.run_id
         return odict
 
     @override
@@ -68,12 +72,15 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         with self._get_engine().begin() as conn:
             conn.execute(stmt)
 
+        print (f'SAVED RESULT of type {result_details['result_type']} attached to {result_details['component_type']} with id {result_details['component_config_id']}, revision {result_details['component_config_revision']}')
+
     def get_result(
         self,
         result_type: str,
         parent_component: NewsegsComponent,
         allow_stale: bool = True
     ) -> tuple[Any, int] | tuple[None, None]:
+        
         stmt = (
             sa.select(
                 self._table.c.result_id,
@@ -108,9 +115,52 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 with self._get_engine().begin() as conn:
                     conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
                 return None, None
+            
             return (obj, rrs)
 
         return None, None
+
+    @override
+    def get_run_result(
+        self, 
+        result_type: str, 
+        run_id: int, 
+        parent_component: NewsegsComponent | None = None
+    ) -> tuple[Any, int] | tuple[None, None]:
+        stmt = (
+            sa.select(
+                self._table.c.result_id,
+                self._table.c.result_file,
+                self._table.c.component_config_revision,
+            )
+            .where(self._table.c.result_type == result_type)
+            .where(self._table.c.run_id == run_id)
+        )
+        if parent_component:
+            stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
+
+        with self._get_engine().connect() as conn:
+            res = conn.execute(stmt)
+        if not res:
+            return None, None
+        result_rows = {row["result_id"]: dict(row) for row in res.mappings()}
+        if len(result_rows) == 0:
+            return None, None
+        if len(result_rows) > 1:
+            raise ValueError(f'Multiple results found for {result_type} for run {run_id} and parent {parent_component.id if parent_component else 'NONE'}')
+
+        res_id = next(iter(result_rows))
+        file_name = result_rows[res_id]['result_file']
+        rrs = result_rows[res_id]['component_config_revision']
+
+        try:
+            obj = load_result(Path(file_name))
+        except FileNotFoundError:
+            with self._get_engine().begin() as conn:
+                conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
+            return None, None
+
+        return (obj, rrs)
 
 class CachedFromDatabaseResultProvider(
     FromDatabaseResultProvider
@@ -133,7 +183,7 @@ class CachedFromDatabaseResultProvider(
         if obj is None:
             print(f'NOT ADDING TO CACHE AS NO RESULT - {result_key}')
         if rrs is None or rrs != result_key[2]:
-            print(f'NOT ADDING TO CACHE AS STALE - {result_key} - current value {rrs}')
+            print(f'NOT ADDING TO CACHE AS STALE - {result_key} - available revision is {rrs}')
         if obj is not None and rrs == result_key[2]:
             print(f'ADDING TO CACHE - {result_key}')
             self._result_cache[result_key] = obj

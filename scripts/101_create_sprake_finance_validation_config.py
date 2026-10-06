@@ -25,4 +25,6 @@ if __name__ == '__main__':
         json.dump(d1, f, sort_keys=False, indent=4)
 
     with open('data/sprakemodel-validation-finance-config.pickle', 'wb') as f:
+        fnc.set_state_exclusion_policy('excluded')
         pickle.dump(fnc, f)
+        fnc.set_state_exclusion_policy('excluded_and_components')
