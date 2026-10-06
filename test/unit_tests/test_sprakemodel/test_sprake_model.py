@@ -94,8 +94,7 @@ class TestSprakeModelConfigEqualities(unittest.TestCase):
         sd1 = mdl.json_dumps_repr()
         d2 = json.loads(sd1)
 
-        mdl2 = sprakemodel.SprakeModel.from_none()
-        mdl2.update(d2)
+        mdl2 = sprakemodel.SprakeModel.from_dict(d2)
 
         self.assertEqual(
             mdl.generation.generator.nameplate_capacity,

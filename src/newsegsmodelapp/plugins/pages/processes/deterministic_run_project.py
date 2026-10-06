@@ -50,6 +50,13 @@ def execute_deterministic_run_project(
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
 
+        revisions = {
+            'grid': mm.model.grid.revision,
+            'generation': mm.model.generation.revision,
+            'consumption_storage': mm.model.consumption_storage.revision
+        }
+    
+
         mm.sync_model_with_changed_variables_deterministic()
 
         progress_callback(step, n_steps, f'Running model - metamodel {i+1} of {n_mm}')
@@ -73,6 +80,10 @@ def execute_deterministic_run_project(
             raise InterruptedError(f'Process {run_id} has been cancelled.')
 
         progress_callback(step, n_steps, f'Saving results - metamodel {i+1} of {n_mm}')
+
+        mm.model.grid.revision = revisions['grid']
+        mm.model.generation.revision = revisions['generation']
+        mm.model.consumption_storage.revision = revisions['consumption_storage']
 
         result_provider.upsert_result('deterministic_grid', mm.model.grid, mm.model.get_grid_result(), request = request)
         result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result(), request = request)

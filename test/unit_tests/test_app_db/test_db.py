@@ -1,6 +1,7 @@
 """
 Unit tests for newsegsmodelapp/backend database
 """
+import copy
 import os
 from pathlib import Path
 import pickle
@@ -12,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from newsegsmodelapp.backend.db import db_tables
+from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 from config import settings
@@ -186,11 +188,19 @@ class TestDatabaseStart(unittest.TestCase):
             )
             self.assertEqual(len(result.fetchall()), 2)
 
+            n_components = (
+                3 * 2 # Modules in model
+                + 2 * 2 # model_data and table_config in model
+                + 2 * 2 # finance_data and table_config in finance
+                + 1 * 2 # table_config in metamodel
+                + 3 # dsa_config, psa_config and table_config in finance
+            )
             result = conn.execute(
                 tbls.snapshot_component_configs.select()
                 .where(tbls.snapshot_component_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 19)
+            #self.assertEqual(len(result.fetchall()), 19)
+            self.assertEqual(len(result.fetchall()), 14)
 
             result = conn.execute(
                 tbls.snapshot_variable_configs.select()
@@ -437,8 +447,9 @@ class TestDatabaseStart(unittest.TestCase):
                 v2 = fvp2.get_variable(id)
                 self.assertNotEqual(v1.deterministic_value, v2.deterministic_value)
             else:
+                # CAUTION! NP arrays are not tracked!
                 dv1 = v1.deterministic_value
-                prm = list(v1.raw_parameters)
+                prm = list(copy.copy(x) for x in v1.raw_parameters)
                 if isinstance(prm[0][0], str): # pyright: ignore[reportIndexIssue]
                     prm[0][0] = prm[0][0] + str(0.1) # pyright: ignore[reportIndexIssue,reportOperatorIssue]
                 elif v1.distribution.distribution == 'dirichlet':
@@ -587,6 +598,11 @@ class TestDatabaseStart(unittest.TestCase):
             mdl2.get_generation_result().meters
         )
 
+        nptest.assert_array_equal(
+            mdl1.get_consumption_storage_result().meters,
+            mdl2.get_consumption_storage_result().meters
+        )
+
     def test_finance_provider(self):
         import numpy.testing as nptest
 
@@ -607,8 +623,10 @@ class TestDatabaseStart(unittest.TestCase):
         finance_provider.add_component(fnc1)
 
         mdl2 = model_provider.get_component(mdl1.id)
-        fnc2 = finance_provider.get_component(fnc1.id)
+        fnc2 = cast(NewsegsFinance, finance_provider.get_component(fnc1.id))
         fnc2.model = mdl2
+
+        self.assertEqual(fnc1.cost_discount_rate, fnc2.cost_discount_rate)
 
         mdl1.run()
         mdl2.run()

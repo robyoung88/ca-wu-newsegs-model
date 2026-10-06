@@ -13,6 +13,7 @@ import uuid as mod_uuid
 
 import numpy as np
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
 
 IMMUTABLE_TYPES = (
@@ -220,10 +221,10 @@ def wrap_value(val: Any, parent: RevisionNotifierProtocol) -> Any:
             return ObservableDict(val, subscribers = parent)
     elif isinstance(val, str):
         return val        
-    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierProtocol):
-        for x in val:
-            if isinstance(x, RevisionNotifierProtocol):
-                parent._add_child(x)
+    elif isinstance(val, Iterable) and not isinstance(val, RevisionNotifierProtocol) and not isinstance(val, np.ndarray):
+       for x in val:
+           if isinstance(x, RevisionNotifierProtocol):
+               parent._add_child(x)
     return val
 
 
@@ -351,7 +352,7 @@ class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.Serialis
 class ConfigurationMixin:
     _config: DataWithRevision
 
-    _id_prefix: str = 'cmp'
+    _id_prefix: str = COMPONENT_PREFIXES['component']
     
     uuid: str = '1'
     component_type = 'abstract'
@@ -560,9 +561,9 @@ def recursive_remove_children(obj, child_item):
         obj._remove_child(child_item._config)
     elif isinstance(child_item, str):
         return
-    elif isinstance(child_item, Iterable):
-        for x in child_item:
-            recursive_remove_children(obj, x)
+    elif isinstance(child_item, Iterable) and not isinstance(child_item, np.ndarray):
+       for x in child_item:
+           recursive_remove_children(obj, x)
 
 
 class ObservableDict(dict, SubscriptionRevisionNotifierMixin):

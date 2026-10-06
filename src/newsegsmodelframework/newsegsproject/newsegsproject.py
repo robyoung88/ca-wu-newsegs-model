@@ -4,11 +4,13 @@ A container and controller for metamodels and variables.
 Provides a class which encapsulates multiple NewSEGS metamodels, for multi-way
 sensitivity analysis.
 """
+from collections import OrderedDict
 import copy
 from typing import Any, Iterable, Optional, Sequence, override
 import warnings
 from useful_types import SequenceNotStr
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
@@ -67,15 +69,15 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
     
     _name = 'NewSEGS Project'
     _version = 'v0.0.1'
-    _id_prefix = 'proj'
+    _id_prefix = COMPONENT_PREFIXES['project']
 
     _excluded_attributes = NewsegsComponent._excluded_attributes.union(
         {'_watcher', '_variables_by_uid', '_variables_by_varid'}
     )
 
     metamodels = TableModifyingComponentListProperty(oftype = newsegsmetamodel.NewsegsMetaModel)
-    dsa_config = ComponentProperty(oftype = DSAComponent)
-    psa_config = ComponentProperty(oftype = PSAComponent)
+    dsa_config = ComponentProperty(default = DSAComponent, oftype = DSAComponent)
+    psa_config = ComponentProperty(default = DSAComponent, oftype = PSAComponent)
 
     _focussed_metamodel: int = 0
     _watcher: RevisionNotifierProtocol | None = None
@@ -208,8 +210,12 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
 
         vars = [self.get_variable(x) for x in variable_id]
         store_interface.upsert_variable(vars, force)
+
+    @override
+    def _preupdate_from_dict(self, config):
+        super()._preupdate_from_dict(config)
+        if not hasattr(self, '_variables_by_varid'):
+            self._variables_by_varid = OrderedDict()
+        if not hasattr(self, '_variables_by_uid'):
+            self._variables_by_uid = dict()
             
-# NewsegsProject._excluded_attributes = (
-#     super(NewsegsProject, NewsegsProject)._excluded_attributes 
-#     + ('_metamodels', '_variables_by_uid', '_variables_by_varid', '_table_config', '_watcher')
-# )

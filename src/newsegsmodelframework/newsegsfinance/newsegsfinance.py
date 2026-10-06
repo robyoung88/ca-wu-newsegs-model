@@ -6,6 +6,7 @@ from typing import Optional
 
 import pandas as pd
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import NewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
@@ -34,7 +35,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
 
     _name = 'NewSEGS Finance Model'
     _finance_version = '0.0.1'
-    _id_prefix = 'f'
+    _id_prefix = COMPONENT_PREFIXES['fm']
 
     _excluded_attributes = NewsegsFinanceInterface._excluded_attributes.union({'_model'})
 
@@ -112,10 +113,6 @@ class NewsegsFinance(NewsegsFinanceInterface):
             argdict.update(kwdrs)
             self.benefit_discount_rate = argdict.get('benefit_discount_rate', self._benefit_discount_rate) or 0.0
             self.cost_discount_rate = argdict.get('cost_discount_rate', self._cost_discount_rate) or 0.0
-
-    def get_component_attributes(self) -> tuple[str, ...]:
-        atts = super().get_component_attributes()
-        return ('finance_data', 'table_config', *atts)
     
     # Benefits
     @property

@@ -185,7 +185,14 @@ class FromDatabaseNewsegsComponentProvider(
                     components.append(v)
                 elif isinstance(v, Mapping) or (not isinstance(v, str) and isinstance(v, Sequence)):
                     components.extend(self._expand_component_sequence(v))
-        return components               
+        return components
+
+    def upsert_children(self, component: NewsegsComponent, force: bool = False):
+        # Expect to override this for different types of component
+        # to deal with different tables
+        component_children = component.get_components(component_group= 'component_configs')
+        if component_children:
+            self.upsert_component(component_children, force = force)
         
     @override
     def upsert_component(
@@ -197,6 +204,9 @@ class FromDatabaseNewsegsComponentProvider(
         if tbl is None:
             tbl = self._table
         component = self._expand_component_sequence(component)
+
+        if len(component) == 0:
+            return
 
         current_revisions = {x.id: x.revision for x in component}
         uids = list(current_revisions.keys())
@@ -246,9 +256,7 @@ class FromDatabaseNewsegsComponentProvider(
                 # TODO: Consider whether to set a rollback here in case we can't access DB
                 
                 #### Save out all child components ####
-                children = cmp.get_components()
-                if children:
-                    self.upsert_component(children, force = force)
+                self.upsert_children(cmp, force = force)
 
                 cmp.syncronise()
 
@@ -280,9 +288,9 @@ class FromDatabaseNewsegsComponentProvider(
                 insert_stmt = tbl.insert()
                 conn.execute(insert_stmt, insert_payload)
 
-        print(f'Inserted {len(insert_payload)} components: {[x['id'] for x in insert_payload]}')
-        print(f'Updated {len(update_payload)} components: {[x['id'] for x in update_payload]}')
-        print(f'Revised {len(rev_payload)} components: {[x['id'] for x in rev_payload]}')
+        print(f'Inserted {len(insert_payload)} components: {[x.get('id', str(x)) for x in insert_payload]}')
+        print(f'Updated {len(update_payload)} components: {[x.get('b_id', str(x)) for x in update_payload]}')
+        print(f'Revised {len(rev_payload)} components: {[x.get('b_id', str(x)) for x in rev_payload]}')
 
     def _delete_one_component(
             self, 
@@ -783,6 +791,20 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                     self._metamodel_variable_jct.insert(),
                     new_variable_entries
                 )
+
+    @override
+    def upsert_children(self, component, force = False):
+        component_children = component.get_components(component_group= 'component_configs')
+        if component_children:
+            self._component_provider.upsert_component(component_children, force = force)
+        
+        em_children = component.get_components(component_group = 'em_configs')
+        if em_children:
+            self._em_provider.upsert_component(em_children, force = force)
+
+        fm_children = component.get_components(component_group = 'fm_configs')
+        if fm_children:
+            self._fm_provider.upsert_component(fm_children, force = force)
         
     @override
     def upsert_component(
@@ -799,10 +821,10 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 component.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
                 
                 rval = super().upsert_component(component, force, tbl)
-                if component.model:
-                    self._em_provider.upsert_component(component.model, force)
-                if component.finance:
-                    self._fm_provider.upsert_component(component.finance, force)
+                # if component.model:
+                #     self._em_provider.upsert_component(component.model, force)
+                # if component.finance:
+                #     self._fm_provider.upsert_component(component.finance, force)
                 self._set_metamodel_variable_junction(component)
                 return rval
             elif isinstance(component, NewsegsModelInterface):
@@ -995,7 +1017,7 @@ class FromDatabaseNewsegsProjectProvider(
         new = super()._create_duplicate_component(original)
         if isinstance(new, NewsegsProject):
             new._variables_by_uid.clear()
-            var_mapping = {}
+            var_mapping = {} 
             for var_uid in original._variables_by_uid.keys():
                 new_var = self.variable_provider.duplicate_variable(var_uid)
                 var_mapping[var_uid] = new_var.id
@@ -1042,6 +1064,16 @@ class FromDatabaseNewsegsProjectProvider(
             raise ValueError(f'{component.id} is being upserted in a modified state')
         return project_to_raw_table_data(component)
 
+    @override
+    def upsert_children(self, component, force = False):
+        component_children = component.get_components(component_group= 'component_configs')
+        if component_children:
+            self._component_provider.upsert_component(component_children, force = force)
+
+        metamodel_children = component.get_components(component_group = 'metamodels')
+        if metamodel_children:
+            self.metamodel_provider.upsert_component(metamodel_children, force = force)
+
     def _upsert_project(
         self,
         project: NewsegsProject,
@@ -1061,7 +1093,8 @@ class FromDatabaseNewsegsProjectProvider(
         #    project.revision += 1
         #    project.table_config.revision += 1
         
-        self.metamodel_provider.upsert_component(project.metamodels) # pyright: ignore[reportArgumentType]
+        # Metamodel upsert happens as part of upsert_children
+        #self.metamodel_provider.upsert_component(project.metamodels) # pyright: ignore[reportArgumentType]
         # At this point, the metamodel list can be syncronised
         project.metamodels._syncronise() # pyright: ignore[reportAttributeAccessIssue]
         

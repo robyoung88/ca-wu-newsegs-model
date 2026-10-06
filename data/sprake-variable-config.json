@@ -6,15 +6,15 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "relative",
             "optim_selected": true,
             "raw_parameters": [
-                200.0
+                1.0
             ]
         },
-        "uuid": "6ecf05db-998c-4f65-afe2-fe8bdf112127",
+        "uuid": "69ba58ee-2008-4a18-953c-2ab6acabcdfe",
         "_component_ids": {},
         "_name": "Wind capacity",
         "unit": "kW",
@@ -30,10 +30,10 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            200.0
+            1.0
         ],
         "_default_parameters": [
-            200.0
+            1.0
         ],
         "_dsa_lower": 0.9,
         "_dsa_upper": 1.1,
@@ -59,15 +59,15 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "relative",
             "optim_selected": true,
             "raw_parameters": [
-                200.0
+                1.0
             ]
         },
-        "uuid": "d5049a94-fe39-4542-ab30-08174a444126",
+        "uuid": "2b1ae9f4-9f49-4ba1-8d48-00c916f58475",
         "_component_ids": {},
         "_name": "Solar PV capacity",
         "unit": "kWp",
@@ -83,10 +83,10 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            200.0
+            1.0
         ],
         "_default_parameters": [
-            200.0
+            1.0
         ],
         "_dsa_lower": 0.9,
         "_dsa_upper": 1.1,
@@ -112,15 +112,15 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "relative",
             "optim_selected": true,
             "raw_parameters": [
-                4000.0
+                1000.0
             ]
         },
-        "uuid": "34a9f7ef-0af4-4a9f-9168-5e1d5be6ad23",
+        "uuid": "0ce556c8-fe65-4ad5-b66f-576e0a05c27f",
         "_component_ids": {},
         "_name": "Storage capacity",
         "unit": "kWh",
@@ -136,10 +136,10 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            4000.0
+            1000.0
         ],
         "_default_parameters": [
-            4000.0
+            1000.0
         ],
         "_dsa_lower": 0.9,
         "_dsa_upper": 1.1,
@@ -165,14 +165,14 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
                 0.8799999999999999,
                 0.02
             ]
         },
-        "uuid": "033e8826-24c7-46e8-8af6-51cadcc4f5f9",
+        "uuid": "af7f3f91-6e4a-47f9-9600-0337de08401e",
         "_component_ids": {},
         "_name": "Storage round trip efficiency",
         "unit": "",
@@ -220,12 +220,12 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "raw_parameters": [
                 100.0
             ]
         },
-        "uuid": "1407b5f1-3436-457e-8d7d-a6bfd44d6158",
+        "uuid": "7e1926b1-7859-4de6-b4c4-9996c9da0067",
         "_component_ids": {},
         "_name": "No. of households",
         "unit": "N",
@@ -270,16 +270,16 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                0.3,
-                0.06
+                1.1,
+                0.22000000000000003
             ]
         },
-        "uuid": "80beb434-7538-4449-9e58-3d6fcb71f75c",
+        "uuid": "041e75e0-324a-4299-bcbe-89ddd08700a9",
         "_component_ids": {},
         "_name": "HLP",
         "unit": "W/m\u00b2/K",
@@ -295,11 +295,11 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            0.3,
-            0.06
+            1.1,
+            0.22000000000000003
         ],
         "_default_parameters": [
-            0.3,
+            1.1,
             1
         ],
         "_dsa_lower": 0.95,
@@ -327,7 +327,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
@@ -335,7 +335,7 @@
                 21.0
             ]
         },
-        "uuid": "86d59333-8fc3-4483-8ba2-4c672124cabd",
+        "uuid": "7495a9c0-12e8-49b9-ae7e-1d3ea9383616",
         "_component_ids": {},
         "_name": "Mean GFA",
         "unit": "m\u00b2/household",
@@ -382,7 +382,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -391,7 +391,7 @@
                 0.9
             ]
         },
-        "uuid": "1b30f1f0-ae5b-464f-964b-acc59efdee61",
+        "uuid": "d2cb5bca-5e9c-4e93-a283-7f9653e78114",
         "_component_ids": {},
         "_name": "Reference hot water demand",
         "unit": "kWh/day",
@@ -439,7 +439,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -448,7 +448,7 @@
                 0.04000000000000001
             ]
         },
-        "uuid": "f6c8e3c7-8946-426d-99d7-f168f7660835",
+        "uuid": "ffc6b38d-bb39-49ab-9169-66e04028e94b",
         "_component_ids": {},
         "_name": "Seasonal variation",
         "unit": "factor",
@@ -496,7 +496,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -505,7 +505,7 @@
                 0.02
             ]
         },
-        "uuid": "8a1bfde3-491f-4d71-a4a7-503e7567a7e8",
+        "uuid": "b83d3e8f-e097-45f9-a27e-c37cdf0aaac3",
         "_component_ids": {},
         "_name": "High-efficiency appliances consumption reduction",
         "unit": "factor",
@@ -553,7 +553,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -562,7 +562,7 @@
                 262.944
             ]
         },
-        "uuid": "a9de5009-5a49-4d10-a379-8aeb7b4de0dc",
+        "uuid": "3af0af3f-850e-4c43-bb3e-a8cb82ad715f",
         "_component_ids": {},
         "_name": "Residential charging per EV",
         "unit": "kWh/yr",
@@ -610,16 +610,16 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                0.2,
-                0.04000000000000001
+                1.2,
+                0.24
             ]
         },
-        "uuid": "72cb1a0a-f3d5-488e-97af-d9d58bf968fa",
+        "uuid": "75c99ea9-e272-45bf-9565-90cde6a30c1e",
         "_component_ids": {},
         "_name": "EVs per household",
         "unit": "N",
@@ -635,11 +635,11 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            24.999999999999993,
-            0.008000000000000002
+            25.0,
+            0.048
         ],
         "_default_parameters": [
-            0.2,
+            1.2,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -667,12 +667,12 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "raw_parameters": [
                 10
             ]
         },
-        "uuid": "7ccedc04-72fa-446e-836c-d72a46907841",
+        "uuid": "97837168-11ae-412b-a68b-36819ca3928a",
         "_component_ids": {},
         "_name": "Model time horizon",
         "unit": "years",
@@ -718,7 +718,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -727,7 +727,7 @@
                 300.0
             ]
         },
-        "uuid": "18b5678e-19f1-479c-ad02-0c8b4e2e409b",
+        "uuid": "cdff85fd-9f1e-4532-b65f-b4b8e0a88fff",
         "_component_ids": {},
         "_name": "Wind Capex",
         "unit": "\u00a3/kW",
@@ -778,7 +778,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -787,7 +787,7 @@
                 9.200000000000001
             ]
         },
-        "uuid": "055e90d5-eb05-46c6-bbd4-5f59d9536ead",
+        "uuid": "4de3b67e-a9eb-40be-b5e2-e370e8b4cafb",
         "_component_ids": {},
         "_name": "Wind Ongoing",
         "unit": "\u00a3/kW/yr",
@@ -837,7 +837,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -846,7 +846,7 @@
                 200.0
             ]
         },
-        "uuid": "946be4b5-f14c-4d51-8e86-03a07ddc6194",
+        "uuid": "b0458d1a-c583-4cc2-b082-ce3b4bc372a7",
         "_component_ids": {},
         "_name": "Solar PV Capex",
         "unit": "\u00a3/kWp",
@@ -897,7 +897,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -906,7 +906,7 @@
                 2.1
             ]
         },
-        "uuid": "1380ed92-b10b-4f68-abb9-d23c02007434",
+        "uuid": "3cc41fc1-9bbd-4a49-9ee3-9fc9d1d17932",
         "_component_ids": {},
         "_name": "Solar PV Ongoing",
         "unit": "\u00a3/kWp/yr",
@@ -956,7 +956,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -965,7 +965,7 @@
                 38.3544
             ]
         },
-        "uuid": "1c877e91-26cb-4afe-833b-c971c7d25d10",
+        "uuid": "9766e666-f096-40a7-882c-42fcb32f9518",
         "_component_ids": {},
         "_name": "BESS Capex",
         "unit": "\u00a3/kWh",
@@ -1015,7 +1015,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -1024,7 +1024,7 @@
                 3.3438000000000003
             ]
         },
-        "uuid": "f198ea2e-6d68-4664-8c37-d9dcd5e4c84b",
+        "uuid": "3c4d8fb4-8fdb-40e1-9a46-4280135906d9",
         "_component_ids": {},
         "_name": "BESS Ongoing",
         "unit": "\u00a3/kWh",
@@ -1074,7 +1074,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
@@ -1082,7 +1082,7 @@
                 0.0
             ]
         },
-        "uuid": "e28e6a24-2108-4452-a606-a9bdb9ff2d8b",
+        "uuid": "cc672181-c5bc-4f1f-92fa-8547193efe9b",
         "_component_ids": {},
         "_name": "Resident standing charge",
         "unit": "\u00a3/household/day",
@@ -1130,15 +1130,15 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
-                0.2975,
-                0.0595
+                0.35,
+                0.06999999999999999
             ]
         },
-        "uuid": "753fcaad-b9a7-48a0-8c01-db09afdd713c",
+        "uuid": "72b3be9e-f2dd-4c15-8aee-54c9a18896ac",
         "_component_ids": {},
         "_name": "Resident per unit charge",
         "unit": "\u00a3/kWh",
@@ -1155,10 +1155,10 @@
         "parameterisation_index": 1,
         "_parameters": [
             25.0,
-            0.011899999999999999
+            0.013999999999999999
         ],
         "_default_parameters": [
-            0.2975,
+            0.35,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -1186,7 +1186,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
@@ -1194,7 +1194,7 @@
                 0.020000000000000004
             ]
         },
-        "uuid": "b8ccd453-7638-4b5b-b392-875881c0434a",
+        "uuid": "5096a2bb-32b0-4615-a78d-7c180e6d8d73",
         "_component_ids": {},
         "_name": "Grid export - mean per unit",
         "unit": "\u00a3/kWh",
@@ -1242,7 +1242,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
@@ -1250,7 +1250,7 @@
                 0.0
             ]
         },
-        "uuid": "de95200c-45d0-4ad6-9ec9-291a743694ad",
+        "uuid": "76514fca-043e-4d24-85ca-d7b34672bc03",
         "_component_ids": {},
         "_name": "Fixed costs for backup",
         "unit": "\u00a3/site/day",
@@ -1298,7 +1298,7 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 3,
+            "_revision": 1,
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "psa_selected": true,
@@ -1307,7 +1307,7 @@
                 0.06999999999999999
             ]
         },
-        "uuid": "5401dfbf-75d7-491b-af01-d951cc42b372",
+        "uuid": "3a955909-8e0d-4800-ba0a-ec7b675c6e48",
         "_component_ids": {},
         "_name": "Per-unit costs for backup",
         "unit": "\u00a3/kWh",
@@ -1355,13 +1355,13 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "raw_parameters": [
-                0.035,
-                0.17434878835254347
+                0.0,
+                0.0
             ]
         },
-        "uuid": "faee6ae3-dd53-49bf-acb9-43db752d83f0",
+        "uuid": "ee893f10-66c5-46ce-8059-2fc044693111",
         "_component_ids": {},
         "_name": "Benefit discount rate",
         "unit": "factor",
@@ -1377,12 +1377,12 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            0.003888888888888891,
-            0.10722222222222226
+            0,
+            1
         ],
         "_default_parameters": [
-            0.035,
-            0.17434878835254347
+            0.0,
+            0.0
         ],
         "_dsa_lower": 0.0,
         "_dsa_upper": 0.06,
@@ -1409,13 +1409,13 @@
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
             "_last_syncronised": 0,
-            "_revision": 2,
+            "_revision": 1,
             "raw_parameters": [
-                0.035,
-                0.17434878835254347
+                0.0,
+                0.0
             ]
         },
-        "uuid": "ed355aba-3da7-4518-8171-7c18e873b9ba",
+        "uuid": "ad3c2e67-754d-471f-a4a3-67eefea931cc",
         "_component_ids": {},
         "_name": "Cost discount rate",
         "unit": "factor",
@@ -1431,12 +1431,12 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            0.003888888888888891,
-            0.10722222222222226
+            0,
+            1
         ],
         "_default_parameters": [
-            0.035,
-            0.17434878835254347
+            0.0,
+            0.0
         ],
         "_dsa_lower": 0.0,
         "_dsa_upper": 0.06,

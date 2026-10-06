@@ -6,6 +6,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Optional, Type, override
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import location as modlocation
 from newsegsmodelframework.core import TimeSpan
@@ -73,7 +74,7 @@ class NewsegsModel(
     
     _name = 'NewSEGS Energy Model'
     _version = '0.0.1'
-    _id_prefix = 'm'
+    _id_prefix = COMPONENT_PREFIXES['em']
 
     _excluded_attributes = newsegsmodelinterface.NewsegsModelInterface._excluded_attributes.union({
         '_grid_result', '_generation_result', '_cs_result',
@@ -298,6 +299,18 @@ class NewsegsModel(
             self.generation.model = self
         if attach_cs:
             self.consumption_storage.model = self
+
+    @override
+    def _post_update_from_dict(self):
+        for attname in ('_grid', '_generation', '_consumption_storage'):
+            try:
+                att = getattr(self, attname)
+            except AttributeError:
+                continue
+
+            if not hasattr(att, '_model') or att._model is not self:
+                att.model = self
+        super()._post_update_from_dict()
 
     # @override
     # def __setstate__(self, state: dict[str, Any]) -> None:

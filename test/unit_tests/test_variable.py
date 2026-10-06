@@ -1830,7 +1830,7 @@ class TestVariableSerialisation(unittest.TestCase):
         self.assertEqual(vbl.distribution.distribution, 'numeric_constant')
         self.assertEqual(vbl.name, 'Storage capacity')
         
-        self.assertTupleEqual(vbl.raw_parameters, (4000,))
+        self.assertTupleEqual(vbl.raw_parameters, (1000,))
     
 class TestVariableCopy(unittest.TestCase):
     """
@@ -2611,8 +2611,11 @@ class TestVariableListManagement(unittest.TestCase):
         self.assertEqual(consumer2.variables[varlist[0]].deterministic_value, new_val)
 
         consumer2.variables._chain_syncronise()
-        self.assertFalse(consumer1.variables.chain_modified)
+        # Because the variables container will have been modified, consumer1.variables.chain_modified will be true
+        self.assertTrue(consumer1.variables.chain_modified)
+        self.assertFalse(any(x.chain_modified for x in consumer1.variables.values()))
         self.assertFalse(consumer2.variables.chain_modified)
+        consumer1.variables._chain_syncronise()
 
         # Replace a variable in consumer 2
         vname = varlist[1]

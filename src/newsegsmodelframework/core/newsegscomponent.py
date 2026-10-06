@@ -18,11 +18,12 @@ from abc import ABCMeta, abstractmethod
 import copy
 import json
 import time
-from typing import TYPE_CHECKING, Any, Literal, Mapping, Optional, Protocol, Sequence, overload, override
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Optional, Protocol, Sequence, overload, override
 import uuid as mod_uuid
 
 from useful_types import SequenceNotStr
 
+from newsegsmodelframework.constants.framework_constants import PREFIX_GROUP_KEY, PREFIX_GROUPS
 from newsegsmodelframework.core import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ComponentProperty, ComponentPropertyInterface, DataWithRevision
 from newsegsmodelframework.util import jsonfuncs
@@ -108,12 +109,6 @@ class NewsegsComponent(
         type_ = type(self)
         type_.set_state_exclusion_policy('excluded')
         odict = self.to_dict()
-        # att_names = self.get_component_attributes()
-        # for att in att_names:
-        #     odict[att] = self._repr_represent(getattr(self, att))
-        #     attunder = '_' + att
-        #     if attunder in odict:
-        #         del odict[attunder]
         type_.set_state_exclusion_policy('excluded_and_components')
         return odict
 
@@ -131,11 +126,24 @@ class NewsegsComponent(
         compnames = self.get_component_attributes()
         for cn in compnames:
             if '_'+ cn in state and not cn in state:
-                print(f'Renaming from {'_'+cn} to {cn} in state')
+                #print(f'Renaming from {'_'+cn} to {cn} in state')
                 state[cn] = state['_' + cn]
                 del state['_' + cn]
 
         super().__setstate__(state)
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        cls.set_state_exclusion_policy('excluded')
+        state = copy.deepcopy(self.__getstate__())
+        cls.set_state_exclusion_policy('excluded_and_components')
+
+        result.__setstate__(state)
+
+        return result
 
     @staticmethod
     def _anonymise_id_sequence(seq: SequenceNotStr):
@@ -161,9 +169,48 @@ class NewsegsComponent(
         atts = tuple(k for k in atts if isinstance(getattr(type_, k), ComponentPropertyInterface))
         return atts
 
-    def get_components(self) -> tuple['NewsegsComponent', ...]:
+    @staticmethod
+    def _recursive_get_component(atts: NewsegsComponent | Iterable) -> list['NewsegsComponent']:
+        rlist = []
+            
+        if isinstance(atts, NewsegsComponent):
+            rlist.append(atts)
+        elif isinstance(atts, Mapping):
+            for x in atts.values():
+                rlist.extend(NewsegsComponent._recursive_get_component(x))
+            #(rlist.extend(NewsegsComponent._recursive_get_component(x)) for x in atts.values())
+        elif isinstance(atts, Iterable):
+            for x in atts:
+                rlist.extend(NewsegsComponent._recursive_get_component(x))
+            #(rlist.extend(NewsegsComponent._recursive_get_component(x)) for x in atts)
+        return rlist                
+
+    def get_components(self, component_group: Optional[PREFIX_GROUP_KEY] = None) -> tuple['NewsegsComponent', ...]:
         """A tuple of all subcomponents that would require saving to store and reattaching after deserialisation."""
-        return tuple(getattr(self, nm) for nm in self.get_component_attributes())
+        attnames = self.get_component_attributes()
+        excl = self._excluded_attributes
+        attnames = (x for x in attnames if '_'+x not in excl)
+
+        atts = []
+        for nm in attnames:
+            try:
+                atts.append(getattr(self, nm))
+            except AttributeError:
+                pass
+
+        components = self._recursive_get_component(atts)
+        
+        if component_group is not None:
+            prefixes = set(x+'-' for x in PREFIX_GROUPS[component_group])
+            # Creatig a generator function doesn't seem to work
+            sublist = []
+            for x in components:
+                if any(x.id.startswith(y) for y in prefixes):
+                    sublist.append(x)
+            components = sublist
+            #components = (x for x in components if not any(x.id.startswith(y) for y in prefixes))
+        
+        return tuple(components)
 
     def update_component_id_dict(self):
         """Update ._component_ids prior to serialisation."""
@@ -180,9 +227,11 @@ class NewsegsComponent(
     ):
         """Using the component_provider, find all components for reattachment."""
         r0 = self.revision
+        prefixes = tuple(x+'-' for x in PREFIX_GROUPS['component_configs'])
         for att_name, comp_id in self._component_ids.items():
-            comp = component_provider.get_component(comp_id)
-            setattr(self, att_name, comp)
+            if any(comp_id.startswith(y) for y in prefixes):
+                comp = component_provider.get_component(comp_id)
+                setattr(self, att_name, comp)
         # Ensure that revision is not incremented due to reattachment
         self.revision = r0
 
@@ -401,7 +450,7 @@ class TableOwningMixin(_Base):
         table_config_exists = hasattr(self, '_table_config')
         full_update = False
 
-        inst_table = config.pop('_table_config', None)
+        inst_table = config.pop('_table_config', config.pop('table_config', None))
         if inst_table:
             if isinstance(inst_table, NewsegsComponent):
                 self.table_config = inst_table

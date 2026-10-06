@@ -30,6 +30,7 @@ import datetime
 import logging
 from typing import Any, Mapping, MutableSequence, Optional, override
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
@@ -124,7 +125,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     _name = 'NewSEGS MetaModel'
     _version = '0.0.1'
-    _id_prefix = 'metam'
+    _id_prefix = COMPONENT_PREFIXES['metamodel']
     _last_modified: datetime.datetime = datetime.datetime.now()
 
     _excluded_attributes = NewsegsComponent._excluded_attributes.union({'_watcher'})
@@ -298,7 +299,6 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
                 v = variable_provider.get_default_variable(var_identifiers['varid'])
             self.variables[var_identifiers['varid']] = v
         self.variables.revision = vr0 # type: ignore
-        #self.variables._syncronise() # type: ignore
         self.revision = r0
         self.table_config.revision = tr0
         
@@ -432,7 +432,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     ) -> set[str]:
         affected_models = set()
         for varid, var in self.variables.items():
-            if self._variables_last_model_sync.get(varid, 0) != var.revision:
+            if self._variables_last_model_sync.get(varid, -1) != var.revision:
                 try:
                     if isinstance(varid, str):
                         affected_models.add(self.update_model_from_variable_deterministic(varid)) 
@@ -480,29 +480,13 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     #     self.finance.anonymise_ids()
     #     # Do not anonymise variables! Remember, the metamodel does not own its variables.
 
-    # def __getstate__(self) -> dict[str, Any]:
-    #     state = self.__dict__.copy()
-    #     for dontpickle in ['_model', '_finance', '_variables']:
-    #         if dontpickle in state:
-    #             del state[dontpickle]
-    #     if self.model:
-    #         state['_model_id'] = self.model.id
-    #     if self.finance:
-    #         state['_finance_id'] = self.finance.id
-    #     state['_variable_ids'] = self.variable_ids
-    #     return state
     
-    # Will have no explicit setstate - require using 'reattach_' methods
-    # to recover the missing components using external mappings.
-    # We will also not use a custom pickler, because we don't want to switch out picklers
-    # depending on what is being pickled, and ultimately we do want models and finances to be
-    # picklable in other circumstances.
-
+   
     @override
     def _preupdate_from_dict(self, config):
         super()._preupdate_from_dict(config)
         # Set the watcher prior to property attachment
-        if self._watcher is None:
+        if not hasattr(self, '_watcher') or self._watcher is None:
             self.watcher = MMVarWatcher(self)
 
     @override
@@ -520,49 +504,31 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
             return super().anonymise_ids()
         else:
             SerialisedConfigurationMixin.anonymise_ids(self)
-            att_names = self.get_component_attributes()
-            att_names = (x for x in att_names if x not in set('variables'))
-            atts = []
-            for nm in att_names:
-                try:
-                    atts.append(getattr(self, nm))
-                except AttributeError:
-                    pass
-            self._anonymise_id_sequence(atts)
+            self._anonymise_id_sequence(self.get_components(component_group = 'exclude_variables'))
 
     def __deepcopy__(self, memo):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        state = copy.deepcopy(self.__getstate__())
-
-        result.update(state)
-
-        # cfg = state.pop('_config', None)
-        # if cfg:
-        #     setattr(result, '_config', copy.deepcopy(cfg, memo))
-        # result.watcher = MMVarWatcher(result)
         
-        r0 = result.revision
+        cls.set_state_exclusion_policy('excluded')
+        state = self.__getstate__()
+        cls.set_state_exclusion_policy('excluded_and_components')
 
-        # tblcfg = state.pop('_table_config', None)
-        # if tblcfg:
-        #     result.table_config = copy.deepcopy(tblcfg)
-        
-        tr0 = result.table_config.revision
-        
-        # for k, v in state.items():
-        #     setattr(result, k, copy.deepcopy(v, memo))
+        state = {k:copy.deepcopy(v, memo) for k, v in state.items() if k != '_variables'}
 
+        result.__setstate__(state)
+        
         # Need to generate a new container, but the contents must be identical
         result.variables = {k: v for k, v in self.variables.items()}
         result.variables.revision = self.variables.revision # pyright: ignore[reportAttributeAccessIssue]
 
-        result.model = copy.deepcopy(self.model)
-        result.finance = copy.deepcopy(self.finance)
-        result.finance.set_model(result.model, dirty = False)
-        result.revision = r0
-        result.table_config.revision = tr0
+        # result.model = copy.deepcopy(self.model)
+        # result.finance = copy.deepcopy(self.finance)
+        # result.finance.set_model(result.model, dirty = False)
+
+        result.revision = self.revision
+        result.table_config.revision = self.table_config.revision
         return result
 
     def to_config(self) -> dict[str, str|int|float]:

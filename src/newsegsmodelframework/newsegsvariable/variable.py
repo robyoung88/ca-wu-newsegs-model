@@ -14,6 +14,7 @@ import numpy as np
 import numpy.typing as npt
 from useful_types import SequenceNotStr
 
+from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
@@ -3286,7 +3287,7 @@ class Variable(
     _label: str | None = None
 
     # NewsegsComponent constants
-    _id_prefix = 'v'
+    _id_prefix = COMPONENT_PREFIXES['variable']
     # SerialiseToDictMixin constants
     _constructor_class = 'Variable'
 

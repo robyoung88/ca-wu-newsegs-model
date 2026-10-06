@@ -329,7 +329,7 @@ class SerialiseToDictMixin:
         # Get rid of constructor class string for this instance
         config.pop('constructor_class', None)
 
-        config = type_.unserialise_dict(config)
+        #config = type_.unserialise_dict(config)
 
         self._preupdate_from_dict(config)
 

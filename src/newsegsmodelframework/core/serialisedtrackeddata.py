@@ -23,6 +23,7 @@ class SerialisedConfigurationMixin(
             if isinstance(inst_config, DataWithRevision):
                 full_update = True
                 setattr(self, '_config', inst_config)
+                config_exists = True
             elif isinstance(inst_config, Mapping):
                 if not config_exists:
                     full_update = True
