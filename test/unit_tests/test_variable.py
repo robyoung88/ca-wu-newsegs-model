@@ -1830,7 +1830,7 @@ class TestVariableSerialisation(unittest.TestCase):
         self.assertEqual(vbl.distribution.distribution, 'numeric_constant')
         self.assertEqual(vbl.name, 'Storage capacity')
         
-        self.assertTupleEqual(vbl.raw_parameters, (1000,))
+        self.assertTupleEqual(vbl.raw_parameters, (4000,))
     
 class TestVariableCopy(unittest.TestCase):
     """
