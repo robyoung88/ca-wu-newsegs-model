@@ -1,6 +1,7 @@
 """NewSEGS model as a multi-page app.
 """
 import time
+from typing import Any
 
 from newsegsmodelapp.backend.db.db import init_db
 from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
@@ -10,7 +11,7 @@ import os
 from pathlib import Path
 import uuid
 
-from dash import Dash, Input, Output, State
+from dash import ALL, Dash, Input, Output, State, DiskcacheManager, CeleryManager
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
 
@@ -45,6 +46,18 @@ if not RESULTS_STORE.exists():
 AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
+
+# if 'REDIS_URL' in os.environ:
+#     # Use Redis & Celery if REDIS_URL set as an env variable
+#     from celery import Celery
+#     celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
+#     background_callback_manager = CeleryManager(celery_app)
+
+# else:
+# Diskcache for non-production apps when developing locally
+import diskcache
+cache = diskcache.Cache(settings.get('DISKCACHE_PATH ', "./cache"))
+background_callback_manager = DiskcacheManager(cache)
 
 import threading
 import traceback
@@ -221,6 +234,11 @@ def add_display_callbacks(app: NewsegsDash):
         print (f'Project {proj_id} has been found for session {session_id}')
         return proj_id
 
+project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
+request_handler = FromDatabaseRequestHandler(db.get_engine)
+    
+
 # -----------------------------------------------
 # Create App
 # -----------------------------------------------
@@ -239,9 +257,9 @@ def create_app(external_stylesheets = None) -> Dash:
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
-    project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
-    results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
-    request_handler = FromDatabaseRequestHandler(db.get_engine)
+    # project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+    # results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
+    # request_handler = FromDatabaseRequestHandler(db.get_engine)
 
     app = NewsegsDash(
         __name__,
@@ -251,6 +269,7 @@ def create_app(external_stylesheets = None) -> Dash:
         project_provider = project_provider,
         results_provider = results_provider,
         request_handler = request_handler,
+        background_callback_manager = background_callback_manager,
     )
 
     app.layout = serve_layout
@@ -261,6 +280,7 @@ def create_app(external_stylesheets = None) -> Dash:
 
     # Bind callbacks
     add_display_callbacks(app)
+    #add_background_callbacks(app)
     add_input_container_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
     map.add_site_selector_callbacks(app)
@@ -282,7 +302,7 @@ if __name__ == '__main__':
     init_db()
     app = create_app()
     #try:
-    app.run(debug = True, use_reloader = False)
+    app.run(debug = False, use_reloader = False)
     # except SystemExit as e:
     #     print(f"Caught SystemExit with code: {e.code}")
     #     import traceback

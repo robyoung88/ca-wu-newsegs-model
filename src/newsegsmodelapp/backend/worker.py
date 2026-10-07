@@ -1,6 +1,7 @@
 """A worker process for performing background computations."""
 import copy
 import pickle
+from sqlalchemy.exc import OperationalError
 from typing import cast
 
 import zmq
@@ -71,7 +72,32 @@ def worker_process(
 
                 response_bytes = pickle.dumps(response_data)
 
-                socket.send_multipart(client_envelope + [response_bytes])
+                retries = 5
+                
+                while retries > 0:
+                    try:
+                        socket.send_multipart(client_envelope + [response_bytes])
+                        send_completed = True
+                        break
+                    except OperationalError:
+                        retries -= 1
+                        continue
+                    except Exception as e:
+                        raise e
+                else:
+                    send_completed = False
+
+                if not send_completed:
+                    try:
+                        socket.setsockopt(zmq.LINGER, 0)
+                        socket.close()
+                    except:
+                        pass
+                    socket = context.socket(zmq.REP)
+                    socket.connect(f'tcp://{server}:{port}')
+                    raise ValueError(f'Cannot send claim ticket back to client - database is unresponsive.')
+
+                print(f'Worker {worker_id} starting job {job_id} - {request}')
 
                 try:
                     if job_id is None:
@@ -128,6 +154,13 @@ def worker_process(
                 # Timeout hit (no message in 1 sec). Re-evaluate stop_event loop condition.
                 continue
             except Exception as e:
+                try:
+                    socket.setsockopt(zmq.LINGER, 0)
+                    socket.close()
+                except:
+                    pass
+                socket = context.socket(zmq.REP)
+                socket.connect(f'tcp://{server}:{port}')
                 print(f"Worker {worker_id} encountered an error: {e}")
             # Process loops back to recv, signalling to dealer that worker is free
     

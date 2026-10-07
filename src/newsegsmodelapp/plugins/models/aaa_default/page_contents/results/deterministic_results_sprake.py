@@ -477,12 +477,16 @@ def _make_net_result_header(
         stat='sum'
     else:
         stat='mean'
-        
-    ms = (
-        pd.DataFrame
-        .from_dict(res['meter_summaries'], orient='columns')
-        .set_index(['variable', 'statistic'])
-    )
+
+    ms = res.get('meter_summaries')
+    if ms is None:
+        return _content_function()
+    if not isinstance(ms, pd.DataFrame):
+        ms = (
+            pd.DataFrame
+            .from_dict(ms, orient='columns')
+            .set_index(['variable', 'statistic'])
+        )
     energy_export = ms.loc[('grid_export',stat),'value']
     energy_import = ms.loc[('grid_import',stat),'value']
     storage_loss = ms.loc[('storage_loss',stat),'value']

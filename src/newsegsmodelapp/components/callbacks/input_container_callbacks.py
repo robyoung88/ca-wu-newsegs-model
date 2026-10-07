@@ -4,15 +4,16 @@ Callbacks to populate input containers when the project or active metamodel chan
 
 import json
 import time
-from typing import Any, Mapping, cast
+from typing import Any
 
 from dash import ALL, MATCH, Input, Output, State, no_update
 from dash import ctx
 from dash.exceptions import PreventUpdate
-import numpy as np
 
+from newsegsmodelapp.backend.db import db
+from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
-from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID, VARIABLE_PARAMETER_KEYS
+from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.components.input_components import get_variable_sharing_status
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
@@ -22,6 +23,8 @@ from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaM
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp.registers import get_input_handler
+
+local_project_provider = project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
 
 def _create_text_field_values(
     proj: NewsegsProject,
@@ -609,7 +612,8 @@ def add_input_container_callbacks(app: NewsegsDash):
         State('active-project-id', 'data'),
         State('app-state', 'data'),
 
-        prevent_initial_call = True
+        prevent_initial_call = True,
+        background = True,
     )
     def update_feedback_graphs(
         configuration_update_trigger,
@@ -628,9 +632,9 @@ def add_input_container_callbacks(app: NewsegsDash):
             except KeyError:
                 artist = None
             if artist:
-                figure_returns[idx] = artist(active_project_id, app.project_provider)
+                figure_returns[idx] = artist(active_project_id, local_project_provider)
 
-        return figure_returns        
+        return figure_returns
 
 
     @app.callback(

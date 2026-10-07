@@ -312,8 +312,9 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         new_name = callback_utils.get_triggered_value()
 
         mm = proj.metamodels[mm_index]
-        if not mm:
+        if not mm or mm.name == new_name:
             raise PreventUpdate
+        print(f'RENAMING METAMODEL {mm.name} to {new_name}')
         mm.name = new_name
         mm.revision += 1
         app.project_provider.upsert_component(proj)

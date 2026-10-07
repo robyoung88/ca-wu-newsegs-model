@@ -81,6 +81,7 @@ def meter_annual_summary_to_interface(
     """
     Converts the summary dataframe into the format expected by the interface
     """
+    #return meter_annual_summary
     return meter_annual_summary.to_dict()
 
 def meter_annual_summary2_to_interface(

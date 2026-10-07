@@ -1,6 +1,6 @@
 import copy
 import json
-from typing import Any, Callable, Literal, Mapping, Optional, Sequence, cast, overload, override
+from typing import Any, Callable, Mapping, Optional, Sequence, cast, overload, override
 
 from cachetools import LRUCache
 import pandas as pd
@@ -11,16 +11,14 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.backend.db import DependentObjectsExistError, db_snapshot
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.constructors.constructors import find_constructor
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentManagerInterface, NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface
+from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentManagerInterface
 
 from newsegsmodelapp.backend.db.project import component_to_raw_table_data, finance_model_to_raw_table_data, metamodel_to_raw_table_data, project_to_raw_table_data
 from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
-from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSING_OPTION, NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -94,9 +92,9 @@ class FromDatabaseNewsegsComponentProvider(
             )
 
         with self._get_engine().connect() as conn:
-            rows = conn.execute(stmt).fetchall()
-
-        reconstructed_components = [self._reconstruct_component(row.payload, row) for row in rows]
+            rows = conn.execute(stmt)
+            reconstructed_components = [self._reconstruct_component(row.payload, row) for row in rows]
+        
         if not is_sequence:
             if len(reconstructed_components) == 0:
                 raise ValueError(f'Component not found: {component_id} in table {self._table}')
@@ -1466,6 +1464,15 @@ class FromDatabaseNewsegsProjectProvider(
         with self._get_engine().connect() as conn:
             res = conn.execute(stmt).scalar_one()
         return res
+
+    def touch_project(self, project_id: str):
+        stmt = (
+            sa.update(self._table)
+            .where(self._table.c.id == project_id)
+            .values(label=self._table.c.label)
+        )
+        with self._get_engine().connect() as conn:
+            conn.execute(stmt)
 
 class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider

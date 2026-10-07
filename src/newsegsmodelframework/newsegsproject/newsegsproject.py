@@ -6,7 +6,7 @@ sensitivity analysis.
 """
 from collections import OrderedDict
 import copy
-from typing import Any, Iterable, Optional, Sequence, override
+from typing import Any, Optional, Sequence, override
 import warnings
 from useful_types import SequenceNotStr
 
@@ -14,7 +14,11 @@ from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIX
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
-from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentListProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, recursive_remove_children, revision_dataclass
+from newsegsmodelframework.core.trackeddata import (
+    ComponentProperty, DataWithRevision, RevisionNotifierProtocol,
+    SubscriptionRevisionNotifierMixin, TableModifyingComponentListProperty, TableModifyingObservableList, 
+    TableModifyingObservableOrderedDict, revision_dataclass
+)
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable

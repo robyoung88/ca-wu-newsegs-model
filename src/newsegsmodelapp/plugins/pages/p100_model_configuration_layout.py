@@ -81,11 +81,22 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
             )
         ),
 
-        dbc.Row(model_input_sections), 
+        dcc.Loading(
+            dbc.Row(model_input_sections),
+            delay_show = 1,
+            delay_hide = 0.3,
+        ),
+
+        
         
         html.Hr(),
 
-        dbc.Row(finance_input_sections),
+        dcc.Loading(
+            dbc.Row(finance_input_sections),
+            delay_show = 1,
+            delay_hide = 0.3,
+        ),
+        
     ]
 
     results_subsections = []
@@ -117,12 +128,8 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         dbc.Row(
             config.layout_map()
         )
-    ] + [
-        dcc.Loading(
-            site_details,
-            delay_show = 300,
-        )
-    ]
+    ] + site_details
+    
 
     b1_contents = [
         config.layout_results_header()

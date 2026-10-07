@@ -63,8 +63,8 @@ def execute_deterministic_run_project(
         step += 1
 
         mm.model.run()
-        # TODO: May want to pull this into the run
-        #mm.model.table_config.revision += 1
+        mm.model.table_config.revision += 1
+        project_provider.upsert_component(mm.model.table_config)
 
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
@@ -73,8 +73,8 @@ def execute_deterministic_run_project(
         step += 1
 
         mm.finance.run()
-        # TODO: May want to pull this into the run
-        #mm.finance.table_config.revision += 1
+        mm.finance.table_config.revision += 1
+        project_provider.upsert_component(mm.finance.table_config)
 
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
@@ -89,6 +89,7 @@ def execute_deterministic_run_project(
         result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result(), request = request)
         result_provider.upsert_result('deterministic_consumption_storage', mm.model.consumption_storage, mm.model.get_consumption_storage_result(), request = request)
 
-    #project_provider.upsert_component(proj)
+        # Touch the project to update modified_order and invalidate cache
+        project_provider.touch_project(request.project_id)
 
     return 'ok'

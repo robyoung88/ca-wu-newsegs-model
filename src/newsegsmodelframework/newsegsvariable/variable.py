@@ -13,6 +13,7 @@ from matplotlib.pylab import Generator
 import numpy as np
 import numpy.typing as npt
 from useful_types import SequenceNotStr
+from scipy.stats import gamma
 
 from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
@@ -2079,7 +2080,7 @@ def _gamma_interval(
 ) -> tuple[float, float]:
     if len(parameters) != 2:
         raise TypeError(f'Gamma requires two parameters, {len(parameters)} provided')
-    from scipy.stats import gamma
+    
     return gamma.interval(interval, a = parameters[0], scale = parameters[1])
 
 # CAUTION! Scipy incorrectly refers to the exponential gamma as the loggamma.

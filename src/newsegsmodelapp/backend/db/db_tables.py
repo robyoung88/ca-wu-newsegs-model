@@ -4,7 +4,6 @@ import datetime
 import uuid6
 
 import sqlalchemy as sa
-from sqlalchemy import event as sa_event
 
 L_VARIABLE_UID = 38
 L_COMPONENT_UID = 42

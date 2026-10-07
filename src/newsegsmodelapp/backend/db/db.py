@@ -4,7 +4,6 @@ from typing import Literal
 import os
 import sqlite3
 
-from alembic import command
 from alembic.config import Config as AlembicConfig
 from pathlib import Path
 import sqlalchemy
@@ -40,7 +39,8 @@ def get_engine(db_path: str | Path | None = None):
         print(f'Creating engine: {engine_url}')
         _engine = sqlalchemy.create_engine(
             engine_url,
-            echo = False
+            echo = False,
+            connect_args = {"timeout": 30.0}
         )
         _connected_db_path = str(db_path)
 
@@ -55,7 +55,8 @@ def get_engine(db_path: str | Path | None = None):
 
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL;")
-            cursor.execute("PRAGMA busy_timeout=5000;")
+            cursor.execute("PRAGMA busy_timeout=30000;")
+            cursor.execute("PRAGMA synchronous = NORMAL;")
             cursor.close()
 
             # 4. Restore the original isolation level for SQLAlchemy transaction management
@@ -130,6 +131,7 @@ def run_migrations():
     Args:
         from_none (bool) - Ignore version number and apply full migration path.
     """
+    from alembic import command
     from newsegsmodelapp import APP_ROOT
     alembic_cfg = AlembicConfig(APP_ROOT.parent / 'alembic.ini')
     command.upgrade(alembic_cfg, 'head')

@@ -3,11 +3,15 @@
 import copy
 import json
 import pickle
+
+import sys
+import time
 from typing import Any
 
 from dash import ALL, Input, NoUpdate, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 import sqlalchemy as sa
+from sqlalchemy.exc import OperationalError
 import zmq
 
 from config import settings
@@ -25,24 +29,62 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 
 DISPATCHSERVER = settings['DISPATCHSERVERS'][1]#'zmq-dispatcher'#
 FRONTENDPORT = settings['FRONTENDPORT']
+REQUEST_RETRIES = 4
 
-def send_to_dispatcher(payload) -> dict:
+
+def send_to_dispatcher(payload, retries: int = REQUEST_RETRIES) -> dict:
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
 
-    socket.setsockopt(zmq.RCVTIMEO, settings.get('JOB_DISPATCH_TIMEOUT_MS', -1))
+    #socket.setsockopt(zmq.RCVTIMEO, settings.get('JOB_DISPATCH_TIMEOUT_MS', -1))
     socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
+
+    poll = zmq.Poller()
+    poll.register(socket, zmq.POLLIN)
     
     payload_bytes = pickle.dumps(payload)
-    socket.send(payload_bytes)
 
-    try:
-        reply_bytes = socket.recv()
-    except zmq.Again:
-        raise ValueError('Job dispatch timed out.')
-    finally:
-        socket.close()
-        context.term()
+    retries_left = retries
+    while retries_left:
+        socket.send(payload_bytes)
+
+        expect_reply = True
+        try:
+            while expect_reply:
+                socks = dict(poll.poll(settings.get('JOB_DISPATCH_TIMEOUT_MS', -1)))
+                if socks.get(socket) == zmq.POLLIN:
+                    reply_bytes = socket.recv()
+                    if not reply_bytes:
+                        break
+                    expect_reply = False
+                else:
+                    print('No response from job server, retrying...')
+                    # Socket is confused. Close and remove it.
+                    socket.setsockopt(zmq.LINGER, 0)
+                    socket.close()
+                    poll.unregister(socket)
+                    retries_left -= 1
+                    if retries_left == 0:
+                        raise ValueError('Job dispatch timed out.')
+                    socket = context.socket(zmq.REQ)
+                    socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
+                    poll.register(socket, zmq.POLLIN)
+                    socket.send(payload_bytes)
+        finally:
+            socket.close()
+            poll.unregister(socket)
+            context.term()
+
+        if not expect_reply:
+            break
+
+    # try:
+    #     reply_bytes = socket.recv()
+    # except zmq.Again:
+    #     raise ValueError('Job dispatch timed out.')
+    # finally:
+    #     socket.close()
+    #     context.term()
 
     reply_data = pickle.loads(reply_bytes)
 
@@ -394,12 +436,21 @@ def add_action_callbacks(app: NewsegsDash):
                                     spawned_actions.append(new_run_id)
                             
                             app.request_handler.mark_completed(original_request.request_id)
-                        with db.get_engine().begin() as conn:
-                            conn.execute(
-                                sa.update(tbls.runs)
-                                .values(children_spawned = True)
-                                .where(tbls.runs.c.run_id.in_(completed_actions))
-                            )
+
+                        n_retries = 5
+                        success = False
+                        while n_retries > 0 and not success:
+                            try:
+                                with db.get_engine().begin() as conn:
+                                    conn.execute(
+                                        sa.update(tbls.runs)
+                                        .values(children_spawned = True)
+                                        .where(tbls.runs.c.run_id.in_(completed_actions))
+                                    )
+                                    success = True
+                            except OperationalError:
+                                time.sleep(0.1)
+                                n_retries -= 1
                         
                         ongoing_actions.remove(run_id)
 

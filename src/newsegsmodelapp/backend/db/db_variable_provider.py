@@ -1,6 +1,5 @@
 import copy
 import json
-import pickle
 from typing import Callable, Sequence, cast, overload, override
 
 import sqlalchemy as sa
@@ -62,13 +61,11 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 .where(tbls.variable_configs.c.id.in_(instance_id))
             )
         with self._get_engine().connect() as conn:
-            rows = conn.execute(stmt).fetchall()
-
-        reconstructed_vars = [self._reconstruct_variable(row) for row in rows]
+            rows = conn.execute(stmt)
+            reconstructed_vars = [self._reconstruct_variable(row) for row in rows]
         if not is_sequence:
             return reconstructed_vars[0]
         
-
         varmap = {x.id:x for x in reconstructed_vars}
         return [varmap[x] for x in instance_id]
 

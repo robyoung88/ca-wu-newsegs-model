@@ -33,10 +33,10 @@ from typing import Any, Mapping, MutableSequence, Optional, override
 from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
+from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
+from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
-from newsegsmodelframework.core.trackeddata import ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, revision_dataclass
-from newsegsmodelframework.newsegsmodel import newsegsmodel
-from newsegsmodelframework.newsegsfinance import newsegsfinance
+from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
@@ -134,8 +134,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     last_psa_run: float = 0.
     last_optim_run: float = 0.
 
-    model = ComponentProperty(default = None, oftype = newsegsmodel.NewsegsModel)
-    finance = ComponentProperty(default = None, oftype = newsegsfinance.NewsegsFinance)
+    model = ComponentProperty(default = None, oftype = NewsegsModelInterface)
+    finance = ComponentProperty(default = None, oftype = NewsegsFinanceInterface)
 
     variables = TableModifyingComponentOrderedDictProperty(oftype = variable.Variable)
     _variables_last_model_sync: dict
@@ -148,8 +148,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     def __init__(
         self,
-        model: newsegsmodel.NewsegsModel,
-        finance: newsegsfinance.NewsegsFinance,
+        model: NewsegsModelInterface,
+        finance: NewsegsFinanceInterface,
         variables: MutableSequence[variable.Variable] = [],
         table_config: Optional[TableConfigNewsegsComponent] = None,
         **kwargs
@@ -177,7 +177,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         
     def reattach_model(
         self,
-        model_provider: Mapping[str, newsegsmodel.NewsegsModel]
+        model_provider: Mapping[str, NewsegsModelInterface]
     ) -> None:
         """Reattach the associated NewsegsModel instance after metamodel reconstruction.
         
@@ -194,7 +194,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         mdl = model_provider.get(self._model_id)
         if mdl is None:
             raise ValueError(f'model_provider could not provide model for key {self._model_id}')
-        if not isinstance(mdl, newsegsmodel.NewsegsModel):
+        if not isinstance(mdl, NewsegsModelInterface):
             raise TypeError(f'model_provider did not provide a NewsegsModel for key {self._model_id} - {type(mdl)} returned instead')
         self.model = mdl
         try:
@@ -211,7 +211,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         if not hasattr(self, '_model_id') or self._model_id == '':
             raise AttributeError('This MetaModel has no associated model to reattach.')
         mdl = em_provider.get_component(self._model_id)
-        if not isinstance(mdl, newsegsmodel.NewsegsModel):
+        if not isinstance(mdl, NewsegsModelInterface):
             raise TypeError(f'em_provider did not provide a NewsegsModel for key {self._model_id}')
         self.model = mdl
         try:
@@ -221,7 +221,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
             pass
         self.revision = r0
 
-    def reattach_finance(self, finance_provider: Mapping[str, newsegsfinance.NewsegsFinance]) -> None:
+    def reattach_finance(self, finance_provider: Mapping[str, NewsegsFinanceInterface]) -> None:
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
         
         Args:
@@ -238,7 +238,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         fnc = finance_provider.get(self._finance_id)
         if fnc is None:
             raise ValueError(f'finance_provider could not provide finance for key {self._finance_id}')
-        if not isinstance(fnc, newsegsfinance.NewsegsFinance):
+        if not isinstance(fnc, NewsegsFinanceInterface):
             raise TypeError(f'finance_provider did not provide a NewsegsFinance for key {self._finance_id} - {type(fnc)} returned instead')
         self.finance = fnc
         if self.model is not None:
@@ -253,7 +253,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         if not hasattr(self, '_finance_id') or self._finance_id == '':
             raise AttributeError('This MetaModel has no associated finance to reattach.')
         fnc = fm_provider.get_component(self._finance_id)
-        if not isinstance(fnc, newsegsfinance.NewsegsFinance):
+        if not isinstance(fnc, NewsegsFinanceInterface):
             raise TypeError(f'fm_provider did not provide a NewsegsFinance for key {self._finance_id}')
         self.finance = fnc
         try:
@@ -556,8 +556,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         return {
             'name': cls._name,
             'metamodel_id': cls.generate_new_id(),
-            '_model_id': newsegsmodel.NewsegsModel.generate_new_id(),
-            '_finance_id': newsegsfinance.NewsegsFinance.generate_new_id(),
+            '_model_id': NewsegsModelInterface.generate_new_id(),
+            '_finance_id': NewsegsFinanceInterface.generate_new_id(),
             'last_modified': datetime.datetime.now().isoformat()
         }
 

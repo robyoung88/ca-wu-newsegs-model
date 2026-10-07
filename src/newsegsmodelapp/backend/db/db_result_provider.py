@@ -1,4 +1,7 @@
 from pathlib import Path
+import time
+from sqlalchemy.exc import OperationalError
+import sys
 from typing import Any, Callable, Optional, override
 import uuid
 
@@ -69,8 +72,19 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_details['result_file'] = saved_path
 
         stmt = self._table.insert().values(result_details)
-        with self._get_engine().begin() as conn:
-            conn.execute(stmt)
+        n_retries = 5
+        success = False
+        while n_retries > 0 and not success:
+            try:
+                with self._get_engine().begin() as conn:
+                    conn.execute(stmt)
+                success = True
+            except OperationalError:
+                time.sleep (0.1)
+                n_retries -= 1
+
+        if not success:
+            raise ValueError(f'Result of {result_details['result_type']} saved to {saved_path}, but not uploaded to database')
 
         print (f'SAVED RESULT of type {result_details['result_type']} attached to {result_details['component_type']} with id {result_details['component_config_id']}, revision {result_details['component_config_revision']}')
 
@@ -90,35 +104,37 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             )
             .where(self._table.c.result_type == result_type)
             .where(self._table.c.component_config_id == parent_component.id)
-            .order_by(self._table.c.created_at)
+            .order_by(self._table.c.created_at.desc())
         )
 
         revision = parent_component.revision
         if not allow_stale:
             stmt = stmt.where(self._table.c.component_config_revision == revision)
 
+        file_name = None
         with self._get_engine().connect() as conn:
-            odf = pd.read_sql(stmt, conn)
+            result = conn.execute(stmt)
+            for idx, row in enumerate(result):
+                if idx == 0:
+                    file_name = row.result_file
+                    rrs = row.component_config_revision
+                if row.component_config_revision == revision:
+                    if idx != 0:
+                        file_name = row.result_file
+                        rrs = revision
+                    break
 
-        if len(odf):
-            if np.any(odf['component_config_revision'] == revision):
-                file_name = odf.loc[odf['component_config_revision'] == revision, 'result_file'].iloc[-1]
-                rrs = revision
-            else:
-                #odf = odf.sort_values('created_at')
-                file_name = odf['result_file'].iloc[-1]
-                rrs = odf['component_config_revision'].iloc[-1]
+        if file_name is None:
+            return None, None
 
-            try:
-                obj = load_result(Path(file_name))
-            except FileNotFoundError:
-                with self._get_engine().begin() as conn:
-                    conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
-                return None, None
-            
-            return (obj, rrs)
-
-        return None, None
+        try:
+            obj = load_result(Path(file_name))
+        except FileNotFoundError:
+            with self._get_engine().begin() as conn:
+                conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
+            return None, None
+        
+        return (obj, rrs)
 
     @override
     def get_run_result(
@@ -146,8 +162,8 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_rows = {row["result_id"]: dict(row) for row in res.mappings()}
         if len(result_rows) == 0:
             return None, None
-        if len(result_rows) > 1:
-            raise ValueError(f'Multiple results found for {result_type} for run {run_id} and parent {parent_component.id if parent_component else 'NONE'}')
+        #if len(result_rows) > 1:
+            #raise ValueError(f'Multiple results found for {result_type} for run {run_id} and parent {parent_component.id if parent_component else 'NONE'}')
 
         res_id = next(iter(result_rows))
         file_name = result_rows[res_id]['result_file']
@@ -168,7 +184,7 @@ class CachedFromDatabaseResultProvider(
     
     def __init__(self, get_engine: Callable[[], sa.Engine], result_store: Path):
         super().__init__(get_engine, result_store)
-        self._result_cache = LRUCache(maxsize = 64)
+        self._result_cache = LRUCache(maxsize = 128)
 
     @override
     def get_result(self, result_type: str, parent_component: NewsegsComponent, allow_stale: bool = True) -> tuple[Any, int] | tuple[None, None]:
@@ -179,6 +195,7 @@ class CachedFromDatabaseResultProvider(
             print(f'RETURNING RESULT FROM CACHE {result_key}')
             return self._result_cache[result_key], result_key[2] # pyright: ignore[reportReturnType]
 
+        print(f'RETURNING RESULT FROM STORE {result_key}')
         obj, rrs = super().get_result(result_type, parent_component, allow_stale)
         if obj is None:
             print(f'NOT ADDING TO CACHE AS NO RESULT - {result_key}')
