@@ -7,9 +7,9 @@ from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import Lightweig
 
 @revision_dataclass
 class LightweightNewsegsMetaModel(LightweightNewsegsComponent):
+    name: str
     table_config: LightweightNewsegsComponent
     model: LightweightNewsegsModel 
     finance: LightweightNewsegsFinance 
     variables: TableModifyingObservableOrderedDict
     location: Location
-    

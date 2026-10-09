@@ -42,54 +42,6 @@ def project_to_raw_table_data(
     return odict
 
 
-
-# -----------------------------------------------------------------------------
-# Project - Metamodels Junction
-# -----------------------------------------------------------------------------
-
-
-# -----------------------------------------------------------------------------
-# Variables
-# -----------------------------------------------------------------------------
-# region SAVE
-_VARIABLE_MODEL_SECTION_MAP = {
-    'model' : {
-        'mod_gen': 'generation',
-        'mod_cs._storage_params': 'cs',
-        'mod_cs': 'cs',
-        'mod_cs._spaceheat_params': 'cs',
-        'mod_cs._dhw_params': 'cs',
-        'mod_cs._appliance_params': 'cs',
-        'mod_cs._ev_params': 'cs',
-        '': 'modeldata',
-    },
-    'finance' : {
-        '_unit_costs': 'financedata',
-        '': 'financedata'
-    }
-}
-
-def variable_to_raw_table_data(
-    variable: Variable
-) -> dict:
-    model_sec = (
-        _VARIABLE_MODEL_SECTION_MAP
-        .get(variable.configuration_type, {})
-        .get(variable.model_section, '')  # type: ignore
-    )
-    odict = dict(
-        id = variable.id,
-        varid = variable_uid(variable),
-        revision = variable.revision,
-        component_type = model_sec,
-        label = variable.name
-    )
-
-    odict['payload'] = variable.json_dumps()
-
-    return odict
-
-
 # -----------------------------------------------------------------------------
 # Metamodels
 # -----------------------------------------------------------------------------
@@ -132,6 +84,7 @@ def energy_model_to_raw_table_data(
         id = energy_model.id,
         model_class = energy_model.__class__.__name__,
         model_version = energy_model.version,
+        model_type = energy_model.model_type,
         revision = energy_model.revision,        
         label = energy_model.name,
         grid_config_id = energy_model.grid.id,

@@ -73,6 +73,7 @@ class NewsegsModel(
     """
     
     _name = 'NewSEGS Energy Model'
+    model_type: str = 'abstractenergymodel'
     _version = '0.0.1'
     _id_prefix = COMPONENT_PREFIXES['em']
 

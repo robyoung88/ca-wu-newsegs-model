@@ -47,6 +47,38 @@ def variable_to_raw_table_data(
 
     varid = variable_uid(variable)
 
+    try:
+        dsa_value_lower = json.dumps(variable.get_dsa_value('lower', True), cls = jsonfuncs.NumpyEncoder)
+    except Exception as e:
+        print(e)
+        dsa_value_lower = None
+    try:
+        dsa_value_upper = json.dumps(variable.get_dsa_value('upper', True), cls = jsonfuncs.NumpyEncoder)
+    except Exception as e:
+        print(e)
+        dsa_value_lower = None
+
+    try:
+        last_std = variable.get_std()
+    except NotImplementedError:
+        last_std = None
+    last_std = json.dumps(last_std, cls = jsonfuncs.NumpyEncoder) if last_std is not None else None
+
+    ci = None
+    try:
+        ci = variable.get_confidence_interval(0.95)
+    except NotImplementedError:
+        ci = None
+    except Exception as e:
+        print(e)
+    if ci is None:
+        psa_ci_lower = None
+        psa_ci_upper = None
+    else:
+        psa_ci_lower = json.dumps(ci[0], cls = jsonfuncs.NumpyEncoder)
+        psa_ci_upper = json.dumps(ci[1], cls = jsonfuncs.NumpyEncoder)
+    
+
     odict = dict(
         id = variable.id,
         varid = varid,
@@ -69,10 +101,15 @@ def variable_to_raw_table_data(
         dsa_bounds_type = variable.dsa_bounds_type,
         dsa_lower = json.dumps(variable.dsa_lower, cls = jsonfuncs.NumpyEncoder) if variable.dsa_lower is not None else None,
         dsa_upper = json.dumps(variable.dsa_upper, cls = jsonfuncs.NumpyEncoder) if variable.dsa_upper is not None else None,
+        dsa_value_lower = dsa_value_lower,
+        dsa_value_upper = dsa_value_upper,
 
         psa_show = variable.psa_show,
         psa_selectable = variable.psa_selectable,
         psa_selected = variable.psa_selected,
+        last_std = last_std,
+        psa_ci_lower = psa_ci_lower,
+        psa_ci_upper = psa_ci_upper,
 
         optim_show = variable.optim_show,
         optim_selectable = variable.optim_selectable,
@@ -100,6 +137,11 @@ _json_attributes = (
     'last_deterministic_value',
     'dsa_lower',
     'dsa_upper',
+    'dsa_value_lower',
+    'dsa_value_upper',
+    'last_std',
+    'psa_ci_lower',
+    'psa_ci_upper',
     'optim_min',
     'optim_max',
     'icon_name',
@@ -158,6 +200,8 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             'dsa_selected',
             'dsa_lower',
             'dsa_upper',
+            'dsa_value_lower',
+            'dsa_value_upper',
 
             'psa_show',
             'psa_selectable',
@@ -570,7 +614,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 revision= sa.case(
                     (changed, self._table.c.revision + 1),
                     else_ = self._table.c.revision
-                )
+                ),
                 **{update_col.name: metadata_value})
         )
 

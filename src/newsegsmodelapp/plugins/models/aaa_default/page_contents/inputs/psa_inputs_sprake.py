@@ -22,6 +22,7 @@ from newsegsmodelapp.components.composite_input_components import generic_create
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.registers import register_input_container_content_creator, register_input_handler, register_single_input_header_content_creator
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 MODEL_TYPE = 'sprake'
 @register_input_container_content_creator('psa', None, MODEL_TYPE)
@@ -36,10 +37,9 @@ def _(
 @register_single_input_header_content_creator('psa', None, MODEL_TYPE)
 def _(
     varid: str,
-    metamodel: NewsegsMetaModel
+    var: variable.Variable | FullLightweightVariable,
 ) -> list[dash.development.base_component.Component]:
-    var = metamodel.variables.get(varid)
-    if not var or not isinstance(var, variable.Variable):
+    if not var or not isinstance(var, (variable.Variable, FullLightweightVariable)):
         return []
     return var_dc.create_psa_header(var) # pyright: ignore[reportArgumentType]
 

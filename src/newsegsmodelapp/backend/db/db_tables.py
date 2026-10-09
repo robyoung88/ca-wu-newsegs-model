@@ -70,10 +70,15 @@ variable_configs = sa.Table(
     sa.Column('dsa_bounds_type', sa.String, nullable = True),
     sa.Column('dsa_lower', sa.String, nullable = True),
     sa.Column('dsa_upper', sa.String, nullable = True),
+    sa.Column('dsa_value_lower', sa.String, nullable = True),
+    sa.Column('dsa_value_upper', sa.String, nullable = True),
 
     sa.Column('psa_show', sa.Boolean, default = False),
     sa.Column('psa_selectable', sa.Boolean, default = False),
     sa.Column('psa_selected', sa.Boolean, default = False),
+    sa.Column('last_std', sa.String, nullable = True),
+    sa.Column('psa_ci_lower', sa.String, nullable = True),
+    sa.Column('psa_ci_upper', sa.String, nullable = True),
 
     sa.Column('optim_show', sa.Boolean, default = False),
     sa.Column('optim_selectable', sa.Boolean, default = False),
@@ -181,6 +186,7 @@ em_configs = sa.Table(
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('model_class', sa.String),
     sa.Column('model_version', sa.String),
+    sa.Column('model_type', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('label', sa.String, nullable = True),

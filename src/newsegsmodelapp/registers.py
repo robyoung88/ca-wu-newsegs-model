@@ -11,8 +11,10 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelapp.types import LayoutConfiguration, Page
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 # -------------------------------------------------------------------------
 # APP PAGE REGISTER
@@ -689,7 +691,7 @@ SINGLE_INPUT_HEADER_CONTENT_CREATORS: dict[
     tuple[str, str | None, str],
     Callable[[
         str,
-        NewsegsMetaModel
+        FullLightweightVariable
     ], list[DashComponent]]] = {}
 """Register of functions to create header elements for a single input.
 
@@ -698,7 +700,7 @@ Keyed by a tuple of:
     section [str | None] - e.g. bc_input
     model_type [str]
 
-Functions take the variable id as string and the containing metamodel.
+Functions take the variable id as string and the variable or up-to-date FullLightweightVariable.
 """
 
 def register_single_input_header_content_creator(

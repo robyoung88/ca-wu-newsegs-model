@@ -479,19 +479,65 @@ class FromDatabaseNewsegsComponentProvider(
     @override
     def set_component_metadata(
         self, 
-        component_id: str, 
+        component_id: str | SequenceNotStr[str], 
         metadata_id: str, 
-        metadata_value: Any
+        metadata_value: Any,
+        increment_revision: bool = True
     ):
         
         pk_col = list(self._table.primary_key.columns)[0]
         update_col = self._table.c[metadata_id]
 
-        stmt = (
-            sa.update(self._table)
-            .where(pk_col == component_id)
-            .values(**{update_col.name: metadata_value})
-        )
+        if isinstance(component_id, str):
+            stmt = (
+                sa.update(self._table)
+                .where(pk_col == component_id)
+            )
+        else:
+            stmt = (
+                sa.update(self._table)
+                .where(pk_col.in_(component_id))
+            )
+
+        if increment_revision and not metadata_id == 'revision':
+            changed = sa.or_(
+                update_col.is_distinct_from(metadata_value)
+            )
+            stmt = stmt.values(
+                revision= sa.case(
+                    (changed, self._table.c.revision + 1),
+                    else_ = self._table.c.revision
+                ),
+                **{update_col.name: metadata_value}
+            )
+        else:
+            stmt = stmt.values(
+                **{update_col.name: metadata_value}
+            )
+
+        with self._get_engine().begin() as conn:
+            conn.execute(stmt)
+
+        return
+
+    def increment_revision(
+        self,
+        component_id: str | SequenceNotStr[str]
+    ):
+        """Increment revision by one on nominated components"""
+        pk_col = list(self._table.primary_key.columns)[0]
+
+        if isinstance(component_id, str):
+            stmt = (
+                sa.update(self._table)
+                .where(pk_col == component_id)
+            )
+        else:
+            stmt = (
+                sa.update(self._table)
+                .where(pk_col.in_(component_id))
+            )
+        stmt = stmt.values(revision = self._table.c.revision + 1)
 
         with self._get_engine().begin() as conn:
             conn.execute(stmt)
@@ -504,6 +550,9 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
     _lightweight_component_columns = tuple(
         tbls.em_configs.columns[x] for x in (
             'id',
+
+            'label',
+            'model_type',
             
             'modeldata_config_id',
             'table_config_id',
@@ -549,6 +598,7 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
     def _reconstruct_lightweight_component(self, row):
         metadata = dict(row._mapping)
         revision = metadata.pop('revision')
+        metadata['name'] = metadata.pop('label')
         child_ids = [
             metadata.pop(x) for x in (
                 'modeldata_config_id',
@@ -816,6 +866,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     _lightweight_component_columns = tuple(
         tbls.metamodels.columns[x] for x in (
             'id',
+            'label',
 
             'table_config_id',
             'em_config_id',
@@ -864,6 +915,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     def _assign_updated_child_uids(self, obj, row):
         super()._assign_updated_child_uids(obj, row)
         if isinstance(obj, NewsegsMetaModel):
+            obj.name = row.label
+
             obj._model_id = row.em_config_id
             obj._finance_id = row.fm_config_id
             obj._component_ids['table_config'] = row.table_config_id
@@ -923,6 +976,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         metadata = dict(row._mapping)
         revision = metadata.pop('revision')
         location = metadata.pop('location')
+        metadata['name'] = metadata.pop('label')
         child_ids = [
             metadata.pop(x) for x in (
                 'table_config_id',
@@ -1358,6 +1412,19 @@ class FromDatabaseNewsegsProjectProvider(
                         break
                 rval._revision = r0
         return rval
+
+    @overload
+    def get_lightweight_project(
+        self, project_id: str
+    ) -> LightweightNewsegsProject:
+        ...
+
+    @overload
+    def get_lightweight_project(
+        self, project_id: SequenceNotStr[str]
+    ) -> SequenceNotStr[LightweightNewsegsProject]:
+        ...
+    
 
     def get_lightweight_project(
         self, project_id: str | SequenceNotStr[str]

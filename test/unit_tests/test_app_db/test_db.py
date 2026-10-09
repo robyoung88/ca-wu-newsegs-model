@@ -582,7 +582,7 @@ class TestDatabaseStart(unittest.TestCase):
         vars = full_lightweight_recovery(varids)
         self.assertEqual(len(vars), len(one_of_each))
 
-        TEST_RELATIVE_TIME = False
+        TEST_RELATIVE_TIME = True
         if TEST_RELATIVE_TIME:
             import timeit
             REPS = 100
@@ -842,6 +842,22 @@ class TestDatabaseStart(unittest.TestCase):
             print(t_full, t_full / t_full)
             
             print(t_light, t_light / t_full)
+
+    # def test_metadata_revision(self):
+    #     """Ensure revised metadata increment revisions appropriately and are maintained on reconstruction."""
+    #     from newsegsmodelapp.backend import db
+    #     from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        
+    #     proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+    #     proj = PROJECT_FACTORIES['sprake']()
+
+    #     proj_provider.add_component(proj)
+
+    #     lproj = proj_provider.get_lightweight_project(proj.id)
+
+    #     mm_revision = lproj.metamodels[0].revision
+    #     proj_provider
+        
             
 
     def test_modification_triggers(self):

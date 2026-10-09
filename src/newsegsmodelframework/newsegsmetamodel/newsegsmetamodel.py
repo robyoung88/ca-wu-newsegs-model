@@ -38,7 +38,7 @@ from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterfa
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
-from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsvariable import update_variable, variable
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
 
 logger = logging.getLogger(__name__)
@@ -359,43 +359,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         var = self.variables.get(varid)
         if var is None:
             raise ValueError(f'variable {varid} not found')
-        old_params = var.parameters
-        old_value = var.deterministic_value
-        old_std = var.get_std()
-        old_dsa_low = var.get_dsa_value('lower', True)
-        old_dsa_high = var.get_dsa_value('upper', True)
-        is_ok, new_params = var.set_single_parameter(value, parameter_index, vector_location)
-
-        if not is_ok:
-            var.set_parameters(*old_params)
-            return False, True, True, True, old_params
-        
-        if var.dsa_show:
-            try:
-                dsa_changed = (
-                    (var.get_dsa_value('lower', True) != old_dsa_low)
-                    or (var.get_dsa_value('upper', True) != old_dsa_high)
-                )
-            except TypeError:
-                var.set_parameters(*old_params)
-                return False, True, True, True, old_params
-        else:
-            dsa_changed = False
-            
-        new_value = var.deterministic_value
-
-        if var.psa_show:
-            new_std = var.get_std()
-            psa_changed = (
-                old_value != new_value
-                or old_std != new_std
-            )
-        else:
-            psa_changed = False
-
-        det_changed = old_value != new_value
-
-        return is_ok, det_changed, dsa_changed, psa_changed, new_params
+        return update_variable(var, parameter_index, vector_location, value)
     
     def update_model_from_variable_deterministic(
         self,

@@ -1,6 +1,6 @@
 import copy
 import time
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
@@ -15,7 +15,7 @@ from newsegsmodelapp.components.variable_identification import VariableInstanceP
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
-from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsvariable import update_variable, variable
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelapp.registers import register_input_handler
@@ -117,14 +117,22 @@ def update_single_parameter(
         new_val = callback_utils.get_triggered_value()
         if new_val is None:
             new_val = 0
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
-    variable_keys = {k: triggered_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
 
+    variable_keys = {k: triggered_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
+    varid = make_varid(**variable_keys)
+    update_variable_keys = {k: v for k,v in variable_keys.items() if k in {'parameter_index', 'vector_location'}}
+    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
+
+    var_instance_id = lmm.variables[varid]
+    var = provider.variable_provider.get_variable(var_instance_id)
+    
     now = time.time_ns()
     
-    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = mm.update_variable_from_interface(
-        value = new_val, **variable_keys # pyright: ignore[reportArgumentType]
+    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = update_variable(
+        value = new_val, **update_variable_keys # pyright: ignore[reportArgumentType]
     )
 
     # Feed back current parameters
@@ -143,13 +151,12 @@ def update_single_parameter(
     for idx, id in enumerate(header_ids):
         try:
             content_creator = get_single_input_header_content_creator(
-                id['supersection'], id['section'], mm.model.model_type
+                id['supersection'], id['section'], lmm.model.model_type
             )
         except KeyError:
             content_creator = None
         if content_creator:
-            varid =  make_varid(**triggered_id)
-            return_dict['header_children'][idx] = content_creator(varid, mm)
+            return_dict['header_children'][idx] = content_creator(varid, var)
 
     # Update triggers
     for idx, id in enumerate(trigger_ids):
@@ -164,11 +171,23 @@ def update_single_parameter(
                 if psa_changed:
                     return_dict['trigger_data'][idx] = now
 
-    # Sync project to store
-    project_provider.upsert_component(proj)
+    if update_ok:
+        # Sync the variable
+        provider.variable_provider.upsert_variable(var)
 
-    # TODO: Feed back to inputs if the update is not ok (set invalid)
-
+        # Mark the model components as revised
+        table_components_to_revise = []
+        metamodels_to_revise = []
+        for mm in lproj.metamodels:
+            if var.id in set(mm.variables.values()):
+                table_components_to_revise.append(mm.table_config.id)
+                metamodels_to_revise.append(mm.id)
+        table_components_to_revise.append(lproj.table_config)
+        
+        provider._component_provider.increment_revision(table_components_to_revise)
+        provider.metamodel_provider.increment_revision(metamodels_to_revise)
+        provider.increment_revision(lproj.id)
+    
     return return_dict
 
 def create_value_reset_button(

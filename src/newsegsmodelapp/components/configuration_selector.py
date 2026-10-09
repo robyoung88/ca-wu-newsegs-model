@@ -6,12 +6,14 @@ from dash import ALL, Input, Output, State, ctx, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import pathvalidate
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components import export
 from newsegsmodelapp.components.export import metamodel_to_config_file
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import icons
 from newsegsmodelframework.core.constructors.constructors import find_constructor
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.util import jsonfuncs
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
@@ -22,7 +24,7 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_config_selector_headerbutton(
     config_index: int = 0,
-    metamodel: NewsegsMetaModel | None = None,
+    metamodel: LightweightNewsegsMetaModel | None = None,
     is_focussed: bool | None = None,
 ):
     if is_focussed:
@@ -68,7 +70,7 @@ _PLACEHOLDER_NAMES = set('Configuration Name')
 
 def create_single_configuration_selector_row(
     config_index: int = 0,
-    metamodel: NewsegsMetaModel | None = None,
+    metamodel: LightweightNewsegsMetaModel | None = None,
     is_focussed: bool | None = None,
     reference_size: int = 20,
 ):
@@ -230,7 +232,7 @@ def create_configuration_selector():
 # -----------------------------------------------
 
 def _create_configuration_rows_for_metamodels(
-    metamodels: Sequence[NewsegsMetaModel],
+    metamodels: Sequence[LightweightNewsegsMetaModel],
     focussed_index: int = 0,
 ):
     contents = [
@@ -241,7 +243,7 @@ def _create_configuration_rows_for_metamodels(
     return contents
 
 def _create_configuration_header_elements_for_metamodels(
-    metamodels: Sequence[NewsegsMetaModel],
+    metamodels: Sequence[LightweightNewsegsMetaModel],
     focussed_index: int = 0,
 ):
     contents = [
@@ -283,9 +285,10 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         ):
             raise PreventUpdate
 
-        proj = app.project_provider.get_project(active_project_id)
-        config_rows = _create_configuration_rows_for_metamodels(proj.metamodels, proj.get_focussed_metamodel_index())
-        header_elements = _create_configuration_header_elements_for_metamodels(proj.metamodels, proj.get_focussed_metamodel_index())
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        config_rows = _create_configuration_rows_for_metamodels(lproj.metamodels, lproj.focussed_metamodel_index)
+        header_elements = _create_configuration_header_elements_for_metamodels(lproj.metamodels, lproj.focussed_metamodel_index)
 
         return (
             [config_rows] * len(configuration_container_ids),
@@ -306,18 +309,21 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         if trig is None or len(ctx.triggered) > 1:
             raise PreventUpdate
 
-        proj = app.project_provider.get_project(active_project_id)
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
 
         mm_index = trig['index']
         new_name = callback_utils.get_triggered_value()
 
-        mm = proj.metamodels[mm_index]
+        mm = lproj.metamodels[mm_index]
         if not mm or mm.name == new_name:
             raise PreventUpdate
         print(f'RENAMING METAMODEL {mm.name} to {new_name}')
-        mm.name = new_name
-        mm.revision += 1
-        app.project_provider.upsert_component(proj)
+        # By changing the metadata, the MM should pick up the new name next time it is
+        # taken from the store as the revision will by incremented by default
+        provider.metamodel_provider.set_component_metadata(mm.id, 'label', new_name)
+        # However, for this to be picked up by the front end, we will have to trigger a revision increment
+        provider.set_component_metadata(active_project_id, 'revision', lproj.revision + 1, increment_revision = False)
 
         # Trigger a rebuild of the page in case the name is baked into e.g. button titles.
         return active_project_id
@@ -378,6 +384,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         mm_index = trig['index']
 
+
         proj = app.project_provider.get_project(active_project_id)
         if len(proj.metamodels) < 2:
             # Do not delete last metamodel.
@@ -413,10 +420,17 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         mm_index = trig['index']
-        proj = app.project_provider.get_project(active_project_id)
-        if proj.get_focussed_metamodel_index() == mm_index:
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+
+        
+        if lproj.focussed_metamodel_index == mm_index:
             raise PreventUpdate
 
+        # TODO: Lower load on focus switcher
+        # Don't love this full load on a config switch - see if we can do without it
+        proj = provider.get_project(active_project_id)
+        
         mm = proj.get_focussed_metamodel()
         mm.sync_model_with_changed_variables_deterministic()
 
