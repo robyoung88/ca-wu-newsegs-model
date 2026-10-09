@@ -6,6 +6,7 @@ from newsegsmodelframework.core.trackeddata import ObservableList, revision_data
 
 @revision_dataclass
 class LightweightNewsegsProject(LightweightNewsegsComponent):
+    name: str
     table_config: LightweightNewsegsComponent
     dsa_config: LightweightNewsegsComponent
     psa_config: LightweightNewsegsComponent

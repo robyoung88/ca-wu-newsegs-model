@@ -4,14 +4,14 @@ Callbacks to populate input containers when the project or active metamodel chan
 
 import json
 import time
-from typing import Any
+from typing import Any, cast
 
 from dash import ALL, MATCH, Input, Output, State, no_update
 from dash import ctx
 from dash.exceptions import PreventUpdate
 
 from newsegsmodelapp.backend.db import db
-from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
@@ -19,7 +19,9 @@ from newsegsmodelapp.components.input_components import get_variable_sharing_sta
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp.registers import get_input_handler
@@ -27,8 +29,8 @@ from newsegsmodelapp.registers import get_input_handler
 local_project_provider = project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
 
 def _create_text_field_values(
-    proj: NewsegsProject,
-    mm: NewsegsMetaModel,
+    proj: LightweightNewsegsProject,
+    mm: LightweightNewsegsMetaModel,
 
     generic_text_ids: list[dict[str, Any]],
 ) -> list[Any]:
@@ -73,11 +75,6 @@ def add_input_container_callbacks(app: NewsegsDash):
         if active_project_id is None:
             raise PreventUpdate
         trig = ctx.triggered_id
-        # if isinstance(trig, Mapping) and trig.get('type') == 'input-group-config-update-trigger':
-        #     trig_val = callback_utils.get_triggered_value()
-        #     if isinstance(trig_val, int):
-        #         # Standard update - do nothing.
-        #         raise PreventUpdate
                         
         app_state = json.loads(app_state) if app_state else {}
         
@@ -116,10 +113,12 @@ def add_input_container_callbacks(app: NewsegsDash):
         if active_project_id is None:
             raise PreventUpdate
 
-        proj = app.project_provider.get_project(active_project_id)
-        mm = proj.get_focussed_metamodel()
+        provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
 
-        text_values = _create_text_field_values(proj, mm, generic_text_ids)
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
+
+        text_values = _create_text_field_values(lproj, lmm, generic_text_ids)
 
         return text_values
 
@@ -613,7 +612,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         State('app-state', 'data'),
 
         prevent_initial_call = True,
-        background = True,
+        background = False,
     )
     def update_feedback_graphs(
         configuration_update_trigger,

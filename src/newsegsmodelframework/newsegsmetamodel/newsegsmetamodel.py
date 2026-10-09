@@ -38,7 +38,8 @@ from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterfa
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
-from newsegsmodelframework.newsegsvariable import update_variable, variable
+from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
 
 logger = logging.getLogger(__name__)

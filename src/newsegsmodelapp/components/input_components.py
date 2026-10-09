@@ -13,9 +13,11 @@ from newsegsmodelapp.components.constants import VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelapp.components.icons import get_icon
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
-from newsegsmodelframework.newsegsvariable import update_variable, variable
+from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelapp.registers import register_input_handler
@@ -132,7 +134,7 @@ def update_single_parameter(
     now = time.time_ns()
     
     update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = update_variable(
-        value = new_val, **update_variable_keys # pyright: ignore[reportArgumentType]
+        var, value = new_val, **update_variable_keys # pyright: ignore[reportArgumentType]
     )
 
     # Feed back current parameters
@@ -182,7 +184,7 @@ def update_single_parameter(
             if var.id in set(mm.variables.values()):
                 table_components_to_revise.append(mm.table_config.id)
                 metamodels_to_revise.append(mm.id)
-        table_components_to_revise.append(lproj.table_config)
+        table_components_to_revise.append(lproj.table_config.id)
         
         provider._component_provider.increment_revision(table_components_to_revise)
         provider.metamodel_provider.increment_revision(metamodels_to_revise)
@@ -322,24 +324,23 @@ def create_input_group_config_update_trigger(
 # Variable group cycling
 # -----------------------------------------------
 
-def get_metamodel_groups_for_var(proj: NewsegsProject, varid: str) -> list[set[int]]:
+def get_metamodel_groups_for_var(proj: LightweightNewsegsProject, varid: str) -> list[set[int]]:
     """
     Finds groups of metamodels (1-indexed) sharing the variable with `varid`.
     Returns a list of sets containing metamodel 1-based indices.
     """
-    var_to_mm_indices: dict[int, set[int]] = {}
-    if not varid in proj._variables_by_varid:
-        print(f'{varid} not in project variables - available keys are {proj._variables_by_varid.keys()}')
-        return []
-    for uid, var in proj._variables_by_varid[varid].items():
-        var_inst_id = id(var)
-        for idx, mm in enumerate(proj.metamodels, start = 1):
-            if varid in mm.variables and id(mm.variables[varid]) == var_inst_id:
-                var_to_mm_indices.setdefault(var_inst_id, set()).add(idx)
+    var_to_mm_indices: dict[str, set[int]] = {}
+    for idx, lmm in enumerate(proj.metamodels, start = 1):
+        if varid in lmm.variables:
+            var_to_mm_indices.setdefault(lmm.variables[varid], set()).add(idx)
             
     return list(var_to_mm_indices.values())
 
-def get_variable_sharing_status(proj, current_mm: NewsegsMetaModel, varid: str) -> tuple[str, str]:
+def get_variable_sharing_status(
+    proj: LightweightNewsegsProject,
+    current_mm: LightweightNewsegsMetaModel, 
+    varid: str
+) -> tuple[str, str]:
     """
     Determines status label and badge color scheme for a given variable.
     """

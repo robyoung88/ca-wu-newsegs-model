@@ -308,6 +308,8 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         v = LightweightVariable.from_dict(metadata)
         v.raw_parameter_0 = json.loads(v.raw_parameter_0) if v.raw_parameter_0 is not None else None
         v.raw_parameter_1 = json.loads(v.raw_parameter_1) if v.raw_parameter_1 is not None else None
+        v.last_deterministic_value = json.loads(v.last_deterministic_value) if v.last_deterministic_value is not None else None
+        v.icon_name = json.loads(v.icon_name)
         v.revision = revision
         v._syncronise()
         return v
@@ -319,10 +321,17 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         v = FullLightweightVariable.from_dict(metadata)
         v.raw_parameter_0 = json.loads(v.raw_parameter_0) if v.raw_parameter_0 is not None else None
         v.raw_parameter_1 = json.loads(v.raw_parameter_1) if v.raw_parameter_1 is not None else None
+        v.last_deterministic_value = json.loads(v.last_deterministic_value) if v.last_deterministic_value is not None else None
         v.dsa_lower = json.loads(v.dsa_lower) if v.dsa_lower is not None else None
         v.dsa_upper = json.loads(v.dsa_upper) if v.dsa_upper is not None else None
+        v.dsa_value_lower = json.loads(v.dsa_value_lower) if v.dsa_value_lower is not None else None
+        v.dsa_value_upper = json.loads(v.dsa_value_upper) if v.dsa_value_upper is not None else None
+        v.last_std = json.loads(v.last_std) if v.last_std is not None else None
+        v.psa_ci_lower = json.loads(v.psa_ci_lower) if v.psa_ci_lower is not None else None
+        v.psa_ci_upper = json.loads(v.psa_ci_upper) if v.psa_ci_upper is not None else None
         v.optim_min = json.loads(v.optim_min) if v.optim_min is not None else None
         v.optim_max = json.loads(v.optim_max) if v.optim_max is not None else None
+        v.icon_name = json.loads(v.icon_name)
         v.revision = revision
         v._syncronise()
         return v

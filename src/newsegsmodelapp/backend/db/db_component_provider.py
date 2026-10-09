@@ -1272,6 +1272,7 @@ class FromDatabaseNewsegsProjectProvider(
     _lightweight_component_columns = tuple(
         tbls.projects.columns[x] for x in (
             'id',
+            'label',
 
             'table_config_id',
             'dsa_component_config_id',
@@ -1357,6 +1358,7 @@ class FromDatabaseNewsegsProjectProvider(
     def _reconstruct_lightweight_component(self, row):
         metadata = dict(row._mapping)
         revision = metadata.pop('revision')
+        metadata['name'] = metadata.pop('label')
         child_ids = [
             metadata.pop(x) for x in (
                 'table_config_id',

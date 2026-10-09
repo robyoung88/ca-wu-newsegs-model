@@ -4,8 +4,10 @@ from typing import cast
 
 import plotly.express as px
 
+from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components import energy_balance_estimation
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
+from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel, get_focussed_metamodel
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable import variable
@@ -16,42 +18,66 @@ _CONST_FILE = APP_ROOT / 'newsegsmodelframework' / 'constants' / 'model_constant
 with open(_CONST_FILE, 'r') as f:
     MODEL_CONSTANTS = json.load(f)
 
-def _get_val(mm, key) -> int | float:
-    return cast(variable.NumericScalarVariable, mm.variables.get(key)).deterministic_value
+def _get_val(lmm, key, variableprovider: FromDatabaseVariableProvider) -> int | float:
+    var = variableprovider.get_lightweight_variable(lmm.variables.get(key))
+    return var.last_deterministic_value
+# def _get_val(mm, key) -> int | float:
+#     return cast(variable.NumericScalarVariable, mm.variables.get(key)).deterministic_value
 
 def update_estimated_energy_balance(
-    mm: NewsegsMetaModel,
+    mm: LightweightNewsegsMetaModel,
+    variableprovider: FromDatabaseVariableProvider,
     energy_balance: energy_balance_estimation.EstimatedEnergyBalance
 ) -> energy_balance_estimation.EstimatedEnergyBalance:
+    vars_required = (
+        'gen_input.wind_capacity.0',
+        'gen_input.pv_capacity.0',
+        'bc_input.n_units.0',
+        'bc_input.hlp.0',
+        'bc_input.gfa.0',
+        'bc_input.ref_daily_consumption.0',
+        'dc_input.efficiency_reduction.0',
+        'dc_input.n_evs_per_household.0',
+        'dc_input.annual_residential_consumption_per_ev.0',
+        'stor_input.storage_capacity.0',
+    )
+
+    variable_uids = [mm.variables.get(x) for x in vars_required]
+
+    vvs = variableprovider.get_variable_metadata(variable_uids, 'last_deterministic_value')
+    variable_demap = {
+        varname: json.loads(vvs[id]['last_deterministic_value']) for id, varname in zip(variable_uids, vars_required)
+    }
+    
     # Generation
-    wind_capacity = _get_val(mm, 'gen_input.wind_capacity.0')
-    pv_capacity = _get_val(mm, 'gen_input.pv_capacity.0')
+    wind_capacity = variable_demap['gen_input.wind_capacity.0']
+    pv_capacity = variable_demap['gen_input.pv_capacity.0']
     energy_balance.set_wind_generation(wind_capacity)
     energy_balance.set_pv_generation(pv_capacity)
 
     # Consumption
-    n_units = _get_val(mm, 'bc_input.n_units.0')
+    n_units = variable_demap['bc_input.n_units.0']
     
-    hlp = _get_val(mm, 'bc_input.hlp.0')
-    gfa = _get_val(mm, 'bc_input.gfa.0')
+    hlp = variable_demap['bc_input.hlp.0']
+    gfa = variable_demap['bc_input.gfa.0']
     # Could use this, but default is more than ok
     energy_balance.set_spaceheat_consumption(n_units, hlp, gfa)
 
-    ref_daily_consumption = _get_val(mm, 'bc_input.ref_daily_consumption.0')
+    ref_daily_consumption = variable_demap['bc_input.ref_daily_consumption.0']
     # Assume conversion efficiency of 1
     energy_balance.set_dhw_consumption(n_units, ref_daily_consumption)
 
-    efficiency_reduction = _get_val(mm, 'dc_input.efficiency_reduction.0')
+    efficiency_reduction = variable_demap['dc_input.efficiency_reduction.0']
     energy_balance.set_direct_consumption(
         n_units,
         (1 - efficiency_reduction) * MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
     )
 
-    n_evs_per_household = _get_val(mm, 'dc_input.n_evs_per_household.0')
-    ev_consumption_per_year = _get_val(mm, 'dc_input.annual_residential_consumption_per_ev.0')
+    n_evs_per_household = variable_demap['dc_input.n_evs_per_household.0']
+    ev_consumption_per_year = variable_demap['dc_input.annual_residential_consumption_per_ev.0']
     energy_balance.set_ev_consumption(n_units, ev_consumption_per_year, n_evs_per_household)
 
-    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
+    stor_cap = variable_demap['stor_input.storage_capacity.0']
     energy_balance.set_storage_capacity(stor_cap)
 
     return energy_balance
@@ -84,11 +110,11 @@ def _(
     project_provider: NewsegsProjectProviderInterface,
     eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
 ):
-    mm = get_focussed_metamodel(project_id, project_provider)
+    lmm = get_focussed_lightweight_metamodel(project_id, project_provider)
     if not eb:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
 
-    eb = update_estimated_energy_balance(mm, eb)
+    eb = update_estimated_energy_balance(lmm, project_provider.variable_provider, eb)
 
     df = eb.estimated_annual_energy_balance
 
@@ -107,11 +133,11 @@ def _(
     project_provider: NewsegsProjectProviderInterface,
     eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
 ):
-    mm = get_focussed_metamodel(project_id, project_provider)
+    lmm = get_focussed_lightweight_metamodel(project_id, project_provider)
     if not eb:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
 
-    eb = update_estimated_energy_balance(mm, eb)
+    eb = update_estimated_energy_balance(lmm, project_provider.variable_provider, eb)
 
     df = eb.estimated_maximum_daily_balance
     fig_max = _feedback_graph_bar(df, y = 'label')
