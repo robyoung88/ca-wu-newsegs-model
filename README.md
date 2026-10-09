@@ -1391,6 +1391,15 @@ MetaModels are modified by one of several events.
 - The deletion of a MetaModel
 
 
+## Profiling
+
+For profiling, use viztracer:
+
+```{bash}
+& C:\Users\Robert.Young\anaconda3\envs\ca-wu-newsegs-mod\python.exe -m viztracer --log_async --min_duration 500 -o trace.json c:/Users/Robert.Young/Dev/ca-wu-newsegs-model/src/app.py    
+```
+
+Results can be viewed at https://www.speedscope.app/ or https://ui.perfetto.dev/.
 
 ## Licence
 This software is available under the [MIT License](LICENCE).

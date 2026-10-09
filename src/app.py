@@ -56,7 +56,7 @@ BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 # else:
 # Diskcache for non-production apps when developing locally
 import diskcache
-cache = diskcache.Cache(settings.get('DISKCACHE_PATH ', "./cache"))
+cache = diskcache.Cache(settings.get('DISKCACHE_PATH', "./cache"))
 background_callback_manager = DiskcacheManager(cache)
 
 import threading
@@ -302,7 +302,7 @@ if __name__ == '__main__':
     init_db()
     app = create_app()
     #try:
-    app.run(debug = False, use_reloader = False)
+    app.run(debug = True, use_reloader = False)
     # except SystemExit as e:
     #     print(f"Caught SystemExit with code: {e.code}")
     #     import traceback

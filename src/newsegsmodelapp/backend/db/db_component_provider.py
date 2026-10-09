@@ -1602,9 +1602,13 @@ class FromDatabaseNewsegsProjectProvider(
 
         from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
         if model_type:
-            return PROJECT_FACTORIES[model_type]()
+            proj = PROJECT_FACTORIES[model_type]()
+            self.add_component(proj)
+            return proj
         else:
-            return PROJECT_FACTORIES[list(PROJECT_FACTORIES.keys())[0]]()
+            proj = PROJECT_FACTORIES[list(PROJECT_FACTORIES.keys())[0]]()
+            self.add_component(proj)
+            return proj
 
     @override
     def get_session_project_id(
@@ -1656,7 +1660,7 @@ class FromDatabaseNewsegsProjectProvider(
                     factory = PROJECT_FACTORIES[list(PROJECT_FACTORIES.keys())[0]]
 
                 proj = factory()
-                self.upsert_component(proj)
+                self.add_component(proj)
                 if session_id:
                     self.set_session_project_id(session_id, proj.id)
                 

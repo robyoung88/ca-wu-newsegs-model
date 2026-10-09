@@ -826,6 +826,10 @@ class TestDatabaseStart(unittest.TestCase):
         self.assertEqual(proj2.metamodels[0].finance.id, lproj2.metamodels[0].finance.id)
         self.assertEqual(proj2.metamodels[0].finance.revision, lproj2.metamodels[0].finance.revision)
 
+        self.assertEqual(len(proj._variables_by_uid), len(proj2._variables_by_uid))
+        self.assertEqual(len(proj.metamodels[0].variables), len(proj2.metamodels[0].variables))
+        self.assertEqual(len(lproj2.metamodels[0].variables), len(proj2.metamodels[0].variables))
+
         TEST_RELATIVE_TIME = True
         if TEST_RELATIVE_TIME:
             import timeit

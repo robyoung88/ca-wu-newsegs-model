@@ -179,6 +179,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         metadata = dict(row._mapping)
         payload = metadata.pop('payload')
         revision = metadata.pop('revision')
+        distribution = metadata.pop('distribution') # Just get this out of the way or it will break the variable reconstruction
         p0 = metadata.pop('raw_parameter_0')
         p1 = metadata.pop('raw_parameter_1')
         constr_dict = json.loads(payload)
@@ -610,7 +611,7 @@ class CachedFromDatabaseVariableProvider(
             found_var = False
             if id_ in self._variable_cache:
                 vx = self._variable_cache[id_]
-                if vx.revision == revisions[idx]:
+                if vx.revision == revisions[id_]['revision']:
                     rlist.append(vx)
                     found_var = True
             if not found_var:
@@ -624,7 +625,7 @@ class CachedFromDatabaseVariableProvider(
                 if id_ is None:
                     vx = vars_from_db[jdx]
                     rlist[idx] = vx
-                    self._variable_cache[vx.id]
+                    self._variable_cache[vx.id] = vx
                     jdx += 1
 
         if is_sequence:
