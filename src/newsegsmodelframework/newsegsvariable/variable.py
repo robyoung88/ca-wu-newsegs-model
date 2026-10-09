@@ -3283,6 +3283,8 @@ class Variable(
     """
     Is the variable to be shown in the opimisation configuration container?
     """
+    optim_min = 0
+    optim_max = None
 
     variable_type: VARIABLE_TYPE = 'scalar'
     _label: str | None = None
@@ -4000,7 +4002,7 @@ class NumericScalarVariable(ScalarVariable):
         if v is None:
             raise TypeError(f'DSA bound should be a numeric value, got None')
         if not isinstance(v, ScalarNumParam):
-            raise TypeError(f'DSA bound should be a numeric value, is type{v}')
+            raise TypeError(f'DSA bound should be a numeric value, is {type(v)}')
         return v
 
     @property
@@ -4691,3 +4693,13 @@ def variable_uid(variable: Variable) -> str | list[str]:
             return list([lambda x,y: str(y) + "." + str(x) + "." + str(variable.interface_subindex) for x,y in zip(variable.interface_key, variable.interface_section)]) # type: ignore
     else:
         return str(variable.interface_section) + "." + str(variable.interface_key) + "." + str(variable.interface_subindex)
+
+def varible_uid_to_dict(varid: str):
+    ss = varid.split('.')
+    if not len(ss) == 3:
+        raise ValueError(f'{varid} is not a valid variable id')
+    return dict(
+        interface_section = ss[0],
+        interface_key = ss[1],
+        interface_subindex = ss[2],
+    )

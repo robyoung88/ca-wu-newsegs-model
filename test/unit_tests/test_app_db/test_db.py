@@ -548,6 +548,57 @@ class TestDatabaseStart(unittest.TestCase):
                     v2.deterministic_value
                 )
 
+    def test_db_lightweight_variable_provider(self):
+        from newsegsmodelapp.backend import db
+        one_of_each = variable_helpers.one_of_every_variable()
+
+        for var in one_of_each.values():
+            self.assertIsNotNone(var.deterministic_value)
+        
+        backend_var_provider = FromDatabaseVariableProvider(db.get_engine)
+ 
+        backend_var_provider.upsert_variable(list(one_of_each.values()))
+
+        for var in one_of_each.values():
+            self.assertFalse(var.modified)
+
+        varids = [x.id for x in one_of_each.values()]
+
+        def full_recovery(varids):
+            return backend_var_provider.get_variable(varids)
+
+        def lightweight_recovery(varids):
+            return backend_var_provider.get_lightweight_variable(varids)
+
+        def full_lightweight_recovery(varids):
+            return backend_var_provider.get_full_lightweight_variable(varids)
+
+        vars = full_recovery(varids)
+        self.assertEqual(len(vars), len(one_of_each))
+
+        vars = lightweight_recovery(varids)
+        self.assertEqual(len(vars), len(one_of_each))
+
+        vars = full_lightweight_recovery(varids)
+        self.assertEqual(len(vars), len(one_of_each))
+
+        TEST_RELATIVE_TIME = False
+        if TEST_RELATIVE_TIME:
+            import timeit
+            REPS = 100
+
+            t_full = timeit.timeit(lambda: full_recovery(varids), number = REPS, globals = globals())
+
+            t_light = timeit.timeit(lambda: lightweight_recovery(varids), number = REPS, globals = globals())
+
+            t_full_light = timeit.timeit(lambda: full_lightweight_recovery(varids), number = REPS, globals = globals())
+
+            print(t_full, t_full / t_full)
+
+            print(t_light, t_light / t_full)
+
+            print(t_full_light, t_full_light / t_full)
+
     def test_project_variable_syncronisation(self):
         import numpy.testing as nptest
 
@@ -747,6 +798,47 @@ class TestDatabaseStart(unittest.TestCase):
             mm1.finance.get_costs_series_discounted(),
             mm2.finance.get_costs_series_discounted()
         )
+
+    def test_lightweight_provider(self):
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+        proj = PROJECT_FACTORIES['sprake']()
+
+        proj_provider.add_component(proj)
+
+        proj2 = proj_provider.get_project(proj.id)
+        lproj2 = proj_provider.get_lightweight_project(proj.id)
+
+        self.assertEqual(proj2.id, lproj2.id)
+        self.assertEqual(proj2.revision, lproj2.revision)
+        self.assertEqual(proj2.metamodels[0].id, lproj2.metamodels[0].id)
+        self.assertEqual(proj2.metamodels[0].revision, lproj2.metamodels[0].revision)
+        self.assertEqual(proj2.metamodels[0].model.id, lproj2.metamodels[0].model.id)
+        self.assertEqual(proj2.metamodels[0].model.revision, lproj2.metamodels[0].model.revision)
+        self.assertEqual(proj2.metamodels[0].model.grid.id, lproj2.metamodels[0].model.grid.id)
+        self.assertEqual(proj2.metamodels[0].model.grid.revision, lproj2.metamodels[0].model.grid.revision)
+        self.assertEqual(proj2.metamodels[0].model.generation.id, lproj2.metamodels[0].model.generation.id)
+        self.assertEqual(proj2.metamodels[0].model.generation.revision, lproj2.metamodels[0].model.generation.revision)
+        self.assertEqual(proj2.metamodels[0].model.consumption_storage.id, lproj2.metamodels[0].model.consumption_storage.id)
+        self.assertEqual(proj2.metamodels[0].model.consumption_storage.revision, lproj2.metamodels[0].model.consumption_storage.revision)
+        self.assertEqual(proj2.metamodels[0].finance.id, lproj2.metamodels[0].finance.id)
+        self.assertEqual(proj2.metamodels[0].finance.revision, lproj2.metamodels[0].finance.revision)
+
+        TEST_RELATIVE_TIME = True
+        if TEST_RELATIVE_TIME:
+            import timeit
+            REPS = 10
+
+            t_full = timeit.timeit(lambda: proj_provider.get_project(proj.id), number = REPS, globals = globals())
+            
+            t_light = timeit.timeit(lambda: proj_provider.get_lightweight_project(proj.id), number = REPS, globals = globals())
+
+            print(t_full, t_full / t_full)
+            
+            print(t_light, t_light / t_full)
+            
 
     def test_modification_triggers(self):
         import time

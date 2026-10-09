@@ -9,8 +9,10 @@ from sqlalchemy.exc import NoResultFound
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.backend.db import DependentObjectsExistError, db_snapshot
-from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
+from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider, FromDatabaseVariableProvider
 from newsegsmodelframework.core.constructors.constructors import find_constructor
+from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightNewsegsComponent
+from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentManagerInterface
 
 from newsegsmodelapp.backend.db.project import component_to_raw_table_data, finance_model_to_raw_table_data, metamodel_to_raw_table_data, project_to_raw_table_data
@@ -18,17 +20,29 @@ from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
+from newsegsmodelframework.newsegsfinance.lightweightnewsegsfinance import LightweightNewsegsFinance
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import LightweightNewsegsModel
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSING_OPTION, NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.variable import Variable
+from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
 
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentManagerInterface
 ):
+    _table = tbls.component_configs
+
+    _lightweight_component_columns = tuple(
+        tbls.component_configs.columns[x] for x in (
+            'id',
+            'revision'
+        )
+    )
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         self._get_engine = get_engine
-        self._table = tbls.component_configs
 
     def _component_from_json(self, json_payload: str) -> NewsegsComponent:
         constr_dict = json.loads(json_payload)
@@ -62,6 +76,14 @@ class FromDatabaseNewsegsComponentProvider(
         if obj.chain_modified:
             raise ValueError('Component has been reconstructed with modified children.')
         return obj
+
+    def _reconstruct_lightweight_component(self, row) -> LightweightNewsegsComponent:
+        metadata = dict(row._mapping)
+        revision = metadata.pop('revision')
+        comp = LightweightNewsegsComponent.from_dict(metadata)
+        comp.revision = revision
+        comp._syncronise()
+        return comp
 
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if component.modified:
@@ -101,6 +123,28 @@ class FromDatabaseNewsegsComponentProvider(
             return reconstructed_components[0]
 
         compmap = {x.id: x for x in reconstructed_components}
+        return [compmap[x] for x in component_id]
+
+    def get_lightweight_component(self, component_id: str | SequenceNotStr[str]) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
+        is_sequence = False
+        if isinstance(component_id, str):
+            stmt = (
+                sa.select(*self._lightweight_component_columns)
+                .where(self._table.c.id == component_id)
+            )
+        else:
+            is_sequence = True
+            stmt = (
+                sa.select(*self._lightweight_component_columns)
+                .where(self._table.c.id.in_(component_id))
+            )
+        with self._get_engine().connect() as conn:
+            rows = conn.execute(stmt).fetchall()
+
+        reconstructed_components = [self._reconstruct_lightweight_component(row) for row in rows]
+        if not is_sequence:
+            return reconstructed_components[0]
+        compmap = {x.id:x for x in reconstructed_components}
         return [compmap[x] for x in component_id]
 
     def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
@@ -455,10 +499,32 @@ class FromDatabaseNewsegsComponentProvider(
         return
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
-    def __init__(self, get_engine: Callable[[], sa.Engine]):
-        super().__init__(get_engine)
-        self._table = tbls.em_configs
-        self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
+    _table = tbls.em_configs
+
+    _lightweight_component_columns = tuple(
+        tbls.em_configs.columns[x] for x in (
+            'id',
+            
+            'modeldata_config_id',
+            'table_config_id',
+            'grid_config_id',
+            'generation_config_id',
+            'cs_config_id',
+
+            'revision'
+        )
+    )
+
+    def _create_component_provider(self) -> NewsegsComponentManagerInterface:
+        return FromDatabaseNewsegsComponentProvider(self._get_engine)
+
+    def __init__(
+        self, *args, 
+        component_provider: Optional[NewsegsComponentManagerInterface] = None, 
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self._component_provider = component_provider if component_provider else self._create_component_provider()
 
     @override
     def _assign_updated_child_uids(self, obj, row):
@@ -480,13 +546,49 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
         return obj
 
     @override
+    def _reconstruct_lightweight_component(self, row):
+        metadata = dict(row._mapping)
+        revision = metadata.pop('revision')
+        child_ids = [
+            metadata.pop(x) for x in (
+                'modeldata_config_id',
+                'table_config_id',
+                'grid_config_id',
+                'generation_config_id',
+                'cs_config_id',
+            )
+        ]
+        child_components = {
+            k:v for k, v in zip(
+                (
+                    'model_data',
+                    'table_config',
+                    'grid',
+                    'generation',
+                    'consumption_storage'
+                ),
+                self._component_provider.get_lightweight_component(child_ids)
+            )
+        }
+        metadata.update(child_components)
+        comp = LightweightNewsegsModel.from_dict(metadata)
+        comp.revision = revision
+        comp._syncronise()
+        return comp
+
+    def get_lightweight_em(
+            self, model_id: str | SequenceNotStr[str]
+        ) -> LightweightNewsegsModel | SequenceNotStr[LightweightNewsegsModel]:
+        return self.get_lightweight_component(model_id)
+    
+    @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsModelInterface):
             return super()._component_to_table_data(component)
         if component.modified:
             raise ValueError(f'{component.id} is being upserted in a modified state')
         return energy_model_to_raw_table_data(component)
-        
+    
     @override
     def upsert_component(
         self,
@@ -561,11 +663,30 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
-    def __init__(self, get_engine: Callable[[], sa.Engine]):
-        super().__init__(get_engine)
-        self._table = tbls.fm_configs
-        self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
+    _table = tbls.fm_configs
 
+    _lightweight_component_columns = tuple(
+        tbls.fm_configs.columns[x] for x in (
+            'id',
+
+            'financedata_config_id',
+            'table_config_id',
+
+            'revision',
+        )
+    )
+
+    def _create_component_provider(self) -> NewsegsComponentManagerInterface:
+        return FromDatabaseNewsegsComponentProvider(self._get_engine)
+
+    def __init__(
+        self, *args, 
+        component_provider: Optional[NewsegsComponentManagerInterface] = None, 
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self._component_provider = component_provider if component_provider else self._create_component_provider()
+        
     @override
     def _assign_updated_child_uids(self, obj, row):
         super()._assign_updated_child_uids(obj, row)
@@ -580,6 +701,36 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
         obj.reattach_components(self._component_provider)
         return obj
 
+    @override
+    def _reconstruct_lightweight_component(self, row):
+        metadata = dict(row._mapping)
+        revision = metadata.pop('revision')
+        child_ids = [
+            metadata.pop(x) for x in (
+                'financedata_config_id',
+                'table_config_id',
+            )
+        ]
+        child_components = {
+            k:v for k, v in zip(
+                (
+                    'finance_data',
+                    'table_config',
+                ),
+                self._component_provider.get_lightweight_component(child_ids)
+            )
+        }
+        metadata.update(child_components)
+        comp = LightweightNewsegsFinance.from_dict(metadata)
+        comp.revision = revision
+        comp._syncronise()
+        return comp
+
+    def get_lightweight_fm(
+        self, finance_id: str | SequenceNotStr[str]
+    ) -> LightweightNewsegsFinance | SequenceNotStr[LightweightNewsegsFinance]:
+        return self.get_lightweight_component(finance_id)
+ 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if not isinstance(component, NewsegsFinanceInterface):
@@ -659,16 +810,55 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider):
-    def __init__(self, get_engine: Callable[[], sa.Engine]):
-        super().__init__(get_engine)
-        self._table = tbls.metamodels
-        self._em_provider = FromDatabaseNewsegsEMProvider(get_engine)
-        self._fm_provider = FromDatabaseNewsegsFMProvider(get_engine)
-        self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
-        # This may be overwritten - e.g. by an enclosing ProjectProvider
-        self.variable_provider = FromDatabaseVariableProvider(get_engine)
+    _table = tbls.metamodels
+    _metamodel_variable_jct = tbls.metamodel_variables
 
-        self._metamodel_variable_jct = tbls.metamodel_variables
+    _lightweight_component_columns = tuple(
+        tbls.metamodels.columns[x] for x in (
+            'id',
+
+            'table_config_id',
+            'em_config_id',
+            'fm_config_id',
+            'location',
+
+            'revision'
+        )
+    )
+
+    def _create_variable_provider(self) -> VariableProviderInterface:
+        return FromDatabaseVariableProvider(self._get_engine)
+
+    def _create_component_provider(self) -> NewsegsComponentManagerInterface:
+        return FromDatabaseNewsegsComponentProvider(self._get_engine)
+
+    def _create_em_provider(self) -> FromDatabaseNewsegsEMProvider:
+        return FromDatabaseNewsegsEMProvider(
+            self._get_engine, component_provider=self._component_provider
+        )
+
+    def _create_fm_provider(self) -> FromDatabaseNewsegsFMProvider:
+        return FromDatabaseNewsegsFMProvider(
+            self._get_engine, component_provider=self._component_provider
+        )
+
+    def __init__(
+            self,
+            *args,
+            variable_provider: Optional[VariableProviderInterface] = None,
+            component_provider: Optional[NewsegsComponentManagerInterface] = None,
+            em_provider: Optional[FromDatabaseNewsegsEMProvider] = None,
+            fm_provider: Optional[FromDatabaseNewsegsFMProvider] = None, # TODO: Make interface
+            **kwargs,
+        ):
+        super().__init__(*args, **kwargs)
+        # This may be overwritten - e.g. by an enclosing ProjectProvider
+        self.variable_provider = variable_provider if variable_provider else self._create_variable_provider()
+
+        self._component_provider = component_provider if component_provider else self._create_component_provider()
+
+        self._em_provider = em_provider if em_provider else self._create_em_provider()
+        self._fm_provider = fm_provider if fm_provider else self._create_fm_provider()
 
     @override
     def _assign_updated_child_uids(self, obj, row):
@@ -695,27 +885,27 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 var_mapping = {
                     row[0]: row[1] for row in result
                 }
-                # To keep order, try to use the existing order
-                used_keys = []
-                var_ids = []
-                for x in obj.variable_ids:
-                    k = x['varid']
-                    uid = var_mapping.get(k)
-                    if uid:
-                        var_ids.append({
-                            'varid': k,
-                            'uid': uid
-                        })
-                        used_keys.append(k)
-                used_keys = set(used_keys)
-                for k in var_mapping.keys():
-                    if not k in used_keys:
-                        var_ids.append({
-                            'varid': k,
-                            'uid': var_mapping[k]
-                        })
-                
-                obj._variable_ids = tuple(var_ids)
+            # To keep order, try to use the existing order
+            used_keys = []
+            var_ids = []
+            for x in obj.variable_ids:
+                k = x['varid']
+                uid = var_mapping.get(k)
+                if uid:
+                    var_ids.append({
+                        'varid': k,
+                        'uid': uid
+                    })
+                    used_keys.append(k)
+            used_keys = set(used_keys)
+            for k in var_mapping.keys():
+                if not k in used_keys:
+                    var_ids.append({
+                        'varid': k,
+                        'uid': var_mapping[k]
+                    })
+            
+            obj._variable_ids = tuple(var_ids)
 
         return obj
 
@@ -728,16 +918,108 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         # Do not reattach variables here - wait until the project does it.
         return obj
 
-    # @override
-    # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
-    #     new =  super()._create_duplicate_component(original)
-    #     # if isinstance(original, NewsegsMetaModel):
-    #     #     new.model = cast(NewsegsModel, self._em_provider.duplicate_component(new._component_ids['model']))
-    #     #     new.finance = cast(NewsegsFinance, self._fm_provider.duplicate_component(new._component_ids['finance']))
-    #     #     # Worth double checking that model is set on finance
-    #     #     new.finance.set_model(new.model, dirty = False)
-    #     #     new.variables = {k: v for k, v in original.variables.items()}
-    #     return new
+    @override
+    def _reconstruct_lightweight_component(self, row):
+        metadata = dict(row._mapping)
+        revision = metadata.pop('revision')
+        location = metadata.pop('location')
+        child_ids = [
+            metadata.pop(x) for x in (
+                'table_config_id',
+            )
+        ]
+        child_components = {
+            k:v for k, v in zip(
+                (
+                    'table_config',
+                ),
+                self._component_provider.get_lightweight_component(child_ids)
+            )
+        }
+        metadata.update(child_components)
+        em_child_ids = [
+            metadata.pop(x) for x in (
+                'em_config_id',
+            )
+        ]
+        em_child_components = {
+            k:v for k, v in zip(
+                (
+                    'model',
+                ),
+                self._em_provider.get_lightweight_component(em_child_ids)
+            )
+        }
+        metadata.update(em_child_components)
+        fm_child_ids = [
+            metadata.pop(x) for x in (
+                'fm_config_id',
+            )
+        ]
+        fm_child_components = {
+            k:v for k, v in zip(
+                (
+                    'finance',
+                ),
+                self._fm_provider.get_lightweight_component(fm_child_ids)
+            )
+        }
+        metadata.update(fm_child_components)
+        if location is not None:
+            metadata['location'] = Location.from_dict(json.loads(location))
+        else:
+            metadata['location'] = Location.from_none()
+        comp = LightweightNewsegsMetaModel.from_dict(metadata)
+        fr0 = comp.finance.revision
+        comp.finance.model = comp.model
+        comp.finance._revision = fr0
+        comp.revision = revision
+        comp._chain_syncronise()
+        return comp
+
+    @override
+    def get_lightweight_component(self, component_id):
+        rval = super().get_lightweight_component(component_id)
+        
+        if isinstance(rval, LightweightNewsegsMetaModel):
+            is_sequence = False
+            component_id = [component_id]
+        else:
+            is_sequence = True
+
+        for idx, comp_id in enumerate(component_id):
+            var_stmt = (
+                sa.select(
+                    tbls.variable_configs.c.varid,
+                    tbls.variable_configs.c.id,
+                )
+                .select_from(self._metamodel_variable_jct)
+                .join(
+                    tbls.variable_configs,
+                    self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
+                )
+                .where(self._metamodel_variable_jct.c.metamodel_id == comp_id)
+            )
+            with self._get_engine().connect() as conn:
+                result = conn.execute(var_stmt)
+                var_mapping = {
+                    row[0]: row[1] for row in result
+                }
+            if is_sequence:
+                r0 = rval[idx].revision
+                rval[idx].variables = var_mapping
+                rval[idx]._revision = r0
+            else:
+                r0 = rval.revision
+                rval.variables = var_mapping
+                rval._revision = r0
+
+        return rval
+
+    def get_lightweight_metamodel(
+        self, metamodel_id: str | SequenceNotStr[str]
+    ) -> LightweightNewsegsMetaModel | SequenceNotStr[LightweightNewsegsMetaModel]:
+        return self.get_lightweight_component(metamodel_id)
 
     @override
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
@@ -793,8 +1075,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         if isinstance(component, NewsegsComponent):
             if isinstance(component, NewsegsMetaModel):
                 # First sync the variables so that the OrderedDict can be syncronised prior to upsert
-                for v in component.variables.values():
-                    self.variable_provider.upsert_variable(v)
+                self.variable_provider.upsert_variable(list(component.variables.values()))
                 component.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
                 
                 rval = super().upsert_component(component, force, tbl)
@@ -930,16 +1211,44 @@ class FromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsComponentProvider,
     NewsegsProjectProviderInterface,
 ):
+    _table = tbls.projects
+    _project_metamodel_jct = tbls.project_metamodels
+    _project_variable_jct = tbls.project_variables
+
+    _lightweight_component_columns = tuple(
+        tbls.projects.columns[x] for x in (
+            'id',
+
+            'table_config_id',
+            'dsa_component_config_id',
+            'psa_component_config_id',
+            
+            'focussed_metamodel_id',
+
+            'revision',
+        )
+    )
+
+    def _create_variable_provider(self) -> VariableProviderInterface:
+        return FromDatabaseVariableProvider(self._get_engine)
+
+    def _create_component_provider(self) -> NewsegsComponentManagerInterface:
+        return FromDatabaseNewsegsComponentProvider(self._get_engine)
+
+    # TODO: Make an interface
+    def _create_metamodel_provider(self) -> FromDatabaseNewsegsMetamodelProvider:
+        return FromDatabaseNewsegsMetamodelProvider(
+            self._get_engine,
+            variable_provider = self.variable_provider,
+            component_provider = self._component_provider,
+        )
+
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         super().__init__(get_engine)
-        self._table = tbls.projects
         # The metamodel and variable providers are public for this class
-        self.metamodel_provider = FromDatabaseNewsegsMetamodelProvider(get_engine)
-        self.variable_provider = FromDatabaseVariableProvider(get_engine)
-        self._component_provider = FromDatabaseNewsegsComponentProvider(get_engine)
-
-        self._project_metamodel_jct = tbls.project_metamodels
-        self._project_variable_jct = tbls.project_variables
+        self.variable_provider = self._create_variable_provider()
+        self._component_provider = self._create_component_provider()
+        self.metamodel_provider = self._create_metamodel_provider()
 
     @override
     def _assign_updated_child_uids(self, obj, row):
@@ -989,6 +1298,71 @@ class FromDatabaseNewsegsProjectProvider(
         obj.reattach_variables(self.variable_provider)
         obj.reattach_metamodels(self.metamodel_provider)
         return obj
+
+    @override
+    def _reconstruct_lightweight_component(self, row):
+        metadata = dict(row._mapping)
+        revision = metadata.pop('revision')
+        child_ids = [
+            metadata.pop(x) for x in (
+                'table_config_id',
+                'dsa_component_config_id',
+                'psa_component_config_id',
+            )
+        ]
+        child_components = {
+            k:v for k, v in zip(
+                (
+                    'table_config',
+                    'dsa_config',
+                    'psa_config',
+                ),
+                self._component_provider.get_lightweight_component(child_ids)
+            )
+        }
+        metadata.update(child_components)
+        comp = LightweightNewsegsProject.from_dict(metadata)
+        comp.revision = revision
+        comp._syncronise()
+        return comp
+
+    @override
+    def get_lightweight_component(self, component_id):
+        rval = super().get_lightweight_component(component_id)
+        if isinstance(rval, LightweightNewsegsProject):
+            is_sequence = False
+            component_id = [component_id]
+        else:
+            is_sequence = True
+
+        for idx, comp_id in enumerate(component_id):
+            metamodel_ids = self.list_project_metamodel_ids(comp_id)
+            if is_sequence:
+                r0 = rval[idx].revision
+                rval[idx].metamodels = (
+                    self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
+                )
+                for jdx, mm_id in enumerate(rval[idx].metamodels):
+                    if mm_id == rval[idx].focussed_metamodel_id:
+                        rval[idx].focussed_metamodel_index = jdx
+                        break
+                rval[idx]._revision = r0
+            else:
+                r0 = rval.revision
+                rval.metamodels = (
+                    self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
+                )
+                for jdx, mm_id in enumerate(rval.metamodels):
+                    if mm_id == rval.focussed_metamodel_id:
+                        rval.focussed_metamodel_index = jdx
+                        break
+                rval._revision = r0
+        return rval
+
+    def get_lightweight_project(
+        self, project_id: str | SequenceNotStr[str]
+    ) -> LightweightNewsegsProject | SequenceNotStr[LightweightNewsegsProject]:
+        return self.get_lightweight_component(project_id)
 
     # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
     #     new = super()._create_duplicate_component(original)
@@ -1058,13 +1432,13 @@ class FromDatabaseNewsegsProjectProvider(
         tbl: sa.Table | None = None
     ) -> None:
         # Unlike other upsertions, projects require junction tables to be sorted.
-        v_to_sync = list(project._variables_by_uid.values())
-        vars_modified = any(x.modified or x.soft_dirty for x in v_to_sync)
-        self.variable_provider.upsert_variable(v_to_sync)
+        # v_to_sync = list(project._variables_by_uid.values())
+        # vars_modified = any(x.modified or x.soft_dirty for x in v_to_sync)
+        # self.variable_provider.upsert_variable(v_to_sync)
 
-        # As variables have all been upserted, we can sync all the metamodel variable lists
-        for mm in project.metamodels:
-            mm.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
+        # # As variables have all been upserted, we can sync all the metamodel variable lists
+        # for mm in project.metamodels:
+        #     mm.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
         
         #if vars_modified:
         #    project.revision += 1
@@ -1477,9 +1851,14 @@ class FromDatabaseNewsegsProjectProvider(
 class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
 ):
+
+    def _create_variable_provider(self) -> VariableProviderInterface:
+        return CachedFromDatabaseVariableProvider(self._get_engine)
+    
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         super().__init__(get_engine)
         self._project_cache = LRUCache(maxsize = 5)
+        self._lightweight_project_cache = LRUCache(maxsize = 10)
         self._project_last_accessed = {}
 
     def _get_project_modification_key(self, project_id: str) -> str | None:
@@ -1499,9 +1878,9 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
         print(f'FINDING PROJECT {project_id}')
         if (
-            project_id in self._project_last_accessed
+            (project_id in self._project_cache)
+            and project_id in self._project_last_accessed
             and (new_modkey == self._project_last_accessed[project_id])
-            and (project_id in self._project_cache)
         ):
             proj = self._project_cache[project_id]
             print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
@@ -1516,14 +1895,40 @@ class CachedFromDatabaseNewsegsProjectProvider(
         return proj
 
     @override
-    def upsert_component(self, component: NewsegsComponent | SequenceNotStr[NewsegsComponent], force: bool = False, tbl: sa.Table | None = None) -> None:
-        super().upsert_component(component, force, tbl)
-        # if isinstance(component, NewsegsProject):
-        #     project_id = component.id
-        #     print(f'ADDING PROJECT TO CACHE FROM UPSERT {project_id} - revision is {component.revision}, modified is {component.chain_modified} and table revision is {component.table_config.revision}')
-        #     modkey = self._get_project_modification_key(project_id)
-        #     self._project_last_accessed[project_id] = modkey
-        #     self._project_cache[project_id] = component
+    def get_lightweight_project(self, project_id):
+        if isinstance(project_id, str):
+            is_sequence = False
+            project_id = [project_id]
+        else:
+            is_sequence = True
+
+        revisions = self.get_component_metadata(project_id, 'revision')
+        rlist = []
+        get_list = []
+        for id_ in project_id:
+            found_component = False
+            if id_ in self._lightweight_project_cache:
+                cmpx = self._lightweight_project_cache[id_]
+                if cmpx.revision == revisions[id_]['revision']:
+                    rlist.append(cmpx)
+                    found_component = True
+            if not found_component:
+                rlist.append(None)
+                get_list.append(id_)
+
+        if len(get_list) > 0:
+            components_from_db = super().get_lightweight_component(get_list)
+            jdx = 0
+            for idx, id_ in enumerate(rlist):
+                if id_ is None:
+                    cmpx = components_from_db[jdx]
+                    rlist[idx] = cmpx
+                    self._lightweight_project_cache[cmpx.id] = cmpx
+                    jdx += 1
+
+        if is_sequence:
+            return rlist
+        return rlist[0] 
 
     @override
     def delete_component(self, component_id: str | SequenceNotStr[str], ignore_ids: list[str] = []) -> list[str]:

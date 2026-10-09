@@ -51,10 +51,47 @@ variable_configs = sa.Table(
     metadata,
     sa.Column('id', sa.String(L_VARIABLE_UID), primary_key = True), # NB - this is the prefix+uuid of the object
     sa.Column('varid', sa.String), # The variable type identifier - e.g. {modelsection}.{key}.{subindex}
+    sa.Column('interface_section', sa.String),
+    sa.Column('interface_key', sa.String),
+    sa.Column('interface_subindex', sa.Integer),
     sa.Column('revision', sa.Integer), # The revision number - incremented on modification of _config
     sa.Column('component_type', sa.String),
+    sa.Column('variable_type', sa.String),
+    sa.Column('distribution', sa.String),
+    sa.Column('parameterisation_index', sa.Integer),
+
+    sa.Column('raw_parameter_0', sa.String, nullable = True),
+    sa.Column('raw_parameter_1', sa.String, nullable = True),
+    sa.Column('last_deterministic_value', sa.String, nullable = True),
+
+    sa.Column('dsa_show', sa.Boolean, default = True),
+    sa.Column('dsa_selectable', sa.Boolean, default = True),
+    sa.Column('dsa_selected', sa.Boolean, default = True),
+    sa.Column('dsa_bounds_type', sa.String, nullable = True),
+    sa.Column('dsa_lower', sa.String, nullable = True),
+    sa.Column('dsa_upper', sa.String, nullable = True),
+
+    sa.Column('psa_show', sa.Boolean, default = False),
+    sa.Column('psa_selectable', sa.Boolean, default = False),
+    sa.Column('psa_selected', sa.Boolean, default = False),
+
+    sa.Column('optim_show', sa.Boolean, default = False),
+    sa.Column('optim_selectable', sa.Boolean, default = False),
+    sa.Column('optim_selected', sa.Boolean, default = False),
+    sa.Column('optim_min', sa.String, nullable = True),
+    sa.Column('optim_max', sa.String, nullable = True),
+
     sa.Column('payload', sa.String),
+
     sa.Column('label', sa.String, nullable = True),
+    sa.Column('icon_name', sa.String, nullable = True),
+    sa.Column('unit', sa.String, default = ""),
+
+    sa.Column('interface_min', sa.Float, nullable = True),
+    sa.Column('interface_max', sa.Float, nullable = True),
+    sa.Column('interface_step', sa.Float, nullable = True),
+    sa.Column('formatter_dp', sa.Integer, nullable = True),
+
     sa.Column('retain', sa.Boolean, default = False),
 )
 
@@ -236,6 +273,7 @@ metamodels = sa.Table(
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
+    sa.Column('location', sa.String, nullable = True),
     sa.Column('lat', sa.Float, default = 53.0),
     sa.Column('lon', sa.Float, default = -3.0),
     sa.Column('n_units', sa.Float, default = 1.0)

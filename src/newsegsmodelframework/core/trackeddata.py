@@ -32,7 +32,7 @@ class RevisionNotifierProtocol(Protocol):
     def _notify_change(self, trigger: Any | None = None, **kwargs): ...
     
 
-class RevisionNotifierMixin(RevisionNotifierProtocol):
+class RevisionNotifierMixin():
     """Handles part-child notifications and revision counts"""
     
     def __init__(
@@ -186,17 +186,16 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
     return cls
 
 
-# Disabling this check for now, as it causes a conflict with the Protocol definition
-# class RevisionDataMeta(type):
-#     """Metaclass to enforce `@revision_dataclass` decoration."""
-#     def __call__(cls, *args, **kwargs):
-#         # Enforce check on first instantiation/usage of the class
-#         if not getattr(cls, "_is_revision_dataclass", False):
-#             raise TypeError(
-#                 f"Class '{cls.__name__}' inherits from DataWithRevision "
-#                 f"but is missing the @revision_dataclass decorator."
-#             )
-#         return super().__call__(*args, **kwargs)
+class RevisionDataMeta(type):
+    """Metaclass to enforce `@revision_dataclass` decoration."""
+    def __call__(cls, *args, **kwargs):
+        # Enforce check on first instantiation/usage of the class
+        if not getattr(cls, "_is_revision_dataclass", False):
+            raise TypeError(
+                f"Class '{cls.__name__}' inherits from DataWithRevision "
+                f"but is missing the @revision_dataclass decorator."
+            )
+        return super().__call__(*args, **kwargs)
 
 
 def wrap_value(val: Any, parent: RevisionNotifierProtocol) -> Any:
@@ -289,7 +288,7 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
         return odict
 
 
-class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin):#, metaclass = RevisionDataMeta):
+class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin, metaclass = RevisionDataMeta):
     """Base class for all revision-tracked dataclasses."""
     _constructor_class = 'DataWithRevision'
     _excluded_attributes = serialisation.SerialiseToDictMixin._excluded_attributes.union({'_children', '_subscribers'})
