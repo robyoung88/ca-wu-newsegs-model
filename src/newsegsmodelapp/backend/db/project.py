@@ -1,5 +1,6 @@
 """Functions for interacting with newsegs projects."""
 from functools import reduce
+import json
 from operator import iconcat
 from typing import Any
 
@@ -97,12 +98,13 @@ def metamodel_to_raw_table_data(
     metamodel: NewsegsMetaModel
 ) -> dict:
     """
-    Convert metamodel to a dictionary representation without foreign keys
+    Convert metamodel to a dictionary representation
     """
     odict = dict(
         id = metamodel.id,
         revision = metamodel.revision,
         label = metamodel.name,
+        location = json.dumps(metamodel.model.location.to_dict()),
         lat = metamodel.model.location.lat,
         lon = metamodel.model.location.lon,
         em_config_id = metamodel.model.id,
