@@ -1,12 +1,13 @@
 
 import json
 import time
-from typing import Any
+from typing import Any, cast
 
 from dash import ALL, MATCH, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 from dash_extensions import Purify
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp import registers
 from newsegsmodelapp.dash_extension import NewsegsDash
@@ -70,7 +71,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         app_state = json.loads(app_state) if app_state else {}
-                
+
         section = container_id.get('section')
         key_ = container_id.get('key')
         model_type = app_state.get('model_type', 'default')
@@ -246,8 +247,8 @@ def add_result_container_callbacks(app: NewsegsDash):
         # Do not update if the toggle status has not changed, the project is the same,
         # and the table revision number is the same.
         
-        proj = app.project_provider.get_project(active_project_id)
-        table_rev = proj.table_config.revision
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        table_rev = lproj.table_config.revision
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
         if all(x is not None and x == ann_hori_toggle for x in rendered_ann_hori_state):
             if all(x is not None and x == active_project_id for x in rendered_project_ids):
@@ -299,7 +300,9 @@ def add_result_container_callbacks(app: NewsegsDash):
                 print(f'Found getter for {table_name}')
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
-                res, rev = table_getter(active_project_id, table_options, app.project_provider, app.results_provider)
+                res, rev = table_getter(
+                    active_project_id, table_options, app.project_provider, app.results_provider
+                )
 
             else:
                 # Conventional table lookup
@@ -312,18 +315,18 @@ def add_result_container_callbacks(app: NewsegsDash):
                 # Try with annual or to horizon subtable suffix
                 sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
                 print (f'getting from table {sub_table_name} - subindex is {subindex}')
-                res, rev = app.results_provider.get_result(sub_table_name, proj.table_config)
+                res, rev = app.results_provider.get_result(sub_table_name, lproj.table_config.id)
                 
                 if res is None:
                     # Retry without the subtable suffix
                     print (f'getting from table {table_name} - subindex is {subindex}')
-                    res, rev = app.results_provider.get_result(table_name, proj.table_config)
+                    res, rev = app.results_provider.get_result(table_name, lproj.table_config.id)
 
             # TODO: Feedback if result is stale
             if res is not None:
                 contents_by_section_subindex[ss] = [res]
                 return_contents[idx] = [res]
-                return_is_stale[idx] = rev != proj.table_config.revision
+                return_is_stale[idx] = rev != lproj.table_config.revision
                 return_rendered_project_table_revision[idx] = rev
             else:
                 contents_by_section_subindex[ss] = []
@@ -388,9 +391,10 @@ def add_result_container_callbacks(app: NewsegsDash):
         print(f'Updating figures {container_ids}')
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
-        
-        proj = app.project_provider.get_project(active_project_id)
-        table_rev = proj.table_config.revision
+
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        table_rev = lproj.table_config.revision
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
 
         return_contents: list[Any] = [no_update] * len(container_ids)
@@ -427,7 +431,9 @@ def add_result_container_callbacks(app: NewsegsDash):
             if figure_getter is not None:
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
-                res, rev = figure_getter(active_project_id, table_options, app.project_provider, app.results_provider)
+                res, rev = figure_getter(
+                    active_project_id, table_options, app.project_provider, app.results_provider
+                )
             
             if res is not None:
                 contents_by_section_subindex[ss] = res
@@ -511,14 +517,16 @@ def add_result_container_callbacks(app: NewsegsDash):
         triggered_id = ctx.triggered_id
         print(f'checking staleness - triggered by {triggered_id}')
         if isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
-            proj = app.project_provider.get_project(active_project_id)
+            provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+            lproj = provider.get_lightweight_project(active_project_id)
+            
             results_stale = False
             # Because have retrieved the proj from database, will never be modified.
             #results_stale = proj.table_config.chain_modified or any(x.modified for x in proj._variables_by_uid.values())
             if not results_stale:
                 results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
             if not results_stale:
-                table_revision = proj.table_config.revision
+                table_revision = lproj.table_config.revision
                 print(f'Checking against project table revision {table_revision}')
                 print(f'Rendered table revisions are {rendered_project_table_revisions}')
                 results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)

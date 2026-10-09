@@ -11,6 +11,7 @@ import pandas as pd
 import sqlalchemy as sa
 
 from newsegsmodelapp.components.result_file import load_result, save_result
+from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 
 from newsegsmodelapp.backend.db import tables as tbls
@@ -32,17 +33,32 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     def _result_to_table_data(
             self, 
             result_type: str,
-            parent_component: NewsegsComponent,
+            parent_component: NewsegsComponent | LightweightDataHoldingNewsegsComponent,
             request: Optional[RunRequest] = None,
+            revision: Optional[int] = None,
         ):
-        odict = dict(
-            component_config_id = parent_component.id,
-            component_type = parent_component.component_type,
-            component_class = parent_component.__class__.__name__,
-            component_version = parent_component.version,
-            component_config_revision = parent_component.revision,
-            result_type = result_type
-        )
+        revision = parent_component.revision if revision is None else revision
+        if isinstance(parent_component, NewsegsComponent):
+            odict = dict(
+                component_config_id = parent_component.id,
+                component_type = parent_component.component_type,
+                component_class = parent_component.__class__.__name__,
+                component_version = parent_component.version,
+                component_config_revision = revision,
+                result_type = result_type
+            )
+        elif isinstance(parent_component, LightweightDataHoldingNewsegsComponent):
+            odict = dict(
+                component_config_id = parent_component.id,
+                component_type = parent_component.component_type,
+                component_class = parent_component.component_class,
+                component_version = parent_component.component_version,
+                component_config_revision = revision,
+                result_type = result_type
+            )
+        else:
+            raise TypeError(f'parent_component should by NewsegsComponent or LightweightDataholdingNewsegsComponent; is {type(parent_component)}')
+        
         if request:
             if request.trigger_run_id != -1:
                 # By default, store results with the inciting run id of the chain
@@ -55,12 +71,19 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     def upsert_result(
         self,
         result_type: str,
-        parent_component: NewsegsComponent,
+        parent_component: NewsegsComponent | str,
         result_object: object,
         mark_stale: bool = False,
         request: Optional[RunRequest] = None,
+        revision: Optional[int] = None,
     ):
-        result_details = self._result_to_table_data(result_type, parent_component, request = request)
+        
+        result_details = self._result_to_table_data(
+            result_type, 
+            parent_component, 
+            request = request,
+            revision = revision,
+        )
         if mark_stale:
             # Just knock the revision down a level for now
             result_details['component_config_revision'] = result_details['component_config_revision'] - 1 # pyright: ignore[reportOperatorIssue]
@@ -88,11 +111,13 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         print (f'SAVED RESULT of type {result_details['result_type']} attached to {result_details['component_type']} with id {result_details['component_config_id']}, revision {result_details['component_config_revision']}')
 
+    @override
     def get_result(
         self,
         result_type: str,
-        parent_component: NewsegsComponent,
-        allow_stale: bool = True
+        parent_component: NewsegsComponent | str,
+        allow_stale: bool = True,
+        revision: Optional[int] = None,
     ) -> tuple[Any, int] | tuple[None, None]:
         
         stmt = (
@@ -103,12 +128,21 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 self._table.c.component_config_revision,
             )
             .where(self._table.c.result_type == result_type)
-            .where(self._table.c.component_config_id == parent_component.id)
-            .order_by(self._table.c.created_at.desc())
         )
+        if isinstance(parent_component, str):
+            stmt = stmt.where(self._table.c.component_config_id == parent_component)
+        else:
+            stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
+            
+        stmt = stmt.order_by(self._table.c.created_at.desc())
 
-        revision = parent_component.revision
+        if revision is None:
+            if not isinstance(parent_component, str):
+                revision = parent_component.revision
+            
         if not allow_stale:
+            if revision is None:
+                raise ValueError(f'If stale results are not allowed, the parent component or a nominated revision must be provided.')
             stmt = stmt.where(self._table.c.component_config_revision == revision)
 
         file_name = None
@@ -141,7 +175,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         self, 
         result_type: str, 
         run_id: int, 
-        parent_component: NewsegsComponent | None = None
+        parent_component: Optional[NewsegsComponent | str] = None
     ) -> tuple[Any, int] | tuple[None, None]:
         stmt = (
             sa.select(
@@ -153,7 +187,10 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             .where(self._table.c.run_id == run_id)
         )
         if parent_component:
-            stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
+            if isinstance(parent_component, str):
+                stmt = stmt.where(self._table.c.component_config_id == parent_component)
+            else:    
+                stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
 
         with self._get_engine().connect() as conn:
             res = conn.execute(stmt)
@@ -162,9 +199,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_rows = {row["result_id"]: dict(row) for row in res.mappings()}
         if len(result_rows) == 0:
             return None, None
-        #if len(result_rows) > 1:
-            #raise ValueError(f'Multiple results found for {result_type} for run {run_id} and parent {parent_component.id if parent_component else 'NONE'}')
-
+        
         res_id = next(iter(result_rows))
         file_name = result_rows[res_id]['result_file']
         rrs = result_rows[res_id]['component_config_revision']
@@ -185,18 +220,34 @@ class CachedFromDatabaseResultProvider(
     def __init__(self, get_engine: Callable[[], sa.Engine], result_store: Path):
         super().__init__(get_engine, result_store)
         self._result_cache = LRUCache(maxsize = 128)
+        self._run_to_revision_lookup = LRUCache(maxsize = 128)
 
     @override
-    def get_result(self, result_type: str, parent_component: NewsegsComponent, allow_stale: bool = True) -> tuple[Any, int] | tuple[None, None]:
+    def get_result(
+        self, 
+        result_type: str, 
+        parent_component: NewsegsComponent | str,
+        allow_stale: bool = True,
+        revision: Optional[int] = None,
+    ) -> tuple[Any, int] | tuple[None, None]:
 
-        result_key = (result_type, parent_component.id, parent_component.revision)
+        if isinstance(parent_component, str):
+            result_key = (result_type, parent_component, revision)
+        else:
+            if revision is None:
+                result_key = (result_type, parent_component.id, parent_component.revision)
+            else:
+                result_key = (result_type, parent_component.id, revision)
+        
         print(f'FINDING RESULT {result_key}')
         if result_key in self._result_cache:
             print(f'RETURNING RESULT FROM CACHE {result_key}')
             return self._result_cache[result_key], result_key[2] # pyright: ignore[reportReturnType]
 
         print(f'RETURNING RESULT FROM STORE {result_key}')
-        obj, rrs = super().get_result(result_type, parent_component, allow_stale)
+        obj, rrs = super().get_result(
+            result_type, parent_component, allow_stale, revision
+        )
         if obj is None:
             print(f'NOT ADDING TO CACHE AS NO RESULT - {result_key}')
         if rrs is None or rrs != result_key[2]:
@@ -205,4 +256,39 @@ class CachedFromDatabaseResultProvider(
             print(f'ADDING TO CACHE - {result_key}')
             self._result_cache[result_key] = obj
         return (obj, rrs) # pyright: ignore[reportReturnType]
+
+    @override
+    def get_run_result(
+        self, 
+        result_type:str,
+        run_id: int,
+        parent_component: Optional[NewsegsComponent | str] = None
+    ) -> tuple[Any, int] | tuple[None, None]:
+        if isinstance(parent_component, str):
+            rrl_key = (result_type, run_id, parent_component)
+        elif isinstance(parent_component, NewsegsComponent):
+            rrl_key = (result_type, run_id, parent_component.id)
+        else:
+            rrl_key = (result_type, run_id, None)
+
+        if rrl_key in self._run_to_revision_lookup:
+            result_key = self._run_to_revision_lookup[rrl_key]
+            if result_key in self._result_cache:
+                return self._result_cache[result_key], result_key[2]
+
+        obj, rrs = super().get_run_result(result_type, run_id, parent_component)
+
+        if obj is None:
+            return (None, None)
+
+        if isinstance(parent_component, str):
+            result_key = (result_type, rrs, parent_component)
+        elif isinstance(parent_component, NewsegsComponent):
+            result_key = (result_type, rrs, parent_component.id)
+        else:
+            result_key = (result_type, rrs, None)
+
+        self._result_cache[result_key] = obj
+
+        return (obj, rrs)
     

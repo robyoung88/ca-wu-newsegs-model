@@ -11,7 +11,7 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.backend.db import DependentObjectsExistError, db_snapshot
 from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider, FromDatabaseVariableProvider
 from newsegsmodelframework.core.constructors.constructors import find_constructor
-from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightNewsegsComponent
+from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent, LightweightNewsegsComponent
 from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentManagerInterface
 
@@ -39,6 +39,18 @@ class FromDatabaseNewsegsComponentProvider(
         tbls.component_configs.columns[x] for x in (
             'id',
             'revision'
+        )
+    )
+
+    _lightweight_dataholding_component_columns = tuple(
+        tbls.component_configs.columns[x] for x in (
+            'id',
+
+            'component_type',
+            'component_class',
+            'component_version',
+
+            'revision',
         )
     )
     def __init__(self, get_engine: Callable[[], sa.Engine]):
@@ -85,6 +97,14 @@ class FromDatabaseNewsegsComponentProvider(
         comp._syncronise()
         return comp
 
+    def _reconstruct_lightweight_dataholding_component(self, row) -> LightweightDataHoldingNewsegsComponent:
+        metadata = dict(row._mapping)
+        revision = metadata.pop('revision')
+        comp = LightweightDataHoldingNewsegsComponent.from_dict(metadata)
+        comp.revision = revision
+        comp._syncronise()
+        return comp
+
     def _component_to_table_data(self, component: NewsegsComponent) -> dict:
         if component.modified:
             raise ValueError(f'{component.id} is being upserted in a modified state')
@@ -125,7 +145,9 @@ class FromDatabaseNewsegsComponentProvider(
         compmap = {x.id: x for x in reconstructed_components}
         return [compmap[x] for x in component_id]
 
-    def get_lightweight_component(self, component_id: str | SequenceNotStr[str]) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
+    def get_lightweight_component(
+        self, component_id: str | SequenceNotStr[str]
+    ) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
         is_sequence = False
         if isinstance(component_id, str):
             stmt = (
@@ -142,6 +164,32 @@ class FromDatabaseNewsegsComponentProvider(
             rows = conn.execute(stmt).fetchall()
 
         reconstructed_components = [self._reconstruct_lightweight_component(row) for row in rows]
+        if not is_sequence:
+            return reconstructed_components[0]
+        compmap = {x.id:x for x in reconstructed_components}
+        return [compmap[x] for x in component_id]
+
+    def get_lightweight_dataholding_component(
+        self, component_id: str | SequenceNotStr[str]
+    ) -> LightweightDataHoldingNewsegsComponent | SequenceNotStr[LightweightDataHoldingNewsegsComponent]:
+        """Get a representation of (a) component(s) with sufficient detail to save results against"""
+        is_sequence = False
+        if isinstance(component_id, str):
+            stmt = (
+                sa.select(*self._lightweight_dataholding_component_columns)
+                .where(self._table.c.id == component_id)
+            )
+        else:
+            is_sequence = True
+            stmt = (
+                sa.select(*self._lightweight_dataholding_component_columns)
+                .where(self._table.c.id.in_(component_id))
+            )
+
+        with self._get_engine().connect() as conn:
+            rows = conn.execute(stmt).fetchall()
+
+        reconstructed_components = [self._reconstruct_lightweight_dataholding_component(row) for row in rows]
         if not is_sequence:
             return reconstructed_components[0]
         compmap = {x.id:x for x in reconstructed_components}

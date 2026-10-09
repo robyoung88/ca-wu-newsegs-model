@@ -9,6 +9,7 @@ import pandas as pd
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.registers import register_result_container_content_creator, register_result_section_header_content_creator, register_table_subindex_map
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
@@ -217,7 +218,7 @@ def _(
 RESULT_HEADER_SINGLE_CONFIG_CLASS = 'result-header-single-config'
 
 def _make_headers_for_multiple_configs(
-    proj: NewsegsProject,
+    lproj: LightweightNewsegsProject,
     result_provider: NewsegsResultProviderInterface,
     result_key,
     content_generator: Callable,
@@ -225,15 +226,14 @@ def _make_headers_for_multiple_configs(
     ann_hori_toggle: bool = True,
 ):
     rval = []
-    focussed_mm = proj.get_focussed_metamodel()
-    for idx, mm in enumerate(proj.metamodels):
+    for idx, lmm in enumerate(lproj.metamodels):
         match table_identifier:
             case 'model':
-                mod = mm.model.table_config
+                mod = lmm.model.table_config
             case 'finance':
-                mod = mm.finance.table_config
+                mod = lmm.finance.table_config
             case _:
-                mod = mm.table_config
+                mod = lmm.table_config
         
         
         mm_icon = icons.get_icon(
@@ -241,7 +241,7 @@ def _make_headers_for_multiple_configs(
             icon_class = icons.ICON_COLOUR_CLASSES[idx % len(icons.ICON_COLOUR_CLASSES)]
         )
 
-        res, rev = result_provider.get_result(result_key, mod)
+        res, rev = result_provider.get_result(result_key, mod.id)
 
         if res is not None:
             cntnt = [mm_icon] + content_generator(res, ann_hori_toggle)
@@ -251,13 +251,13 @@ def _make_headers_for_multiple_configs(
         cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
         if rev != mod.revision:
             cn += ' stale'
-        if mm != focussed_mm:
+        if lmm.id != lproj.focussed_metamodel_id:
             cn += ' unfocussed'
         
         rval.append(html.Div(cntnt, className = cn, id = {
             'type':'result-header-single-config',
             'table': result_key,
-            'metamodel': mm.id
+            'metamodel': lmm.id
         }))
 
     return rval
@@ -317,10 +317,10 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of key
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    lproj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
-        proj,
+        lproj,
         result_provider,
         key_,
         _make_generation_result_header,
@@ -376,7 +376,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    proj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
         proj,
@@ -433,7 +433,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    proj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
         proj,
@@ -501,7 +501,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    proj = proj_provider.get_lightweight_project(proj_id)
     rval = _make_headers_for_multiple_configs(
         proj,
         result_provider,
@@ -513,12 +513,6 @@ def _(
 
     return rval
 
-
-    mm = proj.get_focussed_metamodel()
-    mod = mm.model.table_config
-
-    res, rev = result_provider.get_result(key_, mod)
-    return _make_net_result_header(res, ann_hori_toggle)
 
 SECTION = 'tabledraw'
 KEY = 'table_finance'
@@ -570,35 +564,34 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    lproj = proj_provider.get_lightweight_project(proj_id)
 
     # This one needs to be bespoke, as header is constructed from multiple postprocess keys
     rval = []
-    focussed_mm = proj.get_focussed_metamodel()
-    for idx, mm in enumerate(proj.metamodels):
-        mod = mm.finance.table_config
+    for idx, lmm in enumerate(lproj.metamodels):
+        mod = lmm.finance.table_config
         
         mm_icon = icons.get_icon(
             f'config-{idx + 1}',
             icon_class = icons.ICON_COLOUR_CLASSES[idx % len(icons.ICON_COLOUR_CLASSES)]
         )
 
-        res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod)
-        res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod)
-        res_value, rev_value = result_provider.get_result('postproc_finance_value', mod)
+        res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod.id)
+        res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod.id)
+        res_value, rev_value = result_provider.get_result('postproc_finance_value', mod.id)
 
         cntnt = [mm_icon] + _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
 
         cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
         if rev_benefits != mod.revision or rev_costs != mod.revision or rev_value != mod.revision:
             cn += ' stale'
-        if mm != focussed_mm:
+        if lmm.id != lproj.focussed_metamodel_id:
             cn += ' unfocussed'
 
         rval.append(html.Div(cntnt, className = cn, id = {
             'type':'result-header-single-config',
             'table': key_,
-            'metamodel': mm.id
+            'metamodel': lmm.id
         }))
 
     return rval

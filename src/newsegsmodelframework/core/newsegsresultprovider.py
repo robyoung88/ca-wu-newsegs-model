@@ -18,8 +18,9 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
     def get_result(
         self,
         result_type: str,
-        parent_component: NewsegsComponent,
+        parent_component: NewsegsComponent | str,
         allow_stale: bool = True,
+        revision: Optional[int] = None,
     ) -> tuple[Any, int] | tuple[None, None]:
         """Retrieve a result from the provider. 
         
@@ -35,7 +36,7 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
         self,
         result_type: str,
         run_id: int,
-        parent_component: NewsegsComponent | None = None
+        parent_component: Optional[NewsegsComponent | str] = None,
     ) -> tuple[Any, int] | tuple[None, None]:
         """Retrieve a result from a specific run.
 
