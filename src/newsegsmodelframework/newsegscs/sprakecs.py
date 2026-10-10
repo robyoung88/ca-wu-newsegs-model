@@ -7,7 +7,7 @@ import copy
 from collections.abc import MutableMapping
 from typing import Optional, Union, cast, override
 from numbers import Number
-from functools import singledispatchmethod
+from functools import lru_cache, singledispatchmethod
 
 import numpy as np
 import pandas as pd
@@ -160,42 +160,84 @@ class SprakeCSResult(NewsegsModuleResult):
 # Todo: Consider how to re-wrap these, as DatetimeIndex[es] and Series are unhashable
 # so we can't get a cache working.
 
+@lru_cache
+def _get_sprake_appliance_consumption_reference_data():
+    return (
+        pd.read_parquet(os.path.join(STATICDATA, 'elexon_consumption_sprake.parquet'))
+        .set_index('datetime')
+    )
+
+@lru_cache
+def _get_sprake_appliance_consumption_reference_timeseries(start, periods, freq):
+    datetimes = pd.date_range(start, periods=periods, freq=freq)
+    return (
+        _get_sprake_appliance_consumption_reference_data()
+        .loc[datetimes, :]
+        .reset_index()
+    )
+
 def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
     #from newsegscs.elexon_profiles import get_elexon_consumption
     #cons = get_elexon_consumption(datetimes)
-    cons = (
-        pd.read_parquet(os.path.join(STATICDATA, 'elexon_consumption_sprake.parquet'))
-        .set_index('datetime')
-        .loc[datetimes, :]
-        .reset_index()
-    )
+    start = datetimes[0]
+    periods = len(datetimes)
+    freq = datetimes[1] - datetimes[0]
+    cons = _get_sprake_appliance_consumption_reference_timeseries(start, periods, freq)
     return cast(np.ndarray, pd.Series(cons['consumption']).array) * (1.0 - efficiency_reduction) * n_households
 
-def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
-    # from newsegscs.ev_profiles import get_ev_consumption
-    # cons = get_ev_consumption(datetimes,
-    #                           annual_consumption=annual_residential_consumption_per_ev)
-    #                           .set_index('datetime')
-    # return cons['consumption'] * n_evs
-    cons = (
+@lru_cache
+def _get_sprake_ev_consumption_reference_data():
+    return(
         pd.read_parquet(os.path.join(STATICDATA, 'ev_consumption_sprake.parquet'))
         .set_index('datetime')
+    )
+
+@lru_cache
+def _get_sprake_ev_consumption_reference_timeseries(start, periods, freq):
+    datetimes = pd.date_range(start, periods=periods, freq=freq)
+    return (
+        _get_sprake_ev_consumption_reference_data()
         .loc[datetimes, :]
         .reset_index()
     )
+
+def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
+    start = datetimes[0]
+    periods = len(datetimes)
+    freq = datetimes[1] - datetimes[0]
+    cons = _get_sprake_ev_consumption_reference_timeseries(start, periods, freq)
     return cons['consumption'] * n_evs * annual_residential_consumption_per_ev
 
-def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
+@lru_cache
+def _get_sprake_dhw_energy_consumption_reference_timeseries(start, periods, freq, ref_daily_consumption=4.5, seasonal_variance=0.2,):
     from newsegsmodelframework.newsegscs.dhw_profiles import get_dhw_energy_consumption
-    cons = get_dhw_energy_consumption(datetimes,
-                                      ref_daily_consumption,
-                                      seasonal_variance)
+    datetimes = pd.date_range(start, periods=periods, freq=freq)
+    cons = get_dhw_energy_consumption(
+        datetimes,
+        ref_daily_consumption,
+        seasonal_variance
+    )
+    return cons
+
+def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
+    start = datetimes[0]
+    periods = len(datetimes)
+    freq = datetimes[1] - datetimes[0]
+    cons = _get_sprake_dhw_energy_consumption_reference_timeseries(start, periods, freq, ref_daily_consumption, seasonal_variance)
     return cons['consumption'] * n_households
 
-def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_households=1000):
+@lru_cache
+def _get_sprake_spaceheat_consumption_timeseries(start, periods, freq, hlp=1.1, gfa=105.):
     from newsegsmodelframework.newsegscs.sprake_thermal_model import get_spaceheat_energy_consumption
-    cons = get_spaceheat_energy_consumption(datetimes,
-                                            hlp,gfa)
+    datetimes = pd.date_range(start, periods=periods, freq=freq)
+    cons = get_spaceheat_energy_consumption(datetimes,hlp,gfa)
+    return cons
+
+def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_households=1000):
+    start = datetimes[0]
+    periods = len(datetimes)
+    freq = datetimes[1] - datetimes[0]
+    cons = _get_sprake_spaceheat_consumption_timeseries(start, periods, freq, hlp, gfa)
     return cons['consumption'] * n_households                        
 
 
