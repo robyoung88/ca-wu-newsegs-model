@@ -45,12 +45,12 @@ class FullLightweightVariable(DataWithRevision):
     psa_show: bool
     psa_selectable: bool
     psa_selected: bool
-    last_std: Any | None
-    psa_ci_lower: Any | None
-    psa_ci_upper: Any | None
+    last_std: Any | None = None
+    psa_ci_lower: Any | None = None
+    psa_ci_upper: Any | None = None
 
-    optim_show: bool
-    optim_selectable: bool
-    optim_selected: bool
-    optim_min: Any | None
-    optim_max: Any | None
+    optim_show: bool = False
+    optim_selectable: bool = True
+    optim_selected: bool = False
+    optim_min: Any | None = None
+    optim_max: Any | None = None
