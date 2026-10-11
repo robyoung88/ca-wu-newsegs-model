@@ -1,10 +1,13 @@
 from dataclasses import asdict
 import json
-from typing import Callable
+from typing import Callable, cast
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.registers import PostprocessRequest, RunRequest, register_postprocess_procedure, register_postprocess_request
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
+from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
 from .methods import post_dsa_results
@@ -93,26 +96,27 @@ def _generation_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
-    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+   
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
-    elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
+        lmetamodels = lproj.metamodels
     
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
 
-    n_mm = len(metamodels)
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing generation - model {i+1} of {n_mm}')
         step += 1
 
@@ -121,16 +125,23 @@ def _generation_to_interface_sprake(
 
         mdl = mm.model
 
-        if _result_already_exists(
-            result_provider, result_type, mdl.table_config, request.trigger_run_id,
-        ):
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            mdl.table_config.id, revision = mdl.table_config.revision
+        ) is not False:
             continue
 
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
 
-        res = gen_results_to_interface_sprake(mdl)
+        any_stale = full_model.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+
+        res = gen_results_to_interface_sprake(full_model)
         result_provider.upsert_result(
-            result_type, mdl.table_config, res, mark_stale = any_stale, request = request
+            result_type, full_model.table_config, res, mark_stale = any_stale, request = request
         )
 
     return 'ok'
@@ -148,26 +159,27 @@ def _consumption_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
-    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
+            lmetamodels = lproj.metamodels
+        
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
-    
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
-
-    n_mm = len(metamodels)
+    
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing consumption - model {i+1} of {n_mm}')
         step += 1
 
@@ -176,15 +188,26 @@ def _consumption_to_interface_sprake(
 
         mdl = mm.model
 
-        if _result_already_exists(
-            result_provider, result_type, mdl.table_config, request.trigger_run_id,
-        ):
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            mdl.table_config.id, revision = mdl.table_config.revision
+        ) is not False:
             continue
 
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
 
-        res = consumption_results_to_interface_sprake(mdl) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result(result_type, mdl.table_config, res, mark_stale = any_stale, request = request)
+        any_stale = full_model.reattach_results(
+            result_provider, True, run_id = request.trigger_run_id
+        )
+
+        res = consumption_results_to_interface_sprake(full_model) 
+        result_provider.upsert_result(
+            result_type, full_model.table_config, res, mark_stale = any_stale, request = request
+        )
 
     return 'ok'
 
@@ -201,26 +224,27 @@ def _storage_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
-    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
-    elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
+        lmetamodels = lproj.metamodels
     
+    elif request.trigger_request_type == 'deterministic_run_metamodel':
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
 
-    n_mm = len(metamodels)
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing storage - model {i+1} of {n_mm}')
         step += 1
 
@@ -229,15 +253,24 @@ def _storage_to_interface_sprake(
 
         mdl = mm.model
 
-        if _result_already_exists(
-            result_provider, result_type, mdl.table_config, request.trigger_run_id,
-        ):
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            mdl.table_config.id, revision = mdl.table_config.revision
+        ) is not False:
             continue
-                
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
 
-        res = stor_results_to_interface_sprake(mdl) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result(result_type, mdl.table_config, res, mark_stale = any_stale, request = request)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
+
+        any_stale = full_model.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+
+        res = stor_results_to_interface_sprake(full_model) # pyright: ignore[reportArgumentType]
+        result_provider.upsert_result(
+            result_type, full_model.table_config, res, mark_stale = any_stale, request = request
+        )
 
     return 'ok'
 
@@ -254,26 +287,27 @@ def _net_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
-    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
+            lmetamodels = lproj.metamodels
+        
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
-    
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
 
-    n_mm = len(metamodels)
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing net energy - model {i+1} of {n_mm}')
         step += 1
 
@@ -282,15 +316,26 @@ def _net_to_interface_sprake(
 
         mdl = mm.model
 
-        if _result_already_exists(
-            result_provider, result_type, mdl.table_config, request.trigger_run_id,
-        ):
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            mdl.table_config.id, revision = mdl.table_config.revision
+        ) is not False:
             continue
-                
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
 
-        res = net_results_to_interface_sprake(mdl) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result(result_type, mdl.table_config, res, mark_stale = any_stale, request = request)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
+
+        any_stale = full_model.reattach_results(
+            result_provider, True, run_id = request.trigger_run_id
+        )
+        
+        res = net_results_to_interface_sprake(full_model) # pyright: ignore[reportArgumentType]
+        result_provider.upsert_result(
+            result_type, full_model.table_config, res, mark_stale = any_stale, request = request
+        )
 
     return 'ok'
 
@@ -307,44 +352,57 @@ def _finance_benefits_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
-    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
+            lmetamodels = lproj.metamodels
+        
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
-    
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
-
-    n_mm = len(metamodels)
+    
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing financial benefits - model {i+1} of {n_mm}')
         step += 1
 
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
 
-        mdl = mm.model
         fnc = mm.finance
 
-        if _result_already_exists(
-            result_provider, result_type, fnc.table_config, request.trigger_run_id,
-        ):
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            fnc.table_config.id, revision = fnc.table_config.revision
+        ) is not False:
             continue
 
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
+        full_finance = cast(NewsegsFinance, mm_provider._fm_provider.get_component(mm.finance.id))
+        full_finance.set_model(full_model, dirty = False)
 
-        res = finance_benefits_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result(result_type, fnc.table_config, res, mark_stale = any_stale, request = request)
+        any_stale = full_model.reattach_results(
+            result_provider, True, run_id = request.trigger_run_id
+        )
+
+        res = finance_benefits_results_to_interface_sprake(full_model, full_finance) # pyright: ignore[reportArgumentType]
+        result_provider.upsert_result(
+            result_type, full_finance.table_config, res, mark_stale = any_stale, request = request
+        )
 
     return 'ok'
 
@@ -361,45 +419,57 @@ def _finance_costs_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
-    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
+            lmetamodels = lproj.metamodels
+        
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
-    
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
 
-    n_mm = len(metamodels)
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing financial costs - model {i+1} of {n_mm}')
         step += 1
 
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
 
-        mdl = mm.model
         fnc = mm.finance
-
-        if _result_already_exists(
-            result_provider, result_type, fnc.table_config, request.trigger_run_id,
-        ):
+        
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            fnc.table_config.id, revision = fnc.table_config.revision
+        ) is not False:
             continue
 
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
+        full_finance = cast(NewsegsFinance, mm_provider._fm_provider.get_component(mm.finance.id))
+        full_finance.set_model(full_model, dirty = False)
 
-        res = finance_costs_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_finance_costs', fnc.table_config, res, mark_stale = any_stale, request = request)
+        any_stale = full_model.reattach_results(
+            result_provider, True, run_id = request.trigger_run_id
+        )
 
+        res = finance_costs_results_to_interface_sprake(full_model, full_finance) # pyright: ignore[reportArgumentType]
+        result_provider.upsert_result(
+            result_type, full_finance.table_config, res, mark_stale = any_stale, request = request
+        )
     return 'ok'
 
 POSTPROCESS_TYPE = 'postproc_finance_value'
@@ -415,43 +485,58 @@ def _finance_value_to_interface_sprake(
     check_cancel_status: Callable[[], bool],
     result_type = POSTPROCESS_TYPE, # Use default argument trick to hold value of POSTPROCESS_TYPE
 ) -> str:
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     if request.trigger_request_type == 'deterministic_run_project':
-        proj = project_provider.get_project(request.project_id)
-        metamodels = proj.metamodels
+            lmetamodels = lproj.metamodels
+        
     elif request.trigger_request_type == 'deterministic_run_metamodel':
-        proj = project_provider.get_project(request.project_id)
-    
         run_config = json.loads(request.payload)
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        mm = proj.get_metamodel_by_id(mm_id)
-        metamodels = [mm,]
+        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmetamodels = [lmm,]
+
     else:
         return 'ok'
 
-    n_mm = len(metamodels)
+    n_mm = len(lmetamodels)
     n_steps = n_mm
     step = 0
-    for i, mm in enumerate(metamodels):
+    for i, mm in enumerate(lmetamodels):
         progress_callback(step, n_steps, f'Postprocessing financial value - model {i+1} of {n_mm}')
         step += 1
 
         if check_cancel_status():
             raise InterruptedError(f'Process {run_id} has been cancelled.')
 
-        mdl = mm.model
         fnc = mm.finance
-
-        if _result_already_exists(
-            result_provider, result_type, fnc.table_config, request.trigger_run_id,
-        ):
+        
+        if result_provider.result_exists(
+            result_type, request.trigger_run_id, 
+            fnc.table_config.id, revision = fnc.table_config.revision
+        ) is not False:
             continue
 
-        any_stale = mdl.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        mm_provider = cast(
+            FromDatabaseNewsegsMetamodelProvider,
+            provider.metamodel_provider
+        )
+        full_model = mm_provider._em_provider.get_component(mm.model.id)
+        full_finance = cast(NewsegsFinance, mm_provider._fm_provider.get_component(mm.finance.id))
+        full_finance.set_model(full_model, dirty = False)
 
-        res = finance_value_results_to_interface_sprake(mdl, fnc) # pyright: ignore[reportArgumentType]
-        result_provider.upsert_result('postproc_finance_value', fnc.table_config, res, mark_stale = any_stale, request = request)
+        any_stale = full_model.reattach_results(
+            result_provider, True, run_id = request.trigger_run_id
+        )
+
+
+        res = finance_value_results_to_interface_sprake(full_model, full_finance) # pyright: ignore[reportArgumentType]
+        result_provider.upsert_result(
+            result_type, full_finance.table_config, res, mark_stale = any_stale, request = request
+        )
 
     return 'ok'
 

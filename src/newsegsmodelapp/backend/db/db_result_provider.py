@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import time
 from sqlalchemy.exc import OperationalError
@@ -213,6 +214,57 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         return (obj, rrs)
 
+    def result_exists(
+        self,
+        result_type: str,
+        run_id: int,
+        parent_component: NewsegsComponent | str,
+        revision: Optional[int] = None,
+    ) -> str | bool:
+        stmt = (
+            sa.select(
+                self._table.c.result_id,
+                self._table.c.result_file,
+                self._table.c.component_config_revision,
+            )
+            .where(
+                self._table.c.result_type == result_type
+            )
+        )
+        if isinstance(parent_component, str):
+            stmt = stmt.where(
+                self._table.c.component_config_id == parent_component
+            )
+        else:
+            stmt = stmt.where(
+                self._table.c.component_config_id == parent_component.id
+            )
+
+        if run_id != -1:
+            stmt = stmt.where(
+                self._table.c.run_id == run_id
+            )
+        elif revision is not None:
+            stmt = stmt.where(
+                self._table.c.component_config_revision == revision
+            )
+        elif isinstance(parent_component, NewsegsComponent):
+            stmt = stmt.where(
+                self._table.c.component_config_revision == parent_component.revision
+            )
+
+        with self._get_engine().connect() as conn:
+            result = conn.execute(stmt).fetchall()
+
+        for res in result:
+            if not os.path.exists(res.result_file):
+                with self._get_engine().begin() as conn:
+                    conn.execute(sa.delete(self._table).where(self._table.c.result_file == res.result_file))
+                continue
+            return res.result_id
+        
+        return False            
+        
 class CachedFromDatabaseResultProvider(
     FromDatabaseResultProvider
 ):
