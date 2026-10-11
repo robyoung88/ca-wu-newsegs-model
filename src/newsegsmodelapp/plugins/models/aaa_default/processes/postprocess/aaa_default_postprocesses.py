@@ -556,37 +556,43 @@ def _dsa_to_interface(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
-        
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
         raise ValueError('Metamodel ID not provided for single run.')
-    mm = proj.get_metamodel_by_id(mm_id)
+    lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
 
-
-    if _result_already_exists(
-        result_provider, 'postproc_dsa_single_metamodel_data', mm.table_config, request.trigger_run_id,
-    ):
+    if result_provider.result_exists(
+        'postproc_dsa_single_metamodel_data', request.trigger_run_id, 
+        lmm.table_config.id, revision = lmm.table_config.revision
+    ) is not False:
         return 'ok'
-    
-    dsa_results, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config, True)
+
+    dsa_results, rev = result_provider.get_result(
+        'dsa_single_metamodel', lmm.table_config.id, True, lmm.table_config.revision
+    )
+
     if dsa_results is None:
         return 'missing'
-    any_stale = rev != mm.table_config.revision
+    any_stale = rev != lmm.table_config.revision
 
     index_vars = ['variable', 'bound']
     if not set(dsa_results.index.names) == set(index_vars):
         dsa_results = dsa_results.set_index(index_vars)
     res_table, label_table = post_dsa_results.dsa_results_to_tables(dsa_results)
 
-    result_provider.upsert_result('postproc_dsa_single_metamodel_data', mm.table_config, res_table, mark_stale = any_stale, request = request)
-    result_provider.upsert_result('postproc_dsa_single_metamodel_labels', mm.table_config, label_table, mark_stale = any_stale, request = request)
+    data_table = provider._component_provider.get_lightweight_dataholding_component(lmm.table_config.id)
+
+    result_provider.upsert_result('postproc_dsa_single_metamodel_data', data_table, res_table, mark_stale = any_stale, request = request)
+    result_provider.upsert_result('postproc_dsa_single_metamodel_labels', data_table, label_table, mark_stale = any_stale, request = request)
 
     return 'ok'
 
 # -----------------------------------------------
-# DSA
+# PSA
 # -----------------------------------------------
 
 POSTPROCESS_TYPE = 'postproc_psa_metamodel'
@@ -601,27 +607,40 @@ def _psa_to_interface(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
-        
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
         raise ValueError('Metamodel ID not provided for single run.')
-    mm = proj.get_metamodel_by_id(mm_id)
+    lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
 
-    if _result_already_exists(
-        result_provider, 'postproc_psa_single_metamodel_data', mm.table_config, request.trigger_run_id,
-    ):
+    if result_provider.result_exists(
+        'postproc_psa_single_metamodel_data', request.trigger_run_id, 
+        lmm.table_config.id, revision = lmm.table_config.revision
+    ) is not False:
         return 'ok'
 
-    psa_results, rev = result_provider.get_result('psa_single_metamodel', mm.table_config, True)
+    psa_results, rev = result_provider.get_result(
+        'psa_single_metamodel', lmm.table_config.id, True, lmm.table_config.revision
+    )
+
     if psa_results is None:
         return 'missing'
-    any_stale = rev != mm.table_config.revision
+    any_stale = rev != lmm.table_config.revision
 
     res_table, ppv = post_psa_results.psa_results_to_tables(psa_results)
 
-    result_provider.upsert_result('postproc_psa_single_metamodel_data', mm.table_config, res_table, mark_stale = any_stale, request = request)
-    result_provider.upsert_result('postproc_psa_single_metamodel_prob_positive_npv', mm.table_config, ppv, mark_stale = any_stale, request = request)
+    data_table = provider._component_provider.get_lightweight_dataholding_component(lmm.table_config.id)
+
+    result_provider.upsert_result(
+        'postproc_psa_single_metamodel_data', data_table,
+        res_table, mark_stale = any_stale, request = request
+    )
+    result_provider.upsert_result(
+        'postproc_psa_single_metamodel_prob_positive_npv', data_table,
+        ppv, mark_stale = any_stale, request = request
+    )
 
     return 'ok'
