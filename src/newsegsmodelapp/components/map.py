@@ -336,9 +336,6 @@ def add_site_change_callback(app) -> Dash:
                 lproj = provider.get_lightweight_project(active_project_id)
                 lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 
-                #proj = app.project_provider.get_project(active_project_id)
-                #focussed_mm = proj.get_focussed_metamodel()
-                
                 for mm in lproj.metamodels:
                     if mm != lmm and mm.location:
                         loc = mm.location

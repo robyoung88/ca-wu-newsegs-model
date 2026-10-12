@@ -57,17 +57,10 @@ for supersection, section_tuple in sections_by_supersection.items():
             provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
             lproj = provider.get_lightweight_project(proj_id)
             lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
-            
-            #proj = proj_provider.get_project(proj_id)
-            #mm = proj.get_focussed_metamodel()
-            #key = (_section, proj.id, mm.id)
-            #if key in _cache:
-            #    return _cache[key]
 
             component = generic_create_deterministic_input_container_contents(
                 _section, lproj, lmm, provider.variable_provider
             )
-            #_cache[key] = component
 
             return component
 

@@ -1,4 +1,5 @@
 import time
+from typing import cast
 
 from dash import ALL, ctx, Dash, Input, no_update, Output, Patch, State
 from dash.exceptions import PreventUpdate
@@ -7,6 +8,7 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from plotly_resampler import FigureResampler
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.dash_extension import NewsegsDash
 
 
@@ -79,14 +81,15 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
         if container_style.get('display') == 'none':
             raise PreventUpdate
 
-        proj = app.project_provider.get_project(active_project_id)
-        mm = proj.get_focussed_metamodel()
-        try:
-            _ = mm.model.get_grid_result()
-        except AttributeError:
-            mm.model.reattach_results(app.results_provider)
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
-        mdl = mm.model
+        mdl = provider.metamodel_provider._em_provider.get_component(lmm.model.id)
+        try:
+            _ = mdl.get_grid_result()
+        except AttributeError:
+            mdl.reattach_results(app.results_provider)
 
         genr = mdl.get_generation_result()
         cs = mdl.get_consumption_storage_result()
@@ -191,14 +194,11 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
         eventdate = pd.Timestamp(triggered_id['date'], tz ='utc')
         window_start = eventdate - pd.Timedelta(days=0.5)
         window_end = eventdate + pd.Timedelta(days=1.5)
-        #fig_patch = Patch()
-        #fig_patch['layout']['xaxis'] = {'range': (window_start, window_end), 'autoscale': False}
         return {
             'xaxis.range[0]': window_start,
             'xaxis.range[1]': window_end
         }
-        return fig_patch
-    
+        
     @app.callback(
         Output('graph-timeseries', 'relayoutData', allow_duplicate=True),
         Input({'type': 'link-event-daterange', 'datetime_start': ALL, 'datetime_end': ALL}, 'n_clicks'),
@@ -217,9 +217,5 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
             'xaxis.range[0]': window_start,
             'xaxis.range[1]': window_end
         }
-        # fig_patch = Patch()
-        # fig_patch['layout']['xaxis'] = {'range': (window_start, window_end), 'autoscale': False}
         
-        # return fig_patch
-
     return app
