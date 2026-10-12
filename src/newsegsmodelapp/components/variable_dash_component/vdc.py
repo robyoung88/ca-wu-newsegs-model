@@ -176,7 +176,7 @@ def create_dsa_input_vector_parameter_input(
     return rval
     
 def _create_numeric_inputgroup_from_var(
-    var: variable.NumericScalarVariable,
+    var: FullLightweightVariable,
     parameter_name: str,
     parameter_index: int = 0,
     min: int | float | None = 0,
@@ -196,6 +196,8 @@ def _create_numeric_inputgroup_from_var(
         purpose = purpose,
         parameter_index = parameter_index
     )
+
+    pars = [var.raw_parameter_0, var.raw_parameter_1]
     
     return dbc.InputGroup(
         [
@@ -203,7 +205,7 @@ def _create_numeric_inputgroup_from_var(
             
             create_numeric_variable_parameter_input(
                 variable_id,
-                value = var.raw_parameters[parameter_index], # pyright: ignore[reportArgumentType]
+                value = pars[parameter_index], # pyright: ignore[reportArgumentType]
                 placeholder = parameter_name,
                 min = min,
                 max = max,
@@ -214,19 +216,19 @@ def _create_numeric_inputgroup_from_var(
 
 def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
-    var: variable.NumericScalarVariable,
+    var: FullLightweightVariable,
 ):
     type_id_lower = f'input-dsabound-lower'
     type_id_upper = f'input-dsabound-upper'
 
-    variable_id_lower = VariableInstanceParameterComponentID.from_variable(
+    variable_id_lower = VariableInstanceParameterComponentID.from_lightweight_variable(
         var,
         type = 'single-input-config',
         supersection = 'dsa',
         purpose = 'bound-lower',
     )
 
-    variable_id_upper = VariableInstanceParameterComponentID.from_variable(
+    variable_id_upper = VariableInstanceParameterComponentID.from_lightweight_variable(
         var,
         type = 'single-input-config',
         supersection = 'dsa',
@@ -238,7 +240,7 @@ def create_dsa_bounds_inputs_scalar(
             if bounds_type == 'relative':
                 step_size = 0.05
             else:
-                step_size = float(f'{var.deterministic_value / 10:2g}')
+                step_size = float(f'{var.last_deterministic_value / 10:2g}')
                 if step_size == 0:
                     step_size = 0.05
 
@@ -646,9 +648,9 @@ def create_psa_header(
         hdr = create_psa_input_scalar_numeric_header(
             label,
             fmt(var.last_deterministic_value),
-            fmt(var.last_std()),
-            fmt(var.psa_ci_lower),
-            fmt(var.psa_ci_upper)
+            fmt(var.last_std) if var.last_std is not None else '-',
+            fmt(var.psa_ci_lower) if var.psa_ci_lower is not None else '-',
+            fmt(var.psa_ci_upper) if var.psa_ci_upper is not None else '-'
         )
     else:
         ci = var.get_confidence_interval(0.95)
@@ -663,9 +665,12 @@ def create_psa_header(
     return hdr
 
 def create_psa_distribution_component(
-    var: variable.Variable
+    var: variable.Variable|FullLightweightVariable
 ):
-    distname = var.distribution.distribution.title()
+    if isinstance(var, FullLightweightVariable):
+        distname = var.distribution.title()
+    else:
+        distname = var.distribution.distribution.title()
     return [
         html.P(
             'Distribution:',

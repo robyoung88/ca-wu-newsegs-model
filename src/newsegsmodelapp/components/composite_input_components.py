@@ -60,19 +60,23 @@ def generic_create_deterministic_input_container_contents(
     return contents
 
 def generic_create_dsa_input_container_contents(
-    mm: NewsegsMetaModel,
+    lmm: LightweightNewsegsMetaModel,
+    variable_provider: FromDatabaseVariableProvider
 ) -> list[dash.development.base_component.Component]:
     contents = []
-    for var in mm.variables.values():
+    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
+    for var in vars:
         contents.append(create_dsa_input(var))
 
     return contents
 
 def generic_create_psa_input_container_contents(
-    mm: NewsegsMetaModel,
+    lmm: LightweightNewsegsMetaModel,
+    variable_provider: FromDatabaseVariableProvider
 ) -> list[dash.development.base_component.Component]:
     contents = []
-    for var in mm.variables.values():
+    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
+    for var in vars:
         contents.append(create_psa_input(var))
 
     return contents

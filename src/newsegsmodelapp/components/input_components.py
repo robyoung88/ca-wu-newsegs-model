@@ -9,6 +9,7 @@ import numpy as np
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components.constants import VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
@@ -521,22 +522,27 @@ def _set_variable_optim_active(
     if val is None:
         raise PreventUpdate
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
-    varid = make_varid(**triggered_id)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
-    var = mm.variables.get(varid)
+    varid = make_varid(**triggered_id)
+    varprovider = cast(FromDatabaseVariableProvider, project_provider.variable_provider)
+    varuid =lmm.variables.get(varid)
+    if varuid is None:
+        raise PreventUpdate
+    var = varprovider.get_full_lightweight_variable(varuid)
+
     if var is None:
         raise PreventUpdate
 
     if var.optim_selected == val:
         raise PreventUpdate
 
-    var.optim_selected = True
-    proj.revision += 1
-    project_provider.upsert_component(proj)
+    var.optim_selected = val
+    varprovider.set_variable_metadata(var.id, 'optim_selected', var.optim_selected)
 
-    # Return update signals to refresh input card headers and values
+    provider.invalidate_cache_for_component(lproj.id)
     
     now = time.time_ns()
     # Update triggers in case there is any formatting that needs to be done.

@@ -33,10 +33,12 @@ class LightweightVariable(DataWithRevision):
 @revision_dataclass
 class FullLightweightVariable(DataWithRevision):
     parameterisation_index: int
+    component_type: str
 
     dsa_show: bool
     dsa_selectable: bool
     dsa_selected: bool
+    dsa_bounds_type: str
     dsa_lower: Any | None
     dsa_upper: Any | None
     dsa_value_lower: Any | None
@@ -54,3 +56,9 @@ class FullLightweightVariable(DataWithRevision):
     optim_selected: bool = False
     optim_min: Any | None = None
     optim_max: Any | None = None
+
+    @property
+    def configuration_type(self) -> str:
+        if self.component_type in ('financedata'):
+            return 'finance'
+        return 'model'

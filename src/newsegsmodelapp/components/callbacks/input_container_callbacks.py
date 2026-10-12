@@ -12,6 +12,7 @@ from dash.exceptions import PreventUpdate
 
 from newsegsmodelapp.backend.db import db
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
@@ -506,16 +507,19 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         if not len(container_ids):
             raise PreventUpdate
-        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+        
+        provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+        varprovider = cast(CachedFromDatabaseVariableProvider, project_provider.variable_provider)
 
         varid = make_varid(**container_ids[0])
-        var = mm.variables.get(varid)
-        if not var:
+        varuid =lmm.variables.get(varid)
+        if varuid is None:
             raise PreventUpdate
-        if not isinstance(var, variable.NumericScalarVariable):
-            raise PreventUpdate
+        var = varprovider.get_full_lightweight_variable(varuid)
         bounds_input = create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var)
-
+        
         if var.dsa_selected:
             cn = 'dsa-input-single-value-block'
         else:
@@ -561,14 +565,17 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         if not len(container_ids):
             raise PreventUpdate
-        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+
+        provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+        varprovider = cast(CachedFromDatabaseVariableProvider, project_provider.variable_provider)
 
         varid = make_varid(**container_ids[0])
-        var = mm.variables.get(varid)
-        if not var:
+        varuid =lmm.variables.get(varid)
+        if varuid is None:
             raise PreventUpdate
-        if not isinstance(var, variable.NumericScalarVariable):
-            raise PreventUpdate
+        var = varprovider.get_full_lightweight_variable(varuid)
         
         if var.psa_selected:
             cn = 'psa-input-single-value-block'

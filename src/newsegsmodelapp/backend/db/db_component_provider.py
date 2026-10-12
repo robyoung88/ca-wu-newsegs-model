@@ -86,8 +86,8 @@ class FromDatabaseNewsegsComponentProvider(
             print(f'Syncronising Component revision ({obj.id}): {obj.revision} -> {row.revision}')
             obj.revision = row.revision
             obj._config._last_syncronised = obj.revision
-        if obj.chain_modified:
-            raise ValueError('Component has been reconstructed with modified children.')
+        #if obj.chain_modified:
+        #    raise ValueError('Component has been reconstructed with modified children.')
         return obj
 
     def _reconstruct_lightweight_component(self, row) -> LightweightNewsegsComponent:

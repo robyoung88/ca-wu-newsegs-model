@@ -194,10 +194,12 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
     _full_lightweight_variable_columns = _lightweight_variable_columns + tuple(
         tbls.variable_configs.columns[x] for x in (
             'parameterisation_index',
+            'component_type',
 
             'dsa_show',
             'dsa_selectable',
             'dsa_selected',
+            'dsa_bounds_type',
             'dsa_lower',
             'dsa_upper',
             'dsa_value_lower',
@@ -206,6 +208,10 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             'psa_show',
             'psa_selectable',
             'psa_selected',
+            'last_std',
+            'psa_ci_lower',
+            'psa_ci_upper',
+
 
             'optim_show',
             'optim_selectable',

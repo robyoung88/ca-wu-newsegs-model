@@ -33,8 +33,11 @@ def _(
     proj_id: str,
     proj_provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
+    provider = cast(FromDatabaseNewsegsProjectProvider, proj_provider)
+    lproj = provider.get_lightweight_project(proj_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     return generic_create_psa_input_container_contents(
-        get_focussed_metamodel(proj_id, proj_provider)
+        lmm, provider.variable_provider
     )
 
 @register_single_input_header_content_creator('psa', None, MODEL_TYPE)

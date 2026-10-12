@@ -10,7 +10,7 @@ def create_dsa_input(
 ):
     if not var.dsa_show:
         return []
-    match var.distribution.distribution:
+    match var.distribution:
         case 'constant':
             is_scalar = True
             creation_func = var_dc.create_dsa_input_scalar_constant
