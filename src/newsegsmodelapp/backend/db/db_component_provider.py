@@ -27,7 +27,8 @@ from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import Lightweig
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import ON_MISSING_OPTION, NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegsvariable.variable import Variable
+from newsegsmodelframework.newsegsvariable.lightweight_variable import LightweightVariable
+from newsegsmodelframework.newsegsvariable.variable import Variable, variable_uid
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
 
 class FromDatabaseNewsegsComponentProvider(
@@ -589,6 +590,11 @@ class FromDatabaseNewsegsComponentProvider(
 
         with self._get_engine().begin() as conn:
             conn.execute(stmt)
+
+        try:
+            self.invalidate_cache_for_component(component_id)
+        except AttributeError:
+            pass
 
         return
 
@@ -1153,6 +1159,47 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                     new_variable_entries
                 )
 
+    def refresh_metamodel_variable_junction(
+        self,
+        metamodel: NewsegsMetaModel | LightweightNewsegsMetaModel,
+        variables: Sequence[Variable | LightweightVariable]
+    ):
+        varids = [x.varid if isinstance(x, LightweightVariable) else variable_uid(x) for x in variables]
+        if not varids:
+            return
+
+        # Create a subquery to find variable_config IDs matching the target varids
+        var_config_subquery = (
+            sa.select(tbls.variable_configs.c.id)
+            .where(tbls.variable_configs.c.varid.in_(varids))
+        )
+        
+        clear_statement = (
+            self._metamodel_variable_jct.delete()
+            .where(
+                sa.and_(
+                    self._metamodel_variable_jct.c.metamodel_id == metamodel.id,
+                    self._metamodel_variable_jct.c.variable_config_id.in_(var_config_subquery)
+                )
+            )
+        )
+
+        new_entries = [
+            {
+                'metamodel_id': metamodel.id,
+                'variable_config_id': var.id
+            }
+            for var in variables
+        ]
+        with self._get_engine().begin() as conn:
+            conn.execute(clear_statement)
+
+            if new_entries:
+                conn.execute(
+                    self._metamodel_variable_jct.insert(),
+                    new_entries
+                )
+
     @override
     def upsert_children(self, component, force = False):
         component_children = component.get_components(component_group= 'component_configs')
@@ -1474,12 +1521,52 @@ class FromDatabaseNewsegsProjectProvider(
         self, project_id: SequenceNotStr[str]
     ) -> SequenceNotStr[LightweightNewsegsProject]:
         ...
-    
 
     def get_lightweight_project(
         self, project_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsProject | SequenceNotStr[LightweightNewsegsProject]:
         return self.get_lightweight_component(project_id)
+
+    def add_variables_to_project(
+        self,
+        project_id: str,
+        variables: Sequence[Variable | LightweightVariable]
+    ):
+        new_entries = [
+            {
+                'project_id': project_id,
+                'variable_config_id': x.id if not isinstance(x, str) else x
+            } 
+            for x in variables
+        ]
+        if new_entries:
+            with self._get_engine().begin() as conn:
+                conn.execute(
+                    self._project_variable_jct.insert(),
+                    new_entries
+                )
+
+    def remove_variables_from_project(
+        self,
+        project_id: str,
+        variables: Sequence[Variable | LightweightVariable | str]
+    ):
+        var_uids = [x.id if not isinstance(x, str) else x for x in variables]
+        clear_statement = (
+            self._project_variable_jct.delete()
+            .where(
+                sa.and_(
+                    self._project_variable_jct.c.project_id == project_id,
+                    self._project_variable_jct.c.variable_config_id.in_(var_uids)
+                )
+            )
+        )
+
+        with self._get_engine().begin() as conn:
+            conn.execute(clear_statement)
+
+        # Trust to .delete_orphan_variables to clean up the variable_config table
+        
 
     # def _create_duplicate_component(self, original: NewsegsComponent) -> NewsegsComponent:
     #     new = super()._create_duplicate_component(original)
@@ -2068,6 +2155,15 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
         return olist
 
+    def invalidate_cache_for_component(self, component_id):
+        if isinstance(component_id, str):
+            component_id = [component_id]
+        for id_ in component_id:
+            if id_ in self._project_cache:
+                del self._project_cache[id_]
+            if id_ in self._lightweight_project_cache:
+                del self._lightweight_project_cache[id_]
+
     @override
     def set_component_metadata(
         self, 
@@ -2082,10 +2178,5 @@ class CachedFromDatabaseNewsegsProjectProvider(
             metadata_value, increment_revision
         )
         if invalidate_cache:
-            if isinstance(component_id, str):
-                component_id = [component_id]
-            for id_ in component_id:
-                if id_ in self._project_cache:
-                    del self._project_cache[id_]
-                if id_ in self._lightweight_project_cache:
-                    del self._lightweight_project_cache[id_]
+            self.invalidate_cache_for_component(component_id)
+        

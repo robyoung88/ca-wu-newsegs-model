@@ -677,8 +677,8 @@ def add_input_container_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         triggered_id = ctx.triggered_id
-        proj = app.project_provider.get_project(active_project_id)
-        mm = proj.get_focussed_metamodel()
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         varid = make_varid(**triggered_id) # pyright: ignore[reportCallIssue]
-        contents, colour = get_variable_sharing_status(proj, mm, varid)
+        contents, colour = get_variable_sharing_status(lproj, lmm, varid)
         return [contents] * len(button_ids), [colour] * len(button_ids)

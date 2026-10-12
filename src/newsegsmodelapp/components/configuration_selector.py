@@ -322,8 +322,9 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         # By changing the metadata, the MM should pick up the new name next time it is
         # taken from the store as the revision will by incremented by default
         provider.metamodel_provider.set_component_metadata(mm.id, 'label', new_name)
-        # However, for this to be picked up by the front end, we will have to trigger a revision increment
-        provider.set_component_metadata(active_project_id, 'revision', lproj.revision + 1, increment_revision = False)
+        
+        # However, for this to be picked up by the front end, we will have to invalidate the project provider cache
+        provider.invalidate_cache_for_component(lproj.id)
 
         # Trigger a rebuild of the page in case the name is baked into e.g. button titles.
         return active_project_id
@@ -434,18 +435,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             mm_id, increment_revision = False,
             invalidate_cache = True,
         )
-
-        # # TODO: Lower load on focus switcher
-        # # Don't love this full load on a config switch - see if we can do without it
-
-        # proj = provider.get_project(active_project_id)
         
-        # mm = proj.get_focussed_metamodel()
-        # mm.sync_model_with_changed_variables_deterministic()
-
-        # proj.set_focussed_metamodel_index(mm_index)
-        # app.project_provider.upsert_component(proj, force = True)
-
         # Trigger interface update
         # Could be a bit more elegant, but may have to rebuild inputs for some configurations anyway so brute force for now.
         return active_project_id
