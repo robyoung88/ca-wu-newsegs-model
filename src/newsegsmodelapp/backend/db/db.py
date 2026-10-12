@@ -1,15 +1,22 @@
 """Functions for database creation and management."""
 
+import time
 from typing import Literal
+import logging
 import os
 import sqlite3
+import warnings
 
 from alembic.config import Config as AlembicConfig
 from pathlib import Path
-import sqlalchemy
+import sqlalchemy as sa
+from sqlalchemy.exc import OperationalError
 from sqlalchemy import event
 
 from config import settings
+
+logger = logging.getLogger(__name__)
+
 DB_PATH = str(settings['DB_PATH'])
 DB_BACKUP_PATH = Path(str(settings['DB_BACKUP_PATH']))
 if not DB_BACKUP_PATH.exists():
@@ -25,7 +32,7 @@ class DependentObjectsExistError(ValueError):
     """Raised when attempting to delete a component that still has dependent children."""
     pass
 
-_engine: sqlalchemy.Engine|None = None
+_engine: sa.Engine|None = None
 _connected_db_path: str | None = None
 def get_engine(db_path: str | Path | None = None):
     """Get the sqlalchemy engine for the database."""
@@ -37,7 +44,7 @@ def get_engine(db_path: str | Path | None = None):
     if _engine is None or (_connected_db_path is not None and _connected_db_path != db_path):
         engine_url = f'sqlite+pysqlite:///{db_path}'
         print(f'Creating engine: {engine_url}')
-        _engine = sqlalchemy.create_engine(
+        _engine = sa.create_engine(
             engine_url,
             echo = False,
             connect_args = {"timeout": 30.0}
@@ -145,3 +152,25 @@ def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
                 raise FileNotFoundError('Unable to find or create application database.')
         case _:
             run_migrations()
+
+def write_with_retries(engine: sa.Engine, stmt, n_retries: int = 5, sleep_time: float = 0.1):
+    """Execute stmt with engine, retrying on OperationalError
+    
+    Set n_retries to a negative number for no give up.
+    """
+    if n_retries >= 0:
+        n_retries += 1
+    while n_retries != 0:
+        try:
+            with engine.begin() as conn:
+                conn.execute(stmt)
+            success = True
+            break
+        except OperationalError as e:
+            n_retries -= 1
+            if n_retries == 0:
+                raise e
+            warnings.warn(f'Encountered OperationalError {e} performing {stmt} - retrying up to {n_retries} times.')
+            time.sleep(sleep_time)
+
+    logger.info('Successfully completed database write %s', stmt)

@@ -3,6 +3,7 @@ import json
 
 import sqlalchemy as sa
 
+from newsegsmodelapp.backend.db.db import write_with_retries
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelapp.backend.db import tables as tbls
 
@@ -44,9 +45,7 @@ def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, mes
         )
         .where(tbls.runs.c.run_id == job_id)
     )
-
-    with engine.begin() as conn:
-        conn.execute(stmt)
+    write_with_retries(engine, stmt, sleep_time = 0.02)
 
 def set_cancel_status(engine: sa.Engine, job_id: int, status: bool = True):
     stmt = (
@@ -54,8 +53,7 @@ def set_cancel_status(engine: sa.Engine, job_id: int, status: bool = True):
         .where(tbls.runs.c.run_id == job_id)
         .values(cancel_requested = status)
     )
-    with engine.begin() as conn:
-        conn.execute(stmt)
+    write_with_retries(engine, stmt)
 
 def get_cancel_status(engine: sa.Engine, job_id: int):
     stmt = (
@@ -77,8 +75,7 @@ def set_status_completed(engine: sa.Engine, job_id: int):
         .where(tbls.runs.c.run_id == job_id)
     )
 
-    with engine.begin() as conn:
-        conn.execute(stmt)
+    write_with_retries(engine, stmt)
 
 def set_status_failed(engine: sa.Engine, job_id: int, message: str | None):
     update_vals = dict(
@@ -95,5 +92,4 @@ def set_status_failed(engine: sa.Engine, job_id: int, message: str | None):
         .where(tbls.runs.c.run_id == job_id)
     )
 
-    with engine.begin() as conn:
-        conn.execute(stmt)
+    write_with_retries(engine, stmt)

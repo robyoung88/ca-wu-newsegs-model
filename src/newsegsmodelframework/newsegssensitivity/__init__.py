@@ -2,4 +2,8 @@
 from .dsa import *
 from .psa import *
 
-__all__ = ['DSAComponent', 'PSAComponent']
+__all__ = [
+    'DSAComponent', 
+    'PSAComponent',
+    'PSAConfig',
+]

@@ -81,7 +81,7 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
 
     metamodels = TableModifyingComponentListProperty(oftype = newsegsmetamodel.NewsegsMetaModel)
     dsa_config = ComponentProperty(default = DSAComponent, oftype = DSAComponent)
-    psa_config = ComponentProperty(default = DSAComponent, oftype = PSAComponent)
+    psa_config = ComponentProperty(default = PSAComponent, oftype = PSAComponent)
 
     _focussed_metamodel: int = 0
     _watcher: RevisionNotifierProtocol | None = None

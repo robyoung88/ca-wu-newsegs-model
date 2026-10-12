@@ -107,7 +107,7 @@ def _generation_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -170,7 +170,7 @@ def _consumption_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -235,7 +235,7 @@ def _storage_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -298,7 +298,7 @@ def _net_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -363,7 +363,7 @@ def _finance_benefits_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -430,7 +430,7 @@ def _finance_costs_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -496,7 +496,7 @@ def _finance_value_to_interface_sprake(
         mm_id = run_config.get('metamodel_id')
         if not mm_id:
             raise ValueError('Metamodel ID not provided for single run.')
-        lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+        lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
         lmetamodels = [lmm,]
 
     else:
@@ -563,7 +563,7 @@ def _dsa_to_interface(
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
         raise ValueError('Metamodel ID not provided for single run.')
-    lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+    lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
 
     if result_provider.result_exists(
         'postproc_dsa_single_metamodel_data', request.trigger_run_id, 
@@ -614,7 +614,7 @@ def _psa_to_interface(
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
         raise ValueError('Metamodel ID not provided for single run.')
-    lmm = lproj.metamodels[[x.id == mm_id for x in lproj.metamodels]]
+    lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
 
     if result_provider.result_exists(
         'postproc_psa_single_metamodel_data', request.trigger_run_id, 

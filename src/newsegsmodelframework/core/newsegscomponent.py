@@ -335,6 +335,13 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
     ):
         """Directly set a field in the table. Use with caution!"""
 
+    @abstractmethod
+    def increment_revision(
+        self,
+        component_id: str | SequenceNotStr[str]
+    ):
+        """Increment revision number by one on nominated components"""
+
 
 class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
     """Interface for saving components to persistent storage (in order that they may be accessed by other providers)"""

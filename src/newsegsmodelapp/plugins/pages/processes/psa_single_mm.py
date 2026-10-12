@@ -70,7 +70,7 @@ def execute_psa_single_mm_run(
         progress_callback(step, total, msg)
 
     seed = proj.psa_config.seed
-    seed = int(seed) if seed is not None else seed
+    seed = int(seed) if seed is not None and seed != '' else seed
 
     psa_results = psa.run_psa(
         mm,
