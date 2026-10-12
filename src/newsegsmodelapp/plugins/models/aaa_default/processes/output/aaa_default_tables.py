@@ -620,8 +620,13 @@ def _make_postopt_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
-    optdict, _ = result_provider.get_result('optimisation_result', proj.table_config)
+
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+    
+    optdict, _ = result_provider.get_result(
+        'optimisation_result', lproj.table_config.id, revision = lproj.table_config.revision
+    )
 
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
@@ -634,8 +639,6 @@ def _make_postopt_tables_sprake(
             html.H4('Success'),
             str(optdict['opt'])
         ]
-
-        project_provider.upsert_component(proj)
     else:
         opt = optdict['opt']
         table_data = [
@@ -645,7 +648,10 @@ def _make_postopt_tables_sprake(
             str(opt),
         ]
 
-        result_provider.upsert_result('table_postopt_metamodel', proj.table_config, table_data, request=request)
+    result_provider.upsert_result(
+        'table_postopt_metamodel', lproj.table_config.id, 
+        table_data, request=request
+    )
 
     return 'ok'
 

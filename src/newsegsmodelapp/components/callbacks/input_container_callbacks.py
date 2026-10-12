@@ -314,12 +314,16 @@ def add_input_container_callbacks(app: NewsegsDash):
                 match trigger_id['supersection']:
                     case 'dsa':
                         new_val = callback_utils.get_triggered_value()
-                        proj = app.project_provider.get_project(active_project_id)
-                        mm = proj.get_focussed_metamodel()
+
+                        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                        lproj = provider.get_lightweight_project(active_project_id)
+                        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                         varid =  make_varid(**trigger_id)
-                        var = mm.variables.get(varid)
+                        varuid = lmm.variables.get(varid)
                         if not var:
                             raise PreventUpdate
+                        var = provider.variable_provider.get_variable(varuid)
+
                         dsa_changed = False
                         if trigger_id['purpose'] == 'bound-lower':
                             if not new_val == var.dsa_lower:
@@ -349,18 +353,24 @@ def add_input_container_callbacks(app: NewsegsDash):
                                     case 'dsa':
                                         rval['trigger_data'][idx] = now
 
-                            # Sync project to store
-                            app.project_provider.upsert_component(proj)
+                            provider.variable_provider.upsert_variable(var)
+
+                            provider.increment_revision(lproj.id)
+                            provider._component_provider.increment_revision(
+                                lproj.table_config.id
+                            )
 
                     case 'optim':
                         new_val = callback_utils.get_triggered_value()
-                        proj = app.project_provider.get_project(active_project_id)
-                        varid = make_varid(**trigger_id)
-                        # For now, just going to hack this onto the dsa configuration
-                        # Note that it will not be an observed component.
-                        if not hasattr(proj.dsa_config, 'optim_config'):
-                            proj.dsa_config.optim_config = {}
-                        variable_bounds = proj.dsa_config.optim_config.setdefault('bounds', {})
+
+                        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                        lproj = provider.get_lightweight_project(active_project_id)
+
+                        dsa_config = provider._component_provider.get_component(lproj.table_config.id)
+                        if not hasattr(dsa_config, 'optim_config'):
+                            dsa_config.optim_config = {}
+                        variable_bounds = dsa_config.optim_config.setdefault('bounds', {})
+                        
                         bound = variable_bounds.setdefault(varid, {})
                         match trigger_id['purpose']:
                             case 'plot-intervals':
@@ -369,15 +379,21 @@ def add_input_container_callbacks(app: NewsegsDash):
                                 bound['lower'] = new_val
                             case _:
                                 bound['upper'] = new_val
-                        proj.dsa_config.revision += 1
-                        app.project_provider.upsert_component(proj)
+
+                        provider._component_provider.upsert_component(dsa_config)
+                        provider.invalidate_cache_for_component(lproj.id)
                         
             case 'dsaboundtype':
                 new_val = callback_utils.get_triggered_value()
-                proj = app.project_provider.get_project(active_project_id)
-                mm = proj.get_focussed_metamodel()
+
+                provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                lproj = provider.get_lightweight_project(active_project_id)
+                lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 varid =  make_varid(**trigger_id)
-                var = mm.variables.get(varid)
+                varuid = lmm.variables.get(varid)
+                if not var:
+                    raise PreventUpdate
+                var = provider.variable_provider.get_variable(varuid)
                 if not var or new_val == var.dsa_bounds_type:
                     raise PreventUpdate
 
@@ -415,18 +431,27 @@ def add_input_container_callbacks(app: NewsegsDash):
                         case 'dsa':
                             rval['trigger_data'][idx] = trig_val
 
-                 # Sync project to store
-                app.project_provider.upsert_component(proj)
+                # Sync variable and invalidate tables
+                provider.variable_provider.upsert_variable(var)
+
+                provider.increment_revision(lproj.id)
+                provider._component_provider.increment_revision(
+                    lproj.table_config.id
+                )
 
             case 'dsa-active':
                 new_val = callback_utils.get_triggered_value()
-                proj = app.project_provider.get_project(active_project_id)
-                mm = proj.get_focussed_metamodel()
+                provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                lproj = provider.get_lightweight_project(active_project_id)
+                lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 varid =  make_varid(**trigger_id)
-                var = mm.variables.get(varid)
+                varuid = lmm.variables.get(varid)
+                if not var:
+                    raise PreventUpdate
+                var = provider.variable_provider.get_variable(varuid)
                 if not var or new_val == var.dsa_selected:
                     raise PreventUpdate
-
+                
                 var.dsa_selected = new_val
 
                 # Update triggers with a dictionary, not an integer
@@ -438,9 +463,14 @@ def add_input_container_callbacks(app: NewsegsDash):
                     match id['supersection']:
                         case 'dsa':
                             rval['trigger_data'][idx] = trig_val
+                
+                # Sync variable and invalidate tables
+                provider.variable_provider.upsert_variable(var)
 
-                # Sync project to store
-                app.project_provider.upsert_component(proj)
+                provider.increment_revision(lproj.id)
+                provider._component_provider.increment_revision(
+                    lproj.table_config.id
+                )
 
             case _:
                 try:
@@ -576,7 +606,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         if varuid is None:
             raise PreventUpdate
         var = varprovider.get_full_lightweight_variable(varuid)
-        
+
         if var.psa_selected:
             cn = 'psa-input-single-value-block'
         else:
