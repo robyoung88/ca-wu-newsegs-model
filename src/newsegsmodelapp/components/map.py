@@ -5,6 +5,7 @@ from dash import Dash, html, dcc, Input, Output, State, ALL, no_update
 from dash.exceptions import PreventUpdate
 import dash_leaflet as dl
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
@@ -171,19 +172,47 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         
         newloc = modlocation.Location(lat, lon, name = name)
 
-        proj = app.project_provider.get_project(active_project_id)
-        mm = proj.get_focussed_metamodel()
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
         modified = False
-        if not(newloc == mm.model.location):
-            mm.model.location = newloc
+        if not(newloc == lmm.location):
+            lmm.location = newloc
             modified = True
-        if not mm.model.location.name != name:
-            mm.model.location.name = name
+        if not lmm.location.name != name:
+            lmm.location.name = name
             modified = True
 
         if modified:
-            app.project_provider.upsert_component(proj, force = True)
+            model_provider = cast(
+                FromDatabaseNewsegsEMProvider,
+                provider.metamodel_provider._em_provider
+                )
+            mdl = model_provider.get_component(lmm.model.id)
+            mdl.location = lmm.location
+            model_provider.upsert_component(mdl, force = True)
+            app.project_provider.metamodel_provider.set_component_metadata(
+                lmm.id,
+                'location',
+                json.dumps(mdl.location.to_dict())
+            )
+            provider.metamodel_provider.set_component_metadata(
+                lmm.id, 'lat', mdl.location.lat, increment_revision = False
+            )
+            provider.metamodel_provider.set_component_metadata(
+                lmm.id, 'lon', mdl.location.lon, increment_revision = False
+            )
+            provider.increment_revision(lproj.id)
+            provider.metamodel_provider.increment_revision(lmm.id)
+            provider._component_provider.increment_revision(
+                [
+                    lproj.table_config.id,
+                    lmm.table_config.id,
+                    lmm.model.table_config.id,
+                    lmm.finance.table_config.id,
+                ]
+            )
 
         return f"{lat:.6f}", f"{lon:.6f}", name
 
@@ -303,21 +332,28 @@ def add_site_change_callback(app) -> Dash:
         other_markers = []
         if active_project_id:
             try:
-                proj = app.project_provider.get_project(active_project_id)
-                focussed_mm = proj.get_focussed_metamodel()
+                provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                lproj = provider.get_lightweight_project(active_project_id)
+                lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 
-                for mm in proj.metamodels:
-                    if mm != focussed_mm and mm.model and mm.model.location:
-                        loc = mm.model.location
-                        other_markers.append(
-                            dl.Marker(
-                                position=[loc.lat, loc.lon],
-                                opacity=0.4,
-                                children=[
-                                    dl.Tooltip(getattr(loc, 'name', None) or getattr(mm, 'name', 'Other Configuration'))
-                                ]
+                #proj = app.project_provider.get_project(active_project_id)
+                #focussed_mm = proj.get_focussed_metamodel()
+                
+                for mm in lproj.metamodels:
+                    if mm != lmm and mm.location:
+                        loc = mm.location
+                        lat = loc.lat
+                        lon = loc.lon
+                        if lat and lon:
+                            other_markers.append(
+                                dl.Marker(
+                                    position=[lat, lon],
+                                    opacity=0.4,
+                                    children=[
+                                        dl.Tooltip(loc.name)
+                                    ]
+                                )
                             )
-                        )
             except Exception as e:
                 print(e)
                 pass
