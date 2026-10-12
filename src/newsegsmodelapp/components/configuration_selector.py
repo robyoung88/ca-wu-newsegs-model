@@ -427,15 +427,24 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         if lproj.focussed_metamodel_index == mm_index:
             raise PreventUpdate
 
-        # TODO: Lower load on focus switcher
-        # Don't love this full load on a config switch - see if we can do without it
-        proj = provider.get_project(active_project_id)
-        
-        mm = proj.get_focussed_metamodel()
-        mm.sync_model_with_changed_variables_deterministic()
+        mm_id = lproj.metamodels[mm_index].id
 
-        proj.set_focussed_metamodel_index(mm_index)
-        app.project_provider.upsert_component(proj, force = True)
+        provider.set_component_metadata(
+            lproj.id, 'focussed_metamodel_id',
+            mm_id, increment_revision = False,
+            invalidate_cache = True,
+        )
+
+        # # TODO: Lower load on focus switcher
+        # # Don't love this full load on a config switch - see if we can do without it
+
+        # proj = provider.get_project(active_project_id)
+        
+        # mm = proj.get_focussed_metamodel()
+        # mm.sync_model_with_changed_variables_deterministic()
+
+        # proj.set_focussed_metamodel_index(mm_index)
+        # app.project_provider.upsert_component(proj, force = True)
 
         # Trigger interface update
         # Could be a bit more elegant, but may have to rebuild inputs for some configurations anyway so brute force for now.

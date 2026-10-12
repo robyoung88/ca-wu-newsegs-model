@@ -1446,8 +1446,8 @@ class FromDatabaseNewsegsProjectProvider(
                 rval[idx].metamodels = (
                     self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
                 )
-                for jdx, mm_id in enumerate(rval[idx].metamodels):
-                    if mm_id == rval[idx].focussed_metamodel_id:
+                for jdx, mm in enumerate(rval[idx].metamodels):
+                    if mm.id == rval[idx].focussed_metamodel_id:
                         rval[idx].focussed_metamodel_index = jdx
                         break
                 rval[idx]._revision = r0
@@ -1456,8 +1456,8 @@ class FromDatabaseNewsegsProjectProvider(
                 rval.metamodels = (
                     self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
                 )
-                for jdx, mm_id in enumerate(rval.metamodels):
-                    if mm_id == rval.focussed_metamodel_id:
+                for jdx, mm in enumerate(rval.metamodels):
+                    if mm.id == rval.focussed_metamodel_id:
                         rval.focussed_metamodel_index = jdx
                         break
                 rval._revision = r0
@@ -2067,3 +2067,25 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 pass
 
         return olist
+
+    @override
+    def set_component_metadata(
+        self, 
+        component_id, 
+        metadata_id, 
+        metadata_value, 
+        increment_revision = True,
+        invalidate_cache = True
+    ):
+        super().set_component_metadata(
+            component_id, metadata_id, 
+            metadata_value, increment_revision
+        )
+        if invalidate_cache:
+            if isinstance(component_id, str):
+                component_id = [component_id]
+            for id_ in component_id:
+                if id_ in self._project_cache:
+                    del self._project_cache[id_]
+                if id_ in self._lightweight_project_cache:
+                    del self._lightweight_project_cache[id_]
