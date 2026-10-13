@@ -1,5 +1,6 @@
 import copy
 import json
+import threading
 from typing import Any, Callable, Mapping, Optional, Sequence, cast, overload, override
 
 from cachetools import LRUCache
@@ -155,22 +156,27 @@ class FromDatabaseNewsegsComponentProvider(
     def get_lightweight_component(
         self, component_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
-        is_sequence = False
-        if isinstance(component_id, str):
-            stmt = (
-                sa.select(*self._lightweight_component_columns)
-                .where(self._table.c.id == component_id)
-            )
-        else:
-            is_sequence = True
-            stmt = (
-                sa.select(*self._lightweight_component_columns)
-                .where(self._table.c.id.in_(component_id))
-            )
-        with self._get_engine().connect() as conn:
-            rows = conn.execute(stmt).fetchall()
+        prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+        try:
+            is_sequence = False
+            if isinstance(component_id, str):
+                stmt = (
+                    sa.select(*self._lightweight_component_columns)
+                    .where(self._table.c.id == component_id)
+                )
+            else:
+                is_sequence = True
+                stmt = (
+                    sa.select(*self._lightweight_component_columns)
+                    .where(self._table.c.id.in_(component_id))
+                )
+            with self._get_engine().connect() as conn:
+                rows = conn.execute(stmt).fetchall()
 
-        reconstructed_components = [self._reconstruct_lightweight_component(row) for row in rows]
+            reconstructed_components = [self._reconstruct_lightweight_component(row) for row in rows]
+        finally:
+            RevisionNotifierMixin._set_notification_state(prevstate)
+
         if not is_sequence:
             return reconstructed_components[0]
         compmap = {x.id:x for x in reconstructed_components}
@@ -180,23 +186,28 @@ class FromDatabaseNewsegsComponentProvider(
         self, component_id: str | SequenceNotStr[str]
     ) -> LightweightDataHoldingNewsegsComponent | SequenceNotStr[LightweightDataHoldingNewsegsComponent]:
         """Get a representation of (a) component(s) with sufficient detail to save results against"""
-        is_sequence = False
-        if isinstance(component_id, str):
-            stmt = (
-                sa.select(*self._lightweight_dataholding_component_columns)
-                .where(self._table.c.id == component_id)
-            )
-        else:
-            is_sequence = True
-            stmt = (
-                sa.select(*self._lightweight_dataholding_component_columns)
-                .where(self._table.c.id.in_(component_id))
-            )
+        prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+        try:
+            is_sequence = False
+            if isinstance(component_id, str):
+                stmt = (
+                    sa.select(*self._lightweight_dataholding_component_columns)
+                    .where(self._table.c.id == component_id)
+                )
+            else:
+                is_sequence = True
+                stmt = (
+                    sa.select(*self._lightweight_dataholding_component_columns)
+                    .where(self._table.c.id.in_(component_id))
+                )
 
-        with self._get_engine().connect() as conn:
-            rows = conn.execute(stmt).fetchall()
+            with self._get_engine().connect() as conn:
+                rows = conn.execute(stmt).fetchall()
 
-        reconstructed_components = [self._reconstruct_lightweight_dataholding_component(row) for row in rows]
+            reconstructed_components = [self._reconstruct_lightweight_dataholding_component(row) for row in rows]
+        finally:
+            RevisionNotifierMixin._set_notification_state(prevstate)
+        
         if not is_sequence:
             return reconstructed_components[0]
         compmap = {x.id:x for x in reconstructed_components}
@@ -1102,32 +1113,36 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         else:
             is_sequence = True
 
-        for idx, comp_id in enumerate(component_id):
-            var_stmt = (
-                sa.select(
-                    tbls.variable_configs.c.varid,
-                    tbls.variable_configs.c.id,
+        prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+        try:
+            for idx, comp_id in enumerate(component_id):
+                var_stmt = (
+                    sa.select(
+                        tbls.variable_configs.c.varid,
+                        tbls.variable_configs.c.id,
+                    )
+                    .select_from(self._metamodel_variable_jct)
+                    .join(
+                        tbls.variable_configs,
+                        self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
+                    )
+                    .where(self._metamodel_variable_jct.c.metamodel_id == comp_id)
                 )
-                .select_from(self._metamodel_variable_jct)
-                .join(
-                    tbls.variable_configs,
-                    self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
-                )
-                .where(self._metamodel_variable_jct.c.metamodel_id == comp_id)
-            )
-            with self._get_engine().connect() as conn:
-                result = conn.execute(var_stmt)
-                var_mapping = {
-                    row[0]: row[1] for row in result
-                }
-            if is_sequence:
-                r0 = rval[idx].revision
-                rval[idx].variables = var_mapping
-                rval[idx]._revision = r0
-            else:
-                r0 = rval.revision
-                rval.variables = var_mapping
-                rval._revision = r0
+                with self._get_engine().connect() as conn:
+                    result = conn.execute(var_stmt)
+                    var_mapping = {
+                        row[0]: row[1] for row in result
+                    }
+                if is_sequence:
+                    r0 = rval[idx].revision
+                    rval[idx].variables = var_mapping
+                    rval[idx]._revision = r0
+                else:
+                    r0 = rval.revision
+                    rval.variables = var_mapping
+                    rval._revision = r0
+        finally:
+            RevisionNotifierMixin._set_notification_state(prevstate)
 
         return rval
 
@@ -1487,34 +1502,41 @@ class FromDatabaseNewsegsProjectProvider(
     @override
     def get_lightweight_component(self, component_id):
         rval = super().get_lightweight_component(component_id)
+        
         if isinstance(rval, LightweightNewsegsProject):
             is_sequence = False
             component_id = [component_id]
         else:
             is_sequence = True
 
-        for idx, comp_id in enumerate(component_id):
-            metamodel_ids = self.list_project_metamodel_ids(comp_id)
-            if is_sequence:
-                r0 = rval[idx].revision
-                rval[idx].metamodels = (
-                    self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
-                )
-                for jdx, mm in enumerate(rval[idx].metamodels):
-                    if mm.id == rval[idx].focussed_metamodel_id:
-                        rval[idx].focussed_metamodel_index = jdx
-                        break
-                rval[idx]._revision = r0
-            else:
-                r0 = rval.revision
-                rval.metamodels = (
-                    self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
-                )
-                for jdx, mm in enumerate(rval.metamodels):
-                    if mm.id == rval.focussed_metamodel_id:
-                        rval.focussed_metamodel_index = jdx
-                        break
-                rval._revision = r0
+        prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+        try:
+
+            for idx, comp_id in enumerate(component_id):
+                metamodel_ids = self.list_project_metamodel_ids(comp_id)
+                if is_sequence:
+                    r0 = rval[idx].revision
+                    rval[idx].metamodels = (
+                        self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
+                    )
+                    for jdx, mm in enumerate(rval[idx].metamodels):
+                        if mm.id == rval[idx].focussed_metamodel_id:
+                            rval[idx].focussed_metamodel_index = jdx
+                            break
+                    rval[idx]._revision = r0
+                else:
+                    r0 = rval.revision
+                    rval.metamodels = (
+                        self.metamodel_provider.get_lightweight_metamodel(metamodel_ids)
+                    )
+                    for jdx, mm in enumerate(rval.metamodels):
+                        if mm.id == rval.focussed_metamodel_id:
+                            rval.focussed_metamodel_index = jdx
+                            break
+                    rval._revision = r0
+        finally:
+            RevisionNotifierMixin._set_notification_state(prevstate)
+            
         return rval
 
     @overload
@@ -2075,6 +2097,8 @@ class CachedFromDatabaseNewsegsProjectProvider(
         self._project_cache = LRUCache(maxsize = 5)
         self._lightweight_project_cache = LRUCache(maxsize = 10)
         self._project_last_accessed = {}
+        # Create a lock to prevent a cache stampede at initial load
+        self._lock = threading.Lock()
 
     def _get_project_modification_key(self, project_id: str) -> str | None:
         stmt = (
@@ -2091,22 +2115,25 @@ class CachedFromDatabaseNewsegsProjectProvider(
     def get_project(self, project_id: str) -> NewsegsProject:
         new_modkey = self._get_project_modification_key(project_id)
 
-        print(f'FINDING PROJECT {project_id}')
-        if (
-            (project_id in self._project_cache)
-            and project_id in self._project_last_accessed
-            and (new_modkey == self._project_last_accessed[project_id])
-        ):
-            proj = self._project_cache[project_id]
-            print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
-            return proj
+        with self._lock:
+            print(f'FINDING PROJECT {project_id}')
+            if (
+                (project_id in self._project_cache)
+                and project_id in self._project_last_accessed
+                and (new_modkey == self._project_last_accessed[project_id])
+            ):
+                proj = self._project_cache[project_id]
+                print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+                return proj
 
-        proj = super().get_project(project_id)
-        print(f'ADDING PROJECT TO CACHE AFTER LOAD {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
-        if proj.chain_modified:
-            print('Project has been loaded in a modified state')
-        self._project_last_accessed[project_id] = new_modkey
-        self._project_cache[project_id] = proj
+            proj = super().get_project(project_id)
+            print(f'ADDING PROJECT TO CACHE AFTER LOAD {project_id}')
+            print(get_project_critical_state(proj))
+            if proj.chain_modified:
+                print('Project has been loaded in a modified state')
+            self._project_last_accessed[project_id] = new_modkey
+            self._project_cache[project_id] = proj
+        
         return proj
 
     @override
@@ -2117,29 +2144,34 @@ class CachedFromDatabaseNewsegsProjectProvider(
         else:
             is_sequence = True
 
-        revisions = self.get_component_metadata(project_id, 'revision')
-        rlist = []
-        get_list = []
-        for id_ in project_id:
-            found_component = False
-            if id_ in self._lightweight_project_cache:
-                cmpx = self._lightweight_project_cache[id_]
-                if cmpx.revision == revisions[id_]['revision']:
-                    rlist.append(cmpx)
-                    found_component = True
-            if not found_component:
-                rlist.append(None)
-                get_list.append(id_)
+        with self._lock:
+            revisions = self.get_component_metadata(project_id, 'revision')
+            rlist = []
+            get_list = []
+            for id_ in project_id:
+                print(f'FINDING LIGHTWEIGHT PROJECT {id_}')
+                found_component = False
+                if id_ in self._lightweight_project_cache:
+                    cmpx = self._lightweight_project_cache[id_]
+                    if cmpx.revision == revisions[id_]['revision']:
+                        rlist.append(cmpx)
+                        print(f'FOUND LIGHTWEIGHT PROJECT {cmpx.id} - revision is {cmpx.revision} and table revision is {cmpx.table_config.revision}')
+                        found_component = True
+                if not found_component:
+                    rlist.append(None)
+                    get_list.append(id_)
 
-        if len(get_list) > 0:
-            components_from_db = super().get_lightweight_component(get_list)
-            jdx = 0
-            for idx, id_ in enumerate(rlist):
-                if id_ is None:
-                    cmpx = components_from_db[jdx]
-                    rlist[idx] = cmpx
-                    self._lightweight_project_cache[cmpx.id] = cmpx
-                    jdx += 1
+            if len(get_list) > 0:
+                components_from_db = super().get_lightweight_component(get_list)
+                jdx = 0
+                for idx, id_ in enumerate(rlist):
+                    if id_ is None:
+                        cmpx = components_from_db[jdx]
+                        rlist[idx] = cmpx
+                        self._lightweight_project_cache[cmpx.id] = cmpx
+                        print(f'ADDING LIGHTWEIGHT PROJECT TO CACHE AFTER LOAD {cmpx.id}')
+                        print(get_project_critical_state(cmpx))
+                        jdx += 1
 
         if is_sequence:
             return rlist
@@ -2187,3 +2219,45 @@ class CachedFromDatabaseNewsegsProjectProvider(
         if invalidate_cache:
             self.invalidate_cache_for_component(component_id)
         
+
+def get_component_critical_state(component):
+    return {
+        'id': component.id,
+        'revision': component.revision,
+        'modified': component.modified
+    }
+
+def get_observable_critical_state(observable):
+    return {
+        'revision': observable.revision,
+        'modified': observable.modified
+    }
+
+def get_project_critical_state(project):
+    odict = {}
+    odict.update(
+        {
+            'project': get_component_critical_state(project),
+            'project.table_config': get_component_critical_state(project.table_config),
+            'project.dsa_config': get_component_critical_state(project.dsa_config),
+            'project.psa_config': get_component_critical_state(project.psa_config),
+            'project.metamodels_container': get_observable_critical_state(project.metamodels),
+        }
+    )
+    for idx, mm in enumerate(project.metamodels):
+        mdl = mm.model
+        fnc = mm.finance
+        mm_dict = {
+            f'metamodel_{idx}': get_component_critical_state(mm),
+            f'metamodel_{idx}.table_config': get_component_critical_state(mm.table_config),
+            f'model_{idx}': get_component_critical_state(mdl),
+            f'model_{idx}.table_config': get_component_critical_state(mdl.table_config),
+            f'model_{idx}.grid': get_component_critical_state(mdl.grid),
+            f'model_{idx}.generation': get_component_critical_state(mdl.generation),
+            f'model_{idx}.consumption_storage': get_component_critical_state(mdl.consumption_storage),
+            f'finance_{idx}': get_component_critical_state(fnc),
+            f'finance_{idx}.table_config': get_component_critical_state(fnc.table_config),
+        }
+        odict.update(mm_dict)
+
+    return odict

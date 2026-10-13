@@ -164,8 +164,8 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
             raise PreventUpdate
         try:
             coords = json.loads(site_loc)
-            lat = float(coords.get('lat', ''))
-            lon = float(coords.get('lon', ''))
+            lat = round(float(coords.get('lat', '')), 6)
+            lon = round(float(coords.get('lon', '')), 6)
             name = coords.get('name', no_update)
         except (TypeError, ValueError, json.JSONDecodeError, AttributeError):
             raise PreventUpdate
@@ -180,7 +180,7 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         if not(newloc == lmm.location):
             lmm.location = newloc
             modified = True
-        if not lmm.location.name != name:
+        if not lmm.location.name == name:
             lmm.location.name = name
             modified = True
 

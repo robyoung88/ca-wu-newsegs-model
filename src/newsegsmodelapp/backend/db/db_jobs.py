@@ -45,7 +45,7 @@ def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, mes
         )
         .where(tbls.runs.c.run_id == job_id)
     )
-    write_with_retries(engine, stmt, sleep_time = 0.02)
+    write_with_retries(engine, stmt, base_sleep = 0.02)
 
 def set_cancel_status(engine: sa.Engine, job_id: int, status: bool = True):
     stmt = (

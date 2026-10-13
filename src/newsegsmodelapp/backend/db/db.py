@@ -1,5 +1,6 @@
 """Functions for database creation and management."""
 
+import random
 import time
 from typing import Literal
 import logging
@@ -10,7 +11,7 @@ import warnings
 from alembic.config import Config as AlembicConfig
 from pathlib import Path
 import sqlalchemy as sa
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, DBAPIError
 from sqlalchemy import event
 
 from config import settings
@@ -173,24 +174,37 @@ def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
         case _:
             run_migrations()
 
-def write_with_retries(engine: sa.Engine, stmt, n_retries: int = 5, sleep_time: float = 0.1):
-    """Execute stmt with engine, retrying on OperationalError
-    
-    Set n_retries to a negative number for no give up.
+def write_with_retries(
+    engine: sa.Engine, 
+    stmt, 
+    n_retries: int = 5, 
+    base_sleep: float = 0.05, 
+    max_sleep: float = 2.0
+):
+    """Execute stmt with engine, retrying on lock/operational errors 
+    using exponential backoff and randomized jitter.
     """
-    if n_retries >= 0:
-        n_retries += 1
-    while n_retries != 0:
+    attempt = 0
+    while True:
         try:
             with engine.begin() as conn:
                 conn.execute(stmt)
-            success = True
-            break
-        except OperationalError as e:
-            n_retries -= 1
-            if n_retries == 0:
+            logger.info("Successfully completed database write.")
+            return True
+        except (OperationalError, DBAPIError) as e:
+            # Check if it's actually a lock or timeout error
+            err_msg = str(e).lower()
+            is_lock = any(k in err_msg for k in ["locked", "timeout", "deadlock", "busy"])
+            
+            if not is_lock or (n_retries >= 0 and attempt >= n_retries):
                 raise e
-            warnings.warn(f'Encountered OperationalError {e} performing {stmt} - retrying up to {n_retries} times.')
+            
+            attempt += 1
+            # Exponential backoff with random jitter (prevents thundering herd)
+            sleep_time = min(max_sleep, base_sleep * (2 ** attempt)) + random.uniform(0, 0.05)
+            
+            warnings.warn(
+                f"Encountered lock/operational error (attempt {attempt}/{n_retries if n_retries >= 0 else 'inf'}): {e}. "
+                f"Retrying in {sleep_time:.2f}s..."
+            )
             time.sleep(sleep_time)
-
-    logger.info('Successfully completed database write %s', stmt)

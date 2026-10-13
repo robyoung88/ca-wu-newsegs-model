@@ -12,6 +12,7 @@ import pandas as pd
 import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
+from newsegsmodelapp.backend.db.db import write_with_retries
 from newsegsmodelapp.components.result_file import load_result, save_result
 from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent, LightweightNewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
@@ -97,17 +98,12 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_details['result_file'] = saved_path
 
         stmt = self._table.insert().values(result_details)
-        n_retries = 5
-        success = False
-        while n_retries > 0 and not success:
-            try:
-                with self._get_engine().begin() as conn:
-                    conn.execute(stmt)
-                success = True
-            except OperationalError:
-                time.sleep (0.1)
-                n_retries -= 1
-
+        try:
+            write_with_retries(self._get_engine(), stmt)
+            success = True
+        except OperationalError:
+            success = False
+        
         if not success:
             raise ValueError(f'Result of {result_details['result_type']} saved to {saved_path}, but not uploaded to database')
 

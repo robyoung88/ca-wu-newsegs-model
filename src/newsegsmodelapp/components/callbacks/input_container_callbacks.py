@@ -626,12 +626,14 @@ def add_input_container_callbacks(app: NewsegsDash):
     def sync_loc_inputs_to_store(
         active_project_id
     ):
-        mm = get_focussed_metamodel(active_project_id, app.project_provider)
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         
         loc_input = {
-            'lat': mm.model.location.lat,
-            'lon': mm.model.location.lon,
-            'name': mm.model.location.name
+            'lat': lmm.location.lat,
+            'lon': lmm.location.lon,
+            'name': lmm.location.name
         }
         return json.dumps(loc_input)
 
