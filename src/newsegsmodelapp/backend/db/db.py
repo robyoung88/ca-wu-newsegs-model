@@ -2,7 +2,7 @@
 
 import random
 import time
-from typing import Literal
+from typing import Any, Literal, Optional
 import logging
 import os
 import sqlite3
@@ -176,7 +176,8 @@ def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
 
 def write_with_retries(
     engine: sa.Engine, 
-    stmt, 
+    stmt,
+    parameters: Optional[Any] = None,
     n_retries: int = 5, 
     base_sleep: float = 0.05, 
     max_sleep: float = 2.0
@@ -188,7 +189,10 @@ def write_with_retries(
     while True:
         try:
             with engine.begin() as conn:
-                conn.execute(stmt)
+                if parameters is None:
+                    conn.execute(stmt)
+                else:
+                    conn.execute(stmt, parameters)
             logger.info("Successfully completed database write.")
             return True
         except (OperationalError, DBAPIError) as e:

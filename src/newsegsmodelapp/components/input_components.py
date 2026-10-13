@@ -184,6 +184,8 @@ def update_single_parameter(
         for mm in lproj.metamodels:
             if var.id in set(mm.variables.values()):
                 table_components_to_revise.append(mm.table_config.id)
+                table_components_to_revise.append(mm.model.table_config.id)
+                table_components_to_revise.append(mm.finance.table_config.id)
                 metamodels_to_revise.append(mm.id)
         table_components_to_revise.append(lproj.table_config.id)
         

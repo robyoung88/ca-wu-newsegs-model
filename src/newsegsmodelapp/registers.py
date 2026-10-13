@@ -196,7 +196,7 @@ class RunRequest(SerialisableDataclass):
     progress: float = 0.0
     progress_message: str = ''
     cancel_requested: bool = False
-    background_procedure: bool = False#True 
+    background_procedure: bool = True 
 
 class RunRequestHandler(Protocol):
     def __call__(

@@ -254,11 +254,19 @@ def _make_headers_for_multiple_configs(
         if lmm.id != lproj.focussed_metamodel_id:
             cn += ' unfocussed'
         
-        rval.append(html.Div(cntnt, className = cn, id = {
-            'type':'result-header-single-config',
-            'table': result_key,
-            'metamodel': lmm.id
-        }))
+        rval.append(html.Div(
+            cntnt, 
+            className = cn, 
+            id = {
+                'type':'result-header-single-config',
+                'table': result_key,
+                'metamodel': lmm.id
+            },
+            **{
+                'data-parent-component': mod.id,
+                'data-parent-component-revision': mod.revision
+            }
+            ))
 
     return rval
 
@@ -588,10 +596,18 @@ def _(
         if lmm.id != lproj.focussed_metamodel_id:
             cn += ' unfocussed'
 
-        rval.append(html.Div(cntnt, className = cn, id = {
-            'type':'result-header-single-config',
-            'table': key_,
-            'metamodel': lmm.id
-        }))
+        rval.append(html.Div(
+            cntnt, 
+            className = cn, 
+            id = {
+                'type':'result-header-single-config',
+                'table': key_,
+                'metamodel': lmm.id
+            },
+            **{
+                'data-parent-component': mod.id,
+                'data-parent-component-revision': mod.revision
+            }
+        ))
 
     return rval

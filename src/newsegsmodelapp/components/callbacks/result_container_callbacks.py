@@ -551,3 +551,72 @@ def add_result_container_callbacks(app: NewsegsDash):
         rval['trigger_check_stale_data'] = time.time_ns()
 
         return rval
+
+    @app.callback(
+        output = dict(
+            header_classnames = Output(
+                {
+                    'type': 'result-header-single-config',
+                    'table': ALL,
+                    'metamodel': ALL,
+                },
+                'className'
+            )
+        ),
+        inputs = dict(
+            trigger_check_stale = Input(
+                'trigger-check-stale', 'data'
+            )
+        ),
+        state = dict(
+            headers = dict(
+                parent_component = State(
+                    {
+                        'type': 'result-header-single-config',
+                        'table': ALL,
+                        'metamodel': ALL,
+                    },
+                    'data-parent-component'
+                ),
+                parent_component_revision = State(
+                    {
+                        'type': 'result-header-single-config',
+                        'table': ALL,
+                        'metamodel': ALL,
+                    },
+                    'data-parent-component-revision'
+                ),
+                class_name = State(
+                    {
+                        'type': 'result-header-single-config',
+                        'table': ALL,
+                        'metamodel': ALL,
+                    },
+                    'className'
+                )
+            )
+        ),
+        prevent_initial_call = True
+    )
+    def update_result_header_staleness(
+        headers, **kwargs
+    ):
+        component_ids = list(set(headers['parent_component']))
+        current_revisions = app.project_provider._component_provider.get_component_metadata(
+            component_ids,
+            'revision'
+        )
+
+        rval = []
+        for parent_component, parent_revision, cn in zip(headers['parent_component'], headers['parent_component_revision'], headers['class_name']):
+            r0 = int(parent_revision)
+            r1 = int(current_revisions[parent_component]['revision'])
+            if r0 != r1:
+                if not 'stale' in cn:
+                    cn = (cn + ' stale').strip()
+            else:
+                if 'stale' in cn:
+                    cn = cn.replace(' stale').strip()
+            rval.append(cn)
+        
+        return dict(header_classnames = rval)

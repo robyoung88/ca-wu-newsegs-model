@@ -4,6 +4,7 @@ from typing import Callable, Sequence, overload, override
 import sqlalchemy as sa
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db import write_with_retries
 from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestHandlerInterface
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
@@ -179,8 +180,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             )
         )
 
-        with self._get_engine().begin() as conn:
-            conn.execute(stmt, data)
+        write_with_retries(self._get_engine(), stmt, data)
 
     @override
     def mark_completed(self, request_id: int | Sequence[int], completed: bool = True):
@@ -192,8 +192,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             .where(self._table.c.request_id.in_(request_id))
             .values(completed = completed)
         )
-        with self._get_engine().begin() as conn:
-            conn.execute(stmt)
+        write_with_retries(self._get_engine(), stmt)
 
     @override
     def increment_failure(self, request_id: int) -> bool:

@@ -5,6 +5,7 @@ from typing import Any, Callable, Sequence, cast, overload, override
 from cachetools import LRUCache
 import numpy as np
 import sqlalchemy as sa
+from sqlalchemy.exc import OperationalError, DBAPIError
 from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core.constructors.constructors import find_constructor
@@ -500,23 +501,15 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         saved_revisions = {x.id: x.revision for x in rows}
         existing_uids = set({str(x) for x in saved_revisions.keys()})
         new_inserts = [str(x) for x in uids if x not in existing_uids]
-        requires_revision_increment = []
+
         if not force:
             requires_update = [x for x in existing_uids if (current_revisions[x] != saved_revisions[x]) or soft_dirty[x]]
-            # TODO: Remove this logic - all revision handling should be outside of the provider
-            # for x in var:
-            #     if x.id not in new_inserts and x.id not in requires_update:
-            #         if x.chain_modified:
-            #             requires_revision_increment.append(x.id)
-            #             x.revision += 1
         else:
             requires_update = existing_uids
 
         requires_data = set(requires_update)
         requires_data.update(set(new_inserts))
-
         requires_sync = copy.copy(requires_data)
-        requires_sync.update(set(requires_revision_increment))
 
         # First, do the updates, then do the inserts
         for v in var:
@@ -525,31 +518,49 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 v.syncronise()
 
         vardata = {v.id: variable_to_raw_table_data(v) for v in var if v.id in requires_data}
-        revdata = {v.id: {'id': v.id, 'revision': v.revision} for v in var if v.id in requires_revision_increment}
 
-        update_payload = [vardata[x] for x in requires_update]
+        update_payload = [
+            {'b_id': vardata[x]['id'], **{k: v for k, v in vardata[x].items() if k != 'id'}} 
+            for x in requires_update
+        ]
         insert_payload = [vardata[x] for x in new_inserts]
-        rev_payload = [revdata[x] for x in requires_revision_increment]
 
         if not (update_payload or insert_payload):
             return
         
-        with engine.begin() as conn:
-            if rev_payload:
-                # Cannot use 'id' as the bindparam - rename it
-                rev_payload = [{'b_id': x.pop('id'), **x} for x in rev_payload]
-                rev_stmt = sa.update(self._table).where(self._table.c.id == sa.bindparam('b_id'))
-                conn.execute(rev_stmt, rev_payload)
+        # 3. Robust Write Loop with Exponential Backoff + Jitter
+        max_retries = 5
+        base_sleep = 0.05
+        attempt = 0
 
-            if update_payload:
-                # Cannot use 'id' as the bindparam - rename it.
-                update_payload = [{'b_id': x.pop('id'), **x} for x in update_payload]
-                update_stmt = sa.update(self._table).where(self._table.c.id == sa.bindparam('b_id'))
-                conn.execute(update_stmt, update_payload)
+        while True:
+            try:
+                with engine.begin() as conn:
+                    if update_payload:
+                        update_stmt = sa.update(self._table).where(self._table.c.id == sa.bindparam('b_id'))
+                        conn.execute(update_stmt, update_payload)
 
-            if insert_payload:
-                insert_stmt = self._table.insert()
-                conn.execute(insert_stmt, insert_payload)
+                    if insert_payload:
+                        insert_stmt = self._table.insert()
+                        conn.execute(insert_stmt, insert_payload)
+                break  # Success! Exit loop.
+                
+            except (OperationalError, DBAPIError) as e:
+                err_msg = str(e).lower()
+                is_lock = any(k in err_msg for k in ["locked", "timeout", "deadlock", "busy"])
+                
+                if not is_lock or attempt >= max_retries:
+                    raise e
+                
+                attempt += 1
+                # Calculate backoff with random jitter to prevent thundering herd collisions
+                sleep_time = min(2.0, base_sleep * (2 ** attempt)) + random.uniform(0, 0.05)
+                
+                warnings.warn(
+                    f"Encountered database lock during upsert (attempt {attempt}/{max_retries}): {e}. "
+                    f"Retrying in {sleep_time:.2f}s..."
+                )
+                time.sleep(sleep_time)
 
     @override
     def delete_variable(self, variable_id: str | SequenceNotStr[str]) -> list[str]:
