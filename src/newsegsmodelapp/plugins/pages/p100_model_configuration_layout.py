@@ -58,19 +58,31 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
     model_input_sections = []
     for sec in config.model_input_sections:
         model_input_sections.append(
-            dbc.Col(
-                sec.creation_function(),
-                width = sec.block_width
-            )
+            
+                dbc.Col(
+                    dcc.Loading(
+                        sec.creation_function(),
+                        delay_show = 1,
+                        delay_hide = 0.1,
+                    ),
+                    width = sec.block_width
+                ),
+                
         )
     
     finance_input_sections = []
     for sec in config.finance_input_sections:
         finance_input_sections.append(
-            dbc.Col(
-                sec.creation_function(),
-                width = sec.block_width
-            )
+            
+                dbc.Col(
+                    dcc.Loading(
+                        sec.creation_function(),
+                        delay_show = 1,
+                        delay_hide = 0.1,
+                    ),
+                    width = sec.block_width
+                ),
+                
         )
 
     site_details = [
@@ -81,21 +93,21 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
             )
         ),
 
-        dcc.Loading(
-            dbc.Row(model_input_sections),
-            delay_show = 1,
-            delay_hide = 0.3,
-        ),
+        #dcc.Loading(
+        dbc.Row(model_input_sections),
+        #     delay_show = 1,
+        #     delay_hide = 0.3,
+        # ),
 
         
         
         html.Hr(),
 
-        dcc.Loading(
-            dbc.Row(finance_input_sections),
-            delay_show = 1,
-            delay_hide = 0.3,
-        ),
+        #dcc.Loading(
+        dbc.Row(finance_input_sections),
+        #    delay_show = 1,
+        #    delay_hide = 0.3,
+        #),
         
     ]
 

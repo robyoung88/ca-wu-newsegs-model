@@ -10,21 +10,17 @@ from dash import ALL, MATCH, Input, Output, State, no_update
 from dash import ctx
 from dash.exceptions import PreventUpdate
 
-from newsegsmodelapp.backend.db import db
-from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.components.input_components import get_variable_sharing_status
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
-from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp.registers import get_input_handler
 
 def _create_text_field_values(
@@ -112,7 +108,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         if active_project_id is None:
             raise PreventUpdate
 
-        provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
 
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]

@@ -1,6 +1,7 @@
 """Register input container and input header container content creators for deterministic supersection"""
 
 import json
+import time
 from typing import cast
 
 import dash
@@ -181,6 +182,7 @@ def _create_cost_sales_header_summary(
         provider,
         eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
     ):
+    t0 = time.time_ns()
     if eb is None:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
         eb = update_estimated_energy_balance(mm, provider, eb)
@@ -227,6 +229,10 @@ def _create_cost_sales_header_summary(
     estimated_export_receipts = overproduction * per_unit_export
 
     tot_receipts = res_receipts + ev_receipts + estimated_export_receipts
+
+    t1 = time.time_ns()
+
+    print(f'SALES HEADER IN {(t1 - t0)/1e6} ms.')
 
     return [
         icons.get_icon('cost-residents'),
