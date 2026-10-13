@@ -18,9 +18,8 @@ def get_result_list(
             component = mm.model.table_config
         res, rev = result_provider.get_result(
             result_type,
-            component.id,
-            allow_stale,
-            revision = component.revision
+            component,
+            allow_stale
         )
         any_stale = any_stale or rev != component.revision
         # Can't set an attribute on a dict, so need to think of some other way of flagging stale data

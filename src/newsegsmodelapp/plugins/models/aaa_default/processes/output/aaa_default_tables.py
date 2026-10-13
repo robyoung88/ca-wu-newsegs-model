@@ -448,8 +448,8 @@ def _make_dsa_tables_sprake(
     mm = _get_metamodel_from_proj_by_id(mm_id, lproj)
      
     raw_table, rev = result_provider.get_result(
-        'postproc_dsa_single_metamodel_data', mm.table_config.id, 
-        allow_stale = False, revision = mm.table_config.revision
+        'postproc_dsa_single_metamodel_data', mm.table_config,
+        allow_stale = False
     )
     if raw_table is None:
         return 'missing'
@@ -510,7 +510,9 @@ def _get_dsa_metamodel_table(
     match int(subindex):
         case 1:
             #Tornado!
-            dsa_df, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', lmm.table_config.id, revision = lmm.table_config.revision)
+            dsa_df, rev = result_provider.get_result(
+                'postproc_dsa_single_metamodel_data', lmm.table_config
+            )
             #dsa_df, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config)
             if dsa_df is None:
                 return None, None
@@ -518,7 +520,9 @@ def _get_dsa_metamodel_table(
             if not set(dsa_df.index.names) == set(index_vars):
                 dsa_df = dsa_df.set_index(index_vars)
 
-            label_df, _ = result_provider.get_result('postproc_dsa_single_metamodel_labels', lmm.table_config.id, revision = lmm.table_config.revision)
+            label_df, _ = result_provider.get_result(
+                'postproc_dsa_single_metamodel_labels', lmm.table_config,
+            )
 
             stat = 'net_present_value_undiscounted' if not stat else stat
             plot = tornado_plot(dsa_df, label_df, stat)
@@ -529,7 +533,9 @@ def _get_dsa_metamodel_table(
             else:
                 table_name = 'table_dsa_metamodel'
 
-            return result_provider.get_result(table_name, lmm.table_config.id, True, revision = lmm.table_config.revision)
+            return result_provider.get_result(
+                table_name, lmm.table_config, True
+            )
 
 TABLE_SECTION = 'table_optim_metamodel' # TODO: Improve this key
 _request_plot_marginal_optim = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
@@ -589,9 +595,6 @@ def _trigger_plot_marginal_optim(
 
     fig = optim.statistic_across_margin_plot(plot_df, mm)
 
-    #proj.table_config.revision += 1
-    #project_provider.upsert_component(proj)
-
     result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig, request = request)
 
     return 'ok'
@@ -605,7 +608,9 @@ def _plot_marginal_optim(
 ):
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
     lproj = provider.get_lightweight_project(active_project_id)
-    fig, rev = result_provider.get_result('plot_marginal_optim', lproj.table_config.id, revision = lproj.table_config.revision)
+    fig, rev = result_provider.get_result(
+        'plot_marginal_optim', lproj.table_config,
+    )
 
     return fig, rev
 
@@ -625,7 +630,7 @@ def _make_postopt_tables_sprake(
     lproj = provider.get_lightweight_project(request.project_id)
     
     optdict, _ = result_provider.get_result(
-        'optimisation_result', lproj.table_config.id, revision = lproj.table_config.revision
+        'optimisation_result', lproj.table_config
     )
 
     run_config = json.loads(request.payload)
@@ -676,7 +681,10 @@ def _make_psa_tables_sprake(
         raise ValueError('Metamodel ID not provided for single run.')
     mm = _get_metamodel_from_proj_by_id(mm_id, lproj)
 
-    raw_table, rev = result_provider.get_result('postproc_psa_single_metamodel_data', mm.table_config.id, allow_stale = False, revision = mm.table_config.revision)
+    raw_table, rev = result_provider.get_result(
+        'postproc_psa_single_metamodel_data', mm.table_config,
+        allow_stale = False
+    )
     if raw_table is None:
         return 'missing'
     any_stale = mm.table_config.revision != rev
@@ -715,8 +723,7 @@ def _make_psa_tables_sprake(
 
     npv_data, rev_ppv = result_provider.get_result(
         'postproc_psa_single_metamodel_prob_positive_npv',
-        mm.table_config.id, allow_stale = False, 
-        revision = mm.table_config.revision
+        mm.table_config, allow_stale = False
     )
     if npv_data is None:
         return 'missing'
@@ -758,5 +765,7 @@ def _get_psa_metamodel_table(
             
             table_name = 'table_psa_metamodel'
 
-            return result_provider.get_result(table_name, lmm.table_config.id, True, revision = lmm.table_config.revision)
+            return result_provider.get_result(
+                table_name, lmm.table_config, True
+            )
         

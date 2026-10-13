@@ -539,7 +539,6 @@ def add_dsa_run_callbacks(app: NewsegsDash):
 
                                             proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
                                             proj.set_focussed_metamodel(mm_new.id)
-                                            proj.revision += 1
                                             app.project_provider.upsert_component(proj)
                                             
                                     except ValueError as e:
@@ -572,9 +571,12 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         # Set the result_df as appropriate for a dsa result and trigger post-processing
         result_df = result_df.set_index(['variable', 'bound'])
         mm = proj.get_focussed_metamodel()
+        # Will allow a manual revision increment here as no need to disrupt the upstream project revision number.
         mm.table_config.revision += 1
         mark_stale = mm_new is None
-        app.results_provider.upsert_result('dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale)
+        app.results_provider.upsert_result(
+            'dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale
+        )
 
         # Spoof a dsa run request to register requests for post dsa run procedures
         rr_generator = registers.RUN_REQUEST_REGISTER['dsa_run_metamodel']

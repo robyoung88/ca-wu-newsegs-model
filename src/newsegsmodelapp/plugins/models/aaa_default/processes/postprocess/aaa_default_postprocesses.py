@@ -43,29 +43,6 @@ def _postprocess_request_factory(postproc_request_type: str, **kwargs):
         return PostprocessRequest(**rdict)    
     return make_request
 
-def _result_already_exists(
-    result_provider: NewsegsResultProviderInterface,
-    result_type: str,
-    component: NewsegsComponent,
-    run_id: int = -1,
-):
-    if run_id != -1:
-        # Check under the triggering run if provided
-        exist_res, exist_res = result_provider.get_run_result(
-            result_type, run_id, component,
-        )
-        if exist_res is not None:
-            return True
-    else:
-        # We have a generic request - find latest result
-        exist_res, exist_rev = result_provider.get_result(
-            result_type, component, False
-        )
-        if exist_res is not None:
-            return True
-    return False
-
-
 MODEL_TYPE = 'default'
 POSTPROCESS_TYPE = 'postproc_grid'
 _request_postprocess_model_grid = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
@@ -572,7 +549,7 @@ def _dsa_to_interface(
         return 'ok'
 
     dsa_results, rev = result_provider.get_result(
-        'dsa_single_metamodel', lmm.table_config.id, True, lmm.table_config.revision
+        'dsa_single_metamodel', lmm.table_config, True
     )
 
     if dsa_results is None:
@@ -623,7 +600,7 @@ def _psa_to_interface(
         return 'ok'
 
     psa_results, rev = result_provider.get_result(
-        'psa_single_metamodel', lmm.table_config.id, True, lmm.table_config.revision
+        'psa_single_metamodel', lmm.table_config, True, lmm.table_config
     )
 
     if psa_results is None:

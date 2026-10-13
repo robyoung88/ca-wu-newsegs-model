@@ -42,6 +42,9 @@ class SerialisedConfigurationMixin(
         # at the end of update
         if full_update:
             object.__setattr__(self, '_config_revis_0', self._config._revision)
+        else:
+            if hasattr(self, '_config_revis_0'):
+                delattr(self, '_config_revis_0')
 
     @override
     def _main_update_from_dict(self, config):

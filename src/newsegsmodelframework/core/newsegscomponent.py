@@ -256,13 +256,28 @@ class NewsegsComponent(
         If chain, also perform this for all ComponentProperties
     """
         if chain:
-            comp_props = self._get_component_properties()
-            for propname in comp_props:
-                att = getattr(self, propname)
-                att.revision = 0
-                att._last_syncronised = -1
-        self.revision = 0
-        self._last_syncronised = -1        
+            comps = self.get_components()
+            for att in comps:
+                if hasattr(att, 'reset_revision'):
+                    att.reset_revision(chain = chain)
+                else:
+                    att._revision = 0
+                    att._last_syncronised = -1
+
+            # Also go through the root attributes to get the containers
+            comp_atts = self.get_component_attributes()
+            for attname in comp_atts:
+                att = getattr(self, attname)
+                # No need to repeat for non-containers
+                if not att in comps:
+                    if hasattr(att, 'reset_revision'):
+                        att.reset_revision(chain = chain)
+                    else:
+                        if att is not None:
+                            att._revision = 0
+                            att._last_syncronised = -1
+        self._config._revision = 0
+        self._config._last_syncronised = -1
 
     @property
     def dirty(self):

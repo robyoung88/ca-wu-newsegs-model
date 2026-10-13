@@ -18,9 +18,9 @@ from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaM
 
 from config import settings
 from newsegsmodelapp import registers
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider, FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
-from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
+from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider, FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
@@ -966,6 +966,17 @@ class TestDatabaseStart(unittest.TestCase):
         engine = db.get_engine()
 
         proj = PROJECT_FACTORIES['sprake']()
+
+        # Test variable syncronisation increments revisions
+        mm = proj.metamodels[0]
+        mm.sync_model_with_changed_variables_deterministic()
+        proj.chain_syncronise()
+        mm.variables['gen_input.pv_capacity.0'].set_parameters((201.1))
+        mm.sync_model_with_changed_variables_deterministic()
+        self.assertTrue(mm.model.generation.modified)
+        self.assertTrue(mm.model.chain_modified)
+        self.assertFalse(mm.model.consumption_storage.modified)
+
         proj_provider.add_component(proj)
 
         request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
@@ -985,7 +996,10 @@ class TestDatabaseStart(unittest.TestCase):
         def check_cancel_status():
             return False
 
-        is_ok = runner(request, proj_provider, result_provider, run_id, update_progress, check_cancel_status) # pyright: ignore[reportOptionalCall]
+        is_ok = runner(
+            request, proj_provider, result_provider, 
+            run_id, update_progress, check_cancel_status
+        ) # pyright: ignore[reportOptionalCall]
 
         self.assertEqual(is_ok, 'ok')
 
@@ -1100,3 +1114,93 @@ class TestDatabaseStart(unittest.TestCase):
             res, rev = result_provider.get_result(tbl, proj.table_config, False)
 
             self.assertIsNotNone(res, msg = f'No table for {tbl}')
+
+    @staticmethod
+    def get_project_revision_state(project):
+        odict = {}
+        odict.update(
+            {
+                'project': project.revision,
+                'project.table_config': project.table_config.revision,
+                'project.dsa_config': project.dsa_config.revision,
+                'project.psa_config': project.psa_config.revision,
+                'project.metamodels_container': project.metamodels.revision,
+            }
+        )
+        for idx, mm in enumerate(project.metamodels):
+            mdl = mm.model
+            fnc = mm.finance
+            mm_dict = {
+                f'metamodel_{idx}': mm.revision,
+                f'metamodel_{idx}.table_config': mm.table_config.revision,
+                f'model_{idx}': mdl.revision,
+                f'model_{idx}.table_config': mdl.table_config.revision,
+                f'model_{idx}.grid': mdl.grid.revision,
+                f'model_{idx}.generation': mdl.generation.revision,
+                f'model_{idx}.consumption_storage': mdl.consumption_storage.revision,
+                f'finance_{idx}': fnc.revision,
+                f'finance_{idx}.table_config': fnc.table_config.revision,
+            }
+            odict.update(mm_dict)
+
+        return odict
+
+    @staticmethod
+    def get_project_modification_state(project):
+        odict = {}
+        odict.update(
+            {
+                'project': project.modified,
+                'project.table_config': project.table_config.modified,
+                'project.dsa_config': project.dsa_config.modified,
+                'project.psa_config': project.psa_config.modified,
+                'project.metamodels_container': project.metamodels.modified,
+            }
+        )
+        for idx, mm in enumerate(project.metamodels):
+            mdl = mm.model
+            fnc = mm.finance
+            mm_dict = {
+                f'metamodel_{idx}': mm.modified,
+                f'metamodel_{idx}.table_config': mm.table_config.modified,
+                f'model_{idx}': mdl.modified,
+                f'model_{idx}.table_config': mdl.table_config.modified,
+                f'model_{idx}.grid': mdl.grid.modified,
+                f'model_{idx}.generation': mdl.generation.modified,
+                f'model_{idx}.consumption_storage': mdl.consumption_storage.modified,
+                f'finance_{idx}': fnc.modified,
+                f'finance_{idx}.table_config': fnc.table_config.modified,
+            }
+            odict.update(mm_dict)
+
+        return odict
+
+    def test_process_revisions(self):
+        """Ensure that revisions are being incremented correctly through a process"""
+        import newsegsmodelapp.register_plugins
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+        result_provider = CachedFromDatabaseResultProvider(db.get_engine, self.test_dir)
+
+        engine = db.get_engine()
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        revisions = self.get_project_revision_state(proj)
+        modification_state = self.get_project_modification_state(proj)
+        for k, v in revisions.items():
+            self.assertEqual(v, 0, f'{k} revision incorrect.')
+        for k, v in modification_state.items():
+            self.assertTrue(v, f'{k} modification status incorrect.')
+
+        # Start from a fully synchronised system
+        mm = proj.metamodels[0]
+        mm.sync_model_with_changed_variables_deterministic()
+
+        new_revisions = self.get_project_revision_state(proj)
+        for k, v in new_revisions.items():
+            self.assertEqual(v, 0, f'{k} revision incorrect.')
+        
+        proj_provider.add_component(proj)

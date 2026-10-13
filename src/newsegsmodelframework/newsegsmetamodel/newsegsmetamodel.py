@@ -405,7 +405,14 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
                     logger.error(e)
                 
                 self._variables_last_model_sync[varid] = var.revision
-  
+
+        # Invalidate results
+        if 'model' in affected_models:
+            self.model.table_config._notify_change()
+            self.finance.table_config._notify_change()
+        elif 'finance' in affected_models:
+            self.finance.table_config._notify_change()
+            
         return affected_models
 
     @override

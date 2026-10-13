@@ -241,7 +241,7 @@ def _make_headers_for_multiple_configs(
             icon_class = icons.ICON_COLOUR_CLASSES[idx % len(icons.ICON_COLOUR_CLASSES)]
         )
 
-        res, rev = result_provider.get_result(result_key, mod.id)
+        res, rev = result_provider.get_result(result_key, mod)
 
         if res is not None:
             cntnt = [mm_icon] + content_generator(res, ann_hori_toggle)
@@ -576,9 +576,9 @@ def _(
             icon_class = icons.ICON_COLOUR_CLASSES[idx % len(icons.ICON_COLOUR_CLASSES)]
         )
 
-        res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod.id)
-        res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod.id)
-        res_value, rev_value = result_provider.get_result('postproc_finance_value', mod.id)
+        res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod)
+        res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod)
+        res_value, rev_value = result_provider.get_result('postproc_finance_value', mod)
 
         cntnt = [mm_icon] + _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
 

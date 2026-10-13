@@ -20,6 +20,7 @@ from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
+from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsfinance.lightweightnewsegsfinance import LightweightNewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -121,22 +122,27 @@ class FromDatabaseNewsegsComponentProvider(
 
     @override
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
-        is_sequence = False
-        if isinstance(component_id, str):
-            stmt = (
-                self._table.select()
-                .where(self._table.c.id == component_id)
-            )
-        else:
-            is_sequence = True
-            stmt = (
-                self._table.select()
-                .where(self._table.c.id.in_(component_id))
-            )
+        prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+        try:
+            is_sequence = False
+            if isinstance(component_id, str):
+                stmt = (
+                    self._table.select()
+                    .where(self._table.c.id == component_id)
+                )
+            else:
+                is_sequence = True
+                stmt = (
+                    self._table.select()
+                    .where(self._table.c.id.in_(component_id))
+                )
 
-        with self._get_engine().connect() as conn:
-            rows = conn.execute(stmt)
-            reconstructed_components = [self._reconstruct_component(row.payload, row) for row in rows]
+            with self._get_engine().connect() as conn:
+                rows = conn.execute(stmt)
+                reconstructed_components = [self._reconstruct_component(row.payload, row) for row in rows]
+        
+        finally:
+            RevisionNotifierMixin._set_notification_state(prevstate)
         
         if not is_sequence:
             if len(reconstructed_components) == 0:
@@ -298,18 +304,19 @@ class FromDatabaseNewsegsComponentProvider(
         new_inserts = [x for x in uids if x not in existing_uids]
         if not force:
             requires_update = [x for x in existing_uids if current_revisions[x] != saved_revisions[x]]
+            # TODO: Remove this logic - all revision handling should be outside of the provider
             # If the object exists and has a matching version number but its children have been modified
             # then we do a simple bump of the revision number to indicate that downstream results are stale
             requires_revision_increment = []
-            for comp in component:
-                if comp.id not in new_inserts and comp.id not in requires_update:
-                    if comp.chain_modified:
-                        requires_revision_increment.append(comp.id)
-                        comp.revision += 1
-                        # Update the table config revision if components have been modified.
-                        if hasattr(comp, 'table_config'):
-                            if not comp.table_config.modified:
-                                comp.table_config.revision += 1
+            # for comp in component:
+            #     if comp.id not in new_inserts and comp.id not in requires_update:
+            #         if comp.chain_modified:
+            #             requires_revision_increment.append(comp.id)
+            #             comp.revision += 1
+            #             # Update the table config revision if components have been modified.
+            #             if hasattr(comp, 'table_config'):
+            #                 if not comp.table_config.modified:
+            #                     comp.table_config.revision += 1
         else:
             requires_update = existing_uids
             requires_revision_increment = []

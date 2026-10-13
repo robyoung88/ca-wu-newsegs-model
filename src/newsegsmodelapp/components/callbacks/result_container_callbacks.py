@@ -315,12 +315,12 @@ def add_result_container_callbacks(app: NewsegsDash):
                 # Try with annual or to horizon subtable suffix
                 sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
                 print (f'getting from table {sub_table_name} - subindex is {subindex}')
-                res, rev = app.results_provider.get_result(sub_table_name, lproj.table_config.id)
+                res, rev = app.results_provider.get_result(sub_table_name, lproj.table_config)
                 
                 if res is None:
                     # Retry without the subtable suffix
                     print (f'getting from table {table_name} - subindex is {subindex}')
-                    res, rev = app.results_provider.get_result(table_name, lproj.table_config.id)
+                    res, rev = app.results_provider.get_result(table_name, lproj.table_config)
 
             # TODO: Feedback if result is stale
             if res is not None:

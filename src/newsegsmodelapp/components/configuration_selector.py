@@ -359,7 +359,8 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         proj.metamodels.append(new_mm) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         proj.set_focussed_metamodel(new_mm.id)
         
-        proj.revision += 1
+        # Should be no need to increment project revision - should happen anyway on append of the new_mm
+        # proj.revision += 1
         
         app.project_provider.upsert_component(proj)
 
@@ -395,7 +396,8 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         app.project_provider.metamodel_provider.delete_component(mm_to_delete.id)
         proj.set_focussed_metamodel_index(proj.get_focussed_metamodel_index())
 
-        proj.revision += 1
+        # Should be no need to increment the revision - should occur automatically on pop of the metamodel
+        # proj.revision += 1
         app.project_provider.upsert_component(proj)
 
         # Trigger interface update
@@ -435,7 +437,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             mm_id, increment_revision = False,
             invalidate_cache = True,
         )
-        
+
         # Trigger interface update
         # Could be a bit more elegant, but may have to rebuild inputs for some configurations anyway so brute force for now.
         return active_project_id
@@ -513,7 +515,8 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         proj = app.project_provider.get_project(active_project_id)
         proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
         proj.set_focussed_metamodel(mm_new.id)
-        proj.revision += 1
+        # Project revision increment should occur on the metamodels.append
+        # proj.revision += 1
         app.project_provider.upsert_component(proj)
 
         return active_project_id

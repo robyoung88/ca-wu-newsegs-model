@@ -453,7 +453,6 @@ def add_psa_run_callbacks(app: NewsegsDash):
 
                                             proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
                                             proj.set_focussed_metamodel(mm_new.id)
-                                            proj.revision += 1
                                             app.project_provider.upsert_component(proj)
                                     except ValueError as e:
                                         print(e)

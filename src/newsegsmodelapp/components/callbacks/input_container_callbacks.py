@@ -320,7 +320,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                         varid =  make_varid(**trigger_id)
                         varuid = lmm.variables.get(varid)
-                        if not var:
+                        if not varuid:
                             raise PreventUpdate
                         var = provider.variable_provider.get_variable(varuid)
 
@@ -339,13 +339,13 @@ def add_input_container_callbacks(app: NewsegsDash):
                             for idx, id in enumerate(header_ids):
                                 try:
                                     content_creator = get_single_input_header_content_creator(
-                                        id['supersection'], id['section'], mm.model.model_type
+                                        id['supersection'], id['section'], lmm.model.model_type
                                     )
                                 except KeyError:
                                     content_creator = None
                                 if content_creator:
                                     varid =  make_varid(**trigger_id)
-                                    rval['header_children'][idx] = content_creator(varid, mm)
+                                    rval['header_children'][idx] = content_creator(varid, lmm)
 
                             # Update triggers
                             for idx, id in enumerate(trigger_ids):
@@ -391,7 +391,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                 lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 varid =  make_varid(**trigger_id)
                 varuid = lmm.variables.get(varid)
-                if not var:
+                if not varuid:
                     raise PreventUpdate
                 var = provider.variable_provider.get_variable(varuid)
                 if not var or new_val == var.dsa_bounds_type:
@@ -413,13 +413,13 @@ def add_input_container_callbacks(app: NewsegsDash):
                 for idx, id in enumerate(header_ids):
                     try:
                         content_creator = get_single_input_header_content_creator(
-                            id['supersection'], id['section'], mm.model.model_type
+                            id['supersection'], id['section'], lmm.model.model_type
                         )
                     except KeyError:
                         content_creator = None
                     if content_creator:
                         varid =  make_varid(**trigger_id)
-                        rval['header_children'][idx] = content_creator(varid, mm)
+                        rval['header_children'][idx] = content_creator(varid, lmm)
                 
                 # Update triggers with a dictionary, not an integer
                 trig_val = json.dumps({
@@ -446,7 +446,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                 lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 varid =  make_varid(**trigger_id)
                 varuid = lmm.variables.get(varid)
-                if not var:
+                if not varuid:
                     raise PreventUpdate
                 var = provider.variable_provider.get_variable(varuid)
                 if not var or new_val == var.dsa_selected:

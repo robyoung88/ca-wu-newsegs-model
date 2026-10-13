@@ -12,7 +12,7 @@ import pandas as pd
 import sqlalchemy as sa
 
 from newsegsmodelapp.components.result_file import load_result, save_result
-from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent
+from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent, LightweightNewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 
 from newsegsmodelapp.backend.db import tables as tbls
@@ -111,6 +111,53 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             raise ValueError(f'Result of {result_details['result_type']} saved to {saved_path}, but not uploaded to database')
 
         print (f'SAVED RESULT of type {result_details['result_type']} attached to {result_details['component_type']} with id {result_details['component_config_id']}, revision {result_details['component_config_revision']}')
+
+    def duplicate_result(
+        self,
+        result_type: str,
+        parent_component: NewsegsComponent | LightweightNewsegsComponent,
+        new_request: RunRequest
+    ):
+        """Duplicate a result row in response to a new request providing the same data"""
+        if new_request.trigger_run_id != -1:
+            new_run_id = new_request.trigger_run_id
+        else:
+            new_run_id = new_request.run_id
+
+        # 1. Define columns to insert (excluding auto-increment primary key 'id')
+        insert_cols = [c for c in self._table.c if c.name != 'result_id']
+
+        # 2. Select the latest matching row as a subquery
+        latest_subq = (
+            sa.select(self._table)
+            .where(
+                sa.and_(
+                    self._table.c.result_type == result_type,
+                    self._table.c.component_config_revision == parent_component.revision,
+                    self._table.c.component_config_id == parent_component.id
+                )
+            )
+            .order_by(self._table.c.result_id.desc())
+            .limit(1)
+            .subquery()
+        )
+
+        # 3. Build the SELECT expression, substituting run_id with the new literal
+        select_stmt = sa.select(
+            *[
+                sa.literal(new_run_id).label('run_id') if c.name == 'run_id' else latest_subq.c[c.name]
+                for c in insert_cols
+            ]
+        )
+
+        # 4. Execute the INSERT ... SELECT statement
+        insert_stmt = self._table.insert().from_select(
+            [c.name for c in insert_cols],
+            select_stmt
+        )
+
+        with self._get_engine().begin() as conn:
+            conn.execute(insert_stmt)
 
     @override
     def get_result(
@@ -278,7 +325,7 @@ class CachedFromDatabaseResultProvider(
     def get_result(
         self, 
         result_type: str, 
-        parent_component: NewsegsComponent | str,
+        parent_component: NewsegsComponent | LightweightNewsegsComponent | str,
         allow_stale: bool = True,
         revision: Optional[int] = None,
     ) -> tuple[Any, int] | tuple[None, None]:

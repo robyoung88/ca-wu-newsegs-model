@@ -4,6 +4,7 @@ from typing import Callable, cast
 
 import sqlalchemy as sa
 
+from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProject
@@ -44,52 +45,66 @@ def execute_deterministic_run_project(
     # proj.table_config.revision += 1
 
     for i, mm in enumerate(metamodels):
-        progress_callback(step, n_steps, f'Setting model variables - metamodel {i+1} of {n_mm}')
-        step += 1
+        deterministic_run_metamodel(
+            mm,
+            proj,
+            request,
+            project_provider,
+            result_provider,
+            run_id,
+            progress_callback,
+            check_cancel_status,
+            start_step = i*3,
+            total_steps = n_steps,
+            sequence_number = i + 1
+        )
 
-        if check_cancel_status():
-            raise InterruptedError(f'Process {run_id} has been cancelled.')
+        # progress_callback(step, n_steps, f'Setting model variables - metamodel {i+1} of {n_mm}')
+        # step += 1
 
-        revisions = {
-            'grid': mm.model.grid.revision,
-            'generation': mm.model.generation.revision,
-            'consumption_storage': mm.model.consumption_storage.revision
-        }
+        # if check_cancel_status():
+        #     raise InterruptedError(f'Process {run_id} has been cancelled.')
+
+        # revisions = {
+        #     'grid': mm.model.grid.revision,
+        #     'generation': mm.model.generation.revision,
+        #     'consumption_storage': mm.model.consumption_storage.revision
+        # }
     
 
-        mm.sync_model_with_changed_variables_deterministic()
+        # mm.sync_model_with_changed_variables_deterministic()
 
-        progress_callback(step, n_steps, f'Running model - metamodel {i+1} of {n_mm}')
-        step += 1
+        # progress_callback(step, n_steps, f'Running model - metamodel {i+1} of {n_mm}')
+        # step += 1
 
-        mm.model.run()
-        mm.model.table_config.revision += 1
-        project_provider.upsert_component(mm.model.table_config)
+        # mm.model.run()
+        # mm.model.table_config.revision += 1
+        # project_provider.upsert_component(mm.model.table_config)
 
-        if check_cancel_status():
-            raise InterruptedError(f'Process {run_id} has been cancelled.')
+        # if check_cancel_status():
+        #     raise InterruptedError(f'Process {run_id} has been cancelled.')
 
-        progress_callback(step, n_steps, f'Running finance - metamodel {i+1} of {n_mm}')
-        step += 1
+        # progress_callback(step, n_steps, f'Running finance - metamodel {i+1} of {n_mm}')
+        # step += 1
 
-        mm.finance.run()
-        mm.finance.table_config.revision += 1
-        project_provider.upsert_component(mm.finance.table_config)
+        # mm.finance.run()
+        # mm.finance.table_config.revision += 1
+        # project_provider.upsert_component(mm.finance.table_config)
 
-        if check_cancel_status():
-            raise InterruptedError(f'Process {run_id} has been cancelled.')
+        # if check_cancel_status():
+        #     raise InterruptedError(f'Process {run_id} has been cancelled.')
 
-        progress_callback(step, n_steps, f'Saving results - metamodel {i+1} of {n_mm}')
+        # progress_callback(step, n_steps, f'Saving results - metamodel {i+1} of {n_mm}')
 
-        mm.model.grid.revision = revisions['grid']
-        mm.model.generation.revision = revisions['generation']
-        mm.model.consumption_storage.revision = revisions['consumption_storage']
+        # mm.model.grid.revision = revisions['grid']
+        # mm.model.generation.revision = revisions['generation']
+        # mm.model.consumption_storage.revision = revisions['consumption_storage']
 
-        result_provider.upsert_result('deterministic_grid', mm.model.grid, mm.model.get_grid_result(), request = request)
-        result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result(), request = request)
-        result_provider.upsert_result('deterministic_consumption_storage', mm.model.consumption_storage, mm.model.get_consumption_storage_result(), request = request)
+        # result_provider.upsert_result('deterministic_grid', mm.model.grid, mm.model.get_grid_result(), request = request)
+        # result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result(), request = request)
+        # result_provider.upsert_result('deterministic_consumption_storage', mm.model.consumption_storage, mm.model.get_consumption_storage_result(), request = request)
 
-        # Touch the project to update modified_order and invalidate cache
-        project_provider.touch_project(request.project_id)
+        # # Touch the project to update modified_order and invalidate cache
+        # project_provider.touch_project(request.project_id)
 
     return 'ok'

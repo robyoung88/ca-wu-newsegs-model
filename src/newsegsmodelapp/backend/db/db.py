@@ -47,7 +47,11 @@ def get_engine(db_path: str | Path | None = None):
         _engine = sa.create_engine(
             engine_url,
             echo = False,
-            connect_args = {"timeout": 30.0}
+            connect_args = {"timeout": 30.0},
+            pool_size = 20,
+            max_overflow = 30,
+            pool_timeout = 30,
+            pool_use_lifo = True,
         )
         _connected_db_path = str(db_path)
 
@@ -69,7 +73,23 @@ def get_engine(db_path: str | Path | None = None):
             # 4. Restore the original isolation level for SQLAlchemy transaction management
             dbapi_connection.isolation_level = old_isolation
 
+    checkout_times = {}
+
+    @sa.event.listens_for(_engine, "checkout")
+    def on_checkout(dbapi_connection, connection_record, connection_proxy):
+        checkout_times[id(dbapi_connection)] = time.time()
+
+    @sa.event.listens_for(_engine, "checkin")
+    def on_checkin(dbapi_connection, connection_record):
+        start_time = checkout_times.pop(id(dbapi_connection), None)
+        if start_time:
+            duration = time.time() - start_time
+            if duration > 3.0:  # Threshold in seconds
+                print(f"WARNING: Connection held for {duration:.2f} seconds")
+
     return _engine
+
+
 
 def retrieve_latest_backup(
     db_path: str | Path = DB_PATH,

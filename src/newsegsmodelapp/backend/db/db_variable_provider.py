@@ -503,11 +503,12 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         requires_revision_increment = []
         if not force:
             requires_update = [x for x in existing_uids if (current_revisions[x] != saved_revisions[x]) or soft_dirty[x]]
-            for x in var:
-                if x.id not in new_inserts and x.id not in requires_update:
-                    if x.chain_modified:
-                        requires_revision_increment.append(x.id)
-                        x.revision += 1
+            # TODO: Remove this logic - all revision handling should be outside of the provider
+            # for x in var:
+            #     if x.id not in new_inserts and x.id not in requires_update:
+            #         if x.chain_modified:
+            #             requires_revision_increment.append(x.id)
+            #             x.revision += 1
         else:
             requires_update = existing_uids
 

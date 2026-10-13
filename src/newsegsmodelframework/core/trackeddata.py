@@ -6,7 +6,7 @@ from collections import OrderedDict
 import copy
 from dataclasses import dataclass, fields, asdict
 import re
-from typing import Any, Callable, Collection, Iterable, Mapping, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
+from typing import Any, Callable, Collection, Iterable, Literal, Mapping, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
 from typing_extensions import Self
 import warnings
 import uuid as mod_uuid
@@ -32,8 +32,18 @@ class RevisionNotifierProtocol(Protocol):
     def _notify_change(self, trigger: Any | None = None, **kwargs): ...
     
 
+NOTIFY_STATE = Literal[
+    'broadcast',
+    'local',
+    'disabled',
+]
+
 class RevisionNotifierMixin():
     """Handles part-child notifications and revision counts"""
+
+    _rn_config = {
+        'notify': 'broadcast'
+    }
     
     def __init__(
         self, 
@@ -70,6 +80,12 @@ class RevisionNotifierMixin():
                 
                 return
 
+    @classmethod
+    def _set_notification_state(cls, state: NOTIFY_STATE = 'broadcast'):
+        prevstate = cls._rn_config['notify']
+        cls._rn_config['notify'] = state
+        return prevstate
+
     @property
     def revision(self) -> int:
         return self._revision
@@ -79,6 +95,9 @@ class RevisionNotifierMixin():
         self._revision = revision
 
     def _notify_change(self, trigger: Any | None = None, **kwargs):
+        if self._rn_config['notify'] == 'disabled':
+            return
+        
         if not hasattr(self, '_revision'):
             self._revision = 0
         if not self.modified:
@@ -255,7 +274,8 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
     def _notify_change(self, trigger: Any | None = None, broadcast: bool = True, **kwargs):
         trigger = self if trigger is None else trigger
         super()._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
-        if broadcast:
+
+        if self._rn_config['notify'] == 'broadcast' and broadcast:
             for subscriber in self._subscribers:
                 subscriber._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
 
