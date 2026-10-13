@@ -27,8 +27,6 @@ from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp.registers import get_input_handler
 
-local_project_provider = project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
-
 def _create_text_field_values(
     proj: LightweightNewsegsProject,
     mm: LightweightNewsegsMetaModel,
@@ -538,10 +536,10 @@ def add_input_container_callbacks(app: NewsegsDash):
         if not len(container_ids):
             raise PreventUpdate
         
-        provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
-        varprovider = cast(CachedFromDatabaseVariableProvider, project_provider.variable_provider)
+        varprovider = cast(CachedFromDatabaseVariableProvider, app.project_provider.variable_provider)
 
         varid = make_varid(**container_ids[0])
         varuid =lmm.variables.get(varid)
@@ -596,10 +594,10 @@ def add_input_container_callbacks(app: NewsegsDash):
         if not len(container_ids):
             raise PreventUpdate
 
-        provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
-        varprovider = cast(CachedFromDatabaseVariableProvider, project_provider.variable_provider)
+        varprovider = cast(CachedFromDatabaseVariableProvider, app.project_provider.variable_provider)
 
         varid = make_varid(**container_ids[0])
         varuid =lmm.variables.get(varid)
@@ -651,7 +649,6 @@ def add_input_container_callbacks(app: NewsegsDash):
         State('app-state', 'data'),
 
         prevent_initial_call = True,
-        background = False,
     )
     def update_feedback_graphs(
         configuration_update_trigger,
@@ -670,7 +667,7 @@ def add_input_container_callbacks(app: NewsegsDash):
             except KeyError:
                 artist = None
             if artist:
-                figure_returns[idx] = artist(active_project_id, local_project_provider)
+                figure_returns[idx] = artist(active_project_id, app.project_provider)
 
         return figure_returns
 

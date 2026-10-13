@@ -14,4 +14,4 @@ def get_focussed_metamodel(proj_id: str, proj_provider: NewsegsProjectProviderIn
 def get_focussed_lightweight_metamodel(proj_id, project_provider):
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
     lproj = provider.get_lightweight_project(proj_id)
-    return lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
+    return lproj.metamodels[lproj.focussed_metamodel_index]

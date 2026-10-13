@@ -1536,7 +1536,7 @@ class FromDatabaseNewsegsProjectProvider(
                     rval._revision = r0
         finally:
             RevisionNotifierMixin._set_notification_state(prevstate)
-            
+
         return rval
 
     @overload
@@ -2097,6 +2097,8 @@ class CachedFromDatabaseNewsegsProjectProvider(
         self._project_cache = LRUCache(maxsize = 5)
         self._lightweight_project_cache = LRUCache(maxsize = 10)
         self._project_last_accessed = {}
+        self._project_dataversions = LRUCache(maxsize = 30)
+        self._lightweight_project_dataversions = LRUCache(maxsize = 30)
         # Create a lock to prevent a cache stampede at initial load
         self._lock = threading.Lock()
 
@@ -2113,10 +2115,22 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
     @override
     def get_project(self, project_id: str) -> NewsegsProject:
-        new_modkey = self._get_project_modification_key(project_id)
-
+        print(f'FINDING PROJECT {project_id}')
         with self._lock:
-            print(f'FINDING PROJECT {project_id}')
+            # Check if any writes to db have occurred; if not and project in cache, return immediately
+            existing_dv = self._project_dataversions.get(project_id)
+            with self._get_engine().connect() as conn:
+                current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
+            
+            if existing_dv is not None and current_dv == existing_dv:
+                proj = self._project_cache.get(project_id)
+                if proj is not None:
+                    print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+                    return proj
+
+            # Check the modification status of the project; if equal and project in cache, return from cache.
+            new_modkey = self._get_project_modification_key(project_id)
+            
             if (
                 (project_id in self._project_cache)
                 and project_id in self._project_last_accessed
@@ -2126,12 +2140,15 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
                 return proj
 
+            # Fallback - get project from db, insert into cache.
             proj = super().get_project(project_id)
             print(f'ADDING PROJECT TO CACHE AFTER LOAD {project_id}')
             print(get_project_critical_state(proj))
             if proj.chain_modified:
                 print('Project has been loaded in a modified state')
+            
             self._project_last_accessed[project_id] = new_modkey
+            self._project_dataversions[project_id] = current_dv
             self._project_cache[project_id] = proj
         
         return proj
@@ -2145,6 +2162,18 @@ class CachedFromDatabaseNewsegsProjectProvider(
             is_sequence = True
 
         with self._lock:
+            
+            existing_dvs = [self._lightweight_project_dataversions.get(x) for x in project_id]
+            with self._get_engine().connect() as conn:
+                current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
+
+            if all(x is not None and x == current_dv for x in existing_dvs):
+                rlist = [self._lightweight_project_cache.get(x) for x in project_id]
+                if all(x is not None for x in rlist):
+                    if is_sequence:
+                        return rlist
+                    return rlist[0]
+
             revisions = self.get_component_metadata(project_id, 'revision')
             rlist = []
             get_list = []
@@ -2165,6 +2194,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 components_from_db = super().get_lightweight_component(get_list)
                 jdx = 0
                 for idx, id_ in enumerate(rlist):
+                    self._lightweight_project_dataversions[project_id[idx]] = current_dv
                     if id_ is None:
                         cmpx = components_from_db[jdx]
                         rlist[idx] = cmpx
@@ -2172,6 +2202,9 @@ class CachedFromDatabaseNewsegsProjectProvider(
                         print(f'ADDING LIGHTWEIGHT PROJECT TO CACHE AFTER LOAD {cmpx.id}')
                         print(get_project_critical_state(cmpx))
                         jdx += 1
+            else:
+                for pid in project_id:
+                    self._lightweight_project_dataversions[pid] = current_dv
 
         if is_sequence:
             return rlist
