@@ -339,21 +339,158 @@ def _make_finance_tables_sprake(
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
     lproj = provider.get_lightweight_project(request.project_id)
 
-    # TODO: Check which of these actually needs reprocessing, as we have multiple
-    # triggers.
+    if request.trigger_run_id != request.run_id:
+        # Have a downstream request. Only run full logic if
+        # 1) All upstream tables have been created
+        # 2) Downstream tables have not been made for this run
 
-    benefits, b_stale = get_result_list(
-        'postproc_finance_benefits', lproj,
-        result_provider, True
-    )
+        # As (2) is the fastest to check, we will do that first
+        op_table_names = (
+            'table_finance_so_benefits_ann',
+            'table_finance_so_costs_ann',
+            'table_finance_so_value_ann'
+        )
+        all_op_exist = True
+        for tbl_nm in op_table_names:
+            res_id = result_provider.result_exists(
+                tbl_nm, request.trigger_run_id,
+                lproj.table_config
+            )
+            if res_id is False:
+                all_op_exist = False
+                break
+
+        if all_op_exist:
+            # Can safely exit
+            return 'ok'
+        
+        # Now check that all upstream tables are created
+        
+        try:
+            request_dict = json.loads(request.payload)
+        except:
+            request_dict = {}
+
+        mm_ids = request_dict.get('metamodel_id', None)
+
+        if mm_ids is None:
+            mm_ids = [x.id for x in lproj.metamodels]
+        else:
+            mm_ids = [mm_ids]
+
+        # Sublists hold results for the currently run metamodel if on a single metamodel run,
+        # or all metamodels if on a full project run (and so are not sublists but full lists)
+        benefit_result_sublist = []
+        b_stale = False
+        
+        cost_result_sublist = []
+        c_stale = False
+        
+        value_result_sublist = []
+        v_stale = False
+
+        for mm_id in mm_ids:
+            lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(mm_id)]
+            
+            pp_fnc_ben = result_provider.result_exists(
+                'postproc_finance_benefits', 
+                request.trigger_run_id,
+                lmm.finance.table_config
+            )
+            if pp_fnc_ben == False:
+                return 'missing'
+            res, rev = result_provider.get_result_by_id(pp_fnc_ben)
+            benefit_result_sublist.append(res)
+            b_stale = b_stale or rev != lmm.finance.table_config.revision
+
+            pp_fnc_costs = result_provider.result_exists(
+                'postproc_finance_costs', 
+                request.trigger_run_id,
+                lmm.finance.table_config
+            )
+            if pp_fnc_costs == False:
+                return 'missing'
+            res, rev = result_provider.get_result_by_id(pp_fnc_costs)
+            cost_result_sublist.append(res)
+            c_stale = c_stale or rev != lmm.finance.table_config.revision
+
+            pp_fnc_value = result_provider.result_exists(
+                'postproc_finance_value', 
+                request.trigger_run_id,
+                lmm.finance.table_config
+            )
+            if pp_fnc_value == False:
+                return 'missing'
+            res, rev = result_provider.get_result_by_id(pp_fnc_value)
+            value_result_sublist.append(res)
+            v_stale = v_stale or rev != lmm.finance.table_config.revision
+
+        # As we have made it this far, continue with production of tables
+        jdx = 0
+        
+        if len(mm_ids) != len(lproj.metamodels):
+            benefits = []
+            costs = []
+            value = []
+            for lmm in lproj.metamodels:
+                if lmm.id in mm_ids:
+                    benefits.append(benefit_result_sublist[jdx])
+                    costs.append(cost_result_sublist[jdx])
+                    value.append(value_result_sublist[jdx])
+                    jdx += 1
+                else:
+                    # Benefits
+                    res, rev = result_provider.get_result(
+                        'postproc_finance_benefits', lmm.finance.table_config,
+                        allow_stale = True
+                    )
+                    benefits.append(res)
+                    b_stale = b_stale or rev is None or rev != lmm.finance.table_config.revision
+
+                    # Costs
+                    res, rev = result_provider.get_result(
+                        'postproc_finance_costs', lmm.finance.table_config,
+                        allow_stale = True
+                    )
+                    costs.append(res)
+                    c_stale = c_stale or rev is None or rev != lmm.finance.table_config.revision
+
+                    # Value
+                    res, rev = result_provider.get_result(
+                        'postproc_finance_value', lmm.finance.table_config,
+                        allow_stale = True
+                    )
+                    value.append(res)
+                    v_stale = v_stale or rev is None or rev != lmm.finance.table_config.revision
+        else:
+            benefits = benefit_result_sublist
+            costs = cost_result_sublist
+            value = value_result_sublist
+
+    else:
+        # If a request is generated from the front-end, always just try to make a table
+        benefits, b_stale = get_result_list(
+            'postproc_finance_benefits', lproj,
+            result_provider, True
+        )
+
+        costs, c_stale = get_result_list(
+            'postproc_finance_costs', lproj,
+            result_provider, True
+        )
+
+        value, v_stale = get_result_list(
+            'postproc_finance_value', lproj,
+            result_provider, True
+        )
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
 
     benefits_results = [
         result_tables_sprake.create_so_benefits_results(benefits, True),
         result_tables_sprake.create_so_benefits_results(benefits, False)
     ]
-
-    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
-    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
 
     table_name = 'table_finance_so_benefits'
     result_provider.upsert_result(
@@ -369,11 +506,6 @@ def _make_finance_tables_sprake(
         benefits_results[1],
         mark_stale = b_stale,
         request = request
-    )
-    
-    costs, c_stale = get_result_list(
-        'postproc_finance_costs', lproj,
-        result_provider, True
     )
 
     costs_results = [
@@ -395,11 +527,6 @@ def _make_finance_tables_sprake(
         costs_results[1],
         mark_stale = c_stale,
         request = request
-    )
-
-    value, v_stale = get_result_list(
-        'postproc_finance_value', lproj,
-        result_provider, True
     )
 
     value_results = [

@@ -10,6 +10,7 @@ from cachetools import LRUCache
 import numpy as np
 import pandas as pd
 import sqlalchemy as sa
+from useful_types import SequenceNotStr
 
 from newsegsmodelapp.components.result_file import load_result, save_result
 from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent, LightweightNewsegsComponent
@@ -261,13 +262,35 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         return (obj, rrs)
 
+    def get_result_by_id(
+        self,
+        result_id: int
+    ) ->  tuple[Any, int] | tuple[None, None]:
+        stmt = (
+            sa.select(self._table.c.result_file, self._table.c.component_config_revision)
+            .where(self._table.c.result_id == result_id)
+        )
+
+        with self._get_engine().connect() as conn:
+            row = conn.execute(stmt).fetchone()
+        
+        if not row:
+            return None, None
+
+        try:
+            obj = load_result(Path(row.result_file))
+        except FileNotFoundError:
+            return None, None
+        
+        return (obj, row.component_config_revision)
+
     def result_exists(
         self,
         result_type: str,
         run_id: int,
-        parent_component: NewsegsComponent | str,
+        parent_component: NewsegsComponent | LightweightNewsegsComponent | str,
         revision: Optional[int] = None,
-    ) -> str | bool:
+    ) -> int | bool:
         stmt = (
             sa.select(
                 self._table.c.result_id,
@@ -295,7 +318,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             stmt = stmt.where(
                 self._table.c.component_config_revision == revision
             )
-        elif isinstance(parent_component, NewsegsComponent):
+        elif isinstance(parent_component, (NewsegsComponent, LightweightNewsegsComponent)):
             stmt = stmt.where(
                 self._table.c.component_config_revision == parent_component.revision
             )
@@ -310,7 +333,9 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 continue
             return res.result_id
         
-        return False            
+        return False
+
+    
         
 class CachedFromDatabaseResultProvider(
     FromDatabaseResultProvider

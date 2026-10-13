@@ -1204,3 +1204,199 @@ class TestDatabaseStart(unittest.TestCase):
             self.assertEqual(v, 0, f'{k} revision incorrect.')
         
         proj_provider.add_component(proj)
+
+        for i in range(2):
+            if i == 1:
+                # Alter some variables
+                var1 = proj.metamodels[0].variables['gen_input.wind_capacity.0']
+                var1.set_parameters((212.12,))
+
+                var2 = proj.metamodels[0].variables['import_costs.grid_import_var_per_unit.0']
+                var2.set_parameters(0.31, 0.1*0.31)
+
+                proj_provider.variable_provider.upsert_variable(var1)
+                proj_provider.variable_provider.upsert_variable(var2)
+                # Need to manually invalidate the project cache - this could cause issues!
+                proj_provider.invalidate_cache_for_component(proj.id)
+
+            proj_recovered = proj_provider.get_project(proj.id)
+            recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+            # Don't expect any modification of the model or finance until syncronisation
+            for k, v in recovered_revisions.items():
+                self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrect')
+
+            request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
+            request = request_creator(proj.id, proj_provider)
+            
+            run_id = generate_claim_ticket(engine, request)
+
+            request.run_id = run_id
+            
+            runner = registers.RUN_PROCEDURE_REGISTER.get(request.request_type)
+
+            def update_progress(step, total, message):
+                return
+
+            def check_cancel_status():
+                return False
+
+            # Initial run - deterministic single metamodel
+            is_ok = runner(
+                request, proj_provider, result_provider, 
+                run_id, update_progress, check_cancel_status
+            )
+
+            self.assertEqual(is_ok, 'ok')
+
+            # Recover project
+            proj_recovered = proj_provider.get_project(proj.id)
+            recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+            if i == 0:
+                # Do not expect a revision in any component, as there are no valid results yet.
+                for k, v in recovered_revisions.items():
+                    self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+            else:
+                # Expect a revision in everything downstream of generation.
+                for k, v in recovered_revisions.items():
+                    if k in (
+                        'project.table_config',
+                        'metamodel_0.table_config',
+                        'model_0',
+                        'model_0.table_config',
+                        'finance_0',
+                        'finance_0.table_config',
+                        #'model_0.grid',
+                        'model_0.generation',
+                        #'model_0.consumption_storage'
+                    ):
+                        self.assertEqual(v, new_revisions[k] + 1, f'{k} recovered revision not incremented')
+                    else:
+                        self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+
+            postactions_from_reg = cast(
+                registers.Postactions,
+                registers.POST_ACTION_REGISTER.get(request.request_type)
+            )
+
+            finance_pp_counter = 0
+
+            for pp_proc in postactions_from_reg.postprocess_procedures:
+                procedure_name = pp_proc[0]
+                req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(procedure_name)
+                new_req = req_provider(request)
+
+                procedure = registers.get_postprocess_procedure(procedure_name, new_req)
+
+                pp_run_id = generate_claim_ticket(engine, new_req)
+                new_req.run_id = pp_run_id
+
+                is_ok = procedure(
+                    new_req, proj_provider, result_provider,
+                    pp_run_id, update_progress, check_cancel_status
+                )
+                self.assertEqual(is_ok, 'ok')
+
+                # Recover project
+                proj_recovered = proj_provider.get_project(proj.id)
+                recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+                if i == 0:
+                    # Again, expect no revisions
+                    for k, v in recovered_revisions.items():
+                        self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+                else:
+                    # Expect a revision in everything downstream of generation.
+                    for k, v in recovered_revisions.items():
+                        if k in (
+                            'project.table_config',
+                            'metamodel_0.table_config',
+                            'model_0',
+                            'model_0.table_config',
+                            'finance_0',
+                            'finance_0.table_config',
+                            #'model_0.grid',
+                            'model_0.generation',
+                            #'model_0.consumption_storage'
+                        ):
+                            self.assertEqual(v, new_revisions[k] + 1, f'{k} recovered revision not incremented')
+                        else:
+                            self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+
+                output_actions = cast(
+                    registers.Postactions,
+                    registers.POST_ACTION_REGISTER.get(new_req.request_type)
+                )
+
+                for output_proc in output_actions.table_draw_artists:
+                    op_proc_name = output_proc[0]
+                    op_req_func = registers.TABLE_DRAW_REQUEST_REGISTER.get(op_proc_name)
+                    if op_req_func:
+                        op_req = op_req_func(new_req)
+                    else:
+                        op_req = new_req
+
+                    op_procedure = registers.get_table_draw(op_proc_name, op_req)
+
+                    op_run_id = generate_claim_ticket(engine, op_req)
+                    op_req.run_id = op_run_id
+
+                    is_ok = op_procedure(
+                        op_req, proj_provider, result_provider,
+                        run_id, update_progress, check_cancel_status
+                    )
+                    # Finance tables will not be immediately ok - will require all upstream postprocs to
+                    # be run first
+                    if not op_proc_name == 'table_finance':
+                        self.assertEqual(is_ok, 'ok')
+                    elif finance_pp_counter == 2 and op_proc_name == 'table_finance':
+                        self.assertEqual(is_ok, 'ok')
+                    else:
+                        finance_pp_counter += 1
+                        self.assertEqual(is_ok, 'missing')
+
+                    # Recover project
+                    proj_recovered = proj_provider.get_project(proj.id)
+                    recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+                    if i == 0:
+                        # Again, expect no revisions
+                        for k, v in recovered_revisions.items():
+                            self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+                    else:
+                        # Expect a revision in everything downstream of generation.
+                        for k, v in recovered_revisions.items():
+                            if k in (
+                                'project.table_config',
+                                'metamodel_0.table_config',
+                                'model_0',
+                                'model_0.table_config',
+                                'finance_0',
+                                'finance_0.table_config',
+                                #'model_0.grid',
+                                'model_0.generation',
+                                #'model_0.consumption_storage'
+                            ):
+                                self.assertEqual(v, new_revisions[k] + 1, f'{k} recovered revision not incremented')
+                            else:
+                                self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+
+            # Check that outputs are for the correct revision
+            project_tables = [
+                'table_generation_wind_ann',
+                'table_generation_pv_ann',
+                'table_generation_combined_ann',
+                'table_consumption_ann',
+                'table_consumption_seasonal_ann',
+                'table_storage_ann',
+                'table_net_ann',
+                'table_net_seasonal_ann',
+                'table_finance_so_benefits_ann',
+                'table_finance_so_costs_ann',
+                'table_finance_so_value_ann',
+            ]
+            current_proj = proj_provider.get_lightweight_project(proj.id)
+            for tbl in project_tables:
+                res, rev = result_provider.get_result(tbl, current_proj.table_config, False)
+                self.assertIsNotNone(res, msg = f'No table for {tbl}')

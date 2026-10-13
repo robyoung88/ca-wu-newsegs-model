@@ -72,15 +72,21 @@ def deterministic_run_metamodel(
             mm.model._cs_result = cs_res
             model_run_from = 'complete'   
 
+    table_increment = False
+    """Increment the metamodel and project tables"""
     step += 1
     if model_run_from == 'complete':
         progress_callback(step, total_steps, f'Model already run - config {sequence_number}')
     else:
         progress_callback(step, total_steps, f'Running model - config {sequence_number}')
         mm.model.run(run_from = model_run_from)
-        # There should be no need to increment the table config - this should have happened in the sync_model_with_changed_variables_deterministic
-        # mm.model.table_config._notify_change()
-        project_provider.metamodel_provider._em_provider.upsert_component(mm.model)
+        # There should be no need to increment the table config;
+        # If it was necessary this should have happened in the sync_model_with_changed_variables_deterministic
+        # However, if there are simply no results and the model is unchanged, then rightly nothing should be
+        # incremented.
+        if mm.model.chain_modified:
+            table_increment = True
+            project_provider.metamodel_provider._em_provider.upsert_component(mm.model)
 
     if check_cancel_status():
         raise InterruptedError(f'Process {run_id} has been cancelled.')
@@ -93,17 +99,22 @@ def deterministic_run_metamodel(
     else:
         progress_callback(step, total_steps, f'Running finance - config {sequence_number}')
         mm.finance.run()
-        # There should be no need to increment the table config - this should have happened in the sync_model_with_changed_variables_deterministic
-        # mm.finance.table_config._notify_change()
-        project_provider.metamodel_provider._fm_provider.upsert_component(mm.finance)
+        # There should be no need to increment the table config;
+        # If it was necessary this should have happened in the sync_model_with_changed_variables_deterministic
+        # However, if there are simply no results and the model is unchanged, then rightly nothing should be
+        # incremented.
+        if mm.finance.chain_modified:
+            table_increment = True
+            project_provider.metamodel_provider._fm_provider.upsert_component(mm.finance)
 
         # Invalidate downstream tables
-        project_provider._component_provider.increment_revision([
-            proj.table_config.id,
-            mm.table_config.id,
-            #mm.model.table_config.id,
-            #mm.finance.table_config.id,
-        ])
+        if table_increment:
+            project_provider._component_provider.increment_revision([
+                proj.table_config.id,
+                mm.table_config.id,
+            ])
+            # Invalidate cache on project (only the table_config has been modified, the project itself is unchanged)
+            project_provider.invalidate_cache_for_component(proj.id)
 
     if check_cancel_status():
         raise InterruptedError(f'Deterministic single configuration process {run_id} has been cancelled.')
