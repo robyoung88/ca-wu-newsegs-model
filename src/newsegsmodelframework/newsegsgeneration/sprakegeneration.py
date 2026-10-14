@@ -20,7 +20,8 @@ from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import newsegsmoduleresult
 
 from config import settings
-_LOOKUP_DIR = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+_LOOKUP_DIR = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 NOMINAL_WT_HEIGHT = 10.0
 

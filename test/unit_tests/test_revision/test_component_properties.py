@@ -6,7 +6,7 @@ import unittest
 from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core.constructors import registers
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, NewsegsComponentProviderInterface
+from newsegsmodelframework.core.newsegscomponent import DictionaryComponentProvider, NewsegsComponent, NewsegsComponentProviderInterface
 from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentOrderedDictProperty, ComponentProperty, DataWithRevision, revision_dataclass
 
 @revision_dataclass
@@ -345,66 +345,7 @@ class TestChildComponentProperties(unittest.TestCase):
 
         parent2 = ParentOfProperties.from_dict(d1)
 
-        class CompProvider(NewsegsComponentProviderInterface):
-            def __init__(
-                self,
-                comp_dict: dict
-            ) -> None:
-                self.comp_dict = comp_dict
-
-            @overload
-            def get_component(self, component_id: str) -> NewsegsComponent:
-                ...
-        
-            @overload
-            def get_component(self, component_id: SequenceNotStr[str]) -> SequenceNotStr[NewsegsComponent]:
-                ...
-
-            def get_component(
-                self, 
-                component_id: str | SequenceNotStr[str]
-            ) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
-                if isinstance(component_id, str):
-                    return self.comp_dict[component_id]
-                else:
-                    return[self.comp_dict[x] for x in component_id]
-
-            def duplicate_component(
-                self, 
-                component_id: str | NewsegsComponent
-            ) -> NewsegsComponent:
-                if isinstance(component_id, str):
-                    return copy.deepcopy(self.comp_dict[component_id])
-                else:
-                    return copy.deepcopy(component_id)
-
-            def add_component(
-                self,
-                component: NewsegsComponent
-            ) -> str:
-                self.comp_dict[component.id] = component
-                return component.id
-
-            def get_default_component(
-                self, 
-                component_type: str, 
-                index: int = -1
-            ) -> NewsegsComponent:
-                return next(iter(self.comp_dict.values()))
-            
-            def get_component_metadata(
-                self, 
-                component_id: str | SequenceNotStr[str], 
-                metadata_ids: str | SequenceNotStr[str]
-            ) -> dict[str, Any] | dict[str, dict[str, Any]]:
-                return {'message': 'No metadata'}
-
-            def set_component_metadata(
-                self, component_id: str, metadata_id: str, metadata_value: Any
-            ):
-                ...
-
-        provider = CompProvider(
+        provider = DictionaryComponentProvider(
             {
                 child1.id: child1,
                 child2.id: child2,

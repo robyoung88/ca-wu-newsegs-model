@@ -21,6 +21,7 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
+from newsegsmodelapp.backend.db.db import write_transaction
 from newsegsmodelapp.backend.db import db_tables as tbls
 from newsegsmodelapp.backend.worker import set_status_completed, set_status_failed
 from newsegsmodelapp.components import callback_utils
@@ -441,7 +442,7 @@ def add_action_callbacks(app: NewsegsDash):
                         success = False
                         while n_retries > 0 and not success:
                             try:
-                                with db.get_engine().begin() as conn:
+                                with write_transaction(db.get_engine()) as conn:
                                     conn.execute(
                                         sa.update(tbls.runs)
                                         .values(children_spawned = True)
@@ -502,7 +503,7 @@ def add_action_callbacks(app: NewsegsDash):
             .values(cancel_requested = True)
         )
 
-        with db.get_engine().begin() as conn:
+        with write_transaction(db.get_engine()) as conn:
             conn.execute(cancel_all_jobs)
 
         rval = callback_utils.create_noupdate_return()

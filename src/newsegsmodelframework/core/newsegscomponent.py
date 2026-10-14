@@ -450,6 +450,10 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
     ):
         ...
 
+    @override
+    def increment_revision(self, component_id):
+        self.comp_dict[component_id].revision += 1
+        
 
 if TYPE_CHECKING:
     # During type checking, treat TableOwningMixin as a NewsegsComponent subclass

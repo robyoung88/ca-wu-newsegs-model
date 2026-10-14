@@ -616,7 +616,7 @@ def add_result_container_callbacks(app: NewsegsDash):
                     cn = (cn + ' stale').strip()
             else:
                 if 'stale' in cn:
-                    cn = cn.replace(' stale').strip()
+                    cn = cn.replace(' stale', '').strip()
             rval.append(cn)
         
         return dict(header_classnames = rval)

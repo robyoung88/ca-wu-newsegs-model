@@ -20,6 +20,7 @@ import os
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 
 from newsegsmodelapp.backend import db
+from newsegsmodelapp.backend.db.db import write_transaction
 from newsegsmodelapp.backend.db.db_tables import runs
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
@@ -64,6 +65,7 @@ def run_dispatcher(
         backendport = BACKENDPORT,
         db_path: str | None = None,
         stop_event = None,
+        clean_interval_s = 60,
     ):
     """Supervisor to the proxy and workers"""
 
@@ -96,7 +98,7 @@ def run_dispatcher(
         workers_stop[idx] = wstop_event
     
     print("Supervisor online. Monitoring workers...")
-
+    last_cleaned = time.time()
     try:
         # The supervisor loop
         while stop_event is None or not stop_event.is_set():
@@ -129,9 +131,12 @@ def run_dispatcher(
                 proxy_process.start()
 
             # Check for dead jobs
-            n_cleaned = _cleanup_dead_jobs(engine, DEAD_CALCULATION_INTERVAL_SECONDS)
-            if n_cleaned:
-                print(f'Killed {n_cleaned} jobs due to timeout')
+            now = time.time()
+            if now - last_cleaned > clean_interval_s:
+                n_cleaned = _cleanup_dead_jobs(engine, DEAD_CALCULATION_INTERVAL_SECONDS)
+                if n_cleaned:
+                    print(f'Killed {n_cleaned} jobs due to timeout')
+                last_cleaned = now
 
             # Touch the heartbeat file
             HEARTBEAT_FILE.touch()
@@ -181,9 +186,8 @@ def _cleanup_dead_jobs(engine, dead_interval_seconds: int) -> int:
         )
     )
 
-    with engine.connect() as conn:
+    with write_transaction(engine) as conn:
         result = conn.execute(stmt)
-        conn.commit()
     return result.rowcount
 
 if __name__ == '__main__':

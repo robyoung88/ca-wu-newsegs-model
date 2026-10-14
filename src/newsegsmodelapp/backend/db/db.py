@@ -6,10 +6,13 @@ from typing import Any, Literal, Optional
 import logging
 import os
 import sqlite3
-import warnings
+from contextlib import contextmanager
+from collections.abc import Generator
+import threading
 
 from alembic.config import Config as AlembicConfig
 from pathlib import Path
+import fasteners
 import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError, DBAPIError
 from sqlalchemy import event
@@ -74,19 +77,19 @@ def get_engine(db_path: str | Path | None = None):
             # 4. Restore the original isolation level for SQLAlchemy transaction management
             dbapi_connection.isolation_level = old_isolation
 
-    checkout_times = {}
+        checkout_times = {}
 
-    @sa.event.listens_for(_engine, "checkout")
-    def on_checkout(dbapi_connection, connection_record, connection_proxy):
-        checkout_times[id(dbapi_connection)] = time.time()
+        @event.listens_for(_engine, "checkout")
+        def on_checkout(dbapi_connection, connection_record, connection_proxy):
+            checkout_times[id(dbapi_connection)] = time.time()
 
-    @sa.event.listens_for(_engine, "checkin")
-    def on_checkin(dbapi_connection, connection_record):
-        start_time = checkout_times.pop(id(dbapi_connection), None)
-        if start_time:
-            duration = time.time() - start_time
-            if duration > 3.0:  # Threshold in seconds
-                print(f"WARNING: Connection held for {duration:.2f} seconds")
+        @event.listens_for(_engine, "checkin")
+        def on_checkin(dbapi_connection, connection_record):
+            start_time = checkout_times.pop(id(dbapi_connection), None)
+            if start_time:
+                duration = time.time() - start_time
+                if duration > 3.0:  # Threshold in seconds
+                    print(f"WARNING: Connection held for {duration:.2f} seconds")
 
     return _engine
 
@@ -174,13 +177,27 @@ def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
         case _:
             run_migrations()
 
+# Shared lock file for cross-process synchronization
+LOCKFILE = Path(settings.get('DB_PATH')).parent / 'app_sqlite_write.lock'
+write_lock = fasteners.InterProcessLock(LOCKFILE)
+_write_thread_lock = threading.Lock()
+
+@contextmanager
+def write_transaction(engine: sa.Engine) -> Generator[sa.Connection, None, None]:
+    """Run a SQLite write transaction while holding the cross-process lock."""
+    with _write_thread_lock:
+        with write_lock:
+            with engine.begin() as conn:
+                conn.exec_driver_sql("BEGIN IMMEDIATE")
+                yield conn
+
 def write_with_retries(
     engine: sa.Engine, 
     stmt,
     parameters: Optional[Any] = None,
-    n_retries: int = 5, 
+    n_retries: int = 10,
     base_sleep: float = 0.05, 
-    max_sleep: float = 2.0
+    max_sleep: float = 4.0
 ):
     """Execute stmt with engine, retrying on lock/operational errors 
     using exponential backoff and randomized jitter.
@@ -188,7 +205,7 @@ def write_with_retries(
     attempt = 0
     while True:
         try:
-            with engine.begin() as conn:
+            with write_transaction(engine) as conn:
                 if parameters is None:
                     conn.execute(stmt)
                 else:
@@ -207,8 +224,8 @@ def write_with_retries(
             # Exponential backoff with random jitter (prevents thundering herd)
             sleep_time = min(max_sleep, base_sleep * (2 ** attempt)) + random.uniform(0, 0.05)
             
-            warnings.warn(
+            logger.warning(
                 f"Encountered lock/operational error (attempt {attempt}/{n_retries if n_retries >= 0 else 'inf'}): {e}. "
-                f"Retrying in {sleep_time:.2f}s..."
+                f"Retrying in {sleep_time:.2f}s... SQL: {stmt}"
             )
             time.sleep(sleep_time)

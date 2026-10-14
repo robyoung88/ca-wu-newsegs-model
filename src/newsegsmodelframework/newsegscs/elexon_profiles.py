@@ -11,7 +11,8 @@ from newsegsmodelframework.util.holiday_helpers import get_holiday_df
 
 from config import settings
 # Where to find elexon profile data
-lookup_dir = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 # These data are retrospective, i.e. timestamp marks end of half-hour of demand
 PROFILE_DATA = pd.read_parquet(

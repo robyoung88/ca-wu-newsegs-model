@@ -11,7 +11,8 @@ setup_script_env()
 from newsegsmodelframework.newsegscs import ev_profiles
 
 from config import settings
-lookup_dir = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 if __name__ == '__main__':
     PROFILE_DATA = pd.read_parquet(

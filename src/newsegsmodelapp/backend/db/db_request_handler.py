@@ -4,7 +4,7 @@ from typing import Callable, Sequence, overload, override
 import sqlalchemy as sa
 
 from newsegsmodelapp import registers
-from newsegsmodelapp.backend.db.db import write_with_retries
+from newsegsmodelapp.backend.db.db import write_transaction, write_with_retries
 from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestHandlerInterface
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
@@ -85,7 +85,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
                 'payload': json.dumps(request.as_dict())
             })
         )
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             res = conn.execute(stmt)
             if res and res.inserted_primary_key:
                 return res.inserted_primary_key[0]
@@ -206,7 +206,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             .returning(self._table.c.retry_number < self._table.c.max_retries)
         )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             res = conn.execute(incr_stmt)
             if res:
                 ok_retry = res.scalar()

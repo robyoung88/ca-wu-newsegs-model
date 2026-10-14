@@ -26,7 +26,8 @@ from newsegsmodelframework.newsegsgrid import sprakegrid
 from newsegsmodelframework.newsegscs import sprakecs
 
 from config import settings
-lookup_dir = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 _DEFAULT_TS = pd.Timedelta(hours=1)
 _DEFAULT_TIMESPAN = modtimespan.RegTimeSpan(

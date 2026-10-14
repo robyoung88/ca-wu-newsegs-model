@@ -12,7 +12,7 @@ import pandas as pd
 import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
-from newsegsmodelapp.backend.db.db import write_with_retries
+from newsegsmodelapp.backend.db.db import write_transaction, write_with_retries
 from newsegsmodelapp.components.result_file import load_result, save_result
 from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent, LightweightNewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
@@ -153,7 +153,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             select_stmt
         )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(insert_stmt)
 
     @override
@@ -209,7 +209,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         try:
             obj = load_result(Path(file_name))
         except FileNotFoundError:
-            with self._get_engine().begin() as conn:
+            with write_transaction(self._get_engine()) as conn:
                 conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
             return None, None
         
@@ -252,7 +252,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         try:
             obj = load_result(Path(file_name))
         except FileNotFoundError:
-            with self._get_engine().begin() as conn:
+            with write_transaction(self._get_engine()) as conn:
                 conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
             return None, None
 
@@ -324,7 +324,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         for res in result:
             if not os.path.exists(res.result_file):
-                with self._get_engine().begin() as conn:
+                with write_transaction(self._get_engine()) as conn:
                     conn.execute(sa.delete(self._table).where(self._table.c.result_file == res.result_file))
                 continue
             return res.result_id

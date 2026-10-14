@@ -10,6 +10,7 @@ import pandas as pd
 import pvlib
 
 from common import setup_script_env
+from newsegsmodelframework import STATICDATA
 setup_script_env()
 
 from config import settings
@@ -39,16 +40,18 @@ if __name__ == '__main__':
 
     odata = pvg_data.join(solarpos)
 
+    lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
+
     print(
         os.path.join(
-            settings.get('SprakeDataLoc'),
+            lookup_dir,
             'default_irradiance.csv'
         )
     )
 
     odata.to_csv(
         os.path.join(
-            settings.get('SprakeDataLoc'),
+            lookup_dir,
             'default_irradiance.csv'
         )
     )
@@ -64,7 +67,7 @@ if __name__ == '__main__':
     )
     odata.to_parquet(
         os.path.join(
-            settings.get('SprakeDataLoc'),
+            lookup_dir,
             'default_irradiance.parquet'
         )
     )

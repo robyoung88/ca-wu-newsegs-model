@@ -1,7 +1,11 @@
 """NewSEGS model as a multi-page app.
 """
+import sqlite3
 import time
 from typing import Any
+
+from flask import jsonify
+import sqlalchemy as sa
 
 from newsegsmodelapp.backend.db.db import init_db
 from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
@@ -278,6 +282,28 @@ def create_app(external_stylesheets = None) -> Dash:
         [serve_layout()] + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
     )
 
+    server = app.server
+    # ---------------------------------
+    # Health check
+    # ---------------------------------
+    @server.route('/health')
+    def health_check():
+        DB_PATH = Path(settings['DB_PATH'])
+        """Endpoint for load balancers and Docker to verify app readiness"""
+        # Check if DB file exists (might be restoring)
+        if not DB_PATH.exists():
+            return jsonify({'status': 'starting', 'message': 'Database is restoring...'}), 503
+
+        # Check if the database is responsive and not locked/corrupt
+        try:
+            with db.get_engine().connect() as conn:
+                # Lightweight query to verify read access
+                conn.execute(sa.text('SELECT 1 FROM sqlite_master LIMIT 1'))
+
+            return jsonify({'status': 'healthy', 'message': 'Service is operational'}), 200
+        except sqlite3.Error as e:
+            return jsonify({'status': 'unhealthy', 'message': f'Database error: {e}'}), 500
+
     # Bind callbacks
     add_display_callbacks(app)
     #add_background_callbacks(app)
@@ -301,10 +327,5 @@ def create_app(external_stylesheets = None) -> Dash:
 if __name__ == '__main__':
     init_db()
     app = create_app()
-    #try:
-    app.run(debug = True, use_reloader = False)
-    # except SystemExit as e:
-    #     print(f"Caught SystemExit with code: {e.code}")
-    #     import traceback
-    #     traceback.print_stack()
+    app.run(host = '0.0.0.0', port = 8050, debug = True, use_reloader = False)
         

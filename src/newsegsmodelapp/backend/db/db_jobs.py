@@ -3,7 +3,7 @@ import json
 
 import sqlalchemy as sa
 
-from newsegsmodelapp.backend.db.db import write_with_retries
+from newsegsmodelapp.backend.db.db import write_transaction, write_with_retries
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelapp.backend.db import tables as tbls
 
@@ -25,7 +25,7 @@ def generate_claim_ticket(engine: sa.Engine, job: RunRequest) -> int:
         .returning(tbls.runs.c.run_id)
     )
 
-    with engine.begin() as conn:
+    with write_transaction(engine) as conn:
         result = conn.execute(stmt)
         row = result.fetchone()
         if row is None:

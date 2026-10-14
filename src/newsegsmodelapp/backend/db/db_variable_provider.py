@@ -1,12 +1,16 @@
 import copy
 import json
+import random
+import time
 from typing import Any, Callable, Sequence, cast, overload, override
+import warnings
 
 from cachetools import LRUCache
 import numpy as np
 import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError, DBAPIError
 from useful_types import SequenceNotStr
+from newsegsmodelapp.backend.db.db import write_transaction
 
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable, LightweightVariable
@@ -449,7 +453,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         v2.id = v2.generate_new_id()
         vardata = variable_to_raw_table_data(v2)
         stmt = (tbls.variable_configs.insert().values(vardata))
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
         return v2
@@ -457,7 +461,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
     def add_variable(self, var: Variable) -> str:
         vardata = variable_to_raw_table_data(var)
         stmt = (tbls.variable_configs.insert().values(vardata))
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             res = conn.execute(stmt)
 
         if res is None:
@@ -535,7 +539,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 
         while True:
             try:
-                with engine.begin() as conn:
+                with write_transaction(engine) as conn:
                     if update_payload:
                         update_stmt = sa.update(self._table).where(self._table.c.id == sa.bindparam('b_id'))
                         conn.execute(update_stmt, update_payload)
@@ -570,7 +574,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             self._table.delete()
             .where(self._table.c.id.in_(variable_id))
         )
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             result = conn.execute(del_stmt)
             return [str(result.rowcount)]
 
@@ -645,7 +649,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 **{update_col.name: metadata_value})
         )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
         return

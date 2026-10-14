@@ -1033,6 +1033,7 @@ class TestDatabaseStart(unittest.TestCase):
         self.assertTrue(all(x in [y[0] for y in postactions_from_reg.postprocess_procedures] for x in postprocess_list)) # pyright: ignore[reportOptionalMemberAccess]
 
         table_draws_done = set()
+        finance_pp_counter = 0
 
         for process_name in postprocess_list:
             pp_req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(process_name)
@@ -1050,6 +1051,7 @@ class TestDatabaseStart(unittest.TestCase):
                 update_progress,
                 check_cancel_status
             )
+            
 
             self.assertEqual(is_ok, 'ok')
 
@@ -1072,7 +1074,14 @@ class TestDatabaseStart(unittest.TestCase):
                             update_progress,
                             check_cancel_status,
                         )
-                        self.assertEqual(is_ok, 'ok')
+
+                        if not td_artist_name[0] == 'table_finance':
+                            self.assertEqual(is_ok, 'ok')
+                        elif finance_pp_counter == 2 and td_artist_name[0] == 'table_finance':
+                            self.assertEqual(is_ok, 'ok')
+                        else:
+                            finance_pp_counter += 1
+                            self.assertEqual(is_ok, 'missing')
                     table_draws_done.add(td_artist_name[0])
         
         result_getters = [

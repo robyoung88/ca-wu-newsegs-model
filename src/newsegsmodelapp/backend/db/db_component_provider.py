@@ -19,6 +19,7 @@ from newsegsmodelframework.core.newsegscomponent import NewsegsComponent, Newseg
 from newsegsmodelapp.backend.db.project import component_to_raw_table_data, finance_model_to_raw_table_data, metamodel_to_raw_table_data, project_to_raw_table_data
 from newsegsmodelapp.backend.db.project import energy_model_to_raw_table_data
 from newsegsmodelapp.backend.db import tables as tbls
+from newsegsmodelapp.backend.db.db import write_transaction
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
 from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
@@ -359,7 +360,7 @@ class FromDatabaseNewsegsComponentProvider(
         if not (update_payload or insert_payload):
             return
         
-        with engine.begin() as conn:
+        with write_transaction(engine) as conn:
             if rev_payload:
                 # Cannot use 'id' as the bindparam - rename it
                 rev_payload = [{'b_id': x.pop('id'), **x} for x in rev_payload]
@@ -582,7 +583,7 @@ class FromDatabaseNewsegsComponentProvider(
                 **{update_col.name: metadata_value}
             )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
         return
@@ -606,7 +607,7 @@ class FromDatabaseNewsegsComponentProvider(
             )
         stmt = stmt.values(revision = self._table.c.revision + 1)
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
         try:
@@ -1172,7 +1173,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 'variable_config_id': var['uid']
             } for var in metamodel.variable_ids
         ]
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(clear_statement)
 
             if new_variable_entries:
@@ -1213,7 +1214,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             }
             for var in variables
         ]
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(clear_statement)
 
             if new_entries:
@@ -1569,7 +1570,7 @@ class FromDatabaseNewsegsProjectProvider(
             for x in variables
         ]
         if new_entries:
-            with self._get_engine().begin() as conn:
+            with write_transaction(self._get_engine()) as conn:
                 conn.execute(
                     self._project_variable_jct.insert(),
                     new_entries
@@ -1591,7 +1592,7 @@ class FromDatabaseNewsegsProjectProvider(
             )
         )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(clear_statement)
 
         # Trust to .delete_orphan_variables to clean up the variable_config table
@@ -1691,7 +1692,7 @@ class FromDatabaseNewsegsProjectProvider(
             {'project_id': project.id, 'variable_config_id': var_uid}
             for var_uid in project._variables_by_uid.keys()
         ]
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             # Clear existing entries
             conn.execute(
                 self._project_variable_jct.delete()
@@ -1715,7 +1716,7 @@ class FromDatabaseNewsegsProjectProvider(
             }
             for mm in project.metamodels
         ]
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             # Clear existing entries
             conn.execute(
                 self._project_metamodel_jct.delete()
@@ -1908,7 +1909,7 @@ class FromDatabaseNewsegsProjectProvider(
         delete_stmt = sa.delete(tbls.sessions).where(tbls.sessions.c.session_id == session_id)
         create_stmt = sa.insert(tbls.sessions).values(dict(session_id = session_id, active_project_id = project_id))
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(delete_stmt)
             conn.execute(create_stmt)
 
@@ -1936,7 +1937,7 @@ class FromDatabaseNewsegsProjectProvider(
             .values(label = snapshot_name)
         )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
     @override
@@ -2005,7 +2006,7 @@ class FromDatabaseNewsegsProjectProvider(
 
         _ = self.metamodel_provider.delete_component(mm_ids)
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             conn.execute(del_proj_mm_stmt)
             conn.execute(del_proj_var_stmt)
             conn.execute(del_proj_stmt)
@@ -2026,7 +2027,7 @@ class FromDatabaseNewsegsProjectProvider(
             .where(tbls.variable_configs.c.id.not_in(referenced_variable_ids))
         )
 
-        with self._get_engine().begin() as conn:
+        with write_transaction(self._get_engine()) as conn:
             result = conn.execute(del_stmt)
             return result.rowcount
 

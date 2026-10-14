@@ -6,7 +6,8 @@ import pandas as pd
 
 from config import settings
 # Where to find dhw profile data
-lookup_dir = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 # NB - these data are prospective i.e. timestamp marks start of hour of consumption
 PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
