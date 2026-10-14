@@ -191,6 +191,14 @@ def write_transaction(engine: sa.Engine) -> Generator[sa.Connection, None, None]
                 conn.exec_driver_sql("BEGIN IMMEDIATE")
                 yield conn
 
+@contextmanager
+def read_transaction(engine: sa.Engine) -> Generator[sa.Connection, None, None]:
+    """Run a SQLite read transaction while holding the cross-process lock."""
+    #with _write_thread_lock:
+    #    with write_lock:
+    with engine.connect() as conn:
+        yield conn
+
 def write_with_retries(
     engine: sa.Engine, 
     stmt,

@@ -61,7 +61,7 @@ def get_cancel_status(engine: sa.Engine, job_id: int):
         .where(tbls.runs.c.run_id == job_id)
         .limit(1)
     )
-    with engine.connect() as conn:
+    with read_transaction(engine)as conn:
         result = conn.execute(stmt).fetchone()
         return bool(result and result[0])
 

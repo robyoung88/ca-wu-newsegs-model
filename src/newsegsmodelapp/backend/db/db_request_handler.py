@@ -4,7 +4,7 @@ from typing import Callable, Sequence, overload, override
 import sqlalchemy as sa
 
 from newsegsmodelapp import registers
-from newsegsmodelapp.backend.db.db import write_transaction, write_with_retries
+from newsegsmodelapp.backend.db.db import read_transaction, write_transaction, write_with_retries
 from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestHandlerInterface
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
@@ -121,7 +121,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             self._table.select()
             .where(self._table.c.request_id.in_(request_id))
         )
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             rows = conn.execute(stmt).fetchall()
             requests = [self._row_to_runrequest(x) for x in rows]
         if singular:
@@ -146,7 +146,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
                 self._table.c.project_id == active_project_id
             )
 
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             rows = conn.execute(stmt).fetchall()
             return [self._row_to_runrequest(x) for x in rows]
 

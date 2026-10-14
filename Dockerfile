@@ -6,9 +6,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 
 WORKDIR /app
 
-COPY conda_environment.yml requirements-pip.txt ./
+COPY conda-environment.yml requirements-pip.txt ./
 
-RUN conda env create -f conda_environment.yml && \
+RUN conda env create -f conda-environment.yml && \
     conda run -n ca-wu-newsegs-mod pip install -r requirements-pip.txt && \
     conda clean -afy
 

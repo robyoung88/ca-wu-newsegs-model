@@ -21,7 +21,7 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
-from newsegsmodelapp.backend.db.db import write_transaction
+from newsegsmodelapp.backend.db.db import read_transaction, write_transaction
 from newsegsmodelapp.backend.db import db_tables as tbls
 from newsegsmodelapp.backend.worker import set_status_completed, set_status_failed
 from newsegsmodelapp.components import callback_utils
@@ -330,7 +330,7 @@ def add_action_callbacks(app: NewsegsDash):
                 ).where(tbls.runs.c.run_id.in_(ongoing_actions))
             )
 
-            with db.get_engine().connect() as conn:
+            with read_transaction(db.get_engine())as conn:
                 job_statuses = conn.execute(check_job_stmt).fetchall()
 
             if not job_statuses:
@@ -364,7 +364,7 @@ def add_action_callbacks(app: NewsegsDash):
                             )
                         )
                     )
-                    with db.get_engine().connect() as conn:
+                    with read_transaction(db.get_engine())as conn:
                         result = conn.execute(failed_actions_stmt)
                     run_to_request_map = dict(result.tuples().all())
                     for run_id, request_id in run_to_request_map.items():
@@ -395,7 +395,7 @@ def add_action_callbacks(app: NewsegsDash):
                         .where(tbls.runs.c.run_id.in_(completed_actions))
                     )
 
-                    with db.get_engine().connect() as conn:
+                    with read_transaction(db.get_engine())as conn:
                         result = conn.execute(completed_actions_stmt).fetchall()
                     completed_request_map = {
                         x[0]: {

@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from newsegsmodelapp.backend.db import db_tables
+from newsegsmodelapp.backend.db.db import read_transaction
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
@@ -168,7 +169,7 @@ class TestDatabaseStart(unittest.TestCase):
             proj_2.metamodels[0].finance.id
         )
 
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
             nrow_components_pre = conn.execute(
                 sa.select(sa.func.count())
                 .select_from(tbls.component_configs)
@@ -184,7 +185,7 @@ class TestDatabaseStart(unittest.TestCase):
         proj.revision += 1
         proj_provider.upsert_component(proj)        
 
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
             nrow_components_post = conn.execute(
                 sa.select(sa.func.count())
                 .select_from(tbls.component_configs)
@@ -203,7 +204,7 @@ class TestDatabaseStart(unittest.TestCase):
         )
 
         # Check that the snapshot has been created
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
            
             result = conn.execute(
                 tbls.snapshot_projects.select()
@@ -282,7 +283,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         new_project_id = list(new_ids['projects'].values())[0]
 
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
             r0 = conn.execute(
                 tbls.projects.select()
                 .where(tbls.projects.c.id == project_id)
@@ -872,7 +873,7 @@ class TestDatabaseStart(unittest.TestCase):
         
         proj = PROJECT_FACTORIES['sprake']()
         proj_provider.add_component(proj)
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
 
             init_values = tuple(conn.execute(
                 sa.select(
@@ -888,7 +889,7 @@ class TestDatabaseStart(unittest.TestCase):
         time.sleep(2)
         proj.revision += 1
         proj_provider.upsert_component(proj)
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
         
             updated_values = tuple(conn.execute(
                 sa.select(

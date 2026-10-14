@@ -10,7 +10,7 @@ import numpy as np
 import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError, DBAPIError
 from useful_types import SequenceNotStr
-from newsegsmodelapp.backend.db.db import write_transaction
+from newsegsmodelapp.backend.db.db import read_transaction, write_transaction
 
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable, LightweightVariable
@@ -368,7 +368,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 self._table.select()
                 .where(self._table.c.id.in_(instance_id))
             )
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             rows = conn.execute(stmt).fetchall() # Fetch to avoid leaving the connection open
         
         reconstructed_vars = [self._reconstruct_variable(row) for row in rows]
@@ -396,7 +396,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 )
                 .where(self._table.c.id.in_(instance_id))
             )
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             rows = conn.execute(stmt).fetchall() # Fetch to avoid leaving the connection open
         
         reconstructed_vars = [self._reconstruct_lightweight_variable(row) for row in rows]
@@ -422,7 +422,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 sa.select(*self._full_lightweight_variable_columns)
                 .where(self._table.c.id.in_(instance_id))
             )
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             rows = conn.execute(stmt).fetchall() # Fetch to avoid leaving the connection open
         
         reconstructed_vars = [self._reconstruct_full_lightweight_variable(row) for row in rows]
@@ -438,7 +438,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             .where(self._table.c.varid == variable_id)
         )
 
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             rows = conn.execute(stmt).fetchall()
 
         if not rows:
@@ -471,7 +471,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 
     def get_varids(self) -> tuple[str, ...]:
         stmt = sa.select(tbls.variable_configs.c.varid).distinct()
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             varids = conn.scalars(stmt)
         return tuple(varids)
 
@@ -499,7 +499,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 .where(tbls.variable_configs.c.id.in_(uids))
             )
         engine = self._get_engine()
-        with engine.connect() as conn:
+        with read_transaction(engine)as conn:
             rows = conn.execute(stmt).fetchall()
 
         saved_revisions = {x.id: x.revision for x in rows}
@@ -612,7 +612,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 
         fetch_cols = list({pk_col, *select_cols})
         stmt = sa.select(*fetch_cols).where(pk_col.in_(instance_id))
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             results = conn.execute(stmt).mappings().all()
 
         mapped_data = {

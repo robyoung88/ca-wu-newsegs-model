@@ -12,7 +12,7 @@ import pandas as pd
 import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
-from newsegsmodelapp.backend.db.db import write_transaction, write_with_retries
+from newsegsmodelapp.backend.db.db import read_transaction, write_transaction, write_with_retries
 from newsegsmodelapp.components.result_file import load_result, save_result
 from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightDataHoldingNewsegsComponent, LightweightNewsegsComponent
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
@@ -191,7 +191,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             stmt = stmt.where(self._table.c.component_config_revision == revision)
 
         file_name = None
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             result = conn.execute(stmt)
             for idx, row in enumerate(result):
                 if idx == 0:
@@ -237,7 +237,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             else:    
                 stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
 
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             res = conn.execute(stmt)
         if not res:
             return None, None
@@ -267,7 +267,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             .where(self._table.c.result_id == result_id)
         )
 
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             row = conn.execute(stmt).fetchone()
         
         if not row:
@@ -319,7 +319,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 self._table.c.component_config_revision == parent_component.revision
             )
 
-        with self._get_engine().connect() as conn:
+        with read_transaction(self._get_engine())as conn:
             result = conn.execute(stmt).fetchall()
 
         for res in result:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 
-from newsegsmodelapp.backend.db.db import write_transaction
+from newsegsmodelapp.backend.db.db import read_transaction, write_transaction
 
 
 class TestWriteTransaction(unittest.TestCase):
@@ -33,7 +33,7 @@ class TestWriteTransaction(unittest.TestCase):
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     list(executor.map(insert, range(8)))
 
-                with engine.connect() as conn:
+                with read_transaction(engine)as conn:
                     row_count = conn.execute(
                         sa.text("SELECT COUNT(*) FROM writes")
                     ).scalar_one()

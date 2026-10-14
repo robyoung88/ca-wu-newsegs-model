@@ -16,6 +16,7 @@ from config import settings
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend import dispatcher
+from newsegsmodelapp.backend.db.db import read_transaction
 from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 
@@ -153,7 +154,7 @@ class TestProxy(unittest.TestCase):
                 )
                 .where(tbls.runs.c.run_id.in_(job_id))
             )
-            with db.get_engine().connect() as conn:
+            with read_transaction(db.get_engine())as conn:
                 rows = conn.execute(stmt).all()
 
             if len(rows) < 1:
