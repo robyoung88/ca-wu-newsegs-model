@@ -280,12 +280,12 @@ def register_run_procedure(
             raise KeyError(f'A run procedure already exists for key {name}')
         def wrapped(request: RunRequest, *args, **kwargs):
             logger.info(
-                'Run procedure %s for request %d initiated - Run ID: %d, Triggering Run: %d, Project: %s', 
+                'Run procedure %s for Request ID %d initiated - Run ID: %d; Triggering Run: %d; Project: %s;', 
                 name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
             )
             rval = func(request, *args, **kwargs)
             logger.info(
-                'Run procedure %s for request %d completed with message %s - Run ID: %d, Triggering Run: %d, Project: %s', 
+                'Run procedure %s for Request ID %d completed with message %s - Run ID: %d; Triggering Run: %d; Project: %s;', 
                 name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
             )
             return rval
@@ -370,18 +370,29 @@ def register_postprocess_procedure(
         if model_type != 'default':
             if key in POSTPROCESS_REGISTER:
                 raise KeyError(f'Postprocess procedure already exists for key {key}')
-        POSTPROCESS_REGISTER[key] = func
+        def wrapped(request: RunRequest, *args, **kwargs):
+            logger.info(
+                'Postprocess procedure %s for Request ID %d initiated - Run ID: %d; Triggering Run: %d; Project: %s;', 
+                name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
+            )
+            rval = func(request, *args, **kwargs)
+            logger.info(
+                'Postprocess procedure %s for Request ID %d completed with message %s - Run ID: %d; Triggering Run: %d; Project: %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
+            )
+            return rval
+        POSTPROCESS_REGISTER[key] = wrapped
         for trig in triggers:
             pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
             pa.postprocess_procedures.add(key)
 
         key_default = (key[0], 'default')
         if key_default not in POSTPROCESS_REGISTER:
-            POSTPROCESS_REGISTER[key_default] = func
+            POSTPROCESS_REGISTER[key_default] = wrapped
             for trig in triggers:
                 pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
                 pa.postprocess_procedures.add(key_default)
-        return func
+        return wrapped
     return decorated
 
 def get_postprocess_procedure(procedure: str, request: RunRequest):
@@ -473,18 +484,29 @@ def register_table_draw(
         if model_type != 'default':
             if key in TABLE_DRAW_REGISTER:
                 raise KeyError(f'Table draw artist already exists for key {key}')
-        TABLE_DRAW_REGISTER[key] = func
+        def wrapped(request: RunRequest, *args, **kwargs):
+            logger.info(
+                'Table draw procedure %s for Request ID %d initiated - Run ID: %d; Triggering Run: %d; Project: %s;', 
+                name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
+            )
+            rval = func(request, *args, **kwargs)
+            logger.info(
+                'Table draw procedure %s for Request ID %d completed with message %s - Run ID: %d; Triggering Run: %d; Project: %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
+            )
+            return rval
+        TABLE_DRAW_REGISTER[key] = wrapped
         for trig in triggers:
             pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
             pa.table_draw_artists.add(key)
 
         key_default = (key[0], 'default')
         if key_default not in TABLE_DRAW_REGISTER:
-            TABLE_DRAW_REGISTER[key_default] = func
+            TABLE_DRAW_REGISTER[key_default] = wrapped
             for trig in triggers:
                 pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
                 pa.table_draw_artists.add(key_default)
-        return func
+        return wrapped
     return decorated
 
 def get_table_draw(table_section: str, request: RunRequest):
