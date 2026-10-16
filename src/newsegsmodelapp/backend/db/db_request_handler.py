@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import json
 from typing import Callable, Sequence, overload, override
 
@@ -85,7 +88,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
                 'payload': json.dumps(request.as_dict())
             })
         )
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             res = conn.execute(stmt)
             if res and res.inserted_primary_key:
                 return res.inserted_primary_key[0]
@@ -121,9 +124,9 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             self._table.select()
             .where(self._table.c.request_id.in_(request_id))
         )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall()
-            requests = [self._row_to_runrequest(x) for x in rows]
+        requests = [self._row_to_runrequest(x) for x in rows]
         if singular:
             if not requests:
                 raise ValueError(f'Request ID not found: {request_id[0]}')
@@ -146,12 +149,16 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
                 self._table.c.project_id == active_project_id
             )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall()
-            return [self._row_to_runrequest(x) for x in rows]
+        return [self._row_to_runrequest(x) for x in rows]
 
     @override
-    def mark_dispatched(self, request_id: int | Sequence[int], run_id: int | None | Sequence[int | None]):
+    def mark_dispatched(
+        self, 
+        request_id: int | Sequence[int], 
+        run_id: int | None | Sequence[int | None]
+    ):
         if isinstance(request_id, int):
             request_id = [request_id,]
 
@@ -180,7 +187,9 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             )
         )
 
-        write_with_retries(self._get_engine(), stmt, data)
+        logger.info('Marking request(s) as dispatched: %s', request_id)
+        write_with_retries(self._get_engine(writer = True), stmt, data)
+        logger.info('Request(s) marked dispatched: %s', request_id)
 
     @override
     def mark_completed(self, request_id: int | Sequence[int], completed: bool = True):
@@ -192,7 +201,9 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             .where(self._table.c.request_id.in_(request_id))
             .values(completed = completed)
         )
-        write_with_retries(self._get_engine(), stmt)
+        logger.info('Marking request(s) as completed: %s', request_id)
+        write_with_retries(self._get_engine(writer = True), stmt)
+        logger.info('Request(s) marked completed: %s', request_id)
 
     @override
     def increment_failure(self, request_id: int) -> bool:
@@ -206,13 +217,18 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             .returning(self._table.c.retry_number < self._table.c.max_retries)
         )
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             res = conn.execute(incr_stmt)
             if res:
                 ok_retry = res.scalar()
                 if ok_retry is not None:
+                    if ok_retry:
+                        logger.info('Request %s is ok to retry after incrementing attempt counter', request_id)
+                    else:
+                        logger.info('Request %s will not be retried after incrementing attempt counter', request_id)
                     return ok_retry
                 else:
+                    logger.info('Request %s will not be retried after incrementing attempt counter', request_id)
                     return False
 
         return False        

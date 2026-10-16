@@ -1,4 +1,8 @@
 """proxy between client and workers"""
+import logging
+if not logging.getLogger().hasHandlers():
+    import app_logging
+
 import multiprocessing
 import time
 import zmq
@@ -69,7 +73,7 @@ def run_dispatcher(
     ):
     """Supervisor to the proxy and workers"""
 
-    engine = db.get_engine(db_path)
+    write_engine = db.get_engine(db_path = db_path, writer = True)
 
     # Start Proxy in the background
     proxy_process = multiprocessing.Process(
@@ -87,9 +91,11 @@ def run_dispatcher(
     # Start workers
     workers = {}
     workers_stop = {}
+    # Use spawn, not fork.
+    ctx = multiprocessing.get_context("spawn")
     for idx in range(num_workers):
-        wstop_event = multiprocessing.Event()
-        p = multiprocessing.Process(
+        wstop_event = ctx.Event()
+        p = ctx.Process(
             target = worker_process,
             args = (idx, worker_server, backendport, db_path, wstop_event)
         )
@@ -109,8 +115,8 @@ def run_dispatcher(
                     print(f"CRITICAL: Worker {idx} died! Restarting...")
 
                     # Spawn a replacement worker
-                    wstop_event = multiprocessing.Event()
-                    p = multiprocessing.Process(
+                    wstop_event = ctx.Event()
+                    p = ctx.Process(
                         target = worker_process,
                         args = (idx, worker_server, backendport, db_path, wstop_event)
                     )
@@ -133,7 +139,7 @@ def run_dispatcher(
             # Check for dead jobs
             now = time.time()
             if now - last_cleaned > clean_interval_s:
-                n_cleaned = _cleanup_dead_jobs(engine, DEAD_CALCULATION_INTERVAL_SECONDS)
+                n_cleaned = _cleanup_dead_jobs(write_engine, DEAD_CALCULATION_INTERVAL_SECONDS)
                 if n_cleaned:
                     print(f'Killed {n_cleaned} jobs due to timeout')
                 last_cleaned = now
@@ -169,7 +175,7 @@ def run_dispatcher(
                 p.terminate()
                 p.join(timeout = 1)
 
-        engine.dispose()
+        write_engine.dispose()
 
         # Hard termination of the proxy process - no resources to worry about.
         if proxy_process.is_alive():

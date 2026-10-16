@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 import json
 import threading
@@ -84,13 +87,8 @@ class FromDatabaseNewsegsComponentProvider(
         obj = self._assign_updated_child_uids(obj, row)
         obj = self._reattach_children(obj)
         if obj.revision != row.revision:
-            if obj.revision > row.revision:
-                print(f'WARNING - Component has been constructed with revision greater than stored in row: Payload = {obj.revision}, Row = {row.revision}')
-            print(f'Syncronising Component revision ({obj.id}): {obj.revision} -> {row.revision}')
             obj.revision = row.revision
             obj._config._last_syncronised = obj.revision
-        #if obj.chain_modified:
-        #    raise ValueError('Component has been reconstructed with modified children.')
         return obj
 
     def _reconstruct_lightweight_component(self, row) -> LightweightNewsegsComponent:
@@ -139,9 +137,10 @@ class FromDatabaseNewsegsComponentProvider(
                     .where(self._table.c.id.in_(component_id))
                 )
 
-            with read_transaction(self._get_engine())as conn:
-                rows = conn.execute(stmt)
-                reconstructed_components = [self._reconstruct_component(row.payload, row) for row in rows]
+            with read_transaction(self._get_engine()) as conn:
+                # MUST fetch, otherwise holding the connection open too long
+                rows = conn.execute(stmt).fetchall()
+            reconstructed_components = [self._reconstruct_component(row.payload, row) for row in rows]
         
         finally:
             RevisionNotifierMixin._set_notification_state(prevstate)
@@ -171,7 +170,7 @@ class FromDatabaseNewsegsComponentProvider(
                     sa.select(*self._lightweight_component_columns)
                     .where(self._table.c.id.in_(component_id))
                 )
-            with read_transaction(self._get_engine())as conn:
+            with read_transaction(self._get_engine()) as conn:
                 rows = conn.execute(stmt).fetchall()
 
             reconstructed_components = [self._reconstruct_lightweight_component(row) for row in rows]
@@ -202,7 +201,7 @@ class FromDatabaseNewsegsComponentProvider(
                     .where(self._table.c.id.in_(component_id))
                 )
 
-            with read_transaction(self._get_engine())as conn:
+            with read_transaction(self._get_engine()) as conn:
                 rows = conn.execute(stmt).fetchall()
 
             reconstructed_components = [self._reconstruct_lightweight_dataholding_component(row) for row in rows]
@@ -248,7 +247,7 @@ class FromDatabaseNewsegsComponentProvider(
             .where(self._table.c.component_type == component_type)
         )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall()
 
         if not rows:
@@ -307,8 +306,7 @@ class FromDatabaseNewsegsComponentProvider(
             )
             .where(tbl.c.id.in_(uids))
         )
-        engine = self._get_engine()
-        with read_transaction(engine)as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall()
 
         saved_revisions = {x.id: x.revision for x in rows}
@@ -360,7 +358,7 @@ class FromDatabaseNewsegsComponentProvider(
         if not (update_payload or insert_payload):
             return
         
-        with write_transaction(engine) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             if rev_payload:
                 # Cannot use 'id' as the bindparam - rename it
                 rev_payload = [{'b_id': x.pop('id'), **x} for x in rev_payload]
@@ -377,10 +375,25 @@ class FromDatabaseNewsegsComponentProvider(
                 insert_stmt = tbl.insert()
                 conn.execute(insert_stmt, insert_payload)
 
-        print(f'Inserted {len(insert_payload)} components: {[x.get('id', str(x)) for x in insert_payload]}')
-        print(f'Updated {len(update_payload)} components: {[x.get('b_id', str(x)) for x in update_payload]}')
-        print(f'Revised {len(rev_payload)} components: {[x.get('b_id', str(x)) for x in rev_payload]}')
-
+        logger.debug(
+            'Inserted %d components into table %s: %s',
+            len(insert_payload),
+            self._table.name,
+            [x.get('id', str(x)) for x in insert_payload]
+        )
+        logger.debug(
+            'Updated %d components in table %s: %s',
+            len(update_payload),
+            self._table.name,
+            [x.get('b_id', str(x)) for x in update_payload]
+        )
+        logger.debug(
+            'Revised %d components in table %s: %s',
+            len(rev_payload),
+            self._table.name,
+            [x.get('b_id', str(x)) for x in rev_payload]
+        )
+        
     def _delete_one_component(
             self, 
             component_id: str,
@@ -463,7 +476,7 @@ class FromDatabaseNewsegsComponentProvider(
             .where(tbls.component_configs.c.id == component_id)
         )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine(writer=True)) as conn:
             for trial_stmt in (
                 get_em_count_stmt,
                 get_fm_count_stmt,
@@ -532,7 +545,7 @@ class FromDatabaseNewsegsComponentProvider(
 
         fetch_cols = list({pk_col, *select_cols})
         stmt = sa.select(*fetch_cols).where(pk_col.in_(component_id))
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             results = conn.execute(stmt).mappings().all()
 
         mapped_data = {
@@ -583,7 +596,7 @@ class FromDatabaseNewsegsComponentProvider(
                 **{update_col.name: metadata_value}
             )
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(stmt)
 
         return
@@ -607,7 +620,7 @@ class FromDatabaseNewsegsComponentProvider(
             )
         stmt = stmt.values(revision = self._table.c.revision + 1)
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(stmt)
 
         try:
@@ -763,8 +776,9 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
             .where(self._table.c.id == component_id)
         )
 
+        # use of a writer in a read transaction deliberate here
         child_ids = []
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine(writer = True)) as conn:
             for trial_stmt in (
                 get_mm_count_stmt,
             ):
@@ -910,8 +924,9 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
             .where(self._table.c.id == component_id)
         )
 
+        # Deliberately use writer in read transaction
         child_ids = []
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine(writer = True)) as conn:
             for trial_stmt in (
                 get_mm_count_stmt,
             ):
@@ -1006,7 +1021,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 )
                 .where(self._metamodel_variable_jct.c.metamodel_id == obj.id)
             )
-            with read_transaction(self._get_engine())as conn:
+            with read_transaction(self._get_engine()) as conn:
                 result = conn.execute(var_stmt)
                 var_mapping = {
                     row[0]: row[1] for row in result
@@ -1129,7 +1144,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                     )
                     .where(self._metamodel_variable_jct.c.metamodel_id == comp_id)
                 )
-                with read_transaction(self._get_engine())as conn:
+                with read_transaction(self._get_engine()) as conn:
                     result = conn.execute(var_stmt)
                     var_mapping = {
                         row[0]: row[1] for row in result
@@ -1173,7 +1188,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 'variable_config_id': var['uid']
             } for var in metamodel.variable_ids
         ]
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(clear_statement)
 
             if new_variable_entries:
@@ -1214,7 +1229,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             }
             for var in variables
         ]
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(clear_statement)
 
             if new_entries:
@@ -1352,7 +1367,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         em_ids = []
         fm_ids = []
         child_ids = []
-        with read_transaction(self._get_engine())as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             # No trials, can get on with finding children
             row = conn.execute(get_em_id_stmt).fetchone()
             if row:
@@ -1370,8 +1385,6 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             conn.execute(del_proj_mm_stmt)
             conn.execute(del_mm_var_stmt)
             conn.execute(del_mm_stmt)
-
-            conn.commit()
 
         # Delete children
         _ = self._em_provider.delete_component(em_ids)
@@ -1452,7 +1465,7 @@ class FromDatabaseNewsegsProjectProvider(
                 )
                 .where(self._project_variable_jct.c.project_id == obj.id)
             )
-            with read_transaction(self._get_engine())as conn:
+            with read_transaction(self._get_engine()) as conn:
                 result = conn.execute(stmt)
                 vrus = {}
                 for row in result:
@@ -1570,7 +1583,7 @@ class FromDatabaseNewsegsProjectProvider(
             for x in variables
         ]
         if new_entries:
-            with write_transaction(self._get_engine()) as conn:
+            with write_transaction(self._get_engine(writer = True)) as conn:
                 conn.execute(
                     self._project_variable_jct.insert(),
                     new_entries
@@ -1592,7 +1605,7 @@ class FromDatabaseNewsegsProjectProvider(
             )
         )
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(clear_statement)
 
         # Trust to .delete_orphan_variables to clean up the variable_config table
@@ -1692,7 +1705,7 @@ class FromDatabaseNewsegsProjectProvider(
             {'project_id': project.id, 'variable_config_id': var_uid}
             for var_uid in project._variables_by_uid.keys()
         ]
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             # Clear existing entries
             conn.execute(
                 self._project_variable_jct.delete()
@@ -1716,7 +1729,7 @@ class FromDatabaseNewsegsProjectProvider(
             }
             for mm in project.metamodels
         ]
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             # Clear existing entries
             conn.execute(
                 self._project_metamodel_jct.delete()
@@ -1804,7 +1817,7 @@ class FromDatabaseNewsegsProjectProvider(
         if model_version:
             stmt = stmt.where(self._table.c.model_version == model_version)
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             odf = pd.read_sql(stmt, conn)
         return odf
 
@@ -1825,7 +1838,7 @@ class FromDatabaseNewsegsProjectProvider(
                 .where(tbls.sessions.c.session_id == session_id)
                 .limit(1)
             )
-            with read_transaction(self._get_engine())as conn:
+            with read_transaction(self._get_engine()) as conn:
                 project_id = conn.execute(stmt).scalar_one_or_none()
                 if project_id:
                     return self.get_component(project_id)
@@ -1857,7 +1870,7 @@ class FromDatabaseNewsegsProjectProvider(
                 .where(tbls.sessions.c.session_id == session_id)
                 .limit(1)
             )
-            with read_transaction(self._get_engine())as conn:
+            with read_transaction(self._get_engine()) as conn:
                 project_id = conn.execute(stmt).scalar_one_or_none()
                 if project_id:
                     # Assert that the project is of the correct type
@@ -1870,7 +1883,7 @@ class FromDatabaseNewsegsProjectProvider(
                         .limit(1)
                     )
                     try:
-                        with read_transaction(self._get_engine())as conn:
+                        with read_transaction(self._get_engine()) as conn:
                             current_proj_type = conn.execute(stmt).scalar_one()
                             if current_proj_type == model_type:
                                 return project_id
@@ -1909,7 +1922,7 @@ class FromDatabaseNewsegsProjectProvider(
         delete_stmt = sa.delete(tbls.sessions).where(tbls.sessions.c.session_id == session_id)
         create_stmt = sa.insert(tbls.sessions).values(dict(session_id = session_id, active_project_id = project_id))
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(delete_stmt)
             conn.execute(create_stmt)
 
@@ -1923,7 +1936,7 @@ class FromDatabaseNewsegsProjectProvider(
             )
             .where(tbls.snapshots.c.project_id == project_id)
         )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             return pd.read_sql(stmt, conn)
 
     def rename_snapshot(
@@ -1937,7 +1950,7 @@ class FromDatabaseNewsegsProjectProvider(
             .values(label = snapshot_name)
         )
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(stmt)
 
     @override
@@ -1950,7 +1963,7 @@ class FromDatabaseNewsegsProjectProvider(
 
         # Delete snapshots straight away
         _ = db_snapshot.delete_snapshots_for_project(
-            self._get_engine(),
+            self._get_engine(writer = True),
             tbls.metadata,
             component_id
         )
@@ -1997,7 +2010,7 @@ class FromDatabaseNewsegsProjectProvider(
 
         mm_ids = []
         child_ids = []
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             mm_ids = [x for x in conn.execute(find_mm_stmt).scalars().all()]
 
             row = conn.execute(get_child_component_id_stmt).fetchone()
@@ -2006,7 +2019,7 @@ class FromDatabaseNewsegsProjectProvider(
 
         _ = self.metamodel_provider.delete_component(mm_ids)
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(del_proj_mm_stmt)
             conn.execute(del_proj_var_stmt)
             conn.execute(del_proj_stmt)
@@ -2027,13 +2040,13 @@ class FromDatabaseNewsegsProjectProvider(
             .where(tbls.variable_configs.c.id.not_in(referenced_variable_ids))
         )
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             result = conn.execute(del_stmt)
             return result.rowcount
 
     def create_project_snapshot(self, project_id: str, snapshot_label: str) -> int:
         snapshot_id = db_snapshot.generic_snapshot_entity(
-            self._get_engine(),
+            self._get_engine(writer = True),
             tbls.metadata,
             'projects',
             project_id,
@@ -2044,7 +2057,7 @@ class FromDatabaseNewsegsProjectProvider(
 
     def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
         id_remap = db_snapshot.generic_restore_snapshot(
-            self._get_engine(),
+            self._get_engine(writer = True),
             tbls.metadata,
             snapshot_id
         )
@@ -2052,7 +2065,7 @@ class FromDatabaseNewsegsProjectProvider(
         return self.get_project(new_project_id)
 
     def delete_project_snapshot(self, project_id: str, snapshot_id: int):
-        db_snapshot.delete_snapshot(self._get_engine(), tbls.metadata, snapshot_id)
+        db_snapshot.delete_snapshot(self._get_engine(writer = True), tbls.metadata, snapshot_id)
 
     @override
     def list_project_metamodel_ids(self, project_id: str) -> tuple[str, ...]:
@@ -2062,7 +2075,7 @@ class FromDatabaseNewsegsProjectProvider(
             .order_by(self._project_metamodel_jct.c.created_order)
         )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             result = list(conn.execute(find_mm_stmt).scalars())
         #result.reverse()
         return tuple(result)
@@ -2073,7 +2086,7 @@ class FromDatabaseNewsegsProjectProvider(
             sa.select(self._table.c.focussed_metamodel_id)
             .where(self._table.c.id == project_id)
         )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             res = conn.execute(stmt).scalar_one()
         return res
 
@@ -2083,7 +2096,7 @@ class FromDatabaseNewsegsProjectProvider(
             .where(self._table.c.id == project_id)
             .values(label=self._table.c.label)
         )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
 USE_DATAVERSION = False
@@ -2114,7 +2127,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
             sa.select(self._table.c.modified_order)
             .where(self._table.c.id == project_id)
         )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             res = conn.execute(stmt).scalar()
             if not res:
                 raise KeyError(f'Project {project_id} not found.')
@@ -2122,18 +2135,21 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
     @override
     def get_project(self, project_id: str) -> NewsegsProject:
-        print(f'FINDING PROJECT {project_id}')
+        logger.debug('Finding Full Project: %s', project_id)
         with self._lock:
             if USE_DATAVERSION:
                 # Check if any writes to db have occurred; if not and project in cache, return immediately
                 existing_dv = self._project_dataversions.get(project_id)
-                with read_transaction(self._get_engine())as conn:
+                with read_transaction(self._get_engine()) as conn:
                     current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
                 
                 if existing_dv is not None and current_dv == existing_dv:
                     proj = self._project_cache.get(project_id)
                     if proj is not None:
-                        print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+                        logger.debug(
+                            'Returning Full Project %s from cache due to unmodified dataversion - revision is %d, table revision is %d',
+                            project_id, proj.revision, proj.table_config.revision
+                        )
                         return proj
 
             # Check the modification status of the project; if equal and project in cache, return from cache.
@@ -2145,16 +2161,18 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 and (new_modkey == self._project_last_accessed[project_id])
             ):
                 proj = self._project_cache[project_id]
-                print(f'RETURNING PROJECT FROM CACHE {project_id} - revision is {proj.revision}, modified is {proj.chain_modified} and table revision is {proj.table_config.revision}')
+                logger.debug(
+                    'Returning Full Project %s from cache due to unmodified revision - revision is %d, table revision is %d',
+                    project_id, proj.revision, proj.table_config.revision
+                )
                 return proj
 
             # Fallback - get project from db, insert into cache.
             proj = super().get_project(project_id)
-            print(f'ADDING PROJECT TO CACHE AFTER LOAD {project_id}')
-            print(get_project_critical_state(proj))
-            if proj.chain_modified:
-                print('Project has been loaded in a modified state')
-            
+            logger.debug(
+                'Adding Full Project %s to cache after database load, stste is: %s',
+                project_id, get_project_critical_state(proj)
+            )
             self._project_last_accessed[project_id] = new_modkey
             if USE_DATAVERSION:
                 self._project_dataversions[project_id] = current_dv
@@ -2174,7 +2192,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
             if USE_DATAVERSION:
                 existing_dvs = [self._lightweight_project_dataversions.get(x) for x in project_id]
-                with read_transaction(self._get_engine())as conn:
+                with read_transaction(self._get_engine()) as conn:
                     current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
 
                 if all(x is not None and x == current_dv for x in existing_dvs):
@@ -2188,13 +2206,16 @@ class CachedFromDatabaseNewsegsProjectProvider(
             rlist = []
             get_list = []
             for id_ in project_id:
-                print(f'FINDING LIGHTWEIGHT PROJECT {id_}')
+                logger.debug('Finding Lightweight Project: %s', id_)
                 found_component = False
                 if id_ in self._lightweight_project_cache:
                     cmpx = self._lightweight_project_cache[id_]
                     if cmpx.revision == revisions[id_]['revision']:
                         rlist.append(cmpx)
-                        print(f'FOUND LIGHTWEIGHT PROJECT {cmpx.id} - revision is {cmpx.revision} and table revision is {cmpx.table_config.revision}')
+                        logger.debug(
+                            'Returning Lightweight Project %s from cache due to unmodified revision - revision is %d, table revision is %d',
+                            id_, cmpx.revision, cmpx.table_config.revision
+                        )
                         found_component = True
                 if not found_component:
                     rlist.append(None)
@@ -2210,8 +2231,10 @@ class CachedFromDatabaseNewsegsProjectProvider(
                         cmpx = components_from_db[jdx]
                         rlist[idx] = cmpx
                         self._lightweight_project_cache[cmpx.id] = cmpx
-                        print(f'ADDING LIGHTWEIGHT PROJECT TO CACHE AFTER LOAD {cmpx.id}')
-                        print(get_project_critical_state(cmpx))
+                        logger.debug(
+                            'Adding Full Project %s to cache after database load, stste is: %s',
+                            id_, get_project_critical_state(cmpx)
+                        )
                         jdx += 1
             else:
                 if USE_DATAVERSION:

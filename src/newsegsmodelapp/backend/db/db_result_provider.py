@@ -1,16 +1,14 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import os
 from pathlib import Path
-import time
 from sqlalchemy.exc import OperationalError
-import sys
 from typing import Any, Callable, Optional, override
 import uuid
 
 from cachetools import LRUCache
-import numpy as np
-import pandas as pd
 import sqlalchemy as sa
-from useful_types import SequenceNotStr
 
 from newsegsmodelapp.backend.db.db import read_transaction, write_transaction, write_with_retries
 from newsegsmodelapp.components.result_file import load_result, save_result
@@ -98,8 +96,20 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         result_details['result_file'] = saved_path
 
         stmt = self._table.insert().values(result_details)
+        if request:
+            logger.info(
+                'Saving Result: Type = %s; Request ID: %d; Process Run = %d; Triggering Run = %d; Attached to component id %s revision %d',
+                result_details['result_type'], request.request_id, request.run_id, request.trigger_run_id,
+                result_details['component_config_id'], result_details['component_config_revision']
+            )
+        else:
+            logger.info(
+                'Saving Result: Type = %s; Attached to component id %s revision %d - no request details provided',
+                result_details['result_type'],
+                result_details['component_config_id'], result_details['component_config_revision']
+            )   
         try:
-            write_with_retries(self._get_engine(), stmt)
+            write_with_retries(self._get_engine(writer = True), stmt)
             success = True
         except OperationalError:
             success = False
@@ -107,8 +117,19 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         if not success:
             raise ValueError(f'Result of {result_details['result_type']} saved to {saved_path}, but not uploaded to database')
 
-        print (f'SAVED RESULT of type {result_details['result_type']} attached to {result_details['component_type']} with id {result_details['component_config_id']}, revision {result_details['component_config_revision']}')
-
+        if request:
+            logger.info(
+                'Result saved: Type = %s; Request ID: %d; Process Run = %d; Triggering Run = %d; Attached to component id %s revision %d',
+                result_details['result_type'], request.request_id, request.run_id, request.trigger_run_id,
+                result_details['component_config_id'], result_details['component_config_revision']
+            )
+        else:
+            logger.info(
+                'Result saved: Type = %s; Attached to component id %s revision %d - no request details provided',
+                result_details['result_type'],
+                result_details['component_config_id'], result_details['component_config_revision']
+            )           
+             
     def duplicate_result(
         self,
         result_type: str,
@@ -153,8 +174,16 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             select_stmt
         )
 
-        with write_transaction(self._get_engine()) as conn:
+        logger.info(
+            'Duplicating result of type %s attached to component %s with revision %d for Run ID %d',
+            result_type, parent_component.id, parent_component.revision, new_run_id
+        )
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(insert_stmt)
+        logger.info(
+            'Successfully duplicated result of type %s attached to component %s with revision %d for Run ID %d',
+            result_type, parent_component.id, parent_component.revision, new_run_id
+        )
 
     @override
     def get_result(
@@ -191,7 +220,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             stmt = stmt.where(self._table.c.component_config_revision == revision)
 
         file_name = None
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             result = conn.execute(stmt)
             for idx, row in enumerate(result):
                 if idx == 0:
@@ -209,7 +238,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         try:
             obj = load_result(Path(file_name))
         except FileNotFoundError:
-            with write_transaction(self._get_engine()) as conn:
+            with write_transaction(self._get_engine(writer = True)) as conn:
                 conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
             return None, None
         
@@ -237,7 +266,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             else:    
                 stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             res = conn.execute(stmt)
         if not res:
             return None, None
@@ -252,7 +281,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         try:
             obj = load_result(Path(file_name))
         except FileNotFoundError:
-            with write_transaction(self._get_engine()) as conn:
+            with write_transaction(self._get_engine(writer = True)) as conn:
                 conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
             return None, None
 
@@ -267,7 +296,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             .where(self._table.c.result_id == result_id)
         )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             row = conn.execute(stmt).fetchone()
         
         if not row:
@@ -319,20 +348,19 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 self._table.c.component_config_revision == parent_component.revision
             )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             result = conn.execute(stmt).fetchall()
 
         for res in result:
             if not os.path.exists(res.result_file):
-                with write_transaction(self._get_engine()) as conn:
+                with write_transaction(self._get_engine(writer = True)) as conn:
                     conn.execute(sa.delete(self._table).where(self._table.c.result_file == res.result_file))
                 continue
             return res.result_id
         
         return False
 
-    
-        
+         
 class CachedFromDatabaseResultProvider(
     FromDatabaseResultProvider
 ):
@@ -358,22 +386,36 @@ class CachedFromDatabaseResultProvider(
                 result_key = (result_type, parent_component.id, parent_component.revision)
             else:
                 result_key = (result_type, parent_component.id, revision)
-        
-        print(f'FINDING RESULT {result_key}')
+
+        logger.debug(
+            'Finding result: Type = %s, Parent = %s, Revision = %s',
+            *result_key
+        )
         if result_key in self._result_cache:
-            print(f'RETURNING RESULT FROM CACHE {result_key}')
+            logger.debug(
+                'Returning result: Type = %s, Parent = %s, Revision = %s from cache',
+                *result_key
+            )
             return self._result_cache[result_key], result_key[2] # pyright: ignore[reportReturnType]
 
-        print(f'RETURNING RESULT FROM STORE {result_key}')
         obj, rrs = super().get_result(
             result_type, parent_component, allow_stale, revision
         )
         if obj is None:
-            print(f'NOT ADDING TO CACHE AS NO RESULT - {result_key}')
+            logger.debug(
+                'Unable to find result: Type = %s, Parent = %s, Revision = %s',
+                *result_key
+            )
         if rrs is None or rrs != result_key[2]:
-            print(f'NOT ADDING TO CACHE AS STALE - {result_key} - available revision is {rrs}')
+            logger.debug(
+                'Returning stale result for: Type = %s, Parent = %s, Revision = %s - provided revision is %d',
+                *result_key, rrs
+            )
         if obj is not None and rrs == result_key[2]:
-            print(f'ADDING TO CACHE - {result_key}')
+            logger.debug(
+                'Returning result: Type = %s, Parent = %s, Revision = %s from store',
+                *result_key
+            )
             self._result_cache[result_key] = obj
         return (obj, rrs) # pyright: ignore[reportReturnType]
 

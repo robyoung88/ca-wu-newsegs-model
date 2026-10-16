@@ -1,15 +1,14 @@
 """NewSEGS model as a multi-page app.
 """
-import sqlite3
 import time
-from typing import Any
-
-from flask import jsonify
-import sqlalchemy as sa
-
-from newsegsmodelapp.backend.db.db import init_db
-from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 t1 = time.time()
+
+# Set up logging
+import logging
+if not logging.getLogger().hasHandlers():
+    import app_logging
+logger = logging.getLogger(__name__)
+
 import json
 import os
 from pathlib import Path
@@ -18,6 +17,9 @@ import uuid
 from dash import ALL, Dash, Input, Output, State, DiskcacheManager, CeleryManager
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
+from flask import jsonify
+import sqlalchemy as sa
+import sqlite3
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -28,6 +30,8 @@ import newsegsmodelframework.register_plugins
 import newsegsmodelapp.register_plugins # MUST be imported
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db import init_db
+from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
 from newsegsmodelapp.components.callbacks.action_callbacks import add_action_callbacks
@@ -51,29 +55,8 @@ AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
-# # if 'REDIS_URL' in os.environ:
-# #     # Use Redis & Celery if REDIS_URL set as an env variable
-# #     from celery import Celery
-# #     celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
-# #     background_callback_manager = CeleryManager(celery_app)
-
-# # else:
-# # Diskcache for non-production apps when developing locally
-# import diskcache
-# cache = diskcache.Cache(settings.get('DISKCACHE_PATH', "./cache"))
-# background_callback_manager = DiskcacheManager(cache)
-
-import threading
-import traceback
-
 t2 = time.time()
-print(f'Imports in {t2-t1}')
-
-def thread_exception_handler(args):
-    print(f"Exception in thread {args.thread.name}: {args.exc_type}")
-    traceback.print_tb(args.exc_traceback)
-
-threading.excepthook = thread_exception_handler
+logger.info('App imports completed in %s', t2 - t1)
 
 # -----------------------------------------------
 # Layout
@@ -155,7 +138,7 @@ def add_display_callbacks(app: NewsegsDash):
     def display_page(pathname, session_id, app_state):
         app_state = json.loads(app_state) if app_state else {}
         current_page = app_state.get('current_page', '')
-        print(pathname, ' ', current_page)
+        logger.info('URL changed to %s, current page is %s', pathname, current_page)
 
         # Will allow for refreshes - if we don't and the page load doesn't complete,
         # content will be permanently blank until we navigate.
@@ -164,6 +147,7 @@ def add_display_callbacks(app: NewsegsDash):
         app_state_hold = app_state.copy()
 
         def return_app_state(app_state):
+            # Do not trigger listeners on app state if it has not actually changed.
             if app_state == app_state_hold:
                 return no_update
             return json.dumps(app_state)
@@ -206,7 +190,7 @@ def add_display_callbacks(app: NewsegsDash):
         try:
             page = registers.get_page(pagename)
         except KeyError as e:
-            print (e)
+            logger.warning('Page not found for %s - KeyError raised', pagename)
 
         if page is None:
             rval[0] = '404'
@@ -235,14 +219,13 @@ def add_display_callbacks(app: NewsegsDash):
             session_id,
             model_type,
         )
-        print (f'Project {proj_id} has been found for session {session_id}')
+        logger.info('Project id "%s" has been found for session id "%s"', proj_id, session_id)
         return proj_id
 
 project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
 results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
 request_handler = FromDatabaseRequestHandler(db.get_engine)
     
-
 # -----------------------------------------------
 # Create App
 # -----------------------------------------------
@@ -251,9 +234,7 @@ def create_app(external_stylesheets = None) -> Dash:
     """
     Create the NewSEGS Dash App
     """
-    print('Creating app')
-    t3 = time.time()
-    print(f'TTS: {t3-t1}')
+    logger.info('Creating App')
 
     if external_stylesheets is None:
         external_stylesheets = BOOTSTRAP_STYLESHEETS
@@ -318,6 +299,9 @@ def create_app(external_stylesheets = None) -> Dash:
     for page in registers.PAGE_REGISTER.values():
         page.attach_callbacks(app)
 
+    t3 = time.time()
+    logger.info('App Time To Start (including imports): %s', t3 - t1)
+
     return app
 
 # -----------------------------------------------
@@ -328,4 +312,3 @@ if __name__ == '__main__':
     init_db()
     app = create_app()
     app.run(host = '0.0.0.0', port = 8050, debug = True, use_reloader = False)
-        

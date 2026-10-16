@@ -1,4 +1,9 @@
 """A worker process for performing background computations."""
+import logging
+import random
+import time
+logger = logging.getLogger(__name__)
+
 import copy
 import pickle
 from sqlalchemy.exc import OperationalError
@@ -25,6 +30,8 @@ from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResu
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
 import newsegsmodelapp.registers as registers
 
+import os
+
 POISON_PILL = b"__STOP__"
 
 def worker_process(
@@ -41,7 +48,8 @@ def worker_process(
 
     print(f'Worker {worker_id} listening on {server}:{port}')
 
-    engine = db.get_engine(db_path)
+    write_engine = db.get_engine(writer = True, db_path = db_path)
+    read_engine = db.get_engine(writer = False, db_path = db_path)
 
     proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
     result_provider = CachedFromDatabaseResultProvider(db.get_engine, RESULTS_STORE)
@@ -62,7 +70,7 @@ def worker_process(
 
                 request = cast(registers.RunRequest, pickle.loads(payload_bytes))
 
-                job_id = generate_claim_ticket(engine, request)
+                job_id = generate_claim_ticket(write_engine, request)
 
                 response_data = {
                     'status': 'started',
@@ -73,6 +81,7 @@ def worker_process(
                 response_bytes = pickle.dumps(response_data)
 
                 retries = 5
+                # TODO: Sort out this mess. What's it to do with the database?
                 
                 while retries > 0:
                     try:
@@ -97,7 +106,11 @@ def worker_process(
                     socket.connect(f'tcp://{server}:{port}')
                     raise ValueError(f'Cannot send claim ticket back to client - database is unresponsive.')
 
-                print(f'Worker {worker_id} starting job {job_id} - {request}')
+                logger.info(
+                    'Worker %d initiating procedure %s for request %d; Run ID is %d, triggering run id is %d',
+                    worker_id, request.request_type, request.request_id,
+                    job_id, request.trigger_run_id
+                )
 
                 try:
                     if job_id is None:
@@ -117,20 +130,23 @@ def worker_process(
 
                     def update_progress(step, total, message):
                         # Update SQLite with the new progress
-                        return update_calculation_progress(engine, job_id, step, total, message)
+                        return update_calculation_progress(write_engine, job_id, step, total, message)
                         
                     def check_cancel_status() -> bool:
                         """Return True if cancel_requested where result_id == job_id."""
                         # Check if supervisor would like worker to terminate.
                         if stop_event is not None and stop_event.is_set():
                             # Set the job to cancelled and then return true
-                            set_cancel_status(engine, job_id)
+                            set_cancel_status(write_engine, job_id)
                             return True
                         else:
-                            return get_cancel_status(engine, job_id)
+                            return get_cancel_status(read_engine, job_id)
 
                     rq = copy.copy(request)
                     rq.run_id = job_id
+
+                    # Hold back to allow the client to mark the job(s) as dispatched
+                    time.sleep(settings.get('WORKER_HOLDBACK_TIME_S', 0.01) + random.random() * settings.get('WORKER_HOLDBACK_JITTER', 0.01) )
                     
                     is_ok = runner(
                         rq,
@@ -141,14 +157,22 @@ def worker_process(
                         check_cancel_status,
                     )
 
-                    # Update the database with the final status and file pointer
-                    set_status_completed(engine, job_id)
-                    print(f"Worker {worker_id} finished Job {job_id} with message {is_ok}. Ready for next request.")
+                    # Update the database marking the run successful
+                    set_status_completed(write_engine, job_id)
+                    logger.info(
+                        'Worker %d completed procedure %s for request %d with message %s; Run ID is %d, triggering run id is %d. Ready for next request.',
+                        worker_id, request.request_type, request.request_id, is_ok,
+                        job_id, request.trigger_run_id
+                    )
 
                 except Exception as e:
-                    set_status_failed(engine, job_id, str(e))
-
-                    print(f"Worker {worker_id} failed Job {job_id}. Error {e}.")
+                    set_status_failed(write_engine, job_id, str(e))
+                    logger.warning(
+                        'Worker %d failed procedure %s for request %d; Run ID is %d, triggering run id is %d.',
+                        worker_id, rq.request_type, rq.request_id,
+                        job_id, rq.trigger_run_id,
+                        exc_info = True
+                    )
             
             except zmq.Again:
                 # Timeout hit (no message in 1 sec). Re-evaluate stop_event loop condition.
@@ -166,6 +190,7 @@ def worker_process(
     
     finally:
         print(f'Worker {worker_id} disposing engine.')
-        engine.dispose()
+        write_engine.dispose()
+        read_engine.dispose()
         socket.close()
         context.term()

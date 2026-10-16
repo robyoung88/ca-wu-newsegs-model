@@ -1,14 +1,17 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from dataclasses import asdict
 import json
 
 import sqlalchemy as sa
 
-from newsegsmodelapp.backend.db.db import write_transaction, write_with_retries
+from newsegsmodelapp.backend.db.db import read_transaction, write_transaction, write_with_retries
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelapp.backend.db import tables as tbls
 
 def generate_claim_ticket(engine: sa.Engine, job: RunRequest) -> int:
-    """Generate a claim ticket in the results table and return result (job) id."""
+    """Generate a claim ticket in the results table and return run (job) id."""
 
     jobval = asdict(job)
     del jobval['run_id']
@@ -28,9 +31,9 @@ def generate_claim_ticket(engine: sa.Engine, job: RunRequest) -> int:
     with write_transaction(engine) as conn:
         result = conn.execute(stmt)
         row = result.fetchone()
-        if row is None:
-            raise ValueError(f'Claim ticket not generated for job {job}')
-        run_id = row[0]
+    if row is None:
+        raise ValueError(f'Claim ticket not generated for job {job}')
+    run_id = row[0]
 
     job.run_id = run_id
     return run_id
@@ -48,6 +51,7 @@ def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, mes
     write_with_retries(engine, stmt, base_sleep = 0.02)
 
 def set_cancel_status(engine: sa.Engine, job_id: int, status: bool = True):
+    logger.info('Setting cancel status to %s for Run ID %d', status, job_id)
     stmt = (
         sa.update(tbls.runs)
         .where(tbls.runs.c.run_id == job_id)
@@ -63,7 +67,7 @@ def get_cancel_status(engine: sa.Engine, job_id: int):
     )
     with read_transaction(engine)as conn:
         result = conn.execute(stmt).fetchone()
-        return bool(result and result[0])
+    return bool(result and result[0])
 
 def set_status_completed(engine: sa.Engine, job_id: int):
     stmt = (

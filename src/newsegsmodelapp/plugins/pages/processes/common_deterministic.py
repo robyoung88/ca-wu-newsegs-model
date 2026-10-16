@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from typing import Callable
 
 from newsegsmodelapp.registers import RunRequest
@@ -5,7 +8,6 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-
 
 def deterministic_run_metamodel(
     mm: NewsegsMetaModel,
@@ -123,31 +125,61 @@ def deterministic_run_metamodel(
     progress_callback(step, total_steps, f'Saving results - config {sequence_number}')
 
     if model_run_from == 'start':
+        logger.info(
+            'Upserting deterministic grid result for metamodel %s and grid component %s, for request %d; Run ID is %d, triggering run id is %d',
+            mm.id, mm.model.grid.id,
+            request.request_id, request.run_id, request.trigger_run_id
+        )
         result_provider.upsert_result(
             'deterministic_grid', mm.model.grid, 
             mm.model.get_grid_result(), request = request
         )
     else:
+        logger.info(
+            'Duplicating deterministic grid result for metamodel %s and grid component %s, for request %d; Run ID is %d, triggering run id is %d',
+            mm.id, mm.model.grid.id,
+            request.request_id, request.run_id, request.trigger_run_id
+        )
         result_provider.duplicate_result(
             'deterministic_grid', mm.model.grid, request,
         )
 
     if model_run_from in ('start', 'grid'):
+        logger.info(
+            'Upserting deterministic generation result for metamodel %s and generation component %s, for request %d; Run ID is %d, triggering run id is %d',
+            mm.id, mm.model.generation.id,
+            request.request_id, request.run_id, request.trigger_run_id
+        )
         result_provider.upsert_result(
             'deterministic_generation', mm.model.generation,
             mm.model.get_generation_result(), request = request
         )
     else:
+        logger.info(
+            'Duplicating deterministic generation result for metamodel %s and generation component %s, for request %d; Run ID is %d, triggering run id is %d',
+            mm.id, mm.model.generation.id,
+            request.request_id, request.run_id, request.trigger_run_id
+        )
         result_provider.duplicate_result(
             'deterministic_generation', mm.model.generation, request
         )
 
     if model_run_from in ('start', 'grid', 'generation'):
+        logger.info(
+            'Upserting deterministic consumption storage result for metamodel %s and consumption storage component %s, for request %d; Run ID is %d, triggering run id is %d',
+            mm.id, mm.model.consumption_storage.id,
+            request.request_id, request.run_id, request.trigger_run_id
+        )
         result_provider.upsert_result(
             'deterministic_consumption_storage', mm.model.consumption_storage, 
             mm.model.get_consumption_storage_result(), request = request
         )
     else:
+        logger.info(
+            'Duplicating deterministic consumption storage result for metamodel %s and consumption storage component %s, for request %d; Run ID is %d, triggering run id is %d',
+            mm.id, mm.model.consumption_storage.id,
+            request.request_id, request.run_id, request.trigger_run_id
+        )
         result_provider.duplicate_result(
             'deterministic_consumption_storage', mm.model.consumption_storage, request
         )

@@ -42,15 +42,16 @@ class TestDatabaseStart(unittest.TestCase):
         from newsegsmodelapp.backend import db
         
         # Create all tables
-        db_tables.create_all_tables(db.get_engine())
+        db_tables.create_all_tables(db.get_engine(writer = True))
         
 
     @classmethod
     def tearDownClass(cls):
         from newsegsmodelapp.backend import db
-                
-        engine = db.get_engine(cls.db_path)
-        engine.dispose()
+
+        for writer in (False, True):
+            engine = db.get_engine(writer = writer, db_path = cls.db_path)
+            engine.dispose()
         
         cls.db_dir.cleanup()
 
@@ -61,8 +62,9 @@ class TestDatabaseStart(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary directory after each test."""
         from newsegsmodelapp.backend import db
-        engine = db.get_engine()
-        engine.dispose()
+        for writer in (False, True):
+            engine = db.get_engine(writer = writer)
+            engine.dispose()
 
         self.temp_dir.cleanup()
 
@@ -196,7 +198,7 @@ class TestDatabaseStart(unittest.TestCase):
         project_id = proj.id
 
         snapshot_id = db_snapshot.generic_snapshot_entity(
-            db.get_engine(),
+            db.get_engine(writer = True),
             tbls.metadata,
             'projects',
             project_id,
@@ -204,7 +206,7 @@ class TestDatabaseStart(unittest.TestCase):
         )
 
         # Check that the snapshot has been created
-        with read_transaction(db.get_engine())as conn:
+        with read_transaction(db.get_engine()) as conn:
            
             result = conn.execute(
                 tbls.snapshot_projects.select()
@@ -276,7 +278,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         # Restore the snapshot
         new_ids = db_snapshot.generic_restore_snapshot(
-            db.get_engine(),
+            db.get_engine(writer = True),
             tbls.metadata,
             snapshot_id
         )
@@ -873,7 +875,7 @@ class TestDatabaseStart(unittest.TestCase):
         
         proj = PROJECT_FACTORIES['sprake']()
         proj_provider.add_component(proj)
-        with read_transaction(db.get_engine())as conn:
+        with read_transaction(db.get_engine()) as conn:
 
             init_values = tuple(conn.execute(
                 sa.select(
@@ -889,7 +891,7 @@ class TestDatabaseStart(unittest.TestCase):
         time.sleep(2)
         proj.revision += 1
         proj_provider.upsert_component(proj)
-        with read_transaction(db.get_engine())as conn:
+        with read_transaction(db.get_engine()) as conn:
         
             updated_values = tuple(conn.execute(
                 sa.select(
@@ -964,7 +966,7 @@ class TestDatabaseStart(unittest.TestCase):
         proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
         result_provider = FromDatabaseResultProvider(db.get_engine, self.test_dir)
 
-        engine = db.get_engine()
+        engine = db.get_engine(writer = True)
 
         proj = PROJECT_FACTORIES['sprake']()
 
@@ -1194,7 +1196,7 @@ class TestDatabaseStart(unittest.TestCase):
         proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
         result_provider = CachedFromDatabaseResultProvider(db.get_engine, self.test_dir)
 
-        engine = db.get_engine()
+        write_engine = db.get_engine(writer = True)
 
         proj = PROJECT_FACTORIES['sprake']()
 
@@ -1239,7 +1241,7 @@ class TestDatabaseStart(unittest.TestCase):
             request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
             request = request_creator(proj.id, proj_provider)
             
-            run_id = generate_claim_ticket(engine, request)
+            run_id = generate_claim_ticket(write_engine, request)
 
             request.run_id = run_id
             
@@ -1299,7 +1301,7 @@ class TestDatabaseStart(unittest.TestCase):
 
                 procedure = registers.get_postprocess_procedure(procedure_name, new_req)
 
-                pp_run_id = generate_claim_ticket(engine, new_req)
+                pp_run_id = generate_claim_ticket(write_engine, new_req)
                 new_req.run_id = pp_run_id
 
                 is_ok = procedure(
@@ -1349,7 +1351,7 @@ class TestDatabaseStart(unittest.TestCase):
 
                     op_procedure = registers.get_table_draw(op_proc_name, op_req)
 
-                    op_run_id = generate_claim_ticket(engine, op_req)
+                    op_run_id = generate_claim_ticket(write_engine, op_req)
                     op_req.run_id = op_run_id
 
                     is_ok = op_procedure(

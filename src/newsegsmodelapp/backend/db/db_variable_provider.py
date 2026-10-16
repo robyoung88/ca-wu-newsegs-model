@@ -368,7 +368,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 self._table.select()
                 .where(self._table.c.id.in_(instance_id))
             )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall() # Fetch to avoid leaving the connection open
         
         reconstructed_vars = [self._reconstruct_variable(row) for row in rows]
@@ -396,7 +396,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 )
                 .where(self._table.c.id.in_(instance_id))
             )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall() # Fetch to avoid leaving the connection open
         
         reconstructed_vars = [self._reconstruct_lightweight_variable(row) for row in rows]
@@ -422,7 +422,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 sa.select(*self._full_lightweight_variable_columns)
                 .where(self._table.c.id.in_(instance_id))
             )
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall() # Fetch to avoid leaving the connection open
         
         reconstructed_vars = [self._reconstruct_full_lightweight_variable(row) for row in rows]
@@ -438,7 +438,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             .where(self._table.c.varid == variable_id)
         )
 
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall()
 
         if not rows:
@@ -453,7 +453,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         v2.id = v2.generate_new_id()
         vardata = variable_to_raw_table_data(v2)
         stmt = (tbls.variable_configs.insert().values(vardata))
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(stmt)
 
         return v2
@@ -461,7 +461,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
     def add_variable(self, var: Variable) -> str:
         vardata = variable_to_raw_table_data(var)
         stmt = (tbls.variable_configs.insert().values(vardata))
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             res = conn.execute(stmt)
 
         if res is None:
@@ -471,7 +471,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 
     def get_varids(self) -> tuple[str, ...]:
         stmt = sa.select(tbls.variable_configs.c.varid).distinct()
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             varids = conn.scalars(stmt)
         return tuple(varids)
 
@@ -498,8 +498,8 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 )
                 .where(tbls.variable_configs.c.id.in_(uids))
             )
-        engine = self._get_engine()
-        with read_transaction(engine)as conn:
+        
+        with read_transaction(self._get_engine()) as conn:
             rows = conn.execute(stmt).fetchall()
 
         saved_revisions = {x.id: x.revision for x in rows}
@@ -539,7 +539,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 
         while True:
             try:
-                with write_transaction(engine) as conn:
+                with write_transaction(self._get_engine(writer = True)) as conn:
                     if update_payload:
                         update_stmt = sa.update(self._table).where(self._table.c.id == sa.bindparam('b_id'))
                         conn.execute(update_stmt, update_payload)
@@ -574,7 +574,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             self._table.delete()
             .where(self._table.c.id.in_(variable_id))
         )
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             result = conn.execute(del_stmt)
             return [str(result.rowcount)]
 
@@ -612,7 +612,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 
         fetch_cols = list({pk_col, *select_cols})
         stmt = sa.select(*fetch_cols).where(pk_col.in_(instance_id))
-        with read_transaction(self._get_engine())as conn:
+        with read_transaction(self._get_engine()) as conn:
             results = conn.execute(stmt).mappings().all()
 
         mapped_data = {
@@ -649,7 +649,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
                 **{update_col.name: metadata_value})
         )
 
-        with write_transaction(self._get_engine()) as conn:
+        with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(stmt)
 
         return

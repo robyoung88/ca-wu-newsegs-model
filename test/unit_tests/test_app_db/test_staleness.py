@@ -24,14 +24,15 @@ class TestStalenessUpdates(unittest.TestCase):
         from newsegsmodelapp.backend import db
         
         # Create all tables
-        db_tables.create_all_tables(db.get_engine())
+        db_tables.create_all_tables(db.get_engine(writer = True))
 
     @classmethod
     def tearDownClass(cls):
         from newsegsmodelapp.backend import db
-        
-        engine = db.get_engine(cls.db_path)
-        engine.dispose()
+
+        for writer in (True, False):
+            engine = db.get_engine(writer = writer, db_path = cls.db_path)
+            engine.dispose()
 
         cls.db_dir.cleanup()
 
@@ -42,8 +43,9 @@ class TestStalenessUpdates(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary directory after each test."""
         from newsegsmodelapp.backend import db
-        engine = db.get_engine()
-        engine.dispose()
+        for writer in (True, False):
+            engine = db.get_engine(writer = writer)
+            engine.dispose()
         self.temp_dir.cleanup()
 
     @staticmethod

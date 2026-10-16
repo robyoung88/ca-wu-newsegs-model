@@ -1,4 +1,7 @@
 """Registers and associated for the various dispatch functions"""
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 from dataclasses import asdict, dataclass, field
 import json
@@ -275,11 +278,22 @@ def register_run_procedure(
     def decorated(func):
         if name in RUN_PROCEDURE_REGISTER:
             raise KeyError(f'A run procedure already exists for key {name}')
-        RUN_PROCEDURE_REGISTER[name] = func
+        def wrapped(request: RunRequest, *args, **kwargs):
+            logger.info(
+                'Run procedure %s for request %d initiated - Run ID: %d, Triggering Run: %d, Project: %s', 
+                name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
+            )
+            rval = func(request, *args, **kwargs)
+            logger.info(
+                'Run procedure %s for request %d completed with message %s - Run ID: %d, Triggering Run: %d, Project: %s', 
+                name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
+            )
+            return rval
+        RUN_PROCEDURE_REGISTER[name] = wrapped
         for trig in triggers:
             pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
             pa.run_procedures.add(name)
-        return func
+        return wrapped
     return decorated
 
 # -------------------------------------------------------------------------

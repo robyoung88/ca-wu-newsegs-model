@@ -36,63 +36,41 @@ class DependentObjectsExistError(ValueError):
     """Raised when attempting to delete a component that still has dependent children."""
     pass
 
-_engine: sa.Engine|None = None
-_connected_db_path: str | None = None
-def get_engine(db_path: str | Path | None = None):
+_engines: dict[tuple, sa.Engine] = {}
+
+def _make_engine(db_path: str, *, writer: bool) -> sa.Engine:
+    engine = sa.create_engine(
+        f"sqlite+pysqlite:///{db_path}",
+        connect_args={"timeout": 30.0},
+        pool_size=1 if writer else 10,
+        max_overflow=0 if writer else 10,
+        pool_timeout=30,
+    )
+
+    @event.listens_for(engine, "connect")
+    def on_connect(dbapi_conn, _):
+        dbapi_conn.isolation_level = None          # we control BEGIN ourselves
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=30000")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        if not writer:
+            cur.execute("PRAGMA query_only=ON")    # readers can never write
+        cur.close()
+
+    @event.listens_for(engine, "begin")
+    def on_begin(conn):
+        conn.exec_driver_sql("BEGIN IMMEDIATE" if writer else "BEGIN")
+
+    return engine
+
+def get_engine(*, writer: bool = False, db_path: str | Path | None = None):
     """Get the sqlalchemy engine for the database."""
-    global _engine
-    global _connected_db_path
-
-    db_path = str(settings['DB_PATH']) if db_path is None else db_path
-
-    if _engine is None or (_connected_db_path is not None and _connected_db_path != db_path):
-        engine_url = f'sqlite+pysqlite:///{db_path}'
-        print(f'Creating engine: {engine_url}')
-        _engine = sa.create_engine(
-            engine_url,
-            echo = False,
-            connect_args = {"timeout": 30.0},
-            pool_size = 20,
-            max_overflow = 30,
-            pool_timeout = 30,
-            pool_use_lifo = True,
-        )
-        _connected_db_path = str(db_path)
-
-        # Enable WAL mode for concurrent multi-process access across containers
-        @event.listens_for(_engine, 'connect')
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            # 1. Save the previous isolation level
-            old_isolation = dbapi_connection.isolation_level
-
-            # 2. Set isolation_level to None (autocommit) to execute PRAGMAs outside a transaction
-            dbapi_connection.isolation_level = None
-
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL;")
-            cursor.execute("PRAGMA busy_timeout=30000;")
-            cursor.execute("PRAGMA synchronous = NORMAL;")
-            cursor.close()
-
-            # 4. Restore the original isolation level for SQLAlchemy transaction management
-            dbapi_connection.isolation_level = old_isolation
-
-        checkout_times = {}
-
-        @event.listens_for(_engine, "checkout")
-        def on_checkout(dbapi_connection, connection_record, connection_proxy):
-            checkout_times[id(dbapi_connection)] = time.time()
-
-        @event.listens_for(_engine, "checkin")
-        def on_checkin(dbapi_connection, connection_record):
-            start_time = checkout_times.pop(id(dbapi_connection), None)
-            if start_time:
-                duration = time.time() - start_time
-                if duration > 3.0:  # Threshold in seconds
-                    print(f"WARNING: Connection held for {duration:.2f} seconds")
-
-    return _engine
-
+    db_path = str(db_path or settings['DB_PATH'])
+    key = (os.getpid(), writer, db_path)           # fork-safe
+    if key not in _engines:
+        _engines[key] = _make_engine(db_path, writer=writer)
+    return _engines[key]
 
 
 def retrieve_latest_backup(
@@ -177,25 +155,17 @@ def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
         case _:
             run_migrations()
 
-# Shared lock file for cross-process synchronization
-LOCKFILE = Path(settings.get('DB_PATH')).parent / 'app_sqlite_write.lock'
-write_lock = fasteners.InterProcessLock(LOCKFILE)
-_write_thread_lock = threading.Lock()
-
 @contextmanager
-def write_transaction(engine: sa.Engine) -> Generator[sa.Connection, None, None]:
+def write_transaction(engine: Optional[sa.Engine] = None) -> Generator[sa.Connection, None, None]:
     """Run a SQLite write transaction while holding the cross-process lock."""
-    with _write_thread_lock:
-        with write_lock:
-            with engine.begin() as conn:
-                conn.exec_driver_sql("BEGIN IMMEDIATE")
-                yield conn
+    engine = engine or get_engine(writer = True)
+    with engine.begin() as conn:
+        yield conn
 
 @contextmanager
-def read_transaction(engine: sa.Engine) -> Generator[sa.Connection, None, None]:
+def read_transaction(engine: Optional[sa.Engine] = None) -> Generator[sa.Connection, None, None]:
     """Run a SQLite read transaction while holding the cross-process lock."""
-    #with _write_thread_lock:
-    #    with write_lock:
+    engine = engine or get_engine()
     with engine.connect() as conn:
         yield conn
 
@@ -218,7 +188,7 @@ def write_with_retries(
                     conn.execute(stmt)
                 else:
                     conn.execute(stmt, parameters)
-            logger.info("Successfully completed database write.")
+            logger.debug("Successfully completed database write.")
             return True
         except (OperationalError, DBAPIError) as e:
             # Check if it's actually a lock or timeout error
