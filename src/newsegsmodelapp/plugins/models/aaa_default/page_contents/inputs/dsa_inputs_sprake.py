@@ -1,5 +1,7 @@
 
 """Register input container and input header container content creators for dsa supersection"""
+import logging
+logger = logging.getLogger(__name__)
 
 from typing import cast
 
@@ -23,6 +25,7 @@ def _(
     proj_provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
     provider = cast(FromDatabaseNewsegsProjectProvider, proj_provider)
+    logger.debug('Getting lightweight project - Creating DSA Input Container contents')
     lproj = provider.get_lightweight_project(proj_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     return generic_create_dsa_input_container_contents(

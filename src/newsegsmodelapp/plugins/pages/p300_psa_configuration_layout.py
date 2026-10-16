@@ -1,6 +1,8 @@
 """
 Functions for creating a probabilistic sensitivity analysis layout
 """
+import logging
+logger = logging.getLogger(__name__)
 
 import base64
 from dataclasses import asdict, dataclass
@@ -455,7 +457,9 @@ def add_psa_run_callbacks(app: NewsegsDash):
                                             proj.set_focussed_metamodel(mm_new.id)
                                             app.project_provider.upsert_component(proj)
                                     except ValueError as e:
-                                        print(e)
+                                        logger.exception(
+                                            'Exception whilst uploading PSA results.', exc_info = True
+                                        )
                                         continue
                         
                         if mm_new:
@@ -472,12 +476,16 @@ def add_psa_run_callbacks(app: NewsegsDash):
                             case 'xlsx':
                                 result_df = pd.read_excel(results_file)
         except Exception as e:
-            print(e)
+            logger.exception(
+                'Exception whilst uploading PSA results.', exc_info = True
+            )
             return rval
         
         if result_df is None:
             # Should never be reached
-            print('No results in archive, but initial results file check has passed')
+            logger.exception(
+                'No results in uploaded PSA archive, but initial results file check passed.'
+            )
             return rval
         
         # Set the result_df as appropriate for a psa result and trigger post-processing

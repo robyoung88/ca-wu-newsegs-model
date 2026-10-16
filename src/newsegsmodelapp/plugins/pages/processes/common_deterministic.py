@@ -126,7 +126,7 @@ def deterministic_run_metamodel(
 
     if model_run_from == 'start':
         logger.info(
-            'Upserting deterministic grid result for metamodel %s and grid component %s, for request %d; Run ID is %d, triggering run id is %d',
+            'Upserting deterministic grid result for Metamodel ID = %s; and Grid ID = %s; for Request ID = %d; Run ID = %d; Triggering Run ID = %d;',
             mm.id, mm.model.grid.id,
             request.request_id, request.run_id, request.trigger_run_id
         )
@@ -136,7 +136,7 @@ def deterministic_run_metamodel(
         )
     else:
         logger.info(
-            'Duplicating deterministic grid result for metamodel %s and grid component %s, for request %d; Run ID is %d, triggering run id is %d',
+            'Duplicating deterministic grid result for Metamodel ID = %s; and Grid ID = %s, for Request ID = %d; Run ID = %d, Triggering Run ID = %d;',
             mm.id, mm.model.grid.id,
             request.request_id, request.run_id, request.trigger_run_id
         )
@@ -146,7 +146,7 @@ def deterministic_run_metamodel(
 
     if model_run_from in ('start', 'grid'):
         logger.info(
-            'Upserting deterministic generation result for metamodel %s and generation component %s, for request %d; Run ID is %d, triggering run id is %d',
+            'Upserting deterministic generation result for Metamodel ID = %s; and Generation ID = %s, for Request ID = %d; Run ID = %d, Triggering Run ID = %d;',
             mm.id, mm.model.generation.id,
             request.request_id, request.run_id, request.trigger_run_id
         )
@@ -156,7 +156,7 @@ def deterministic_run_metamodel(
         )
     else:
         logger.info(
-            'Duplicating deterministic generation result for metamodel %s and generation component %s, for request %d; Run ID is %d, triggering run id is %d',
+            'Duplicating deterministic generation result for Metamodel ID = %s; and Generation ID = %s, for Request ID = %d; Run ID = %d, Triggering Run ID = %d;',
             mm.id, mm.model.generation.id,
             request.request_id, request.run_id, request.trigger_run_id
         )
@@ -166,7 +166,7 @@ def deterministic_run_metamodel(
 
     if model_run_from in ('start', 'grid', 'generation'):
         logger.info(
-            'Upserting deterministic consumption storage result for metamodel %s and consumption storage component %s, for request %d; Run ID is %d, triggering run id is %d',
+            'Upserting deterministic consumption storage result for Metamodel ID = %s; and Consumption_Storage ID = %s, for Request ID = %d; Run ID = %d, Triggering Run ID = %d;',
             mm.id, mm.model.consumption_storage.id,
             request.request_id, request.run_id, request.trigger_run_id
         )
@@ -176,7 +176,7 @@ def deterministic_run_metamodel(
         )
     else:
         logger.info(
-            'Duplicating deterministic consumption storage result for metamodel %s and consumption storage component %s, for request %d; Run ID is %d, triggering run id is %d',
+            'Duplicating deterministic consumption storage result for Metamodel ID = %s; and Consumption_Storage ID = %s, for Request ID = %d; Run ID = %d, Triggering Run ID = %d;',
             mm.id, mm.model.consumption_storage.id,
             request.request_id, request.run_id, request.trigger_run_id
         )

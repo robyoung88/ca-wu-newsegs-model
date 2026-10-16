@@ -19,17 +19,22 @@ LOGGING_CONFIG = {
         },
     },
     "root": {
-        "level": "INFO", # Up this to "DEBUG" for more detail
+        "level": "INFO",
         "handlers": ["console"],
     },
     "loggers": {
+        "newsegsmodelapp": {
+            "level": "DEBUG",
+            "handlers": ["console"],
+            "propagate": False,
+        },
         # Control verbosity for database engines without cluttering stdout
         # Ensure that you gate this inside alembic/env.py using
         # if config.config_file_name and not logging.getLogger().hasHandlers():
         #     fileConfig(config.config_file_name)
         "sqlalchemy.engine": {
             "level": "WARNING",
-            #"handlers": ["console"],
+            #,
             "propagate": True,
         },
         "sqlalchemy.pool": {

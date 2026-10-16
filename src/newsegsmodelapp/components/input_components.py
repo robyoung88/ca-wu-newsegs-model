@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 import time
 from typing import Any, Optional, cast
@@ -126,6 +129,7 @@ def update_single_parameter(
     update_variable_keys = {k: v for k,v in variable_keys.items() if k in {'parameter_index', 'vector_location'}}
     
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Updating a single parameter')
     lproj = provider.get_lightweight_project(active_project_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
@@ -231,6 +235,7 @@ def _reset_value(
         raise PreventUpdate
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Resetting a variable')
     lproj = provider.get_lightweight_project(active_project_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
@@ -294,6 +299,7 @@ def _set_default_value(
         raise PreventUpdate
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug("Getting lightweight project - Setting a variable's default value")
     lproj = provider.get_lightweight_project(active_project_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
@@ -419,7 +425,6 @@ def _toggle_variable_sharing(
     varid = make_varid(**triggered_id)
 
     groups = get_metamodel_groups_for_var(lproj, varid)
-    print(varid, ' ' , groups)
     if not groups or len(groups) < 1 or (len(groups) == 1 and len(groups[0]) <= 1):
         return return_dict
     
@@ -427,7 +432,6 @@ def _toggle_variable_sharing(
     
     # Locate current group index
     current_group_idx = next(i for i, g in enumerate(groups) if current_mm_idx in g)
-    print(current_group_idx)
 
     vars_to_delete = []
     if len(groups[current_group_idx]) == 1:
@@ -525,6 +529,7 @@ def _set_variable_optim_active(
         raise PreventUpdate
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug("Getting lightweight project - Toggling a variable's activation status for optimisation")
     lproj = provider.get_lightweight_project(active_project_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 

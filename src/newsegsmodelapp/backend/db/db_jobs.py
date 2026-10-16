@@ -40,6 +40,10 @@ def generate_claim_ticket(engine: sa.Engine, job: RunRequest) -> int:
 
 def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, message):
     """Pass progress information into the database."""
+    logger.debug(
+        'Updating Run Progress: Run ID = %d; Step = %s; Total = %s; Message = %s',
+        job_id, step, total, message
+    )
     stmt = (
         sa.update(tbls.runs)
         .values(
@@ -51,7 +55,7 @@ def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, mes
     write_with_retries(engine, stmt, base_sleep = 0.02)
 
 def set_cancel_status(engine: sa.Engine, job_id: int, status: bool = True):
-    logger.info('Setting cancel status to %s for Run ID %d', status, job_id)
+    logger.info('Setting Cancel Status to %s: Run ID = %d;', status, job_id)
     stmt = (
         sa.update(tbls.runs)
         .where(tbls.runs.c.run_id == job_id)
@@ -70,6 +74,7 @@ def get_cancel_status(engine: sa.Engine, job_id: int):
     return bool(result and result[0])
 
 def set_status_completed(engine: sa.Engine, job_id: int):
+    logger.debug('Setting Run Status to "SUCCESS": Run ID = %d;', job_id)
     stmt = (
         sa.update(tbls.runs)
         .values(
@@ -82,6 +87,7 @@ def set_status_completed(engine: sa.Engine, job_id: int):
     write_with_retries(engine, stmt)
 
 def set_status_failed(engine: sa.Engine, job_id: int, message: str | None):
+    logger.debug('Setting Run Status to "FAILED": Run ID = %d; Message = %s', job_id, message)
     update_vals = dict(
         status = 'FAILED',
         progress = 0.0

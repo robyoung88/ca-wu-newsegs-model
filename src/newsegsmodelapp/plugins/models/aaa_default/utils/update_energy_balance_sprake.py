@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from functools import partial
 import json
 from typing import cast
@@ -110,6 +113,7 @@ def _(
     project_provider: NewsegsProjectProviderInterface,
     eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
 ):
+    logger.debug('Getting lightweight project - Updating estimated annual energy')
     lmm = get_focussed_lightweight_metamodel(project_id, project_provider)
     if not eb:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
@@ -133,6 +137,7 @@ def _(
     project_provider: NewsegsProjectProviderInterface,
     eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
 ):
+    logger.debug('Getting lightweight project - Updating estimated maximum daily energy')
     lmm = get_focussed_lightweight_metamodel(project_id, project_provider)
     if not eb:
         eb = energy_balance_estimation.EstimatedEnergyBalance()

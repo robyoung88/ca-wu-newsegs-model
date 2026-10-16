@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from dataclasses import asdict
 import json
 from typing import Callable, cast
@@ -79,6 +82,7 @@ def _make_generation_tables_sprake(
     result_type = 'postproc_generation'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res, stale = get_result_list(result_type, lproj, result_provider, True)
@@ -165,6 +169,7 @@ def _make_consumption_tables_sprake(
     result_type = 'postproc_consumption'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res, stale = get_result_list(result_type, lproj, result_provider, True)
@@ -229,6 +234,7 @@ def _make_storage_tables_sprake(
     result_type = 'postproc_storage'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res,stale = get_result_list(result_type, lproj, result_provider, True)
@@ -273,6 +279,7 @@ def _make_net_tables_sprake(
     result_type = 'postproc_net'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res, stale = get_result_list(result_type, lproj, result_provider, True)
@@ -337,6 +344,7 @@ def _make_finance_tables_sprake(
 ) -> str:
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_finance')
     lproj = provider.get_lightweight_project(request.project_id)
 
     if request.trigger_run_id != request.run_id:
@@ -565,6 +573,7 @@ def _make_dsa_tables_sprake(
 ) -> str:
     
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_dsa_metamodel')
     lproj = provider.get_lightweight_project(request.project_id)
             
     run_config = json.loads(request.payload)
@@ -632,6 +641,7 @@ def _get_dsa_metamodel_table(
     subindex = table_options['subindex']
 
     lproj = project_provider.get_lightweight_project(active_project_id)
+    logger.debug('Getting lightweight project - Table Getter [%s]', 'table_dsa_metamodel')
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
     match int(subindex):
@@ -734,6 +744,7 @@ def _plot_marginal_optim(
     result_provider: NewsegsResultProviderInterface
 ):
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Table Getter [%s]', 'table_optim_metamodel')
     lproj = provider.get_lightweight_project(active_project_id)
     fig, rev = result_provider.get_result(
         'plot_marginal_optim', lproj.table_config,
@@ -754,6 +765,7 @@ def _make_postopt_tables_sprake(
 ) -> str:
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_postopt_metamodel')
     lproj = provider.get_lightweight_project(request.project_id)
     
     optdict, _ = result_provider.get_result(
@@ -800,6 +812,7 @@ def _make_psa_tables_sprake(
 ) -> str:
     
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_psa_metamodel')
     lproj = provider.get_lightweight_project(request.project_id)
             
     run_config = json.loads(request.payload)
@@ -883,6 +896,7 @@ def _get_psa_metamodel_table(
     subindex = table_options['subindex']
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Table Getter [%s]', 'table_psa_metamodel')
     lproj = provider.get_lightweight_project(active_project_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     match int(subindex):

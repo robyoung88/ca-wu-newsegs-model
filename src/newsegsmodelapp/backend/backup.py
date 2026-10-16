@@ -1,4 +1,7 @@
 """A scheduled backup service"""
+import logging
+logger = logging.getLogger(__name__)
+
 import sqlite3
 import time
 import os
@@ -33,9 +36,9 @@ def cleanup_old_backups(
             if os.path.getmtime(file) < (now - cutoff_seconds):
                 try:
                     os.remove(file)
-                    print(f'[{datetime.now()}] Pruned old backup: {file.name}')
+                    logger.info('Pruned old backup: %s', file.name)
                 except Exception as e:
-                    print(f'Failed to delete {file.name}: {e}')
+                    logger.warning('Failed to delete old backup: %s', file.name, exc_info = True)
 
 def backup_now(
     db_path: str | Path = DB_PATH,
@@ -56,7 +59,7 @@ def backup_now(
         with sqlite3.connect(db_path) as source:
             with sqlite3.connect(backup_file_path) as dest:
                 source.backup(dest)
-        print(f"[{datetime.now()}] Backup complete: {backup_file_path}")
+        logger.info('Database backed up to: %s', backup_file_path)
 
     except Exception as e:
-        print(f"[{datetime.now()}] CRITICAL ERROR during backup cycle: {e}")
+        logger.error('CRITICAL ERROR during database backup: ', exc_info = True)

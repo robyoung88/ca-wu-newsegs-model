@@ -1,6 +1,8 @@
 """
 Callbacks to populate input containers when the project or active metamodel changes.
 """
+import logging
+logger = logging.getLogger(__name__)
 
 import json
 import time
@@ -85,10 +87,13 @@ def add_input_container_callbacks(app: NewsegsDash):
                 input_supersection, input_section, model_type
             )
         except KeyError as e:
-            print('Content creator not found for ', str(container_id))
-            print(e)
+            logger.exception('Input Container content creator not found for Container ID: %s', container_id)
             return []
 
+        logger.debug(
+            'Creating Input Container contents using creator found for %s.%s.%s',
+            input_supersection, input_section, model_type
+        )
         return content_creator(active_project_id, app.project_provider)
 
     @app.callback(
@@ -111,8 +116,13 @@ def add_input_container_callbacks(app: NewsegsDash):
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
 
         lproj = provider.get_lightweight_project(active_project_id)
+        logger.debug('Getting lightweight project - Creating Generic Text Field contents')
         lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
 
+        logger.debug(
+            'Creating Generic Text Field values based on Project ID: %s; with Focussed Metamodel ID: %s; (MM index: %d);',
+            lproj.id, lmm.id, lproj.focussed_metamodel_index,
+        )
         text_values = _create_text_field_values(lproj, lmm, generic_text_ids)
 
         return text_values
@@ -157,22 +167,23 @@ def add_input_container_callbacks(app: NewsegsDash):
         if not supersection or not section:
             raise PreventUpdate
 
-        def _not_found(msg = None):
-            print('Header creator not found for ', str(container_id))
-            if msg:
-                print(msg)
+        def _not_found():
+            logger.exception('Input Section Header content creator not found for Container ID: %s', container_id)
             return []
         
         try:
             content_creator = get_input_section_header_content_creator(
                 supersection, section, model_type
             )
+            if content_creator is None:
+                return _not_found()
         except KeyError as e:
-            return _not_found(e)
-
-        if content_creator is None:
             return _not_found()
-        
+
+        logger.debug(
+            'Creating Input Section Header contents using creator found for %s.%s.%s',
+            supersection, section, model_type
+        )
         return content_creator(active_project_id, app.project_provider)
 
     @app.callback(
@@ -288,12 +299,6 @@ def add_input_container_callbacks(app: NewsegsDash):
         app_state,
         **kwargs
     ):
-        
-        print('Triggering object was ', ctx.triggered_id, type(ctx.triggered_id))
-        print('Header ids are ', header_ids)
-        print('Trigger ids are ', trigger_ids)
-        print('Updated value is ', callback_utils.get_triggered_value())
-
         # Primary dispatch is on the purpose of the input
         trigger_id = ctx.triggered_id
         if trigger_id is None or active_project_id is None:
@@ -302,14 +307,21 @@ def add_input_container_callbacks(app: NewsegsDash):
         rval = callback_utils.create_noupdate_return()
 
         now = time.time_ns()
+
+        logger.debug(
+            'Input change has triggered "react_to_input_change". Triggering object was %s and updated value is %s',
+            ctx.triggered_id, callback_utils.get_triggered_value()
+        )
         
         match trigger_id['purpose']:
             case 'bound-lower' | 'bound-upper' | 'plot-intervals':
                 match trigger_id['supersection']:
                     case 'dsa':
+                        logger.debug('Input change being handled as dsa bounds value change.')
                         new_val = callback_utils.get_triggered_value()
 
                         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                        logger.debug('Getting lightweight project - Handling DSA bounds value change')
                         lproj = provider.get_lightweight_project(active_project_id)
                         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                         varid =  make_varid(**trigger_id)
@@ -355,9 +367,11 @@ def add_input_container_callbacks(app: NewsegsDash):
                             )
 
                     case 'optim':
+                        logger.debug('Input change being handled as optim bounds value or plot resolution change.')
                         new_val = callback_utils.get_triggered_value()
 
                         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                        logger.debug('Getting lightweight project - Handling optim bounds value change')
                         lproj = provider.get_lightweight_project(active_project_id)
 
                         dsa_config = provider._component_provider.get_component(lproj.table_config.id)
@@ -378,9 +392,11 @@ def add_input_container_callbacks(app: NewsegsDash):
                         provider.invalidate_cache_for_component(lproj.id)
                         
             case 'dsaboundtype':
+                logger.debug('Input change being handled as dsa bounds type change.')
                 new_val = callback_utils.get_triggered_value()
 
                 provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                logger.debug('Getting lightweight project - Handling DSA bounds type change')
                 lproj = provider.get_lightweight_project(active_project_id)
                 lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 varid =  make_varid(**trigger_id)
@@ -434,8 +450,10 @@ def add_input_container_callbacks(app: NewsegsDash):
                 )
 
             case 'dsa-active':
+                logger.debug('Input change being handled as dsa active toggle change.')
                 new_val = callback_utils.get_triggered_value()
                 provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                logger.debug('Getting lightweight project - Handling DSA active status change')
                 lproj = provider.get_lightweight_project(active_project_id)
                 lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 varid =  make_varid(**trigger_id)
@@ -470,9 +488,13 @@ def add_input_container_callbacks(app: NewsegsDash):
                 try:
                     handler = get_input_handler(trigger_id['purpose'], trigger_id['type'], json.loads(app_state).get('model_type', 'default'))
                 except KeyError:
-                    print(f'No handlers for purpose {trigger_id["purpose"]}')
+                    logger.exception('No input handlers found for purpose: %s', trigger_id['purpose'])
                     raise PreventUpdate
                 if handler:
+                    logger.debug(
+                        'Input change being handled by input handler registered to purpose: %s; and type: %s; for model type: %s;',
+                        trigger_id['purpose'], trigger_id['type'], json.loads(app_state).get('model_type', 'default')
+                    )
                     return handler(
                         trigger_id,
                         input_ids,
@@ -484,7 +506,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                         return_dict = rval
                     )
                 else:
-                    print(f'No handlers for purpose {trigger_id["purpose"]}')
+                    logger.exception('No input handlers found for purpose: %s', trigger_id['purpose'])
                     raise PreventUpdate
 
         return rval
@@ -533,6 +555,7 @@ def add_input_container_callbacks(app: NewsegsDash):
             raise PreventUpdate
         
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Handling DSA Input Group update')
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         varprovider = cast(CachedFromDatabaseVariableProvider, app.project_provider.variable_provider)
@@ -548,6 +571,14 @@ def add_input_container_callbacks(app: NewsegsDash):
             cn = 'dsa-input-single-value-block'
         else:
             cn = 'dsa-input-single-value-block deselected'
+
+        logger.debug(
+            """
+            Reacting to an Input Group Configuration Update Trigger for a DSA input container. 
+            Affected container ids are: %s.
+            """,
+            container_ids
+        )
 
         return (
             [bounds_input] * len(container_ids),
@@ -591,6 +622,7 @@ def add_input_container_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Handling PSA Input Group update')
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         varprovider = cast(CachedFromDatabaseVariableProvider, app.project_provider.variable_provider)
@@ -605,6 +637,14 @@ def add_input_container_callbacks(app: NewsegsDash):
             cn = 'psa-input-single-value-block'
         else:
             cn = 'psa-input-single-value-block deselected'
+
+        logger.debug(
+            """
+            Reacting to an Input Group Configuration Update Trigger for a PSA input container. 
+            Affected container ids are: %s.
+            """,
+            container_ids
+        )
 
         return (
             [cn] * len(container_ids)
@@ -621,6 +661,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         active_project_id
     ):
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Updating site-location')
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         
@@ -629,6 +670,7 @@ def add_input_container_callbacks(app: NewsegsDash):
             'lon': lmm.location.lon,
             'name': lmm.location.name
         }
+        logger.debug('Setting site location in response to a trigger by "active-project-id".')
         return json.dumps(loc_input)
 
     @app.callback(
@@ -663,6 +705,8 @@ def add_input_container_callbacks(app: NewsegsDash):
             except KeyError:
                 artist = None
             if artist:
+                logger.debug(
+                    'Creating feedback graph for key: %s. Trigger was: %s', id['key'], ctx.triggered_id)
                 figure_returns[idx] = artist(active_project_id, app.project_provider)
 
         return figure_returns
@@ -709,8 +753,11 @@ def add_input_container_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         triggered_id = ctx.triggered_id
+        logger.debug('Getting lightweight project - Updating variable status badge')
         lproj = app.project_provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         varid = make_varid(**triggered_id) # pyright: ignore[reportCallIssue]
         contents, colour = get_variable_sharing_status(lproj, lmm, varid)
+
+        logger.debug('Updated the variable status badge for variable %s, triggered by %s', varid, triggered_id)
         return [contents] * len(button_ids), [colour] * len(button_ids)

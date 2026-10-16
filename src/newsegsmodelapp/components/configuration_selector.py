@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import base64
 import json
 from typing import Any, Sequence, cast
@@ -286,9 +289,16 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Populating configuration selector')
         lproj = provider.get_lightweight_project(active_project_id)
         config_rows = _create_configuration_rows_for_metamodels(lproj.metamodels, lproj.focussed_metamodel_index)
         header_elements = _create_configuration_header_elements_for_metamodels(lproj.metamodels, lproj.focussed_metamodel_index)
+
+        logger.debug(
+            "Created configuration selector elements for project %s. "
+            "Number of metamodels: %d; Focussed metamodel index: %d;",
+            lproj.id, len(lproj.metamodels), lproj.focussed_metamodel_index
+        )
 
         return (
             [config_rows] * len(configuration_container_ids),
@@ -310,6 +320,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Renaming metamodel')
         lproj = provider.get_lightweight_project(active_project_id)
 
         mm_index = trig['index']
@@ -318,10 +329,17 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         mm = lproj.metamodels[mm_index]
         if not mm or mm.name == new_name:
             raise PreventUpdate
-        print(f'RENAMING METAMODEL {mm.name} to {new_name}')
+
+        old_name = mm.name
+
         # By changing the metadata, the MM should pick up the new name next time it is
         # taken from the store as the revision will by incremented by default
         provider.metamodel_provider.set_component_metadata(mm.id, 'label', new_name)
+
+        logger.info(
+            'Renamed metamodel %s; Old name: %s; New name: %s;',
+            mm.id, old_name, new_name
+        )
         
         # However, for this to be picked up by the front end, we will have to invalidate the project provider cache
         provider.invalidate_cache_for_component(lproj.id)
@@ -350,6 +368,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         proj = app.project_provider.get_project(active_project_id)
         ref_mm = proj.metamodels[mm_index]
+
         new_mm = cast(
             NewsegsMetaModel,
             app.project_provider.metamodel_provider.duplicate_component(ref_mm.id) # pyright: ignore[reportAttributeAccessIssue]
@@ -358,6 +377,11 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         new_mm.reattach_variables(proj)
         proj.metamodels.append(new_mm) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
         proj.set_focussed_metamodel(new_mm.id)
+
+        logger.info(
+            'Duplicated metamodel %s -> %s; Name: %s;',
+            ref_mm.id, new_mm.id, new_mm.name,
+        )
         
         # Should be no need to increment project revision - should happen anyway on append of the new_mm
         # proj.revision += 1
@@ -396,6 +420,11 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         app.project_provider.metamodel_provider.delete_component(mm_to_delete.id)
         proj.set_focussed_metamodel_index(proj.get_focussed_metamodel_index())
 
+        logger.info(
+            'Deleted metamodel %s from project %s; Project has %d metamodels and the focussed metamodel is %d.',
+            mm_to_delete.id, proj.id, len(proj.metamodels), proj.get_focussed_metamodel_index()
+        )
+
         # Should be no need to increment the revision - should occur automatically on pop of the metamodel
         # proj.revision += 1
         app.project_provider.upsert_component(proj)
@@ -424,18 +453,24 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         mm_index = trig['index']
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Setting focussed metamodel')
         lproj = provider.get_lightweight_project(active_project_id)
 
-        
         if lproj.focussed_metamodel_index == mm_index:
             raise PreventUpdate
 
+        old_mm_index = lproj.focussed_metamodel_index
         mm_id = lproj.metamodels[mm_index].id
 
         provider.set_component_metadata(
             lproj.id, 'focussed_metamodel_id',
             mm_id, increment_revision = False,
             invalidate_cache = True,
+        )
+
+        logger.info(
+            "Changed focussed metamodel index from %d to %d for project %s.",
+            old_mm_index, mm_index, lproj.id
         )
 
         # Trigger interface update
@@ -466,6 +501,11 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         fn = odict.get('config_name','metamodel_configuration') + ".json"
         fn = pathvalidate.sanitize_filename(fn)
+
+        logger.info(
+            'Downloading metamodel %s to file %s',
+            mm.id, fn
+        )
         
         return dict(
             content = json.dumps(odict, cls = jsonfuncs.NumpyEncoder, sort_keys=False, indent=4), 
@@ -496,7 +536,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             ctype, cstr = working_conf.split(',')
             cfg = json.loads(base64.b64decode(cstr))
         except json.JSONDecodeError as e:
-            print(e)
+            logging.exception('Could not decode uploaded metamodel configuration', exc_info = True)
             raise PreventUpdate
         
         mm_config = cfg.get('metamodel')
@@ -510,7 +550,6 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         # Caution: We cannot safely add this new metamodel to the project until we have generated new ids
         # for each component.
         mm_new.anonymise_ids()
-        print(mm_new)
 
         proj = app.project_provider.get_project(active_project_id)
         proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
@@ -518,6 +557,11 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         # Project revision increment should occur on the metamodels.append
         # proj.revision += 1
         app.project_provider.upsert_component(proj)
+
+        logger.info(
+            'Added uploaded metamodel to project. Project ID: %s; Metamodel ID: %s; Metamodel name: %s;',
+            proj.id, mm_new.id, mm_new.name,
+        )
 
         return active_project_id
 

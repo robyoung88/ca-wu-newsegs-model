@@ -61,7 +61,7 @@ def send_to_dispatcher(payload, retries: int = REQUEST_RETRIES) -> dict:
                         break
                     expect_reply = False
                 else:
-                    print('No response from job server, retrying...')
+                    logger.warning('No response from job server, retrying...')
                     # Socket is confused. Close and remove it.
                     socket.setsockopt(zmq.LINGER, 0)
                     socket.close()
@@ -112,7 +112,7 @@ def _local_run_any(
         set_status_completed(engine, job_id)
         return job_id
     except Exception as e:
-        print(e)
+        logger.exception('Local run Run ID: %d; has failed with exception', job_id, exc_info = True)
         set_status_failed(engine, job_id, str(e))
         return job_id
 
@@ -125,7 +125,7 @@ def local_run_procedure(
 ):
     runner = registers.RUN_PROCEDURE_REGISTER.get(procedure_name)
     if runner is None:
-        print(f'runner not found for {procedure_name}')
+        logger.exception('Runner not found in RUN_PROCEDURE_REGISTER for procedure name: %s', procedure_name)
         return None
     
     return _local_run_any(
@@ -142,6 +142,7 @@ def local_run_postprocess(
 ):
     runner = registers.get_postprocess_procedure(procedure_name, request)
     if runner is None:
+        logger.exception('Runner not found in POSTPROCESS_PROCEDURE_REGISTER for procedure name: %s', procedure_name)
         return None
 
     return _local_run_any(
@@ -158,6 +159,7 @@ def local_run_table_draw(
 ):
     runner = registers.get_table_draw(procedure_name, request)
     if runner is None:
+        logger.exception('Runner not found in TABLE_DRAW_REGISTER for procedure name: %s', procedure_name)
         return None
 
     return _local_run_any(
@@ -194,7 +196,7 @@ def spawn_job(
                 return None
 
         logger.info(
-            'Local initiation of procedure %s for request %d; Triggering run id is %d',
+            'Local initiation of procedure %s for Request ID = %d; Triggering Run ID = %d',
             request.request_type, request.request_id,
             request.trigger_run_id
         )
@@ -205,13 +207,13 @@ def spawn_job(
         )
         if run_id is None:
             logger.warning(
-                'Local failure of procedure %s for request %d; Triggering run id is %d',
+                'Local failure of procedure %s for Request ID = %d; Triggering Run ID = %d',
                 request.request_type, request.request_id,
                 request.trigger_run_id
             )
         else:
             logger.info(
-                'Local completion of procedure %s for request %d; Run ID is %d, triggering run id is %d',
+                'Local completion of procedure %s for Request ID = %d; Run ID = %d, Triggering Run ID = %d',
                 request.request_type, request.request_id,
                 run_id, request.trigger_run_id
             )
@@ -330,6 +332,8 @@ def add_action_callbacks(app: NewsegsDash):
         if not isinstance(trigger_id, str) and trigger_id['type'] == 'action-button' and callback_utils.get_triggered_value() == 0:
             raise PreventUpdate
         logger.debug('Action manager triggered by %s', trigger_id)
+        logger.debug('Ongoing actions are: %s', ongoing_actions)
+
         postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)
         failed_actions = []
         completed_actions = []
@@ -339,20 +343,41 @@ def add_action_callbacks(app: NewsegsDash):
         prog_ = no_update
         mess_ = no_update
 
-        if isinstance(trigger_id, str):
-            if trigger_id == 'trigger-check-requests':
-                new_requests = app.request_handler.get_new_requests()
-                for req in new_requests:
-                    logger.info(
-                        'Action Manager handling Request ID: %d; Type: %s; as New Request, will spawn job.',
-                        req.request_id, req.request_type
-                    )
-                    run_id = spawn_job(req, app.project_provider, app.results_provider)
-                    if run_id:
-                        ongoing_actions.append(run_id)
-                        req.run_id = run_id
-                        app.request_handler.mark_dispatched(req.request_id, req.run_id)
-                        new_jobs = True
+        retry_spawns = False
+        """Set if the callback needs to be fired again due to failed Run spawns.
+        
+        Needs to be set if there are requests left undispatched in the request handler.
+        """
+
+        # At the moment, just using the single Interval to repeat checks
+        # which pulls double duty for checking active job status
+        # and forcing a retry on undispatched requests;
+        # TODO: Avoid checking for new requests unless something in trigger or state indicates it is necessary
+        #if isinstance(trigger_id, str):
+        #    if trigger_id == 'trigger-check-requests':
+        new_requests = app.request_handler.get_new_requests()
+        for req in new_requests:
+            logger.info(
+                'Action Manager handling Request ID = %d; Type = %s; as New Request, will spawn job.',
+                req.request_id, req.request_type
+            )
+            run_id = spawn_job(req, app.project_provider, app.results_provider)
+            if run_id:
+                logger.debug(
+                    'Appending to ongoing actions: Newly spawned Run [Run ID = %d] for Request ID = %d; Type = %s;',
+                    run_id, req.request_id, req.request_type
+                )
+                ongoing_actions.append(run_id)
+                req.run_id = run_id
+                app.request_handler.mark_dispatched(req.request_id, req.run_id)
+                new_jobs = True
+            else:
+                retry_spawns = True
+                logger.warning(
+                    'Unable to Spawn Run for Request ID = %d; Type = %s; '
+                    'Should be retried on next run through.',
+                    req.request_id, req.request_type
+                )
                     
         # Check on ongoing actions
         if ongoing_actions:
@@ -425,6 +450,7 @@ def add_action_callbacks(app: NewsegsDash):
                                 )
                     
                     for run_id in failed_actions:
+                        logger.debug('Removing Failed Run from list of ongoing actions: Run ID = %d;', run_id)
                         ongoing_actions.remove(run_id)
 
                 if completed_actions:
@@ -458,8 +484,8 @@ def add_action_callbacks(app: NewsegsDash):
                         original_request.run_id = run_id
                         if not req_data['children_spawned']:
                             logger.info(
-                                'Action Manager handling completion of Request ID: %d; Type: %s; as Completed Request, will set triggers and create child requests.',
-                                original_request.request_id, original_request.request_type
+                                'Action Manager handling completion of Request ID = %d; Type = %s; as Completed Request due to Run ID = %d; will set triggers and create child requests.',
+                                original_request.request_id, original_request.request_type, run_id,
                             )
                             
                             action_type = req_data['action_type']
@@ -474,11 +500,12 @@ def add_action_callbacks(app: NewsegsDash):
                             require_child_requests.append(original_request)
 
                             logger.info(
-                                'Action Manager marking completion of Request ID: %d; Type: %s; as Completed Request.',
-                                original_request.request_id, original_request.request_type
+                                'Action Manager marking completion of Request ID: %d; Type: %s; as Completed Request due to Run ID = %d;',
+                                original_request.request_id, original_request.request_type, run_id,
                             )
                             app.request_handler.mark_completed(original_request.request_id)
 
+                        logger.debug('Removing Successful Run from list of ongoing actions: Run ID = %d', run_id)
                         ongoing_actions.remove(run_id)
 
                     # In one go, generate requests, spawn jobs, mark dispatched
@@ -501,9 +528,10 @@ def add_action_callbacks(app: NewsegsDash):
                             new_request.run_id = new_run_id
                             app.request_handler.mark_dispatched(new_request.request_id, new_request.run_id)
                             spawned_actions.append(new_run_id)
+
                             
                     logger.info(
-                        'Action Manager marking Runs with Run IDs %s as having spawned children:',
+                        'Action Manager marking Runs with Run IDs %s as having spawned all necessary children.',
                         completed_actions
                     )
                     stmt = (
@@ -536,7 +564,7 @@ def add_action_callbacks(app: NewsegsDash):
         return (
             postaction_trigger_returns,
             ongoing_actions,
-            len(ongoing_actions) == 0,
+            not(retry_spawns) and len(ongoing_actions) == 0,
             (['CALCULATING'] if len(ongoing_actions) > 0 else ['IDLE']) * len(container_ids),
             (['Computing...'] if new_jobs else [no_update]) * len(container_ids),
             [prog_] * len(container_ids),

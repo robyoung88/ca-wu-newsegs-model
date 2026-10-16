@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 import time
 from typing import cast
 
@@ -82,6 +84,7 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Showing model timeseries')
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 

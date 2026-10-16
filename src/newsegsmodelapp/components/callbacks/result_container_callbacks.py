@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 
 import json
 import time
@@ -59,7 +61,6 @@ def add_result_container_callbacks(app: NewsegsDash):
         container_id,
         last_rendered_project_id,
     ):
-        print(f'Updating result container {container_id}')
         if active_project_id is None:
             raise PreventUpdate
 
@@ -69,7 +70,6 @@ def add_result_container_callbacks(app: NewsegsDash):
         project_has_changed = (active_project_id != last_rendered_project_id)
         if is_project_trigger and not project_has_changed:
             raise PreventUpdate
-
         app_state = json.loads(app_state) if app_state else {}
 
         section = container_id.get('section')
@@ -79,18 +79,26 @@ def add_result_container_callbacks(app: NewsegsDash):
         if not key_ or not section:
             raise PreventUpdate
 
+        def _not_found():
+            logger.exception(
+                'Result container content creator not found for Container ID: %s',
+                container_id
+            )
+            return [], active_project_id
+
         try:
             content_creator = get_result_container_content_creator(
                 key_, section, model_type
             )
         except KeyError as e:
-            print('Content creator not found for ', str(container_id))
-            print(e)
-            return [], active_project_id
+            return _not_found()
         if content_creator is None:
-            print('Content creator not found for ', str(container_id))
-            return [], active_project_id
+            return _not_found()
 
+        logger.debug(
+            'Creating Result Container contents using creator found for %s.%s.%s',
+            key_, section, model_type
+        )
         return content_creator(active_project_id, app.project_provider), active_project_id
 
     @app.callback(
@@ -125,7 +133,6 @@ def add_result_container_callbacks(app: NewsegsDash):
         app_state,
         container_ids,
     ):
-        print(f'Updating header {container_ids}')
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
@@ -150,6 +157,10 @@ def add_result_container_callbacks(app: NewsegsDash):
             )
             if content_creator is None:
                 continue
+            logger.debug(
+                'Creating Result Section Header contents using creator found for %s.%s.%s',
+                key, section, model_type
+            )
             contents = content_creator(
                 active_project_id, app.project_provider, app.results_provider, ann_hori_toggle
             )
@@ -240,13 +251,15 @@ def add_result_container_callbacks(app: NewsegsDash):
         rendered_project_table_revision,
         rendered_ann_hori_state,
     ):
-        print(f'Updating results {container_ids}')
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
         # Do not update if the toggle status has not changed, the project is the same,
         # and the table revision number is the same.
-        
+        logger.debug(
+            'Getting lightweight project - Updating Result Table Containers [Section = %s, Key = %s]', 
+            container_ids[0]['section'], container_ids[0]['key']
+        )
         lproj = app.project_provider.get_lightweight_project(active_project_id)
         table_rev = lproj.table_config.revision
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
@@ -271,9 +284,6 @@ def add_result_container_callbacks(app: NewsegsDash):
         for optid, optval in zip(option_ids, result_table_options):
             table_options[optid['purpose']] = optval
 
-        print('TABLE OPTIONS')
-        print(table_options)
-
         for idx, cid in enumerate(container_ids):
 
             # Check if already drawn
@@ -297,7 +307,10 @@ def add_result_container_callbacks(app: NewsegsDash):
                 pass
 
             if table_getter is not None:
-                print(f'Found getter for {table_name}')
+                logger.debug(
+                    'Updating Result Table Container using custom getter: Section: %s; Subindex: %s; Key: %s;',
+                    section, subindex, key
+                )
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
                 res, rev = table_getter(
@@ -314,21 +327,36 @@ def add_result_container_callbacks(app: NewsegsDash):
 
                 # Try with annual or to horizon subtable suffix
                 sub_table_name = table_name + '_hori' if ann_hori_toggle else table_name + '_ann'
-                print (f'getting from table {sub_table_name} - subindex is {subindex}')
                 res, rev = app.results_provider.get_result(sub_table_name, lproj.table_config)
                 
                 if res is None:
                     # Retry without the subtable suffix
-                    print (f'getting from table {table_name} - subindex is {subindex}')
                     res, rev = app.results_provider.get_result(table_name, lproj.table_config)
+                    logger.debug(
+                        'Updating Result Table Container using standard getter: Section: %s; Subindex: %s; Key: %s;',
+                        section, subindex, table_name
+                    )
+                else:
+                    logger.debug(
+                        'Updating Result Table Container using standard getter: Section: %s; Subindex: %s; Key: %s;',
+                        section, subindex, sub_table_name
+                    )
 
             # TODO: Feedback if result is stale
             if res is not None:
+                logger.debug(
+                    'Table found is for revision %d; Current project table revision is %d. Result Table Container Section: %s; Subindex: %s; Key: %s;',
+                    rev, lproj.table_config.revision, section, subindex, key
+                )
                 contents_by_section_subindex[ss] = [res]
                 return_contents[idx] = [res]
                 return_is_stale[idx] = rev != lproj.table_config.revision
                 return_rendered_project_table_revision[idx] = rev
             else:
+                logger.debug(
+                    'Table not found for Result Table Container: Section: %s; Subindex: %s; Key: %s;',
+                    section, subindex, key
+                )
                 contents_by_section_subindex[ss] = []
                 return_contents[idx] = []
                 return_is_stale[idx] = True
@@ -388,11 +416,11 @@ def add_result_container_callbacks(app: NewsegsDash):
         container_ids,
         option_ids,
     ):
-        print(f'Updating figures {container_ids}')
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Updating Result Figure Containers')
         lproj = provider.get_lightweight_project(active_project_id)
         table_rev = lproj.table_config.revision
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
@@ -429,6 +457,10 @@ def add_result_container_callbacks(app: NewsegsDash):
             except KeyError:
                 continue
             if figure_getter is not None:
+                logger.debug(
+                    'Updating Result Figure Container using custom getter: Section: %s; Subindex: %s; Key: %s;',
+                    section, subindex, key
+                )
                 table_options['ann_hori_toggle'] = ann_hori_toggle
                 table_options['subindex'] = subindex
                 res, rev = figure_getter(
@@ -436,6 +468,10 @@ def add_result_container_callbacks(app: NewsegsDash):
                 )
             
             if res is not None:
+                logger.debug(
+                    'Figure found is for revision %d; Current project table revision is %d. Result Figure Container Section: %s; Subindex: %s; Key: %s;',
+                    rev, lproj.table_config.revision, section, subindex, key
+                )
                 contents_by_section_subindex[ss] = res
                 return_contents[idx] = res
 
@@ -515,9 +551,12 @@ def add_result_container_callbacks(app: NewsegsDash):
         **kwargs
     ):
         triggered_id = ctx.triggered_id
-        print(f'checking staleness - triggered by {triggered_id}')
-        if isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
+        logger.debug('Checking staleness - triggered by %s', triggered_id)
+        if triggered_id is None:
+            raise PreventUpdate
+        elif isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
             provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+            logger.debug('Getting lightweight project - Checking Staleness')
             lproj = provider.get_lightweight_project(active_project_id)
             
             results_stale = False
@@ -527,14 +566,20 @@ def add_result_container_callbacks(app: NewsegsDash):
                 results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
             if not results_stale:
                 table_revision = lproj.table_config.revision
-                print(f'Checking against project table revision {table_revision}')
-                print(f'Rendered table revisions are {rendered_project_table_revisions}')
+                logger.debug(
+                    'Checking against project table revision: %s', table_revision
+                )
+                logger.debug(
+                    'Rendered table revisions are: %s', rendered_project_table_revisions
+                )
                 results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
                 
         else:
             if data_stale is None:
                 raise PreventUpdate
-            print(f'Checking against data-is-stale {data_stale}')
+            logger.debug(
+                'Checking against data-is-stale: %s', data_stale
+            )
             results_stale = any(x for x in data_stale)
 
         rval = callback_utils.create_noupdate_return()
@@ -593,6 +638,14 @@ def add_result_container_callbacks(app: NewsegsDash):
                         'metamodel': ALL,
                     },
                     'className'
+                ),
+                id = State(
+                    {
+                        'type': 'result-header-single-config',
+                        'table': ALL,
+                        'metamodel': ALL,
+                    },
+                    'id'
                 )
             )
         ),
@@ -608,9 +661,13 @@ def add_result_container_callbacks(app: NewsegsDash):
         )
 
         rval = []
-        for parent_component, parent_revision, cn in zip(headers['parent_component'], headers['parent_component_revision'], headers['class_name']):
+        for parent_component, parent_revision, cn, id in zip(headers['parent_component'], headers['parent_component_revision'], headers['class_name'], headers['id']):
             r0 = int(parent_revision)
             r1 = int(current_revisions[parent_component]['revision'])
+            logger.debug(
+                'Checking staleness for Result Header ID: %s; Drawn: %d; Live: %d; Component ID: %s',
+                id, r0, r1, parent_component
+            )
             if r0 != r1:
                 if not 'stale' in cn:
                     cn = (cn + ' stale').strip()

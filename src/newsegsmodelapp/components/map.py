@@ -1,3 +1,7 @@
+import logging
+logger = logging.getLogger(__name__)
+
+import copy
 import json
 from typing import cast
 from pyproj import Transformer
@@ -173,10 +177,12 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         newloc = modlocation.Location(lat, lon, name = name)
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Updating configuration location to map location')
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
         modified = False
+        oldloc = copy.copy(lmm.location)
         if not(newloc == lmm.location):
             lmm.location = newloc
             modified = True
@@ -212,6 +218,11 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
                     lmm.model.table_config.id,
                     lmm.finance.table_config.id,
                 ]
+            )
+
+            logger.info(
+                'Location changed for Metamodel ID %s; %s -> %s',
+                lmm.id, oldloc, lmm.location
             )
 
         return f"{lat:.6f}", f"{lon:.6f}", name
@@ -319,7 +330,7 @@ def add_site_change_callback(app) -> Dash:
         if not easting:
             easting, northing = _trans_togb.transform(pos[0], pos[1])
 
-        # Active focused marker
+        # Active focussed marker
         focussed_marker = [
             dl.Marker(
                 id='site-marker',
@@ -328,11 +339,12 @@ def add_site_change_callback(app) -> Dash:
             )
         ]
 
-        # Non-focused metamodel markers (translucent)
+        # Non-focussed metamodel markers (translucent)
         other_markers = []
         if active_project_id:
             try:
                 provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                logger.debug('Getting lightweight project - Getting locations of all project metamodels for map')
                 lproj = provider.get_lightweight_project(active_project_id)
                 lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 
@@ -352,7 +364,7 @@ def add_site_change_callback(app) -> Dash:
                                 )
                             )
             except Exception as e:
-                print(e)
+                logger.exception('Could not draw non-focussed metamodel markers', exc_info = True)
                 pass
         
         return (

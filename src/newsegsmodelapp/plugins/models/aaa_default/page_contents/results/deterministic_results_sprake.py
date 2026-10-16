@@ -1,4 +1,6 @@
 """Register restult container and result header container content creators"""
+import logging
+logger = logging.getLogger(__name__)
 
 from typing import Callable
 
@@ -325,6 +327,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of key
 ) -> list[dash.development.base_component.Component]:
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
     lproj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
@@ -384,6 +387,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
     proj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
@@ -441,6 +445,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
     proj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
@@ -509,6 +514,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
     proj = proj_provider.get_lightweight_project(proj_id)
     rval = _make_headers_for_multiple_configs(
         proj,
@@ -572,6 +578,7 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
     lproj = proj_provider.get_lightweight_project(proj_id)
 
     # This one needs to be bespoke, as header is constructed from multiple postprocess keys

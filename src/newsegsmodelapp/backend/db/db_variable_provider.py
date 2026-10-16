@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 import json
 import random
@@ -55,12 +58,20 @@ def variable_to_raw_table_data(
     try:
         dsa_value_lower = json.dumps(variable.get_dsa_value('lower', True), cls = jsonfuncs.NumpyEncoder)
     except Exception as e:
-        print(e)
+        logger.exception(
+            'Variable %s of distribution %s raised exception when accessing lower dsa value', 
+            varid, variable.distribution.distribution,
+            exc_info = True
+        )
         dsa_value_lower = None
     try:
         dsa_value_upper = json.dumps(variable.get_dsa_value('upper', True), cls = jsonfuncs.NumpyEncoder)
     except Exception as e:
-        print(e)
+        logger.exception(
+            'Variable %s of distribution %s raised exception when accessing upper dsa value', 
+            varid, variable.distribution.distribution,
+            exc_info = True
+        )
         dsa_value_lower = None
 
     try:
@@ -75,7 +86,11 @@ def variable_to_raw_table_data(
     except NotImplementedError:
         ci = None
     except Exception as e:
-        print(e)
+        logger.exception(
+            'Variable %s of distribution %s raised unhandled exception when accessing confidence interval', 
+            varid, variable.distribution.distribution,
+            exc_info = True
+        )
     if ci is None:
         psa_ci_lower = None
         psa_ci_upper = None

@@ -119,15 +119,15 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         if request:
             logger.info(
-                'Result saved: Type = %s; Request ID: %d; Process Run = %d; Triggering Run = %d; Attached to component id %s revision %d',
+                'Result saved: Type = %s; Request ID = %d; Process Run = %d; Triggering Run = %d; Attached to component id %s revision %d; Filename = %s',
                 result_details['result_type'], request.request_id, request.run_id, request.trigger_run_id,
-                result_details['component_config_id'], result_details['component_config_revision']
+                result_details['component_config_id'], result_details['component_config_revision'], saved_path
             )
         else:
             logger.info(
-                'Result saved: Type = %s; Attached to component id %s revision %d - no request details provided',
+                'Result saved: Type = %s; Attached to Component ID = %s; revision = %d; - no request details provided. Filename = %s ',
                 result_details['result_type'],
-                result_details['component_config_id'], result_details['component_config_revision']
+                result_details['component_config_id'], result_details['component_config_revision'], saved_path,
             )           
              
     def duplicate_result(

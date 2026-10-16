@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import json
 
 from dash import ALL, Input, Output, ctx, html
@@ -98,7 +101,7 @@ def assign_callbacks(app: NewsegsDash):
             case _:
                 raise ValueError(f'Unknown prop has called update_model_type: {pid}')
 
-        print('Model selected - going to landing')
+        logger.info('Model selected: %s; going to landing', model_type)
         
         return f'/{model_type}/landing'
 

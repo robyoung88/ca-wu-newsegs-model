@@ -126,7 +126,6 @@ class NewsegsComponent(
         compnames = self.get_component_attributes()
         for cn in compnames:
             if '_'+ cn in state and not cn in state:
-                #print(f'Renaming from {'_'+cn} to {cn} in state')
                 state[cn] = state['_' + cn]
                 del state['_' + cn]
 

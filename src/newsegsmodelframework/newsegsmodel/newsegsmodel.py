@@ -3,6 +3,9 @@ Abstract base class for NewSEGS model
 """
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
 from abc import abstractmethod
 from typing import Any, Optional, Type, override
 
@@ -463,7 +466,11 @@ class NewsegsModel(
 
             any_stale = any_stale or res_ is None or self._grid_result_revision != self.grid.revision
         except Exception as e:
-            print (e)
+            logger.exception(
+                'Exception obtaining grid result for module: %s',
+                self.grid.id,
+                exc_info = True
+            )
             any_stale = True
 
         try:
@@ -484,7 +491,11 @@ class NewsegsModel(
 
             any_stale = any_stale or res_ is None or self._generation_result_revision != self.generation.revision
         except Exception as e:
-            print (e)
+            logger.exception(
+                'Exception obtaining generation result for module: %s',
+                self.generation.id,
+                exc_info = True
+            )
             any_stale = True
 
         try:
@@ -505,7 +516,11 @@ class NewsegsModel(
 
             any_stale = any_stale or res_ is None or self._cs_result_revision != self.consumption_storage.revision
         except Exception as e:
-            print(e)
+            logger.exception(
+                'Exception obtaining consumption storage result for module: %s',
+                self.consumption_storage.id,
+                exc_info = True
+            )
             any_stale = True
             
         return any_stale

@@ -2170,7 +2170,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
             # Fallback - get project from db, insert into cache.
             proj = super().get_project(project_id)
             logger.debug(
-                'Adding Full Project %s to cache after database load, stste is: %s',
+                'Adding Full Project %s to cache after database load, state is: %s',
                 project_id, get_project_critical_state(proj)
             )
             self._project_last_accessed[project_id] = new_modkey
@@ -2232,7 +2232,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
                         rlist[idx] = cmpx
                         self._lightweight_project_cache[cmpx.id] = cmpx
                         logger.debug(
-                            'Adding Full Project %s to cache after database load, stste is: %s',
+                            'Adding Lightweight Project %s to cache after database load, state is:\n%s',
                             id_, get_project_critical_state(cmpx)
                         )
                         jdx += 1

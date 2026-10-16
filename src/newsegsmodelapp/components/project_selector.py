@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 
 import json
 from typing import Any, cast
@@ -80,7 +82,7 @@ def verify_project_exists(
             project_id, 'label'
         )
     except Exception as e:
-        print(f'Failed to retrieve project {project_id} - {e}')
+        logger.exception('Failed to retrieve Project ID: %s', project_id, exc_info = True)
         return False
     return label is not None
 
@@ -684,7 +686,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
                                 app_state.get('model_type', 'default')
                             )
                         except Exception as e:
-                            print(f'Could not delete project {project_id}: {e}')
+                            logger.exception('Could not delete Project ID: %s;', project_id, exc_info = True)
 
                         callback_utils.update_property_by_id(
                             'active-project-id',
@@ -850,7 +852,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
                 pass
 
             case _:
-                print(f'Unknown trigger: {triggered}')
+                logger.exception('Unknown trigger when handling project selector action button clicks: %s', triggered)
         
         return rval
 

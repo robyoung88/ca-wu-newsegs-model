@@ -1,5 +1,7 @@
-
 """Register input container and input header container content creators for psa supersection"""
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 import json
 import time
@@ -34,6 +36,7 @@ def _(
     proj_provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
     provider = cast(FromDatabaseNewsegsProjectProvider, proj_provider)
+    logger.debug('Getting lightweight project - Creating PSA Input Container contents')
     lproj = provider.get_lightweight_project(proj_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     return generic_create_psa_input_container_contents(
@@ -55,6 +58,7 @@ def _(
     proj_provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
     provider = cast(FromDatabaseNewsegsProjectProvider, proj_provider)
+    logger.debug('Getting lightweight project - Creating PSA Settings Input Container contents')
     lproj = provider.get_lightweight_project(proj_id)
     psa_config = provider._component_provider.get_component(lproj.psa_config.id)
     if not psa_config:
@@ -186,6 +190,7 @@ def handle_psa_settings(
             new_val = 0
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Handling PSA settings change')
     lproj = provider.get_lightweight_project(active_project_id)
     psa_config = provider._component_provider.get_component(lproj.psa_config.id)
 
@@ -196,22 +201,28 @@ def handle_psa_settings(
     match triggered_id['key']:
         case 'seed':
             if psa_config.seed != new_val:
+                old_val = psa_config.seed
                 psa_config.seed = new_val
         case 'samples':
             new_val = max(min(int(new_val), 10000), 10) 
             if psa_config.samples != int(new_val):
+                old_val = psa_config.samples
                 psa_config.samples = int(new_val)
         case 'return_draws':
             if psa_config.return_draws != new_val:
+                old_val = psa_config.return_draws
                 psa_config.return_draws = new_val 
         case _:
-            print (f'No handler for key {triggered_id["key"]}')
+            logger.exception('No PSA setting handler for key: %s', triggered_id['key'])
 
     modified = psa_config.revision != r0
     if not modified:
         return return_dict
 
-    print(f'PSA SETTING CHANGE: {triggered_id["key"]} to {new_val} - config revision from {r0} to {psa_config.revision}')
+    logger.debug(
+        'PSA setting changed - %s: %s -> %s',
+        triggered_id["key"], old_val, new_val
+    )
 
     # Feed back current parameters
     for idx, id in enumerate(input_ids):
@@ -250,6 +261,7 @@ def handle_psa_active(
         new_val = callback_utils.get_triggered_value()
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Handling PSA activation change')
     lproj = provider.get_lightweight_project(active_project_id)
     lmm = cast(LightweightNewsegsMetaModel, lproj.metamodels[lproj.focussed_metamodel_index])
 

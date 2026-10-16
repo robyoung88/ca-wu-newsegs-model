@@ -46,7 +46,7 @@ def worker_process(
     socket.setsockopt(zmq.RCVTIMEO, settings.get('WORKER_RECEIVE_TIMEOUT_MS', -1))
     socket.connect(f'tcp://{server}:{port}')
 
-    print(f'Worker {worker_id} listening on {server}:{port}')
+    logger.info('Worker %d listening on %s:%s', worker_id, server, port)
 
     write_engine = db.get_engine(writer = True, db_path = db_path)
     read_engine = db.get_engine(writer = False, db_path = db_path)
@@ -61,7 +61,7 @@ def worker_process(
 
                 # Handle poison pill
                 if frames[-1] == POISON_PILL:
-                    print(f'Worker {worker_id} received poison pill. Shutting down...')
+                    logger.info('Worker %d received poison pill. Shutting down...', worker_id)
                     break
 
                 # Extract envelope frames and payload frame
@@ -107,7 +107,7 @@ def worker_process(
                     raise ValueError(f'Cannot send claim ticket back to client - database is unresponsive.')
 
                 logger.info(
-                    'Worker %d initiating procedure %s for request %d; Run ID is %d, triggering run id is %d',
+                    'Worker %d initiating procedure %s for Request ID = %d; Run ID = %d, Triggering Run ID = %d',
                     worker_id, request.request_type, request.request_id,
                     job_id, request.trigger_run_id
                 )
@@ -160,7 +160,7 @@ def worker_process(
                     # Update the database marking the run successful
                     set_status_completed(write_engine, job_id)
                     logger.info(
-                        'Worker %d completed procedure %s for request %d with message %s; Run ID is %d, triggering run id is %d. Ready for next request.',
+                        'Worker %d Completed procedure %s for Request ID = %d; with message %s; Run ID = %d; Triggering Run ID = %d. Ready for next request.',
                         worker_id, request.request_type, request.request_id, is_ok,
                         job_id, request.trigger_run_id
                     )
@@ -168,7 +168,7 @@ def worker_process(
                 except Exception as e:
                     set_status_failed(write_engine, job_id, str(e))
                     logger.warning(
-                        'Worker %d failed procedure %s for request %d; Run ID is %d, triggering run id is %d.',
+                        'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d, Triggering Run ID = %d.',
                         worker_id, rq.request_type, rq.request_id,
                         job_id, rq.trigger_run_id,
                         exc_info = True
@@ -185,11 +185,11 @@ def worker_process(
                     pass
                 socket = context.socket(zmq.REP)
                 socket.connect(f'tcp://{server}:{port}')
-                print(f"Worker {worker_id} encountered an error: {e}")
+                logger.error('Worker %d encountered and error', worker_id, exc_info = True)
             # Process loops back to recv, signalling to dealer that worker is free
     
     finally:
-        print(f'Worker {worker_id} disposing engine.')
+        logger.info('Worker %d disposing engines and closing sockets.', worker_id)
         write_engine.dispose()
         read_engine.dispose()
         socket.close()

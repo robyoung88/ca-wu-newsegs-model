@@ -1,7 +1,8 @@
 """Register input container and input header container content creators for deterministic supersection"""
+import logging
+logger = logging.getLogger(__name__)
 
 import json
-import time
 from typing import cast
 
 import dash
@@ -56,6 +57,7 @@ for supersection, section_tuple in sections_by_supersection.items():
             _section: str = section # Using default argument trick to force evaluation of section
         ) -> list[dash.development.base_component.Component]:
             provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+            logger.debug('Getting lightweight project - Creating Deterministic Input Container contents')
             lproj = provider.get_lightweight_project(proj_id)
             lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
 
@@ -182,7 +184,6 @@ def _create_cost_sales_header_summary(
         provider,
         eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
     ):
-    t0 = time.time_ns()
     if eb is None:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
         eb = update_estimated_energy_balance(mm, provider, eb)
@@ -229,10 +230,6 @@ def _create_cost_sales_header_summary(
     estimated_export_receipts = overproduction * per_unit_export
 
     tot_receipts = res_receipts + ev_receipts + estimated_export_receipts
-
-    t1 = time.time_ns()
-
-    print(f'SALES HEADER IN {(t1 - t0)/1e6} ms.')
 
     return [
         icons.get_icon('cost-residents'),
@@ -340,6 +337,7 @@ for supersection, section_tuple in sections_by_supersection.items():
             ) -> list[dash.development.base_component.Component]:
                 if not proj_id:
                     raise PreventUpdate
+                logger.debug('Getting lightweight project - Creating Deterministic Input Section Header Contents [%s]', _section)
                 return _generic_create_deterministic_input_header_contents(
                     _section, get_focussed_lightweight_metamodel(proj_id, proj_provider), proj_provider.variable_provider
                 )

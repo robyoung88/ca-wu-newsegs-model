@@ -1,6 +1,9 @@
 """
 Functions for creating a deterministic sensitivity analysis layout
 """
+import logging
+logger = logging.getLogger(__name__)
+
 import base64
 from dataclasses import asdict, dataclass
 import io
@@ -542,7 +545,9 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                                             app.project_provider.upsert_component(proj)
                                             
                                     except ValueError as e:
-                                        print(e)
+                                        logger.exception(
+                                            'Exception whilst uploading DSA results.', exc_info = True
+                                        )
                                         continue
                         
                         if mm_new:
@@ -560,12 +565,16 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                             case 'xlsx':
                                 result_df = pd.read_excel(results_file)
         except Exception as e:
-            print(e)
+            logger.exception(
+                'Exception whilst uploading DSA results.', exc_info = True
+            )
             raise PreventUpdate
         
         if result_df is None:
             # Should never be reached
-            print('No results in archive, but initial results file check has passed')
+            logger.exception(
+                'No results in uploaded DSA archive, but initial results file check passed.'
+            )
             return rval
         
         # Set the result_df as appropriate for a dsa result and trigger post-processing

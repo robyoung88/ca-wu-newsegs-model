@@ -96,7 +96,7 @@ def retrieve_latest_backup(
         return 'missing'
 
     latest_backup = backup_files[-1]
-    print(f"Restoring database from latest backup: {latest_backup.name}")
+    logger.warning('Restoring database from latest backup: %s', latest_backup.name)
 
     # Ensure target directory exists
     db_path.parent.mkdir(parents = True, exist_ok = True)
@@ -106,7 +106,7 @@ def retrieve_latest_backup(
         with sqlite3.connect(db_path) as dest:
             source.backup(dest)
 
-    print('Database restoration complete.')
+    logger.warning('Database restoration complete.')
     return 'from_backup'
 
 def retrieve_db_file(
@@ -130,7 +130,7 @@ def create_db(
     try:
         run_migrations()
     except sqlite3.Error as e:
-        print(f'Unable to create application database: {e}')
+        logger.exception('CRITICAL: Unable to create application database', exc_info = True)
         raise
     return True
 

@@ -4,6 +4,9 @@ A container and controller for metamodels and variables.
 Provides a class which encapsulates multiple NewSEGS metamodels, for multi-way
 sensitivity analysis.
 """
+import logging
+logger = logging.getLogger(__name__)
+
 from collections import OrderedDict
 import copy
 from typing import Any, Optional, Sequence, override
@@ -63,7 +66,7 @@ class ProjVarWatcher(RevisionNotifierProtocol):
                     found_uids.add(vid)
             lost_vars = var_uids - found_uids
             if lost_vars:
-                print(f'Removing variables from project: {lost_vars}')
+                logger.info('Removing variables from project: %s', lost_vars)
                 proj.delete_variable(list(lost_vars))
         # Otherwise, do nothing
 

@@ -1,4 +1,6 @@
 """Provides functions for scheduling backups and pruning whilst app is running."""
+import logging
+logger = logging.getLogger(__name__)
 import time
 
 from pathlib import Path
@@ -31,7 +33,7 @@ schedule.every().day.at("02:00").do(run_backup)
 schedule.every().sunday.at("03:00").do(run_pruning)
 
 if __name__ == '__main__':
-    print('Maintenance scheduler online.')
+    logger.info('Maintenance scheduler online.')
     while True:
         schedule.run_pending()
         time.sleep(300) # Wake every 5 minutes to check the schedule.

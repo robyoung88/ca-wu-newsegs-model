@@ -585,7 +585,7 @@ class TestDatabaseStart(unittest.TestCase):
         vars = full_lightweight_recovery(varids)
         self.assertEqual(len(vars), len(one_of_each))
 
-        TEST_RELATIVE_TIME = True
+        TEST_RELATIVE_TIME = False
         if TEST_RELATIVE_TIME:
             import timeit
             REPS = 100
