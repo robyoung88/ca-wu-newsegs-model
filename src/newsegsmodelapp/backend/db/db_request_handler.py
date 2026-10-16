@@ -140,7 +140,8 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             self._table.select()
             .where(sa.and_(
                 self._table.c.dispatched == False,
-                self._table.c.completed == False
+                self._table.c.completed == False,
+                self._table.c.retry_number < self._table.c.max_retries,
                 )
             )
         )
@@ -212,7 +213,9 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             .where(self._table.c.request_id == request_id)
             .values(
                 run_id = None,
-                retry_number = self._table.c.retry_number + 1
+                retry_number = self._table.c.retry_number + 1,
+                # Remove dispatch mark to allow for a retry
+                dispatched = False,
             )
             .returning(self._table.c.retry_number < self._table.c.max_retries)
         )

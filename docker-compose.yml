@@ -80,6 +80,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
+  sqlite-web:
+    image: coleifer/sqlite-web:latest
+    ports:
+      - "9080:8080"
+    volumes:
+      - local_db_data:/var/lib/sqlite_data
+    command: ["python", "-m", "sqlite_web", "/var/lib/sqlite_data/newsegs_db.db", "--port", "8080", "--host", "0.0.0.0"]
+    restart: unless-stopped
+
 volumes:
   # Named volume managed by the Docker host engine
   local_db_data:

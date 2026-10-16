@@ -2099,7 +2099,7 @@ class FromDatabaseNewsegsProjectProvider(
         with read_transaction(self._get_engine()) as conn:
             conn.execute(stmt)
 
-USE_DATAVERSION = False
+USE_DATAVERSION = True
 """Enable use of the database dataversion pragma to determine data staleness.
 
 Has been known to allow for the return of stale results.
@@ -2115,10 +2115,13 @@ class CachedFromDatabaseNewsegsProjectProvider(
     def __init__(self, get_engine: Callable[[], sa.Engine]):
         super().__init__(get_engine)
         self._project_cache = LRUCache(maxsize = 5)
-        self._lightweight_project_cache = LRUCache(maxsize = 10)
         self._project_last_accessed = {}
         self._project_dataversions = LRUCache(maxsize = 30)
+
+        self._lightweight_project_cache = LRUCache(maxsize = 10)
+        self._lightweight_project_last_accessed = {}
         self._lightweight_project_dataversions = LRUCache(maxsize = 30)
+        
         # Create a lock to prevent a cache stampede at initial load
         self._lock = threading.Lock()
 
@@ -2202,18 +2205,23 @@ class CachedFromDatabaseNewsegsProjectProvider(
                             return rlist
                         return rlist[0]
 
-            revisions = self.get_component_metadata(project_id, 'revision')
+            new_modkeys = [self._get_project_modification_key(x) for x in project_id]
+            
             rlist = []
             get_list = []
-            for id_ in project_id:
+            for idx, id_ in enumerate(project_id):
                 logger.debug('Finding Lightweight Project: %s', id_)
                 found_component = False
                 if id_ in self._lightweight_project_cache:
                     cmpx = self._lightweight_project_cache[id_]
-                    if cmpx.revision == revisions[id_]['revision']:
+                    
+                    if (
+                        id_ in self._lightweight_project_last_accessed
+                        and (new_modkeys[idx] == self._lightweight_project_last_accessed[id_])
+                    ):
                         rlist.append(cmpx)
                         logger.debug(
-                            'Returning Lightweight Project %s from cache due to unmodified revision - revision is %d, table revision is %d',
+                            'Returning Lightweight Project ID = %s; from cache due to unchanged modification key - revision = %d; table revision = %d;',
                             id_, cmpx.revision, cmpx.table_config.revision
                         )
                         found_component = True
@@ -2231,8 +2239,9 @@ class CachedFromDatabaseNewsegsProjectProvider(
                         cmpx = components_from_db[jdx]
                         rlist[idx] = cmpx
                         self._lightweight_project_cache[cmpx.id] = cmpx
+                        self._lightweight_project_last_accessed[cmpx.id] = new_modkeys[idx]
                         logger.debug(
-                            'Adding Lightweight Project %s to cache after database load, state is:\n%s',
+                            'Adding Lightweight Project ID = %s; to cache after database load, state:\n%s',
                             id_, get_project_critical_state(cmpx)
                         )
                         jdx += 1
