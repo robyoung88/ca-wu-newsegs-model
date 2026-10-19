@@ -14,6 +14,7 @@ from sqlalchemy import inspect
 
 from newsegsmodelapp.backend.db import db_tables
 from newsegsmodelapp.backend.db.db import read_transaction
+from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
@@ -965,6 +966,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
         result_provider = FromDatabaseResultProvider(db.get_engine, self.test_dir)
+        request_handler = FromDatabaseRequestHandler(db.get_engine)
 
         engine = db.get_engine(writer = True)
 
@@ -982,9 +984,12 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider.add_component(proj)
 
-        request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
-        self.assertIsNotNone(request_creator)
-        request = request_creator(proj.id, proj_provider) # pyright: ignore[reportOptionalCall]
+        request = request_handler.add_request(
+            'deterministic_run_metamodel',
+            proj.id,
+            proj_provider,
+            'run'
+        )
 
         run_id, exists = generate_claim_ticket(engine, request)
 
@@ -1039,9 +1044,13 @@ class TestDatabaseStart(unittest.TestCase):
         finance_pp_counter = 0
 
         for process_name in postprocess_list:
-            pp_req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(process_name)
-            self.assertIsNotNone(pp_req_provider, msg = f'Postprocess request generator not found for {process_name}')
-            pp_req = pp_req_provider(request) # pyright: ignore[reportOptionalCall]
+            pp_req = request_handler.add_request(
+                process_name,
+                proj.id,
+                proj_provider,
+                'postprocess',
+                triggering_request = request
+            )
             self.assertIsInstance(pp_req, registers.PostprocessRequest)
 
             proc = registers.get_postprocess_procedure(process_name, pp_req)
@@ -1061,11 +1070,13 @@ class TestDatabaseStart(unittest.TestCase):
             postactions_from_reg = registers.POST_ACTION_REGISTER.get(pp_req.request_type)
             if postactions_from_reg is not None:
                 for td_artist_name in postactions_from_reg.table_draw_artists:
-                    td_req_func = registers.TABLE_DRAW_REQUEST_REGISTER.get(td_artist_name[0])
-                    if td_req_func:
-                        td_req = td_req_func(pp_req)
-                    else:
-                        td_req = pp_req
+                    td_req = request_handler.add_request(
+                        td_artist_name[0],
+                        proj.id,
+                        proj_provider,
+                        'tabledraw',
+                        triggering_request= pp_req
+                    )
 
                     td_artist = registers.get_table_draw(td_artist_name[0], pp_req)
                     if td_artist:
@@ -1195,6 +1206,7 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
         result_provider = CachedFromDatabaseResultProvider(db.get_engine, self.test_dir)
+        request_handler = FromDatabaseRequestHandler(db.get_engine)
 
         write_engine = db.get_engine(writer = True)
 
@@ -1238,8 +1250,12 @@ class TestDatabaseStart(unittest.TestCase):
             for k, v in recovered_revisions.items():
                 self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrect')
 
-            request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
-            request = request_creator(proj.id, proj_provider)
+            request = request_handler.add_request(
+                'deterministic_run_metamodel',
+                proj.id,
+                proj_provider,
+                'run'
+            )
             
             run_id, exists = generate_claim_ticket(write_engine, request)
 
@@ -1296,9 +1312,13 @@ class TestDatabaseStart(unittest.TestCase):
 
             for pp_proc in postactions_from_reg.postprocess_procedures:
                 procedure_name = pp_proc[0]
-                req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(procedure_name)
-                new_req = req_provider(request)
-
+                new_req = request_handler.add_request(
+                    procedure_name,
+                    proj.id,
+                    proj_provider,
+                    'postprocess',
+                    triggering_request = request
+                )
                 procedure = registers.get_postprocess_procedure(procedure_name, new_req)
 
                 pp_run_id, exists = generate_claim_ticket(write_engine, new_req)
@@ -1343,11 +1363,13 @@ class TestDatabaseStart(unittest.TestCase):
 
                 for output_proc in output_actions.table_draw_artists:
                     op_proc_name = output_proc[0]
-                    op_req_func = registers.TABLE_DRAW_REQUEST_REGISTER.get(op_proc_name)
-                    if op_req_func:
-                        op_req = op_req_func(new_req)
-                    else:
-                        op_req = new_req
+                    op_req = request_handler.add_request(
+                        op_proc_name,
+                        proj.id,
+                        proj_provider,
+                        'tabledraw',
+                        triggering_request= new_req
+                    )
 
                     op_procedure = registers.get_table_draw(op_proc_name, op_req)
 
