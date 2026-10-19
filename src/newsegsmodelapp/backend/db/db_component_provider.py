@@ -2266,7 +2266,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
                         self._lightweight_project_last_accessed[cmpx.id] = new_modkeys[idx]
                         logger.debug(
                             'Adding Lightweight Project ID = %s; to cache after database load, state:\n%s',
-                            id_, get_project_critical_state(cmpx)
+                            cmpx.id, get_project_critical_state(cmpx)
                         )
                         jdx += 1
             else:

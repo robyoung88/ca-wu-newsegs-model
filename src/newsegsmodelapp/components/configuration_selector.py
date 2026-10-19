@@ -375,19 +375,26 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             app.project_provider.metamodel_provider.duplicate_component(ref_mm.id) # pyright: ignore[reportAttributeAccessIssue]
         )
         new_mm.name = new_mm.name + ' - Copy'
+
+        # Ensure that the variables can be obtained from the project,
+        # though they will be identical to the sourced metamodel
+        # and so won't add any new variables to the project when the metamodel
+        # is appended.
         new_mm.reattach_variables(proj)
         proj.metamodels.append(new_mm) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
+        
         proj.set_focussed_metamodel(new_mm.id)
 
         logger.info(
-            'Duplicated metamodel %s -> %s; Name: %s;',
-            ref_mm.id, new_mm.id, new_mm.name,
+            'Duplicated metamodel %s -> %s; Name: %s; Project revision = %d',
+            ref_mm.id, new_mm.id, new_mm.name, proj.revision
         )
         
-        # Should be no need to increment project revision - should happen anyway on append of the new_mm
-        # proj.revision += 1
-        
         app.project_provider.upsert_component(proj)
+        # As a change of name does not dirty the metamodel, need to update that
+        app.project_provider.metamodel_provider.set_component_metadata(
+            new_mm.id, 'label', new_mm.name
+        )
 
         # Trigger interface update
         return active_project_id
