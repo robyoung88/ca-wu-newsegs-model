@@ -244,6 +244,10 @@ def _make_headers_for_multiple_configs(
         )
 
         res, rev = result_provider.get_result(result_key, mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            result_key, mod.id, mod.revision, rev
+        )
 
         if res is not None:
             cntnt = [mm_icon] + content_generator(res, ann_hori_toggle)
@@ -266,7 +270,7 @@ def _make_headers_for_multiple_configs(
             },
             **{
                 'data-parent-component': mod.id,
-                'data-parent-component-revision': mod.revision
+                'data-parent-component-revision': rev
             }
             ))
 
@@ -592,8 +596,20 @@ def _(
         )
 
         res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            'postproc_finance_benefits', mod.id, mod.revision, rev_benefits
+        )
         res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            'postproc_finance_costs', mod.id, mod.revision, rev_costs
+        )
         res_value, rev_value = result_provider.get_result('postproc_finance_value', mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            'postproc_finance_value', mod.id, mod.revision, rev_value
+        )
 
         cntnt = [mm_icon] + _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
 
@@ -613,7 +629,7 @@ def _(
             },
             **{
                 'data-parent-component': mod.id,
-                'data-parent-component-revision': mod.revision
+                'data-parent-component-revision': rev_value # TODO: use min
             }
         ))
 

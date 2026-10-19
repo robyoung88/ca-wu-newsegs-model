@@ -81,9 +81,10 @@ def _make_generation_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_generation'
+    table_name = 'table_generation_wind'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
-    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res, stale = get_result_list(result_type, lproj, result_provider, True)
@@ -96,7 +97,6 @@ def _make_generation_tables_sprake(
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
     table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
                     
-    table_name = 'table_generation_wind'
     result_provider.upsert_result(
         table_name + '_ann',
         table_component,
@@ -168,9 +168,10 @@ def _make_consumption_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_consumption'
+    table_name = 'table_consumption'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
-    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res, stale = get_result_list(result_type, lproj, result_provider, True)
@@ -183,7 +184,6 @@ def _make_consumption_tables_sprake(
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
     table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
     
-    table_name = 'table_consumption'
     result_provider.upsert_result(
         table_name + '_ann',
         table_component,
@@ -233,9 +233,10 @@ def _make_storage_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_storage'
+    table_name = 'table_storage'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
-    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res,stale = get_result_list(result_type, lproj, result_provider, True)
@@ -248,7 +249,6 @@ def _make_storage_tables_sprake(
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
     table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
 
-    table_name = 'table_storage'
     result_provider.upsert_result(
         table_name + '_ann',
         table_component,
@@ -278,9 +278,10 @@ def _make_net_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_net'
+    table_name = 'table_net'
 
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
-    logger.debug('Getting lightweight project - Creating Table [%s]', result_type)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
     lproj = provider.get_lightweight_project(request.project_id)
 
     res, stale = get_result_list(result_type, lproj, result_provider, True)
@@ -293,7 +294,6 @@ def _make_net_tables_sprake(
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
     table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
 
-    table_name = 'table_net'
     result_provider.upsert_result(
         table_name + '_ann',
         table_component,

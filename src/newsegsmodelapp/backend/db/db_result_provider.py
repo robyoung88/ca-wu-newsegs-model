@@ -215,7 +215,10 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         else:
             stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
             
-        stmt = stmt.order_by(self._table.c.created_at.desc())
+        stmt = stmt.order_by(
+            self._table.c.component_config_revision,
+            self._table.c.created_at.desc()
+        )
 
         if revision is None:
             if not isinstance(parent_component, str):
@@ -230,7 +233,12 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         with read_transaction(self._get_engine()) as conn:
             result = conn.execute(stmt)
             for idx, row in enumerate(result):
+                logger.debug(
+                    'Iterating results [%d]: Type = %s; Parent = %s; Revision = %s; Created at: %s',
+                    idx, result_type, parent_component.id, row.component_config_revision, row.created_at
+                )
                 if idx == 0:
+                    
                     file_name = row.result_file
                     rrs = row.component_config_revision
                 if row.component_config_revision == revision:

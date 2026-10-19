@@ -136,6 +136,11 @@ def add_result_container_callbacks(app: NewsegsDash):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
+        logger.debug(
+            'Updating Result Section Header for Section = %s, Key = %s; Triggered by: %s;',
+            container_ids[0]['section'], container_ids[0]['key'], ctx.triggered_id
+        )
+
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
         return_headers: list[Any] = [no_update] * len(container_ids)
         contents_by_section = {}
@@ -597,83 +602,83 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         return rval
 
-    @app.callback(
-        output = dict(
-            header_classnames = Output(
-                {
-                    'type': 'result-header-single-config',
-                    'table': ALL,
-                    'metamodel': ALL,
-                },
-                'className'
-            )
-        ),
-        inputs = dict(
-            trigger_check_stale = Input(
-                'trigger-check-stale', 'data'
-            )
-        ),
-        state = dict(
-            headers = dict(
-                parent_component = State(
-                    {
-                        'type': 'result-header-single-config',
-                        'table': ALL,
-                        'metamodel': ALL,
-                    },
-                    'data-parent-component'
-                ),
-                parent_component_revision = State(
-                    {
-                        'type': 'result-header-single-config',
-                        'table': ALL,
-                        'metamodel': ALL,
-                    },
-                    'data-parent-component-revision'
-                ),
-                class_name = State(
-                    {
-                        'type': 'result-header-single-config',
-                        'table': ALL,
-                        'metamodel': ALL,
-                    },
-                    'className'
-                ),
-                id = State(
-                    {
-                        'type': 'result-header-single-config',
-                        'table': ALL,
-                        'metamodel': ALL,
-                    },
-                    'id'
-                )
-            )
-        ),
-        prevent_initial_call = True
-    )
-    def update_result_header_staleness(
-        headers, **kwargs
-    ):
-        component_ids = list(set(headers['parent_component']))
-        current_revisions = app.project_provider._component_provider.get_component_metadata(
-            component_ids,
-            'revision'
-        )
+    # @app.callback(
+    #     output = dict(
+    #         header_classnames = Output(
+    #             {
+    #                 'type': 'result-header-single-config',
+    #                 'table': ALL,
+    #                 'metamodel': ALL,
+    #             },
+    #             'className'
+    #         )
+    #     ),
+    #     inputs = dict(
+    #         trigger_check_stale = Input(
+    #             'trigger-check-stale', 'data'
+    #         )
+    #     ),
+    #     state = dict(
+    #         headers = dict(
+    #             parent_component = State(
+    #                 {
+    #                     'type': 'result-header-single-config',
+    #                     'table': ALL,
+    #                     'metamodel': ALL,
+    #                 },
+    #                 'data-parent-component'
+    #             ),
+    #             parent_component_revision = State(
+    #                 {
+    #                     'type': 'result-header-single-config',
+    #                     'table': ALL,
+    #                     'metamodel': ALL,
+    #                 },
+    #                 'data-parent-component-revision'
+    #             ),
+    #             class_name = State(
+    #                 {
+    #                     'type': 'result-header-single-config',
+    #                     'table': ALL,
+    #                     'metamodel': ALL,
+    #                 },
+    #                 'className'
+    #             ),
+    #             id = State(
+    #                 {
+    #                     'type': 'result-header-single-config',
+    #                     'table': ALL,
+    #                     'metamodel': ALL,
+    #                 },
+    #                 'id'
+    #             )
+    #         )
+    #     ),
+    #     prevent_initial_call = True
+    # )
+    # def update_result_header_staleness(
+    #     headers, **kwargs
+    # ):
+    #     component_ids = list(set(headers['parent_component']))
+    #     current_revisions = app.project_provider._component_provider.get_component_metadata(
+    #         component_ids,
+    #         'revision'
+    #     )
 
-        rval = []
-        for parent_component, parent_revision, cn, id in zip(headers['parent_component'], headers['parent_component_revision'], headers['class_name'], headers['id']):
-            r0 = int(parent_revision)
-            r1 = int(current_revisions[parent_component]['revision'])
-            logger.debug(
-                'Checking staleness for Result Header ID: %s; Drawn: %d; Live: %d; Component ID: %s',
-                id, r0, r1, parent_component
-            )
-            if r0 != r1:
-                if not 'stale' in cn:
-                    cn = (cn + ' stale').strip()
-            else:
-                if 'stale' in cn:
-                    cn = cn.replace(' stale', '').strip()
-            rval.append(cn)
+    #     rval = []
+    #     for parent_component, parent_revision, cn, id in zip(headers['parent_component'], headers['parent_component_revision'], headers['class_name'], headers['id']):
+    #         r0 = -1 if parent_revision is None else int(parent_revision)
+    #         r1 = int(current_revisions[parent_component]['revision'])
+    #         logger.debug(
+    #             'Checking staleness for Result Header ID: %s; Drawn: %d; Live: %d; Component ID: %s',
+    #             id, r0, r1, parent_component
+    #         )
+    #         if r0 != r1:
+    #             if not 'stale' in cn:
+    #                 cn = (cn + ' stale').strip()
+    #         else:
+    #             if 'stale' in cn:
+    #                 cn = cn.replace(' stale', '').strip()
+    #         rval.append(cn)
         
-        return dict(header_classnames = rval)
+    #     return dict(header_classnames = rval)
