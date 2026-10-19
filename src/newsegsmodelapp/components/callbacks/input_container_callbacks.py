@@ -388,7 +388,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                             case _:
                                 bound['upper'] = new_val
 
-                        provider._component_provider.upsert_component(dsa_config)
+                        provider._component_provider.upsert_component(dsa_config, project_id = active_project_id)
                         provider.invalidate_cache_for_component(lproj.id)
                         
             case 'dsaboundtype':

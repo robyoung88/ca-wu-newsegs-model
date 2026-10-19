@@ -197,17 +197,17 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
                 )
             mdl = model_provider.get_component(lmm.model.id)
             mdl.location = lmm.location
-            model_provider.upsert_component(mdl, force = True)
+            model_provider.upsert_component(mdl, force = True, project_id = active_project_id)
             app.project_provider.metamodel_provider.set_component_metadata(
                 lmm.id,
                 'location',
                 json.dumps(mdl.location.to_dict())
             )
             provider.metamodel_provider.set_component_metadata(
-                lmm.id, 'lat', mdl.location.lat, increment_revision = False
+                lmm.id, 'lat', mdl.location.lat, increment_revision = False, project_id = active_project_id
             )
             provider.metamodel_provider.set_component_metadata(
-                lmm.id, 'lon', mdl.location.lon, increment_revision = False
+                lmm.id, 'lon', mdl.location.lon, increment_revision = False, project_id = active_project_id,
             )
             provider.increment_revision(lproj.id)
             provider.metamodel_provider.increment_revision(lmm.id)

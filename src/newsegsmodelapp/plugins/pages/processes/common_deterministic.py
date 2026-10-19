@@ -88,7 +88,7 @@ def deterministic_run_metamodel(
         # incremented.
         if mm.model.chain_modified:
             table_increment = True
-            project_provider.metamodel_provider._em_provider.upsert_component(mm.model)
+            project_provider.metamodel_provider._em_provider.upsert_component(mm.model, project_id = proj.id)
 
     if check_cancel_status():
         raise InterruptedError(f'Process {run_id} has been cancelled.')
@@ -107,7 +107,7 @@ def deterministic_run_metamodel(
         # incremented.
         if mm.finance.chain_modified:
             table_increment = True
-            project_provider.metamodel_provider._fm_provider.upsert_component(mm.finance)
+            project_provider.metamodel_provider._fm_provider.upsert_component(mm.finance, project_id = proj.id)
 
         # Invalidate downstream tables
         if table_increment:

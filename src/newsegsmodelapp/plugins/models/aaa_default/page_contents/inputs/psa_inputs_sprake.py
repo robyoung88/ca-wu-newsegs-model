@@ -234,7 +234,7 @@ def handle_psa_settings(
         return_dict['trigger_data'][idx] = now
 
     # Sync configuration to store
-    provider._component_provider.upsert_component(psa_config)
+    provider._component_provider.upsert_component(psa_config, project_id = active_project_id)
     
     # TODO: Invalidate only PSA outputs
     # Currently, we have to invalidate all outputs even though these

@@ -334,7 +334,8 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         # By changing the metadata, the MM should pick up the new name next time it is
         # taken from the store as the revision will by incremented by default
-        provider.metamodel_provider.set_component_metadata(mm.id, 'label', new_name)
+        # Give the project ID to invalidate cache
+        provider.metamodel_provider.set_component_metadata(mm.id, 'label', new_name, project_id = active_project_id)
 
         logger.info(
             'Renamed metamodel %s; Old name: %s; New name: %s;',
@@ -465,7 +466,6 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         provider.set_component_metadata(
             lproj.id, 'focussed_metamodel_id',
             mm_id, increment_revision = False,
-            invalidate_cache = True,
         )
 
         logger.info(

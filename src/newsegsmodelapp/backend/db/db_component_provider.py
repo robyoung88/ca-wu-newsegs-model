@@ -286,8 +286,17 @@ class FromDatabaseNewsegsComponentProvider(
         self, 
         component: NewsegsComponent | SequenceNotStr[NewsegsComponent], 
         force: bool = False,
-        tbl: Optional[sa.Table] = None
+        tbl: Optional[sa.Table] = None,
+        project_id: Optional[str] = None,
     ) -> None:
+        """_summary_
+
+        Args:
+            component (NewsegsComponent | SequenceNotStr[NewsegsComponent]): _description_
+            force (bool, optional): _description_. Defaults to False.
+            tbl (Optional[sa.Table], optional): _description_. Defaults to None.
+            project_id (Optional[str], optional): Cache invalidate this project if upsert results in table change. Defaults to None.
+        """
         if tbl is None:
             tbl = self._table
         component = self._expand_component_sequence(component)
@@ -374,6 +383,10 @@ class FromDatabaseNewsegsComponentProvider(
             if insert_payload:
                 insert_stmt = tbl.insert()
                 conn.execute(insert_stmt, insert_payload)
+
+            if project_id and (rev_payload or update_payload or insert_payload):
+                # Cache invalidate by touching the project table
+                conn.execute(sa.update(tbls.projects).where(tbls.projects.c.id == project_id).values(id = project_id))
 
         logger.debug(
             'Inserted %d components into table %s: %s',
@@ -563,7 +576,8 @@ class FromDatabaseNewsegsComponentProvider(
         component_id: str | SequenceNotStr[str], 
         metadata_id: str, 
         metadata_value: Any,
-        increment_revision: bool = True
+        increment_revision: bool = True,
+        project_id: Optional[str] = None,
     ):
         
         pk_col = list(self._table.primary_key.columns)[0]
@@ -598,6 +612,9 @@ class FromDatabaseNewsegsComponentProvider(
 
         with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(stmt)
+            if project_id:
+                # Cache invalidate by touching the project table
+                conn.execute(sa.update(tbls.projects).where(tbls.projects.c.id == project_id).values(id = project_id))
 
         return
 
@@ -730,12 +747,13 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
         self,
         component: NewsegsComponent | SequenceNotStr[NewsegsComponent], 
         force: bool = False,
-        tbl: sa.Table | None = None
+        tbl: sa.Table | None = None,
+        project_id: Optional[str] = None
     ) -> None:
         if isinstance(component, NewsegsModelInterface) or isinstance(component, Sequence) and all(isinstance(x, NewsegsModelInterface) for x in component):
-            return super().upsert_component(component, force, tbl)
+            return super().upsert_component(component, force, tbl, project_id = project_id)
         else:
-            return self._component_provider.upsert_component(component, force, tbl)
+            return self._component_provider.upsert_component(component, force, tbl, project_id = project_id)
 
     @override
     def _delete_one_component(
@@ -881,12 +899,13 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
         self,
         component: NewsegsComponent | SequenceNotStr[NewsegsComponent], 
         force: bool = False,
-        tbl: sa.Table | None = None
+        tbl: sa.Table | None = None,
+        project_id: Optional[str] = None
     ) -> None:
         if isinstance(component, NewsegsFinanceInterface) or isinstance(component, Sequence) and all(isinstance(x, NewsegsFinanceInterface) for x in component):
-            return super().upsert_component(component, force, tbl)
+            return super().upsert_component(component, force, tbl, project_id = project_id)
         else:
-            return self._component_provider.upsert_component(component, force, tbl)
+            return self._component_provider.upsert_component(component, force, tbl, project_id = project_id)
 
     @override
     def _delete_one_component(
@@ -1257,7 +1276,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         self,
         component: NewsegsComponent | SequenceNotStr[NewsegsComponent],
         force: bool = False,
-        tbl: sa.Table | None = None
+        tbl: sa.Table | None = None,
+        project_id: Optional[str] = None,
     ) -> None:
         if isinstance(component, NewsegsComponent):
             if isinstance(component, NewsegsMetaModel):
@@ -1265,7 +1285,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 self.variable_provider.upsert_variable(list(component.variables.values()))
                 component.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
                 
-                rval = super().upsert_component(component, force, tbl)
+                rval = super().upsert_component(component, force, tbl, project_id = project_id)
                 # if component.model:
                 #     self._em_provider.upsert_component(component.model, force)
                 # if component.finance:
@@ -1273,11 +1293,11 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 self._set_metamodel_variable_junction(component)
                 return rval
             elif isinstance(component, NewsegsModelInterface):
-                return self._em_provider.upsert_component(component, force, tbl)
+                return self._em_provider.upsert_component(component, force, tbl, project_id = project_id)
             elif isinstance(component, NewsegsFinanceInterface):
-                return self._fm_provider.upsert_component(component, force, tbl)
+                return self._fm_provider.upsert_component(component, force, tbl, project_id = project_id)
             else:
-                return self._component_provider.upsert_component(component, force, tbl)
+                return self._component_provider.upsert_component(component, force, tbl, project_id = project_id)
         else:
             metamodel_indices = []
             model_indices = []
@@ -1296,24 +1316,27 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             if metamodel_indices:
                 for idx in metamodel_indices:
                     comp = component[idx]
-                    self.upsert_component(comp, force, tbl)
+                    self.upsert_component(comp, force, tbl, project_id = project_id)
             if model_indices:
                 self._em_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in model_indices],
                     force,
-                    tbl
+                    tbl,
+                    project_id = project_id
                 )
             if finance_indices:
                 self._fm_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in finance_indices],
                     force,
-                    tbl
+                    tbl,
+                    project_id = project_id
                 )
             if component_indices:
                 self._component_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in component_indices],
                     force,
-                    tbl
+                    tbl,
+                    project_id = project_id
                 )
 
     @override
@@ -1750,17 +1773,18 @@ class FromDatabaseNewsegsProjectProvider(
         self,
         component: NewsegsComponent | SequenceNotStr[NewsegsComponent],
         force: bool = False,
-        tbl: sa.Table | None = None
+        tbl: sa.Table | None = None,
+        project_id: Optional[str] = None,
     ) -> None:
         if isinstance(component, NewsegsComponent):
             if isinstance(component, NewsegsProject):
                 return self._upsert_project(component, force, tbl)
             elif isinstance(component, NewsegsMetaModel):
-                return self.metamodel_provider.upsert_component(component, force)
+                return self.metamodel_provider.upsert_component(component, force, project_id = project_id)
             elif isinstance(component, Variable):
                 return self.variable_provider.upsert_variable(component, force)
             else:
-                return self._component_provider.upsert_component(component, force, tbl)
+                return self._component_provider.upsert_component(component, force, tbl, project_id = project_id)
         else:
             project_indices = []
             metamodel_indices = []
@@ -1778,11 +1802,11 @@ class FromDatabaseNewsegsProjectProvider(
             if project_indices:
                 for idx in project_indices:
                     comp = component[idx]
-                    self.upsert_component(comp)
+                    self.upsert_component(comp, project_id = project_id)
             if metamodel_indices:
                 self.metamodel_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in metamodel_indices],
-                    force
+                    force, project_id = project_id
                 )
             if variable_indices:
                 self.variable_provider.upsert_variable(
@@ -1793,7 +1817,7 @@ class FromDatabaseNewsegsProjectProvider(
                 self._component_provider.upsert_component(
                     [x for i, x in enumerate(component) if i in component_indices],
                     force,
-                    tbl
+                    tbl, project_id = project_id
                 )
 
     def _get_project_details_columns(self):
@@ -2278,24 +2302,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
             if id_ in self._project_cache:
                 del self._project_cache[id_]
             if id_ in self._lightweight_project_cache:
-                del self._lightweight_project_cache[id_]
-
-    @override
-    def set_component_metadata(
-        self, 
-        component_id, 
-        metadata_id, 
-        metadata_value, 
-        increment_revision = True,
-        invalidate_cache = True
-    ):
-        super().set_component_metadata(
-            component_id, metadata_id, 
-            metadata_value, increment_revision
-        )
-        if invalidate_cache:
-            self.invalidate_cache_for_component(component_id)
-        
+                del self._lightweight_project_cache[id_]        
 
 def get_component_critical_state(component):
     return {
