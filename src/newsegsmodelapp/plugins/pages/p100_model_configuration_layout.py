@@ -178,14 +178,14 @@ def add_deterministic_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'deterministic_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
     @app.callback(
         Output('trigger-check-requests', 'data', allow_duplicate = True),
@@ -201,14 +201,14 @@ def add_deterministic_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'deterministic_run_project',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
 model_configuration_page = Page(
     id = PAGE_TYPE,

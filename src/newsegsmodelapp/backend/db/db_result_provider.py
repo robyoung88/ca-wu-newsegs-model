@@ -61,11 +61,12 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             raise TypeError(f'parent_component should by NewsegsComponent or LightweightDataholdingNewsegsComponent; is {type(parent_component)}')
         
         if request:
-            if request.trigger_run_id != -1:
+            odict['run_id'] = request.run_id
+            if request.trigger_request_id != -1:
                 # By default, store results with the inciting run id of the chain
-                odict['run_id'] = request.trigger_run_id
+                odict['request_id'] = request.trigger_request_id
             else:
-                odict['run_id'] = request.run_id
+                odict['request_id'] = request.request_id
         return odict
 
     @override
@@ -97,16 +98,18 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         stmt = self._table.insert().values(result_details)
         if request:
-            logger.info(
-                'Saving Result: Type = %s; Request ID: %d; Process Run = %d; Triggering Run = %d; Attached to component id %s revision %d',
-                result_details['result_type'], request.request_id, request.run_id, request.trigger_run_id,
+            logger.debug(
+                'Saving Result: Type = %s; Request ID: %d; Process Run ID = %d; '
+                'Triggering Request ID = %d; Attached to Component ID = %s; revision = %d;',
+                result_details['result_type'], request.request_id, request.run_id, request.trigger_request_id,
                 result_details['component_config_id'], result_details['component_config_revision']
             )
         else:
-            logger.info(
-                'Saving Result: Type = %s; Attached to component id %s revision %d - no request details provided',
-                result_details['result_type'],
-                result_details['component_config_id'], result_details['component_config_revision']
+            logger.debug(
+                'Saving Result: Type = %s; Attached to Component ID = %s; revision = %d; '
+                '- no request details provided',
+                result_details['result_type'], result_details['component_config_id'], 
+                result_details['component_config_revision']
             )   
         try:
             write_with_retries(self._get_engine(writer = True), stmt)
@@ -119,15 +122,17 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
 
         if request:
             logger.info(
-                'Result saved: Type = %s; Request ID = %d; Process Run = %d; Triggering Run = %d; Attached to component id %s revision %d; Filename = %s',
-                result_details['result_type'], request.request_id, request.run_id, request.trigger_run_id,
+                'Result saved: Type = %s; Request ID = %d; Process Run ID = %d; ' 
+                'Triggering Request ID = %d; Attached to Component ID = %s; revision = %d; Filename = %s;',
+                result_details['result_type'], request.request_id, request.run_id, request.trigger_request_id,
                 result_details['component_config_id'], result_details['component_config_revision'], saved_path
             )
         else:
             logger.info(
-                'Result saved: Type = %s; Attached to Component ID = %s; revision = %d; - no request details provided. Filename = %s ',
-                result_details['result_type'],
-                result_details['component_config_id'], result_details['component_config_revision'], saved_path,
+                'Result saved: Type = %s; Attached to Component ID = %s; revision = %d; '
+                '- no request details provided. Filename = %s ',
+                result_details['result_type'], result_details['component_config_id'],
+                result_details['component_config_revision'], saved_path,
             )           
              
     def duplicate_result(
@@ -137,10 +142,10 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         new_request: RunRequest
     ):
         """Duplicate a result row in response to a new request providing the same data"""
-        if new_request.trigger_run_id != -1:
-            new_run_id = new_request.trigger_run_id
+        if new_request.trigger_request_id != -1:
+            new_request_id = new_request.trigger_request_id
         else:
-            new_run_id = new_request.run_id
+            new_request_id = new_request.request_id
 
         # 1. Define columns to insert (excluding auto-increment primary key 'id')
         insert_cols = [c for c in self._table.c if c.name != 'result_id']
@@ -163,7 +168,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         # 3. Build the SELECT expression, substituting run_id with the new literal
         select_stmt = sa.select(
             *[
-                sa.literal(new_run_id).label('run_id') if c.name == 'run_id' else latest_subq.c[c.name]
+                sa.literal(new_request_id).label('request_id') if c.name == 'request_id' else latest_subq.c[c.name]
                 for c in insert_cols
             ]
         )
@@ -174,15 +179,17 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             select_stmt
         )
 
-        logger.info(
-            'Duplicating result of type %s attached to component %s with revision %d for Run ID %d',
-            result_type, parent_component.id, parent_component.revision, new_run_id
+        logger.debug(
+            'Duplicating result of type %s attached to Component ID = %s; with revision = %d; '
+            'for Request ID = %d;',
+            result_type, parent_component.id, parent_component.revision, new_request_id
         )
         with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(insert_stmt)
         logger.info(
-            'Successfully duplicated result of type %s attached to component %s with revision %d for Run ID %d',
-            result_type, parent_component.id, parent_component.revision, new_run_id
+            'Duplicated result of type %s attached to Component ID = %s; with revision = %d; '
+            'for Request ID = %d;',
+            result_type, parent_component.id, parent_component.revision, new_request_id
         )
 
     @override
@@ -245,10 +252,10 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         return (obj, rrs)
 
     @override
-    def get_run_result(
+    def get_request_result(
         self, 
         result_type: str, 
-        run_id: int, 
+        request_id: int, 
         parent_component: Optional[NewsegsComponent | str] = None
     ) -> tuple[Any, int] | tuple[None, None]:
         stmt = (
@@ -258,7 +265,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 self._table.c.component_config_revision,
             )
             .where(self._table.c.result_type == result_type)
-            .where(self._table.c.run_id == run_id)
+            .where(self._table.c.request_id == request_id)
         )
         if parent_component:
             if isinstance(parent_component, str):
@@ -312,7 +319,7 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     def result_exists(
         self,
         result_type: str,
-        run_id: int,
+        request_id: int,
         parent_component: NewsegsComponent | LightweightNewsegsComponent | str,
         revision: Optional[int] = None,
     ) -> int | bool:
@@ -335,9 +342,9 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 self._table.c.component_config_id == parent_component.id
             )
 
-        if run_id != -1:
+        if request_id != -1:
             stmt = stmt.where(
-                self._table.c.run_id == run_id
+                self._table.c.request_id == request_id
             )
         elif revision is not None:
             stmt = stmt.where(
@@ -408,7 +415,7 @@ class CachedFromDatabaseResultProvider(
             )
         if rrs is None or rrs != result_key[2]:
             logger.debug(
-                'Returning stale result for: Type = %s, Parent = %s, Revision = %s - provided revision is %d',
+                'Returning stale result for: Type = %s, Parent = %s, Revision = %s - provided revision is %s;',
                 *result_key, rrs
             )
         if obj is not None and rrs == result_key[2]:

@@ -32,19 +32,19 @@ class NewsegsResultProviderInterface(metaclass = ABCMeta):
         """
 
     @abstractmethod
-    def get_run_result(
+    def get_request_result(
         self,
         result_type: str,
-        run_id: int,
+        request_id: int,
         parent_component: Optional[NewsegsComponent | str] = None,
     ) -> tuple[Any, int] | tuple[None, None]:
-        """Retrieve a result from a specific run.
+        """Retrieve a result produced for a specific request.
 
-        For single results per run, no need to specify a parent_component;
+        For single results per request, no need to specify a parent_component;
         If results are one per metamodel, include the parent component or a ValueError will be
         thrown for multiple returned results.
 
         Returns:
             tuple[object, int] - The result and the revision of the component generating the result.
-            None if no applicable results are found.
+            None, None if no applicable results are found.
         """

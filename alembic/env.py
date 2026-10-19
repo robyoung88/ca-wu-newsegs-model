@@ -57,7 +57,7 @@ def run_migrations_online() -> None:
 
     """
     from newsegsmodelapp.backend import db
-    connectable = db.get_engine()
+    connectable = db.get_engine(writer = True)
 
     with connectable.connect() as connection:
         context.configure(

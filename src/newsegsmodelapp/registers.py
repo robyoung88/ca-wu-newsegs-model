@@ -18,6 +18,7 @@ from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import L
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
+from newsegsmodelapp.backend.db import db_tables as tbls
 
 # -------------------------------------------------------------------------
 # APP PAGE REGISTER
@@ -186,19 +187,23 @@ be found in RUN_PROCEDURE_REGISTER.)
 
 @dataclass
 class RunRequest(SerialisableDataclass):
-    request_id: int = 0
-    run_id: int = 0
-    trigger_run_id: int = -1
-    project_id: str = ''
-    model_type: str = 'default'
+    request_id: int = -1
+    request_type: str = ''
+    
+    trigger_request_id: int = -1
+    trigger_request_type: str = ''
+    
+    run_id: int = -1
+    
     request_label: str = ''
     request_class: str = 'run'
-    request_type: str = ''
+
+    project_id: str = ''
+    model_type: str = 'default'
+    
     payload: str = ''
-    status: str = ''
-    progress: float = 0.0
-    progress_message: str = ''
-    cancel_requested: bool = False
+    status: tbls.REQUEST_STATUS = 'AWAITING DISPATCH'
+    
     background_procedure: bool = True 
 
 class RunRequestHandler(Protocol):
@@ -280,13 +285,13 @@ def register_run_procedure(
             raise KeyError(f'A run procedure already exists for key {name}')
         def wrapped(request: RunRequest, *args, **kwargs):
             logger.info(
-                'Run procedure %s for Request ID %d initiated - Run ID: %d; Triggering Run: %d; Project: %s;', 
-                name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
+                'Run procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, request.run_id, request.trigger_request_id, request.project_id
             )
             rval = func(request, *args, **kwargs)
             logger.info(
-                'Run procedure %s for Request ID %d completed with message %s - Run ID: %d; Triggering Run: %d; Project: %s;', 
-                name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
+                'Run procedure %s for Request ID = %d; completed with message %s - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_request_id, request.project_id
             )
             return rval
         RUN_PROCEDURE_REGISTER[name] = wrapped
@@ -303,7 +308,6 @@ def register_run_procedure(
 @dataclass
 class PostprocessRequest(RunRequest):
     request_class: str = 'postprocess'
-    trigger_request_type: str = ''
 
 class PostprocessRequestHandler(Protocol):
     def __call__(
@@ -372,13 +376,13 @@ def register_postprocess_procedure(
                 raise KeyError(f'Postprocess procedure already exists for key {key}')
         def wrapped(request: RunRequest, *args, **kwargs):
             logger.info(
-                'Postprocess procedure %s for Request ID %d initiated - Run ID: %d; Triggering Run: %d; Project: %s;', 
-                name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
+                'Postprocess procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, request.run_id, request.trigger_request_id, request.project_id
             )
             rval = func(request, *args, **kwargs)
             logger.info(
-                'Postprocess procedure %s for Request ID %d completed with message %s - Run ID: %d; Triggering Run: %d; Project: %s;', 
-                name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
+                'Postprocess procedure %s for Request ID = %d; completed with message %s - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_request_id, request.project_id
             )
             return rval
         POSTPROCESS_REGISTER[key] = wrapped
@@ -413,9 +417,6 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 @dataclass
 class TableDrawRequest(RunRequest):
     request_class: str = 'tabledraw'
-    trigger_request_type: str = ''
-    
-    ann_hori_toggle: bool = False
 
 class TableDrawRequestHandler(Protocol):
     def __call__(
@@ -486,13 +487,13 @@ def register_table_draw(
                 raise KeyError(f'Table draw artist already exists for key {key}')
         def wrapped(request: RunRequest, *args, **kwargs):
             logger.info(
-                'Table draw procedure %s for Request ID %d initiated - Run ID: %d; Triggering Run: %d; Project: %s;', 
-                name, request.request_id, request.run_id, request.trigger_run_id, request.project_id
+                'Table draw procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, request.run_id, request.trigger_request_id, request.project_id
             )
             rval = func(request, *args, **kwargs)
             logger.info(
-                'Table draw procedure %s for Request ID %d completed with message %s - Run ID: %d; Triggering Run: %d; Project: %s;', 
-                name, request.request_id, rval, request.run_id, request.trigger_run_id, request.project_id
+                'Table draw procedure %s for Request ID = %d; completed with message %s - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_request_id, request.project_id
             )
             return rval
         TABLE_DRAW_REGISTER[key] = wrapped

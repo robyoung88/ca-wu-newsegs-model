@@ -29,7 +29,8 @@ def _postprocess_request_factory(postproc_request_type: str, **kwargs):
         rdict['request_type'] = postproc_request_type
         rdict['trigger_request_type'] = request_type
         # The trigger should be carried forward from the inciting event
-        rdict['trigger_run_id'] = request.trigger_run_id if request.trigger_run_id != -1 else rdict.pop('run_id', -1)
+        rdict['trigger_request_id'] = request.trigger_request_id if request.trigger_request_id != -1 else rdict.pop('request_id', -1)
+        _ = rdict.pop('run_id', -1)
         if config:
             payload = rdict.get('payload', '{}')
             try:
@@ -103,7 +104,7 @@ def _generation_to_interface_sprake(
         mdl = mm.model
 
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             mdl.table_config.id, revision = mdl.table_config.revision
         ) is not False:
             continue
@@ -114,7 +115,7 @@ def _generation_to_interface_sprake(
         )
         full_model = mm_provider._em_provider.get_component(mm.model.id)
 
-        any_stale = full_model.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        any_stale = full_model.reattach_results(result_provider, True, request_id = request.trigger_request_id)
 
         res = gen_results_to_interface_sprake(full_model)
         result_provider.upsert_result(
@@ -166,7 +167,7 @@ def _consumption_to_interface_sprake(
         mdl = mm.model
 
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             mdl.table_config.id, revision = mdl.table_config.revision
         ) is not False:
             continue
@@ -178,7 +179,7 @@ def _consumption_to_interface_sprake(
         full_model = mm_provider._em_provider.get_component(mm.model.id)
 
         any_stale = full_model.reattach_results(
-            result_provider, True, run_id = request.trigger_run_id
+            result_provider, True, request_id = request.trigger_request_id
         )
 
         res = consumption_results_to_interface_sprake(full_model) 
@@ -231,7 +232,7 @@ def _storage_to_interface_sprake(
         mdl = mm.model
 
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             mdl.table_config.id, revision = mdl.table_config.revision
         ) is not False:
             continue
@@ -242,7 +243,7 @@ def _storage_to_interface_sprake(
         )
         full_model = mm_provider._em_provider.get_component(mm.model.id)
 
-        any_stale = full_model.reattach_results(result_provider, True, run_id = request.trigger_run_id)
+        any_stale = full_model.reattach_results(result_provider, True, request_id = request.trigger_request_id)
 
         res = stor_results_to_interface_sprake(full_model) # pyright: ignore[reportArgumentType]
         result_provider.upsert_result(
@@ -294,7 +295,7 @@ def _net_to_interface_sprake(
         mdl = mm.model
 
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             mdl.table_config.id, revision = mdl.table_config.revision
         ) is not False:
             continue
@@ -306,7 +307,7 @@ def _net_to_interface_sprake(
         full_model = mm_provider._em_provider.get_component(mm.model.id)
 
         any_stale = full_model.reattach_results(
-            result_provider, True, run_id = request.trigger_run_id
+            result_provider, True, request_id = request.trigger_request_id
         )
         
         res = net_results_to_interface_sprake(full_model) # pyright: ignore[reportArgumentType]
@@ -359,7 +360,7 @@ def _finance_benefits_to_interface_sprake(
         fnc = mm.finance
 
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             fnc.table_config.id, revision = fnc.table_config.revision
         ) is not False:
             continue
@@ -373,7 +374,7 @@ def _finance_benefits_to_interface_sprake(
         full_finance.set_model(full_model, dirty = False)
 
         any_stale = full_model.reattach_results(
-            result_provider, True, run_id = request.trigger_run_id
+            result_provider, True, request_id = request.trigger_request_id
         )
 
         res = finance_benefits_results_to_interface_sprake(full_model, full_finance) # pyright: ignore[reportArgumentType]
@@ -426,7 +427,7 @@ def _finance_costs_to_interface_sprake(
         fnc = mm.finance
         
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             fnc.table_config.id, revision = fnc.table_config.revision
         ) is not False:
             continue
@@ -440,7 +441,7 @@ def _finance_costs_to_interface_sprake(
         full_finance.set_model(full_model, dirty = False)
 
         any_stale = full_model.reattach_results(
-            result_provider, True, run_id = request.trigger_run_id
+            result_provider, True, request_id = request.trigger_request_id
         )
 
         res = finance_costs_results_to_interface_sprake(full_model, full_finance) # pyright: ignore[reportArgumentType]
@@ -492,7 +493,7 @@ def _finance_value_to_interface_sprake(
         fnc = mm.finance
         
         if result_provider.result_exists(
-            result_type, request.trigger_run_id, 
+            result_type, request.trigger_request_id, 
             fnc.table_config.id, revision = fnc.table_config.revision
         ) is not False:
             continue
@@ -506,7 +507,7 @@ def _finance_value_to_interface_sprake(
         full_finance.set_model(full_model, dirty = False)
 
         any_stale = full_model.reattach_results(
-            result_provider, True, run_id = request.trigger_run_id
+            result_provider, True, request_id = request.trigger_request_id
         )
 
 
@@ -543,7 +544,7 @@ def _dsa_to_interface(
     lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
 
     if result_provider.result_exists(
-        'postproc_dsa_single_metamodel_data', request.trigger_run_id, 
+        'postproc_dsa_single_metamodel_data', request.trigger_request_id, 
         lmm.table_config.id, revision = lmm.table_config.revision
     ) is not False:
         return 'ok'
@@ -594,7 +595,7 @@ def _psa_to_interface(
     lmm = next(iter(filter(lambda x: x.id == mm_id, lproj.metamodels)))
 
     if result_provider.result_exists(
-        'postproc_psa_single_metamodel_data', request.trigger_run_id, 
+        'postproc_psa_single_metamodel_data', request.trigger_request_id, 
         lmm.table_config.id, revision = lmm.table_config.revision
     ) is not False:
         return 'ok'

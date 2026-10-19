@@ -16,11 +16,11 @@ class RequestHandlerInterface(metaclass = ABCMeta):
         procedure_class: Optional[str] = None,
         config: Optional[dict] = None,
         triggering_request: Optional[registers.RunRequest] = None,
-    ) -> int | None:
+    ) -> registers.RunRequest:
         """Add a new request to the dispatch list.
         
         Returns:
-            [int] ID of the request.
+            [RunRequest] The full RunRequest object for the added request.
         """
 
     @overload
@@ -37,6 +37,18 @@ class RequestHandlerInterface(metaclass = ABCMeta):
         request_id: int | Sequence[int]
     ) -> registers.RunRequest | list[registers.RunRequest]:
         """Get one or more requests by id."""
+
+    def get_active_requests(
+        self,
+        active_project_id: str | None = None
+    ) -> list[registers.RunRequest]:
+        """A list of RunRequests requiring management.
+        
+        Requests will either have status:
+            - "AWAITING DISPATCH" (i.e. requiring a new run generated)
+            or
+            - "DISPATCHED" (i.e. with a run assigned and without having processed a completion of that run)
+        """
 
     @abstractmethod
     def get_new_requests(

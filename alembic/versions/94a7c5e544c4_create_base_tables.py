@@ -1,8 +1,8 @@
-"""Initial table creation
+"""Create base tables
 
-Revision ID: dbb8dbbdb194
+Revision ID: 94a7c5e544c4
 Revises: 
-Create Date: 2026-10-09 12:47:04.726146
+Create Date: 2026-10-18 13:21:23.666677
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'dbb8dbbdb194'
+revision: str = '94a7c5e544c4'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -115,6 +115,7 @@ def upgrade() -> None:
     op.create_table('results',
     sa.Column('result_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('component_config_id', sa.String(length=42), nullable=True),
+    sa.Column('request_id', sa.Integer(), nullable=True),
     sa.Column('run_id', sa.Integer(), nullable=True),
     sa.Column('component_type', sa.String(), nullable=True),
     sa.Column('component_class', sa.String(), nullable=True),
@@ -191,36 +192,21 @@ def upgrade() -> None:
     )
     op.create_table('requests',
     sa.Column('request_id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('project_id', sa.String(length=38), nullable=False),
-    sa.Column('request_class', sa.String(), nullable=True),
     sa.Column('request_type', sa.String(), nullable=True),
-    sa.Column('payload', sa.String(), nullable=True),
-    sa.Column('dispatched', sa.Boolean(), nullable=True),
+    sa.Column('trigger_request_id', sa.Integer(), nullable=True),
+    sa.Column('trigger_request_type', sa.String(), nullable=True),
     sa.Column('run_id', sa.Integer(), nullable=True),
-    sa.Column('retry_number', sa.Integer(), nullable=True),
-    sa.Column('max_retries', sa.Integer(), nullable=True),
-    sa.Column('completed', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
-    sa.PrimaryKeyConstraint('request_id')
-    )
-    op.create_table('runs',
-    sa.Column('run_id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('project_id', sa.String(length=38), nullable=False),
-    sa.Column('model_type', sa.String(), nullable=True),
-    sa.Column('request_id', sa.Integer(), nullable=True),
     sa.Column('request_label', sa.String(), nullable=True),
     sa.Column('request_class', sa.String(), nullable=True),
-    sa.Column('request_type', sa.String(), nullable=True),
+    sa.Column('project_id', sa.String(length=38), nullable=False),
+    sa.Column('model_type', sa.String(), nullable=True),
     sa.Column('payload', sa.String(), nullable=True),
-    sa.Column('status', sa.String(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
-    sa.Column('modified_at', sa.DateTime(), nullable=True),
-    sa.Column('progress', sa.Float(), nullable=True),
-    sa.Column('progress_message', sa.String(), nullable=True),
-    sa.Column('cancel_requested', sa.Boolean(), nullable=True),
-    sa.Column('children_spawned', sa.Boolean(), nullable=True),
+    sa.Column('status', sa.String(length=24), nullable=True),
+    sa.Column('background_procedure', sa.Boolean(), nullable=True),
+    sa.Column('retry_number', sa.Integer(), nullable=True),
+    sa.Column('max_retries', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
-    sa.PrimaryKeyConstraint('run_id')
+    sa.PrimaryKeyConstraint('request_id')
     )
     op.create_table('sessions',
     sa.Column('session_id', sa.String(), nullable=False),
@@ -235,6 +221,18 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
     sa.PrimaryKeyConstraint('snapshot_id')
+    )
+    op.create_table('runs',
+    sa.Column('run_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('request_id', sa.Integer(), nullable=True),
+    sa.Column('status', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('modified_at', sa.DateTime(), nullable=True),
+    sa.Column('progress', sa.Float(), nullable=True),
+    sa.Column('progress_message', sa.String(), nullable=True),
+    sa.Column('cancel_requested', sa.Boolean(), nullable=True),
+    sa.ForeignKeyConstraint(['request_id'], ['requests.request_id'], ),
+    sa.PrimaryKeyConstraint('run_id')
     )
     op.create_table('snapshot_component_configs',
     sa.Column('snapshot_id', sa.Integer(), nullable=False),
@@ -360,6 +358,7 @@ def upgrade() -> None:
     sa.Column('snapshot_id', sa.Integer(), nullable=False),
     sa.Column('result_id', sa.Integer(), nullable=False),
     sa.Column('component_config_id', sa.String(length=42), nullable=True),
+    sa.Column('request_id', sa.Integer(), nullable=True),
     sa.Column('run_id', sa.Integer(), nullable=True),
     sa.Column('component_type', sa.String(), nullable=True),
     sa.Column('component_class', sa.String(), nullable=True),
@@ -438,9 +437,9 @@ def downgrade() -> None:
     op.drop_table('snapshot_em_configs')
     op.drop_table('snapshot_variable_configs')
     op.drop_table('snapshot_component_configs')
+    op.drop_table('runs')
     op.drop_table('snapshots')
     op.drop_table('sessions')
-    op.drop_table('runs')
     op.drop_table('requests')
     op.drop_table('project_variables')
     op.drop_table('project_metamodels')

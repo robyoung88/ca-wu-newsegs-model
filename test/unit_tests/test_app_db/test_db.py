@@ -986,7 +986,7 @@ class TestDatabaseStart(unittest.TestCase):
         self.assertIsNotNone(request_creator)
         request = request_creator(proj.id, proj_provider) # pyright: ignore[reportOptionalCall]
 
-        run_id = generate_claim_ticket(engine, request)
+        run_id, exists = generate_claim_ticket(engine, request)
 
         request.run_id = run_id
 
@@ -1241,7 +1241,7 @@ class TestDatabaseStart(unittest.TestCase):
             request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
             request = request_creator(proj.id, proj_provider)
             
-            run_id = generate_claim_ticket(write_engine, request)
+            run_id, exists = generate_claim_ticket(write_engine, request)
 
             request.run_id = run_id
             
@@ -1301,7 +1301,7 @@ class TestDatabaseStart(unittest.TestCase):
 
                 procedure = registers.get_postprocess_procedure(procedure_name, new_req)
 
-                pp_run_id = generate_claim_ticket(write_engine, new_req)
+                pp_run_id, exists = generate_claim_ticket(write_engine, new_req)
                 new_req.run_id = pp_run_id
 
                 is_ok = procedure(
@@ -1351,7 +1351,7 @@ class TestDatabaseStart(unittest.TestCase):
 
                     op_procedure = registers.get_table_draw(op_proc_name, op_req)
 
-                    op_run_id = generate_claim_ticket(write_engine, op_req)
+                    op_run_id, exists = generate_claim_ticket(write_engine, op_req)
                     op_req.run_id = op_run_id
 
                     is_ok = op_procedure(

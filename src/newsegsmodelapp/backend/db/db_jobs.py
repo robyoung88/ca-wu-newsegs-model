@@ -1,4 +1,5 @@
 import logging
+from typing import Sequence
 logger = logging.getLogger(__name__)
 
 from dataclasses import asdict
@@ -10,33 +11,57 @@ from newsegsmodelapp.backend.db.db import read_transaction, write_transaction, w
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelapp.backend.db import tables as tbls
 
-def generate_claim_ticket(engine: sa.Engine, job: RunRequest) -> int:
-    """Generate a claim ticket in the results table and return run (job) id."""
+def generate_claim_ticket(
+    engine: sa.Engine, 
+    request: RunRequest
+) -> tuple[int, bool]:
+    """Generate a claim ticket in the results table and return run (job) id and whether run is already existing."""
 
-    jobval = asdict(job)
-    del jobval['run_id']
-    jobval['payload'] = json.dumps(jobval)
-    jobval['status'] = 'CALCULATING'
-    valid_cols = set(tbls.runs.columns.keys())
-    for key in list(jobval.keys()):
-        if key not in valid_cols:
-            del jobval[key]
+    run_val = {
+        'request_id': request.request_id,
+        'status': 'CALCULATING'
+    }
 
-    stmt = (
+    run_exists_stmt = (
+        sa.select(tbls.runs.c.run_id)
+        .where(
+            tbls.runs.c.request_id == request.request_id,
+            tbls.runs.c.status.in_(['READY', 'CALCULATING', 'SUCCESS', 'COMPLETED'])
+        )
+    )
+
+    insert_stmt = (
         sa.insert(tbls.runs)
-        .values(jobval)
+        .values(run_val)
         .returning(tbls.runs.c.run_id)
     )
 
     with write_transaction(engine) as conn:
-        result = conn.execute(stmt)
+        existing = conn.execute(run_exists_stmt).scalar()
+        if existing:
+            return existing, True
+        
+        result = conn.execute(insert_stmt)
         row = result.fetchone()
-    if row is None:
-        raise ValueError(f'Claim ticket not generated for job {job}')
-    run_id = row[0]
+        if row is None:
+            raise ValueError(f'Claim ticket not generated for Request ID = {request.request_id}')
+        run_id = row[0]
+        logger.debug('Claim Ticket Run ID = %d; generated for Request ID = %s;', run_id, request.request_id)
 
-    job.run_id = run_id
-    return run_id
+        # Update the corresponding request record if request_id is available
+        if request.request_id is not None:
+            update_stmt = (
+                sa.update(tbls.requests)
+                .where(tbls.requests.c.request_id == request.request_id)
+                .values(
+                    status="DISPATCHED",
+                    run_id=run_id
+                )
+            )
+            conn.execute(update_stmt)
+
+    request.run_id = run_id
+    return run_id, False
 
 def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, message):
     """Pass progress information into the database."""
@@ -54,8 +79,8 @@ def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, mes
     )
     write_with_retries(engine, stmt, base_sleep = 0.02)
 
-def set_cancel_status(engine: sa.Engine, job_id: int, status: bool = True):
-    logger.info('Setting Cancel Status to %s: Run ID = %d;', status, job_id)
+def set_cancel_request_status(engine: sa.Engine, job_id: int, status: bool = True):
+    logger.info('Setting Run Cancel Request Status to %s: Run ID = %d;', status, job_id)
     stmt = (
         sa.update(tbls.runs)
         .where(tbls.runs.c.run_id == job_id)
@@ -73,15 +98,37 @@ def get_cancel_status(engine: sa.Engine, job_id: int):
         result = conn.execute(stmt).fetchone()
     return bool(result and result[0])
 
-def set_status_completed(engine: sa.Engine, job_id: int):
-    logger.debug('Setting Run Status to "SUCCESS": Run ID = %d;', job_id)
+def set_status_success(engine: sa.Engine, run_id: int | Sequence[int]):
+    """Call when run has completed request, but before postprocessing triggers have been applied."""
+    run_id = [run_id] if isinstance(run_id, int) else run_id
+    
+    for rid in run_id:
+        logger.debug('Setting Run Status to "SUCCESS": Run ID = %d;', rid)
+    
     stmt = (
         sa.update(tbls.runs)
         .values(
             status = 'SUCCESS', 
             progress = 1.0,
         )
-        .where(tbls.runs.c.run_id == job_id)
+        .where(tbls.runs.c.run_id.in_(run_id))
+    )
+
+    write_with_retries(engine, stmt)
+
+def set_status_completed(engine: sa.Engine, run_id: int | Sequence[int]):
+    """Call after run has had postprocess triggers applied and is safe to archive."""
+    run_id = [run_id] if isinstance(run_id, int) else run_id
+    
+    for rid in run_id:
+        logger.debug('Setting Run Status to "COMPLETED": Run ID = %d;', rid)
+    
+    stmt = (
+        sa.update(tbls.runs)
+        .values(
+            status = 'COMPLETED'
+        )
+        .where(tbls.runs.c.run_id.in_(run_id))
     )
 
     write_with_retries(engine, stmt)

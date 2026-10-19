@@ -689,14 +689,14 @@ def add_psa_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'psa_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
 psa_configuration_page = Page(
     id = PAGE_TYPE,

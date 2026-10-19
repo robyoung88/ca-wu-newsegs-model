@@ -24,7 +24,7 @@ BACKENDPORT = str(settings['BACKENDPORT'])
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_tables import runs
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_status, update_calculation_progress, get_cancel_status, set_status_completed, set_status_failed
+from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_request_status, update_calculation_progress, get_cancel_status, set_status_success, set_status_failed
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
@@ -33,6 +33,9 @@ import newsegsmodelapp.registers as registers
 import os
 
 POISON_PILL = b"__STOP__"
+
+class RunAlreadyExistsError(BaseException):
+    pass
 
 def worker_process(
     worker_id: str,
@@ -70,12 +73,13 @@ def worker_process(
 
                 request = cast(registers.RunRequest, pickle.loads(payload_bytes))
 
-                job_id = generate_claim_ticket(write_engine, request)
+                job_id, job_exists = generate_claim_ticket(write_engine, request)
 
                 response_data = {
                     'status': 'started',
-                    'worker': worker_id,
+                    'worker': worker_id if not job_exists else None,
                     'job_id': job_id,
+                    'prexisting': job_exists
                 }
 
                 response_bytes = pickle.dumps(response_data)
@@ -106,10 +110,14 @@ def worker_process(
                     socket.connect(f'tcp://{server}:{port}')
                     raise ValueError(f'Cannot send claim ticket back to client - database is unresponsive.')
 
+                if job_exists:
+                    # Loop back
+                    raise RunAlreadyExistsError
+
                 logger.info(
-                    'Worker %d initiating procedure %s for Request ID = %d; Run ID = %d, Triggering Run ID = %d',
+                    'Worker %d initiating procedure %s for Request ID = %d; Run ID = %d, Triggering Request ID = %d',
                     worker_id, request.request_type, request.request_id,
-                    job_id, request.trigger_run_id
+                    job_id, request.trigger_request_id
                 )
 
                 try:
@@ -137,7 +145,7 @@ def worker_process(
                         # Check if supervisor would like worker to terminate.
                         if stop_event is not None and stop_event.is_set():
                             # Set the job to cancelled and then return true
-                            set_cancel_status(write_engine, job_id)
+                            set_cancel_request_status(write_engine, job_id, True)
                             return True
                         else:
                             return get_cancel_status(read_engine, job_id)
@@ -146,7 +154,7 @@ def worker_process(
                     rq.run_id = job_id
 
                     # Hold back to allow the client to mark the job(s) as dispatched
-                    time.sleep(settings.get('WORKER_HOLDBACK_TIME_S', 0.01) + random.random() * settings.get('WORKER_HOLDBACK_JITTER', 0.01) )
+                    time.sleep(settings.get('WORKER_HOLDBACK_TIME_S', 0.00) + random.random() * settings.get('WORKER_HOLDBACK_JITTER', 0.00) )
                     
                     is_ok = runner(
                         rq,
@@ -158,23 +166,23 @@ def worker_process(
                     )
 
                     # Update the database marking the run successful
-                    set_status_completed(write_engine, job_id)
+                    set_status_success(write_engine, job_id)
                     logger.info(
-                        'Worker %d Completed procedure %s for Request ID = %d; with message %s; Run ID = %d; Triggering Run ID = %d. Ready for next request.',
+                        'Worker %d Completed procedure %s for Request ID = %d; with message %s; Run ID = %d; Triggering Request ID = %d. Ready for next request.',
                         worker_id, request.request_type, request.request_id, is_ok,
-                        job_id, request.trigger_run_id
+                        job_id, request.trigger_request_id
                     )
 
                 except Exception as e:
                     set_status_failed(write_engine, job_id, str(e))
                     logger.warning(
-                        'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d, Triggering Run ID = %d.',
+                        'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d; Triggering Request ID = %d;',
                         worker_id, rq.request_type, rq.request_id,
-                        job_id, rq.trigger_run_id,
+                        job_id, rq.trigger_request_id,
                         exc_info = True
                     )
             
-            except zmq.Again:
+            except (zmq.Again, RunAlreadyExistsError):
                 # Timeout hit (no message in 1 sec). Re-evaluate stop_event loop condition.
                 continue
             except Exception as e:
@@ -185,9 +193,10 @@ def worker_process(
                     pass
                 socket = context.socket(zmq.REP)
                 socket.connect(f'tcp://{server}:{port}')
-                logger.error('Worker %d encountered and error', worker_id, exc_info = True)
+                logger.error('Worker %d encountered an error', worker_id, exc_info = True)
             # Process loops back to recv, signalling to dealer that worker is free
-    
+
+
     finally:
         logger.info('Worker %d disposing engines and closing sockets.', worker_id)
         write_engine.dispose()

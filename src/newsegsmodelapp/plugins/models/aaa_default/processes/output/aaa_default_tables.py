@@ -37,7 +37,8 @@ def _table_draw_request_factory(postproc_request_type: str, **kwargs):
         rdict['request_type'] = postproc_request_type
         rdict['trigger_request_type'] = request_type
         # The trigger should be carried forward from the inciting event
-        rdict['trigger_run_id'] = request.trigger_run_id if request.trigger_run_id != -1 else rdict.pop('run_id', -1)
+        rdict['trigger_request_id'] = request.trigger_request_id if request.trigger_request_id != -1 else rdict.pop('request_id', -1)
+        _ = rdict.pop('run_id', -1)
         if config:
             payload = rdict.get('payload', '{}')
             try:
@@ -347,7 +348,7 @@ def _make_finance_tables_sprake(
     logger.debug('Getting lightweight project - Creating Table [%s]', 'table_finance')
     lproj = provider.get_lightweight_project(request.project_id)
 
-    if request.trigger_run_id != request.run_id:
+    if request.trigger_request_id != request.request_id and request.trigger_request_id != -1:
         # Have a downstream request. Only run full logic if
         # 1) All upstream tables have been created
         # 2) Downstream tables have not been made for this run
@@ -361,7 +362,7 @@ def _make_finance_tables_sprake(
         all_op_exist = True
         for tbl_nm in op_table_names:
             res_id = result_provider.result_exists(
-                tbl_nm, request.trigger_run_id,
+                tbl_nm, request.trigger_request_id,
                 lproj.table_config
             )
             if res_id is False:
@@ -402,7 +403,7 @@ def _make_finance_tables_sprake(
             
             pp_fnc_ben = result_provider.result_exists(
                 'postproc_finance_benefits', 
-                request.trigger_run_id,
+                request.trigger_request_id,
                 lmm.finance.table_config
             )
             if pp_fnc_ben == False:
@@ -413,7 +414,7 @@ def _make_finance_tables_sprake(
 
             pp_fnc_costs = result_provider.result_exists(
                 'postproc_finance_costs', 
-                request.trigger_run_id,
+                request.trigger_request_id,
                 lmm.finance.table_config
             )
             if pp_fnc_costs == False:
@@ -424,7 +425,7 @@ def _make_finance_tables_sprake(
 
             pp_fnc_value = result_provider.result_exists(
                 'postproc_finance_value', 
-                request.trigger_run_id,
+                request.trigger_request_id,
                 lmm.finance.table_config
             )
             if pp_fnc_value == False:

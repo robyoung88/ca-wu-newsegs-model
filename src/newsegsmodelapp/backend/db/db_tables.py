@@ -1,6 +1,7 @@
 """Provides table definitions for application"""
 
 import datetime
+from typing import Literal
 import uuid6
 
 import sqlalchemy as sa
@@ -145,6 +146,7 @@ results = sa.Table(
     metadata,
     sa.Column('result_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
+    sa.Column('request_id', sa.Integer), # No need to put a FK constraint on this, is for convenience only
     sa.Column('run_id', sa.Integer), # No need to put a FK constraint on this, is for convenience only
     sa.Column('component_type', sa.String),
     sa.Column('component_class', sa.String),
@@ -450,43 +452,69 @@ snapshot_metamodel_variables = sa.Table(
 # Runs
 # -----------------------------------------------------------------------------
 
+RUN_STATUS = Literal[
+    'READY',
+    'CALCULATING',
+    'SUCCESS',
+    'FAILED',
+    'COMPLETED', # All steps and postprocessing applied
+]
+
 runs = sa.Table(
     'runs',
     metadata,
     sa.Column('run_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
-    sa.Column('model_type', sa.String),
-    sa.Column('request_id', sa.Integer),
-    sa.Column('request_label', sa.String),
-    sa.Column('request_class', sa.String),
-    sa.Column('request_type', sa.String),
-    sa.Column('payload', sa.String),
-    sa.Column('status', sa.String),
+    sa.Column('request_id', sa.Integer, sa.ForeignKey('requests.request_id')),
+    sa.Column('status', sa.String, default = 'READY'),
+
+    # Automatic run health columns
     sa.Column('created_at', sa.DateTime, server_default = sa.func.now()),
     sa.Column('modified_at', sa.DateTime, default = datetime.datetime.now, onupdate = datetime.datetime.now), # Do not use server_onupdate, as not all backends can handle it.
+    
+    # Run feedback
     sa.Column('progress', sa.Float, default = 0.0),
     sa.Column('progress_message', sa.String, nullable = True),
+
+    # Interaction from frontend 
     sa.Column('cancel_requested', sa.Boolean, default = False),
-    sa.Column('children_spawned', sa.Boolean, default = False)
 )
 
 # -----------------------------------------------------------------------------
 # Requests
 # -----------------------------------------------------------------------------
 
+REQUEST_STATUS = Literal[
+    'AWAITING DISPATCH',
+    'DISPATCHED',
+    'FAILED',
+    'CANCELLED',
+    'FULFILLED',
+]
+
 requests = sa.Table(
     'requests',
     metadata,
     sa.Column('request_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
-    sa.Column('request_class', sa.String),
     sa.Column('request_type', sa.String),
-    sa.Column('payload', sa.String),
-    sa.Column('dispatched', sa.Boolean, default = False),
+
+    sa.Column('trigger_request_id', sa.Integer, default = -1),
+    sa.Column('trigger_request_type', sa.String),
+
     sa.Column('run_id', sa.Integer, nullable = True),
+
+    sa.Column('request_label', sa.String, default = ''),
+    sa.Column('request_class', sa.String),
+
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
+    sa.Column('model_type', sa.String),
+    
+    sa.Column('payload', sa.String),
+    sa.Column('status', sa.String(24), default = 'AWAITING DISPATCH'), # Should be a REQUEST_STATUS
+    
+    sa.Column('background_procedure', sa.Boolean, default = True),
+
     sa.Column('retry_number', sa.Integer, default = 0),
     sa.Column('max_retries', sa.Integer, default = 5),
-    sa.Column('completed', sa.Boolean, default = False)
 )
 
 # -----------------------------------------------------------------------------

@@ -618,14 +618,14 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'dsa_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
 def add_optim_run_callbacks(app: NewsegsDash):
 
@@ -704,7 +704,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
         if stat is not None and not isinstance(stat, str) and len(stat):
             kwargs['statistic'] = stat[0]
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'optim_run_metamodel',
             active_project_id,
             app.project_provider,
@@ -712,7 +712,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
             kwargs
         )
 
-        return dict(trigger = request_id)
+        return dict(trigger = request.request_id)
 
     # Marginal statistic plot draw
     @app.callback(
@@ -759,7 +759,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
         if isinstance(triggered_id, str):
             raise TypeError('Can only trigger with an object specifing the variable to plot')
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'table_optim_metamodel', # TODO: Improve this key
             active_project_id,
             app.project_provider,
@@ -771,7 +771,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
             )
         )
 
-        return dict(trigger = request_id)
+        return dict(trigger = request.request_id)
 
     @app.callback(
         Output('active-project-id', 'data'),
