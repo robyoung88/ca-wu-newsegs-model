@@ -1,0 +1,5 @@
+services:
+  dash-app:
+    command: python -m debugpy --listen 0.0.0.0:5678 --wait-for-client src/app.py
+    ports:
+      - "5678:5678"

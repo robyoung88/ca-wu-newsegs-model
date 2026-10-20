@@ -14,6 +14,7 @@ dependencies:
   - dash-iconify=0.1.2
   - dash-leaflet=1.0.15
   - decorator
+  - debugpy
   - dynaconf=3.3.3
   - holidays
   - pathvalidate
@@ -22,6 +23,7 @@ dependencies:
   - plotly-resampler
   - pvlib=0.16.1
   - pyproj
+  - proj-data
   - pytz
   - blas=2.311=openblas
   - matplotlib=3.11.2

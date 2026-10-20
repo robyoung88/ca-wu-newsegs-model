@@ -150,6 +150,10 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
             return no_update
         easting,northing = _trans_togb.transform(lat, lon)
         new_site = json.dumps({'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing, 'name': site_name})
+        logger.debug(
+            'Site location inputs syncronised to store: lat/lon: (%s, %s); OSGB: (%s, %s)',
+            lat, lon, easting, northing
+        )
         if new_site == current_site:
             return no_update
         return new_site
@@ -247,7 +251,9 @@ def add_map_click_callback(app: NewsegsDash):
             if not coordinates:
                 raise PreventUpdate
             lat, lon = coordinates.values()
-            easting,northing = _trans_togb.transform(lat, lon)
+            easting,northing = _trans_togb.transform(float(lat), float(lon))
+            logger.debug('Potential site location change to lat/lon: (%s, %s); OSGB: (%s, %s)',
+                         lat, lon, easting, northing)
             return json.dumps({'lat':lat,'lon':lon, 'easting': easting, 'northing': northing, 'name': current_name})
         else:
             return json.dumps({'lat':0,'lon':0, 'name': current_name})
@@ -329,6 +335,11 @@ def add_site_change_callback(app) -> Dash:
         northing = coords.get('northing', None)
         if not easting:
             easting, northing = _trans_togb.transform(pos[0], pos[1])
+
+        logger.debug(
+            'Site location is lat/lon: (%s, %s); OSGB: (%s, %s)',
+            pos[0], pos[1], easting, northing
+        )
 
         # Active focussed marker
         focussed_marker = [
