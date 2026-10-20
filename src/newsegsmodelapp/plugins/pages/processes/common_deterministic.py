@@ -189,3 +189,5 @@ def deterministic_run_metamodel(
         result_provider.duplicate_result(
             'deterministic_consumption_storage', mm.model.consumption_storage, request
         )
+
+    return mm

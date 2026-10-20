@@ -159,6 +159,7 @@ def run_psa(
     progress: Callable[[int, int], None] | None = None,
     cancel_status: Callable[[], bool] | None = None,
     include_deterministic: bool = True,
+    precomputed_deterministic: bool = False,
 ) -> pd.DataFrame:
     """_summary_
 
@@ -171,7 +172,8 @@ def run_psa(
         return_draws (bool, optional): _description_. Defaults to False.
         progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
         include_deterministic (bool, optional): _description_. Defaults to True.
-
+        precomputed_deterministic (Boolean): Metamodel is preloaded with valid determistic results.        
+        
     Returns:
         pd.DataFrame: _description_
     """
@@ -192,12 +194,13 @@ def run_psa(
         raise InterruptedError('PSA job cancelled')
     
     if include_deterministic:
-        for v in variables:
-            v.psa_active = False
-            v.update_model(mdl)
-            v.update_model(fnc)
-        mdl.run()
-        fnc.run()
+        if not precomputed_deterministic:
+            for v in variables:
+                v.psa_active = False
+                v.update_model(mdl)
+                v.update_model(fnc)
+            mdl.run()
+            fnc.run()
 
         res = make_psa_result(mm, mdl, fnc, statistics, return_draws)
         res['deterministic'] = True

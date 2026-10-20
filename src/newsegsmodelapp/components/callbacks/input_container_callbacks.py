@@ -301,7 +301,7 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         # Primary dispatch is on the purpose of the input
         trigger_id = ctx.triggered_id
-        if trigger_id is None or active_project_id is None:
+        if trigger_id is None or active_project_id is None or len(ctx.triggered) > 1:
             raise PreventUpdate
 
         rval = callback_utils.create_noupdate_return()

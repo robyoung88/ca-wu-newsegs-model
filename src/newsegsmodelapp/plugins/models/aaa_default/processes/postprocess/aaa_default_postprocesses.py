@@ -601,7 +601,7 @@ def _psa_to_interface(
         return 'ok'
 
     psa_results, rev = result_provider.get_result(
-        'psa_single_metamodel', lmm.table_config, True, lmm.table_config
+        'psa_single_metamodel', lmm.table_config, True, lmm.table_config.revision
     )
 
     if psa_results is None:

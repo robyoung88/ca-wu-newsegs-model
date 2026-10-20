@@ -595,7 +595,7 @@ def _make_dsa_tables_sprake(
     dsa_statistics = list(sensitivity.DSA_STATISTIC_LABELS.keys())
 
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
-    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
+    table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
     
     table_name = 'table_dsa_metamodel'
     for stat in dsa_statistics:
