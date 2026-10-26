@@ -25,41 +25,48 @@ def add_result_container_callbacks(app: NewsegsDash):
     """
 
     @app.callback(
-        Output({
-            'type': 'result-container', 'purpose': 'container',
-            'supersection': MATCH, 'section': MATCH,
-            'key': MATCH, 'subindex': MATCH
-        }, 'children'),
-        Output({
-            'type': 'result-container', 'purpose': 'container',
-            'supersection': MATCH, 'section': MATCH,
-            'key': MATCH, 'subindex': MATCH
-        }, 'data-rendered-project-id'),
-
-        Input('url', 'pathname'),
-        Input('layout-update-trigger', 'data'),
-        Input('active-project-id', 'data'),
-
-        State('app-state', 'data'),
-        State({
-            'type': 'result-container', 'purpose': 'container',
-            'supersection': MATCH, 'section': MATCH,
-            'key': MATCH, 'subindex': MATCH
-        }, 'id'),
-        State({
-            'type': 'result-container', 'purpose': 'container',
-            'supersection': MATCH, 'section': MATCH,
-            'key': MATCH, 'subindex': MATCH
-        }, 'data-rendered-project-id'),
+        output = dict(
+            containers = Output(
+               {
+                    'type': 'result-container', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 'children' 
+            ),
+            rendered_project_ids = Output(
+                {
+                    'type': 'result-container', 'purpose': 'container',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 'data-rendered-project-id'
+            ),
+        ),
+        inputs = dict(
+            page = Input('url', 'pathname'),
+            layout_update_trigger = Input('layout-update-trigger', 'data'),
+            active_project_id = Input('active-project-id', 'data'),
+        ),
+        state = dict(
+            app_state = State('app-state', 'data'),
+            container_ids = State({
+                'type': 'result-container', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'id'),
+            rendered_project_ids = State({
+                'type': 'result-container', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-project-id'),
+        ),
         prevent_initial_call = True
     )
     def update_output_container_contents(
-        page_change_trigger,
-        layout_update_trigger,
         active_project_id,
         app_state,
-        container_id,
-        last_rendered_project_id,
+        container_ids,
+        rendered_project_ids,
+        **kwargs
     ):
         if active_project_id is None:
             raise PreventUpdate
@@ -68,106 +75,136 @@ def add_result_container_callbacks(app: NewsegsDash):
         # Do not update layout if only redrawing the existing project
         triggered_id = ctx.triggered_id
         is_project_trigger = (triggered_id == 'active-project-id')
-        project_has_changed = (active_project_id != last_rendered_project_id)
-        if is_project_trigger and not project_has_changed:
-            raise PreventUpdate
-        app_state = json.loads(app_state) if app_state else {}
 
-        section = container_id.get('section')
-        key_ = container_id.get('key')
+        app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
 
-        if not key_ or not section:
-            raise PreventUpdate
+        rval = callback_utils.create_noupdate_return()
+        for container_id, rendered_project_id in zip(container_ids, rendered_project_ids):
+            project_has_changed = (active_project_id != rendered_project_id)
+            if is_project_trigger and not project_has_changed:
+                continue
 
-        def _not_found():
-            logger.exception(
-                'Result container content creator not found for Container ID: %s',
-                container_id
-            )
-            return [], active_project_id
+            section = container_id.get('section')
+            key_ = container_id.get('key')
 
-        try:
-            content_creator = get_result_container_content_creator(
-                key_, section, model_type
-            )
-        except KeyError as e:
-            return _not_found()
-        if content_creator is None:
-            return _not_found()
+            def _not_found():
+                logger.exception(
+                    'Result container content creator not found for Container ID: %s',
+                    container_id
+                )
+    
+            try:
+                content_creator = get_result_container_content_creator(
+                    key_, section, model_type
+                )
+                if content_creator is None:
+                    _not_found()
+                else:
+                    logger.info(
+                        'Creating Result Container contents using creator found for %s.%s.%s',
+                        key_, section, model_type
+                    )
+                    callback_utils.update_property_by_id(
+                        container_id,
+                        'children',
+                        content_creator(active_project_id, app.project_provider),
+                        rval
+                    )
+                    callback_utils.update_property_by_id(
+                        container_id,
+                        'data-rendered-project-id',
+                        active_project_id,
+                        rval
+                    )
 
-        logger.debug(
-            'Creating Result Container contents using creator found for %s.%s.%s',
-            key_, section, model_type
-        )
-        cc = content_creator(active_project_id, app.project_provider), active_project_id
+            except KeyError as e:
+                _not_found()
+
         t1 = time.perf_counter()
-        logger.info(f'Result Container for {section}, {key_} created in {t1 - t0:.3f}s')
-        return cc
+        logger.info(f'Result Container(s) created in {t1 - t0:.3f}s')
+        return rval
 
     @app.callback(
-        Output({
-            'type': 'result-section-header', 'purpose': 'header',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'children'),
-
-        Input({
-            'type': 'postaction-trigger', 'purpose': 'trigger',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data'),
-
-        Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
-        Input('active-project-id', 'data'),
-        Input('trigger-check-stale', 'data'),
-        State('app-state', 'data'),
-
-        State({
-            'type': 'result-section-header', 'purpose': 'header',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'id'),
+        output = dict(
+            containers = Output(
+               {
+                    'type': 'result-section-header', 'purpose': 'header',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 'children' 
+            )
+        ),
+        inputs = dict(
+            postaction_triggers = Input({
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data'),
+            ann_hori_toggle = Input(
+                {'type': 'annual-horizon-toggle', 'page': ALL}, 
+                'value'
+            ),
+            active_project_id = Input('active-project-id', 'data'),
+            trigger_check_stale = Input('trigger-check-stale', 'data'),
+        ),
+        state = dict(
+            app_state = State('app-state', 'data')
+        ),
+        prevent_initial_call = False, # Want to trigger as we change page
     )
     def update_result_section_header_contents(
-        postaction_triggers,
         ann_hori_toggle,
         active_project_id,
-        check_stale,
         app_state,
-        container_ids,
+        **kwargs
     ):
-        if active_project_id is None or container_ids is None or not len(container_ids):
+        if active_project_id is None:
             raise PreventUpdate
         t0 = time.perf_counter()
 
-        logger.debug(
-            'Updating Result Section Header for Section = %s, Key = %s; Triggered by: %s;',
-            container_ids[0]['section'], container_ids[0]['key'], ctx.triggered_id
-        )
+        rval = callback_utils.create_noupdate_return()
+        if len(rval) == 0:
+            raise PreventUpdate
 
-        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
-        return_headers: list[Any] = [no_update] * len(container_ids)
-        contents_by_section = {}
+        trig_id = ctx.triggered_id
+        update_all_headers = isinstance(trig_id, str) or trig_id is None or trig_id['type'] == 'annual-horizon-toggle'
+
+        if update_all_headers:
+            headers_for_update = [x['id'] for x in ctx.outputs_grouping['containers']]
+        else:
+            headers_for_update = []
+            for trig in ctx.triggered:
+                trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
+                trig['purpose'] = 'header'
+                trig['type'] = 'result-section-header'
+                del trig['subindex']
+                del trig['supersection']
+                headers_for_update.append(trig)
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
-        for idx, cid in enumerate(container_ids):
-            section = cid.get('section')
+
+        contents_by_section = {}
+        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
+
+        for container_id in headers_for_update:
+            section = container_id['section']
             if section in contents_by_section:
-                return_headers[idx] = contents_by_section[section]
+                callback_utils.update_property_by_id(
+                    container_id,
+                    'children',
+                    contents_by_section[section],
+                    rval
+                )
                 continue
-
-            key = cid.get('key')
-            if not section or not key:
-                continue
-
+            key = container_id['key']
             content_creator = get_result_section_header_content_creator(
                 key, section, model_type
             )
             if content_creator is None:
                 continue
-            logger.debug(
+            logger.info(
                 'Creating Result Section Header contents using creator found for %s.%s.%s',
                 key, section, model_type
             )
@@ -175,12 +212,17 @@ def add_result_container_callbacks(app: NewsegsDash):
                 active_project_id, app.project_provider, app.results_provider, ann_hori_toggle
             )
             contents_by_section[section] = contents
-            return_headers[idx] = contents
+            callback_utils.update_property_by_id(
+                container_id,
+                'children',
+                contents,
+                rval
+            )
 
         t1 = time.perf_counter()
-        logger.info(f'Result Section Header for {container_ids[0]['section']}, {container_ids[0]['key']} created in {t1 - t0:.3f}s')
+        logger.info(f'Result Section Header(s) created in {t1 - t0:.3f}s')
 
-        return return_headers
+        return rval
 
     @app.callback(
         Output({
