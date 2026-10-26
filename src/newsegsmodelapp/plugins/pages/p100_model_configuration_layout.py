@@ -60,11 +60,7 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         model_input_sections.append(
             
                 dbc.Col(
-                    dcc.Loading(
-                        sec.creation_function(),
-                        delay_show = 1,
-                        delay_hide = 0.1,
-                    ),
+                    sec.creation_function(),
                     width = sec.block_width
                 ),
                 
@@ -75,11 +71,7 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         finance_input_sections.append(
             
                 dbc.Col(
-                    dcc.Loading(
-                        sec.creation_function(),
-                        delay_show = 1,
-                        delay_hide = 0.1,
-                    ),
+                    sec.creation_function(),
                     width = sec.block_width
                 ),
                 

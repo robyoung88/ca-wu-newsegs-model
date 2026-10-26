@@ -63,6 +63,7 @@ def add_result_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None:
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         # Do not update layout if only redrawing the existing project
         triggered_id = ctx.triggered_id
@@ -99,7 +100,10 @@ def add_result_container_callbacks(app: NewsegsDash):
             'Creating Result Container contents using creator found for %s.%s.%s',
             key_, section, model_type
         )
-        return content_creator(active_project_id, app.project_provider), active_project_id
+        cc = content_creator(active_project_id, app.project_provider), active_project_id
+        t1 = time.perf_counter()
+        logger.info(f'Result Container for {section}, {key_} created in {t1 - t0:.3f}s')
+        return cc
 
     @app.callback(
         Output({
@@ -135,6 +139,7 @@ def add_result_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         logger.debug(
             'Updating Result Section Header for Section = %s, Key = %s; Triggered by: %s;',
@@ -171,6 +176,9 @@ def add_result_container_callbacks(app: NewsegsDash):
             )
             contents_by_section[section] = contents
             return_headers[idx] = contents
+
+        t1 = time.perf_counter()
+        logger.info(f'Result Section Header for {container_ids[0]['section']}, {container_ids[0]['key']} created in {t1 - t0:.3f}s')
 
         return return_headers
 
@@ -258,6 +266,8 @@ def add_result_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
+
+        t0 = time.perf_counter()
 
         # Do not update if the toggle status has not changed, the project is the same,
         # and the table revision number is the same.
@@ -367,6 +377,9 @@ def add_result_container_callbacks(app: NewsegsDash):
                 return_is_stale[idx] = True
                 return_rendered_project_table_revision[idx] = -1
 
+        t1 = time.perf_counter()
+        logger.info(f'Result Table for {section}, {subindex}, {key} created in {t1 - t0:.3f}s')
+
         return (
             return_contents, 
             return_is_stale, 
@@ -423,6 +436,7 @@ def add_result_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Updating Result Figure Containers')
@@ -479,6 +493,8 @@ def add_result_container_callbacks(app: NewsegsDash):
                 )
                 contents_by_section_subindex[ss] = res
                 return_contents[idx] = res
+        t1 = time.perf_counter()
+        logger.info(f'Result Figure for {section}, {subindex}, {key} created in {t1 - t0:.3f}s')
 
         return return_contents 
         
@@ -556,6 +572,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         **kwargs
     ):
         triggered_id = ctx.triggered_id
+        t0 = time.perf_counter()
         logger.debug('Checking staleness - triggered by %s', triggered_id)
         if triggered_id is None:
             raise PreventUpdate
@@ -599,6 +616,9 @@ def add_result_container_callbacks(app: NewsegsDash):
         rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
         rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
         rval['trigger_check_stale_data'] = time.time_ns()
+
+        t1 = time.perf_counter()
+        logger.info(f'Staleness checked in {t1 - t0:.3f}s')
 
         return rval
 

@@ -1,5 +1,5 @@
 import dash
-from dash import html
+from dash import dcc, html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
@@ -20,18 +20,44 @@ def create_input_card(
                 title, 
                 className='card-title'
             ),
-            
-            html.H4(
-                id = {'type': 'input-section-header', 'supersection': supersection, 'section': section},
-                className='card-subtitle'
+
+            dcc.Loading(
+                html.H4(
+                    id = {'type': 'input-section-header', 'supersection': supersection, 'section': section},
+                    className='card-subtitle'
+                ),
+                delay_show = 500,
+                delay_hide = 500,
+                overlay_style={"visibility":"visible", "filter": "blur(1px)"},
+                custom_spinner=html.H1(''),
             ),
+            
             
             html.Details([
                 html.Summary(""),
-                html.Div(
-                    id = {'type': 'input-container', 'supersection': supersection, 'section': section},
-                    className = container_class_name
+                dcc.Loading(
+                    html.Div(
+                        id = {'type': 'input-container', 'supersection': supersection, 'section': section},
+                        className = container_class_name
+                    ),
+                    delay_show = 500,
+                    delay_hide = 500,
+                    overlay_style={"visibility":"visible", "filter": "blur(1px)"},
+                    custom_spinner=html.H1(''),
                 )
-            ])
+                
+            ]),
+
+            dcc.Interval(
+                id = {
+                    'type': 'input-container-hydration-interval', 
+                    'supersection': supersection, 
+                    'section': section
+                },
+                n_intervals = 1,
+                disabled = False,
+                max_intervals = 1,
+                interval = 50,
+            )
         ])
     ])

@@ -24,7 +24,7 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "newsegsmodelapp": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["console"],
             "propagate": False,
         },

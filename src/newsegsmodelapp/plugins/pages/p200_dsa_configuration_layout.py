@@ -82,15 +82,33 @@ def create_dsa_header():
 
 def create_dsa_configuration_editor():
     return dbc.Col([
-        html.Div([
-            html.H2(
-                'DSA Configuration',
-                style = {'display': 'inline-flex',
-                         'margin-right': '20px'}
-            ),
+        html.Div(
+            [
+                html.H2(
+                    'DSA Configuration',
+                    style = {'display': 'inline-flex',
+                            'margin-right': '20px'}
+                ),
             ],
             style = {'vertical-align': 'baseline'}
-            ),
+        ),
+
+        html.Div(
+            id = {'type': 'input-section-header', 'supersection': 'dsa', 'section': 'dsa'},
+            style = {'display': 'none'}
+        ),
+        dcc.Interval(
+            id = {
+                'type': 'input-container-hydration-interval', 
+                'supersection': 'dsa', 
+                'section': 'dsa'
+            },
+            n_intervals = 1,
+            disabled = False,
+            max_intervals = 1,
+            interval = 50,
+        ),
+
         html.Div(
             id = {'type': 'input-container', 'supersection': 'dsa', 'section': 'dsa'}
         )
@@ -169,10 +187,28 @@ def create_optim_configuration_editor(**kwargs):
                     section = 'tabledraw',
                     supersection = 'optim'
                 ),
+
+                html.Div(
+                    id = {'type': 'input-section-header', 'supersection': 'optim', 'section': 'optim'},
+                    style = {'display': 'none'}
+                ),
+
+                dcc.Interval(
+                    id = {
+                        'type': 'input-container-hydration-interval', 
+                        'supersection': 'optim', 
+                        'section': 'optim'
+                    },
+                    n_intervals = 1,
+                    disabled = False,
+                    max_intervals = 1,
+                    interval = 50,
+                ),
+                
                 
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
-                ), 
+                ),
             ] + optim_process_components(**kwargs),
             delay_show = 300, 
         )

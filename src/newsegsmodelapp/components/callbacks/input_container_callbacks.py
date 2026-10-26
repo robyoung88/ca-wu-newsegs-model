@@ -53,48 +53,144 @@ def add_input_container_callbacks(app: NewsegsDash):
     """
 
     @app.callback(
-        Output({'type': 'input-container', 'supersection': MATCH, 'section': MATCH}, 'children'),
+        # Output(
+        #     {'type': 'input-container', 'supersection': MATCH, 'section': MATCH},
+        #     'children'
+        # ),
+        Output(
+            {'type': 'input-section-header', 'supersection': MATCH, 'section': MATCH},
+            'children'
+        ),
+        Output(
+            {'type': 'input-container-hydration-interval', 'supersection': MATCH, 'section': MATCH},
+            'n_intervals'
+        ),
 
         Input('layout-update-trigger', 'data'),
         Input('active-project-id', 'data'),
+
+        Input({
+            'type': 'input-group-config-update-trigger', 
+            'supersection': MATCH, 'purpose': 'trigger',
+            'section': MATCH, 'key': ALL, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 
+        'data'),
+
         State('app-state', 'data'),
 
         State({'type': 'input-container', 'supersection': MATCH, 'section': MATCH}, 'id'),
+        
         prevent_initial_call = True
     )
-    def update_input_container_contents(
+    def update_input_header_contents(
         layout_update_trigger,
         active_project_id,
+        input_group_update_trigger,
         app_state,
         container_id,
-        
     ):
         if active_project_id is None:
             raise PreventUpdate
+        t0 = time.perf_counter()
         trig = ctx.triggered_id
-                        
+
+        update_header = True
+        update_contents = isinstance(trig, str) # i.e. 'layout-update-trigger' or 'active-project-id'
+
+        if not isinstance(trig, str):
+            if callback_utils.get_triggered_value() is None:
+                # Occurs after initial hydration
+                raise PreventUpdate         
+
         app_state = json.loads(app_state) if app_state else {}
         
-        input_supersection = container_id.get('supersection')
-        input_section = container_id.get('section')
+        supersection = container_id.get('supersection')
+        section = container_id.get('section')
         model_type = app_state.get('model_type', 'default')
 
-        if not input_supersection or not input_section:
+        if not supersection or not section:
             raise PreventUpdate
+
+        rval = [no_update, no_update]
+
+        def _not_found(creator_type):
+            logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
+
+        if update_contents:
+            rval[1] = 0
+
+        if update_header:
+            try:
+                content_creator = get_input_section_header_content_creator(
+                    supersection, section, model_type
+                )
+                if content_creator is None:
+                    return _not_found('Input Section Header')
+                else:
+                    logger.debug(
+                        'Creating Input Section Header contents using creator found for %s.%s.%s',
+                        supersection, section, model_type
+                    )
+                    rval[0] = content_creator(active_project_id, app.project_provider)
+            except KeyError as e:
+                _not_found('Input Section Header')
+
+        t1 = time.perf_counter()
+        logger.info(f'Input Header for {supersection}, {section} created in {t1 - t0:.3f}s')
+        return rval
+
+    @app.callback(
+        Output(
+            {'type': 'input-container', 'supersection': MATCH, 'section': MATCH},
+            'children'
+        ),
+
+        Input(
+            {'type': 'input-container-hydration-interval', 'supersection': MATCH, 'section': MATCH},
+            'n_intervals'
+        ),
+
+        State('active-project-id', 'data'),
+        State('app-state', 'data'),
+        State({'type': 'input-container', 'supersection': MATCH, 'section': MATCH}, 'id'),
+        prevent_initial_call = True
+    )
+    def hydrate_input_container(n_intervals, active_project_id, app_state, container_id):
+        if n_intervals != 1:
+            raise PreventUpdate
+        t0 = time.perf_counter()
+
+        app_state = json.loads(app_state) if app_state else {}
+                
+        supersection = container_id.get('supersection')
+        section = container_id.get('section')
+        model_type = app_state.get('model_type', 'default')
+
+        if not supersection or not section:
+            raise PreventUpdate
+
+        def _not_found(creator_type):
+            logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
 
         try:
             content_creator = get_input_container_content_creator(
-                input_supersection, input_section, model_type
+                supersection, section, model_type
             )
+            if content_creator is None:
+                _not_found('Input Container')
+            else:
+                logger.debug(
+                    'Creating Input Container contents using creator found for %s.%s.%s',
+                    supersection, section, model_type
+                )
+                rval = content_creator(active_project_id, app.project_provider)
         except KeyError as e:
-            logger.exception('Input Container content creator not found for Container ID: %s', container_id)
-            return []
+            _not_found('Input Container')
 
-        logger.debug(
-            'Creating Input Container contents using creator found for %s.%s.%s',
-            input_supersection, input_section, model_type
-        )
-        return content_creator(active_project_id, app.project_provider)
+        t1 = time.perf_counter()
+        logger.info(f'Input Container hydrated for {supersection}, {section} in {t1 - t0:.3f}s')
+        return rval        
 
     @app.callback(
         Output({'type': 'generic_text', 'section': ALL, 'key': ALL}, 'children'),
@@ -112,6 +208,7 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None:
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
 
@@ -124,67 +221,9 @@ def add_input_container_callbacks(app: NewsegsDash):
             lproj.id, lmm.id, lproj.focussed_metamodel_index,
         )
         text_values = _create_text_field_values(lproj, lmm, generic_text_ids)
-
+        t1 = time.perf_counter()
+        logger.info(f'Generic Text Field values created in {t1 - t0:.3f}s')
         return text_values
-
-    @app.callback(
-        Output({
-            'type': 'input-section-header', 
-            'supersection': MATCH, 
-            'section': MATCH
-            },
-            'children'
-        ),
-
-        Input({
-            'type': 'input-group-config-update-trigger', 
-            'supersection': MATCH, 'purpose': 'trigger',
-            'section': MATCH, 'key': ALL, 'subindex': ALL,
-            'parameter_index': ALL, 'vector_location': ALL
-        }, 
-        'data'),
-        Input(CONFIGURATION_UPDATE_TRIGGER_ID, 'data'),
-        Input('active-project-id', 'data'),
-        State('app-state', 'data'),
-
-        State({'type': 'input-container', 'supersection': MATCH, 'section': MATCH}, 'id'),
-    )
-    def update_input_section_header_contents(
-        input_group_triggers,
-        configuration_update_trigger,
-        active_project_id,
-        app_state,
-        container_id,
-    ):
-        if active_project_id is None:
-            raise PreventUpdate
-        app_state = json.loads(app_state) if app_state else {}
-                
-        supersection = container_id.get('supersection')
-        section = container_id.get('section')
-        model_type = app_state.get('model_type', 'default')
-
-        if not supersection or not section:
-            raise PreventUpdate
-
-        def _not_found():
-            logger.exception('Input Section Header content creator not found for Container ID: %s', container_id)
-            return []
-        
-        try:
-            content_creator = get_input_section_header_content_creator(
-                supersection, section, model_type
-            )
-            if content_creator is None:
-                return _not_found()
-        except KeyError as e:
-            return _not_found()
-
-        logger.debug(
-            'Creating Input Section Header contents using creator found for %s.%s.%s',
-            supersection, section, model_type
-        )
-        return content_creator(active_project_id, app.project_provider)
 
     @app.callback(
         output = dict(
@@ -303,12 +342,13 @@ def add_input_container_callbacks(app: NewsegsDash):
         trigger_id = ctx.triggered_id
         if trigger_id is None or active_project_id is None or len(ctx.triggered) > 1:
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         rval = callback_utils.create_noupdate_return()
 
         now = time.time_ns()
 
-        logger.debug(
+        logger.info(
             'Input change has triggered "react_to_input_change". Triggering object was %s and updated value is %s',
             ctx.triggered_id, callback_utils.get_triggered_value()
         )
@@ -495,7 +535,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                         'Input change being handled by input handler registered to purpose: %s; and type: %s; for model type: %s;',
                         trigger_id['purpose'], trigger_id['type'], json.loads(app_state).get('model_type', 'default')
                     )
-                    return handler(
+                    rval = handler(
                         trigger_id,
                         input_ids,
                         header_ids,
@@ -508,6 +548,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 else:
                     logger.exception('No input handlers found for purpose: %s', trigger_id['purpose'])
                     raise PreventUpdate
+
+        t1 = time.perf_counter()
+        logger.info(f'Input Change for {trigger_id['purpose']} {trigger_id['supersection']} handled in {t1 - t0:.3f}s')
 
         return rval
 
@@ -553,6 +596,7 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         if not len(container_ids):
             raise PreventUpdate
+        t0 = time.perf_counter()
         
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Handling DSA Input Group update')
@@ -580,10 +624,14 @@ def add_input_container_callbacks(app: NewsegsDash):
             container_ids
         )
 
-        return (
+        rval = (
             [bounds_input] * len(container_ids),
             [cn] * len(container_ids)
         )
+        
+        t1 = time.perf_counter()
+        logger.info(f'DSA Input Change for {varid} handled in {t1 - t0:.3f}s')
+        return rval
 
     @app.callback(
         Output({
@@ -620,6 +668,7 @@ def add_input_container_callbacks(app: NewsegsDash):
     ):
         if not len(container_ids):
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Handling PSA Input Group update')
@@ -646,6 +695,9 @@ def add_input_container_callbacks(app: NewsegsDash):
             container_ids
         )
 
+        t1 = time.perf_counter()
+        logger.info(f'PSA Input Change for {varid} handled in {t1 - t0:.3f}s')
+
         return (
             [cn] * len(container_ids)
         )
@@ -660,6 +712,7 @@ def add_input_container_callbacks(app: NewsegsDash):
     def sync_loc_inputs_to_store(
         active_project_id
     ):
+        t0 = time.perf_counter()
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Updating site-location')
         lproj = provider.get_lightweight_project(active_project_id)
@@ -671,16 +724,27 @@ def add_input_container_callbacks(app: NewsegsDash):
             'name': lmm.location.name
         }
         logger.debug('Setting site location in response to a trigger by "active-project-id".')
+        t1 = time.perf_counter()
+        logger.info(f'Site location synced in {t1 - t0:.3f}s')
         return json.dumps(loc_input)
+
+    @app.callback(
+        Output('feedback-graph-interval', 'n_intervals'),
+        Input({
+            'type': 'input-group-config-update-trigger', 
+            'supersection': ALL, 'purpose': 'trigger',
+            'section': ALL, 'key': ALL, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'data'),
+        prevent_initial_call = True
+    )
+    def trigger_feedback_graphs(configuration_update_trigger):
+        return 0
 
     @app.callback(
         Output({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'figure'),
 
-        Input({'type': 'input-group-config-update-trigger', 
-                'supersection': ALL, 'purpose': 'trigger',
-                'section': ALL, 'key': ALL, 'subindex': ALL,
-                'parameter_index': ALL, 'vector_location': ALL}, 
-                'data'),
+        Input('feedback-graph-interval', 'n_intervals'),
 
         State({'type': 'feedback-graph', 'section': ALL, 'key': ALL}, 'id'),
         State('active-project-id', 'data'),
@@ -689,11 +753,14 @@ def add_input_container_callbacks(app: NewsegsDash):
         prevent_initial_call = True,
     )
     def update_feedback_graphs(
-        configuration_update_trigger,
+        feedback_graph_interval,
         figure_ids,
         active_project_id,
         app_state
     ):
+        if feedback_graph_interval != 1:
+            raise PreventUpdate
+        t0 = time.perf_counter()
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
 
@@ -708,6 +775,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 logger.debug(
                     'Creating feedback graph for key: %s. Trigger was: %s', id['key'], ctx.triggered_id)
                 figure_returns[idx] = artist(active_project_id, app.project_provider)
+
+        t1 = time.perf_counter()
+        logger.info(f'Feedback Graphs updated in {t1 - t0:.3f}s')
 
         return figure_returns
 
@@ -751,6 +821,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         trigger_id = ctx.triggered_id
         if trigger_id is None or active_project_id is None:
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         triggered_id = ctx.triggered_id
         logger.debug('Getting lightweight project - Updating variable status badge')
@@ -760,4 +831,6 @@ def add_input_container_callbacks(app: NewsegsDash):
         contents, colour = get_variable_sharing_status(lproj, lmm, varid)
 
         logger.debug('Updated the variable status badge for variable %s, triggered by %s', varid, triggered_id)
+        t1 = time.perf_counter()
+        logger.info(f'Variable Status badge for {varid} updated in {t1 - t0:.3f}s')
         return [contents] * len(button_ids), [colour] * len(button_ids)

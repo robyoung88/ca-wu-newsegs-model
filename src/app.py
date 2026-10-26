@@ -105,6 +105,7 @@ def serve_layout():
         dcc.Store(id = 'trigger-check-stale', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
+        dcc.Interval(id = 'feedback-graph-interval', interval = 100, n_intervals = 1, max_intervals = 1, disabled = False),
     ] 
     + post_action_triggers
 )
@@ -294,7 +295,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
     add_result_container_callbacks(app)
-    add_result_timeseries_callbacks(app)
+    #add_result_timeseries_callbacks(app)
 
     for page in registers.PAGE_REGISTER.values():
         page.attach_callbacks(app)
@@ -308,7 +309,12 @@ def create_app(external_stylesheets = None) -> Dash:
 # if __name__ == '__main__'
 # -----------------------------------------------
 
+init_db()
+app = create_app()
+# Expose the underlying Flask server for WSGI servers like Gunicorn
+server = app.server
+
 if __name__ == '__main__':
-    init_db()
-    app = create_app()
-    app.run(host = '0.0.0.0', port = 8050, debug = True, use_reloader = False)
+#    init_db()
+#    app = create_app()
+    app.run(host = '0.0.0.0', port = 8050, debug = True, use_reloader = False, threaded = True)

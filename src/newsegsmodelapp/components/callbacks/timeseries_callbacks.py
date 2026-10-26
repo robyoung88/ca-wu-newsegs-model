@@ -82,6 +82,7 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
         
         if container_style.get('display') == 'none':
             raise PreventUpdate
+        t0 = time.perf_counter()
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Showing model timeseries')
@@ -181,6 +182,8 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
             legend_y = 0,
             legend_yanchor = 'bottom'
         )
+        t1 = time.perf_counter()
+        logger.info(f'Timeseries plot created in {t1 - t0:.3f}s')
         return fig
     
     @app.callback(

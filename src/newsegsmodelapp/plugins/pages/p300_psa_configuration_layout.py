@@ -92,12 +92,42 @@ def create_psa_configuration_editor():
             )
         ),
         html.Div(
+            id = {'type': 'input-section-header', 'supersection': 'psa', 'section': 'psa-settings'},
+            style = {'display': 'none'}
+        ),
+        html.Div(
             id = {'type': 'input-container', 'supersection': 'psa', 'section': 'psa-settings'},
+        ),
+        dcc.Interval(
+            id = {
+                'type': 'input-container-hydration-interval', 
+                'supersection': 'psa', 
+                'section': 'psa-settings'
+            },
+            n_intervals = 1,
+            disabled = False,
+            max_intervals = 1,
+            interval = 50,
         ),
         html.Hr(),
         html.Div(
+            id = {'type': 'input-section-header', 'supersection': 'psa', 'section': 'psa'},
+            style = {'display': 'none'}
+        ),
+        html.Div(
             id = {'type': 'input-container', 'supersection': 'psa', 'section': 'psa'}
-        )
+        ),
+        dcc.Interval(
+            id = {
+                'type': 'input-container-hydration-interval', 
+                'supersection': 'psa', 
+                'section': 'psa'
+            },
+            n_intervals = 1,
+            disabled = False,
+            max_intervals = 1,
+            interval = 50,
+        ),
     ])
 
 @dataclass
