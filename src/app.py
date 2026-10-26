@@ -106,6 +106,7 @@ def serve_layout():
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
         dcc.Interval(id = 'feedback-graph-interval', interval = 100, n_intervals = 1, max_intervals = 1, disabled = False),
+        dcc.Interval(id = 'delayed-result-container-refill-interval', interval = 1000, n_intervals = 1, max_intervals = 1, disabled = False),
     ] 
     + post_action_triggers
 )
@@ -223,6 +224,14 @@ def add_display_callbacks(app: NewsegsDash):
         logger.info('Project id "%s" has been found for session id "%s"', proj_id, session_id)
         return proj_id
 
+    @app.callback(
+        Output('delayed-result-container-refill-interval', 'n_intervals'),
+        Input('active-project-id', 'data'),
+        prevent_initial_call = True
+    )
+    def _(apid):
+        return 0 # Interval will increment to 1
+
 project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
 results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
 request_handler = FromDatabaseRequestHandler(db.get_engine)
@@ -294,7 +303,7 @@ def create_app(external_stylesheets = None) -> Dash:
     map.add_site_selector_callbacks(app)
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
-    add_result_container_callbacks(app)
+    #add_result_container_callbacks(app)
     #add_result_timeseries_callbacks(app)
 
     for page in registers.PAGE_REGISTER.values():

@@ -222,7 +222,8 @@ def add_result_container_callbacks(app: NewsegsDash):
         }, 'value'),
 
         Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
-        Input('active-project-id', 'data'),
+        Input('delayed-result-container-refill-interval', 'n_intervals'),
+        State('active-project-id', 'data'),
         State('app-state', 'data'),
 
         State({
@@ -256,6 +257,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         postaction_triggers,
         result_table_options,
         ann_hori_toggle,
+        result_interval_count,
         active_project_id,
         app_state,
         container_ids,
@@ -266,6 +268,11 @@ def add_result_container_callbacks(app: NewsegsDash):
     ):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
+
+        trig = ctx.triggered_id
+        if isinstance(trig, str) and trig == 'result-container-refill-interval':
+            if callback_utils.get_triggered_value() != 1:
+                raise PreventUpdate
 
         t0 = time.perf_counter()
 
@@ -498,129 +505,129 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         return return_contents 
         
-    @app.callback(
-        output = dict(
-            indicator_class = Output(
-                {'type': 'resize-handle', 'page': ALL},
-                'className',
-            ),
-            tooltip_children = Output(
-                {'type': 'result-tooltip', 'page': ALL}, 
-                'children',
-            ),
-            trigger_check_stale_data = Output(
-                'trigger-check-stale', 'data'
-            ),
-        ),
-        inputs = dict(
-            data_stale = Input(
-                {
-                    'type': 'result-table', 'purpose': 'container',
-                    'supersection': ALL, 'section': ALL,
-                    'key': ALL, 'subindex': ALL
-                }, 
-                'data-is-stale',
-            ),
-            config_update = Input(
-                {
-                    'type': 'input-group-config-update-trigger', 
-                    'supersection': ALL, 'purpose': 'trigger',
-                    'section': ALL, 'key': ALL, 'subindex': ALL,
-                    'parameter_index': ALL, 'vector_location': ALL,
-                }, 
-                'data'
-            ),
-        ),
-        state = dict(
-            active_project_id = State('active-project-id', 'data'),
-            rendered_project_ids = State(
-                {
-                    'type': 'result-table', 'purpose': 'container',
-                    'supersection': ALL, 'section': ALL,
-                    'key': ALL, 'subindex': ALL
-                }, 
-                'data-rendered-project-id'
-            ),
-            rendered_project_table_revisions = State(
-                {
-                    'type': 'result-table', 'purpose': 'container',
-                    'supersection': ALL, 'section': ALL,
-                    'key': ALL, 'subindex': ALL
-                },
-                'data-rendered-project-table-revision'
-            ),
-            trigger_ids = State(
-                {
-                    'type': 'postaction-trigger', 'purpose': 'trigger',
-                    'supersection': ALL, 'section': ALL,
-                    'key': ALL, 'subindex': ALL
-                },
-                'id'
-            ),
-            #indicator_class = State({'type': 'resize-handle', 'page': ALL}, 'className'),
-            #tooltip_children = State({'type': 'result-tooltip', 'page': ALL}, 'children'),
-        ),
-    )
-    def update_stale_indicators(
-        data_stale,
-        config_update,
-        active_project_id,
-        rendered_project_ids,
-        rendered_project_table_revisions,
-        #indicator_class,
-        #tooltip_children,
-        **kwargs
-    ):
-        triggered_id = ctx.triggered_id
-        t0 = time.perf_counter()
-        logger.debug('Checking staleness - triggered by %s', triggered_id)
-        if triggered_id is None:
-            raise PreventUpdate
-        elif isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
-            provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
-            logger.debug('Getting lightweight project - Checking Staleness')
-            lproj = provider.get_lightweight_project(active_project_id)
+    # @app.callback(
+    #     output = dict(
+    #         indicator_class = Output(
+    #             {'type': 'resize-handle', 'page': ALL},
+    #             'className',
+    #         ),
+    #         tooltip_children = Output(
+    #             {'type': 'result-tooltip', 'page': ALL}, 
+    #             'children',
+    #         ),
+    #         trigger_check_stale_data = Output(
+    #             'trigger-check-stale', 'data'
+    #         ),
+    #     ),
+    #     inputs = dict(
+    #         data_stale = Input(
+    #             {
+    #                 'type': 'result-table', 'purpose': 'container',
+    #                 'supersection': ALL, 'section': ALL,
+    #                 'key': ALL, 'subindex': ALL
+    #             }, 
+    #             'data-is-stale',
+    #         ),
+    #         config_update = Input(
+    #             {
+    #                 'type': 'input-group-config-update-trigger', 
+    #                 'supersection': ALL, 'purpose': 'trigger',
+    #                 'section': ALL, 'key': ALL, 'subindex': ALL,
+    #                 'parameter_index': ALL, 'vector_location': ALL,
+    #             }, 
+    #             'data'
+    #         ),
+    #     ),
+    #     state = dict(
+    #         active_project_id = State('active-project-id', 'data'),
+    #         rendered_project_ids = State(
+    #             {
+    #                 'type': 'result-table', 'purpose': 'container',
+    #                 'supersection': ALL, 'section': ALL,
+    #                 'key': ALL, 'subindex': ALL
+    #             }, 
+    #             'data-rendered-project-id'
+    #         ),
+    #         rendered_project_table_revisions = State(
+    #             {
+    #                 'type': 'result-table', 'purpose': 'container',
+    #                 'supersection': ALL, 'section': ALL,
+    #                 'key': ALL, 'subindex': ALL
+    #             },
+    #             'data-rendered-project-table-revision'
+    #         ),
+    #         trigger_ids = State(
+    #             {
+    #                 'type': 'postaction-trigger', 'purpose': 'trigger',
+    #                 'supersection': ALL, 'section': ALL,
+    #                 'key': ALL, 'subindex': ALL
+    #             },
+    #             'id'
+    #         ),
+    #         #indicator_class = State({'type': 'resize-handle', 'page': ALL}, 'className'),
+    #         #tooltip_children = State({'type': 'result-tooltip', 'page': ALL}, 'children'),
+    #     ),
+    # )
+    # def update_stale_indicators(
+    #     data_stale,
+    #     config_update,
+    #     active_project_id,
+    #     rendered_project_ids,
+    #     rendered_project_table_revisions,
+    #     #indicator_class,
+    #     #tooltip_children,
+    #     **kwargs
+    # ):
+    #     triggered_id = ctx.triggered_id
+    #     t0 = time.perf_counter()
+    #     logger.debug('Checking staleness - triggered by %s', triggered_id)
+    #     if triggered_id is None:
+    #         raise PreventUpdate
+    #     elif isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
+    #         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+    #         logger.debug('Getting lightweight project - Checking Staleness')
+    #         lproj = provider.get_lightweight_project(active_project_id)
             
-            results_stale = False
-            # Because have retrieved the proj from database, will never be modified.
-            #results_stale = proj.table_config.chain_modified or any(x.modified for x in proj._variables_by_uid.values())
-            if not results_stale:
-                results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
-            if not results_stale:
-                table_revision = lproj.table_config.revision
-                logger.debug(
-                    'Checking against project table revision: %s', table_revision
-                )
-                logger.debug(
-                    'Rendered table revisions are: %s', rendered_project_table_revisions
-                )
-                results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
+    #         results_stale = False
+    #         # Because have retrieved the proj from database, will never be modified.
+    #         #results_stale = proj.table_config.chain_modified or any(x.modified for x in proj._variables_by_uid.values())
+    #         if not results_stale:
+    #             results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
+    #         if not results_stale:
+    #             table_revision = lproj.table_config.revision
+    #             logger.debug(
+    #                 'Checking against project table revision: %s', table_revision
+    #             )
+    #             logger.debug(
+    #                 'Rendered table revisions are: %s', rendered_project_table_revisions
+    #             )
+    #             results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
                 
-        else:
-            if data_stale is None:
-                raise PreventUpdate
-            logger.debug(
-                'Checking against data-is-stale: %s', data_stale
-            )
-            results_stale = any(x for x in data_stale)
+    #     else:
+    #         if data_stale is None:
+    #             raise PreventUpdate
+    #         logger.debug(
+    #             'Checking against data-is-stale: %s', data_stale
+    #         )
+    #         results_stale = any(x for x in data_stale)
 
-        rval = callback_utils.create_noupdate_return()
+    #     rval = callback_utils.create_noupdate_return()
 
-        if results_stale:
-            handle_class = 'resize-handle resize-handle-warning'
-            tooltip_text = 'Results require refreshing.'
-        else:
-            handle_class = 'resize-handle resize-handle-ok'
-            tooltip_text = 'Results up to date.'
+    #     if results_stale:
+    #         handle_class = 'resize-handle resize-handle-warning'
+    #         tooltip_text = 'Results require refreshing.'
+    #     else:
+    #         handle_class = 'resize-handle resize-handle-ok'
+    #         tooltip_text = 'Results up to date.'
 
-        rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
-        rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
-        rval['trigger_check_stale_data'] = time.time_ns()
+    #     rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
+    #     rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
+    #     rval['trigger_check_stale_data'] = time.time_ns()
 
-        t1 = time.perf_counter()
-        logger.info(f'Staleness checked in {t1 - t0:.3f}s')
+    #     t1 = time.perf_counter()
+    #     logger.info(f'Staleness checked in {t1 - t0:.3f}s')
 
-        return rval
+    #     return rval
 
     # @app.callback(
     #     output = dict(

@@ -1,6 +1,7 @@
 """
 Callbacks to populate input containers when the project or active metamodel changes.
 """
+import copy
 import logging
 logger = logging.getLogger(__name__)
 
@@ -53,74 +54,85 @@ def add_input_container_callbacks(app: NewsegsDash):
     """
 
     @app.callback(
-        # Output(
-        #     {'type': 'input-container', 'supersection': MATCH, 'section': MATCH},
-        #     'children'
-        # ),
-        Output(
-            {'type': 'input-section-header', 'supersection': MATCH, 'section': MATCH},
-            'children'
+        output = dict(
+            headers = Output(
+                {'type': 'input-section-header', 'supersection': ALL, 'section': ALL},
+                'children'    
+            ),
+            input_container_triggers = Output(
+                {'type': 'input-container-hydration-interval', 'supersection': ALL, 'section': ALL},
+                'n_intervals'
+            ),
         ),
-        Output(
-            {'type': 'input-container-hydration-interval', 'supersection': MATCH, 'section': MATCH},
-            'n_intervals'
+        inputs = dict(
+            layout_update_trigger = Input('layout-update-trigger', 'data'),
+            active_project_id = Input('active-project-id', 'data'),
+            input_group_update_trigger = Input({
+                'type': 'input-group-config-update-trigger', 
+                'supersection': ALL, 'purpose': 'trigger',
+                'section': ALL, 'key': ALL, 'subindex': ALL,
+                'parameter_index': ALL, 'vector_location': ALL
+            }, 'data'),
         ),
-
-        Input('layout-update-trigger', 'data'),
-        Input('active-project-id', 'data'),
-
-        Input({
-            'type': 'input-group-config-update-trigger', 
-            'supersection': MATCH, 'purpose': 'trigger',
-            'section': MATCH, 'key': ALL, 'subindex': ALL,
-            'parameter_index': ALL, 'vector_location': ALL
-        }, 
-        'data'),
-
-        State('app-state', 'data'),
-
-        State({'type': 'input-container', 'supersection': MATCH, 'section': MATCH}, 'id'),
-        
+        state  = dict(
+            app_state = State('app-state', 'data')
+        ),
         prevent_initial_call = True
     )
     def update_input_header_contents(
-        layout_update_trigger,
         active_project_id,
-        input_group_update_trigger,
         app_state,
-        container_id,
+        **kwargs
     ):
         if active_project_id is None:
             raise PreventUpdate
         t0 = time.perf_counter()
         trig = ctx.triggered_id
 
-        update_header = True
-        update_contents = isinstance(trig, str) # i.e. 'layout-update-trigger' or 'active-project-id'
-
         if not isinstance(trig, str):
             if callback_utils.get_triggered_value() is None:
-                # Occurs after initial hydration
-                raise PreventUpdate         
+                # input-group-config-update-trigger are fired after initial hydration with None
+                raise PreventUpdate
+        
+        rval = callback_utils.create_noupdate_return()
+
+        update_all_headers = isinstance(trig, str) # i.e. 'layout-update-trigger' or 'active-project-id'
+        # If trigger is not a layout change (or project change) then no need to redraw the inputs
+        update_contents = update_all_headers                 
 
         app_state = json.loads(app_state) if app_state else {}
-        
-        supersection = container_id.get('supersection')
-        section = container_id.get('section')
         model_type = app_state.get('model_type', 'default')
 
-        if not supersection or not section:
-            raise PreventUpdate
+        id_roots = []
+        if update_all_headers:
+            for container_id in ctx.outputs_grouping['headers']:
+                id_roots.append(container_id['id'])
+        else:
+            container_id = {
+                'type': 'input-section-header',
+                'supersection': trig['supersection'],
+                'section': trig['section'],
+            }
+            id_roots = [container_id]
 
-        rval = [no_update, no_update]
+        for container_id in id_roots:
+            supersection = container_id.get('supersection')
+            section = container_id.get('section')
+            
+            def _not_found(creator_type):
+                logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
 
-        def _not_found(creator_type):
-            logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
+            if update_contents:
+                # set the intervals count to 0
+                trigger_id = copy.copy(container_id)
+                trigger_id['type'] = 'input-container-hydration-interval'
+                callback_utils.update_property_by_id(
+                    trigger_id,
+                    'n_intervals',
+                    0,
+                    rval
+                )
 
-        if update_contents:
-            rval[1] = 0
-
-        if update_header:
             try:
                 content_creator = get_input_section_header_content_creator(
                     supersection, section, model_type
@@ -128,68 +140,90 @@ def add_input_container_callbacks(app: NewsegsDash):
                 if content_creator is None:
                     return _not_found('Input Section Header')
                 else:
-                    logger.debug(
+                    logger.info(
                         'Creating Input Section Header contents using creator found for %s.%s.%s',
                         supersection, section, model_type
                     )
-                    rval[0] = content_creator(active_project_id, app.project_provider)
+                    callback_utils.update_property_by_id(
+                        container_id,
+                        'children',
+                        content_creator(active_project_id, app.project_provider),
+                        rval
+                    )
             except KeyError as e:
                 _not_found('Input Section Header')
 
         t1 = time.perf_counter()
-        logger.info(f'Input Header for {supersection}, {section} created in {t1 - t0:.3f}s')
+        logger.info(f'Input Header(s) created in {t1 - t0:.3f}s')
         return rval
 
     @app.callback(
-        Output(
-            {'type': 'input-container', 'supersection': MATCH, 'section': MATCH},
-            'children'
+        output = dict(
+            containers = Output(
+                {'type': 'input-container', 'supersection': ALL, 'section': ALL},
+                'children'
+            )
         ),
-
-        Input(
-            {'type': 'input-container-hydration-interval', 'supersection': MATCH, 'section': MATCH},
-            'n_intervals'
+        inputs = dict(
+            hydration_trigger = Input(
+                {'type': 'input-container-hydration-interval', 'supersection': ALL, 'section': ALL},
+                'n_intervals'
+            ),
         ),
-
-        State('active-project-id', 'data'),
-        State('app-state', 'data'),
-        State({'type': 'input-container', 'supersection': MATCH, 'section': MATCH}, 'id'),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            app_state = State('app-state', 'data'),
+        ),
         prevent_initial_call = True
     )
-    def hydrate_input_container(n_intervals, active_project_id, app_state, container_id):
-        if n_intervals != 1:
-            raise PreventUpdate
+    def hydrate_input_container(
+        active_project_id, 
+        app_state, 
+        **kwargs
+    ):
         t0 = time.perf_counter()
 
+        rval = callback_utils.create_noupdate_return()
+        
         app_state = json.loads(app_state) if app_state else {}
-                
-        supersection = container_id.get('supersection')
-        section = container_id.get('section')
         model_type = app_state.get('model_type', 'default')
 
-        if not supersection or not section:
-            raise PreventUpdate
+        for trig in ctx.triggered:
+            trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
+            supersection = trig.get('supersection')
+            section = trig.get('section')
 
-        def _not_found(creator_type):
-            logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
-
-        try:
-            content_creator = get_input_container_content_creator(
-                supersection, section, model_type
+            container_id = dict(
+                type = 'input-container',
+                supersection = supersection,
+                section = section
             )
-            if content_creator is None:
-                _not_found('Input Container')
-            else:
-                logger.debug(
-                    'Creating Input Container contents using creator found for %s.%s.%s',
+
+            def _not_found(creator_type):
+                logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
+
+            try:
+                content_creator = get_input_container_content_creator(
                     supersection, section, model_type
                 )
-                rval = content_creator(active_project_id, app.project_provider)
-        except KeyError as e:
-            _not_found('Input Container')
+                if content_creator is None:
+                    _not_found('Input Container')
+                else:
+                    logger.debug(
+                        'Creating Input Container contents using creator found for %s.%s.%s',
+                        supersection, section, model_type
+                    )
+                    callback_utils.update_property_by_id(
+                        container_id,
+                        'children',
+                        content_creator(active_project_id, app.project_provider),
+                        rval
+                    )
+            except KeyError as e:
+                _not_found('Input Container')
 
         t1 = time.perf_counter()
-        logger.info(f'Input Container hydrated for {supersection}, {section} in {t1 - t0:.3f}s')
+        logger.info(f'Input Container(s) hydrated in {t1 - t0:.3f}s')
         return rval        
 
     @app.callback(
