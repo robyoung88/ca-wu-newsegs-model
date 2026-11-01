@@ -180,7 +180,15 @@ def add_result_container_callbacks(app: NewsegsDash):
                 trig['type'] = 'result-section-header'
                 del trig['subindex']
                 del trig['supersection']
-                headers_for_update.append(trig)
+                headers_for_update.extend(
+                    [
+                        x['id'] for x in ctx.outputs_grouping['containers']
+                        if callback_utils.intersection_values_match(trig, x['id'])
+                    ]
+                )
+
+        if not headers_for_update:
+            return rval
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
@@ -335,7 +343,14 @@ def add_result_container_callbacks(app: NewsegsDash):
                 trig['type'] = 'result-table'
                 del trig['subindex']
                 del trig['supersection']
-                tables_for_update.append(trig)
+                tables_for_update.extend(
+                    [
+                        x['id'] for x in ctx.outputs_grouping['table'] 
+                        if callback_utils.intersection_values_match(trig, x['id'])
+                    ]
+                )
+        if not tables_for_update:
+            return rval
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
