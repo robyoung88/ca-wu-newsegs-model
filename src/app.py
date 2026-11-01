@@ -304,7 +304,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
     add_result_container_callbacks(app)
-    #add_result_timeseries_callbacks(app)
+    add_result_timeseries_callbacks(app)
 
     for page in registers.PAGE_REGISTER.values():
         page.attach_callbacks(app)

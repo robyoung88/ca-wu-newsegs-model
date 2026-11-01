@@ -225,144 +225,186 @@ def add_result_container_callbacks(app: NewsegsDash):
         return rval
 
     @app.callback(
-        Output({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'children'),
-        Output({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-is-stale'),
-        Output({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-rendered-project-id'),
-        Output({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-rendered-project-table-revision'),
-        Output({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-rendered-ann-hori-state'),
-
-        Input({
-            'type': 'postaction-trigger', 'purpose': 'trigger',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data'),
-
-        Input({
-            'type': 'result-table-option', 'purpose': ALL,
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'value'),
-
-        Input({'type': 'annual-horizon-toggle', 'page': ALL}, 'value'),
-        Input('delayed-result-container-refill-interval', 'n_intervals'),
-        State('active-project-id', 'data'),
-        State('app-state', 'data'),
-
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'id'),
-        State({
-            'type': 'result-table-option', 'purpose': ALL,
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'id'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-rendered-project-id'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-rendered-project-table-revision'),
-        State({
-            'type': 'result-table', 'purpose': 'container',
-            'supersection': ALL, 'section': MATCH,
-            'key': MATCH, 'subindex': ALL
-        }, 'data-rendered-ann-hori-state'),
-        #prevent_initial_call = True
+        output = dict(
+            table = Output({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'children'),
+            data_is_stale = Output({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-is-stale'),
+            data_rendered_project_id = Output({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-project-id'),
+            data_rendered_project_table_revision = Output({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-project-table-revision'),
+            data_rendered_ann_hori_state = Output({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-ann-hori-state'),
+        ),
+        inputs = dict(
+            postaction_triggers = Input({
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data'),
+            table_options = dict(
+                values = Input({
+                    'type': 'result-table-option', 'purpose': ALL,
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 'value'),
+                ids = State({
+                    'type': 'result-table-option', 'purpose': ALL,
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                }, 'id'),
+            ),
+            ann_hori_toggle = Input(
+                {'type': 'annual-horizon-toggle', 'page': ALL}, 
+                'value'
+            ),
+            active_project_id_interval = Input('delayed-result-container-refill-interval', 'n_intervals'),
+        ),
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+            app_state = State('app-state', 'data'),
+            container_ids = State({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'id'),
+            rendered_project_ids = State({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-project-id'),
+            rendered_project_table_revisions =  State({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-project-table-revision'),
+            rendered_ann_hori_states =  State({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-ann-hori-state'),
+        ),
+        prevent_initial_call = False, 
     )
     def update_result_section_contents(
-        postaction_triggers,
-        result_table_options,
+        table_options,
         ann_hori_toggle,
-        result_interval_count,
         active_project_id,
         app_state,
         container_ids,
-        option_ids,
         rendered_project_ids,
-        rendered_project_table_revision,
-        rendered_ann_hori_state,
+        rendered_project_table_revisions,
+        rendered_ann_hori_states,
+        **kwargs
     ):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
-        trig = ctx.triggered_id
-        if isinstance(trig, str) and trig == 'result-container-refill-interval':
+        trig_id = ctx.triggered_id
+        if isinstance(trig_id, str) and trig_id == 'result-container-refill-interval':
             if callback_utils.get_triggered_value() != 1:
                 raise PreventUpdate
 
         t0 = time.perf_counter()
+        rval = callback_utils.create_noupdate_return()
 
-        # Do not update if the toggle status has not changed, the project is the same,
-        # and the table revision number is the same.
-        logger.debug(
-            'Getting lightweight project - Updating Result Table Containers [Section = %s, Key = %s]', 
-            container_ids[0]['section'], container_ids[0]['key']
-        )
-        lproj = app.project_provider.get_lightweight_project(active_project_id)
-        table_rev = lproj.table_config.revision
-        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
-        if all(x is not None and x == ann_hori_toggle for x in rendered_ann_hori_state):
-            if all(x is not None and x == active_project_id for x in rendered_project_ids):
-                if all(x is not None and x==table_rev for x in rendered_project_table_revision):
-                    raise PreventUpdate
-
-        return_contents: list[Any] = [no_update] * len(container_ids)
-        return_is_stale: list[Any] = [no_update] * len(container_ids)
-        return_rendered_project_id = [active_project_id] * len(rendered_project_ids)
-        return_rendered_project_table_revision = [table_rev] * len(rendered_project_table_revision)
-        return_ann_hori_state = [ann_hori_toggle] * len(rendered_ann_hori_state)
-
-        contents_by_section_subindex = {}
-        """Local store for contents to prevent redrawing within single call"""
+        update_all_tables = isinstance(trig_id, str) or trig_id == None
+        if update_all_tables:
+            tables_for_update = [x['id'] for x in ctx.outputs_grouping['table']]
+        else:
+            tables_for_update = []
+            for trig in ctx.triggered:
+                trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
+                trig['purpose'] = 'container'
+                trig['type'] = 'result-table'
+                del trig['subindex']
+                del trig['supersection']
+                tables_for_update.append(trig)
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
+        
+        contents_by_section_subindex = {}
+        """Local store for contents to prevent redrawing within single call"""
+        
+        # Do not update if the toggle status has not changed, the project is the same,
+        # and the table revision number is the same.
+        logger.debug('Getting lightweight project - Updating Result Table Containers')
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        table_rev = lproj.table_config.revision
+        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
 
-        table_options = {}
-        for optid, optval in zip(option_ids, result_table_options):
-            table_options[optid['purpose']] = optval
+        rendered_project = {
+            (k['section'], k['key']) : v for k, v in zip(container_ids, rendered_project_ids)
+        }
+        rendered_revision = {
+            (k['section'], k['key']) : v for k, v in zip(container_ids, rendered_project_table_revisions)
+        }
+        rendered_ann_hori_state = {
+            (k['section'], k['key']) : v for k, v in zip(container_ids, rendered_ann_hori_states)
+        }
 
-        for idx, cid in enumerate(container_ids):
+        options_per_table = {}
+        for id, val in zip(table_options['ids'], table_options['values']):
+            lookup = (id['section'], id['key'])
+            options_per_table.setdefault(lookup, {})[id['purpose']] = val
 
-            # Check if already drawn
-            section = cid.get('section')
-            subindex = int(cid.get('subindex'))
+        for container_id in tables_for_update:
+            section = container_id['section']
+            key = container_id['key']
+            lookup = (section, key)
+            if rendered_ann_hori_state.get(lookup) is not None and rendered_ann_hori_state[lookup] == ann_hori_toggle:
+                if rendered_project.get(lookup) is not None and rendered_project[lookup] == active_project_id:
+                    if rendered_revision.get(lookup) is not None and rendered_revision[lookup] == table_rev:
+                        continue
+
+            subindex = int(container_id.get('subindex'))
             ss = (section, subindex)
             if ss in contents_by_section_subindex:
-                return_contents[idx] = contents_by_section_subindex[ss]
+                callback_utils.update_property_by_id(
+                    container_id,
+                    'children',
+                    contents_by_section_subindex[ss][0],
+                    rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-is-stale',
+                    contents_by_section_subindex[ss][1],
+                    rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-project-id',
+                    active_project_id, rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-project-table-revision',
+                    table_rev, rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-ann-hori-state',
+                    ann_hori_toggle, rval
+                )
                 continue
+            
+            opts = options_per_table.get(lookup, {})
 
-            key = cid.get('key')
-            if not section or not key:
-                continue
-
-            # Find any custom table providers for this table / model
+            # 1) Find any custom table providers for this table / model
             table_name = key
             table_getter = None
             try:
@@ -375,14 +417,14 @@ def add_result_container_callbacks(app: NewsegsDash):
                     'Updating Result Table Container using custom getter: Section: %s; Subindex: %s; Key: %s;',
                     section, subindex, key
                 )
-                table_options['ann_hori_toggle'] = ann_hori_toggle
-                table_options['subindex'] = subindex
+                opts['ann_hori_toggle'] = ann_hori_toggle
+                opts['subindex'] = subindex
                 res, rev = table_getter(
-                    active_project_id, table_options, app.project_provider, app.results_provider
+                    active_project_id, opts, app.project_provider, app.results_provider
                 )
 
             else:
-                # Conventional table lookup
+                # 2) Fall back to conventional table lookup
                 if subindex > 0:
                     # Optionally vary the table name from default if subindex != 0
                     subindex_map = registers.get_table_subindex_map(key, model_type)
@@ -405,37 +447,63 @@ def add_result_container_callbacks(app: NewsegsDash):
                         'Updating Result Table Container using standard getter: Section: %s; Subindex: %s; Key: %s;',
                         section, subindex, sub_table_name
                     )
-
-            # TODO: Feedback if result is stale
+            
             if res is not None:
                 logger.debug(
                     'Table found is for revision %d; Current project table revision is %d. Result Table Container Section: %s; Subindex: %s; Key: %s;',
                     rev, lproj.table_config.revision, section, subindex, key
                 )
-                contents_by_section_subindex[ss] = [res]
-                return_contents[idx] = [res]
-                return_is_stale[idx] = rev != lproj.table_config.revision
-                return_rendered_project_table_revision[idx] = rev
-            else:
-                logger.debug(
-                    'Table not found for Result Table Container: Section: %s; Subindex: %s; Key: %s;',
-                    section, subindex, key
+                stale = rev != lproj.table_config.revision
+                contents_by_section_subindex[ss] = res, stale
+                callback_utils.update_property_by_id(
+                    container_id,
+                    'children',
+                    contents_by_section_subindex[ss][0],
+                    rval
                 )
-                contents_by_section_subindex[ss] = []
-                return_contents[idx] = []
-                return_is_stale[idx] = True
-                return_rendered_project_table_revision[idx] = -1
+                callback_utils.update_property_by_id(
+                    container_id, 'data-is-stale',
+                    contents_by_section_subindex[ss][1],
+                    rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-project-id',
+                    active_project_id, rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-project-table-revision',
+                    table_rev, rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-ann-hori-state',
+                    ann_hori_toggle, rval
+                )
+
+            else:
+                callback_utils.update_property_by_id(
+                    container_id,
+                    'children',
+                    [],
+                    rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-project-id',
+                    active_project_id, rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-is-stale',
+                    True,
+                    rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-project-table-revision',
+                    -1, rval
+                )
 
         t1 = time.perf_counter()
-        logger.info(f'Result Table for {section}, {subindex}, {key} created in {t1 - t0:.3f}s')
+        logger.info(f'Result Table (s) created in {t1 - t0:.3f}s')
 
-        return (
-            return_contents, 
-            return_is_stale, 
-            return_rendered_project_id, 
-            return_rendered_project_table_revision, 
-            return_ann_hori_state
-        )
+        return rval
 
     # Graphs can't hold data attributes, so can't use them directly
     # for state monitoring.
