@@ -1,6 +1,7 @@
-"""Config module.
+"""Settings for the `dynaconf` module.
 
-TODO: Describe the purpose of the module.
+Used to ensure that `dynaconf` picks up settings from the correct file paths
+and responds to environment variables.
 """
 
 from dynaconf import Dynaconf

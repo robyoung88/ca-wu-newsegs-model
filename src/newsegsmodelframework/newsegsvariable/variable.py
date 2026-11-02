@@ -1,4 +1,69 @@
-"""Provides Variable."""
+"""Variables: the statistical characterisation of the parameters of an energy or finance model.
+
+A [`Variable`][newsegsmodelframework.newsegsvariable.variable.Variable] supplies the value, or
+values, of one parameter (or of a group of parameters that must vary together) of a NewSEGS energy model or
+finance model. It holds:
+
+- **A distribution** that describes the uncertainty in the value: constant, binomial, normal,
+  beta, gamma, constant vector, multivariate normal or Dirichlet.
+- **Meta-parameters** that describe the distribution (e.g. the mean and standard deviation of
+  a normal distribution). The same distribution may be *parameterised* in different ways (e.g. a
+  log-normal by `mu` and `sigma` of the logarithm, or by the `mean` and `sd` of the value). The
+  *raw* parameters, as the user gave them in the parameterisation, are stored with the
+  variable and are converted to the *native* parameters of the distribution.
+- **A transform** (`identity` or `ln`) that gives the model value as a function of the underlying
+  distribution; `ln` makes the model value the exponential of the distribution, as for a
+  log-normal or multivariate log-normal variable.
+- **A deterministic (central) value**, derived from the distribution, which is used in an
+  ordinary model run.
+- **Bounds for one-way (deterministic) sensitivity analysis, DSA**: the lower and upper bounds
+  of the value, specified as `absolute`, `offset`, `relative` or `interval` bounds.
+- **Control information**: whether the variable may be, and is, selected for DSA, probabilistic
+  sensitivity analysis (PSA) and optimisation, and whether it is shown on the corresponding pages.
+- **Formatting information**: a label, unit, icon, default numeric format and the limits and step
+  of the input field.
+- **Location information**: the section and key under which it appears in the interface
+  (`interface_section`, `interface_key`, `interface_subindex`, which together form the *varid*)
+  and the section and parameter in the model that it sets (`model_section`, `model_parameter`).
+
+The module is organised in three layers:
+
+| Layer | Classes | Role |
+|---|---|---|
+| Parameterisation | `Parameterisation` and its subclasses | Convert the raw parameters a user gives into the native parameters of a distribution, and update them one at a time. |
+| Distribution | `Distribution` and its subclasses | Statistical behaviour: validation, central value, standard deviation, intervals, DSA bounds and PSA draws. Stateless singletons. |
+| Variable | `Variable` and its subclasses | The stateful component: holds the parameters and control information and updates the model. |
+
+`Variable(name, distribution = ...)` returns an instance of the subclass for the distribution:
+
+| `distribution` | Class | Parameterisations (raw parameters) |
+|---|---|---|
+| `constant` | `ConstantVariable` | `value` |
+| `numeric_constant` | `NumericConstantVariable` | `value` |
+| `binomial` | `BinomialVariable` | (`probability`, `trials`); (`mean`, `trials`) |
+| `normal` | `NormalVariable` | (`mean`, `sd`); with `ln`: (`mu`, `sigma`); (`mean`, `sd`) of the log-normal |
+| `beta` | `BetaVariable` | (`a`, `b`); (`mean`, `sd`); with `ln`: (`a_log`, `b_log`) |
+| `gamma` | `GammaVariable` | (`shape`, `scale`); (`mean`, `sd`); with `ln`: (`shape_log`, `scale_log`) |
+| `constant_vector` | `ConstantVectorVariable` | `values` |
+| `mvn` | `MultivariateNormalVariable` | (`mean`, `vcv`); with `ln`: (`mu`, `vcv`); (`mean`, `vcv`, `transform`) |
+| `dirichlet` | `DirichletVariable` | `alpha`; (`mean`, `vcv`) |
+
+Example:
+    ```python
+    var = Variable(
+        'capital_cost', distribution = 'normal', transform = 'ln',
+        model_section = 'costs', model_parameter = 'capital',
+        unit = 'GBP',
+    )
+    # The first parameterisation eligible for `ln` is (mu, sigma) of the logarithm;
+    # choose the one which takes the mean and sd of the value itself.
+    var.parameterisation_index = var.find_parameterisation(lambda p: 'mean' in p.names)
+    var.set_parameters(1000., 150.)   # mean and sd of the log-normal value
+    var.deterministic_value           # 1000.0
+    var.update_model(finance)         # set finance.costs.capital
+    ```
+
+"""
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -41,12 +106,16 @@ VARIABLE_TYPE = Literal[
     'scalar',
     'vector'
 ]
+"""Whether a variable has a single value (`scalar`) or several (`vector`).
+"""
 
 PARAMETER_TYPE = Literal[
     'scalar',
     'vector',
     'matrix',
 ]
+"""The type of a raw parameter of a distribution.
+"""
 
 VARIABLE_DISTRIBUTION = Literal[
     'constant',
@@ -59,6 +128,8 @@ VARIABLE_DISTRIBUTION = Literal[
     'mvn', # multivariate normal
     'dirichlet', # for simplex i.e. vector of probabilities summing to 1
 ]
+"""The distributions available to a variable.
+"""
 
 SCALAR_DISTRIBUTIONS = [
     'constant',
@@ -68,28 +139,38 @@ SCALAR_DISTRIBUTIONS = [
     'beta',
     'gamma'
 ]
+"""The distributions of scalar variables.
+"""
 
 VECTOR_DISTRIBUTIONS = [
     'constant_vector',
     'mvn',
     'dirichlet'
 ]
+"""The distributions of vector variables.
+"""
 
 VARIABLE_TRANSFORM = Literal[
     'identity',
     'ln'
 ]
+"""Transform from the underlying distribution to the model value: `identity`, or `ln` when the value is the exponential of the distribution.
+"""
 
 CONFIGURATION_TYPE = Literal[
     'model',
     'finance'
 ]
+"""The kind of component whose parameter a variable sets: the energy `model` or the `finance` model.
+"""
 
 DSA_BOUND = Literal[
     'central',
     'lower',
     'upper'
 ]
+"""The bounds of deterministic sensitivity analysis.
+"""
 
 DSA_BOUNDS_TYPE = Literal[
     'absolute',
@@ -97,6 +178,8 @@ DSA_BOUNDS_TYPE = Literal[
     'relative',
     'interval'
 ]
+"""How the DSA bounds are specified: an `absolute` value; an `offset` from, or `relative` multiple of, the central value; or the lower/upper limits of a confidence `interval`.
+"""
 
 def _parameter_validation_default(var: Variable, val: Param):
     return
@@ -139,9 +222,9 @@ def _multiparameter_partial_generation_broadcast(
 # NB - we don't really use the features of a Singleton here, as no Singletons have any instance parameters that are modified.
 # In the future, this may be stripped out and the classes re-composed.
 class Singleton(type):
-    """Singleton.
+    """Metaclass that creates a single instance of each class.
 
-    TODO: Add a description.
+    The parameterisation and distribution classes have no instance state, so one instance of each is shared.
     """
     _instances = {}
     def __call__(cls, *args: Any, **kwargs: Any) -> Singleton:
@@ -153,8 +236,19 @@ class Singleton(type):
         return cls._instances[cls]
 
 class Parameterisation(metaclass = Singleton):
-    """
-    A single parameterisation of a distribution.
+    """A single way of parameterising a distribution.
+
+    A distribution may be described by different sets of meta-parameters - for example a normal
+    distribution by `mean` and `sd`, or a log-normal distribution by the `mu` and `sigma` of its
+    logarithm or by the `mean` and `sd` of its value. Each is a `Parameterisation`: it knows the
+    names, types and default values of the *raw* parameters, converts them into the *native*
+    parameters of the distribution (`generator`), updates them one at a time (`partial_generator`)
+    and says whether it can be used with the transform of a variable (`eligibility`).
+
+    Attributes:
+        names: Names of the raw parameters.
+        types: Type of each raw parameter: `scalar`, `vector` or `matrix`.
+        defaults: Default values of the raw parameters.
     """
 
     names: tuple[str, ...]
@@ -188,38 +282,34 @@ class Parameterisation(metaclass = Singleton):
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Depends on the transform of the variable, e.g. a `LogNormalParameterisationDefault` is for variables with an `ln` transform. The default is always eligible.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if the parameterisation can be used.
         """
         return True
     
 
 class TwoParamParameterisation(Parameterisation):
     
-    """Two Param Parameterisation.
-
-    TODO: Add a description.
+    """Parameterisation of a distribution with two scalar numeric parameters.
     """
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
-
-        TODO: Add a description.
+        """Convert raw parameters into the native parameters of the distribution.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         ...
     
@@ -234,42 +324,38 @@ class TwoParamParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Used when the user changes one parameter of a variable. The other parameters are adjusted (if `autoscale`) so that the set remains valid.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         ...
 
 class VectorParameterisation(Parameterisation):
 
-    """Vector Parameterisation.
-
-    TODO: Add a description.
+    """Parameterisation of a distribution with vector or matrix parameters.
     """
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[VectorParam|MatrixNumParam, ...]:
-        """Generator.
-
-        TODO: Add a description.
+        """Convert raw parameters into the native parameters of the distribution.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         ...
 
@@ -284,27 +370,39 @@ class VectorParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[Param, ...], tuple[VectorParam|MatrixNumParam, ...]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Used when the user changes one parameter of a variable. The other parameters are adjusted (if `autoscale`) so that the set remains valid.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         ...
         
 class Distribution(metaclass = Singleton):
-    """Distribution.
+    """Statistical behaviour of a type of variable.
 
-    TODO: Add a description.
+    A distribution is a stateless singleton: it holds the list of its parameterisations and
+    what it supports, and its methods take the variable whose parameters are to be used. It can
+    say whether the variable's value can be varied in DSA, PSA and optimisation, validate
+    parameters and values, and calculate the deterministic value, standard deviation and
+    intervals, DSA bounds and PSA draws.
+
+    Attributes:
+        distribution: Name of the distribution (`VARIABLE_DISTRIBUTION`).
+        parameterisations: The parameterisations that the distribution supports.
+        dsa_possible: Whether the value can be varied in deterministic sensitivity analysis.
+        psa_possible: Whether the value can be drawn in probabilistic sensitivity analysis.
+        optim_possible: Whether the value can be varied in optimisation.
+        permitted_dsa_bounds: The kinds of DSA bound that can be used.
     """
     distribution : VARIABLE_DISTRIBUTION
     parameterisations: Sequence[Parameterisation]
@@ -319,15 +417,13 @@ class Distribution(metaclass = Singleton):
 
     @classmethod
     def n_values(cls, var: Variable) -> int:
-        """N values.
-
-        TODO: Add a description.
+        """Number of values the variable provides.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The number of values: 1 for a scalar variable.
         """
         try:
             if (
@@ -357,119 +453,109 @@ class Distribution(metaclass = Singleton):
     @classmethod
     @abstractmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         ...
     
     @classmethod
     @abstractmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         ...
     
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> Value:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central (deterministic) value of the variable.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         ...
 
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> Value:
-        """Std.
-
-        TODO: Add a description.
+        """The standard deviation of the value.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[Value, Value]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         ...
 
     @classmethod
     @abstractmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> Value:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         ...
     
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> Value:
-        """Psa value.
-
-        TODO: Add a description.
+        """Draw a value for probabilistic sensitivity analysis.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         ...
     
     @classmethod
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[Value, Value]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         ...
 
@@ -504,33 +590,29 @@ class Distribution(metaclass = Singleton):
 
 
 class ScalarValuedDistribution(Distribution):
-    """Scalar Valued Distribution.
-
-    TODO: Add a description.
+    """A distribution of a single value of any type, which may be a string.
     """
     @classmethod
     def n_values(cls, var: Variable) -> int:
-        """N values.
-
-        TODO: Add a description.
+        """Number of values the variable provides.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The number of values: 1 for a scalar variable.
         """
         return 1
     
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         if len(values) > 1 or len(values) < 1:
             raise TypeError(f'Single value expected, got {len(values)}')
@@ -543,46 +625,40 @@ class ScalarValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> ScalarParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central (deterministic) value of the variable.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         ...
 
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> ScalarParam:
-        """Std.
-
-        TODO: Add a description.
+        """The standard deviation of the value.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarParam, ScalarParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         ...
     
@@ -651,16 +727,14 @@ class ScalarValuedDistribution(Distribution):
 
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarParam:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         if not isinstance(var, ScalarVariable):
             raise TypeError(f'Expected ScalarVariable, got {type(var)}')
@@ -687,39 +761,40 @@ class ScalarValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarParam:
-        """Psa value.
-
-        TODO: Add a description.
+        """Draw a value for probabilistic sensitivity analysis.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         ...
     
     @classmethod
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[ScalarParam, ScalarParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         ...
 
 
 class NumericScalarValuedDistribution(ScalarValuedDistribution):
-    """Numeric Scalar Valued Distribution.
+    """A distribution of a single numeric value.
 
-    TODO: Add a description.
+    Adds the `interval` DSA bound - the central interval of the distribution of the given probability - and the ability to be varied in optimisation.
+
+    Attributes:
+        interval_function: Function of a probability and the native parameters returning the lower and upper bounds of the central interval.
     """
     interval_function: Callable[[float, Sequence[ScalarNumParam]], tuple[float, float]]
     permitted_dsa_bounds = (
@@ -732,13 +807,13 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         if len(values) > 1 or len(values) < 1:
             raise TypeError(f'Single value expected, got {len(values)}')
@@ -751,46 +826,40 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central (deterministic) value of the variable.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         ...
 
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> ScalarNumParam:
-        """Std.
-
-        TODO: Add a description.
+        """The standard deviation of the value.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         if not isinstance(var, NumericScalarVariable):
             raise TypeError(f'var is expected to be NumericScalarVariable, is {type(var)}')
@@ -851,6 +920,15 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
     @override
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        """The value of the variable at a bound in deterministic sensitivity analysis.
+
+        Args:
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
+
+        Returns:
+            The value at the requested bound.
+        """
         if var.dsa_bounds_type == 'interval':
             if not isinstance(var, NumericScalarVariable):
                 raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
@@ -872,16 +950,14 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarNumParam:
-        """Psa value.
-
-        TODO: Add a description.
+        """Draw a value for probabilistic sensitivity analysis.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         ...
     
@@ -891,16 +967,16 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
         var: Variable,
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
-            interval: TODO.
+            var: The variable.
+            interval: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         if not isinstance(var, NumericScalarVariable):
             raise TypeError(f'Expected var as NumericScalarVariable, got {type(var)}')
@@ -919,19 +995,17 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
                 raise ValueError(f'Unknown dsa_bounds_type {var.dsa_bounds_type}')
 
 class TwoParamNumericScalarValuedDistribution(NumericScalarValuedDistribution):
-    """Two Param Numeric Scalar Valued Distribution.
-
-    TODO: Add a description.
+    """A distribution of a single numeric value described by two numeric scalar parameters.
     """
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if len(parameters) != 2 :
             raise TypeError(f'Two numeric parameters expected, got {len(parameters)}')
@@ -947,53 +1021,45 @@ class TwoParamNumericScalarValuedDistribution(NumericScalarValuedDistribution):
 
 class VectorValuedDistribution(Distribution):
 
-    """Vector Valued Distribution.
-
-    TODO: Add a description.
+    """A distribution of a vector of values, which may be of any type.
     """
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> VectorParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central (deterministic) value of the variable.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         ...
     
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> VectorParam:
-        """Std.
-
-        TODO: Add a description.
+        """The standard deviation of the value.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[VectorParam, VectorParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         ...
     
@@ -1065,16 +1131,14 @@ class VectorValuedDistribution(Distribution):
 
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> VectorParam:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         if not isinstance(var, VectorVariable):
             raise TypeError(f'Expected VectorVariable, got {type(var)}')
@@ -1101,39 +1165,37 @@ class VectorValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> VectorParam:
-        """Psa value.
-
-        TODO: Add a description.
+        """Draw a value for probabilistic sensitivity analysis.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         ...
     
     @classmethod
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[VectorParam, VectorParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         ...
 
 class NumericVectorValuedDistribution(VectorValuedDistribution):
 
-    """Numeric Vector Valued Distribution.
+    """A distribution of a vector of numeric values.
 
-    TODO: Add a description.
+    DSA varies the element at `dsa_value_index` of the variable. Allows the `interval` DSA bound.
     """
     permitted_dsa_bounds = (
         'absolute',
@@ -1156,46 +1218,40 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central (deterministic) value of the variable.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         ...
     
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> VectorParam:
-        """Std.
-
-        TODO: Add a description.
+        """The standard deviation of the value.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[VectorParam, VectorParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         if not isinstance(var, NumericVectorVariable):
             raise TypeError(f'var should be a NumericVectorVariable, is {type(var)}')
@@ -1203,16 +1259,14 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
 
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> NumericVectorParam:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         if var.dsa_bounds_type == 'interval':
             if not isinstance(var, NumericVectorVariable):
@@ -1238,16 +1292,14 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
         var: Variable,
         rng: np.random.Generator
     ) -> NumericVectorParam:
-        """Psa value.
-
-        TODO: Add a description.
+        """Draw a value for probabilistic sensitivity analysis.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         ...
     
@@ -1257,15 +1309,15 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
         cls, 
         var: Variable
     ) -> tuple[NumericVectorParam, NumericVectorParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         ...
 
@@ -1274,16 +1326,14 @@ class _ConstantParameterisation(Parameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarParam]:
-        """Generator.
-
-        TODO: Add a description.
+        """Convert raw parameters into the native parameters of the distribution.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         ...
 
@@ -1298,20 +1348,20 @@ class _ConstantParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarParam], tuple[ScalarParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Used when the user changes one parameter of a variable. The other parameters are adjusted (if `autoscale`) so that the set remains valid.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         ...
 
@@ -1319,9 +1369,13 @@ class _ConstantParameterisation(Parameterisation):
 class ConstantParameterisationDefault(
     _ConstantParameterisation
 ):
-    """Constant Parameterisation Default.
+    """Parameterisation of the constant distribution by its `value`.
 
-    TODO: Add a description.
+    Raw parameter: `value` - a single value of any type, including a string.
+
+    Native parameter: `(value,)`.
+
+    Eligible when always.
     """
     names = ('value', )
     types = ('scalar', )
@@ -1329,17 +1383,19 @@ class ConstantParameterisationDefault(
     
     @classmethod
     def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameter: `value` - a single value of any type, including a string.
+
+        Native parameter: `(value,)`.
 
         Args:
-            value: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            value: The value.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if len(args):
             raise TypeError('Constant variable can only accept single value - use constant_vector')
@@ -1369,6 +1425,23 @@ class ConstantParameterisationDefault(
         **kwargs
     ) -> tuple[tuple[ScalarParam], tuple[ScalarParam]]:
         # As there is only a single parameter, there is no difference between setting a single parameter and all
+        """Generate the parameters after a change to some of the raw parameters.
+
+        Raw parameter: `value` - a single value of any type, including a string.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
+
+        Args:
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
+
+        Returns:
+            The raw parameters and the native parameters.
+        """
         raw_par = (parameter[0],)
         if not isinstance(raw_par[0], str) and (isinstance(raw_par[0], Sequence) or isinstance(raw_par[0], np.ndarray)):
             raise TypeError(f'parameter expected to be of scalar type, is {type(parameter)}')
@@ -1377,9 +1450,11 @@ class ConstantParameterisationDefault(
         
 
 class ConstantDistribution(ScalarValuedDistribution):
-    """Constant Distribution.
+    """Distribution of a single value of any type (including strings) that does not vary.
 
-    TODO: Add a description.
+    The value is the parameter; its standard deviation is zero. It can be varied in DSA but not in PSA.
+
+    Used by [`ConstantVariable`][newsegsmodelframework.newsegsvariable.variable.ConstantVariable].
     """
     distribution = 'constant'
     parameterisations = [
@@ -1390,13 +1465,13 @@ class ConstantDistribution(ScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
@@ -1419,15 +1494,15 @@ class ConstantDistribution(ScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The parameter (exponentiated if the transform is `ln`).
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
@@ -1445,45 +1520,43 @@ class ConstantDistribution(ScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        Always zero.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         return 0
     
     @classmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarParam, ScalarParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         return(cls.deterministic_value(var), cls.deterministic_value(var))
 
     @classmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        The deterministic value - a constant does not vary.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
@@ -1492,15 +1565,17 @@ class ConstantDistribution(ScalarValuedDistribution):
     
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[ScalarParam, ScalarParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
+
+        Bounds that leave the value unchanged.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
@@ -1520,16 +1595,14 @@ class _NumericConstantParameterisation(Parameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarNumParam]:
-        """Generator.
-
-        TODO: Add a description.
+        """Convert raw parameters into the native parameters of the distribution.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         ...
 
@@ -1544,20 +1617,20 @@ class _NumericConstantParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam], tuple[ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Used when the user changes one parameter of a variable. The other parameters are adjusted (if `autoscale`) so that the set remains valid.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         ...
 
@@ -1565,9 +1638,13 @@ class _NumericConstantParameterisation(Parameterisation):
 class NumericConstantParameterisationDefault(
     _NumericConstantParameterisation
 ):
-    """Numeric Constant Parameterisation Default.
+    """Parameterisation of the numeric constant distribution by its `value`.
 
-    TODO: Add a description.
+    Raw parameter: `value` - a single number.
+
+    Native parameter: `(value,)`.
+
+    Eligible when always.
     """
     names = ('value', )
     types = ('scalar', )
@@ -1575,17 +1652,19 @@ class NumericConstantParameterisationDefault(
     
     @classmethod
     def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameter: `value` - a single number.
+
+        Native parameter: `(value,)`.
 
         Args:
-            value: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            value: The value.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if len(args):
             raise TypeError('Constant variable can only accept single value - use constant_vector for %s', args)
@@ -1615,6 +1694,23 @@ class NumericConstantParameterisationDefault(
         **kwargs
     ) -> tuple[tuple[ScalarNumParam], tuple[ScalarNumParam]]:
         # As there is only a single parameter, there is no difference between setting a single parameter and all
+        """Generate the parameters after a change to some of the raw parameters.
+
+        Raw parameter: `value` - a single number.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
+
+        Args:
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
+
+        Returns:
+            The raw parameters and the native parameters.
+        """
         raw_par = (parameter[0],)
         if isinstance(raw_par[0], str) or (isinstance(raw_par[0], Sequence) or isinstance(raw_par[0], np.ndarray)):
             raise TypeError(f'parameter expected to be of numeric scalar type, is {type(parameter)}')
@@ -1623,9 +1719,11 @@ class NumericConstantParameterisationDefault(
 
 
 class NumericConstantDistribution(NumericScalarValuedDistribution):
-    """Numeric Constant Distribution.
+    """Distribution of a single numeric value that does not vary.
 
-    TODO: Add a description.
+    As `ConstantDistribution`, restricted to numbers, and so also able to be varied in optimisation.
+
+    Used by [`NumericConstantVariable`][newsegsmodelframework.newsegsvariable.variable.NumericConstantVariable].
     """
     distribution = 'numeric_constant'
     parameterisations = [
@@ -1636,13 +1734,13 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
@@ -1664,15 +1762,15 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The parameter (exponentiated if the transform is `ln`).
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
@@ -1690,45 +1788,43 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        Always zero.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         return 0
     
     @classmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         return(cls.deterministic_value(var), cls.deterministic_value(var))
 
     @classmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarNumParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        The deterministic value - a constant does not vary.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
@@ -1737,16 +1833,18 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
     
     @classmethod
     def dsa_auto_values(cls, var: Variable, interval: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
+
+        Bounds that leave the value unchanged.
 
         Args:
-            var: TODO.
-            interval: TODO.
+            var: The variable.
+            interval: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
@@ -1767,9 +1865,13 @@ class _BinomialParameterisation(TwoParamParameterisation):
 class BinomialParameterisationDefault(
     _BinomialParameterisation
 ):
-    """Binomial Parameterisation Default.
+    """Parameterisation of the binomial distribution by `probability` and `trials`.
 
-    TODO: Add a description.
+    Raw parameters: `probability` of success per trial, in [0, 1], and the number of `trials`, a non-negative integer.
+
+    Native parameters: `(trials, probability)` - note the order.
+
+    Eligible when always.
     """
     names = ('probability', 'trials')
     types = ('scalar', 'scalar')
@@ -1782,18 +1884,20 @@ class BinomialParameterisationDefault(
         trials: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `probability` of success per trial, in [0, 1], and the number of `trials`, a non-negative integer.
+
+        Native parameters: `(trials, probability)` - note the order.
 
         Args:
-            probability: TODO.
-            trials: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            probability: Probability of success in each trial.
+            trials: Number of trials.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         return (trials, probability)
     
@@ -1807,20 +1911,22 @@ class BinomialParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `probability` of success per trial, in [0, 1], and the number of `trials`, a non-negative integer.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -1850,9 +1956,13 @@ class BinomialParameterisationDefault(
 class BinomialParameterisationExpected(
     _BinomialParameterisation
 ):
-    """Binomial Parameterisation Expected.
+    """Parameterisation of the binomial distribution by the expected number of successes (`mean`) and `trials`.
 
-    TODO: Add a description.
+    Raw parameters: `mean` - the expected number of successes, between 0 and `trials` - and the number of `trials`.
+
+    Native parameters: `(trials, mean / trials)`.
+
+    Eligible when always.
     """
     names = ('mean', 'trials')
     types = ('scalar', 'scalar')
@@ -1865,18 +1975,20 @@ class BinomialParameterisationExpected(
         trials: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` - the expected number of successes, between 0 and `trials` - and the number of `trials`.
+
+        Native parameters: `(trials, mean / trials)`.
 
         Args:
-            mean: TODO.
-            trials: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            trials: Number of trials.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if trials == 0:
             if mean == 0:
@@ -1896,20 +2008,22 @@ class BinomialParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` - the expected number of successes, between 0 and `trials` - and the number of `trials`.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -1957,9 +2071,11 @@ def _binomial_interval_function(
     return binom.interval(interval, parameters[0], parameters[1])
 
 class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
-    """Binomial Distribution.
+    """Distribution of a number of successes in a number of independent trials (use one trial for a Bernoulli variable).
 
-    TODO: Add a description.
+    The value is an integer between 0 and the number of trials. Only the identity transform is supported.
+
+    Used by [`BinomialVariable`][newsegsmodelframework.newsegsvariable.variable.BinomialVariable].
     """
     distribution = 'binomial'
     parameterisations: Sequence[_BinomialParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -1972,13 +2088,13 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
@@ -1996,13 +2112,13 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         super().value_validation(var, *values)
 
@@ -2016,15 +2132,15 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The expected number of successes `trials * probability`, rounded to a whole number.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
@@ -2035,31 +2151,29 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        The standard deviation of the number of successes.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         from scipy.stats import binom
         return float(binom.std(var.parameters[0], var.parameters[1]))
     
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
@@ -2074,16 +2188,16 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable,
         rng: np.random.Generator
     ) -> ScalarNumParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        A binomial draw.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
@@ -2096,16 +2210,18 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
+
+        Bounds are rounded to whole numbers between 0 and the number of trials.
 
         Args:
-            var: TODO.
-            interval: TODO.
+            var: The variable.
+            interval: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         rval = super().dsa_auto_values(var, interval)
         var = cast(TwoParamNumericScalarVariable, var)
@@ -2154,9 +2270,13 @@ class _NormalParameterisation(TwoParamParameterisation):
 class NormalParameterisationDefault(
     _NormalParameterisation
 ):
-    """Normal Parameterisation Default.
+    """Parameterisation of the normal distribution by `mean` and standard deviation `sd`.
 
-    TODO: Add a description.
+    Raw parameters: `mean` and `sd` (non-negative).
+
+    Native parameters: `(mean, sd)`.
+
+    Eligible when the transform is `'identity'`.
     """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
@@ -2169,18 +2289,20 @@ class NormalParameterisationDefault(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `sd` (non-negative).
+
+        Native parameters: `(mean, sd)`.
 
         Args:
-            mean: TODO.
-            sd: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            sd: Standard deviation.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         return (mean, sd)
     
@@ -2193,20 +2315,22 @@ class NormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `sd` (non-negative).
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -2230,24 +2354,28 @@ class NormalParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'identity'
     
 class LogNormalParameterisationDefault(
     _NormalParameterisation
 ):
-    """Log Normal Parameterisation Default.
+    """Parameterisation of the log-normal distribution by the `mu` and `sigma` of the underlying normal distribution.
 
-    TODO: Add a description.
+    Raw parameters: `mu` and `sigma` (non-negative) - the mean and standard deviation of the logarithm of the value.
+
+    Native parameters: `(mu, sigma)`.
+
+    Eligible when the transform is `'ln'`.
     """
     names = ('mu', 'sigma')
     types = ('scalar', 'scalar')
@@ -2260,18 +2388,20 @@ class LogNormalParameterisationDefault(
         sigma: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mu` and `sigma` (non-negative) - the mean and standard deviation of the logarithm of the value.
+
+        Native parameters: `(mu, sigma)`.
 
         Args:
-            mu: TODO.
-            sigma: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mu: Mean of the underlying normal distribution.
+            sigma: Standard deviation of the underlying normal distribution.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if sigma < 0:
             raise ValueError(f'Sigma parameter must be positive, is {sigma}')
@@ -2286,20 +2416,22 @@ class LogNormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mu` and `sigma` (non-negative) - the mean and standard deviation of the logarithm of the value.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -2323,24 +2455,28 @@ class LogNormalParameterisationDefault(
         
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'ln'
 
 class LogNormalParameterisationExpected(
     _NormalParameterisation
 ):
-    """Log Normal Parameterisation Expected.
+    """Parameterisation of the log-normal distribution by the `mean` and `sd` of the value itself.
 
-    TODO: Add a description.
+    Raw parameters: `mean` (positive) and `sd` (non-negative) of the log-normal value, not of its logarithm.
+
+    Native parameters: `(mu, sigma)` of the underlying normal distribution, where `sigma^2 = ln(sd^2 / mean^2 + 1)` and `mu = ln(mean) - sigma^2 / 2`.
+
+    Eligible when the transform is `'ln'`.
     """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
@@ -2353,18 +2489,20 @@ class LogNormalParameterisationExpected(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` (positive) and `sd` (non-negative) of the log-normal value, not of its logarithm.
+
+        Native parameters: `(mu, sigma)` of the underlying normal distribution, where `sigma^2 = ln(sd^2 / mean^2 + 1)` and `mu = ln(mean) - sigma^2 / 2`.
 
         Args:
-            mean: TODO.
-            sd: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            sd: Standard deviation.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if sd == 0:
             return (np.log(mean), 0)
@@ -2383,20 +2521,22 @@ class LogNormalParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` (positive) and `sd` (non-negative) of the log-normal value, not of its logarithm.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -2421,15 +2561,15 @@ class LogNormalParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'ln'
     
@@ -2454,9 +2594,11 @@ def _lognormal_interval(
     return lognorm.interval(interval, parameters[1], scale=np.exp(parameters[0]))
     
 class NormalDistribution(TwoParamNumericScalarValuedDistribution):
-    """Normal Distribution.
+    """Distribution of a normal distribution, or with the `ln` transform a log-normal distribution.
 
-    TODO: Add a description.
+    With the `ln` transform the distribution is of the logarithm of the value, so the value is log-normal. Parameterisations are available by mean and standard deviation of the normal and of the log-normal.
+
+    Used by [`NormalVariable`][newsegsmodelframework.newsegsvariable.variable.NormalVariable].
     """
     distribution = 'normal'
     parameterisations: Sequence[_NormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -2471,13 +2613,13 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
@@ -2492,15 +2634,15 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The mean `mean` for an identity transform; for the `ln` transform the mean of the log-normal distribution, `exp(mu + sigma^2 / 2)`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
@@ -2511,36 +2653,44 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        The parameter `sd`; for the `ln` transform the standard deviation of the log-normal distribution.
+
+        Note:
+            For the `ln` transform the native parameters `(mu, sigma)` are those of the
+            underlying normal distribution, i.e. on the log scale. This is the scale on which
+            maximum likelihood estimates, Jacobians and covariance matrices are naturally
+            calculated, so it is the default parameterisation. The standard deviation returned
+            is nevertheless that of the log-normal value, `exp(mu + sigma^2 / 2) * sqrt(exp(sigma^2) - 1)`,
+            whichever parameterisation was used to set it.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
         if var.transform[0] == 'ln':
             from scipy.stats import lognorm
-            return float(lognorm.std(*var.parameters))
+            # NB - scipy's lognorm takes sigma as its shape, and exp(mu) as its scale
+            mu, sigma = var.parameters
+            return float(lognorm.std(sigma, scale = np.exp(mu)))
         else:
             return var.parameters[1]
     
     @classmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            var: TODO.
-            confidence: TODO.
+            var: The variable.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
@@ -2552,16 +2702,14 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         if var.transform[0] == 'ln' and var.dsa_bounds_type == 'interval':
             if not isinstance(var, NumericScalarVariable):
@@ -2589,16 +2737,16 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> ScalarNumParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        A normal draw, or log-normal draw for the `ln` transform; the deterministic value if `sd` is zero.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
@@ -2616,16 +2764,16 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
-            interval: TODO.
+            var: The variable.
+            interval: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         match var.transform[0]:
             case 'identity':
@@ -2652,9 +2800,13 @@ class _BetaParameterisation(TwoParamParameterisation):
 class BetaParameterisationDefault(
     _BetaParameterisation
 ):
-    """Beta Parameterisation Default.
+    """Parameterisation of the beta distribution by its shape parameters `a` and `b`.
 
-    TODO: Add a description.
+    Raw parameters: `a` and `b` (positive).
+
+    Native parameters: `(a, b)`.
+
+    Eligible when the transform is `'identity'`.
     """
     names = ('a', 'b')
     types = ('scalar', 'scalar')
@@ -2667,18 +2819,20 @@ class BetaParameterisationDefault(
         b: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `a` and `b` (positive).
+
+        Native parameters: `(a, b)`.
 
         Args:
-            a: TODO.
-            b: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            a: First shape parameter.
+            b: Second shape parameter.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         return (a, b)
     
@@ -2691,20 +2845,22 @@ class BetaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `a` and `b` (positive).
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -2728,24 +2884,28 @@ class BetaParameterisationDefault(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'identity'
 
 class BetaParameterisationExpected(
     _BetaParameterisation
 ):
-    """Beta Parameterisation Expected.
+    """Parameterisation of the beta distribution by the `mean` and `sd` of the value.
 
-    TODO: Add a description.
+    Raw parameters: `mean` in [0, 1] and `sd` in [0, 0.5].
+
+    Native parameters: `(a, b)` with the requested mean and standard deviation.
+
+    Eligible when the transform is `'identity'`.
     """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
@@ -2758,18 +2918,20 @@ class BetaParameterisationExpected(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` in [0, 1] and `sd` in [0, 0.5].
+
+        Native parameters: `(a, b)` with the requested mean and standard deviation.
 
         Args:
-            mean: TODO.
-            sd: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            sd: Standard deviation.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if mean == 0:
             return (0, 1)
@@ -2791,20 +2953,22 @@ class BetaParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` in [0, 1] and `sd` in [0, 0.5].
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -2852,24 +3016,28 @@ class BetaParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'identity'
 
 class LogBetaParameterisationDefault(
     _BetaParameterisation
 ):
-    """Log Beta Parameterisation Default.
+    """Parameterisation of the exponential of a beta-distributed value by the shape parameters of the beta distribution.
 
-    TODO: Add a description.
+    Raw parameters: `a_log` and `b_log` (positive).
+
+    Native parameters: `(a_log, b_log)`.
+
+    Eligible when the transform is `'ln'`.
     """
     names = ('a_log', 'b_log')
     types = ('scalar', 'scalar')
@@ -2882,18 +3050,20 @@ class LogBetaParameterisationDefault(
         b_log: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `a_log` and `b_log` (positive).
+
+        Native parameters: `(a_log, b_log)`.
 
         Args:
-            a_log: TODO.
-            b_log: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            a_log: First shape parameter of the beta distribution of the logarithm.
+            b_log: Second shape parameter of the beta distribution of the logarithm.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         return (a_log, b_log)
     
@@ -2906,20 +3076,22 @@ class LogBetaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `a_log` and `b_log` (positive).
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -2943,15 +3115,15 @@ class LogBetaParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'ln'
 
@@ -2965,9 +3137,11 @@ def _beta_interval(
     return beta.interval(interval, parameters[0], parameters[1])
 
 class BetaDistribution(TwoParamNumericScalarValuedDistribution):
-    """Beta Distribution.
+    """Distribution of a beta distribution on [0, 1], e.g. a proportion or probability.
 
-    TODO: Add a description.
+    With the `ln` transform the value is the exponential of a beta-distributed variable (not fully supported).
+
+    Used by [`BetaVariable`][newsegsmodelframework.newsegsvariable.variable.BetaVariable].
     """
     distribution = 'beta'
     parameterisations: Sequence[_BetaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -2982,13 +3156,13 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
@@ -3003,13 +3177,13 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         super().value_validation(var, *values)
 
@@ -3023,15 +3197,15 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The mean `a / (a + b)`; for the `ln` transform the expectation of `exp(X)`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
@@ -3044,15 +3218,15 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        The standard deviation of the beta distribution. Not implemented for the `ln` transform.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
@@ -3072,16 +3246,16 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> ScalarNumParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        A beta draw (exponentiated for the `ln` transform); the deterministic value if `a` or `b` is zero.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
@@ -3103,9 +3277,13 @@ class _GammaParameterisation(TwoParamParameterisation):
 class GammaParameterisationDefault(
     _GammaParameterisation
 ):
-    """Gamma Parameterisation Default.
+    """Parameterisation of the gamma distribution by `shape` and `scale`.
 
-    TODO: Add a description.
+    Raw parameters: `shape` and `scale` (positive).
+
+    Native parameters: `(shape, scale)`.
+
+    Eligible when the transform is `'identity'`.
     """
     names = ('shape', 'scale')
     types = ('scalar', 'scalar')
@@ -3118,18 +3296,20 @@ class GammaParameterisationDefault(
         scale: ScalarNumParam,
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `shape` and `scale` (positive).
+
+        Native parameters: `(shape, scale)`.
 
         Args:
-            shape: TODO.
-            scale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            shape: Shape parameter.
+            scale: Scale parameter.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         return (shape, scale)
     
@@ -3142,20 +3322,22 @@ class GammaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `shape` and `scale` (positive).
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -3179,24 +3361,28 @@ class GammaParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'identity'
     
 class GammaParameterisationExpected(
     _GammaParameterisation
 ):
-    """Gamma Parameterisation Expected.
+    """Parameterisation of the gamma distribution by the `mean` and `sd` of the value.
 
-    TODO: Add a description.
+    Raw parameters: `mean` and `sd` (positive).
+
+    Native parameters: `(shape, scale)` with `shape = (mean / sd)^2` and `scale = mean / shape`.
+
+    Eligible when the transform is `'identity'`.
     """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
@@ -3218,18 +3404,20 @@ class GammaParameterisationExpected(
         # scale = mean/shape
         # sd = sqrt(shape) * mean / shape = mean / sqrt(shape)
         # shape = (mean / sd) **2
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `sd` (positive).
+
+        Native parameters: `(shape, scale)` with `shape = (mean / sd)^2` and `scale = mean / shape`.
 
         Args:
-            mean: TODO.
-            sd: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            sd: Standard deviation.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if sd < 0:
             raise ValueError(f'sd must be positive, is: {sd}')
@@ -3252,20 +3440,22 @@ class GammaParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `sd` (positive).
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -3289,24 +3479,28 @@ class GammaParameterisationExpected(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'identity'
 
 class LogGammaParameterisationDefault(
     _GammaParameterisation
 ):
-    """Log Gamma Parameterisation Default.
+    """Parameterisation of the exponential of a gamma-distributed value by the shape and scale of the gamma distribution.
 
-    TODO: Add a description.
+    Raw parameters: `shape_log` and `scale_log` (positive).
+
+    Native parameters: `(shape_log, scale_log)`.
+
+    Eligible when the transform is `'ln'`.
     """
     names = ('shape_log', 'scale_log')
     types = ('scalar', 'scalar')
@@ -3319,18 +3513,20 @@ class LogGammaParameterisationDefault(
         scale_log: ScalarNumParam,
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `shape_log` and `scale_log` (positive).
+
+        Native parameters: `(shape_log, scale_log)`.
 
         Args:
-            shape_log: TODO.
-            scale_log: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            shape_log: Shape parameter of the gamma distribution of the logarithm.
+            scale_log: Scale parameter of the gamma distribution of the logarithm.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         return (shape_log, scale_log)
     
@@ -3343,20 +3539,22 @@ class LogGammaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `shape_log` and `scale_log` (positive).
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -3380,15 +3578,15 @@ class LogGammaParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return var.transform[0] == 'ln'
 
@@ -3415,9 +3613,11 @@ def _loggamma_interval(
     return (np.exp(interval_values[0]), np.exp(interval_values[1]))
 
 class GammaDistribution(TwoParamNumericScalarValuedDistribution):
-    """Gamma Distribution.
+    """Distribution of a gamma distribution on positive values.
 
-    TODO: Add a description.
+    With the `ln` transform the value is the exponential of a gamma-distributed variable.
+
+    Used by [`GammaVariable`][newsegsmodelframework.newsegsvariable.variable.GammaVariable].
     """
     distribution = 'gamma'
     parameterisations: Sequence[_GammaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -3432,13 +3632,13 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
@@ -3453,13 +3653,13 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         super().value_validation(var, *values)
 
@@ -3473,15 +3673,15 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The mean `shape * scale`; for the `ln` transform the expectation of `exp(X)`, found by numerical integration.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
@@ -3501,15 +3701,15 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        The standard deviation of the gamma distribution (of the exponential, for the `ln` transform).
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
@@ -3522,16 +3722,14 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
-        """Dsa value.
-
-        TODO: Add a description.
+        """The value of the variable at a bound in deterministic sensitivity analysis.
 
         Args:
-            var: TODO.
-            bound: TODO.
+            var: The variable.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         if var.dsa_bounds_type == 'interval':
 
@@ -3574,16 +3772,16 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> ScalarNumParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        A gamma draw (exponentiated for the `ln` transform).
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
@@ -3606,16 +3804,16 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
-            interval: TODO.
+            var: The variable.
+            interval: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         match var.transform[0]:
             case 'identity':
@@ -3643,9 +3841,13 @@ class _ConstantVectorParameterisation(VectorParameterisation):
 class ConstantVectorParameterisationDefault(
     _ConstantVectorParameterisation
 ):
-    """Constant Vector Parameterisation Default.
+    """Parameterisation of the constant vector distribution by its `values`.
 
-    TODO: Add a description.
+    Raw parameter: `values` - a vector of values. Further positional arguments are appended to the vector.
+
+    Native parameter: `(values,)`.
+
+    Eligible when always.
     """
     names = ('values',)
     types = ('vector',)
@@ -3657,17 +3859,19 @@ class ConstantVectorParameterisationDefault(
         values: VectorParam,
         *args, **kwargs
     ) -> tuple[VectorParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameter: `values` - a vector of values. Further positional arguments are appended to the vector.
+
+        Native parameter: `(values,)`.
 
         Args:
-            values: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            values: The value(s) to check.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if len(args) > 0:
             # Assume that we need to concat
@@ -3699,13 +3903,32 @@ class ConstantVectorParameterisationDefault(
         **kwargs
     ) -> tuple[tuple[VectorParam], tuple[VectorParam]]:
         # As there is only a single parameter, there is no difference between setting a single parameter and all
+        """Generate the parameters after a change to some of the raw parameters.
+
+        Raw parameter: `values` - a vector of values. Further positional arguments are appended to the vector.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
+
+        Args:
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
+
+        Returns:
+            The raw parameters and the native parameters.
+        """
         return parameter, cls.generator(parameter[0])
     
 
 class ConstantVectorDistribution(VectorValuedDistribution):
-    """Constant Vector Distribution.
+    """Distribution of a vector of values that do not vary.
 
-    TODO: Add a description.
+    The vector counterpart of `ConstantDistribution`. It can be varied in DSA but not in PSA.
+
+    Used by [`ConstantVectorVariable`][newsegsmodelframework.newsegsvariable.variable.ConstantVectorVariable].
     """
     distribution = 'constant_vector'
     parameterisations: Sequence[_ConstantVectorParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -3717,13 +3940,13 @@ class ConstantVectorDistribution(VectorValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if len(parameters) != 1:
             raise TypeError(f'Single parameter sequence expected, got {len(parameters)} separate parameters')
@@ -3732,13 +3955,13 @@ class ConstantVectorDistribution(VectorValuedDistribution):
     
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         if len(values) != 1:
             raise TypeError(f'Single vector or Sequence of values expected, got {len(values)} individual values')
@@ -3754,15 +3977,15 @@ class ConstantVectorDistribution(VectorValuedDistribution):
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> VectorParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        A copy of the vector of values.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, ConstantVectorVariable):
             raise TypeError(f'Expecting var as ConstantVectorVariable, is {type(var)}')
@@ -3795,15 +4018,15 @@ class ConstantVectorDistribution(VectorValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> VectorParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        A vector of zeros.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         return np.zeros_like(cls.deterministic_value(var))
 
@@ -3815,16 +4038,16 @@ class ConstantVectorDistribution(VectorValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> VectorParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        The deterministic value - a constant does not vary.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, ConstantVectorVariable):
             raise TypeError(f'Expecting var as ConstantVectorVariable, is {type(var)}')
@@ -3832,15 +4055,17 @@ class ConstantVectorDistribution(VectorValuedDistribution):
     
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[VectorParam, VectorParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
+
+        Bounds that leave the values unchanged.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         if not isinstance(var, ConstantVectorVariable):
             raise TypeError(f'Expecting var as ConstantVectorVariable, is {type(var)}')
@@ -3859,25 +4084,27 @@ class _MultivariateNormalParameterisation(VectorParameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[NumericVectorParam, MatrixNumParam]:
-        """Generator.
-
-        TODO: Add a description.
+        """Convert raw parameters into the native parameters of the distribution.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         ...
 
 class MultivariateNormalParameterisationDefault(
     _MultivariateNormalParameterisation
 ):
-    """Multivariate Normal Parameterisation Default.
+    """Parameterisation of the multivariate normal distribution by `mean` vector and variance-covariance matrix `vcv`.
 
-    TODO: Add a description.
+    Raw parameters: `mean` and `vcv`, square with side the length of `mean`.
+
+    Native parameters: `(mean, vcv)`.
+
+    Eligible when no element of the transform is `'ln'`.
     """
     names = ('mean', 'vcv')
     types = ('vector', 'matrix')
@@ -3890,18 +4117,20 @@ class MultivariateNormalParameterisationDefault(
         vcv: MatrixNumParam, 
         *args, **kwargs
     ) -> tuple[NumericVectorParam, MatrixNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `vcv`, square with side the length of `mean`.
+
+        Native parameters: `(mean, vcv)`.
 
         Args:
-            mean: TODO.
-            vcv: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            vcv: Variance-covariance matrix.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
@@ -3921,20 +4150,22 @@ class MultivariateNormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam, MatrixNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `vcv`, square with side the length of `mean`.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -3992,24 +4223,28 @@ class MultivariateNormalParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when no element of the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return all(trans == 'identity' for trans in var.transform)
     
 class MultivariateLogNormalParameterisationDefault(
     _MultivariateNormalParameterisation
 ):
-    """Multivariate Log Normal Parameterisation Default.
+    """Parameterisation of the multivariate log-normal distribution by the `mu` vector and `vcv` of the underlying multivariate normal distribution.
 
-    TODO: Add a description.
+    Raw parameters: `mu` and `vcv`, of the logarithm of the values.
+
+    Native parameters: `(mu, vcv)`.
+
+    Eligible when an element of the transform is `'ln'`.
     """
     names = ('mu', 'vcv')
     types = ('vector', 'matrix')
@@ -4022,18 +4257,20 @@ class MultivariateLogNormalParameterisationDefault(
         vcv: MatrixNumParam, 
         *args, **kwargs
     ) -> tuple[NumericVectorParam, MatrixNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mu` and `vcv`, of the logarithm of the values.
+
+        Native parameters: `(mu, vcv)`.
 
         Args:
-            mu: TODO.
-            vcv: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mu: Mean of the underlying normal distribution.
+            vcv: Variance-covariance matrix.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if not isinstance(mu, np.ndarray):
             mu = np.asarray(mu, dtype = np.float64)
@@ -4053,20 +4290,22 @@ class MultivariateLogNormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam, MatrixNumParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mu` and `vcv`, of the logarithm of the values.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -4124,24 +4363,28 @@ class MultivariateLogNormalParameterisationDefault(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when an element of the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return any(trans == 'ln' for trans in var.transform)
     
 class MultivariateLogNormalParameterisationExpected(
     _MultivariateNormalParameterisation
 ):
-    """Multivariate Log Normal Parameterisation Expected.
+    """Parameterisation of the multivariate log-normal distribution by the `mean` vector of the values, and `vcv` of the underlying normal distribution.
 
-    TODO: Add a description.
+    Raw parameters: `mean`, `vcv` and `transform` (taken from the variable, not set by the user). Elements with an `ln` transform are converted to `mu = ln(mean) - vcv[i, i] / 2`.
+
+    Native parameters: `(mu, vcv)`, with `mu` replaced by the converted value for elements with an `ln` transform.
+
+    Eligible when an element of the transform is `'ln'`.
     """
     names = ('mean', 'vcv', 'transform')
     types = ('vector', 'matrix', 'vector')
@@ -4155,19 +4398,21 @@ class MultivariateLogNormalParameterisationExpected(
         transform: VectorParam,
         *args, **kwargs
     ) -> tuple[NumericVectorParam, MatrixNumParam]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean`, `vcv` and `transform` (taken from the variable, not set by the user). Elements with an `ln` transform are converted to `mu = ln(mean) - vcv[i, i] / 2`.
+
+        Native parameters: `(mu, vcv)`, with `mu` replaced by the converted value for elements with an `ln` transform.
 
         Args:
-            mean: TODO.
-            vcv: TODO.
-            transform: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            vcv: Variance-covariance matrix.
+            transform: Transform(s) of the underlying distribution to the model value: `'identity'` or `'ln'` (the model value is the exponential of the distribution).
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
@@ -4195,22 +4440,24 @@ class MultivariateLogNormalParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when an element of the transform is `'ln'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return any(trans == 'ln' for trans in var.transform)
 
 class MultivariateNormalDistribution(NumericVectorValuedDistribution):
-    """Multivariate Normal Distribution.
+    """Distribution of a multivariate normal distribution, with a variance-covariance matrix; each element may have an `ln` transform, making it log-normal.
 
-    TODO: Add a description.
+    DSA varies one element (`dsa_value_index`) of the vector at a time.
+
+    Used by [`MultivariateNormalVariable`][newsegsmodelframework.newsegsvariable.variable.MultivariateNormalVariable].
     """
     distribution = 'mvn'
     parameterisations: Sequence[_MultivariateNormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -4228,16 +4475,14 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
         interval: float, 
         var: NumericVectorVariable
     ) -> tuple[NumericVectorParam, NumericVectorParam]:
-        """Interval function.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution.
 
         Args:
-            interval: TODO.
-            var: TODO.
+            interval: Probability mass within the interval (e.g. 0.95).
+            var: The variable.
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         out_val = super().interval_function(interval, var)
         i = var.dsa_value_index
@@ -4263,13 +4508,13 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if len(parameters) != 2:
             raise TypeError(f'Two parameters expected - vector of means and variance-covariance matrix; got {len(parameters)} separate parameters')
@@ -4297,13 +4542,13 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         if len(values) != 1:
             raise TypeError(f'Single vector or Sequence of values expected, got {len(values)} individual values')
@@ -4328,15 +4573,15 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
             
     @classmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The mean vector; elements with an `ln` transform are the mean of the log-normal, `exp(mu_i + vcv[i, i] / 2)`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
@@ -4356,15 +4601,15 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> NumericVectorParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        The square roots of the diagonal of the variance-covariance matrix; for elements with an `ln` transform the standard deviation of the log-normal.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
@@ -4387,16 +4632,16 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> NumericVectorParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        A multivariate normal draw, with elements exponentiated where the transform is `ln`.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
@@ -4411,15 +4656,15 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[NumericVectorParam, NumericVectorParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
@@ -4445,25 +4690,27 @@ class _DirichletParameterisation(Parameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[NumericVectorParam]:
-        """Generator.
-
-        TODO: Add a description.
+        """Convert raw parameters into the native parameters of the distribution.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         ...
 
 class DirichletParameterisationDefault(
     _DirichletParameterisation
 ):
-    """Dirichlet Parameterisation Default.
+    """Parameterisation of the Dirichlet distribution by its concentration parameters `alpha`.
 
-    TODO: Add a description.
+    Raw parameter: `alpha` - vector of at least two non-negative concentration parameters.
+
+    Native parameter: `(alpha,)`.
+
+    Eligible when every element of the transform is `'identity'`.
     """
     names = ('alpha',)
     types = ('vector',)
@@ -4475,17 +4722,19 @@ class DirichletParameterisationDefault(
         alpha: NumericVectorParam,
         *args, **kwargs
     ) -> tuple[NumericVectorParam, ]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameter: `alpha` - vector of at least two non-negative concentration parameters.
+
+        Native parameter: `(alpha,)`.
 
         Args:
-            alpha: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            alpha: Vector of concentration parameters.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         alpha = np.asarray(alpha, dtype = np.float64).flatten()
         return (alpha, )
@@ -4501,43 +4750,49 @@ class DirichletParameterisationDefault(
         **kwargs
     ) -> tuple[tuple[NumericVectorParam], tuple[NumericVectorParam]]:
         # As there is only a single parameter, there is no difference between setting a single parameter and all
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameter: `alpha` - vector of at least two non-negative concentration parameters.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         return parameter, cls.generator(parameter[0]) # pyright: ignore[reportReturnType, reportArgumentType]
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when every element of the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return all(trans == 'identity' for trans in var.transform)
     
 class DirichletParameterisationExpected(
     _DirichletParameterisation
 ):
-    """Dirichlet Parameterisation Expected.
+    """Parameterisation of the Dirichlet distribution by the `mean` vector (which sums to 1) and `vcv` of the values.
 
-    TODO: Add a description.
+    Raw parameters: `mean` and `vcv`. The concentration parameters are fitted (`fit_dirichlet`) to the variances; an `ArithmeticError` is raised if the means cannot be recovered.
+
+    Native parameter: `(alpha,)`.
+
+    Eligible when every element of the transform is `'identity'`.
     """
     names = ('mean', 'vcv')
     types = ('vector', 'matrix')
@@ -4551,18 +4806,20 @@ class DirichletParameterisationExpected(
         vcv: MatrixNumParam,
         *args, **kwargs
     ) -> tuple[NumericVectorParam, ]:
-        """Generator.
+        """Convert the raw parameters to the native parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `vcv`. The concentration parameters are fitted (`fit_dirichlet`) to the variances; an `ArithmeticError` is raised if the means cannot be recovered.
+
+        Native parameter: `(alpha,)`.
 
         Args:
-            mean: TODO.
-            vcv: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            mean: Mean.
+            vcv: Variance-covariance matrix.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The native parameters.
         """
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
@@ -4595,20 +4852,22 @@ class DirichletParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam]]:
-        """Partial generator.
+        """Generate the parameters after a change to some of the raw parameters.
 
-        TODO: Add a description.
+        Raw parameters: `mean` and `vcv`. The concentration parameters are fitted (`fit_dirichlet`) to the variances; an `ArithmeticError` is raised if the means cannot be recovered.
+
+        Raises `ValueError` if the new value is not valid for the parameter.
 
         Args:
-            parameter: TODO.
-            parameter_index: TODO.
-            current_params: TODO.
-            autoscale: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            parameter: The new raw parameter value(s), in a tuple.
+            parameter_index: Indices of the raw parameters being set.
+            current_params: The raw parameters currently held.
+            autoscale: If the new value would be inconsistent with the other parameters, adjust the others to accommodate it rather than raising an error.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The raw parameters and the native parameters.
         """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
@@ -4667,22 +4926,24 @@ class DirichletParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
-        """Eligibility.
+        """Whether the parameterisation can be used for a variable.
 
-        TODO: Add a description.
+        Eligible when every element of the transform is `'identity'`.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            True if eligible.
         """
         return all(trans == 'identity' for trans in var.transform)
 
 class DirichletDistribution(NumericVectorValuedDistribution):
-    """Dirichlet Distribution.
+    """Distribution of a Dirichlet distribution - a vector of probabilities which sum to 1 (a simplex).
 
-    TODO: Add a description.
+    DSA varies one element (`dsa_value_index`) of the vector, scaling the others to preserve the sum. Only the identity transform is supported.
+
+    Used by [`DirichletVariable`][newsegsmodelframework.newsegsvariable.variable.DirichletVariable].
     """
     distribution = 'dirichlet'
     parameterisations: Sequence[_DirichletParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
@@ -4699,16 +4960,16 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         interval: float,
         var: NumericVectorVariable
     ) -> tuple[NumericVectorParam, NumericVectorParam]:
-        """Interval function.
+        """Bounds of the central interval of the distribution.
 
-        TODO: Add a description.
+        Treats the element at `dsa_value_index` as beta distributed with parameters `alpha_i` and `sum(alpha) - 1`, and scales the other elements so the vector still sums to 1.
 
         Args:
-            interval: TODO.
-            var: TODO.
+            interval: Probability mass within the interval (e.g. 0.95).
+            var: The variable.
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         out_val = super().interval_function(interval, var)
 
@@ -4748,13 +5009,13 @@ class DirichletDistribution(NumericVectorValuedDistribution):
     
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
-        """Parameter validation.
+        """Check that the native parameters are valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *parameters: TODO.
+            var: The variable.
+            *parameters: The parameters, in native form.
         """
         if len(parameters) != 1:
             raise TypeError(f'Single numeric vector of concentration parameters expected - got {len(parameters)} individual parameters')
@@ -4780,13 +5041,13 @@ class DirichletDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
-        """Value validation.
+        """Check that a value is valid for this distribution.
 
-        TODO: Add a description.
+        Raises `TypeError` or `ValueError` if not.
 
         Args:
-            var: TODO.
-            *values: TODO.
+            var: The variable.
+            *values: The value(s) to check.
         """
         if len(values) != 1:
             raise TypeError(f'Single vector or Sequence of values expected, got {len(values)} individual values')
@@ -4818,15 +5079,15 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
-        """Deterministic value.
+        """The central (deterministic) value of the variable.
 
-        TODO: Add a description.
+        The mean `alpha / sum(alpha)`. The `ln` transform is not implemented.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The deterministic value, after applying any transform.
         """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
@@ -4840,15 +5101,15 @@ class DirichletDistribution(NumericVectorValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> NumericVectorParam:
-        """Std.
+        """The standard deviation of the value.
 
-        TODO: Add a description.
+        The standard deviation of the values. The `ln` transform is not implemented.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The standard deviation (a vector for a vector variable).
         """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
@@ -4867,16 +5128,16 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> NumericVectorParam:
-        """Psa value.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        A Dirichlet draw; zero concentration parameters give zero probability.
 
         Args:
-            var: TODO.
-            rng: TODO.
+            var: The variable.
+            rng: Random number generator from which to draw.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
@@ -4895,15 +5156,15 @@ class DirichletDistribution(NumericVectorValuedDistribution):
             
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[NumericVectorParam, NumericVectorParam]:
-        """Dsa auto values.
+        """Default lower and upper bounds for deterministic sensitivity analysis, according to the `dsa_bounds_type` of the variable.
 
-        TODO: Add a description.
+        For a `relative` bound the defaults are 0.9 and 1.1 of the central value; for an `offset` or `absolute` bound they come from the confidence interval.
 
         Args:
-            var: TODO.
+            var: The variable.
 
         Returns:
-            TODO.
+            The default lower and upper bounds, to be interpreted according to `dsa_bounds_type`.
         """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
@@ -4946,17 +5207,17 @@ def get_value_from_model(
     model_section: str | SequenceNotStr[str] | None, 
     model_parameter: str | SequenceNotStr[str]
 ) -> Value | Sequence[Value]:
-    """Get value from model.
+    """Read the value of a parameter from a model or finance.
 
-    TODO: Add a description.
+    The section is a dotted path of attributes (or mapping keys) from the model; a sequence of parameters gives a list of values.
 
     Args:
-        model: TODO.
-        model_section: TODO.
-        model_parameter: TODO.
+        model: The energy model or finance model.
+        model_section: Dotted path from the model to the object holding the parameter (`None` or `''` for the model itself).
+        model_parameter: Name of the parameter.
 
     Returns:
-        TODO.
+        The value(s).
     """
     if not isinstance(model_parameter, str) and isinstance(model_parameter, Sequence):
         if not isinstance(model_section, str) and isinstance(model_section, Sequence):
@@ -5008,15 +5269,15 @@ def update_model_with_value(
     model_section: str | None,
     model_parameter: str
 ) -> None:
-    """Update model with value.
+    """Set a parameter of a model or finance.
 
-    TODO: Add a description.
+    Builds a nested dictionary from the dotted section and parameter and passes it to `model.update`.
 
     Args:
-        value: TODO.
-        model: TODO.
-        model_section: TODO.
-        model_parameter: TODO.
+        value: The value.
+        model: The energy model or finance model.
+        model_section: Dotted path from the model to the object holding the parameter (`None` or `''` for the model itself).
+        model_parameter: Name of the parameter.
     """
     update_dict = {}
     last_dict = update_dict
@@ -5033,9 +5294,14 @@ def update_model_with_value(
 class VariableConfig(DataWithRevision):
     # Don't include parameters as well as raw, or update will trigger two revisions
     #parameters: ParamList | None = None
-    """Variable Config.
+    """Revision-tracked configuration of a `Variable`: the parts that change under user control.
 
-    TODO: Add a description.
+    Attributes:
+        raw_parameters: The parameters as set by the user, in the form of the current parameterisation.
+        dsa_selected: If DSA is possible and the variable is selectable, whether it is selected.
+        dsa_bounds_type: How the DSA bounds are specified: `absolute`, `offset`, `relative` or `interval`.
+        psa_selected: If PSA is possible and the variable is selectable, whether it is selected.
+        optim_selected: Whether the variable is varied in optimisation.
     """
     raw_parameters: ParamList | None = None
 
@@ -5057,12 +5323,57 @@ class VariableConfig(DataWithRevision):
 class Variable(
     NewsegsComponent
 ):
-    """
-    A single unit of variation in a model.
+    """A single unit of variation in a model.
 
-    May be associated with a single parameter, or a group of parameters that
-    must co-vary (e.g. parameters for a statistical distribution, or a
-    set of probabilities which form a simplex)
+    May be associated with a single parameter, or a group of parameters that must co-vary (e.g. the
+    parameters of a statistical distribution, or a set of probabilities which form a simplex).
+    A `Variable` is a [`NewsegsComponent`][newsegsmodelframework.core.NewsegsComponent] so is
+    serialisable and revision-tracked. The subclass, and the statistical behaviour, is chosen by
+    the `distribution` argument: `Variable(name, distribution = 'normal')` returns a `NormalVariable`.
+
+    See the [module documentation][newsegsmodelframework.newsegsvariable.variable] for an overview.
+
+    **Identity and location.** `interface_section`, `interface_key` and `interface_subindex`
+    identify the variable in the interface and in a metamodel; together they form the *varid*
+    `{section}.{key}.{subindex}`. `model_section` and `model_parameter` locate the parameter(s)
+    of the model or finance (`configuration_type`) that it sets. A vector variable may set several
+    parameters, by giving sequences of parameters (and sections).
+
+    **Parameters.** The user-facing *raw parameters* (`raw_parameters`) are in the form of the
+    current parameterisation (`parameterisation_index` into the list of parameterisations of the
+    distribution that are eligible for the transform). They are converted to the *native*
+    `parameters` of the distribution when set.
+
+    **Values.** `deterministic_value` is the central value. `get_dsa_value` returns the lower, central
+    or upper value for DSA and `draw_psa` / `get_psa_value` the value of a PSA draw; both return the
+    deterministic value unless the variable is selected and active for the analysis.
+    `update_model` and its relatives write the appropriate value into a model.
+
+    Attributes:
+        name: Name of the variable.
+        label: Display label; the name if none has been set.
+        unit: Unit of measurement of the value(s).
+        icon_name: Name(s) of the icon(s) used in the interface.
+        configuration_type: Whether the variable sets a parameter of the `model` or the `finance`.
+        distribution: The (stateless) distribution.
+        parameterisation_index: Index of the parameterisation in use.
+        value_name: Names of the individual values of a vector variable.
+        value_formatter: Function giving a sensible string for a value.
+        formatter_dp: Decimal places of the default format of a numeric value.
+        interface_min: Minimum value of the input field.
+        interface_max: Maximum value of the input field.
+        interface_step: Step of the input field.
+        configuration_show: Whether to show an input on the model configuration page.
+        dsa_selectable: Whether the variable can be selected for DSA.
+        dsa_active: Whether the system is running a DSA.
+        dsa_focussed: Whether the variable is the one being varied in the current DSA run.
+        psa_selectable: Whether the variable can be selected for PSA.
+        psa_active: Whether the system is running a PSA.
+        optim_selectable: Whether the variable can be varied in optimisation.
+        optim_min: Lower limit for optimisation.
+        optim_max: Upper limit for optimisation.
+        variable_type: `scalar` or `vector`.
+        soft_dirty: Flags the variable for storage without dirtying the components that depend upon it.
     """
     distribution: Distribution
     parameterisation_index: int
@@ -5163,6 +5474,13 @@ class Variable(
         distribution: VARIABLE_DISTRIBUTION = 'constant',
         **kwargs
     ):
+        """Create the subclass of `Variable` for the requested `distribution`.
+
+        Args:
+            distribution: The distribution, selecting the subclass; one of `VARIABLE_DISTRIBUTION`.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
+        """
         subclasses = {
             'constant': ConstantVariable,
             'numeric_constant': NumericConstantVariable,
@@ -5223,6 +5541,42 @@ class Variable(
         optim_show: bool = False,
         **kwargs
     ):
+        """Create a variable.
+
+        Args:
+            name: Name of the variable.
+            label: Display label; defaults to the name.
+            unit: Unit of measurement of the value(s).
+            icon_name: Name(s) of the icon(s) used in the interface.
+            configuration_type: Whether the variable sets a parameter of the `model` or of the `finance`.
+            model_section: Dotted path to the object in the model that holds the parameter (a sequence if different parameters are in different sections).
+            model_parameter: Name(s) of the model parameter(s) set by the variable; defaults to `name`.
+            interface_section: Section of the interface (part of the varid).
+            interface_key: Key within the section (part of the varid); defaults to `name`.
+            interface_subindex: Distinguishes several instances of the same key (part of the varid).
+            distribution: The distribution of the variable; selects the subclass.
+            transform: Transform(s) from the distribution to the model value: `identity` or `ln`.
+            parameterisation_index: Which parameterisation of the distribution to use; defaults to the first eligible for the transform.
+            default_parameters: The default raw parameters, to which `reset_parameters` returns; defaults to the initial parameters.
+            value_name: Names for the individual values of a vector variable.
+            configuration_show: Whether to show an input on the model configuration page.
+            dsa_show: Whether to show an input on the DSA page.
+            psa_show: Whether to show an input on the PSA page.
+            dsa_lower: Lower DSA bound; defaults to a value from `dsa_auto_values`.
+            dsa_upper: Upper DSA bound; defaults to a value from `dsa_auto_values`.
+            dsa_selectable: Whether the variable can be selected for DSA.
+            dsa_active: Whether the system is running a DSA.
+            dsa_focussed: Whether this is the variable varying in the present DSA run.
+            psa_selectable: Whether the variable can be selected for PSA.
+            psa_active: Whether the system is running a PSA.
+            interface_min: Minimum value of the input field.
+            interface_max: Maximum value of the input field.
+            interface_step: Step of the input field.
+            formatter_dp: Decimal places for formatting numeric values.
+            optim_selectable: Whether the variable can be varied in optimisation.
+            optim_show: Whether to show an input in the optimisation configuration.
+            **kwargs: Further configuration, e.g. `raw_parameters`.
+        """
         if 'parameters' in kwargs:
             if not 'raw_parameters' in kwargs:
                 kwargs['raw_parameters'] = kwargs.pop('parameters')
@@ -5331,9 +5685,7 @@ class Variable(
 
     @property
     def label(self) -> str:
-        """Label.
-
-        TODO: Add a description.
+        """Display label of the variable; the name if no label has been set.
         """
         if self._label is None:
             return self.name
@@ -5345,9 +5697,7 @@ class Variable(
 
     @property
     def parameterisation(self) -> Parameterisation:
-        """Parameterisation.
-
-        TODO: Add a description.
+        """The `Parameterisation` in use.
         """
         if self.parameterisation_index is None:
             raise AttributeError('No parameterisation index set')
@@ -5369,9 +5719,7 @@ class Variable(
 
     @property
     def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
-        """Parameters.
-
-        TODO: Add a description.
+        """The native parameters of the distribution.
         """
         return self._get_native_parameters()
 
@@ -5380,12 +5728,12 @@ class Variable(
         self._set_native_parameters(parameters)
 
     def set_parameters(self, *parameters: Param):
-        """Set parameters.
+        """Set the parameters from raw parameters.
 
-        TODO: Add a description.
+        The raw parameters are converted by the current parameterisation into native parameters, which are validated by the distribution. The raw parameters are stored in the configuration.
 
         Args:
-            *parameters: TODO.
+            *parameters: The parameters, in native form.
         """
         raw_parameters = copy.copy(parameters)
         
@@ -5418,31 +5766,27 @@ class Variable(
     @property
     @abstractmethod
     def transform(self) -> tuple[VARIABLE_TRANSFORM, ...]:
-        """Transform.
-
-        TODO: Add a description.
+        """The transform from distribution to model value for each value: `identity` or `ln`.
         """
         ...
 
     @abstractmethod
     def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
-        """Set transform.
+        """Set the transform from the distribution to the model value.
 
-        TODO: Add a description.
+        An `'ln'` transform makes the model value the exponential of the distribution.
 
         Args:
-            transform: TODO.
-            autosize: TODO.
+            transform: Transform(s) of the underlying distribution to the model value: `'identity'` or `'ln'` (the model value is the exponential of the distribution).
+            autosize: If true and a single transform is given for a vector variable, repeat it for every value.
         """
         ...
     
     def get_deterministic_value(self) -> Value:
-        """Get deterministic value.
-
-        TODO: Add a description.
+        """The central value, validated by the distribution.
 
         Returns:
-            TODO.
+            The deterministic value.
         """
         v = self.distribution.deterministic_value(self)
         self.distribution.value_validation(self, v)
@@ -5450,65 +5794,51 @@ class Variable(
 
     @property
     def deterministic_value(self) -> Value:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central (deterministic) value of the variable, used in an ordinary model run.
         """
         return self.get_deterministic_value()
     
     def get_std(self) -> Value:
-        """Get std.
-
-        TODO: Add a description.
+        """The standard deviation of the value.
 
         Returns:
-            TODO.
+            The standard deviation.
         """
         v = self.distribution.std(self)
         return v
     
     def get_confidence_interval(self, confidence: float = 0.95) -> tuple[Value, Value]:
-        """Get confidence interval.
-
-        TODO: Add a description.
+        """Bounds of the central interval of the distribution of the value.
 
         Args:
-            confidence: TODO.
+            confidence: Probability mass within the interval (e.g. 0.95).
 
         Returns:
-            TODO.
+            The lower and upper bounds.
         """
         v = self.distribution.interval(self, confidence)
         return v
 
     def set_distribution(self) -> None:
-        """Set distribution.
-
-        TODO: Add a description.
+        """Hook for subclasses to set up after the distribution is known. Does nothing.
         """
         pass
 
     @property
     def dsa_possible(self) -> bool:
-        """Dsa possible.
-
-        TODO: Add a description.
+        """Whether the distribution allows the variable to be varied in DSA.
         """
         return self.distribution.dsa_possible
     
     @property
     def psa_possible(self) -> bool:
-        """Psa possible.
-
-        TODO: Add a description.
+        """Whether the distribution allows the variable to be drawn in PSA.
         """
         return self.distribution.psa_possible
     
     @property
     def optim_possible(self) -> bool:
-        """Optim possible.
-
-        TODO: Add a description.
+        """Whether the distribution allows the variable to be varied in optimisation.
         """
         return self.distribution.optim_possible
     
@@ -5555,12 +5885,10 @@ class Variable(
         self._optim_show = show
     
     def get_indexed_parameterisations(self):
-        """Get indexed parameterisations.
-
-        TODO: Add a description.
+        """The parameterisations that can be used with the transform of the variable.
 
         Returns:
-            TODO.
+            List of dictionaries with the `index` into the parameterisations of the distribution and the `parameterisation`.
         """
         return [
             {'index':i, 'parameterisation': x} 
@@ -5610,12 +5938,12 @@ class Variable(
         self._default_parameters = parameters
 
     def reset_parameters(self, parameter_index: int | None = None):
-        """Reset parameters.
+        """Return the parameters to their defaults.
 
-        TODO: Add a description.
+        The defaults are those set by `replace_default_parameters` or `default_parameters`.
 
         Args:
-            parameter_index: TODO.
+            parameter_index: Indices of the raw parameters being set.
         """
         if parameter_index is None:
             self.set_parameters(*self._default_parameters)
@@ -5638,17 +5966,13 @@ class Variable(
 
     @property
     def n_values(self) -> int:
-        """N values.
-
-        TODO: Add a description.
+        """The number of values the variable provides: 1 for a scalar variable.
         """
         return self.distribution.n_values(self)
     
     @property
     def dsa_lower(self) -> Value:
-        """Dsa lower.
-
-        TODO: Add a description.
+        """The lower DSA bound, interpreted according to `dsa_bounds_type`.
         """
         return self._dsa_lower
     
@@ -5660,9 +5984,7 @@ class Variable(
     
     @property
     def dsa_upper(self) -> Value:
-        """Dsa upper.
-
-        TODO: Add a description.
+        """The upper DSA bound, interpreted according to `dsa_bounds_type`.
         """
         return self._dsa_upper
     
@@ -5707,16 +6029,16 @@ class Variable(
         rng: np.random.Generator,
         retries: int = 1
         ) -> Value:
-        """Draw psa.
+        """Draw a value for probabilistic sensitivity analysis.
 
-        TODO: Add a description.
+        The draw is stored and returned by `get_psa_value`. If the variable is not PSA-possible, selectable, selected and active, the deterministic value is returned. A draw which fails validation is retried; if all fail the deterministic value is used and a warning issued.
 
         Args:
-            rng: TODO.
-            retries: TODO.
+            rng: Random number generator from which to draw.
+            retries: Number of attempts to draw a valid value before falling back to the deterministic value.
 
         Returns:
-            TODO.
+            The value drawn.
         """
         if (
             self.distribution.psa_possible
@@ -5742,12 +6064,12 @@ class Variable(
         return self.deterministic_value
         
     def get_psa_value(self) -> Value:
-        """Get psa value.
+        """The value from the last PSA draw.
 
-        TODO: Add a description.
+        The deterministic value if the variable is not being varied in a PSA.
 
         Returns:
-            TODO.
+            The value.
         """
         if (
             self.distribution.psa_possible
@@ -5759,15 +6081,15 @@ class Variable(
         return self.deterministic_value
     
     def is_model_type(self, model: ModelType) -> bool:
-        """Is model type.
+        """Whether the model is of the type that the variable sets.
 
-        TODO: Add a description.
+        Compares `configuration_type` (`'model'` or `'finance'`) with the type of the model.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
 
         Returns:
-            TODO.
+            True if the variable applies to the model.
         """
         match self.configuration_type:
             case 'model':
@@ -5816,12 +6138,12 @@ class Variable(
 
     
     def update_model(self, model: ModelType) -> None:
-        """Update model.
+        """Set the model parameter(s) to the deterministic value(s).
 
-        TODO: Add a description.
+        Equivalent to `update_model_deterministic`.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         self.update_model_deterministic(model)
 
@@ -5834,13 +6156,13 @@ class Variable(
         self._update_model(model, self.deterministic_value)
 
     def update_model_dsa(self, model: ModelType, bound: DSA_BOUND) -> None:
-        """Update model dsa.
+        """Set the associated parameter(s) in the model or finance to the DSA value at a bound.
 
-        TODO: Add a description.
+        Does nothing if the variable is not for that type of model.
 
         Args:
-            model: TODO.
-            bound: TODO.
+            model: The energy model or finance model.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
         """
         if not self.is_model_type(model):
             return
@@ -5848,12 +6170,12 @@ class Variable(
         self._update_model(model, val)
 
     def update_model_psa(self, model: ModelType) -> None:
-        """Update model psa.
+        """Set the associated parameter(s) in the model or finance to the value of the last PSA draw.
 
-        TODO: Add a description.
+        Does nothing if the variable is not for that type of model.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -5878,6 +6200,11 @@ class Variable(
 
     @override
     def update(self, config: dict[str, Any] | type[serialisation.T]):
+        """Update the state from a dictionary, restoring parameters to tuples after serialisation as JSON.
+
+        Args:
+            config: Dictionary of the serialised state.
+        """
         super().update(config)
         # Convert required attributes to tuple in case they have come from json
         if isinstance(config, dict):
@@ -5891,11 +6218,18 @@ class Variable(
                 self._transform = tuple(self._transform)
 
     def __deepcopy__(self, memo):
+        """Deep copy of the variable.
+
+        Args:
+            memo: Memo dictionary of `copy.deepcopy`.
+        """
         o = Variable(self.name, distribution = self.distribution.distribution) # pyright: ignore[reportAbstractUsage]
         o.__dict__.update(copy.deepcopy(self.__dict__)) # pyright: ignore[reportAttributeAccessIssue]
         return o
     
     def __reduce__(self) -> str | tuple[Any, ...]:
+        """Reduce for pickling: recreate with the name and distribution and restore the state.
+        """
         return (
             _recover_variable, # Callable for initial object version # pyright: ignore[reportAbstractUsage]
             (self.name, self.distribution.distribution), # Args for initial construction
@@ -5904,6 +6238,8 @@ class Variable(
 
     @override
     def json_dumps(self) -> str:
+        """Serialise the variable to a JSON string.
+        """
         return json.dumps(self.to_dict(), cls = jsonfuncs.NumpyEncoder)
 
 def _recover_variable(name, dist):
@@ -5914,9 +6250,7 @@ def _recover_variable(name, dist):
 
 class ScalarVariable(Variable):
 
-    """Scalar Variable.
-
-    TODO: Add a description.
+    """A variable with a single value.
     """
     distribution: ScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: ScalarParam
@@ -5943,9 +6277,7 @@ class ScalarVariable(Variable):
         
     @property
     def dsa_lower(self) -> ScalarParam:
-        """Dsa lower.
-
-        TODO: Add a description.
+        """The lower DSA bound, a single value.
         """
         return self._dsa_lower
 
@@ -5958,9 +6290,7 @@ class ScalarVariable(Variable):
     
     @property
     def dsa_upper(self) -> ScalarParam:
-        """Dsa upper.
-
-        TODO: Add a description.
+        """The upper DSA bound, a single value.
         """
         return self._dsa_upper
 
@@ -5973,20 +6303,18 @@ class ScalarVariable(Variable):
 
     @property
     def transform(self) -> tuple[VARIABLE_TRANSFORM]:
-        """Transform.
-
-        TODO: Add a description.
+        """The transform: a one-element tuple.
         """
         return self._transform
     
     def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
-        """Set transform.
+        """Set the transform from the distribution to the model value.
 
-        TODO: Add a description.
+        A single transform, or a sequence of one.
 
         Args:
-            transform: TODO.
-            autosize: TODO.
+            transform: Transform(s) of the underlying distribution to the model value: `'identity'` or `'ln'` (the model value is the exponential of the distribution).
+            autosize: If true and a single transform is given for a vector variable, repeat it for every value.
         """
         if isinstance(transform, str):
             if not transform in get_args(VARIABLE_TRANSFORM):
@@ -6008,31 +6336,27 @@ class ScalarVariable(Variable):
     
     @property
     def deterministic_value(self) -> ScalarParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central value of the variable.
         """
         return cast(ScalarParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> ScalarParam:
-        """Get dsa value.
+        """The value at a bound for deterministic sensitivity analysis.
 
-        TODO: Add a description.
+        See `Variable.get_dsa_value`.
 
         Args:
-            bound: TODO.
-            force: TODO.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
+            force: Return the DSA value even if the variable is not currently selected, active and focussed for DSA.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         return cast(ScalarParam, super().get_dsa_value(bound, force))
 
 
 class NumericScalarVariable(ScalarVariable):
-    """Numeric Scalar Variable.
-
-    TODO: Add a description.
+    """A variable with a single numeric value.
     """
     distribution: NumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
 
@@ -6057,6 +6381,8 @@ class NumericScalarVariable(ScalarVariable):
     @property
     @override
     def parameters(self) -> tuple[ScalarNumParam, ...]:
+        """The native parameters of the distribution, as numbers.
+        """
         return cast(tuple[ScalarNumParam, ...], self._get_native_parameters())
 
     @parameters.setter
@@ -6065,37 +6391,35 @@ class NumericScalarVariable(ScalarVariable):
 
     @property
     def deterministic_value(self) -> ScalarNumParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central value of the variable.
         """
         return cast(ScalarNumParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> ScalarNumParam:
-        """Get dsa value.
+        """The value at a bound for deterministic sensitivity analysis.
 
-        TODO: Add a description.
+        See `Variable.get_dsa_value`.
 
         Args:
-            bound: TODO.
-            force: TODO.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
+            force: Return the DSA value even if the variable is not currently selected, active and focussed for DSA.
 
         Returns:
-            TODO.
+            The value at the requested bound.
         """
         return cast(ScalarNumParam, super().get_dsa_value(bound, force))
 
 
 class TwoParamNumericScalarVariable(NumericScalarVariable):
-    """Two Param Numeric Scalar Variable.
-
-    TODO: Add a description.
+    """A numeric variable whose distribution has two scalar parameters.
     """
     distribution: TwoParamNumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
     @override
     def parameters(self) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """The two native parameters of the distribution.
+        """
         return cast(tuple[ScalarNumParam, ScalarNumParam], self._get_native_parameters())
 
     @parameters.setter
@@ -6105,9 +6429,7 @@ class TwoParamNumericScalarVariable(NumericScalarVariable):
 
 class VectorVariable(Variable):
 
-    """Vector Variable.
-
-    TODO: Add a description.
+    """A variable with a vector of values.
     """
     distribution: VectorValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: VectorParam
@@ -6119,6 +6441,8 @@ class VectorVariable(Variable):
     @property
     @override
     def parameters(self) -> tuple[VectorParam | MatrixParam, ...]:
+        """The native parameters of the distribution, which may be vectors or matrices.
+        """
         return cast(tuple[VectorParam, ...], self._get_native_parameters())
 
     @parameters.setter
@@ -6129,12 +6453,10 @@ class VectorVariable(Variable):
         self, 
         *parameters: Param,
     ):
-        """Set parameters.
-
-        TODO: Add a description.
+        """Set the parameters from raw parameters, resizing the transform to the number of values.
 
         Args:
-            *parameters: TODO.
+            *parameters: The parameters, in native form.
         """
         super().set_parameters(*parameters)
         if len(self.parameters) == 0:
@@ -6172,9 +6494,7 @@ class VectorVariable(Variable):
     
     @property
     def dsa_lower(self) -> VectorParam:
-        """Dsa lower.
-
-        TODO: Add a description.
+        """The lower DSA bound, a value for each element.
         """
         return self._dsa_lower
     
@@ -6187,9 +6507,7 @@ class VectorVariable(Variable):
     
     @property
     def dsa_upper(self) -> VectorParam:
-        """Dsa upper.
-
-        TODO: Add a description.
+        """The upper DSA bound, a value for each element.
         """
         return self._dsa_upper
     
@@ -6202,20 +6520,18 @@ class VectorVariable(Variable):
     
     @property
     def transform(self) -> tuple[VARIABLE_TRANSFORM, ...]:
-        """Transform.
-
-        TODO: Add a description.
+        """The transform of each value.
         """
         return self._transform
     
     def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
-        """Set transform.
+        """Set the transform of each value.
 
-        TODO: Add a description.
+        A single transform is repeated for every value if `autosize`.
 
         Args:
-            transform: TODO.
-            autosize: TODO.
+            transform: Transform(s) of the underlying distribution to the model value: `'identity'` or `'ln'` (the model value is the exponential of the distribution).
+            autosize: If true and a single transform is given for a vector variable, repeat it for every value.
         """
         if isinstance(transform, str):
             if not transform in get_args(VARIABLE_TRANSFORM):
@@ -6247,41 +6563,40 @@ class VectorVariable(Variable):
     
     @property
     def deterministic_value(self) -> VectorParam:
-        """Deterministic value.
-
-        TODO: Add a description.
+        """The central value of the variable, a vector.
         """
         return cast(VectorParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> VectorParam:
-        """Get dsa value.
+        """The values at a bound for deterministic sensitivity analysis.
 
-        TODO: Add a description.
+        See `Variable.get_dsa_value`.
 
         Args:
-            bound: TODO.
-            force: TODO.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
+            force: Return the DSA value even if the variable is not currently selected, active and focussed for DSA.
 
         Returns:
-            TODO.
+            The vector of values at the requested bound.
         """
         return cast(VectorParam, super().get_dsa_value(bound, force))
     
     def get_psa_value(self) -> VectorParam:
-        """Get psa value.
+        """The values from the last PSA draw.
 
-        TODO: Add a description.
+        See `Variable.get_psa_value`.
 
         Returns:
-            TODO.
+            The vector of values.
         """
         return cast(VectorParam, super().get_psa_value())
     
     
 class NumericVectorVariable(VectorVariable):
-    """Numeric Vector Variable.
+    """A variable with a vector of numeric values.
 
-    TODO: Add a description.
+    Attributes:
+        dsa_value_index: Which element is varied in DSA.
     """
     distribution: NumericVectorValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: NumericVectorParam # pyright: ignore[reportIncompatibleVariableOverride]
@@ -6293,6 +6608,8 @@ class NumericVectorVariable(VectorVariable):
     @property
     @override
     def parameters(self) -> tuple[NumericVectorParam | MatrixNumParam, ...]:
+        """The native parameters of the distribution.
+        """
         return cast(tuple[NumericVectorParam, ...], self._get_native_parameters())
 
     @parameters.setter
@@ -6329,10 +6646,7 @@ class NumericVectorVariable(VectorVariable):
 
     @property
     def dsa_lower(self) -> NumericVectorParam:
-        """Dsa lower.
-
-        TODO: Add a description.
-        """
+        """The lower DSA bound, a value for each element."""
         return self._dsa_lower
     
     @dsa_lower.setter
@@ -6349,10 +6663,7 @@ class NumericVectorVariable(VectorVariable):
 
     @property
     def dsa_upper(self) -> NumericVectorParam:
-        """Dsa upper.
-
-        TODO: Add a description.
-        """
+        """The upper DSA bound, a value for each element."""
         return self._dsa_upper
     
     @dsa_upper.setter
@@ -6369,23 +6680,20 @@ class NumericVectorVariable(VectorVariable):
 
     @property
     def deterministic_value(self) -> NumericVectorParam:
-        """Deterministic value.
-
-        TODO: Add a description.
-        """
+        """The central value of the variable, a vector of numbers."""
         return cast(NumericVectorParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> NumericVectorParam:
-        """Get dsa value.
+        """The values at a bound for deterministic sensitivity analysis.
 
-        TODO: Add a description.
+        See `Variable.get_dsa_value`.
 
         Args:
-            bound: TODO.
-            force: TODO.
+            bound: Which DSA value to return: `'central'`, `'lower'` or `'upper'`.
+            force: Return the DSA value even if the variable is not currently selected, active and focussed for DSA.
 
         Returns:
-            TODO.
+            The vector of values at the requested bound.
         """
         return cast(NumericVectorParam, super().get_dsa_value(bound, force))
 
@@ -6393,15 +6701,17 @@ class NumericVectorVariable(VectorVariable):
 
 
 class ConstantVariable(ScalarVariable):
-    """Constant Variable.
+    """Variable for a single value of any type that does not vary.
 
-    TODO: Add a description.
+    The distribution is [`ConstantDistribution`][newsegsmodelframework.newsegsvariable.variable.ConstantDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = ConstantDistribution()
 
     @property
     @override
     def parameters(self) -> tuple[ScalarParam]:
+        """The native parameters: the value.
+        """
         return cast(tuple[ScalarParam], self._get_native_parameters())
 
     @parameters.setter
@@ -6412,12 +6722,12 @@ class ConstantVariable(ScalarVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the value. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6449,15 +6759,17 @@ class ConstantVariable(ScalarVariable):
 
 
 class NumericConstantVariable(NumericScalarVariable):
-    """Numeric Constant Variable.
+    """Variable for a single number that does not vary.
 
-    TODO: Add a description.
+    The distribution is [`NumericConstantDistribution`][newsegsmodelframework.newsegsvariable.variable.NumericConstantDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = NumericConstantDistribution()
 
     @property
     @override
     def parameters(self) -> tuple[ScalarNumParam]:
+        """The native parameters: the value.
+        """
         return cast(tuple[ScalarNumParam], self._get_native_parameters())
 
     @parameters.setter
@@ -6468,12 +6780,12 @@ class NumericConstantVariable(NumericScalarVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the value. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6505,9 +6817,9 @@ class NumericConstantVariable(NumericScalarVariable):
         
 
 class BinomialVariable(TwoParamNumericScalarVariable):
-    """Binomial Variable.
+    """Variable for a binomially distributed count.
 
-    TODO: Add a description.
+    The distribution is [`BinomialDistribution`][newsegsmodelframework.newsegsvariable.variable.BinomialDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = BinomialDistribution()
 
@@ -6515,12 +6827,12 @@ class BinomialVariable(TwoParamNumericScalarVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the expected number of successes (using the `mean` parameterisation) keeping the number of trials. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6556,9 +6868,9 @@ class BinomialVariable(TwoParamNumericScalarVariable):
 
 
 class NormalVariable(TwoParamNumericScalarVariable):
-    """Normal Variable.
+    """Variable for a normally (or, with the `ln` transform, log-normally) distributed number.
 
-    TODO: Add a description.
+    The distribution is [`NormalDistribution`][newsegsmodelframework.newsegsvariable.variable.NormalDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = NormalDistribution()
 
@@ -6566,12 +6878,12 @@ class NormalVariable(TwoParamNumericScalarVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the mean (using a `mean` parameterisation); for the `ln` transform the standard deviation is re-derived from the existing sigma. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6610,9 +6922,9 @@ class NormalVariable(TwoParamNumericScalarVariable):
 
 
 class BetaVariable(TwoParamNumericScalarVariable):
-    """Beta Variable.
+    """Variable for a beta distributed proportion.
 
-    TODO: Add a description.
+    The distribution is [`BetaDistribution`][newsegsmodelframework.newsegsvariable.variable.BetaDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = BetaDistribution()
 
@@ -6620,12 +6932,12 @@ class BetaVariable(TwoParamNumericScalarVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the mean (using a `mean` parameterisation), keeping the standard deviation unless that is infeasible for the new mean. The `ln` transform is not supported. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6668,9 +6980,9 @@ class BetaVariable(TwoParamNumericScalarVariable):
 
 
 class GammaVariable(TwoParamNumericScalarVariable):
-    """Gamma Variable.
+    """Variable for a gamma distributed positive number.
 
-    TODO: Add a description.
+    The distribution is [`GammaDistribution`][newsegsmodelframework.newsegsvariable.variable.GammaDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = GammaDistribution()
 
@@ -6678,12 +6990,12 @@ class GammaVariable(TwoParamNumericScalarVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the mean (using a `mean` parameterisation), re-deriving the spread from the existing parameters. The `ln` transform is not supported. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6707,7 +7019,7 @@ class GammaVariable(TwoParamNumericScalarVariable):
 
         if self.transform[0] == 'identity':
             shape, scale = self.parameters
-            sd = shape * scale**2
+            sd = np.sqrt(shape * scale**2)
         else:
             raise NotImplementedError('Derivation of log-gamma parameters not supported')
         
@@ -6722,17 +7034,15 @@ class GammaVariable(TwoParamNumericScalarVariable):
 
 
 class ConstantVectorVariable(VectorVariable):
-    """Constant Vector Variable.
+    """Variable for a vector of values that do not vary.
 
-    TODO: Add a description.
+    The distribution is [`ConstantVectorDistribution`][newsegsmodelframework.newsegsvariable.variable.ConstantVectorDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = ConstantVectorDistribution()
     
     @property
     def parameters(self) -> tuple[VectorParam]:
-        """Parameters.
-
-        TODO: Add a description.
+        """The native parameters: the vector of values.
         """
         return cast(tuple[VectorParam], self._get_native_parameters())
 
@@ -6744,12 +7054,12 @@ class ConstantVectorVariable(VectorVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the vector of values. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6775,17 +7085,15 @@ class ConstantVectorVariable(VectorVariable):
 
 
 class MultivariateNormalVariable(NumericVectorVariable):
-    """Multivariate Normal Variable.
+    """Variable for a multivariate normal (optionally log-normal) vector.
 
-    TODO: Add a description.
+    The distribution is [`MultivariateNormalDistribution`][newsegsmodelframework.newsegsvariable.variable.MultivariateNormalDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = MultivariateNormalDistribution()
 
     @property
     def parameters(self) -> tuple[NumericVectorParam, MatrixNumParam]:
-        """Parameters.
-
-        TODO: Add a description.
+        """The native parameters: the vector of means and the variance-covariance matrix.
         """
         return cast(
             tuple[NumericVectorParam, MatrixNumParam],
@@ -6798,12 +7106,12 @@ class MultivariateNormalVariable(NumericVectorVariable):
     
     
     def set_parameters(self, *parameters: Param):
-        """Set parameters.
+        """Set the parameters from raw parameters.
 
-        TODO: Add a description.
+        If the parameterisation takes a `transform`, the transform of the variable is supplied.
 
         Args:
-            *parameters: TODO.
+            *parameters: The parameters, in native form.
         """
         if 'transform' in self.parameterisation.names and len(parameters) < 3:
             super().set_parameters(*parameters, self.transform)
@@ -6814,12 +7122,12 @@ class MultivariateNormalVariable(NumericVectorVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the mean vector, re-deriving the spread from the existing parameters. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6858,17 +7166,15 @@ class MultivariateNormalVariable(NumericVectorVariable):
 
 
 class DirichletVariable(NumericVectorVariable):
-    """Dirichlet Variable.
+    """Variable for a vector of probabilities summing to 1.
 
-    TODO: Add a description.
+    The distribution is [`DirichletDistribution`][newsegsmodelframework.newsegsvariable.variable.DirichletDistribution], and the variable is created with `Variable(name, distribution = ...)`.
     """
     distribution = DirichletDistribution()
 
     @property
     def parameters(self) -> tuple[NumericVectorParam]:
-        """Parameters.
-
-        TODO: Add a description.
+        """The native parameters: the vector of concentration parameters.
         """
         return cast(tuple[NumericVectorParam], self._get_native_parameters())
 
@@ -6880,12 +7186,12 @@ class DirichletVariable(NumericVectorVariable):
         self, 
         model: ModelType
     ) -> None:
-        """Synchronise from model.
+        """Set the parameters of the variable from the present value in the model.
 
-        TODO: Add a description.
+        Reads the model value (`model_section`, `model_parameter`) and sets the concentration parameters (`alpha`) to the model values, so the variances are whatever those imply. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
 
         Args:
-            model: TODO.
+            model: The energy model or finance model.
         """
         if not self.is_model_type(model):
             return
@@ -6933,17 +7239,19 @@ VARIABLE_CONSTRUCTORS = {
     'MultivariateNormalVariable': partial(Variable, distribution = 'mvn'),
     'DirichletVariable': partial(Variable, distribution = 'dirichlet'),
 }
+"""Constructors of each class of variable, by class name; used to restore a variable from its serialised state.
+"""
 
 def variable_from_dict(config: dict[str, Any]) -> Variable:
-    """Variable from dict.
+    """Create a variable from a dictionary of its serialised state.
 
-    TODO: Add a description.
+    The dictionary names the `class` of variable.
 
     Args:
-        config: TODO.
+        config: Dictionary of the serialised state.
 
     Returns:
-        TODO.
+        The variable.
     """
     classname = config.get('class')
     if classname is None:
@@ -6962,34 +7270,33 @@ def variable_from_dict(config: dict[str, Any]) -> Variable:
     return var
 
 def variable_uid(variable: Variable) -> str | list[str]:
-    """Variable uid.
+    """The varid of a variable.
 
-    TODO: Add a description.
+    The varid is `{interface_section}.{interface_key}.{interface_subindex}`. It identifies the variable in the interface and in metamodels.
 
     Args:
-        variable: TODO.
+        variable: The variable.
 
     Returns:
-        TODO.
+        The varid.
     """
     if not isinstance(variable.interface_key, str) and isinstance(variable.interface_key, Sequence):
+        sub = variable.interface_subindex
         if isinstance(variable.interface_section, str):
-            return list([lambda x: str(variable.interface_section) + "." + str(x) + "." + str(variable.interface_subindex) for x in variable.interface_key]) # type: ignore
+            return [f"{variable.interface_section}.{key}.{sub}" for key in variable.interface_key]
         else:
-            return list([lambda x,y: str(y) + "." + str(x) + "." + str(variable.interface_subindex) for x,y in zip(variable.interface_key, variable.interface_section)]) # type: ignore
+            return [f"{section}.{key}.{sub}" for key, section in zip(variable.interface_key, variable.interface_section)]
     else:
         return str(variable.interface_section) + "." + str(variable.interface_key) + "." + str(variable.interface_subindex)
 
-def varible_uid_to_dict(varid: str):
-    """Varible uid to dict.
-
-    TODO: Add a description.
+def variable_uid_to_dict(varid: str):
+    """Split a varid into its parts.
 
     Args:
-        varid: TODO.
+        varid: Variable id of the form `{section}.{key}.{subindex}`.
 
     Returns:
-        TODO.
+        Dictionary of `interface_section`, `interface_key` and `interface_subindex`.
     """
     ss = varid.split('.')
     if not len(ss) == 3:

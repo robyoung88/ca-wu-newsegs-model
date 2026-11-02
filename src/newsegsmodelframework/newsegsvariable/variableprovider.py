@@ -13,9 +13,11 @@ from newsegsmodelframework.newsegsvariable.variable import Variable, variable_ui
 
 class VariableProviderInterface(metaclass = ABCMeta):
 
-    """Variable Provider Interface.
+    """Interface for providing variables when given their ids or varids.
 
-    TODO: Add a description.
+    A variable is held as an *instance* with a unique id. Several instances may share a *varid*
+    (`{section}.{key}.{subindex}`), e.g. the same parameter in different metamodels; the
+    provider holds them in the order added, the last being the default for the varid.
     """
     @overload
     @abstractmethod
@@ -29,44 +31,42 @@ class VariableProviderInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def get_variable(self, instance_id: str | SequenceNotStr[str]) -> Variable | SequenceNotStr[Variable]:
-        """Get variable.
+        """Get the variable with an instance id, or variables with a sequence of ids.
 
-        TODO: Add a description.
+        Raises `KeyError` if a variable is not found.
 
         Args:
-            instance_id: TODO.
+            instance_id: Id(s) of the variable instance(s) - the `id` of the component, not the varid.
 
         Returns:
-            TODO.
+            The variable, or a sequence of variables.
         """
         ...
 
     @abstractmethod
     def get_default_variable(self, variable_id: str, index: int = -1) -> Variable:
-        """Get default variable.
+        """Get the default instance of a variable by varid.
 
-        TODO: Add a description.
+        Raises `KeyError` if there is no variable with the varid.
 
         Args:
-            variable_id: TODO.
-            index: TODO.
+            variable_id: The varid (`{section}.{key}.{subindex}`) of the variable.
+            index: Which instance of the varid to return, in the order they were added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The variable.
         """
         ...
 
     @abstractmethod
     def duplicate_variable(self, instance_id: str) -> Variable:
-        """Duplicate variable.
-
-        TODO: Add a description.
+        """Make a copy of a variable with a new id, and add it to the provider.
 
         Args:
-            instance_id: TODO.
+            instance_id: Id(s) of the variable instance(s) - the `id` of the component, not the varid.
 
         Returns:
-            TODO.
+            The new variable.
         """
         ...
 
@@ -103,38 +103,60 @@ class VariablePersistenceInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def delete_variable(self, variable_id: str | SequenceNotStr[str]) -> list[str]:
-        """Delete a component or list of components in the store.
+        """Delete a variable or list of variables in the store.
 
         Will remove all dependent components and snapshots (if applicable).
 
         Args:
-            component_id [str | Sequence[str]]: ID(s) of component(s) to delete.
-            ignore_ids [list[str]]: IDs of components which may be ignored in dependents search
+            variable_id: ID(s) of the variable(s) to delete.
+
         Returns:
-            List of component_ids for which deletion has failed.
+            List of variable ids for which deletion has failed.
         """
 
 class VariableManagerInterface(VariableProviderInterface, VariablePersistenceInterface):
-    """Variable Manager Interface.
-
-    TODO: Add a description.
+    """A variable provider which can also persist variables: the interface of a store.
     """
     ...
 
 
 class InMemoryVariableProvider(VariableManagerInterface):
 
-    """In Memory Variable Provider.
+    """Variable provider holding the variables in memory.
 
-    TODO: Add a description.
+    Variables are indexed by their instance id and by varid (insertion-ordered).
+
+    Note:
+        `variable_uid` returns a list of varids for a variable with several `interface_key`s
+        (a vector variable setting several parameters). Such a list cannot be used as a
+        dictionary key, so these variables are not yet supported: adding one raises
+        `NotImplementedError`.
     """
+
+    # TODO: Support variables with several varids, e.g. by indexing the variable under each
+    # varid in the list that `variable_uid` returns.
+    @staticmethod
+    def _get_varid(var: Variable) -> str:
+        """The varid of a variable.
+
+        Raises:
+            NotImplementedError: if the variable has several varids.
+        """
+        vid = variable_uid(var)
+        if not isinstance(vid, str):
+            raise NotImplementedError(
+                f'Variable {var.name} has several varids ({vid}); variables with more than one '
+                'interface_key are not supported by the in-memory variable provider'
+            )
+        return vid
+
     def __init__(self, default_variables):
         super().__init__()
         self._variables_by_varid = OrderedDict()
         self._variables_by_uid = dict()
 
         for var in default_variables:
-            vid = variable_uid(var)
+            vid = self._get_varid(var)
             if not vid in self._variables_by_varid:
                 self._variables_by_varid[vid] = OrderedDict()
 
@@ -150,15 +172,15 @@ class InMemoryVariableProvider(VariableManagerInterface):
         ...
 
     def get_variable(self, instance_id: str | SequenceNotStr[str]) -> Variable | SequenceNotStr[Variable]:
-        """Get variable.
+        """Get the variable with an instance id, or variables with a sequence of ids.
 
-        TODO: Add a description.
+        Raises `KeyError` if a variable is not found.
 
         Args:
-            instance_id: TODO.
+            instance_id: Id(s) of the variable instance(s) - the `id` of the component, not the varid.
 
         Returns:
-            TODO.
+            The variable, or a sequence of variables.
         """
         if isinstance(instance_id, str):
             if instance_id in self._variables_by_uid:
@@ -168,54 +190,54 @@ class InMemoryVariableProvider(VariableManagerInterface):
         raise KeyError(f'Variable {instance_id} not found - try get_default_variable with the varid')
 
     def get_default_variable(self, variable_id: str, index: int = -1) -> Variable:
-        """Get default variable.
+        """Get the default instance of a variable by varid.
 
-        TODO: Add a description.
+        Raises `KeyError` if there is no variable with the varid.
 
         Args:
-            variable_id: TODO.
-            index: TODO.
+            variable_id: The varid (`{section}.{key}.{subindex}`) of the variable.
+            index: Which instance of the varid to return, in the order they were added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The variable.
         """
         if variable_id in self._variables_by_varid:
             return list(self._variables_by_varid[variable_id].values())[index]
         raise KeyError(f'Variable type {variable_id} not found - a first application of this variable must be added.')
 
     def duplicate_variable(self, instance_id: str) -> Variable:
-        """Duplicate variable.
+        """Make a deep copy of a variable with a new id, and add it to the provider.
 
-        TODO: Add a description.
+        Raises `KeyError` if the instance is not found.
 
         Args:
-            instance_id: TODO.
+            instance_id: Id(s) of the variable instance(s) - the `id` of the component, not the varid.
 
         Returns:
-            TODO.
+            The new variable.
         """
         if instance_id in self._variables_by_uid:
             v1 = self._variables_by_uid[instance_id]
             v2 = cast(Variable, copy.deepcopy(v1))
             v2.id = v2.generate_new_id()
-            vid = variable_uid(v2)
+            vid = self._get_varid(v2)
             self._variables_by_varid[vid][v2.id] = v2
             self._variables_by_uid[v2.id] = v2
             return v2
         raise KeyError(f'Variable {instance_id} not found - try get_default_variable with the varid')
 
     def add_variable(self, var: Variable) -> str:
-        """Add variable.
+        """Add a variable instance, so that it can be got by instance id and by varid.
 
-        TODO: Add a description.
+        The most recently added instance of a varid becomes its default.
 
         Args:
-            var: TODO.
+            var: The variable, or sequence of variables.
 
         Returns:
-            TODO.
+            The id of the variable.
         """
-        vid = variable_uid(var)
+        vid = self._get_varid(var)
         if not vid in self._variables_by_varid:
             self._variables_by_varid[vid] = OrderedDict()
 
@@ -225,12 +247,12 @@ class InMemoryVariableProvider(VariableManagerInterface):
         return var.id
 
     def get_varids(self) -> tuple[str, ...]:
-        """Get varids.
+        """The varids served by the provider.
 
-        TODO: Add a description.
+        In the order that they were first added.
 
         Returns:
-            TODO.
+            Tuple of varids.
         """
         return tuple(self._variables_by_varid.keys())
 
@@ -250,7 +272,7 @@ class InMemoryVariableProvider(VariableManagerInterface):
             if var is None:
                 continue
 
-            varid = variable_uid(var)
+            varid = self._get_varid(var)
             try:
                 del self._variables_by_varid[varid][uid]
             except KeyError as e:
@@ -282,12 +304,12 @@ class RecoverableInMemoryVariableProvider(InMemoryVariableProvider):
         self._variables_by_uid = dict()
 
     def reattach_variables(self, variable_provider: VariableProviderInterface):
-        """Reattach variables.
+        """Restore the variables of the provider from another provider.
 
-        TODO: Add a description.
+        When the provider is pickled only the ids of its variables are kept; this restores the variables from, for example, the store.
 
         Args:
-            variable_provider: TODO.
+            variable_provider: Provider (e.g. a database store) from which to recover the variables by id.
         """
         if not hasattr(self, '_variable_recovery_uids'):
             return
@@ -321,7 +343,7 @@ class RecoverableInMemoryVariableProvider(InMemoryVariableProvider):
             if var is None:
                 continue
 
-            varid = variable_uid(var)
+            varid = self._get_varid(var)
             try:
                 del self._variables_by_varid[varid][uid]
             except KeyError as e:
