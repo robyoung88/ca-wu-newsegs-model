@@ -388,9 +388,7 @@ class RaisedLocation(Location):
     
     @property
     def height_agl(self) -> float:
-        """Height agl.
-
-        TODO: Add a description.
+        """Height above ground level (m).
         """
         return self._height
     
@@ -583,9 +581,7 @@ class AspectLocation(RaisedLocation):
     
     @property
     def azimuth(self) -> float:
-        """Azimuth.
-
-        TODO: Add a description.
+        """Compass direction that the surface faces (degrees).
         """
         return self._azimuth
     
@@ -595,9 +591,7 @@ class AspectLocation(RaisedLocation):
     
     @property
     def pitch(self) -> float:
-        """Pitch.
-
-        TODO: Add a description.
+        """Tilt of the surface from horizontal (degrees).
         """
         return self._pitch
     
@@ -773,20 +767,20 @@ class PVLibPVSystem(
 
 @lru_cache
 def cached_get_solarposition(t0, periods, freq, lat, lon, method: str = 'nrel_numba'):
-    """Cached get solarposition.
+    """Solar position (cached) at times given by a start, number of periods and frequency.
 
-    TODO: Add a description.
+    Uses `pvlib.solarposition.get_solarposition`; results are cached because they are requested repeatedly for the same site and period.
 
     Args:
-        t0: TODO.
-        periods: TODO.
-        freq: TODO.
-        lat: TODO.
-        lon: TODO.
-        method: TODO.
+        t0: Start time.
+        periods: Number of periods.
+        freq: Frequency of the periods (a pandas offset alias).
+        lat: Latitude (degrees).
+        lon: Longitude (degrees).
+        method: The solar position algorithm of pvlib.
 
     Returns:
-        TODO.
+        Dataframe of solar position.
     """
     from pvlib.solarposition import get_solarposition
     import pandas as pd

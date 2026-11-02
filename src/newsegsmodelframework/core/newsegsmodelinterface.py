@@ -19,17 +19,16 @@ class NewsegsModelInterface(
     newsegsmodeltimeinterface.NewsegsModelTimeInterface,
     TableOwningRunnableNewsegsComponent,
 ):
-    """Newsegs Model Interface.
+    """Interface of an energy model.
 
-    TODO: Add a description.
+    A runnable, table-owning component which serves environmental data, holds the results of its modules
+    and gives the time over which they are run.
     """
     ...
 
 
 class NewsegsModelProviderInterface(NewsegsComponentProviderInterface):
-    """Newsegs Model Provider Interface.
-
-    TODO: Add a description.
+    """Provider of energy models.
     """
     @overload
     @abstractmethod
@@ -42,51 +41,43 @@ class NewsegsModelProviderInterface(NewsegsComponentProviderInterface):
 
     @abstractmethod
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsModelInterface | SequenceNotStr[NewsegsModelInterface]:
-        """Get component.
-
-        TODO: Add a description.
+        """Get the model with an id, or models with a sequence of ids.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The model, or sequence of models.
         """
         ...
 
     @abstractmethod
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsModelInterface:
-        """Duplicate component.
-
-        TODO: Add a description.
+        """Make a copy of a model with new ids.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The new model.
         """
         ...
 
     @abstractmethod
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsModelInterface:
-        """Get default component.
-
-        TODO: Add a description.
+        """Get the default model of a type.
 
         Args:
-            component_type: TODO.
-            index: TODO.
+            component_type: The type of the component (e.g. `model`, `finance`).
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The model.
         """
         ...
 
 
 class NewsegsModelPersistenceInterface(NewsegsComponentPersistenceInterface):
-    """Newsegs Model Persistence Interface.
-
-    TODO: Add a description.
+    """Interface for saving models to persistent storage.
     """
     ...

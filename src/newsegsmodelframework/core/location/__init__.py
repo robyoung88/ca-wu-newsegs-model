@@ -1,7 +1,8 @@
 """Locations of NewSEGS sites.
 
-The classes (`Location`, `RaisedLocation`, `AspectLocation`) are defined in the `location`
-module, with the pvlib wrappers `PVLibLocation` and `PVLibPVSystem`.
+The classes are defined in the `location` module: `Location`, `RaisedLocation` (with a height)
+and `AspectLocation` (with a height, slope and aspect), and the wrappers of the pvlib classes
+`PVLibLocation` and `PVLibPVSystem`.
 """
-from .location import *
+from .location import Location, RaisedLocation, AspectLocation, PVLibLocation, PVLibPVSystem
 __all__ = ['Location', 'RaisedLocation', 'AspectLocation', 'PVLibLocation', 'PVLibPVSystem']

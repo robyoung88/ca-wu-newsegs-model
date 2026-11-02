@@ -1,6 +1,4 @@
-"""Serialisedtrackeddata module.
-
-TODO: Describe the purpose of the module.
+"""Serialisation of components with a revision-tracked configuration.
 """
 import copy
 from typing import Any, Mapping, Sequence, Type, override
@@ -14,9 +12,11 @@ class SerialisedConfigurationMixin(
     ConfigurationMixin,
     StateSerialiseToDictMixin
 ):
-    """Serialised Configuration Mixin.
+    """Mixin for components whose state is mostly held in a `_config` object with revision tracking.
 
-    TODO: Add a description.
+    Combines `ConfigurationMixin` (which holds the configuration as `_config` and exposes its fields as attributes
+    of the component) with `StateSerialiseToDictMixin` (which serialises the component to a dictionary). When a component is
+    restored from a dictionary, the `_config` entry is restored first.
     """
     @override
     def _preupdate_from_dict(self, config):

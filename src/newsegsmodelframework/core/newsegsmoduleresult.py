@@ -51,73 +51,59 @@ class NewsegsModuleResult(metaclass = ABCMeta):
     @property
     @abstractmethod
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
-        """Meters.
-
-        TODO: Add a description.
+        """Array of the meter values (energy flows) of the run, with a row for each meter and a column for each timestep.
         """
         ...
 
     @property
     @abstractmethod
     def dsm(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
-        """Dsm.
-
-        TODO: Add a description.
+        """Array of the DSM (system state) values of the run, with a row for each value and a column for each timestep.
         """
         ...
         
     @abstractmethod
     def get_meter_names(self) -> Sequence[str]:
-        """Get meter names.
-
-        TODO: Add a description.
+        """Names of the meters, in the order of the rows of `meters`.
 
         Returns:
-            TODO.
+            The names.
         """
         ...
 
     @abstractmethod
     def get_meter_types(self) -> Sequence[str]:
-        """Get meter types.
-
-        TODO: Add a description.
+        """Types of the meters, in the order of the rows of `meters`.
 
         Returns:
-            TODO.
+            The types.
         """
         ...
 
     @abstractmethod
     def get_dsm_names(self) -> Sequence[str]:
-        """Get dsm names.
-
-        TODO: Add a description.
+        """Names of the DSM values, in the order of the rows of `dsm`.
 
         Returns:
-            TODO.
+            The names.
         """
         ...
 
     @abstractmethod
     def get_dsm_types(self) -> Sequence[str]:
-        """Get dsm types.
-
-        TODO: Add a description.
+        """Types of the DSM values, in the order of the rows of `dsm`.
 
         Returns:
-            TODO.
+            The types.
         """
         ...
 
     @abstractmethod
     def get_timespan(self) -> RegTimeSpan:
-        """Get timespan.
-
-        TODO: Add a description.
+        """The time span of the run.
 
         Returns:
-            TODO.
+            The time span; the columns of `meters` and `dsm` are its timesteps.
         """
         ...
 
@@ -148,15 +134,15 @@ class NewsegsModuleResult(metaclass = ABCMeta):
 
 @lru_cache
 def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
-    """Defer meters to pandas.
+    """Convert the meters of a result to a dataframe, with a column for each meter indexed by time.
 
-    TODO: Add a description.
+    Cached on the result.
 
     Args:
-        res: TODO.
+        res: The result.
 
     Returns:
-        TODO.
+        The dataframe; empty if there are no meters.
     """
     data = res.meters.T
     if len(data) == 0:
@@ -171,15 +157,15 @@ def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
 
 @lru_cache
 def defer_dsm_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
-    """Defer dsm to pandas.
+    """Convert the DSM values of a result to a dataframe, with a column for each value indexed by time.
 
-    TODO: Add a description.
+    Cached on the result.
 
     Args:
-        res: TODO.
+        res: The result.
 
     Returns:
-        TODO.
+        The dataframe; empty if there are no DSM values.
     """
     data = res.dsm.T
     if len(data) == 0:

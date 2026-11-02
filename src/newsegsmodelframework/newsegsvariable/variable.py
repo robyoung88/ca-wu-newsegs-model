@@ -6992,7 +6992,15 @@ class GammaVariable(TwoParamNumericScalarVariable):
     ) -> None:
         """Set the parameters of the variable from the present value in the model.
 
-        Reads the model value (`model_section`, `model_parameter`) and sets the mean (using a `mean` parameterisation), re-deriving the spread from the existing parameters. The `ln` transform is not supported. Does nothing if the model value is already the deterministic value, or the model is of the wrong type for the variable. The spread of the distribution is not recoverable from a single model value, so this is best avoided.
+        Reads the model value (`model_section`, `model_parameter`) and sets it as the mean, using
+        a parameterisation by `mean` and `sd`. The standard deviation, `sqrt(shape) * scale` of the
+        current parameters, is kept, so the shape and scale change. Under a different
+        parameterisation the raw parameters are then replaced by the native `(shape, scale)`.
+
+        The `ln` transform is not supported (`NotImplementedError`). Does nothing if the model value
+        is already the deterministic value, or the model is of the wrong type for the variable.
+        The spread of the distribution is not recoverable from a single model value, so this is
+        best avoided.
 
         Args:
             model: The energy model or finance model.

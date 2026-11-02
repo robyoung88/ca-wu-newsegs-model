@@ -12,9 +12,11 @@ from typing import Any, Callable, Literal, Type
 from newsegsmodelframework.core.serialisation import T
 
 class NakedConstructor:
-    """Naked Constructor.
+    """Interface of a class that can be constructed from a dictionary.
 
-    TODO: Add a description.
+    Registers hold, for each class name, an object with this interface. For NewSEGS classes it is the class itself
+    (they implement `from_dict`); for foreign types such as pandas timestamps it is a stand-in object whose
+    `from_dict` builds the instance.
     """
     def to_dict(self) -> dict[str, Any]: ...
     def update(self, config: dict[str, Any]): ...
@@ -24,15 +26,13 @@ class NakedConstructor:
 
     @classmethod
     def from_dict(cls: Type[T], config: dict[str, Any]) -> T:
-        """From dict.
-
-        TODO: Add a description.
+        """Build an instance from its serialised dictionary.
 
         Args:
-            config: TODO.
+            config: Dictionary of the serialised state.
 
         Returns:
-            TODO.
+            The instance.
         """
         ...
 
@@ -52,7 +52,14 @@ def get_subclasses_in_module(
             on these classes should result in an instance of the class.
     """
     odict = {}
-    for objname in pymod.__all__:
+    # A module with no `__all__` is searched for the public classes it defines
+    objnames = getattr(pymod, '__all__', None)
+    if objnames is None:
+        objnames = [
+            name for name, obj in vars(pymod).items()
+            if isinstance(obj, type) and obj.__module__ == pymod.__name__ and not name.startswith('_')
+        ]
+    for objname in objnames:
         obj = getattr(pymod, objname)
         if not inspect.isabstract(obj):
             try:
@@ -78,7 +85,7 @@ def register_constructor_class(cc_name: str):
 
     Example:
         ```python
-        from core import register_constructor_class
+        from newsegsmodelframework.core.constructors.registers import register_constructor_class, get_subclasses_in_module
         
         @register_constructor_class('my_constructor_class')
         def get_mcc_constructors():
@@ -115,7 +122,7 @@ def get_datawithrevision_register():
     from newsegsmodelframework.core import newsegscomponent
     import newsegsmodelframework.newsegsmodel as newsegsmodel
     import newsegsmodelframework.newsegsfinance as newsegsfinance
-    import newsegsmodelframework.core.generation as generation
+    from newsegsmodelframework.core.generation import generators
     import newsegsmodelframework.newsegsgrid as newsegsgrid
     import newsegsmodelframework.newsegsgeneration as newsegsgeneration
     import newsegsmodelframework.newsegscs as newsegscs
@@ -127,7 +134,7 @@ def get_datawithrevision_register():
     CONSTRUCTORS = {}
     for pymod in [
         newsegscomponent, newsegsmodel, newsegsfinance, 
-        generation, newsegsgrid, newsegsgeneration, 
+        generators, newsegsgrid, newsegsgeneration, 
         newsegscs, newsegsvariable, newsegsmetamodel, 
         newsegsproject, trackeddata, 
         newsegssensitivity
@@ -185,56 +192,51 @@ def get_newsegsmodule_register():
 
 @register_constructor_class('Generator')
 def get_generator_register():
-    """Get generator register.
-
-    TODO: Add a description.
+    """Register of the electricity generators: the concrete subclasses of `ABCElecGenerator`.
 
     Returns:
-        TODO.
+        Dictionary of constructors by class name.
     """
-    from newsegsmodelframework.core import generation
+    from newsegsmodelframework.core.generation import generators
     
     GENERATOR_CONSTRUCTORS = {}
-    for pymod in [generation]:
+    for pymod in [generators]:
         GENERATOR_CONSTRUCTORS.update(
-            get_subclasses_in_module(pymod, generation.ABCElecGenerator)
+            get_subclasses_in_module(pymod, generators.ABCElecGenerator)
         )
     
     return GENERATOR_CONSTRUCTORS
 
 @register_constructor_class('Environment')
 def get_environment_register():
-    """Get environment register.
-
-    TODO: Add a description.
+    """Register of the environment servers: concrete subclasses of `NewsegsLocalEnvironment` and `NewsegsWiderEnvironment`.
 
     Returns:
-        TODO.
+        Dictionary of constructors by class name.
     """
-    from newsegsmodelframework.core import environment
+    from newsegsmodelframework.core.environment import (
+        dummy_env_servers, environment_servers, inmem_env_servers
+    )
 
     ENVIRONMENT_CONSTRUCTORS = {}
-    for pymod in [environment]:
+    for pymod in [dummy_env_servers, inmem_env_servers]:
         ENVIRONMENT_CONSTRUCTORS.update(
-            get_subclasses_in_module(pymod, environment.NewsegsLocalEnvironment)
+            get_subclasses_in_module(pymod, environment_servers.NewsegsLocalEnvironment)
         )
-    for pymod in [environment]:
         ENVIRONMENT_CONSTRUCTORS.update(
-            get_subclasses_in_module(pymod, environment.NewsegsWiderEnvironment)
+            get_subclasses_in_module(pymod, environment_servers.NewsegsWiderEnvironment)
         )
     
     return ENVIRONMENT_CONSTRUCTORS
 
 @register_constructor_class('Location')
 def get_location_register():
-    """Get location register.
-
-    TODO: Add a description.
+    """Register of the locations: concrete subclasses of `Location`.
 
     Returns:
-        TODO.
+        Dictionary of constructors by class name.
     """
-    from newsegsmodelframework.core import location
+    from newsegsmodelframework.core.location import location
 
     LOCATION_CONSTRUCTORS = {}
     for pymod in [location]:
@@ -244,14 +246,12 @@ def get_location_register():
 
 @register_constructor_class('TimeSpan')
 def get_timespan_register():
-    """Get timespan register.
-
-    TODO: Add a description.
+    """Register of the time spans: concrete subclasses of `TimeSpan`.
 
     Returns:
-        TODO.
+        Dictionary of constructors by class name.
     """
-    from newsegsmodelframework.core import timespan
+    from newsegsmodelframework.core.timespan import timespan
 
     TIMESPAN_CONSTRUCTORS = {}
     for pymod in [timespan]:
@@ -261,12 +261,10 @@ def get_timespan_register():
 
 @register_constructor_class('Timestamp')
 def get_timestamp_register():
-    """Get timestamp register.
-
-    TODO: Add a description.
+    """Register of the constructor of a pandas `Timestamp` from its dictionary.
 
     Returns:
-        TODO.
+        Dictionary with the constructor.
     """
     import pandas as pd
     def timestamp_from_dict(config: dict[str, Any]) -> pd.Timestamp:
@@ -284,12 +282,10 @@ def get_timestamp_register():
 
 @register_constructor_class('Timedelta')
 def get_timedelta_register():
-    """Get timedelta register.
-
-    TODO: Add a description.
+    """Register of the constructor of a pandas `Timedelta` from its dictionary.
 
     Returns:
-        TODO.
+        Dictionary with the constructor.
     """
     import pandas as pd
 
@@ -307,12 +303,10 @@ def get_timedelta_register():
 
 @register_constructor_class('datetime')
 def get_datetime_register():
-    """Get datetime register.
-
-    TODO: Add a description.
+    """Register of the constructor of a `datetime.datetime` from its dictionary (an ISO format string).
 
     Returns:
-        TODO.
+        Dictionary with the constructor.
     """
     import datetime
 
@@ -330,14 +324,12 @@ def get_datetime_register():
 
 @register_constructor_class('PVLib')
 def get_pvlib_register():
-    """Get pvlib register.
-
-    TODO: Add a description.
+    """Register of the pvlib location wrappers: concrete subclasses of `PVLibLocation`.
 
     Returns:
-        TODO.
+        Dictionary of constructors by class name.
     """
-    from newsegsmodelframework.core import location
+    from newsegsmodelframework.core.location import location
 
     LOCATION_CONSTRUCTORS = {}
     for pymod in [location]:
@@ -347,12 +339,10 @@ def get_pvlib_register():
 
 @register_constructor_class('Variable')
 def get_variable_register():
-    """Get variable register.
-
-    TODO: Add a description.
+    """Register of the variables; the same classes as the component register, which includes the variable constructors.
 
     Returns:
-        TODO.
+        Dictionary of constructors by class name.
     """
     return CONSTRUCTOR_CLASS_REGISTER['NewsegsComponent']()
 

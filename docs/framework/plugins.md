@@ -80,7 +80,7 @@ them it calls [`find_constructor`][newsegsmodelframework.core.find_constructor] 
 dictionary.
 
 The registry of classes for each constructor class is built by functions decorated with
-[`register_constructor_class`][newsegsmodelframework.core.register_constructor_class] in
+[`register_constructor_class`][newsegsmodelframework.core.constructors.registers.register_constructor_class] in
 `newsegsmodelframework/core/constructors/registers.py`. The built-in registries
 find classes by inspecting the `__all__` of the framework packages, so:
 
@@ -101,10 +101,4 @@ The constructor classes are `DataWithRevision`, `NewsegsComponent`, `NewsegsModu
 
 ::: newsegsmodelframework.plugins.registers
 
-::: newsegsmodelframework.core.constructors.registers
-    options:
-      members:
-        - register_constructor_class
-        - register_custom_class
-        - get_register
-        - get_subclasses_in_module
+The registries and `register_constructor_class` are documented with the [core components](core.md).

@@ -8,9 +8,10 @@ from abc import ABCMeta, abstractmethod
 from newsegsmodelframework.core.environment import environment_servers
 
 class EnvironmentServerInterface(metaclass = ABCMeta):
-    """Environment Server Interface.
+    """Interface of an object, such as an energy model, which serves environmental data.
 
-    TODO: Add a description.
+    Provides access to the local environment server (conditions at the site) and the wider environment server
+    (conditions affecting the wider electricity grid).
     """
     @property
     @abstractmethod

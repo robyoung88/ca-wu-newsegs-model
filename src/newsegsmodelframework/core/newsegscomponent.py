@@ -66,12 +66,12 @@ class NewsegsComponent(
 
     @classmethod
     def set_state_exclusion_policy(cls, excludes: _STATE_EXCLUDES = 'excluded_and_components'):
-        """Set state exclusion policy.
+        """Set which attributes are left out of the dictionary made by `to_dict`.
 
-        TODO: Add a description.
+        Applies to the class. The default leaves out the attributes which are themselves components, which are stored separately; `to_dict_repr` temporarily includes them.
 
         Args:
-            excludes: TODO.
+            excludes: `'excluded'` omits the attributes excluded from the state; `'excluded_and_components'` also omits the attributes which are components, which are saved and reattached separately.
         """
         cls._serialisation_settings['state_excludes'] = excludes
 
@@ -84,9 +84,7 @@ class NewsegsComponent(
             
     @property
     def name(self) -> str:
-        """Name.
-
-        TODO: Add a description.
+        """Name of the type of component.
         """
         return self._name
     
@@ -96,17 +94,13 @@ class NewsegsComponent(
 
     @property
     def version(self) -> str:
-        """Version.
-
-        TODO: Add a description.
+        """Version of the component; changes when the structure of the configuration changes.
         """
         return self._version
 
     @property
     def config(self) -> DataWithRevision:
-        """Config.
-
-        TODO: Add a description.
+        """The revision-tracked configuration object.
         """
         return self._config
 
@@ -132,12 +126,10 @@ class NewsegsComponent(
         return odict
 
     def json_dumps_repr(self) -> str:
-        """Json dumps repr.
-
-        TODO: Add a description.
+        """Serialise the representation made by `to_dict_repr` (including child components) to a JSON string.
 
         Returns:
-            TODO.
+            The JSON string.
         """
         return json.dumps(self.to_dict_repr(), cls = jsonfuncs.NumpyEncoder)
     
@@ -306,17 +298,15 @@ class NewsegsComponent(
 
     @property
     def dirty(self):
-        """Dirty.
-
-        TODO: Add a description.
+        """Whether the component, or any of its children, has been modified since it was last synchronised with storage.
         """
         return self.chain_modified
     
 
 class RunnableNewsegsComponent(NewsegsComponent):
-    """Runnable Newsegs Component.
+    """A component which can be run to give results.
 
-    TODO: Add a description.
+    Records the time of the last run. The results of a run are accessed through the properties of the component.
     """
     last_run: float = 0.0
 
@@ -352,58 +342,50 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
-        """Get component.
-
-        TODO: Add a description.
+        """Get the component with an id, or components with a sequence of ids.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The component, or sequence of components.
         """
         ...
 
     @abstractmethod
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
-        """Duplicate component.
-
-        TODO: Add a description.
+        """Make a copy of a component with new ids.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The new component.
         """
         ...
 
     @abstractmethod
     def add_component(self, component: NewsegsComponent) -> str:
-        """Add component.
-
-        TODO: Add a description.
+        """Add a component to the provider.
 
         Args:
-            component: TODO.
+            component: The component.
 
         Returns:
-            TODO.
+            The id of the component.
         """
         ...
 
     @abstractmethod
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsComponent:
-        """Get default component.
-
-        TODO: Add a description.
+        """Get the default component of a type.
 
         Args:
-            component_type: TODO.
-            index: TODO.
+            component_type: The type of the component (e.g. `model`, `finance`).
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The component.
         """
         ...
 
@@ -413,16 +395,14 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
         component_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
-        """Get component metadata.
-
-        TODO: Add a description.
+        """Get metadata of components, e.g. the label or revision, without constructing them.
 
         Args:
-            component_id: TODO.
-            metadata_ids: TODO.
+            component_id: Id(s) of the component(s).
+            metadata_ids: Name(s) of the metadata field(s) wanted.
 
         Returns:
-            TODO.
+            Dictionary of metadata for a single component, or a dictionary of these by component id.
         """
         ...
 
@@ -473,17 +453,13 @@ class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
         """
 
 class NewsegsComponentManagerInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
-    """Newsegs Component Manager Interface.
-
-    TODO: Add a description.
+    """A component provider which can also persist components: the interface of a store.
     """
     ...
 
 
 class DictionaryComponentProvider(NewsegsComponentProviderInterface):
-    """Dictionary Component Provider.
-
-    TODO: Add a description.
+    """Component provider which holds the components in a dictionary by id.
     """
     def __init__(
         self,
@@ -503,15 +479,15 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self, 
         component_id: str | SequenceNotStr[str]
     ) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
-        """Get component.
+        """Get the component with an id, or components with a sequence of ids.
 
-        TODO: Add a description.
+        Raises `KeyError` if a component is not found.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The component, or list of components.
         """
         if isinstance(component_id, str):
             return self.comp_dict[component_id]
@@ -522,15 +498,13 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self, 
         component_id: str | NewsegsComponent
     ) -> NewsegsComponent:
-        """Duplicate component.
-
-        TODO: Add a description.
+        """Make a deep copy of a component.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The copy.
         """
         if isinstance(component_id, str):
             return copy.deepcopy(self.comp_dict[component_id])
@@ -541,15 +515,13 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self,
         component: NewsegsComponent
     ) -> str:
-        """Add component.
-
-        TODO: Add a description.
+        """Add a component to the dictionary under its id.
 
         Args:
-            component: TODO.
+            component: The component.
 
         Returns:
-            TODO.
+            The id of the component.
         """
         self.comp_dict[component.id] = component
         return component.id
@@ -559,16 +531,16 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         component_type: str, 
         index: int = -1
     ) -> NewsegsComponent:
-        """Get default component.
+        """Get the first component held.
 
-        TODO: Add a description.
+        The type and index are ignored.
 
         Args:
-            component_type: TODO.
-            index: TODO.
+            component_type: The type of the component (e.g. `model`, `finance`).
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The component.
         """
         return next(iter(self.comp_dict.values()))
     
@@ -577,30 +549,26 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         component_id: str | SequenceNotStr[str], 
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
-        """Get component metadata.
-
-        TODO: Add a description.
+        """Not supported: there is no metadata.
 
         Args:
-            component_id: TODO.
-            metadata_ids: TODO.
+            component_id: Id(s) of the component(s).
+            metadata_ids: Name(s) of the metadata field(s) wanted.
 
         Returns:
-            TODO.
+            A dictionary with a message.
         """
         return {'message': 'No metadata'}
 
     def set_component_metadata(
         self, component_id: str, metadata_id: str, metadata_value: Any
     ):
-        """Set component metadata.
-
-        TODO: Add a description.
+        """Not supported: does nothing.
 
         Args:
-            component_id: TODO.
-            metadata_id: TODO.
-            metadata_value: TODO.
+            component_id: Id(s) of the component(s).
+            metadata_id: Name of the metadata field.
+            metadata_value: The value to set.
         """
         ...
 

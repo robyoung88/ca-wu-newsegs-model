@@ -12,9 +12,7 @@ from newsegsmodelframework.core.timespan.timespan import TimeSpan
 
 
 class DummyLocalEnv(NewsegsLocalEnvironment):
-    """Dummy Local Env.
-
-    TODO: Add a description.
+    """Local environment with constant placeholder values (e.g. zero wind), for tests and for models which do not need weather data.
     """
     _version = '0.0.1'
     _name = 'Dummy local environment'
@@ -111,9 +109,7 @@ class DummyLocalEnv(NewsegsLocalEnvironment):
     
 
 class DummyWiderEnv(NewsegsWiderEnvironment):
-    """Dummy Wider Env.
-
-    TODO: Add a description.
+    """Wider environment with constant placeholder values (a constant 15 degrees C), for tests and for models which do not need weather data.
     """
     _version = '0.0.1'
     _name = 'Dummy wider environment'

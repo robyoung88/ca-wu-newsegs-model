@@ -190,14 +190,14 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
                        location:RaisedLocation,
                        timespan:OffsetRegTimeSpan):
         # Only store a single series for temperature
-        """Set external temperature.
+        """Store a series of external (air) temperatures.
 
-        TODO: Add a description.
+        A single series is held for all locations.
 
         Args:
-            external_temperature: TODO.
-            location: TODO.
-            timespan: TODO.
+            external_temperature: Temperatures (degrees C) at each timestep of `timespan`.
+            location: The location.
+            timespan: The period of time.
         """
         self._external_temperature_series[None] = {
             'timespan': timespan,
@@ -205,15 +205,15 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         }
 
     def access_external_temperature_series(self,location:Location):
-        """Access external temperature series.
+        """The stored external temperature series.
 
-        TODO: Add a description.
+        The location is ignored: one series is held.
 
         Args:
-            location: TODO.
+            location: The location.
 
         Returns:
-            TODO.
+            Dictionary of the `timespan` and the `timeseries`.
         """
         return self._external_temperature_series[None]
 
@@ -244,14 +244,14 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         location: AspectLocation,
         timespan: OffsetRegTimeSpan
     ):
-        """Set solar flux on plane.
+        """Store a series of solar flux on a plane with the azimuth and pitch of an `AspectLocation`.
 
-        TODO: Add a description.
+        Series are held by azimuth and pitch.
 
         Args:
-            solar_flux: TODO.
-            location: TODO.
-            timespan: TODO.
+            solar_flux: Solar flux on the plane at each timestep of `timespan`.
+            location: The location.
+            timespan: The period of time.
         """
         az = location.azimuth
         pitch = location.pitch
@@ -264,15 +264,13 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         }
 
     def access_solar_flux_on_plane_series(self,location:AspectLocation):
-        """Access solar flux on plane series.
-
-        TODO: Add a description.
+        """The stored solar flux series for the azimuth and pitch of an `AspectLocation`.
 
         Args:
-            location: TODO.
+            location: The location.
 
         Returns:
-            TODO.
+            Dictionary of the `timespan` and the `timeseries`, or None if there is no series for that plane.
         """
         az = location.azimuth
         pitch = location.pitch
@@ -375,9 +373,7 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
-    """In Memory Wider Env.
-
-    TODO: Add a description.
+    """Wider environment which holds its temperature and horizontal solar flux series in memory.
     """
     _version = '0.0.1'
     _name = 'Wider environment'
@@ -391,13 +387,11 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         effective_temperatures: npt.ArrayLike,
         timespan: OffsetRegTimeSpan
     ):
-        """Set temperature series.
-
-        TODO: Add a description.
+        """Store the series of effective temperatures of the wider environment.
 
         Args:
-            effective_temperatures: TODO.
-            timespan: TODO.
+            effective_temperatures: Effective temperature at each timestep of `timespan`.
+            timespan: The period of time.
         """
         self._temperature_series = {
             'timespan': timespan,
@@ -424,13 +418,11 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         horizontal_solar_flux: npt.ArrayLike,
         timespan = OffsetRegTimeSpan
     ):
-        """Set horizontal solar flux series.
-
-        TODO: Add a description.
+        """Store the series of horizontal solar flux of the wider environment.
 
         Args:
-            horizontal_solar_flux: TODO.
-            timespan: TODO.
+            horizontal_solar_flux: Horizontal solar flux at each timestep of `timespan`.
+            timespan: The period of time.
         """
         self._horizontal_solar_flux_series = {
             'timespan': timespan,

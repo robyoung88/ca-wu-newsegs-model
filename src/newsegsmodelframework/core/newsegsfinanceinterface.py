@@ -13,17 +13,13 @@ from newsegsmodelframework.core.newsegscomponent import NewsegsComponentPersiste
 class NewsegsFinanceInterface(
     TableOwningRunnableNewsegsComponent,
 ):
-    """Newsegs Finance Interface.
-
-    TODO: Add a description.
+    """Interface of a finance model: a runnable, table-owning component.
     """
     ...
 
 
 class NewsegsFinanceProviderInterface(NewsegsComponentProviderInterface):
-    """Newsegs Finance Provider Interface.
-
-    TODO: Add a description.
+    """Provider of finance models.
     """
     @overload
     @abstractmethod
@@ -36,51 +32,43 @@ class NewsegsFinanceProviderInterface(NewsegsComponentProviderInterface):
 
     @abstractmethod
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsFinanceInterface | SequenceNotStr[NewsegsFinanceInterface]:
-        """Get component.
-
-        TODO: Add a description.
+        """Get the finance model with an id, or models with a sequence of ids.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The finance model, or sequence of finance models.
         """
         ...
 
     @abstractmethod
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsFinanceInterface:
-        """Duplicate component.
-
-        TODO: Add a description.
+        """Make a copy of a finance model with new ids.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The new finance model.
         """
         ...
 
     @abstractmethod
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsFinanceInterface:
-        """Get default component.
-
-        TODO: Add a description.
+        """Get the default finance model of a type.
 
         Args:
-            component_type: TODO.
-            index: TODO.
+            component_type: The type of the component (e.g. `model`, `finance`).
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The finance model.
         """
         ...
 
 
 class NewsegsFinancePersistenceInterface(NewsegsComponentPersistenceInterface):
-    """Newsegs Finance Persistence Interface.
-
-    TODO: Add a description.
+    """Interface for saving finance models to persistent storage.
     """
     ...

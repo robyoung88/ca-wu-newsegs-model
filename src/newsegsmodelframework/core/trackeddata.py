@@ -27,9 +27,9 @@ __all__ = [
 
 @runtime_checkable
 class RevisionNotifierProtocol(Protocol):
-    """Revision Notifier Protocol.
+    """Protocol of an object which can hold children and be notified of changes.
 
-    TODO: Add a description.
+    Implemented by `RevisionNotifierMixin`. A parent counts the changes of its children as changes of its own.
     """
     def _add_child(self, child: 'RevisionNotifierProtocol', subscribe: bool = True): ...
     def _remove_child(self, child: 'RevisionNotifierProtocol'): ...
@@ -92,9 +92,7 @@ class RevisionNotifierMixin():
 
     @property
     def revision(self) -> int:
-        """Revision.
-
-        TODO: Add a description.
+        """The revision number: it increases by one when the object is changed after having been synchronised.
         """
         return self._revision
 
@@ -122,17 +120,13 @@ class RevisionNotifierMixin():
 
     @property
     def modified(self) -> bool:
-        """Modified.
-
-        TODO: Add a description.
+        """Whether the object has changed since it was last synchronised (e.g. with storage).
         """
         return self._last_syncronised != self.revision
 
     @property
     def chain_modified(self) -> bool:
-        """Chain modified.
-
-        TODO: Add a description.
+        """Whether the object, or any of its children, has changed since it was last synchronised.
         """
         return (
             self.modified 
@@ -297,12 +291,12 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
 
     def subscribe(self, subscriber: 'RevisionNotifierProtocol | ConfigurationMixin'):
         # Addition to subscriber list occurs in _add_child
-        """Subscribe.
+        """Subscribe an object to the changes of this one.
 
-        TODO: Add a description.
+        The subscriber has this object as a child, so changes here count as changes of the subscriber.
 
         Args:
-            subscriber: TODO.
+            subscriber: The object to be notified of changes (a revision notifier or a component).
         """
         if isinstance(subscriber, ConfigurationMixin):
             subscriber._config._add_child(self, subscribe = True)
@@ -310,12 +304,12 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
             subscriber._add_child(self, subscribe = True)
 
     def unsubscribe(self, subscriber: 'RevisionNotifierProtocol | ConfigurationMixin'):
-        """Unsubscribe.
+        """Stop notifying a subscriber of changes.
 
-        TODO: Add a description.
+        If the subscriber is subscribed several times, one subscription is removed.
 
         Args:
-            subscriber: TODO.
+            subscriber: The object to be notified of changes (a revision notifier or a component).
         """
         if isinstance(subscriber, ConfigurationMixin):
             search_subscriber = subscriber._config
@@ -399,9 +393,15 @@ class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.Serialis
 
 
 class ConfigurationMixin:
-    """Configuration Mixin.
+    """Mixin for components whose changeable state is held in a revision-tracked `_config` object.
 
-    TODO: Add a description.
+    Reads and writes of the fields of the configuration are redirected to it, so setting
+    `component.x = y` for a field `x` of the configuration changes `_config`, which counts the revision.
+    The mixin also gives each component a unique, prefixed id and passes on the revision of the configuration.
+
+    Attributes:
+        _config: The configuration, a `DataWithRevision`.
+        uuid: The unique part of the id.
     """
     _config: DataWithRevision
 
@@ -416,20 +416,16 @@ class ConfigurationMixin:
     
     @classmethod
     def generate_new_id(cls) -> str:
-        """Generate new id.
-
-        TODO: Add a description.
+        """A new unique id with the prefix of the component type.
 
         Returns:
-            TODO.
+            The id.
         """
         return cls._id_prefix + '-' + str(mod_uuid.uuid4())
 
     @property
     def id(self) -> str:
-        """Id.
-
-        TODO: Add a description.
+        """The id of the component: the prefix of the component type, and the unique id.
         """
         return self._id_prefix + '-' + self.uuid
     
@@ -442,9 +438,7 @@ class ConfigurationMixin:
         self.uuid = uid
 
     def anonymise_ids(self):
-        """Anonymise ids.
-
-        TODO: Add a description.
+        """Replace the id with a new one, e.g. after copying a component.
         """
         self.id = self.generate_new_id()
 
@@ -507,9 +501,7 @@ class ConfigurationMixin:
 
     @property 
     def revision(self) -> int:
-        """Revision.
-
-        TODO: Add a description.
+        """The revision number of the configuration.
         """
         return self._config.revision
 
@@ -520,31 +512,23 @@ class ConfigurationMixin:
 
     @property
     def modified(self) -> bool:
-        """Modified.
-
-        TODO: Add a description.
+        """Whether the configuration has changed since it was last synchronised.
         """
         return self._config.modified
 
     @property
     def chain_modified(self) -> bool:
-        """Chain modified.
-
-        TODO: Add a description.
+        """Whether the configuration, or any of its children, has changed since it was last synchronised.
         """
         return self._config.chain_modified
 
     def syncronise(self):
-        """Syncronise.
-
-        TODO: Add a description.
+        """Mark the configuration as synchronised (e.g. after saving it to storage).
         """
         self._config._syncronise()
 
     def chain_syncronise(self):
-        """Chain syncronise.
-
-        TODO: Add a description.
+        """Mark the configuration and all its children as synchronised.
         """
         self._config._chain_syncronise()
     
@@ -591,23 +575,19 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
             self._notify_change()
 
     def append(self, item):
-        """Append.
-
-        TODO: Add a description.
+        """Append an item, counting a change.
 
         Args:
-            item: TODO.
+            item: The item.
         """
         super().append(self._wrap_value(item, [self]))
         self._notify_change()
 
     def extend(self, iterable: Iterable) -> None:
-        """Extend.
-
-        TODO: Add a description.
+        """Append items, counting a change.
 
         Args:
-            iterable: TODO.
+            iterable: The items.
         """
         wrapped = [self._wrap_value(item, [self]) for item in iterable]
         if wrapped:
@@ -615,27 +595,23 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
             self._notify_change()
 
     def insert(self, index, item):
-        """Insert.
-
-        TODO: Add a description.
+        """Insert an item, counting a change.
 
         Args:
-            index: TODO.
-            item: TODO.
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
+            item: The item.
         """
         super().insert(index, self._wrap_value(item, [self]))
         self._notify_change()
 
     def pop(self, index: SupportsIndex = -1):
-        """Pop.
-
-        TODO: Add a description.
+        """Remove and return an item, counting a change and releasing the item.
 
         Args:
-            index: TODO.
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
 
         Returns:
-            TODO.
+            The item.
         """
         item = super().pop(index)
         self._notify_change()
@@ -644,12 +620,12 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
         return item
 
     def remove(self, value):
-        """Remove.
+        """Remove the first occurrence of a value, counting a change and releasing the item.
 
-        TODO: Add a description.
+        Raises `ValueError` if the value is absent.
 
         Args:
-            value: TODO.
+            value: The value.
         """
         try:
             idx = self.index(value)
@@ -664,9 +640,7 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
         self._notify_change()
 
     def clear(self):
-        """Clear.
-
-        TODO: Add a description.
+        """Remove all items, counting a change.
         """
         if len(self) > 0:
             super().clear()
@@ -684,13 +658,13 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
 
 
 def recursive_remove_children(obj, child_item):
-    """Recursive remove children.
+    """Release a child, or the children within a collection, from an object.
 
-    TODO: Add a description.
+    Strings and arrays are not searched. Used when values are replaced or removed so that stale children do not keep notifying the parent.
 
     Args:
-        obj: TODO.
-        child_item: TODO.
+        obj: The object whose children are tracked.
+        child_item: The child, or collection of children, to remove.
     """
     if child_item is None:
         return
@@ -768,13 +742,11 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
         self._notify_change()
 
     def update(self, *args, **kwargs):
-        """Update.
-
-        TODO: Add a description.
+        """Update from a mapping, counting a change if a value is new or different.
 
         Args:
-            *args: TODO.
-            **kwargs: TODO.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
         """
         other = dict(*args, **kwargs)
         changed = False
@@ -789,16 +761,16 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
             self._notify_change()
     
     def pop(self, key, *args):
-        """Pop.
+        """Remove and return an item, counting a change and releasing the item.
 
-        TODO: Add a description.
+        As `dict.pop`, a default may be given.
 
         Args:
-            key: TODO.
-            *args: TODO.
+            key: The key.
+            *args: Further positional arguments.
 
         Returns:
-            TODO.
+            The item.
         """
         if key in self:
             item = super().pop(key)
@@ -808,9 +780,7 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
         return super().pop(key, *args)
 
     def clear(self):
-        """Clear.
-
-        TODO: Add a description.
+        """Remove all items, counting a change.
         """
         if len(self) > 0:
             for item in self.values():
@@ -868,17 +838,17 @@ class ObservableOrderedDict(ObservableDict, OrderedDict):
             subscriber._add_child(self, subscribe = False)
 
     def pop(self, key, *args, **kwargs):
-        """Pop.
+        """Remove and return an item, counting a change and releasing the item.
 
-        TODO: Add a description.
+        As `dict.pop`, a default may be given.
 
         Args:
-            key: TODO.
-            *args: TODO.
-            **kwargs: TODO.
+            key: The key.
+            *args: Further positional arguments.
+            **kwargs: Further keyword arguments.
 
         Returns:
-            TODO.
+            The item.
         """
         if key in self:
             item = super().pop(key)
@@ -890,9 +860,9 @@ class ObservableOrderedDict(ObservableDict, OrderedDict):
 
 class TableModifyingObservableOrderedDict(ObservableOrderedDict):
     
-    """Table Modifying Observable Ordered Dict.
+    """An observable ordered dictionary whose changes also change the table configuration of its owner.
 
-    TODO: Add a description.
+    Subscribes both the configuration of the owner and its `table_config`, so that a change here makes the results tables out of date.
     """
     def __init__(
         self, 
@@ -1076,9 +1046,10 @@ class ComponentOrderedDictProperty(ComponentSubscriptionRevisionNotifierProperty
         
 
 class TableModifyingComponentSRNProperty(ComponentSubscriptionRevisionNotifierProperty):
-    """Table Modifying Component SRN Property.
+    """Property for observable containers whose changes also change the table configuration of the owner.
 
-    TODO: Add a description.
+    Like `ComponentSubscriptionRevisionNotifierProperty`, but the container is attached to the `table_config` of the owner (if it has one),
+    as well as its configuration.
     """
     @override
     def __set__(self, instance: ConfigurationMixin, value: Any):
@@ -1118,9 +1089,7 @@ class TableModifyingComponentSRNProperty(ComponentSubscriptionRevisionNotifierPr
 
 class TableModifyingComponentOrderedDictProperty(TableModifyingComponentSRNProperty):
 
-    """Table Modifying Component Ordered Dict Property.
-
-    TODO: Add a description.
+    """Property for an ordered dictionary of components whose changes also change the table configuration of the owner.
     """
     def __init__(
         self,
@@ -1252,9 +1221,7 @@ class TableModifyingObservableList(ObservableList):
 
 class TableModifyingComponentListProperty(TableModifyingComponentSRNProperty):
 
-    """Table Modifying Component List Property.
-
-    TODO: Add a description.
+    """Property for a list of components whose changes also change the table configuration of the owner.
     """
     def __init__(
         self,
