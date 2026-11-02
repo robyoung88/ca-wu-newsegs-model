@@ -73,3 +73,17 @@ PSA_STATISTIC_LABELS = OrderedDict(
     all_recurrent_costs_undiscounted = 'Total present opex (undiscounted)',
 )
 """Labels of the statistics of a PSA, in the order that they are shown, by statistic."""
+
+PSA_PAIRWISE_STATISTIC_LABELS = OrderedDict(
+    incremental_net_monetary_value_discounted = 'Incremental net monetary value (discounted)',
+    incremental_net_monetary_value_undiscounted = 'Incremental net monetary value (undiscounted)',
+    incremental_total_costs_discounted = 'Incremental total costs (discounted)',
+    incremental_total_costs_undiscounted = 'Incremental total costs (undiscounted)',
+    incremental_total_benefits_discounted = 'Incremental total benefits (discounted)',
+    incremental_total_benefits_undiscounted = 'Incremental total benefits (undiscounted)',
+    incremental_all_capex_costs_discounted = 'Incremental capex (discounted)',
+    incremental_all_capex_costs_undiscounted = 'Incremental capex (undiscounted)',
+    incremental_all_recurrent_costs_discounted = 'Incremental opex (discounted)',
+    incremental_all_recurrent_costs_undiscounted = 'Incremental opex (undiscounted)',
+)
+"""Labels of the pairwise (comparator against reference) statistics of a whole-project PSA, in the order that they are shown, by statistic."""

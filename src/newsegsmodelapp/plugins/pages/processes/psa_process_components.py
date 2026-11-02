@@ -18,7 +18,18 @@ def psa_process_components(**kwargs):
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle('Run PSA?')),
-                dbc.ModalBody('Probabilistic Sensitivity Analyses require a large number of model runs (often > 1000) and can take minutes to hours to complete, dependent on model complexity. Are you ready to continue?'),
+                dbc.ModalBody([
+                    html.P('Probabilistic Sensitivity Analyses require a large number of model runs (often > 1000) and can take minutes to hours to complete, dependent on model complexity. Are you ready to continue?'),
+                    html.H3('Configurations to analyse:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Selected configuration', 'value': 'metamodel'},
+                            {'label': 'All configurations (for comparison, sharing each draw)', 'value': 'project'},
+                        ],
+                        'metamodel',
+                        id = 'psa-run-scope',
+                    ),
+                ]),
                 dbc.ModalFooter([
                     dbc.Button(
                         'OK',

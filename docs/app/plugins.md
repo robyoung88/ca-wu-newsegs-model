@@ -32,6 +32,7 @@ newsegsmodelapp/plugins/
 │       ├── dsa_single_mm.py
 │       ├── dsa_run_project.py             # whole-project DSA (every configuration)
 │       ├── psa_single_mm.py
+│       ├── psa_run_project.py             # whole-project PSA (every configuration, sharing each draw)
 │       ├── optim_single_mm.py
 │       └── ...
 └── models/

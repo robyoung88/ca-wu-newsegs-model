@@ -21,14 +21,14 @@ import pandas as pd
 from newsegsmodelapp import registers
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
-from newsegsmodelapp.components import callback_utils, export, navigation
+from newsegsmodelapp.components import callback_utils, export, navigation, stats
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.components.layouts import result_group_containers, results_header
 from newsegsmodelapp.types import Page
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
-from newsegsmodelframework.newsegssensitivity import psa
+from newsegsmodelframework.newsegssensitivity import common as sensitivity, psa
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 from .processes.psa_process_components import psa_process_components
@@ -143,6 +143,130 @@ def create_psa_configuration_editor():
         ),
     ])
 
+def _psa_project_option_id(purpose: str) -> dict:
+    """Id of an option of the comparator views of a whole-project PSA (the `table_psa_project` table)"""
+    return {
+        'type': 'result-table-option', 'purpose': purpose,
+        'supersection': 'psa', 'section': 'tabledraw',
+        'key': 'table_psa_project', 'subindex': 0
+    }
+
+def _options(labels: dict) -> list[dict]:
+    return [{'label': v, 'value': k} for k, v in labels.items()]
+
+def create_psa_project_options():
+    """Create the options of the comparator views of a whole-project PSA: the statistic, the plot, the comparators and the variable.
+
+    Hidden in the individual view. The options are filled from the results by `update_psa_view_options`.
+
+    Returns:
+        The options.
+    """
+    def labelled(label, component):
+        return html.Div([html.Label(label), component], className = 'mb-2')
+
+    return html.Div(
+        [
+            dbc.Row([
+                dbc.Col(labelled('Statistic:', dcc.Dropdown(
+                    options = _options(sensitivity.PSA_STATISTIC_LABELS),
+                    value = next(iter(sensitivity.PSA_STATISTIC_LABELS)),
+                    id = _psa_project_option_id('statistic'),
+                    searchable = False,
+                    clearable = False,
+                ))),
+                dbc.Col(labelled('Plot:', dcc.Dropdown(
+                    options = _options(stats.PSA_PROJECT_PLOTS['multiple']),
+                    value = next(iter(stats.PSA_PROJECT_PLOTS['multiple'])),
+                    id = _psa_project_option_id('plot'),
+                    searchable = False,
+                    clearable = False,
+                ))),
+            ]),
+            html.Div(
+                labelled('Configurations:', dcc.Dropdown(
+                    options = [], value = [], multi = True,
+                    id = _psa_project_option_id('comparators'),
+                    placeholder = 'All configurations',
+                )),
+                id = 'psa-multiple-options',
+                style = {'display': 'none'},
+            ),
+            html.Div(
+                dbc.Row([
+                    dbc.Col(labelled('Comparator:', dcc.Dropdown(
+                        options = [], id = _psa_project_option_id('comparator'), clearable = False,
+                    ))),
+                    dbc.Col(labelled('Reference:', dcc.Dropdown(
+                        options = [], id = _psa_project_option_id('reference'), clearable = False,
+                    ))),
+                ]),
+                id = 'psa-pairwise-options',
+                style = {'display': 'none'},
+            ),
+            html.Div(
+                labelled('Variable:', dcc.Dropdown(
+                    options = [], id = _psa_project_option_id('variable'), clearable = False,
+                    placeholder = 'Choose a variable drawn in the PSA',
+                )),
+                id = 'psa-variable-options',
+                style = {'display': 'none'},
+            ),
+        ],
+        id = 'psa-project-options',
+        style = {'display': 'none'},
+    )
+
+def create_psa_project_results():
+    """Create the containers of the comparator views of a whole-project PSA: a table and a plot.
+
+    Hidden in the individual view.
+
+    Returns:
+        The containers.
+    """
+    return html.Div(
+        [
+            dbc.Col(
+                [
+                    html.H2('PSA Comparison Table'),
+                    html.Div(
+                        'No whole-project PSA run',
+                        id = {
+                            'type': 'result-table', 'purpose': 'container',
+                            'supersection': 'psa', 'section': 'tabledraw',
+                            'key': 'table_psa_project', 'subindex': 0,
+                        }
+                    )
+                ],
+                width = 12
+            ),
+            html.Hr(),
+            dbc.Col(
+                [
+                    html.H2('Comparison plot'),
+                    dcc.Graph(
+                        # Using result-table dispatch to call a custom table getter
+                        id = {
+                            'type': 'result-figure', 'purpose': 'container',
+                            'supersection': 'psa', 'section': 'tabledraw',
+                            'key': 'table_psa_project', 'subindex': 1,
+                        },
+                        style = {
+                            'minHeight': '590px',
+                            'border': '1px solid #dee2e6',
+                            'borderRadius': '0.5rem',
+                            'backgroundColor': 'transparent'
+                        }
+                    ),
+                ],
+                width = 12
+            ),
+        ],
+        id = 'psa-project-results',
+        style = {'display': 'none'},
+    )
+
 @dataclass
 class PSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
     """Layout configuration of the PSA page: the input and result cards and the navigation.
@@ -191,7 +315,22 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
             [
                 dbc.Row(
                     config.layout_results_header(**kwargs)
-                )
+                ),
+                dbc.Row(
+                    dcc.RadioItems(
+                        options = [
+                            {'label': 'Individual', 'value': 'individual'},
+                            {'label': 'Multiple', 'value': 'multiple'},
+                            {'label': 'Pairwise', 'value': 'pairwise'},
+                        ],
+                        value = 'individual',
+                        inline = True,
+                        inputStyle = {'margin-right': '4px', 'margin-left': '12px'},
+                        id = _psa_project_option_id('view'),
+                    ),
+                    class_name = 'mb-2',
+                ),
+                create_psa_project_options(),
             ]
         )
     ]
@@ -269,8 +408,10 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
                             dcc.Store(id={'type': 'result-statistics', 'supersection': 'psa-results', 'key': 'res-psa-table'}, data = []),
                         ]
                     )
-                ]
+                ],
+                id = 'psa-individual-results',
             ),
+            create_psa_project_results(),
         ]),
         dbc.Button(
             'Cancel PSA',
@@ -756,24 +897,142 @@ def add_psa_run_callbacks(app: NewsegsDash):
         Output('trigger-check-requests', 'data', allow_duplicate = True),
         Input('btn-action-psa-run-metamodel', 'n_clicks'),
         State('active-project-id', 'data'),
+        State('psa-run-scope', 'value'),
         prevent_initial_call = True
     )
     def request_psa_run_metamodel(
         n_clicks,
-        active_project_id
+        active_project_id,
+        run_scope,
     ):
         click = callback_utils.get_triggered_value()
         if not click:
             raise PreventUpdate
 
         request = app.request_handler.add_request(
-            'psa_run_metamodel',
+            'psa_run_project' if run_scope == 'project' else 'psa_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
         return request.request_id
+
+    @app.callback(
+        output = dict(
+            individual_results_style = Output('psa-individual-results', 'style'),
+            project_options_style = Output('psa-project-options', 'style'),
+            project_results_style = Output('psa-project-results', 'style'),
+            multiple_options_style = Output('psa-multiple-options', 'style'),
+            pairwise_options_style = Output('psa-pairwise-options', 'style'),
+            variable_options_style = Output('psa-variable-options', 'style'),
+            statistic = dict(
+                options = Output(_psa_project_option_id('statistic'), 'options'),
+                value = Output(_psa_project_option_id('statistic'), 'value'),
+            ),
+            plot = dict(
+                options = Output(_psa_project_option_id('plot'), 'options'),
+                value = Output(_psa_project_option_id('plot'), 'value'),
+            ),
+            comparators = dict(
+                options = Output(_psa_project_option_id('comparators'), 'options'),
+                value = Output(_psa_project_option_id('comparators'), 'value'),
+            ),
+            comparator = dict(
+                options = Output(_psa_project_option_id('comparator'), 'options'),
+                value = Output(_psa_project_option_id('comparator'), 'value'),
+            ),
+            reference = dict(
+                options = Output(_psa_project_option_id('reference'), 'options'),
+                value = Output(_psa_project_option_id('reference'), 'value'),
+            ),
+            variable = dict(
+                options = Output(_psa_project_option_id('variable'), 'options'),
+                value = Output(_psa_project_option_id('variable'), 'value'),
+            ),
+        ),
+        inputs = dict(
+            view = Input(_psa_project_option_id('view'), 'value'),
+            plot_value = Input(_psa_project_option_id('plot'), 'value'),
+            table_trigger = Input({
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': 'global', 'section': 'tabledraw',
+                'key': 'table_psa_project', 'subindex': 0
+            }, 'data'),
+            active_project_id = Input('active-project-id', 'data'),
+        ),
+        state = dict(
+            statistic = State(_psa_project_option_id('statistic'), 'value'),
+            comparators = State(_psa_project_option_id('comparators'), 'value'),
+            comparator = State(_psa_project_option_id('comparator'), 'value'),
+            reference = State(_psa_project_option_id('reference'), 'value'),
+            variable = State(_psa_project_option_id('variable'), 'value'),
+        ),
+    )
+    def update_psa_view_options(
+        view,
+        plot_value,
+        table_trigger,
+        active_project_id,
+        statistic,
+        comparators,
+        comparator,
+        reference,
+        variable,
+    ):
+        """Show the options and results of the PSA view, and fill the comparator and variable options from the results of the whole-project PSA."""
+        rval = callback_utils.create_noupdate_return()
+        # Shown components keep the display of their classes
+        shown, hidden = {}, {'display': 'none'}
+        is_individual = view not in stats.PSA_PROJECT_PLOTS
+        rval['individual_results_style'] = shown if is_individual else hidden
+        rval['project_options_style'] = hidden if is_individual else shown
+        rval['project_results_style'] = hidden if is_individual else shown
+        rval['multiple_options_style'] = shown if view == 'multiple' else hidden
+        rval['pairwise_options_style'] = shown if view == 'pairwise' else hidden
+        if is_individual:
+            rval['variable_options_style'] = hidden
+            return rval
+
+        plots = stats.PSA_PROJECT_PLOTS[view]
+        rval['plot']['options'] = _options(plots)
+        if plot_value not in plots:
+            plot_value = next(iter(plots))
+            rval['plot']['value'] = plot_value
+        rval['variable_options_style'] = shown if plot_value == 'marginal' else hidden
+
+        labels = sensitivity.PSA_PAIRWISE_STATISTIC_LABELS if view == 'pairwise' else sensitivity.PSA_STATISTIC_LABELS
+        rval['statistic']['options'] = _options(labels)
+        if statistic not in labels:
+            rval['statistic']['value'] = next(iter(labels))
+
+        if active_project_id is None:
+            return rval
+
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        options, _ = app.results_provider.get_result('table_psa_project_options', lproj.table_config, True)
+        if not options:
+            for key in ('comparators', 'comparator', 'reference', 'variable'):
+                rval[key]['options'] = []
+            return rval
+
+        mm_options = options.get('metamodels', [])
+        mm_ids = [x['value'] for x in mm_options]
+        var_options = options.get('variables', [])
+        for key in ('comparators', 'comparator', 'reference'):
+            rval[key]['options'] = mm_options
+        rval['variable']['options'] = [{'label': x, 'value': x} for x in var_options]
+
+        if not comparators or any(x not in mm_ids for x in comparators):
+            rval['comparators']['value'] = [x for x in (comparators or []) if x in mm_ids] or mm_ids
+        if comparator not in mm_ids:
+            rval['comparator']['value'] = mm_ids[1] if len(mm_ids) > 1 else (mm_ids[0] if mm_ids else None)
+        if reference not in mm_ids:
+            rval['reference']['value'] = mm_ids[0] if mm_ids else None
+        if variable not in var_options:
+            rval['variable']['value'] = var_options[0] if var_options else None
+
+        return rval
 
 psa_configuration_page = Page(
     id = PAGE_TYPE,

@@ -351,6 +351,26 @@ def handle_psa_active(
     # Sync variable
     project_provider.variable_provider.upsert_variable(var)
 
+    # Sync the selection onto the independent instances of the variable in the other metamodels,
+    # so that a whole-project PSA varies the same variables in every metamodel
+    changed_mm_ids = list(staleness.metamodels_using_variable(lproj, var_uid))
+    for other_lmm in lproj.metamodels:
+        other_uid = other_lmm.variables.get(varid)
+        if not other_uid or other_uid == var_uid:
+            continue
+        other_var = project_provider.variable_provider.get_variable(other_uid)
+        if (
+            not other_var
+            or not (other_var.psa_possible and other_var.psa_selectable)
+            or other_var.psa_selected == new_val
+        ):
+            continue
+        other_var.psa_selected = new_val
+        project_provider.variable_provider.upsert_variable(other_var)
+        for mm_id in staleness.metamodels_using_variable(lproj, other_uid):
+            if mm_id not in changed_mm_ids:
+                changed_mm_ids.append(mm_id)
+
     # Don't need to invalidate metamodels, as PSA will run anyway,
     # but do need to invalidate at project level
     # TODO: Invalidate only PSA outputs
@@ -360,6 +380,6 @@ def handle_psa_active(
     
     provider.increment_revision(lproj.id)
 
-    db_staleness.mark_inputs_changed(staleness.metamodels_using_variable(lproj, var_uid), 'psa')
-    
+    db_staleness.mark_inputs_changed(changed_mm_ids, 'psa')
+
     return return_dict

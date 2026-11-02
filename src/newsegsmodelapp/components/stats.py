@@ -1424,3 +1424,348 @@ def multi_tornado_plot(
     fig.update_yaxes(autorange = 'reversed')
 
     return fig
+
+# -----------------------------------------------
+# Whole-project PSA
+#
+# The raw results are those of psa.run_psa_multiple: a row for each metamodel
+# and draw. The comparisons are made from them when they are shown.
+# -----------------------------------------------
+
+PSA_ALL_STATISTIC_LABELS = {**sensitivity.PSA_STATISTIC_LABELS, **sensitivity.PSA_PAIRWISE_STATISTIC_LABELS}
+"""Labels of the statistics of a PSA, individual and pairwise, by statistic."""
+
+PSA_SUMMARY_COLUMNS = ['Deterministic', 'Mean', 'Median', 'Std', '2_5 pctile', '97_5 pctile']
+"""Columns of the summary tables of a PSA (from `psa.basic_psa_stats`) shown in comparisons, in order."""
+
+PSA_SUMMARY_COLUMN_LABELS = {
+    'Deterministic': 'Deterministic', 'Mean': 'Mean', 'Median': 'Median', 'Std': 'Std. dev.',
+    '2_5 pctile': '2.5th percentile', '97_5 pctile': '97.5th percentile',
+}
+"""Labels of the columns of the summary tables of a PSA."""
+
+DEFAULT_BENEFIT_VALUES = np.round(np.linspace(0., 3., 61), 2)
+"""Values of one pound of benefit at which the cost-effectiveness acceptability curves are drawn by default."""
+
+PSA_PROJECT_PLOTS = {
+    'multiple': {
+        'distribution': 'Distribution',
+        'ceaf': 'Cost-effectiveness acceptability frontier',
+        'marginal': 'Marginal sensitivity to a variable',
+    },
+    'pairwise': {
+        'distribution': 'Distribution of the increment',
+        'plane': 'Cost-effectiveness plane',
+        'ceaf': 'Cost-effectiveness acceptability frontier',
+        'marginal': 'Marginal sensitivity of the increment to a variable',
+    },
+}
+"""The plots of each comparator view of a whole-project PSA, by key."""
+
+_PSA_FRONTIER_COLOR = '#3d3d3d'
+_PSA_REFERENCE_LINE_COLOR = '#8c8c8c'
+
+def _comparator_color(color_indexes: Mapping[str, int], comparator: str, default: int = 0) -> str:
+    return COMPARATOR_COLORS[color_indexes.get(comparator, default) % len(COMPARATOR_COLORS)]
+
+def _empty_psa_figure(message: str = 'No PSA results to show'):
+    return _empty_dsa_figure(message)
+
+def _psa_layout(fig, title: str, xaxis_title: str, yaxis_title: str, **kwargs):
+    fig.update_layout(
+        title = title,
+        xaxis_title = xaxis_title,
+        yaxis_title = yaxis_title,
+        template = 'plotly_white',
+        height = 560,
+        margin = dict(l = 20, r = 20, t = 80, b = 20),
+        legend = dict(orientation = 'h', yanchor = 'bottom', y = 1.0, xanchor = 'left', x = 0),
+        hovermode = 'closest',
+        **kwargs
+    )
+    return fig
+
+def psa_summary_comparison_table(
+    summaries: Mapping[str, pd.DataFrame],
+    statistic: str,
+) -> pd.DataFrame:
+    """Present one statistic of the PSAs of several comparators side by side.
+
+    Args:
+        summaries: Summary tables of the PSA (from `psa.basic_psa_stats`), indexed by statistic, by the label of the
+            comparator.
+        statistic: The statistic.
+
+    Returns:
+        Dataframe with a row for each comparator that has the statistic, and the summary columns.
+    """
+    rows = {}
+    for comparator, table in summaries.items():
+        if statistic not in table.index:
+            continue
+        rows[comparator] = table.loc[statistic, [x for x in PSA_SUMMARY_COLUMNS if x in table.columns]]
+    if not rows:
+        return pd.DataFrame(columns = ['Configuration'] + PSA_SUMMARY_COLUMNS)
+    return (
+        pd.DataFrame(rows).transpose()
+        .rename_axis('Configuration')
+        .reset_index()
+    )
+
+def psa_distribution_plot(
+    samples: Mapping[str, pd.Series],
+    statistic: str,
+    deterministic: Mapping[str, float] | None = None,
+    color_indexes: Mapping[str, int] | None = None,
+    title: str = 'Distribution by configuration',
+):
+    """Plot the cumulative distributions of a statistic of the PSAs of several comparators.
+
+    Each comparator has its empirical cumulative distribution, with a marker at its deterministic value.
+
+    Args:
+        samples: The sampled values of the statistic, by the label of the comparator.
+        statistic: The statistic, for the label of the axis.
+        deterministic: The deterministic value of the statistic, by the label of the comparator.
+        color_indexes: Index of the color of each comparator in `COMPARATOR_COLORS`; by default the order of `samples`.
+        title: Title of the plot.
+
+    Returns:
+        The figure.
+    """
+    samples = {k: pd.to_numeric(v, errors = 'coerce').dropna() for k, v in samples.items()}
+    samples = {k: v for k, v in samples.items() if len(v)}
+    if not samples:
+        return _empty_psa_figure()
+    deterministic = deterministic or {}
+    color_indexes = color_indexes or {k: i for i, k in enumerate(samples)}
+    label = PSA_ALL_STATISTIC_LABELS.get(statistic, statistic)
+
+    fig = go.Figure()
+    for i, (comparator, values) in enumerate(samples.items()):
+        color = _comparator_color(color_indexes, comparator, i)
+        x = np.sort(values.to_numpy(dtype = float))
+        y = np.arange(1, len(x) + 1) / len(x)
+        fig.add_trace(go.Scatter(
+            x = x, y = y, mode = 'lines', line = dict(color = color, width = 2, shape = 'hv'),
+            name = comparator, legendgroup = comparator,
+            hovertemplate = f'<b>{comparator}</b><br>{label}: %{{x:,.0f}}<br>Cumulative probability: %{{y:.1%}}<extra></extra>',
+        ))
+        det = deterministic.get(comparator)
+        if det is not None and pd.notna(det):
+            fig.add_trace(go.Scatter(
+                x = [det], y = [float(np.mean(x <= det))], mode = 'markers',
+                marker = dict(color = color, size = 10, symbol = 'diamond', line = dict(color = 'white', width = 2)),
+                name = f'{comparator} - deterministic', legendgroup = comparator, showlegend = False,
+                hovertemplate = f'<b>{comparator}</b><br>Deterministic {label}: %{{x:,.0f}}<extra></extra>',
+            ))
+
+    _psa_layout(fig, title, label, 'Cumulative probability')
+    fig.update_yaxes(range = [0, 1.02], tickformat = '.0%')
+    return fig
+
+def psa_ceaf_plot(
+    ceac: pd.DataFrame,
+    labels: Mapping[str, str] | None = None,
+    color_indexes: Mapping[str, int] | None = None,
+    title: str = 'Cost-effectiveness acceptability curves and frontier',
+):
+    """Plot the cost-effectiveness acceptability curves of several comparators, and the frontier.
+
+    Each comparator has its curve: the probability that it has the greatest net benefit, by the value of benefits.
+    The frontier follows the curve of the comparator with the greatest expected net benefit at each value, which
+    is the one to choose. A reference line marks a value of 1, at which the net benefit is the net present value.
+
+    Args:
+        ceac: The curves and frontier, from `psa.psa_ceac`.
+        labels: The label of each comparator, by id.
+        color_indexes: Index of the color of each comparator in `COMPARATOR_COLORS`, by id; by default the order of
+            the columns.
+        title: Title of the plot.
+
+    Returns:
+        The figure.
+    """
+    comparators = [x for x in ceac.columns if x not in ('frontier', 'frontier_probability')]
+    if ceac.empty or not comparators:
+        return _empty_psa_figure()
+    labels = labels or {}
+    color_indexes = color_indexes or {k: i for i, k in enumerate(comparators)}
+    x = ceac.index.to_numpy(dtype = float)
+
+    fig = go.Figure()
+    for i, comparator in enumerate(comparators):
+        name = labels.get(comparator, comparator)
+        fig.add_trace(go.Scatter(
+            x = x, y = ceac[comparator].to_numpy(dtype = float), mode = 'lines',
+            line = dict(color = _comparator_color(color_indexes, comparator, i), width = 2),
+            name = name,
+            hovertemplate = f'<b>{name}</b><br>Value of £1 of benefit: £%{{x:.2f}}<br>Probability cost-effective: %{{y:.1%}}<extra></extra>',
+        ))
+
+    frontier_names = [labels.get(x, x) for x in ceac['frontier']]
+    fig.add_trace(go.Scatter(
+        x = x, y = ceac['frontier_probability'].to_numpy(dtype = float), mode = 'lines',
+        line = dict(color = _PSA_FRONTIER_COLOR, width = 6),
+        opacity = 0.35,
+        name = 'Frontier (greatest expected net benefit)',
+        customdata = frontier_names,
+        hovertemplate = '<b>Frontier: %{customdata}</b><br>Value of £1 of benefit: £%{x:.2f}<br>Probability cost-effective: %{y:.1%}<extra></extra>',
+    ))
+    # The comparator on the frontier changes where the expected net benefits cross
+    changes = [i for i in range(1, len(x)) if ceac['frontier'].iloc[i] != ceac['frontier'].iloc[i - 1]]
+    for i in changes:
+        fig.add_annotation(
+            x = x[i], y = float(ceac['frontier_probability'].iloc[i]),
+            text = f'→ {frontier_names[i]}', showarrow = True, arrowhead = 0, ax = 0, ay = -30,
+            font = dict(size = 11),
+        )
+
+    if x.min() <= 1. <= x.max():
+        fig.add_vline(
+            x = 1., line = dict(color = _PSA_REFERENCE_LINE_COLOR, width = 1, dash = 'dot'),
+            annotation_text = 'NPV (£1 per £1)', annotation_position = 'bottom right',
+        )
+
+    _psa_layout(fig, title, 'Value of £1 of benefit (£)', 'Probability cost-effective')
+    fig.update_yaxes(range = [0, 1.02], tickformat = '.0%')
+    return fig
+
+def psa_ce_plane_plot(
+    pairwise: pd.DataFrame,
+    discount: str = 'discounted',
+    comparator: str = 'Comparator',
+    reference: str = 'Reference',
+    color_index: int = 0,
+):
+    """Plot the cost-effectiveness plane of a pairwise comparison of a whole-project PSA.
+
+    Each draw is a point of its incremental benefits and costs. Below the line of equal increments the comparator
+    has the greater net present value; the proportion of draws below it is shown.
+
+    Args:
+        pairwise: The pairwise comparison, from `psa.psa_pairwise`.
+        discount: Whether to plot the `discounted` or `undiscounted` increments.
+        comparator: Label of the comparator.
+        reference: Label of the reference.
+        color_index: Index of the color of the comparator in `COMPARATOR_COLORS`.
+
+    Returns:
+        The figure.
+    """
+    cost, benefit = f'incremental_total_costs_{discount}', f'incremental_total_benefits_{discount}'
+    if pairwise.empty or cost not in pairwise.columns:
+        return _empty_psa_figure()
+    sampled = pairwise.loc[~pairwise['deterministic'].astype(bool), :]
+    if sampled.empty:
+        return _empty_psa_figure()
+    det = pairwise.loc[pairwise['deterministic'].astype(bool), :]
+    color = COMPARATOR_COLORS[color_index % len(COMPARATOR_COLORS)]
+    x = sampled[benefit].to_numpy(dtype = float)
+    y = sampled[cost].to_numpy(dtype = float)
+    p_ce = float(np.mean(x - y > 0))
+
+    fig = go.Figure()
+    if not det.empty:
+        # Drawn first and open, so that draws close to it remain visible
+        fig.add_trace(go.Scatter(
+            x = det[benefit], y = det[cost], mode = 'markers',
+            marker = dict(color = _PSA_FRONTIER_COLOR, size = 14, symbol = 'diamond-open', line = dict(width = 2)),
+            name = 'Deterministic',
+            hovertemplate = 'Deterministic<br>Incremental benefits: %{x:,.0f}<br>Incremental costs: %{y:,.0f}<extra></extra>',
+        ))
+    fig.add_trace(go.Scatter(
+        x = x, y = y, mode = 'markers',
+        marker = dict(color = color, size = 8, opacity = 0.5, line = dict(color = 'white', width = 1)),
+        name = 'Draws',
+        customdata = sampled['draw'],
+        hovertemplate = 'Draw %{customdata}<br>Incremental benefits: %{x:,.0f}<br>Incremental costs: %{y:,.0f}<extra></extra>',
+    ))
+    lo = float(np.nanmin(np.concatenate([x, y, [0.]])))
+    hi = float(np.nanmax(np.concatenate([x, y, [0.]])))
+    fig.add_trace(go.Scatter(
+        x = [lo, hi], y = [lo, hi], mode = 'lines',
+        line = dict(color = _PSA_REFERENCE_LINE_COLOR, width = 1, dash = 'dot'),
+        name = 'Equal increments', hoverinfo = 'skip',
+    ))
+    fig.add_hline(y = 0, line = dict(color = _PSA_REFERENCE_LINE_COLOR, width = 1))
+    fig.add_vline(x = 0, line = dict(color = _PSA_REFERENCE_LINE_COLOR, width = 1))
+    fig.add_annotation(
+        text = f'Probability {comparator} has the greater NPV: {p_ce:.1%}',
+        xref = 'paper', yref = 'paper', x = 0.01, y = 0.99, xanchor = 'left', yanchor = 'top',
+        showarrow = False, bgcolor = 'rgba(255, 255, 255, 0.8)',
+    )
+    _psa_layout(
+        fig, f'Cost-effectiveness plane: {comparator} vs {reference} ({discount})',
+        f'Incremental total benefits ({discount})', f'Incremental total costs ({discount})',
+    )
+    return fig
+
+def _format_marginal_value(value: float, fmt: str) -> str:
+    return '-' if value is None or not np.isfinite(value) else format(value, fmt)
+
+def psa_marginal_summary(marginal) -> str:
+    """The summary statistics of a marginal sensitivity (from `psa.psa_marginal`), as text."""
+    return (
+        f'ρ = {_format_marginal_value(marginal.spearman, ".2f")}, '
+        f'slope = {_format_marginal_value(marginal.slope, ",.3g")} per unit, '
+        f'R² = {_format_marginal_value(marginal.r_squared, ".2f")}'
+    )
+
+def psa_marginal_plot(
+    marginals: Mapping[str, object],
+    variable: str,
+    statistic: str,
+    color_indexes: Mapping[str, int] | None = None,
+    title: str | None = None,
+):
+    """Plot the marginal (univariate) sensitivity of a statistic of a PSA to the draws of a variable.
+
+    For each comparator, the draws as points, the mean of the statistic by quantile group of the variable as a
+    line, with a band of the 5th to 95th percentiles of each group. The Spearman rank correlation, the slope of the
+    least-squares line and its R² label the comparator in the legend.
+
+    Args:
+        marginals: The marginal sensitivity (from `psa.psa_marginal`), by the label of the comparator.
+        variable: Label of the variable.
+        statistic: The statistic, for the label of the axis.
+        color_indexes: Index of the color of each comparator in `COMPARATOR_COLORS`; by default the order of `marginals`.
+        title: Title of the plot; by default from the variable and statistic.
+
+    Returns:
+        The figure.
+    """
+    marginals = {k: v for k, v in marginals.items() if len(v.points)}
+    if not marginals:
+        return _empty_psa_figure(f'No draws of {variable} in these PSA results')
+    color_indexes = color_indexes or {k: i for i, k in enumerate(marginals)}
+    label = PSA_ALL_STATISTIC_LABELS.get(statistic, statistic)
+
+    fig = go.Figure()
+    for i, (comparator, m) in enumerate(marginals.items()):
+        color = _comparator_color(color_indexes, comparator, i)
+        fig.add_trace(go.Scatter(
+            x = m.points['x'], y = m.points['y'], mode = 'markers',
+            marker = dict(color = color, size = 6, opacity = 0.35),
+            name = f'{comparator} - draws', legendgroup = comparator, showlegend = False,
+            hovertemplate = f'<b>{comparator}</b><br>{variable}: %{{x:,.3g}}<br>{label}: %{{y:,.0f}}<extra></extra>',
+        ))
+        binned = m.binned
+        if len(binned) > 1:
+            fig.add_trace(go.Scatter(
+                x = np.concatenate([binned['x'], binned['x'][::-1]]),
+                y = np.concatenate([binned['y_upper'], binned['y_lower'][::-1]]),
+                fill = 'toself', fillcolor = color, opacity = 0.12, line = dict(width = 0),
+                name = f'{comparator} - 5th to 95th percentile', legendgroup = comparator, showlegend = False,
+                hoverinfo = 'skip',
+            ))
+        fig.add_trace(go.Scatter(
+            x = binned['x'], y = binned['y'], mode = 'lines+markers',
+            line = dict(color = color, width = 2), marker = dict(color = color, size = 8),
+            name = f'{comparator} ({psa_marginal_summary(m)})', legendgroup = comparator,
+            customdata = binned['count'],
+            hovertemplate = f'<b>{comparator}</b><br>Mean {variable}: %{{x:,.3g}}<br>Mean {label}: %{{y:,.0f}}<br>Draws: %{{customdata}}<extra></extra>',
+        ))
+
+    _psa_layout(fig, title or f'Marginal sensitivity of {label} to {variable}', variable, label)
+    return fig
