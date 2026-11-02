@@ -20,7 +20,7 @@ from newsegsmodelapp.components.stats import tornado_plot
 from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request, register_table_getter
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegssensitivity import common as sensitivity, dsa, optim
+from newsegsmodelframework.newsegssensitivity import common as sensitivity, dsa, optim, psa
 
 from ..postprocess.methods import post_dsa_results
 from . import result_tables_sprake
@@ -988,11 +988,11 @@ def _make_psa_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    
+
     provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
     logger.debug('Getting lightweight project - Creating Table [%s]', 'table_psa_metamodel')
     lproj = provider.get_lightweight_project(request.project_id)
-            
+
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
@@ -1007,9 +1007,43 @@ def _make_psa_tables_sprake(
         return 'missing'
     any_stale = mm.table_config.revision != rev
 
-    psa_statistics = list(sensitivity.PSA_STATISTIC_LABELS.keys())
+    npv_data, rev_ppv = result_provider.get_result(
+        'postproc_psa_single_metamodel_prob_positive_npv',
+        mm.table_config, allow_stale = False
+    )
+    if npv_data is None:
+        return 'missing'
 
-    table_name = 'table_psa_metamodel'
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
+    _draw_psa_metamodel_table(raw_table, npv_data, table_component, any_stale, request, result_provider)
+
+    return 'ok'
+
+_PSA_VALUE_FORMATTER = {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "}
+_PSA_LABEL_FORMATTER = {"function":  "params.value ? params.value : '-' "}
+_PSA_PROBABILITY_FORMATTER = {"function":  "params.value != null ? d3.format('.1%')(params.value) : '-' "}
+
+def _psa_grid(otable, label_columns = ('Statistic', 'Configuration'), probability_columns = ()):
+    """AG grid of a table of PSA statistics, labelled by its first column"""
+    columnDefs = [
+        {
+            'field': i,
+            "valueFormatter": (
+                _PSA_LABEL_FORMATTER if i in label_columns
+                else _PSA_PROBABILITY_FORMATTER if i in probability_columns
+                else _PSA_VALUE_FORMATTER
+            )
+        }
+        for i in otable.columns
+    ]
+    return dag.AgGrid(
+        rowData = otable.to_dict('records'),
+        columnDefs = columnDefs
+    )
+
+def _draw_psa_metamodel_table(raw_table, npv_data, table_component, stale, request, result_provider):
+    """Store the summary table of the PSA of a metamodel, with its probabilities of a positive NPV, as `table_psa_metamodel`"""
     otable = (
         raw_table
         .rename(sensitivity.PSA_STATISTIC_LABELS)
@@ -1017,34 +1051,7 @@ def _make_psa_tables_sprake(
         .rename(columns={'index':'Statistic'})
     )
 
-    rval = []
-        
-    formatters = {
-        'Statistic': {"function":  "params.value ? params.value : '-' "},
-    }
-    columnDefs = [
-        {
-            'field': i,
-            "valueFormatter": formatters.get(i, {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "})
-        }
-        for i in otable.columns
-    ]
-
-    tbl1 = dag.AgGrid(
-        rowData = otable.to_dict('records'),
-        columnDefs = columnDefs
-    )
-
-    rval.append(
-        tbl1   
-    )
-
-    npv_data, rev_ppv = result_provider.get_result(
-        'postproc_psa_single_metamodel_prob_positive_npv',
-        mm.table_config, allow_stale = False
-    )
-    if npv_data is None:
-        return 'missing'
+    rval = [_psa_grid(otable)]
 
     pnpv = [
         html.H2('Probability of positive NPV:'),
@@ -1057,12 +1064,7 @@ def _make_psa_tables_sprake(
     ]
     rval.extend(pnpv)
 
-    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
-    table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
-
-    result_provider.upsert_result('table_psa_metamodel', table_component, html.Div(rval), mark_stale = any_stale, request=request)
-    
-    return 'ok'
+    result_provider.upsert_result('table_psa_metamodel', table_component, html.Div(rval), mark_stale = stale, request=request)
 
 @register_table_getter(TABLE_SECTION, MODEL_TYPE)
 def _get_psa_metamodel_table(
@@ -1081,10 +1083,223 @@ def _get_psa_metamodel_table(
         case 1:
             return None, None
         case _:
-            
+
             table_name = 'table_psa_metamodel'
 
             return result_provider.get_result(
                 table_name, lmm.table_config, True
             )
-        
+
+TABLE_SECTION = 'table_psa_project'
+_request_table_draw_psa_project = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
+
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_psa_project'])
+def _make_psa_project_tables(
+    request: TableDrawRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    """Draw the tables of a whole-project PSA.
+
+    Draws the summary table of each metamodel for its individual view, and stores the options of the comparator
+    views (the metamodels and the variables drawn) as `table_psa_project_options`. The comparisons are drawn by
+    the table getter, as they depend on the options chosen.
+    """
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', TABLE_SECTION)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    raw_table, rev = result_provider.get_result('postproc_psa_project_data', lproj.table_config, True)
+    if raw_table is None:
+        return 'missing'
+    npv_data, _ = result_provider.get_result('postproc_psa_project_prob_positive_npv', lproj.table_config, True)
+    if npv_data is None:
+        return 'missing'
+    stale = lproj.table_config.revision != rev
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    metamodel_ids = list(raw_table.index.get_level_values('metamodel').unique())
+    for lmm in lproj.metamodels:
+        if lmm.id not in metamodel_ids:
+            continue
+        table_component = component_provider.get_lightweight_dataholding_component(lmm.table_config.id)
+        _draw_psa_metamodel_table(
+            raw_table.xs(lmm.id, level = 'metamodel'), npv_data.xs(lmm.id, level = 'metamodel'),
+            table_component, stale, request, result_provider
+        )
+
+    variables = []
+    psa_results, _ = result_provider.get_result('psa_project', lproj.table_config, True)
+    if psa_results is not None:
+        variables = psa.psa_variable_columns(psa_results)
+
+    labels = _dsa_project_labels(lproj)
+    options = {
+        'metamodels': [{'value': x, 'label': labels.get(x, x)} for x in metamodel_ids],
+        'variables': variables,
+    }
+    result_provider.upsert_result(
+        'table_psa_project_options',
+        component_provider.get_lightweight_dataholding_component(lproj.table_config.id),
+        options,
+        mark_stale = stale,
+        request = request
+    )
+
+    return 'ok'
+
+def _psa_discount(statistic: str) -> str:
+    return 'undiscounted' if statistic.endswith('undiscounted') else 'discounted'
+
+def _psa_ceaf(psa_results, metamodel_ids, labels, available, statistic):
+    """The cost-effectiveness acceptability frontier plot of the metamodels, discounted as the statistic"""
+    discount = _psa_discount(statistic)
+    ceac = psa.psa_ceac(
+        psa_results, metamodel_ids, stats.DEFAULT_BENEFIT_VALUES,
+        cost_statistic = f'total_present_costs_{discount}',
+        benefit_statistic = f'total_present_benefits_{discount}',
+    )
+    return stats.psa_ceaf_plot(
+        ceac,
+        labels = {x: labels.get(x, x) for x in metamodel_ids},
+        color_indexes = {x: available.index(x) for x in metamodel_ids},
+        title = f'Cost-effectiveness acceptability curves and frontier ({discount})',
+    )
+
+@register_table_getter(TABLE_SECTION, MODEL_TYPE)
+def _get_psa_project_table(
+    active_project_id: str,
+    table_options: dict,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface
+):
+    """Get the table (subindex 0) or plot (subindex 1) of a comparator view of a whole-project PSA.
+
+    The options are the view (`multiple` or `pairwise`), the statistic, the plot (see `stats.PSA_PROJECT_PLOTS`), the
+    comparators of the multiple view, the comparator and reference of the pairwise view, and the variable of the
+    marginal sensitivity plot.
+    """
+    view = table_options.get('view')
+    if view not in stats.PSA_PROJECT_PLOTS:
+        return None, None
+    subindex = int(table_options.get('subindex', 0))
+    stat = table_options.get('statistic')
+    plot = table_options.get('plot')
+    if plot not in stats.PSA_PROJECT_PLOTS[view]:
+        plot = next(iter(stats.PSA_PROJECT_PLOTS[view]))
+    variable = table_options.get('variable')
+
+    lproj = project_provider.get_lightweight_project(active_project_id)
+    logger.debug('Getting lightweight project - Table Getter [%s]', TABLE_SECTION)
+    labels = _dsa_project_labels(lproj)
+
+    psa_results, rev = result_provider.get_result('psa_project', lproj.table_config, True)
+    if psa_results is None:
+        return None, None
+    available = list(psa_results['metamodel'].unique())
+
+    if view == 'multiple':
+        if stat not in sensitivity.PSA_STATISTIC_LABELS:
+            stat = next(iter(sensitivity.PSA_STATISTIC_LABELS))
+        comparators = [x for x in _as_list(table_options.get('comparators')) if x in available] or available
+        color_indexes = {labels.get(x, x): available.index(x) for x in comparators}
+
+        if subindex == 0:
+            summaries, _ = result_provider.get_result('postproc_psa_project_data', lproj.table_config, True)
+            if summaries is None:
+                return None, None
+            otable = stats.psa_summary_comparison_table(
+                {labels.get(x, x): summaries.xs(x, level = 'metamodel') for x in comparators
+                 if x in summaries.index.get_level_values('metamodel')},
+                stat,
+            )
+            if otable.empty:
+                return html.Div('No results for the chosen configurations and statistic'), rev
+            return _psa_grid(otable.rename(columns = stats.PSA_SUMMARY_COLUMN_LABELS)), rev
+
+        if stat not in psa_results.columns:
+            return stats._empty_psa_figure('The statistic is not in these PSA results - re-run the PSA'), rev
+        match plot:
+            case 'ceaf':
+                if len(comparators) < 2:
+                    return stats._empty_psa_figure('Choose at least two configurations to compare'), rev
+                return _psa_ceaf(psa_results, comparators, labels, available, stat), rev
+            case 'marginal':
+                if variable not in psa_results.columns:
+                    return stats._empty_psa_figure('Choose a variable drawn in the PSA'), rev
+                # A configuration which does not vary the variable has no draws of it, and is left out of the plot
+                marginals = {
+                    labels.get(x, x): psa.psa_marginal(psa_results.loc[psa_results['metamodel'] == x, :], variable, stat)
+                    for x in comparators
+                }
+                return stats.psa_marginal_plot(marginals, variable, stat, color_indexes = color_indexes), rev
+            case _:
+                frames = {x: psa_results.loc[psa_results['metamodel'] == x, :] for x in comparators}
+                return stats.psa_distribution_plot(
+                    {labels.get(x, x): df.loc[~df['deterministic'].astype(bool), stat] for x, df in frames.items()},
+                    stat,
+                    deterministic = {
+                        labels.get(x, x): df.loc[df['deterministic'].astype(bool), stat].iloc[0]
+                        for x, df in frames.items() if df['deterministic'].any()
+                    },
+                    color_indexes = color_indexes,
+                ), rev
+
+    # Pairwise
+    if stat not in sensitivity.PSA_PAIRWISE_STATISTIC_LABELS:
+        stat = next(iter(sensitivity.PSA_PAIRWISE_STATISTIC_LABELS))
+    comparator = table_options.get('comparator')
+    reference = table_options.get('reference')
+    if not comparator or not reference:
+        return html.Div('Choose a comparator and a reference configuration'), None
+    try:
+        pairwise = psa.psa_pairwise(psa_results, comparator, reference)
+    except KeyError:
+        return html.Div('No PSA results for the chosen configurations'), rev
+    comparator_label = labels.get(comparator, comparator)
+    reference_label = labels.get(reference, reference)
+    versus = f'{comparator_label} vs {reference_label}'
+
+    if subindex == 0:
+        statistics = list(sensitivity.PSA_PAIRWISE_STATISTIC_LABELS)
+        summary, _ = psa.basic_psa_stats(pairwise, statistics, npv_statistics = [])
+        # The probability that the comparator increases each statistic
+        sampled = pairwise.loc[~pairwise['deterministic'].astype(bool), statistics]
+        summary['P(increase)'] = sampled.gt(0).mean(axis = 0).where(sampled.notna().any(axis = 0))
+        otable = (
+            summary.loc[:, [x for x in stats.PSA_SUMMARY_COLUMNS if x in summary.columns] + ['P(increase)']]
+            .dropna(how = 'all', subset = ['Mean'])
+            .rename(columns = stats.PSA_SUMMARY_COLUMN_LABELS)
+            .rename(sensitivity.PSA_PAIRWISE_STATISTIC_LABELS)
+            .rename_axis('Statistic')
+            .reset_index()
+        )
+        return html.Div([html.H3(versus), _psa_grid(otable, probability_columns = ('P(increase)',))]), rev
+
+    color_index = available.index(comparator)
+    match plot:
+        case 'plane':
+            return stats.psa_ce_plane_plot(
+                pairwise, _psa_discount(stat), comparator_label, reference_label, color_index
+            ), rev
+        case 'ceaf':
+            return _psa_ceaf(psa_results, [reference, comparator], labels, available, stat), rev
+        case 'marginal':
+            if variable not in pairwise.columns:
+                return stats._empty_psa_figure('Choose a variable drawn in the PSA'), rev
+            return stats.psa_marginal_plot(
+                {versus: psa.psa_marginal(pairwise, variable, stat)}, variable, stat,
+                color_indexes = {versus: color_index},
+            ), rev
+        case _:
+            det = pairwise.loc[pairwise['deterministic'].astype(bool), stat]
+            return stats.psa_distribution_plot(
+                {versus: pairwise.loc[~pairwise['deterministic'].astype(bool), stat]},
+                stat,
+                deterministic = {versus: det.iloc[0]} if len(det) else None,
+                color_indexes = {versus: color_index},
+                title = f'Distribution of the increment: {versus}',
+            ), rev

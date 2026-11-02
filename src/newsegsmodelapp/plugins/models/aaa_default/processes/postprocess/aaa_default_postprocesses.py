@@ -14,7 +14,7 @@ from newsegsmodelapp.registers import PostprocessRequest, RunRequest, register_p
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegssensitivity import dsa
+from newsegsmodelframework.newsegssensitivity import dsa, psa
 
 from .methods import post_dsa_results
 from .methods import post_psa_results
@@ -688,6 +688,67 @@ def _psa_to_interface(
     result_provider.upsert_result(
         'postproc_psa_single_metamodel_prob_positive_npv', data_table,
         ppv, mark_stale = any_stale, request = request
+    )
+
+    return 'ok'
+
+POSTPROCESS_TYPE = 'postproc_psa_project'
+_request_postprocess_psa_project = register_postprocess_request(POSTPROCESS_TYPE)(_postprocess_request_factory(POSTPROCESS_TYPE))
+
+@register_postprocess_procedure(POSTPROCESS_TYPE, MODEL_TYPE, ['psa_run_project'])
+def _psa_project_to_interface(
+    request: PostprocessRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    """Convert the results of a whole-project PSA into the summary tables of each metamodel.
+
+    Stores, on the project table configuration, the summary tables of every metamodel (indexed by 'metamodel' and
+    statistic) and their probabilities of a positive net present value; and, on the table configuration of each
+    metamodel, its own, as after a PSA of that metamodel alone. Comparisons are made when they are shown.
+    """
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    if result_provider.result_exists(
+        'postproc_psa_project_data', request.trigger_request_id,
+        lproj.table_config.id, revision = lproj.table_config.revision
+    ) is not False:
+        return 'ok'
+
+    psa_results, rev = result_provider.get_result('psa_project', lproj.table_config, True)
+    if psa_results is None:
+        return 'missing'
+    any_stale = rev != lproj.table_config.revision
+
+    res_tables, ppv_tables = {}, {}
+    for lmm in lproj.metamodels:
+        try:
+            single = psa.psa_multiple_for_metamodel(psa_results, lmm.id)
+        except KeyError:
+            # Metamodel added since the PSA was run
+            continue
+        res_table, ppv = post_psa_results.psa_results_to_tables(single)
+        res_tables[lmm.id], ppv_tables[lmm.id] = res_table, ppv
+
+        mm_data_table = provider._component_provider.get_lightweight_dataholding_component(lmm.table_config.id)
+        result_provider.upsert_result('postproc_psa_single_metamodel_data', mm_data_table, res_table, mark_stale = any_stale, request = request)
+        result_provider.upsert_result('postproc_psa_single_metamodel_prob_positive_npv', mm_data_table, ppv, mark_stale = any_stale, request = request)
+
+    if not res_tables:
+        return 'missing'
+
+    data_table = provider._component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
+    result_provider.upsert_result(
+        'postproc_psa_project_data', data_table,
+        pd.concat(res_tables, names = ['metamodel']), mark_stale = any_stale, request = request
+    )
+    result_provider.upsert_result(
+        'postproc_psa_project_prob_positive_npv', data_table,
+        pd.concat(ppv_tables, names = ['metamodel']), mark_stale = any_stale, request = request
     )
 
     return 'ok'

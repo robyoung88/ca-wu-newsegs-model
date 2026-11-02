@@ -378,6 +378,485 @@ def basic_psa_stats(
 
     return all_res, prob_positive_npv
 
+##### Whole-project PSA #####
+
+PSA_PAIRWISE_STATISTIC = Literal[
+    'incremental_net_monetary_value_discounted',
+    'incremental_net_monetary_value_undiscounted',
+    'incremental_total_costs_discounted',
+    'incremental_total_costs_undiscounted',
+    'incremental_total_benefits_discounted',
+    'incremental_total_benefits_undiscounted',
+    'incremental_all_capex_costs_discounted',
+    'incremental_all_capex_costs_undiscounted',
+    'incremental_all_recurrent_costs_discounted',
+    'incremental_all_recurrent_costs_undiscounted',
+]
+"""Statistics comparing two metamodels (a comparator against a reference), draw by draw, in a whole-project PSA."""
+
+PSA_MULTIPLE_INDEX_COLUMNS = ['metamodel', 'draw', 'deterministic']
+"""The columns of the results of `run_psa_multiple` which precede the statistics."""
+
+_NON_VARIABLE_COLUMNS = set(PSA_MULTIPLE_INDEX_COLUMNS) | set(get_args(PSA_FLOAT_STATISTIC)) | set(get_args(PSA_PAIRWISE_STATISTIC))
+
+def psa_variable_columns(results: pd.DataFrame) -> list[str]:
+    """The columns of PSA results which hold the values drawn for the variables (labelled by variable).
+
+    Args:
+        results: Results of `run_psa`, `run_psa_multiple`, `psa_multiple_for_metamodel` or `psa_pairwise`.
+
+    Returns:
+        The columns, in order.
+    """
+    return [x for x in results.columns if x not in _NON_VARIABLE_COLUMNS]
+
+def _psa_variable_is_candidate(var) -> bool:
+    return bool(var.psa_possible and var.psa_selectable)
+
+def _psa_variable_is_varied(var) -> bool:
+    return _psa_variable_is_candidate(var) and bool(var.psa_selected)
+
+def synchronise_psa_selection(metamodels: Sequence[NewsegsMetaModel]) -> list[str]:
+    """Make the PSA selection of variables common to several metamodels consistent.
+
+    A variable (identified by its varid) which is selected for PSA in any of the metamodels is selected in all of
+    the metamodels that have it; otherwise it is deselected in all. Only variables which are PSA-possible and
+    selectable are changed. Independent instances with the same varid keep their own distributions.
+
+    Args:
+        metamodels: The metamodels.
+
+    Returns:
+        The varids of the selected variables, in the order in which they first appear in the metamodels.
+    """
+    order: dict[str, None] = {}
+    selected: set[str] = set()
+    for mm in metamodels:
+        for varid, var in mm.variables.items():
+            order.setdefault(varid, None)
+            if _psa_variable_is_varied(var):
+                selected.add(varid)
+
+    for mm in metamodels:
+        for varid, var in mm.variables.items():
+            if not _psa_variable_is_candidate(var):
+                continue
+            is_selected = varid in selected
+            if var.psa_selected != is_selected:
+                var.psa_selected = is_selected
+
+    return [x for x in order if x in selected]
+
+def run_psa_multiple(
+    metamodels: Sequence[NewsegsMetaModel],
+    statistics: Sequence[PSA_FLOAT_STATISTIC] = get_args(PSA_FLOAT_STATISTIC),
+    samples: int = 100,
+    seed: int | None = None,
+    rng: np.random.Generator | None = None,
+    progress: Callable[[int, int], None] | None = None,
+    cancel_status: Callable[[], bool] | None = None,
+    include_deterministic: bool = True,
+    precomputed_deterministic: bool = False,
+    synchronise: bool = True,
+) -> pd.DataFrame:
+    """Run a probabilistic sensitivity analysis across several metamodels (a whole-project PSA).
+
+    In each sample every metamodel is run with the same draw of each variable, so that the metamodels can be
+    compared draw by draw. A variable shared by metamodels is a single instance, drawn once. Independent instances
+    with the same varid are drawn with common random numbers - each from a generator seeded identically for the
+    varid and draw - so that instances with the same distribution take the same value, and instances whose
+    distributions differ only in their parameters take correspondingly correlated values. Different variables are
+    drawn independently.
+
+    A metamodel which does not have a variable, or for which it cannot be varied, keeps the variable at its
+    deterministic value.
+
+    Args:
+        metamodels: The metamodels.
+        statistics: The statistics to calculate for each run.
+        samples: The number of samples to draw.
+        seed: Seed of the random number generator, if none is provided.
+        rng: Random number generator; used in preference to the seed.
+        progress: Function reporting progress, called with the number of runs completed and the total.
+        cancel_status: Function returning whether cancellation has been requested; checked before each sample.
+        include_deterministic: Whether to include the deterministic run of each metamodel (draw 0).
+        precomputed_deterministic: Whether the metamodels already hold valid results of their deterministic runs,
+            so that they need not be repeated.
+        synchronise: Whether to make the PSA selection of common variables consistent first (see
+            `synchronise_psa_selection`).
+
+    Returns:
+        Dataframe with a row for each metamodel for each run, and columns `metamodel` (id), `draw` (0 for the
+        deterministic run), `deterministic`, the statistics, and the value of each variable selected for PSA
+        (labelled by the variable; empty for a metamodel which does not vary it).
+
+    Raises:
+        InterruptedError: if cancellation is requested.
+    """
+    metamodels = list(metamodels)
+    if cancel_status is None:
+        cancel_status = lambda: False
+
+    if synchronise:
+        varids = synchronise_psa_selection(metamodels)
+    else:
+        order: dict[str, None] = {}
+        for mm in metamodels:
+            for varid, var in mm.variables.items():
+                if _psa_variable_is_varied(var):
+                    order.setdefault(varid, None)
+        varids = list(order)
+
+    n_calcs = len(metamodels) * (samples + (1 if include_deterministic else 0))
+    prog_i = 0
+    def _report():
+        if progress is not None:
+            progress(prog_i, n_calcs)
+    _report()
+
+    if cancel_status():
+        raise InterruptedError('PSA job cancelled')
+
+    def _result(mm, draw: int, deterministic: bool) -> dict[str, Any]:
+        res = make_psa_result(mm, mm.model, mm.finance, statistics, return_draws = True)
+        return {'metamodel': mm.id, 'draw': draw, 'deterministic': deterministic, **res}
+
+    results = []
+    # Shared variables are a single instance; flag each instance once
+    all_variables = list({id(v): v for mm in metamodels for v in mm.variables.values()}.values())
+
+    if include_deterministic:
+        for mm in metamodels:
+            if not precomputed_deterministic:
+                for v in mm.variables.values():
+                    v.psa_active = False
+                    v.update_model(mm.model)
+                    v.update_model(mm.finance)
+                mm.model.run()
+                mm.finance.run()
+            results.append(_result(mm, 0, True))
+            prog_i += 1
+            _report()
+
+    if samples > 0:
+        if rng is None:
+            rng = np.random.default_rng(seed)
+        elif seed is not None:
+            warnings.warn('Both a seed and a random generator are provided - existing generator will be used without reseeding')
+
+        varied_variables = [v for v in all_variables if _psa_variable_is_varied(v)]
+        for v in varied_variables:
+            v.psa_active = True
+
+        try:
+            for i in range(samples):
+                if cancel_status():
+                    raise InterruptedError('PSA job cancelled')
+
+                draw_seed = int(rng.integers(0, 2**63 - 1))
+                for k, varid in enumerate(varids):
+                    drawn: set[int] = set()
+                    for mm in metamodels:
+                        var = mm.variables.get(varid)
+                        if var is None or id(var) in drawn or not _psa_variable_is_varied(var):
+                            continue
+                        # Common random numbers: the same stream for every instance of the varid in this draw
+                        var.draw_psa(np.random.default_rng([draw_seed, k]))
+                        drawn.add(id(var))
+
+                for mm in metamodels:
+                    for v in mm.variables.values():
+                        if _psa_variable_is_varied(v):
+                            v.update_model_psa(mm.model)
+                            v.update_model_psa(mm.finance)
+                    mm.model.run()
+                    mm.finance.run()
+                    results.append(_result(mm, i + 1, False))
+                    prog_i += 1
+                    _report()
+        finally:
+            for v in varied_variables:
+                v.psa_active = False
+            for mm in metamodels:
+                for v in mm.variables.values():
+                    v.update_model(mm.model)
+                    v.update_model(mm.finance)
+                mm.model.run()
+                mm.finance.run()
+
+    odf = pd.DataFrame(results)
+    statistic_columns = [x for x in statistics if x in odf.columns]
+    leading = PSA_MULTIPLE_INDEX_COLUMNS + statistic_columns
+    return odf.loc[:, leading + [x for x in odf.columns if x not in leading]]
+
+def psa_multiple_for_metamodel(
+    results: pd.DataFrame,
+    metamodel_id: str,
+) -> pd.DataFrame:
+    """The results of one metamodel from a whole-project PSA, in the form of the results of `run_psa`.
+
+    Args:
+        results: The results of `run_psa_multiple`.
+        metamodel_id: Id of the metamodel.
+
+    Returns:
+        Dataframe with columns of the statistics, the values of the variables that the metamodel varied,
+        `deterministic` and `draw`.
+
+    Raises:
+        KeyError: if the metamodel is not in the results.
+    """
+    mm_results = results.loc[results['metamodel'] == metamodel_id, :]
+    if len(mm_results) == 0:
+        raise KeyError(f'Metamodel {metamodel_id} not found in PSA results')
+    variable_columns = [x for x in psa_variable_columns(mm_results) if mm_results[x].notna().any()]
+    statistic_columns = [x for x in mm_results.columns if x in get_args(PSA_FLOAT_STATISTIC)]
+    return (
+        mm_results
+        .loc[:, variable_columns + statistic_columns + ['deterministic', 'draw']]
+        .reset_index(drop = True)
+    )
+
+def psa_pairwise(
+    results: pd.DataFrame,
+    comparator_id: str,
+    reference_id: str,
+) -> pd.DataFrame:
+    """Compare two metamodels of a whole-project PSA: the comparator against the reference, draw by draw.
+
+    For each draw (including the deterministic run, draw 0, if present) the statistics of the reference are
+    subtracted from those of the comparator:
+
+    - incremental total costs and benefits: the change in total present costs and in total present benefits;
+    - incremental net monetary value: incremental benefits less incremental costs (the change in net present value);
+    - incremental capex and opex: the change in total capital expenditure and in total recurrent costs. These are
+      NaN if the results do not include the capex and opex statistics.
+
+    each discounted and undiscounted. The values drawn for the variables are kept (those of the comparator, or of
+    the reference for a variable that only the reference varies), so that increments can be related to the draws.
+
+    Args:
+        results: The results of `run_psa_multiple`, which must include the total present costs and benefits,
+            discounted and undiscounted.
+        comparator_id: Id of the comparator metamodel.
+        reference_id: Id of the reference metamodel.
+
+    Returns:
+        Dataframe with columns `draw`, `deterministic`, the pairwise statistics and the values of the variables.
+
+    Raises:
+        KeyError: if a metamodel, or a required statistic, is not in the results.
+    """
+    required = [
+        f'total_present_{x}_{y}' for x in ('costs', 'benefits') for y in ('discounted', 'undiscounted')
+    ]
+    missing = [x for x in required if x not in results.columns]
+    if missing:
+        raise KeyError(f'PSA results do not include the statistics required for pairwise comparison: {missing}')
+
+    def _frame(mm_id):
+        df = results.loc[results['metamodel'] == mm_id, :]
+        if len(df) == 0:
+            raise KeyError(f'Metamodel {mm_id} not found in PSA results')
+        return df.set_index('draw')
+
+    comp = _frame(comparator_id)
+    ref = _frame(reference_id).reindex(comp.index)
+
+    odf = pd.DataFrame({'deterministic': comp['deterministic']}, index = comp.index)
+    for disc in ('discounted', 'undiscounted'):
+        d_costs = comp[f'total_present_costs_{disc}'] - ref[f'total_present_costs_{disc}']
+        d_benefits = comp[f'total_present_benefits_{disc}'] - ref[f'total_present_benefits_{disc}']
+        odf[f'incremental_net_monetary_value_{disc}'] = d_benefits - d_costs
+        odf[f'incremental_total_costs_{disc}'] = d_costs
+        odf[f'incremental_total_benefits_{disc}'] = d_benefits
+        for cost in ('all_capex_costs', 'all_recurrent_costs'):
+            stat = f'{cost}_{disc}'
+            odf[f'incremental_{stat}'] = comp[stat] - ref[stat] if stat in results.columns else np.nan
+
+    variable_columns = psa_variable_columns(results)
+    draws = comp.loc[:, variable_columns].combine_first(ref.loc[:, variable_columns])
+    draws = draws.loc[:, [x for x in variable_columns if draws[x].notna().any()]]
+
+    odf = odf.join(draws).reset_index()
+    return odf.loc[:, ['draw', 'deterministic'] + list(get_args(PSA_PAIRWISE_STATISTIC)) + list(draws.columns)]
+
+def psa_net_benefit(
+    results: pd.DataFrame,
+    metamodel_ids: Sequence[str],
+    benefit_value: float = 1.,
+    cost_statistic: str = 'total_present_costs_discounted',
+    benefit_statistic: str = 'total_present_benefits_discounted',
+) -> pd.DataFrame:
+    """The net benefit of each metamodel in each draw of a whole-project PSA, valuing benefits by a multiplier.
+
+    The net benefit is `benefit_value * benefits - costs`; with a multiplier of 1 it is the net present value.
+
+    Args:
+        results: The results of `run_psa_multiple`.
+        metamodel_ids: Ids of the metamodels.
+        benefit_value: The value of one pound of benefit.
+        cost_statistic: The statistic used as costs.
+        benefit_statistic: The statistic used as benefits.
+
+    Returns:
+        Dataframe indexed by draw (sampled draws only), with a column for each metamodel.
+
+    Raises:
+        KeyError: if a metamodel is not in the results.
+    """
+    sampled = results.loc[~results['deterministic'].astype(bool), :]
+    frames = {}
+    for mm_id in metamodel_ids:
+        df = sampled.loc[sampled['metamodel'] == mm_id, :]
+        if len(df) == 0:
+            raise KeyError(f'Metamodel {mm_id} not found in PSA results')
+        df = df.set_index('draw')
+        frames[mm_id] = benefit_value * df[benefit_statistic] - df[cost_statistic]
+    return pd.DataFrame(frames).dropna()
+
+def psa_ceac(
+    results: pd.DataFrame,
+    metamodel_ids: Sequence[str],
+    benefit_values: Sequence[float],
+    cost_statistic: str = 'total_present_costs_discounted',
+    benefit_statistic: str = 'total_present_benefits_discounted',
+) -> pd.DataFrame:
+    """Cost-effectiveness acceptability curves and frontier of the metamodels of a whole-project PSA.
+
+    For each value of benefits (see `psa_net_benefit`), the probability that each metamodel is cost-effective -
+    has the greatest net benefit of the metamodels in a draw - and the frontier: the metamodel with the greatest
+    expected (mean) net benefit, which is the one to choose at that value, with its probability of being cost-effective.
+
+    Args:
+        results: The results of `run_psa_multiple`.
+        metamodel_ids: Ids of the metamodels compared.
+        benefit_values: The values of one pound of benefit at which to evaluate the curves.
+        cost_statistic: The statistic used as costs.
+        benefit_statistic: The statistic used as benefits.
+
+    Returns:
+        Dataframe indexed by `benefit_value`, with a column of the probability for each metamodel, `frontier`
+        (the id of the metamodel on the frontier) and `frontier_probability`.
+
+    Raises:
+        KeyError: if a metamodel is not in the results.
+        ValueError: if no metamodels are given.
+    """
+    metamodel_ids = list(metamodel_ids)
+    if not metamodel_ids:
+        raise ValueError('No metamodels to compare')
+    rows = []
+    for benefit_value in benefit_values:
+        nb = psa_net_benefit(results, metamodel_ids, benefit_value, cost_statistic, benefit_statistic)
+        values = nb.to_numpy(dtype = np.float64)
+        best = np.argmax(values, axis = 1)
+        probabilities = np.bincount(best, minlength = len(metamodel_ids)) / max(1, len(best))
+        frontier = int(np.argmax(values.mean(axis = 0))) if len(values) else 0
+        row: dict[str, Any] = {'benefit_value': float(benefit_value)}
+        row.update({mm_id: p for mm_id, p in zip(metamodel_ids, probabilities)})
+        row['frontier'] = metamodel_ids[frontier]
+        row['frontier_probability'] = probabilities[frontier]
+        rows.append(row)
+    return pd.DataFrame(rows).set_index('benefit_value')
+
+class PSAMarginalData(NamedTuple):
+    """Data for a marginal (univariate) sensitivity plot of a statistic of a PSA against the draws of a variable.
+
+    Attributes:
+        points: The sampled draws: columns `x` (the variable) and `y` (the statistic).
+        binned: The draws grouped by quantile of the variable: columns `x` and `y` (the means of each group),
+            `y_lower` and `y_upper` (the 5th and 95th percentiles of the statistic in each group) and `count`.
+        spearman: Spearman rank correlation of the statistic with the variable.
+        pearson: Pearson correlation of the statistic with the variable.
+        slope: Slope of the least-squares line of the statistic on the variable (change of statistic per unit).
+        intercept: Intercept of the least-squares line.
+        r_squared: Proportion of the variance of the statistic explained by the line.
+    """
+    points: pd.DataFrame
+    binned: pd.DataFrame
+    spearman: float
+    pearson: float
+    slope: float
+    intercept: float
+    r_squared: float
+
+def psa_marginal(
+    results: pd.DataFrame,
+    variable_column: str,
+    statistic: str,
+    bins: int = 10,
+) -> PSAMarginalData:
+    """Marginal (univariate) sensitivity of a statistic of a PSA to the draws of one variable.
+
+    The other variables vary too, so the relation is that of the statistic to the variable averaged over the
+    other variables. Works on the results of one metamodel or on pairwise (incremental) results.
+
+    Args:
+        results: The results: those of `run_psa`, `psa_multiple_for_metamodel` or `psa_pairwise`.
+        variable_column: The column of the variable.
+        statistic: The column of the statistic.
+        bins: The number of quantile groups of the variable.
+
+    Returns:
+        The points, the binned means and the summary statistics. The statistics are NaN where they cannot be
+        found (fewer than three draws, or a variable or statistic which does not vary).
+
+    Raises:
+        KeyError: if the variable or the statistic is not in the results.
+    """
+    if variable_column not in results.columns:
+        raise KeyError(f'Variable {variable_column} not found in PSA results')
+    if statistic not in results.columns:
+        raise KeyError(f'Statistic {statistic} not found in PSA results')
+    sampled = results
+    if 'deterministic' in results.columns:
+        sampled = results.loc[~results['deterministic'].astype(bool), :]
+    points = (
+        pd.DataFrame({
+            'x': pd.to_numeric(sampled[variable_column], errors = 'coerce'),
+            'y': pd.to_numeric(sampled[statistic], errors = 'coerce'),
+        })
+        .dropna()
+        .reset_index(drop = True)
+    )
+
+    nan = float('nan')
+    spearman = pearson = slope = intercept = r_squared = nan
+    x = points['x'].to_numpy(dtype = np.float64)
+    y = points['y'].to_numpy(dtype = np.float64)
+    if len(points) >= 3 and np.ptp(x) > 0:
+        slope, intercept = (float(v) for v in np.polyfit(x, y, 1))
+        if np.ptp(y) > 0:
+            pearson = float(np.corrcoef(x, y)[0, 1])
+            spearman = float(points['x'].rank().corr(points['y'].rank()))
+            r_squared = pearson**2
+        else:
+            r_squared = 0.
+
+    if len(points):
+        if np.ptp(x) > 0:
+            groups = pd.qcut(points['x'], q = min(bins, len(points)), duplicates = 'drop')
+        else:
+            # A variable that does not vary is a single group
+            groups = pd.Series(0, index = points.index)
+        binned = (
+            points
+            .groupby(groups, observed = True)
+            .agg(
+                x = ('x', 'mean'),
+                y = ('y', 'mean'),
+                y_lower = ('y', lambda s: s.quantile(0.05)),
+                y_upper = ('y', lambda s: s.quantile(0.95)),
+                count = ('y', 'count'),
+            )
+            .reset_index(drop = True)
+        )
+    else:
+        binned = pd.DataFrame(columns = ['x', 'y', 'y_lower', 'y_upper', 'count'])
+
+    return PSAMarginalData(points, binned, spearman, pearson, slope, intercept, r_squared)
+
 ##### Generic Graph functions #####
 
 class BoundingBox(NamedTuple):
