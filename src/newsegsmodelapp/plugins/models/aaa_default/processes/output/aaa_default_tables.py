@@ -12,14 +12,17 @@ from typing import Callable, cast
 
 import dash_ag_grid as dag
 from dash import html
+import pandas as pd
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.components import stats
 from newsegsmodelapp.components.stats import tornado_plot
 from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request, register_table_getter
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegssensitivity import common as sensitivity, optim
+from newsegsmodelframework.newsegssensitivity import common as sensitivity, dsa, optim
 
+from ..postprocess.methods import post_dsa_results
 from . import result_tables_sprake
 from .get_result_list import get_result_list
 
@@ -597,36 +600,42 @@ def _make_dsa_tables_sprake(
         return 'missing'
     stale = mm.table_config.revision != rev
 
-    # Results from before a statistic was added do not include it
-    available_statistics = set(raw_table.index.get_level_values('statistic'))
-    dsa_statistics = [s for s in sensitivity.DSA_STATISTIC_LABELS.keys() if s in available_statistics]
-
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
     table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
-    
-    table_name = 'table_dsa_metamodel'
-    for stat in dsa_statistics:
-        otable = (
-            raw_table
-            .xs(stat, level=1, axis=0)
-            .xs('absolute', level = 0, axis = 1)
-            .loc[:,['central', 'interval', 'lower', 'upper']]
-            .reset_index()
-        )
-        formatters = {
-            'variable': {"function":  "params.value ? params.value : '-' "},
+
+    _draw_dsa_metamodel_grids(raw_table, table_component, stale, request, result_provider)
+
+    return 'ok'
+
+_DSA_VALUE_FORMATTER = {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "}
+_DSA_LABEL_FORMATTER = {"function":  "params.value ? params.value : '-' "}
+
+def _dsa_statistic_grid(otable):
+    """AG grid of a table of one statistic of a DSA (from `stats.dsa_statistic_table`)"""
+    formatters = {
+        'variable': _DSA_LABEL_FORMATTER,
+    }
+    columnDefs = [
+        {
+            'field': i,
+            "valueFormatter": formatters.get(i, _DSA_VALUE_FORMATTER)
         }
-        columnDefs = [
-            {
-                'field': i,
-                "valueFormatter": formatters.get(i, {"function":  "params.value ? d3.format(',.2f')(params.value) : '-' "})
-            }
-            for i in otable.columns
-        ]
-        res = dag.AgGrid(
-            rowData = otable.to_dict('records'),
-            columnDefs = columnDefs
-        )
+        for i in otable.columns
+    ]
+    return dag.AgGrid(
+        rowData = otable.to_dict('records'),
+        columnDefs = columnDefs
+    )
+
+def _draw_dsa_metamodel_grids(raw_table, table_component, stale, request, result_provider):
+    """Store the grid of each statistic of the DSA of a metamodel, as `table_dsa_metamodel_<statistic>`"""
+    table_name = 'table_dsa_metamodel'
+    # Results from before a statistic was added do not include it
+    available_statistics = set(raw_table.index.get_level_values('statistic'))
+    for stat in sensitivity.DSA_STATISTIC_LABELS.keys():
+        if stat not in available_statistics:
+            continue
+        res = _dsa_statistic_grid(stats.dsa_statistic_table(raw_table, stat))
 
         result_provider.upsert_result(
             table_name + '_' + stat,
@@ -635,8 +644,6 @@ def _make_dsa_tables_sprake(
             mark_stale = stale,
             request = request
         )
-    
-    return 'ok'
 
 @register_table_getter(TABLE_SECTION, MODEL_TYPE)
 def _get_dsa_metamodel_table(
@@ -683,6 +690,167 @@ def _get_dsa_metamodel_table(
             return result_provider.get_result(
                 table_name, lmm.table_config, True
             )
+
+TABLE_SECTION = 'table_dsa_project'
+_request_table_draw_dsa_project = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
+
+def _dsa_project_labels(lproj) -> dict[str, str]:
+    """Labels of the metamodels of a project, by id, for the comparator options"""
+    return {
+        lmm.id: f'Config {i + 1}: {lmm.name}' if lmm.name else f'Config {i + 1}'
+        for i, lmm in enumerate(lproj.metamodels)
+    }
+
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_dsa_project'])
+def _make_dsa_project_tables(
+    request: TableDrawRequest,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface,
+    run_id: int,
+    progress_callback: Callable[[float, float, str], None],
+    check_cancel_status: Callable[[], bool],
+) -> str:
+    """Draw the tables of a whole-project DSA.
+
+    Stores the grids of each metamodel (as after a DSA of that metamodel alone) and, on the project, the options of
+    the comparator views: the metamodels with results and the variables. The comparator tables and plots depend
+    on the options chosen, so are made when they are shown, by `_get_dsa_project_table`.
+    """
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', TABLE_SECTION)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    raw_table, rev = result_provider.get_result('postproc_dsa_project_data', lproj.table_config, True)
+    if raw_table is None:
+        return 'missing'
+    stale = lproj.table_config.revision != rev
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    metamodel_ids = list(raw_table.index.get_level_values('metamodel').unique())
+    for lmm in lproj.metamodels:
+        if lmm.id not in metamodel_ids:
+            continue
+        table_component = component_provider.get_lightweight_dataholding_component(lmm.table_config.id)
+        _draw_dsa_metamodel_grids(
+            raw_table.xs(lmm.id, level = 'metamodel'), table_component,
+            stale, request, result_provider
+        )
+
+    labels = _dsa_project_labels(lproj)
+    options = {
+        'metamodels': [{'value': x, 'label': labels.get(x, x)} for x in metamodel_ids],
+        'variables': list(raw_table.index.get_level_values('variable').unique()),
+    }
+    result_provider.upsert_result(
+        'table_dsa_project_options',
+        component_provider.get_lightweight_dataholding_component(lproj.table_config.id),
+        options,
+        mark_stale = stale,
+        request = request
+    )
+
+    return 'ok'
+
+def _dsa_comparison_grid(otable):
+    """AG grid of a table of one statistic of several comparators (from `stats.dsa_comparison_table`)"""
+    comparators = list(otable.columns.get_level_values('comparator').unique())
+    records = []
+    for variable, row in otable.iterrows():
+        rec = {'variable': variable}
+        for i, comp in enumerate(comparators):
+            for bound in stats.DSA_BOUND_COLUMNS:
+                val = row[(comp, bound)]
+                rec[f'c{i}_{bound}'] = None if pd.isna(val) else float(val)
+        records.append(rec)
+    columnDefs = [{'field': 'variable', 'pinned': 'left', 'valueFormatter': _DSA_LABEL_FORMATTER}] + [
+        {
+            'headerName': comp,
+            'children': [
+                {'field': f'c{i}_{bound}', 'headerName': bound, 'valueFormatter': _DSA_VALUE_FORMATTER}
+                for bound in stats.DSA_BOUND_COLUMNS
+            ]
+        }
+        for i, comp in enumerate(comparators)
+    ]
+    return dag.AgGrid(rowData = records, columnDefs = columnDefs)
+
+def _as_list(value) -> list:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return list(value)
+
+@register_table_getter(TABLE_SECTION, MODEL_TYPE)
+def _get_dsa_project_table(
+    active_project_id: str,
+    table_options: dict,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface
+):
+    """Get the table (subindex 0) or tornado plot (subindex 1) of a comparator view of a whole-project DSA.
+
+    The options are the view (`multiple` or `pairwise`), the statistic, the comparators of the multiple view, the
+    comparator and reference of the pairwise view, and the variables to show (all if none are chosen).
+    """
+    view = table_options.get('view')
+    if view not in ('multiple', 'pairwise'):
+        return None, None
+    subindex = int(table_options.get('subindex', 0))
+    variables = _as_list(table_options.get('variables')) or None
+    stat = table_options.get('statistic')
+
+    lproj = project_provider.get_lightweight_project(active_project_id)
+    logger.debug('Getting lightweight project - Table Getter [%s]', TABLE_SECTION)
+    labels = _dsa_project_labels(lproj)
+
+    if view == 'multiple':
+        if stat not in sensitivity.DSA_STATISTIC_LABELS:
+            stat = 'net_present_value_undiscounted'
+        dsa_df, rev = result_provider.get_result('postproc_dsa_project_data', lproj.table_config, True)
+        if dsa_df is None:
+            return None, None
+        available = list(dsa_df.index.get_level_values('metamodel').unique())
+        comparators = [x for x in _as_list(table_options.get('comparators')) if x in available] or available
+        dsa_dfs = {labels.get(x, x): dsa_df.xs(x, level = 'metamodel') for x in comparators}
+        if subindex == 1:
+            label_df, _ = result_provider.get_result('postproc_dsa_project_labels', lproj.table_config, True)
+            label_dfs = {}
+            if label_df is not None:
+                label_dfs = {
+                    labels.get(x, x): label_df.xs(x, level = 'metamodel')
+                    for x in comparators if x in label_df.index.get_level_values('metamodel')
+                }
+            color_indexes = {labels.get(x, x): available.index(x) for x in comparators}
+            return stats.multi_tornado_plot(
+                dsa_dfs, stat, variables, label_dfs = label_dfs, color_indexes = color_indexes
+            ), rev
+        otable = stats.dsa_comparison_table(dsa_dfs, stat, variables)
+        if otable.empty:
+            return html.Div('No results for the chosen configurations and variables'), rev
+        return _dsa_comparison_grid(otable), rev
+
+    # Pairwise
+    if stat not in sensitivity.DSA_PAIRWISE_STATISTIC_LABELS:
+        stat = next(iter(sensitivity.DSA_PAIRWISE_STATISTIC_LABELS))
+    comparator = table_options.get('comparator')
+    reference = table_options.get('reference')
+    if not comparator or not reference:
+        return html.Div('Choose a comparator and a reference configuration'), None
+    raw, rev = result_provider.get_result('dsa_project', lproj.table_config, True)
+    if raw is None:
+        return None, None
+    try:
+        pairwise = dsa.dsa_pairwise(raw, comparator, reference)
+    except KeyError:
+        return html.Div('No DSA results for the chosen configurations'), rev
+    if len(pairwise) < 2:
+        return html.Div('No variables were varied in the DSA'), rev
+    pw_table, pw_labels = post_dsa_results.dsa_results_to_tables(pairwise.set_index(['variable', 'bound']))
+    if subindex == 1:
+        title = f'Incremental DSA variation: {labels.get(comparator, comparator)} vs {labels.get(reference, reference)}'
+        return stats.tornado_plot(pw_table, pw_labels, stat, variables, title = title), rev
+    return _dsa_statistic_grid(stats.dsa_statistic_table(pw_table, stat, variables)), rev
 
 TABLE_SECTION = 'table_optim_metamodel' # TODO: Improve this key
 _request_plot_marginal_optim = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))

@@ -19,6 +19,7 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components.callbacks.action_callbacks import generate_post_action_requests
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 
@@ -124,6 +125,127 @@ def create_dsa_configuration_editor():
             id = {'type': 'input-container', 'supersection': 'dsa', 'section': 'dsa'}
         )
     ])
+
+def _dsa_project_option_id(purpose: str) -> dict:
+    """Id of an option of the comparator views of a whole-project DSA (the `table_dsa_project` table)"""
+    return {
+        'type': 'result-table-option', 'purpose': purpose,
+        'supersection': 'dsa', 'section': 'tabledraw',
+        'key': 'table_dsa_project', 'subindex': 0
+    }
+
+def create_dsa_project_options():
+    """Create the options of the comparator views of a whole-project DSA: the statistic, the comparators and the variables.
+
+    Hidden in the individual view. The options are filled from the results by `update_dsa_view_options`.
+
+    Returns:
+        The options.
+    """
+    def labelled(label, component):
+        return html.Div([html.Label(label), component], className = 'mb-2')
+
+    return html.Div(
+        [
+            labelled('Statistic:', dcc.Dropdown(
+                options = [{'label': v, 'value': k} for k, v in sensitivity.DSA_STATISTIC_LABELS.items()],
+                value = list(sensitivity.DSA_STATISTIC_LABELS.keys())[0],
+                id = _dsa_project_option_id('statistic'),
+                searchable = False,
+                clearable = False,
+            )),
+            html.Div(
+                labelled('Configurations:', dcc.Dropdown(
+                    options = [], value = [], multi = True,
+                    id = _dsa_project_option_id('comparators'),
+                    placeholder = 'All configurations',
+                )),
+                id = 'dsa-multiple-options',
+                style = {'display': 'none'},
+            ),
+            html.Div(
+                dbc.Row([
+                    dbc.Col(labelled('Comparator:', dcc.Dropdown(
+                        options = [], id = _dsa_project_option_id('comparator'), clearable = False,
+                    ))),
+                    dbc.Col(labelled('Reference:', dcc.Dropdown(
+                        options = [], id = _dsa_project_option_id('reference'), clearable = False,
+                    ))),
+                ]),
+                id = 'dsa-pairwise-options',
+                style = {'display': 'none'},
+            ),
+            labelled('Variables:', dbc.InputGroup([
+                dcc.Dropdown(
+                    options = [], value = [], multi = True,
+                    id = _dsa_project_option_id('variables'),
+                    placeholder = 'All variables',
+                    style = {'flex': '1 1 auto'},
+                ),
+                dbc.Button(
+                    'Selected only',
+                    id = 'btn-dsa-filter-selected',
+                    color = 'secondary',
+                    outline = True,
+                    title = 'Show only the variables currently selected for DSA',
+                    n_clicks = 0,
+                ),
+            ], class_name = 'flex-nowrap')),
+        ],
+        id = 'dsa-project-options',
+        style = {'display': 'none'},
+    )
+
+def create_dsa_project_results():
+    """Create the containers of the comparator views of a whole-project DSA: a table and a tornado plot.
+
+    Hidden in the individual view.
+
+    Returns:
+        The containers.
+    """
+    return html.Div(
+        [
+            dbc.Col(
+                [
+                    html.H2('DSA Comparison Table'),
+                    html.Div(
+                        'No whole-project DSA run',
+                        id = {
+                            'type': 'result-table', 'purpose': 'container',
+                            'supersection': 'dsa', 'section': 'tabledraw',
+                            'key': 'table_dsa_project', 'subindex': 0,
+                        }
+                    )
+                ],
+                width = 12
+            ),
+            html.Hr(),
+            dbc.Col(
+                [
+                    html.H2('Comparison tornado plot'),
+                    dcc.Graph(
+                        # Using result-table dispatch to call a custom table getter
+                        id = {
+                            'type': 'result-figure', 'purpose': 'container',
+                            'supersection': 'dsa', 'section': 'tabledraw',
+                            'key': 'table_dsa_project', 'subindex': 1,
+                        },
+                        style = {
+                            'minHeight': '590px',
+                            'border': '1px solid #dee2e6',
+                            'borderRadius': '0.5rem',
+                            'backgroundColor': 'transparent'
+                        }
+                    ),
+                ],
+                width = 12
+            ),
+        ],
+        className = 'drawer-content',
+        id = 'dsa-project-results',
+        style = {'display': 'none'},
+    )
 
 def create_optim_configuration_editor_header(**kwargs):
     """Create the header of the optimisation editor.
@@ -295,6 +417,20 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
                     config.layout_results_header(**asdict(config)),
                 ),
                 
+                dbc.Row(
+                    dcc.RadioItems(
+                        options = [
+                            {'label': 'Individual', 'value': 'individual'},
+                            {'label': 'Multiple', 'value': 'multiple'},
+                            {'label': 'Pairwise', 'value': 'pairwise'},
+                        ],
+                        value = 'individual',
+                        inline = True,
+                        inputStyle = {'margin-right': '4px', 'margin-left': '12px'},
+                        id = _dsa_project_option_id('view'),
+                    ),
+                    class_name = 'mb-2',
+                ),
                 dbc.Row([
                     dcc.Dropdown(
                         options = [
@@ -309,8 +445,11 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
                         searchable = False,
                         clearable = False,
                     )
-                ]),
-            ]    
+                ],
+                id = 'dsa-individual-options',
+                ),
+                create_dsa_project_options(),
+            ]
         )
     ]
 
@@ -359,9 +498,11 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
                     dcc.Store(id={'type': 'trigger', 'page': config.page_type, 'key': 'dsa-run-postprocess'}, data = []),
                     dcc.Store(id={'type': 'result-statistics', 'supersection': 'dsa-results', 'key': 'res-dsa-table'}, data = []),
                 ],
-                
+
                 className = 'drawer-content',
+                id = 'dsa-individual-results',
                 ),
+                create_dsa_project_results(),
             ],
             section = 'tabledraw',
             supersection = 'dsa',
@@ -687,24 +828,139 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         Output('trigger-check-requests', 'data', allow_duplicate = True),
         Input('btn-action-dsa-run-metamodel', 'n_clicks'),
         State('active-project-id', 'data'),
+        State('dsa-run-scope', 'value'),
         prevent_initial_call = True
     )
     def request_dsa_run_metamodel(
         n_clicks,
-        active_project_id
+        active_project_id,
+        run_scope,
     ):
         click = callback_utils.get_triggered_value()
         if not click:
             raise PreventUpdate
 
         request = app.request_handler.add_request(
-            'dsa_run_metamodel',
+            'dsa_run_project' if run_scope == 'project' else 'dsa_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
         return request.request_id
+
+    @app.callback(
+        output = dict(
+            individual_options_style = Output('dsa-individual-options', 'style'),
+            individual_results_style = Output('dsa-individual-results', 'style'),
+            project_options_style = Output('dsa-project-options', 'style'),
+            project_results_style = Output('dsa-project-results', 'style'),
+            multiple_options_style = Output('dsa-multiple-options', 'style'),
+            pairwise_options_style = Output('dsa-pairwise-options', 'style'),
+            statistic = dict(
+                options = Output(_dsa_project_option_id('statistic'), 'options'),
+                value = Output(_dsa_project_option_id('statistic'), 'value'),
+            ),
+            comparators = dict(
+                options = Output(_dsa_project_option_id('comparators'), 'options'),
+                value = Output(_dsa_project_option_id('comparators'), 'value'),
+            ),
+            comparator = dict(
+                options = Output(_dsa_project_option_id('comparator'), 'options'),
+                value = Output(_dsa_project_option_id('comparator'), 'value'),
+            ),
+            reference = dict(
+                options = Output(_dsa_project_option_id('reference'), 'options'),
+                value = Output(_dsa_project_option_id('reference'), 'value'),
+            ),
+            variables = dict(
+                options = Output(_dsa_project_option_id('variables'), 'options'),
+                value = Output(_dsa_project_option_id('variables'), 'value'),
+            ),
+        ),
+        inputs = dict(
+            view = Input(_dsa_project_option_id('view'), 'value'),
+            table_trigger = Input({
+                'type': 'postaction-trigger', 'purpose': 'trigger',
+                'supersection': 'global', 'section': 'tabledraw',
+                'key': 'table_dsa_project', 'subindex': 0
+            }, 'data'),
+            filter_selected = Input('btn-dsa-filter-selected', 'n_clicks'),
+            active_project_id = Input('active-project-id', 'data'),
+        ),
+        state = dict(
+            statistic = State(_dsa_project_option_id('statistic'), 'value'),
+            comparators = State(_dsa_project_option_id('comparators'), 'value'),
+            comparator = State(_dsa_project_option_id('comparator'), 'value'),
+            reference = State(_dsa_project_option_id('reference'), 'value'),
+            variables = State(_dsa_project_option_id('variables'), 'value'),
+        ),
+    )
+    def update_dsa_view_options(
+        view,
+        table_trigger,
+        filter_selected,
+        active_project_id,
+        statistic,
+        comparators,
+        comparator,
+        reference,
+        variables,
+    ):
+        """Show the options and results of the DSA view, and fill the comparator and variable options from the results of the whole-project DSA."""
+        rval = callback_utils.create_noupdate_return()
+        # Shown components keep the display of their classes
+        shown, hidden = {}, {'display': 'none'}
+        is_individual = view not in ('multiple', 'pairwise')
+        rval['individual_options_style'] = shown if is_individual else hidden
+        rval['individual_results_style'] = shown if is_individual else hidden
+        rval['project_options_style'] = hidden if is_individual else shown
+        rval['project_results_style'] = hidden if is_individual else shown
+        rval['multiple_options_style'] = shown if view == 'multiple' else hidden
+        rval['pairwise_options_style'] = shown if view == 'pairwise' else hidden
+
+        labels = sensitivity.DSA_PAIRWISE_STATISTIC_LABELS if view == 'pairwise' else sensitivity.DSA_STATISTIC_LABELS
+        rval['statistic']['options'] = [{'label': v, 'value': k} for k, v in labels.items()]
+        if statistic not in labels:
+            rval['statistic']['value'] = next(iter(labels))
+
+        if is_individual or active_project_id is None:
+            return rval
+
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        options, _ = app.results_provider.get_result('table_dsa_project_options', lproj.table_config, True)
+        if not options:
+            for key in ('comparators', 'comparator', 'reference', 'variables'):
+                rval[key]['options'] = []
+            return rval
+
+        mm_options = options.get('metamodels', [])
+        mm_ids = [x['value'] for x in mm_options]
+        var_options = options.get('variables', [])
+        for key in ('comparators', 'comparator', 'reference'):
+            rval[key]['options'] = mm_options
+        rval['variables']['options'] = [{'label': x, 'value': x} for x in var_options]
+
+        if not comparators or any(x not in mm_ids for x in comparators):
+            rval['comparators']['value'] = [x for x in (comparators or []) if x in mm_ids] or mm_ids
+        if comparator not in mm_ids:
+            rval['comparator']['value'] = mm_ids[1] if len(mm_ids) > 1 else (mm_ids[0] if mm_ids else None)
+        if reference not in mm_ids:
+            rval['reference']['value'] = mm_ids[0] if mm_ids else None
+
+        if ctx.triggered_id == 'btn-dsa-filter-selected':
+            # Filter to the variables still selected for DSA in any configuration
+            provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+            selected_names = set()
+            for varuid in {v for lmm in lproj.metamodels for v in lmm.variables.values()}:
+                var = provider.variable_provider.get_variable(varuid)
+                if var and var.dsa_selected:
+                    selected_names.add(var.name)
+            rval['variables']['value'] = [x for x in var_options if x in selected_names]
+        elif variables and any(x not in var_options for x in variables):
+            rval['variables']['value'] = [x for x in variables if x in var_options]
+
+        return rval
 
 def add_optim_run_callbacks(app: NewsegsDash):
 
