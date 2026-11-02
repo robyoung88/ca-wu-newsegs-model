@@ -352,7 +352,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         are also cancelled.
         """
         
-        select_requests_subquery = (
+        select_requests = (
             sa.select(
                 self._table.c.request_id,
                 self._table.c.run_id
@@ -368,46 +368,45 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             request_id = [request_id] if isinstance(request_id, int) else request_id
 
             if chain:
-                select_requests_subquery = (
-                    select_requests_subquery
+                select_requests = (
+                    select_requests
                     .where(
                         sa.or_(
                             self._table.c.request_id.in_(request_id),
-                            self._table.c.triggering_request_id.in_(request_id))
+                            self._table.c.trigger_request_id.in_(request_id))
                     )
                 )
             else:
-                select_requests_subquery = (
-                    select_requests_subquery
+                select_requests = (
+                    select_requests
                     .where(self._table.c.request_id.in_(request_id))
                 )
-        
-        select_requests_subquery = select_requests_subquery.subquery()
-        run_id_subquery = (
-            select_requests_subquery
-            .where(self._table.c.run_id >= 0)
-            .subquery()
-        )
+
+        # Filters must be applied to the select before it becomes a subquery, as
+        # a subquery is a FROM clause with no .where. Selecting from the subquery
+        # (a derived table) also stops it correlating with the requests table
+        # updated below, which would otherwise drop its FROM clause.
+        requests_to_cancel = select_requests.subquery()
 
         run_cancel_statement = (
             sa.update(tbls.runs)
             .where(
                 tbls.runs.c.run_id.in_(
-                    sa.select(run_id_subquery.c.run_id)
+                    sa.select(requests_to_cancel.c.run_id)
+                    .where(requests_to_cancel.c.run_id >= 0)
                 )
             )
             .values(cancel_requested = True)
-
         )
-        
+
         request_cancel_statement = (
             sa.update(self._table)
             .where(
                 self._table.c.request_id.in_(
-                    sa.select(select_requests_subquery.c.request_id)
+                    sa.select(requests_to_cancel.c.request_id)
                 )
             )
-            .values(state = 'CANCELLED')
+            .values(status = 'CANCELLED')
             .returning(
                 self._table.c.request_id
             )
@@ -416,6 +415,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(run_cancel_statement)
 
-            result = conn.execute(request_cancel_statement).scalars()
+            # Consume the result while the connection is open
+            cancelled = list(conn.execute(request_cancel_statement).scalars())
 
-        return result
+        return cancelled
