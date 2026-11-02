@@ -657,7 +657,9 @@ def add_input_container_callbacks(app: NewsegsDash):
             'data'
         ),
 
-        Input('active-project-id', 'data'),
+        # Not an Input: a project or configuration change rehydrates the whole input container,
+        # which builds this content afresh
+        State('active-project-id', 'data'),
         State('app-state', 'data'),
         State({
             'type': 'input-component', 
@@ -666,6 +668,8 @@ def add_input_container_callbacks(app: NewsegsDash):
             'parameter_index': ALL, 'vector_location': ALL},
             'id'
         ),
+        # The trigger is inserted with the input group on hydration, which has already built this content
+        prevent_initial_call = True,
     )
     def update_dsa_input_contents(
         input_group_triggers,
@@ -673,7 +677,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         app_state,
         container_ids
     ):
-        if not len(container_ids):
+        if not len(container_ids) or active_project_id is None:
             raise PreventUpdate
         t0 = time.perf_counter()
         
@@ -729,7 +733,9 @@ def add_input_container_callbacks(app: NewsegsDash):
             'data'
         ),
 
-        Input('active-project-id', 'data'),
+        # Not an Input: a project or configuration change rehydrates the whole input container,
+        # which builds this content afresh
+        State('active-project-id', 'data'),
         State('app-state', 'data'),
         State({
             'type': 'input-component', 
@@ -738,6 +744,8 @@ def add_input_container_callbacks(app: NewsegsDash):
             'parameter_index': ALL, 'vector_location': ALL},
             'id'
         ),
+        # The trigger is inserted with the input group on hydration, which has already built this content
+        prevent_initial_call = True,
     )
     def update_psa_input_contents(
         input_group_triggers,
@@ -745,7 +753,7 @@ def add_input_container_callbacks(app: NewsegsDash):
         app_state,
         container_ids
     ):
-        if not len(container_ids):
+        if not len(container_ids) or active_project_id is None:
             raise PreventUpdate
         t0 = time.perf_counter()
 
