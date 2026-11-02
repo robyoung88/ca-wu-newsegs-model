@@ -1,32 +1,34 @@
 [default]
 appversion = 'dev'
 
-dispatchservers = ['0.0.0.0','127.0.0.1']
+#dispatchservers = ['0.0.0.0','127.0.0.1']
+dispatchservers = ['0.0.0.0','zmq-dispatcher']
 FRONTENDPORT = 8555
 BACKENDPORT = 8556
-#HEARTBEAT_FILE = '/tmp/dispatcher_heartbeat.txt'
-HEARTBEAT_FILE = 'C:/Scratch/dispatcher_heartbeat.txt'
+HEARTBEAT_FILE = '/tmp/dispatcher_heartbeat.txt'
 
-SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
 SprakeStartDatetime = "2005-01-01T00:00:00"
 SprakeEndDatetime = "2015-01-01T00:00:00"
 SprakeValidationLat = 53.25535
 SprakeValidationLon = -3.47697
-SprakeExcelValidationLoc = "@format {env[OneDrive]}\\Model\\Validation"
 
 NEWAEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/microscale-atlas/v1/"
 NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1/"
 NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/"
-DiskcacheCache = 'C:\\scratch\\appdiskcache'
 
 PROGRESS_POLL_INTERVAL = 1000
-JOB_DISPATCH_TIMEOUT_MS = 10000
+JOB_DISPATCH_TIMEOUT_MS = 200
 WORKER_RECEIVE_TIMEOUT_MS = 3000
 WORKER_SHUTDOWN_TIMEOUT_S = 5
+
+[testing]
+HEARTBEAT_FILE = 'C:/Scratch/dispatcher_heartbeat.txt'
+#SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
+SprakeExcelValidationLoc = "@format {env[OneDrive]}\\Model\\Validation"
 
 [spraketest]
 SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"
 
 [production]
 appversion = '0.1.1'
-
+dispatchservers = ['0.0.0.0','zmq-dispatcher']

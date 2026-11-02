@@ -1,4 +1,7 @@
 """Registers and associated for the various dispatch functions"""
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 from dataclasses import asdict, dataclass, field
 import json
@@ -11,8 +14,11 @@ from useful_types import SequenceNotStr
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelapp.types import LayoutConfiguration, Page
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
+from newsegsmodelapp.backend.db import db_tables as tbls
 
 # -------------------------------------------------------------------------
 # APP PAGE REGISTER
@@ -181,19 +187,23 @@ be found in RUN_PROCEDURE_REGISTER.)
 
 @dataclass
 class RunRequest(SerialisableDataclass):
-    request_id: int = 0
-    run_id: int = 0
-    trigger_run_id: int = -1
-    project_id: str = ''
-    model_type: str = 'default'
+    request_id: int = -1
+    request_type: str = ''
+    
+    trigger_request_id: int = -1
+    trigger_request_type: str = ''
+    
+    run_id: int = -1
+    
     request_label: str = ''
     request_class: str = 'run'
-    request_type: str = ''
+
+    project_id: str = ''
+    model_type: str = 'default'
+    
     payload: str = ''
-    status: str = ''
-    progress: float = 0.0
-    progress_message: str = ''
-    cancel_requested: bool = False
+    status: tbls.REQUEST_STATUS = 'AWAITING DISPATCH'
+    
     background_procedure: bool = True 
 
 class RunRequestHandler(Protocol):
@@ -273,11 +283,22 @@ def register_run_procedure(
     def decorated(func):
         if name in RUN_PROCEDURE_REGISTER:
             raise KeyError(f'A run procedure already exists for key {name}')
-        RUN_PROCEDURE_REGISTER[name] = func
+        def wrapped(request: RunRequest, *args, **kwargs):
+            logger.info(
+                'Run procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, request.run_id, request.trigger_request_id, request.project_id
+            )
+            rval = func(request, *args, **kwargs)
+            logger.info(
+                'Run procedure %s for Request ID = %d; completed with message %s - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_request_id, request.project_id
+            )
+            return rval
+        RUN_PROCEDURE_REGISTER[name] = wrapped
         for trig in triggers:
             pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
             pa.run_procedures.add(name)
-        return func
+        return wrapped
     return decorated
 
 # -------------------------------------------------------------------------
@@ -287,7 +308,6 @@ def register_run_procedure(
 @dataclass
 class PostprocessRequest(RunRequest):
     request_class: str = 'postprocess'
-    trigger_request_type: str = ''
 
 class PostprocessRequestHandler(Protocol):
     def __call__(
@@ -354,18 +374,29 @@ def register_postprocess_procedure(
         if model_type != 'default':
             if key in POSTPROCESS_REGISTER:
                 raise KeyError(f'Postprocess procedure already exists for key {key}')
-        POSTPROCESS_REGISTER[key] = func
+        def wrapped(request: RunRequest, *args, **kwargs):
+            logger.info(
+                'Postprocess procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, request.run_id, request.trigger_request_id, request.project_id
+            )
+            rval = func(request, *args, **kwargs)
+            logger.info(
+                'Postprocess procedure %s for Request ID = %d; completed with message %s - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_request_id, request.project_id
+            )
+            return rval
+        POSTPROCESS_REGISTER[key] = wrapped
         for trig in triggers:
             pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
             pa.postprocess_procedures.add(key)
 
         key_default = (key[0], 'default')
         if key_default not in POSTPROCESS_REGISTER:
-            POSTPROCESS_REGISTER[key_default] = func
+            POSTPROCESS_REGISTER[key_default] = wrapped
             for trig in triggers:
                 pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
                 pa.postprocess_procedures.add(key_default)
-        return func
+        return wrapped
     return decorated
 
 def get_postprocess_procedure(procedure: str, request: RunRequest):
@@ -386,9 +417,6 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 @dataclass
 class TableDrawRequest(RunRequest):
     request_class: str = 'tabledraw'
-    trigger_request_type: str = ''
-    
-    ann_hori_toggle: bool = False
 
 class TableDrawRequestHandler(Protocol):
     def __call__(
@@ -457,18 +485,29 @@ def register_table_draw(
         if model_type != 'default':
             if key in TABLE_DRAW_REGISTER:
                 raise KeyError(f'Table draw artist already exists for key {key}')
-        TABLE_DRAW_REGISTER[key] = func
+        def wrapped(request: RunRequest, *args, **kwargs):
+            logger.info(
+                'Table draw procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, request.run_id, request.trigger_request_id, request.project_id
+            )
+            rval = func(request, *args, **kwargs)
+            logger.info(
+                'Table draw procedure %s for Request ID = %d; completed with message %s - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
+                name, request.request_id, rval, request.run_id, request.trigger_request_id, request.project_id
+            )
+            return rval
+        TABLE_DRAW_REGISTER[key] = wrapped
         for trig in triggers:
             pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
             pa.table_draw_artists.add(key)
 
         key_default = (key[0], 'default')
         if key_default not in TABLE_DRAW_REGISTER:
-            TABLE_DRAW_REGISTER[key_default] = func
+            TABLE_DRAW_REGISTER[key_default] = wrapped
             for trig in triggers:
                 pa = POST_ACTION_REGISTER.setdefault(trig, Postactions(trig))
                 pa.table_draw_artists.add(key_default)
-        return func
+        return wrapped
     return decorated
 
 def get_table_draw(table_section: str, request: RunRequest):
@@ -689,7 +728,7 @@ SINGLE_INPUT_HEADER_CONTENT_CREATORS: dict[
     tuple[str, str | None, str],
     Callable[[
         str,
-        NewsegsMetaModel
+        FullLightweightVariable
     ], list[DashComponent]]] = {}
 """Register of functions to create header elements for a single input.
 
@@ -698,7 +737,7 @@ Keyed by a tuple of:
     section [str | None] - e.g. bc_input
     model_type [str]
 
-Functions take the variable id as string and the containing metamodel.
+Functions take the variable id as string and the variable or up-to-date FullLightweightVariable.
 """
 
 def register_single_input_header_content_creator(

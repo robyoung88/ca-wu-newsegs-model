@@ -58,19 +58,23 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
     model_input_sections = []
     for sec in config.model_input_sections:
         model_input_sections.append(
-            dbc.Col(
-                sec.creation_function(),
-                width = sec.block_width
-            )
+            
+                dbc.Col(
+                    sec.creation_function(),
+                    width = sec.block_width
+                ),
+                
         )
     
     finance_input_sections = []
     for sec in config.finance_input_sections:
         finance_input_sections.append(
-            dbc.Col(
-                sec.creation_function(),
-                width = sec.block_width
-            )
+            
+                dbc.Col(
+                    sec.creation_function(),
+                    width = sec.block_width
+                ),
+                
         )
 
     site_details = [
@@ -81,11 +85,22 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
             )
         ),
 
-        dbc.Row(model_input_sections), 
+        #dcc.Loading(
+        dbc.Row(model_input_sections),
+        #     delay_show = 1,
+        #     delay_hide = 0.3,
+        # ),
+
+        
         
         html.Hr(),
 
+        #dcc.Loading(
         dbc.Row(finance_input_sections),
+        #    delay_show = 1,
+        #    delay_hide = 0.3,
+        #),
+        
     ]
 
     results_subsections = []
@@ -117,12 +132,8 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         dbc.Row(
             config.layout_map()
         )
-    ] + [
-        dcc.Loading(
-            site_details,
-            delay_show = 300,
-        )
-    ]
+    ] + site_details
+    
 
     b1_contents = [
         config.layout_results_header()
@@ -159,14 +170,14 @@ def add_deterministic_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'deterministic_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
     @app.callback(
         Output('trigger-check-requests', 'data', allow_duplicate = True),
@@ -182,14 +193,14 @@ def add_deterministic_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'deterministic_run_project',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
 model_configuration_page = Page(
     id = PAGE_TYPE,

@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 
 from dataclasses import dataclass
 import datetime
@@ -5,6 +7,8 @@ import json
 import time
 from typing import Callable
 
+from newsegsmodelapp.backend.db import db_staleness
+from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework import newsegssensitivity
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -36,6 +40,7 @@ def execute_dsa_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
 
     # TODO: get dsa configuration from project dsa config
@@ -71,14 +76,41 @@ def execute_dsa_single_mm_run(
 
         progress_callback(step, total, msg)
 
+    def deterministic_progress_callback(step, total, message):
+        msg = 'DSA: Reference run'
+        progress_callback(0, 1, msg)
+
+    # By running the deterministic through this process, the module revisions will
+    # be correctly modified
+    logger.debug(
+        'DSA run: - Pre-Deterministic. Metamodel modified: %s',
+        mm.modified
+    )
+    mm = deterministic_run_metamodel(
+        mm, proj, request, project_provider, result_provider, run_id,
+        deterministic_progress_callback, check_cancel_status,
+        run_started_ns = started_ns,
+    )
+    logger.debug(
+        'DSA run: - Post-Deterministic. Metamodel modified: %s',
+        mm.modified
+    )
+
     dsa_results_frame = newsegssensitivity.run_dsa(
         mm, 
         progress = internal_progress_callback, 
-        cancel_status = check_cancel_status
+        cancel_status = check_cancel_status,
+        precomputed_deterministic = True
     )
 
     # Connect this result to the metamodel table config, rather than the project dsa config
     #project_provider.upsert_component(proj)
-    result_provider.upsert_result('dsa_single_metamodel', mm.table_config, dsa_results_frame, request = request)
+    result_provider.upsert_result(
+        'dsa_single_metamodel', 
+        mm.table_config, 
+        dsa_results_frame, 
+        request = request
+    )
+    db_staleness.record_process_run(mm.id, 'dsa', started_ns)
 
     return 'ok'

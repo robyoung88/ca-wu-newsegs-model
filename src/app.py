@@ -1,18 +1,25 @@
 """NewSEGS model as a multi-page app.
 """
 import time
-
-from newsegsmodelapp.backend.db.db import init_db
-from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 t1 = time.time()
+
+# Set up logging
+import logging
+if not logging.getLogger().hasHandlers():
+    import app_logging
+logger = logging.getLogger(__name__)
+
 import json
 import os
 from pathlib import Path
 import uuid
 
-from dash import Dash, Input, Output, State
+from dash import ALL, Dash, Input, Output, State, DiskcacheManager, CeleryManager
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
+from flask import jsonify
+import sqlalchemy as sa
+import sqlite3
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
@@ -23,6 +30,8 @@ import newsegsmodelframework.register_plugins
 import newsegsmodelapp.register_plugins # MUST be imported
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db import init_db
+from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
 from newsegsmodelapp.components.callbacks.action_callbacks import add_action_callbacks
@@ -46,17 +55,8 @@ AVAILABLE_MODELS = ['sprake', 'sprake-localised']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
-import threading
-import traceback
-
 t2 = time.time()
-print(f'Imports in {t2-t1}')
-
-def thread_exception_handler(args):
-    print(f"Exception in thread {args.thread.name}: {args.exc_type}")
-    traceback.print_tb(args.exc_traceback)
-
-threading.excepthook = thread_exception_handler
+logger.info('App imports completed in %s', t2 - t1)
 
 # -----------------------------------------------
 # Layout
@@ -103,8 +103,12 @@ def serve_layout():
         dcc.Store(id = CONFIGURATION_UPDATE_TRIGGER_ID, data = '', storage_type = 'memory'),
         dcc.Store(id = 'trigger-check-requests', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'trigger-check-stale', data = 0, storage_type = 'memory'),
+        # Set when process staleness may have changed outside the input-group update triggers
+        dcc.Store(id = 'staleness-update-trigger', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
+        dcc.Interval(id = 'feedback-graph-interval', interval = 100, n_intervals = 1, max_intervals = 1, disabled = False),
+        dcc.Interval(id = 'delayed-result-container-refill-interval', interval = 1000, n_intervals = 1, max_intervals = 1, disabled = False),
     ] 
     + post_action_triggers
 )
@@ -138,7 +142,7 @@ def add_display_callbacks(app: NewsegsDash):
     def display_page(pathname, session_id, app_state):
         app_state = json.loads(app_state) if app_state else {}
         current_page = app_state.get('current_page', '')
-        print(pathname, ' ', current_page)
+        logger.info('URL changed to %s, current page is %s', pathname, current_page)
 
         # Will allow for refreshes - if we don't and the page load doesn't complete,
         # content will be permanently blank until we navigate.
@@ -147,6 +151,7 @@ def add_display_callbacks(app: NewsegsDash):
         app_state_hold = app_state.copy()
 
         def return_app_state(app_state):
+            # Do not trigger listeners on app state if it has not actually changed.
             if app_state == app_state_hold:
                 return no_update
             return json.dumps(app_state)
@@ -189,7 +194,7 @@ def add_display_callbacks(app: NewsegsDash):
         try:
             page = registers.get_page(pagename)
         except KeyError as e:
-            print (e)
+            logger.warning('Page not found for %s - KeyError raised', pagename)
 
         if page is None:
             rval[0] = '404'
@@ -218,9 +223,21 @@ def add_display_callbacks(app: NewsegsDash):
             session_id,
             model_type,
         )
-        print (f'Project {proj_id} has been found for session {session_id}')
+        logger.info('Project id "%s" has been found for session id "%s"', proj_id, session_id)
         return proj_id
 
+    @app.callback(
+        Output('delayed-result-container-refill-interval', 'n_intervals'),
+        Input('active-project-id', 'data'),
+        prevent_initial_call = True
+    )
+    def _(apid):
+        return 0 # Interval will increment to 1
+
+project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
+request_handler = FromDatabaseRequestHandler(db.get_engine)
+    
 # -----------------------------------------------
 # Create App
 # -----------------------------------------------
@@ -229,9 +246,7 @@ def create_app(external_stylesheets = None) -> Dash:
     """
     Create the NewSEGS Dash App
     """
-    print('Creating app')
-    t3 = time.time()
-    print(f'TTS: {t3-t1}')
+    logger.info('Creating App')
 
     if external_stylesheets is None:
         external_stylesheets = BOOTSTRAP_STYLESHEETS
@@ -239,9 +254,9 @@ def create_app(external_stylesheets = None) -> Dash:
         # Always add on bootstrap
         external_stylesheets += BOOTSTRAP_STYLESHEETS
 
-    project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
-    results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
-    request_handler = FromDatabaseRequestHandler(db.get_engine)
+    # project_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+    # results_provider = CachedFromDatabaseResultProvider(db.get_engine,  RESULTS_STORE)
+    # request_handler = FromDatabaseRequestHandler(db.get_engine)
 
     app = NewsegsDash(
         __name__,
@@ -251,6 +266,7 @@ def create_app(external_stylesheets = None) -> Dash:
         project_provider = project_provider,
         results_provider = results_provider,
         request_handler = request_handler,
+        #background_callback_manager = background_callback_manager,
     )
 
     app.layout = serve_layout
@@ -259,8 +275,31 @@ def create_app(external_stylesheets = None) -> Dash:
         [serve_layout()] + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
     )
 
+    server = app.server
+    # ---------------------------------
+    # Health check
+    # ---------------------------------
+    @server.route('/health')
+    def health_check():
+        DB_PATH = Path(settings['DB_PATH'])
+        """Endpoint for load balancers and Docker to verify app readiness"""
+        # Check if DB file exists (might be restoring)
+        if not DB_PATH.exists():
+            return jsonify({'status': 'starting', 'message': 'Database is restoring...'}), 503
+
+        # Check if the database is responsive and not locked/corrupt
+        try:
+            with db.get_engine().connect() as conn:
+                # Lightweight query to verify read access
+                conn.execute(sa.text('SELECT 1 FROM sqlite_master LIMIT 1'))
+
+            return jsonify({'status': 'healthy', 'message': 'Service is operational'}), 200
+        except sqlite3.Error as e:
+            return jsonify({'status': 'unhealthy', 'message': f'Database error: {e}'}), 500
+
     # Bind callbacks
     add_display_callbacks(app)
+    #add_background_callbacks(app)
     add_input_container_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
     map.add_site_selector_callbacks(app)
@@ -272,19 +311,27 @@ def create_app(external_stylesheets = None) -> Dash:
     for page in registers.PAGE_REGISTER.values():
         page.attach_callbacks(app)
 
+    t3 = time.time()
+    logger.info('App Time To Start (including imports): %s', t3 - t1)
+
     return app
 
 # -----------------------------------------------
 # if __name__ == '__main__'
 # -----------------------------------------------
 
+init_db()
+app = create_app()
+# Expose the underlying Flask server for WSGI servers like Gunicorn
+server = app.server
+
 if __name__ == '__main__':
-    init_db()
-    app = create_app()
-    #try:
-    app.run(debug = True, use_reloader = False)
-    # except SystemExit as e:
-    #     print(f"Caught SystemExit with code: {e.code}")
-    #     import traceback
-    #     traceback.print_stack()
-        
+#    init_db()
+#    app = create_app()
+    app.run(
+        host = '0.0.0.0', port = 8050, debug = True, use_reloader = False, threaded = True,
+        # Circular-callback validation expands every pattern-matching id over all
+        # wildcard values in the browser, which blocks the initial page load for
+        # about a minute. Set DASH_VALIDATE_CALLBACKS=true to check for cycles.
+        dev_tools_validate_callbacks = os.environ.get('DASH_VALIDATE_CALLBACKS', 'false').lower() == 'true',
+    )

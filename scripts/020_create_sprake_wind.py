@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from common import setup_script_env
+from newsegsmodelframework import STATICDATA
 setup_script_env()
 
 from config import settings
@@ -47,12 +48,13 @@ if __name__ == '__main__':
         .mean()
         .reset_index()
     )
-    
+
+    lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
+
     wind_out.to_csv(
         os.path.join(
-            settings.get('SprakeDataLoc'),
+            lookup_dir,
             'default_wind_speeds.csv'
         ),
         index=False
     )
-

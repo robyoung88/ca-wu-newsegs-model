@@ -1,4 +1,6 @@
 """Register input container and input header container content creators for deterministic supersection"""
+import logging
+logger = logging.getLogger(__name__)
 
 import json
 from typing import cast
@@ -8,8 +10,10 @@ from dash import html
 from dash.exceptions import PreventUpdate
 from cachetools import LRUCache
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components import energy_balance_estimation
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
+from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel, get_focussed_metamodel
 from newsegsmodelapp.components.composite_input_components import generic_create_deterministic_input_container_contents
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.registers import register_input_container_content_creator, register_input_section_header_content_creator
@@ -49,19 +53,17 @@ for supersection, section_tuple in sections_by_supersection.items():
         @register_input_container_content_creator(supersection, section, MODEL_TYPE)
         def _(
             proj_id: str, 
-            proj_provider: NewsegsProjectProviderInterface, 
+            project_provider: NewsegsProjectProviderInterface, 
             _section: str = section # Using default argument trick to force evaluation of section
         ) -> list[dash.development.base_component.Component]:
-            proj = proj_provider.get_project(proj_id)
-            mm = proj.get_focussed_metamodel()
-            #key = (_section, proj.id, mm.id)
-            #if key in _cache:
-            #    return _cache[key]
+            provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+            logger.debug('Getting lightweight project - Creating Deterministic Input Container contents')
+            lproj = provider.get_lightweight_project(proj_id)
+            lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(lproj.focussed_metamodel_id)]
 
             component = generic_create_deterministic_input_container_contents(
-                _section, proj, mm
+                _section, lproj, lmm, provider.variable_provider
             )
-            #_cache[key] = component
 
             return component
 
@@ -69,12 +71,13 @@ for supersection, section_tuple in sections_by_supersection.items():
 #################################################
 # HEADER FUNCTIONS
 #################################################
-def _get_val(mm, key) -> int | float:
-    return cast(variable.NumericScalarVariable, mm.variables.get(key)).deterministic_value
+def _get_val(lmm, key, variableprovider: FromDatabaseVariableProvider) -> int | float:
+    var = variableprovider.get_lightweight_variable(lmm.variables.get(key))
+    return var.last_deterministic_value
 
-def _create_generation_header_summary(mm):
-    wind_cap = _get_val(mm, 'gen_input.wind_capacity.0')
-    pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
+def _create_generation_header_summary(mm, provider):
+    wind_cap = _get_val(mm, 'gen_input.wind_capacity.0', provider)
+    pv_cap = _get_val(mm, 'gen_input.pv_capacity.0', provider)
     return [
         'Total generation: ',
         icons.get_icon('gen-wind','p-1 my-1 ms-1', 'unpadded'),
@@ -87,26 +90,26 @@ def _create_generation_header_summary(mm):
         " kWp"
     ]
 
-def _create_storage_header_summary(mm):
-    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
+def _create_storage_header_summary(mm, provider):
+    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0', provider)
     return [
         'Storage capacity: ',
         html.Span(f"{stor_cap:,.0f}"),
         " kWh"
     ]
 
-def _create_bc_header_summary(mm):
-    site_size = _get_val(mm, 'bc_input.n_units.0')
+def _create_bc_header_summary(mm, provider):
+    site_size = _get_val(mm, 'bc_input.n_units.0', provider)
     return [
         'Site size: ',
         html.Span(f"{site_size:,.0f}"),
         " units"
     ]
 
-def _create_dc_header_summary(mm):
-    efficiency_reduction = _get_val(mm, 'dc_input.efficiency_reduction.0')
-    n_evs_per_household = _get_val(mm, 'dc_input.n_evs_per_household.0')
-    ev_consumption_per_year = _get_val(mm, 'dc_input.annual_residential_consumption_per_ev.0')
+def _create_dc_header_summary(mm, provider):
+    efficiency_reduction = _get_val(mm, 'dc_input.efficiency_reduction.0', provider)
+    n_evs_per_household = _get_val(mm, 'dc_input.n_evs_per_household.0', provider)
+    ev_consumption_per_year = _get_val(mm, 'dc_input.annual_residential_consumption_per_ev.0', provider)
     ann_appliance = (
         (1.0 - float(efficiency_reduction))  # pyright: ignore[reportArgumentType]
         * MODEL_CONSTANTS['sprake_model']['sprake_ref_appliance_consumption_annual']
@@ -126,8 +129,8 @@ def _create_dc_header_summary(mm):
         " kWh/yr/household"
     ]
 
-def _create_model_config_header_summary(mm):
-    time_horizon = _get_val(mm, 'mc_input.horizon.0')
+def _create_model_config_header_summary(mm, provider):
+    time_horizon = _get_val(mm, 'mc_input.horizon.0', provider)
     return [
         icons.get_icon('model-settings-time-horizon'),
         " = ",
@@ -135,13 +138,13 @@ def _create_model_config_header_summary(mm):
         " years"
     ]
 
-def _create_cost_generation_header_summary(mm):
-    wind_cap = _get_val(mm, 'gen_input.wind_capacity.0')
-    pv_cap = _get_val(mm, 'gen_input.pv_capacity.0')
-    capex_rate_wind = _get_val(mm, 'gen_costs.wind_capex_per_kw.0')
-    capex_rate_pv = _get_val(mm, 'gen_costs.pv_capex_per_kw.0')
-    om_rate_wind = _get_val(mm, 'gen_costs.wind_om_per_kw_year.0')
-    om_rate_pv = _get_val(mm, 'gen_costs.pv_om_per_kw_year.0')
+def _create_cost_generation_header_summary(mm, provider):
+    wind_cap = _get_val(mm, 'gen_input.wind_capacity.0', provider)
+    pv_cap = _get_val(mm, 'gen_input.pv_capacity.0', provider)
+    capex_rate_wind = _get_val(mm, 'gen_costs.wind_capex_per_kw.0', provider)
+    capex_rate_pv = _get_val(mm, 'gen_costs.pv_capex_per_kw.0', provider)
+    om_rate_wind = _get_val(mm, 'gen_costs.wind_om_per_kw_year.0', provider)
+    om_rate_pv = _get_val(mm, 'gen_costs.pv_om_per_kw_year.0', provider)
 
     tot_capex = (
         capex_rate_wind * wind_cap
@@ -160,10 +163,10 @@ def _create_cost_generation_header_summary(mm):
         "/yr"
     ]
 
-def _create_cost_storage_header_summary(mm):
-    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0')
-    capex_rate_bess = _get_val(mm, 'stor_costs.bess_capex_per_kwh.0')
-    om_rate_bess = _get_val(mm, 'stor_costs.bess_om_per_kwh_year.0')
+def _create_cost_storage_header_summary(mm, provider):
+    stor_cap = _get_val(mm, 'stor_input.storage_capacity.0', provider)
+    capex_rate_bess = _get_val(mm, 'stor_costs.bess_capex_per_kwh.0', provider)
+    om_rate_bess = _get_val(mm, 'stor_costs.bess_om_per_kwh_year.0', provider)
 
     tot_capex = capex_rate_bess * stor_cap
     tot_ongoing = om_rate_bess * stor_cap
@@ -178,19 +181,20 @@ def _create_cost_storage_header_summary(mm):
 
 def _create_cost_sales_header_summary(
         mm,
+        provider,
         eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
     ):
     if eb is None:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
-        eb = update_estimated_energy_balance(mm, eb)
+        eb = update_estimated_energy_balance(mm, provider, eb)
     
-    n_units = _get_val(mm, 'bc_input.n_units.0')
+    n_units = _get_val(mm, 'bc_input.n_units.0', provider)
 
-    standing_charge = _get_val(mm, 'sales_costs.resident_sc_per_unit_day.0')
-    per_unit_resident = _get_val(mm, 'sales_costs.resident_var_per_unit.0')
+    standing_charge = _get_val(mm, 'sales_costs.resident_sc_per_unit_day.0', provider)
+    per_unit_resident = _get_val(mm, 'sales_costs.resident_var_per_unit.0', provider)
     per_unit_ev = per_unit_resident
 
-    per_unit_export = _get_val(mm, 'sales_costs.grid_export_var_per_unit.0')
+    per_unit_export = _get_val(mm, 'sales_costs.grid_export_var_per_unit.0', provider)
 
     aeb = eb.estimated_annual_energy_balance
 
@@ -247,12 +251,12 @@ def _create_cost_sales_header_summary(
     ]
 
 def _create_cost_import_header_summary(
-        mm,
+        mm, provider,
         eb: energy_balance_estimation.EstimatedEnergyBalance | None = None
     ):
     if not eb:
         eb = energy_balance_estimation.EstimatedEnergyBalance()
-        eb = update_estimated_energy_balance(mm, eb)
+        eb = update_estimated_energy_balance(mm, provider, eb)
 
     aeb = eb.estimated_annual_energy_balance
     total_consumption = (
@@ -272,8 +276,8 @@ def _create_cost_import_header_summary(
     if underproduction < 0:
         underproduction = 0
     
-    standing_charge = _get_val(mm, 'import_costs.grid_import_sc_per_day.0')
-    per_unit_import = _get_val(mm, 'import_costs.grid_import_var_per_unit.0')
+    standing_charge = _get_val(mm, 'import_costs.grid_import_sc_per_day.0', provider)
+    per_unit_import = _get_val(mm, 'import_costs.grid_import_var_per_unit.0', provider)
 
     import_costs = underproduction * per_unit_import
     import_standing_costs = standing_charge * 365
@@ -289,9 +293,9 @@ def _create_cost_import_header_summary(
         "/yr"
     ]
 
-def _create_finance_header_summary(mm):
-    benefit_dr = _get_val(mm, 'finance_settings.benefit_discount_rate.0')
-    cost_dr = _get_val(mm, 'finance_settings.cost_discount_rate.0')
+def _create_finance_header_summary(mm, provider):
+    benefit_dr = _get_val(mm, 'finance_settings.benefit_discount_rate.0', provider)
+    cost_dr = _get_val(mm, 'finance_settings.cost_discount_rate.0', provider)
     return [
         icons.get_icon('finance-settings-benefit-discount'),
         " = ",
@@ -318,8 +322,9 @@ header_creation_functions = {
 def _generic_create_deterministic_input_header_contents(
     section: str,
     mm: NewsegsMetaModel,
+    provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
-    return header_creation_functions[section](mm)
+    return header_creation_functions[section](mm, provider)
 
 for supersection, section_tuple in sections_by_supersection.items():
     for section in section_tuple:
@@ -332,8 +337,9 @@ for supersection, section_tuple in sections_by_supersection.items():
             ) -> list[dash.development.base_component.Component]:
                 if not proj_id:
                     raise PreventUpdate
+                logger.debug('Getting lightweight project - Creating Deterministic Input Section Header Contents [%s]', _section)
                 return _generic_create_deterministic_input_header_contents(
-                    _section, get_focussed_metamodel(proj_id, proj_provider)
+                    _section, get_focussed_lightweight_metamodel(proj_id, proj_provider), proj_provider.variable_provider
                 )
 
 

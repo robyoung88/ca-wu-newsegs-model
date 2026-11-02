@@ -4,6 +4,7 @@ import warnings
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
+from newsegsmodelapp.backend.db.db import write_transaction
 
 def generic_snapshot_entity(
     engine: sa.Engine,
@@ -20,7 +21,7 @@ def generic_snapshot_entity(
 
     project_id = root_id if project_id is None else project_id
 
-    with engine.begin() as conn:
+    with write_transaction(engine) as conn:
         # Create the master Snapshot entry
         snapshots = metadata.tables['snapshots']
         res = conn.execute(
@@ -201,7 +202,7 @@ def generic_restore_snapshot(
     # Key mapping registry: { ('table_name', old_id): new_id }
     id_map: dict[tuple, Any] = {}
 
-    with engine.begin() as conn:
+    with write_transaction(engine) as conn:
         for table in metadata.sorted_tables:
             # Skip non-target tables
             if table.name.startswith('snapshot_') or table.name in ('snapshots', 'users', 'sessions', 'groups'):
@@ -292,7 +293,7 @@ def delete_snapshot(
     if snapshots_table is None:
         raise ValueError("The 'snapshots' table is not present in metadata.")
 
-    with engine.begin() as conn:
+    with write_transaction(engine) as conn:
         # Iterate through sorted_tables in reverse order (bottom-up: children before parents)
         # to respect Foreign Key constraints when deleting from child/junction snapshot tables.
         for table in reversed(metadata.sorted_tables):
@@ -326,7 +327,7 @@ def delete_snapshots_for_project(
     if snapshots_table is None:
         raise ValueError("The 'snapshots' table is not present in metadata.")
 
-    with engine.begin() as conn:
+    with write_transaction(engine) as conn:
         # 1. Fetch all snapshot_ids associated with the given project_id
         snapshot_ids = conn.execute(
             sa.select(snapshots_table.c.snapshot_id).where(

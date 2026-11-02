@@ -1,8 +1,6 @@
-import copy
 from typing import List
 from collections.abc import Callable, Mapping, Iterable
 
-from dash import html
 from functools import reduce, partial
 
 import pandas as pd
@@ -341,26 +339,6 @@ def recursive_val_percent_formatter_factory(value_id, fraction_id, value_dp=0, f
         return fmt.format(recursive_get(d, *value_id), recursive_get(d, *fraction_id))
     return val_percent_formatter
 
-def present_single_stat(data_list,
-                        stat_name,
-                        stat_label,
-                        stat_value='mean',
-                        fmt='{:.2f}',
-                        none_str='-'):
-    n_configs = len(data_list)
-
-    if isinstance(stat_name, str):
-        comp_result = [x.get(stat_name, None) if x is not None else None for x in data_list]
-    else:
-        comp_result = [recursive_get(x, stat_name) if x is not None else None for x in data_list]
-        
-    vals = [x.get(stat_value, None) if x is not None else None for x in comp_result]
-    
-    rw = [html.Td(stat_label, colSpan=2)] \
-        + [html.Td(fmt.format(x)) if x is not None else html.Td(none_str) for x in vals]
-
-    return [html.Tr(rw)]
-
 def as_df(
     df: None|pd.DataFrame|dict,
     orient: str = 'columns',
@@ -629,92 +607,8 @@ def present_single_stat_per_row_plus_paired_scalars(
     
     return otbl
     
-def present_stat_description(
-        data_list,
-        stat_name,
-        stat_label,
-        stat_list=ANNUAL_DEFAULT_STATS,
-        fmt='{:,.2f}',
-        none_str='-'
-    ):
+def _compound_trans_stats(data_list, stat_name, stat_formatter, stat_list):
     n_rows = len(stat_list)
-    n_configs = len(data_list)
-
-    # Make a list of the dictionaries of computational results for this stat,
-    # e.g. if stat_name is annual_production,
-    # then comp_result may consist of dicts of {'mean': xxx, 'min': yyy, 'max': zzz}
-    if isinstance(stat_name, str):
-        comp_result = [x.get(stat_name, None) if x is not None else None for x in data_list]
-    else:
-        comp_result = [recursive_get(x, *stat_name) if x is not None else None for x in data_list]
-
-    def get_Tr(idx):
-        stat = stat_list[idx]
-        if (idx == 0):
-            rw = [html.Td(stat_label, rowSpan=n_rows)]
-        else:
-            rw = []
-        rw = rw + [html.Td(stat['label'])]
-        val_fmt = stat.get('fmt', None)
-        if val_fmt is None:
-            val_fmt = fmt
-        
-        val_lookup = stat.get('value')
-        
-        vals = [x.get(val_lookup, None) if x is not None else None for x in comp_result]
-        
-        rw = rw + [html.Td(val_fmt.format(x)) if x is not None else html.Td(none_str) for x in vals]
-        return html.Tr(rw)
-
-    rws = [get_Tr(i) for i in range(n_rows)]
-    return rws
-
-def present_stat_description_parallel(
-    data_list,
-    container_name,
-    stat_label,
-    stat1_name,
-    stat2_name,
-    stat_list = ANNUAL_DEFAULT_STATS,
-    fmt1='{:,.0f}',
-    fmt2='{:,.1%}',
-    none_str='-'
-):
-    n_rows = len(stat_list)
-    n_configs = len(data_list)
-
-    if isinstance(container_name, str):
-        config_containers = [x.get(container_name, None) if x is not None else None for x in data_list]
-    else:
-        config_containers = [recursive_get(x, *container_name) if x is not None else None for x in data_list]
-    
-    def get_Tr(idx):
-        stat = stat_list[idx]
-        if (idx == 0):
-            rw = [html.Td(stat_label, rowSpan=n_rows)]
-        else:
-            rw = []
-        rw = rw + [html.Td(stat['label'])]
-
-        val_lookup = stat.get('value')
-        
-        vals_1 = [x.get(stat1_name,{}).get(val_lookup) if x is not None else None for x in config_containers]
-        vals_2 = [x.get(stat2_name,{}).get(val_lookup) if x is not None else None for x in config_containers]
-
-        rw = rw + [html.Td(fmt1.format(x)+' ('+fmt2.format(y)+")") if x is not None else html.Td(none_str) for x, y in zip(vals_1, vals_2)]
-        return html.Tr(rw)
-    
-    rws = [get_Tr(i) for i in range(n_rows)]
-    return rws
-
-def present_stat_description_compound(data_list,
-                                      stat_name,
-                                      stat_label,
-                                      stat_formatter=DEFAULT_STAT_FORMATTER,
-                                      stat_list=DEFAULT_HOURS_IN_RANGE_STATS):
-    # Extension to present_stat_description to allow for complex compound formatting of table values
-    n_rows = len(stat_list)
-    n_configs = len(data_list)
 
     # Grab the computed results for the desired stat
     if isinstance(stat_name, str):
@@ -742,22 +636,14 @@ def present_stat_description_compound(data_list,
 
         return {stat_list[i].get('value'): trans_stat(i) for i in range(n_rows)}
 
-    trans_stats = [{str(stat_name): transform_stats(x)} for x in comp_result]
+    return [{str(stat_name): transform_stats(x)} for x in comp_result]
 
-    return present_stat_description(trans_stats, str(stat_name), stat_label, stat_list, fmt="{}")
-
-def present_self_consumption_data(data_list,
-                                  table_name,
-                                  stat_label,
-                                  stat_list=ANNUAL_SC_STATS,
-                                  index_filter='generation_export'):
+def _self_consumption_trans_stats(data_list, table_name, stat_list, index_filter):
     """
-    Process a list of generation data to extract self-consumption into a table
-
-
+    Returns the per-config formatted stats, and a copy of stat_list with each
+    'value' set to its 'label' so that the formatted stats can be looked up.
     """
     n_rows = len(stat_list)
-    n_configs = len(data_list)
 
     # Get the list of tight dictionary representations of dataframes
     if isinstance(table_name, str):
@@ -787,23 +673,14 @@ def present_self_consumption_data(data_list,
 
     trans_stats = [{str(table_name): transform_stats(x)} for x in dict_data]
 
-    stat_list = copy.copy(stat_list)
-    for i in range(len(stat_list)):
-        stat_list[i]['value'] = stat_list[i]['label']
+    return trans_stats, [{**x, 'value': x['label']} for x in stat_list]
 
-    return present_stat_description(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")
-
-def present_seasonal_consumption_data(
-    data_list,
-    table_name,
-    stat_label,
-    stat_list=ANNUAL_CONS_STATS
-):
+def _seasonal_consumption_trans_stats(data_list, table_name, stat_list):
     """
-    Process a list of seasonal consumption data into a table
+    Returns the per-config formatted stats, and a copy of stat_list with each
+    'value' set to its 'label' so that the formatted stats can be looked up.
     """
     n_rows = len(stat_list)
-    n_configs = len(data_list)
 
     # Get the list of tight dictionary representations of dataframes
     if isinstance(table_name, str):
@@ -833,94 +710,193 @@ def present_seasonal_consumption_data(
 
     trans_stats = [{str(table_name): transform_stats(x)} for x in dict_data]
 
-    stat_list = copy.copy(stat_list)
-    for i in range(len(stat_list)):
-        stat_list[i]['value'] = stat_list[i]['label']
+    return trans_stats, [{**x, 'value': x['label']} for x in stat_list]
 
-    return present_stat_description(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")        
+# -----------------------------------------------
+# Record builders
+#
+# Each returns a list of row dicts for rendering with
+# results_table.create_result_grid, keyed by the label fields 'variable',
+# optionally 'season', and 'statistic', plus 'config-N' per configuration.
+# A cell value is either a display string or, for a zoomable date,
+# {'label': ..., 'start': ...[, 'end': ...]}.
+# -----------------------------------------------
 
-def present_event_and_date(data_list,
-                           event_name,
-                           event_label,
-                           event_value,
-                           event_value_formatter,
-                           date_label='On:',
-                           event_date='datetime',
-                           none_str='-',
-                           nonedate_str='#/#/#',
-                           trimdate=15):
-    n_configs = len(data_list)
+def _config_key(idx):
+    return f'config-{idx+1}'
 
-    if isinstance(event_name, str):
-        comp_result = [x.get(event_name, None) if x is not None else None for x in data_list]
-    else:
-        comp_result = [recursive_get(x, event_name) if x is not None else None for x in data_list]
+def _comp_results(data_list, stat_name):
+    if isinstance(stat_name, str):
+        return [x.get(stat_name, None) if x is not None else None for x in data_list]
+    return [recursive_get(x, *stat_name) if x is not None else None for x in data_list]
 
-    val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] +
-        [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
+def dataframe_records(df: pd.DataFrame) -> list[dict]:
+    """
+    Records from a table made by the present_* functions, indexed by
+    'variable'[, 'season'], 'statistic' with a column per configuration.
+    """
+    if df.empty:
+        return []
+    return df.reset_index().to_dict('records')
 
-    date_row = html.Tr(
-        [html.Td(date_label, style={'text-align':'end'})] 
-        + [
-            html.Td(
-                html.A(
-                    f'{x.get(event_date)[:-trimdate]}',
-                    disable_n_clicks = False,
-                    id = {
-                        'type': 'link-event-date',
-                        'date': x.get(event_date)[:-trimdate]
-                    },
-                    style = {
-                        'cursor': 'zoom-in'
-                    }
-                )
-            ) if x is not None else html.Td(none_str) for x in comp_result
-        ]
-    )
+def single_stat_records(
+    data_list,
+    stat_name,
+    stat_label,
+    stat_value='mean',
+    fmt='{:.2f}',
+    none_str='-'
+) -> list[dict]:
+    """A single row of one statistic per configuration"""
+    comp_result = _comp_results(data_list, stat_name)
 
-    return [val_row, date_row]    
+    rec = {'variable': stat_label, 'statistic': ''}
+    for i, x in enumerate(comp_result):
+        val = x.get(stat_value, None) if x is not None else None
+        rec[_config_key(i)] = fmt.format(val) if val is not None else none_str
+    return [rec]
 
-def present_event_and_daterange(data_list,
-                                event_name,
-                                event_label,
-                                event_value,
-                                event_value_formatter,
-                                range_label='From - To',
-                                event_start='datetime_start',
-                                event_end='datetime_end',
-                                none_str='-',
-                                nonedate_str='#/#/# - #/#/#',
-                                trimdate = 9):
-    #n_rows = 2
-    n_configs = len(data_list)
+def stat_description_records(
+    data_list,
+    stat_name,
+    stat_label,
+    stat_list=ANNUAL_DEFAULT_STATS,
+    fmt='{:,.2f}',
+    none_str='-'
+) -> list[dict]:
+    """A row per statistic in stat_list"""
+    comp_result = _comp_results(data_list, stat_name)
 
-    if isinstance(event_name, str):
-        comp_result = [x.get(event_name, None) if x is not None else None for x in data_list]
-    else:
-        comp_result = [recursive_get(x, event_name) if x is not None else None for x in data_list]
+    records = []
+    for stat in stat_list:
+        val_fmt = stat.get('fmt', None) or fmt
+        val_lookup = stat.get('value')
+        rec = {'variable': stat_label, 'statistic': stat['label']}
+        for i, x in enumerate(comp_result):
+            val = x.get(val_lookup, None) if x is not None else None
+            rec[_config_key(i)] = val_fmt.format(val) if val is not None else none_str
+        records.append(rec)
+    return records
 
-    val_row = html.Tr([html.Td(event_label,rowSpan=2), html.Td()] + 
-        [html.Td(event_value_formatter(x.get(event_value))) if x is not None else html.Td(none_str) for x in comp_result])
+def stat_description_parallel_records(
+    data_list,
+    container_name,
+    stat_label,
+    stat1_name,
+    stat2_name,
+    stat_list = ANNUAL_DEFAULT_STATS,
+    fmt1='{:,.0f}',
+    fmt2='{:,.1%}',
+    none_str='-'
+) -> list[dict]:
+    """A row per statistic in stat_list, formatted as 'stat1 (stat2)'"""
+    config_containers = _comp_results(data_list, container_name)
 
-    date_row = html.Tr(
-        [html.Td(range_label, style={'text-align':'end'})] 
-        + [
-            html.Td(
-                html.A(
-                    f'{x.get(event_start)[:-trimdate]} - {x.get(event_end)[:-trimdate]}',
-                    disable_n_clicks = False,
-                    id = {
-                        'type': 'link-event-daterange',
-                        'datetime_start': x.get(event_start)[:-trimdate],
-                        'datetime_end': x.get(event_end)[:-trimdate],
-                    },
-                    style = {
-                        'cursor': 'zoom-in'
-                    }
-                )
-            ) if x is not None else html.Td(nonedate_str) for x in comp_result
-        ]
-    )
+    records = []
+    for stat in stat_list:
+        val_lookup = stat.get('value')
+        rec = {'variable': stat_label, 'statistic': stat['label']}
+        for i, x in enumerate(config_containers):
+            val_1 = x.get(stat1_name, {}).get(val_lookup) if x is not None else None
+            val_2 = x.get(stat2_name, {}).get(val_lookup) if x is not None else None
+            rec[_config_key(i)] = fmt1.format(val_1) + ' (' + fmt2.format(val_2) + ')' if val_1 is not None else none_str
+        records.append(rec)
+    return records
+
+def stat_description_compound_records(
+    data_list,
+    stat_name,
+    stat_label,
+    stat_formatter=DEFAULT_STAT_FORMATTER,
+    stat_list=DEFAULT_HOURS_IN_RANGE_STATS
+) -> list[dict]:
+    """A row per statistic in stat_list, allowing compound formatting of values"""
+    trans_stats = _compound_trans_stats(data_list, stat_name, stat_formatter, stat_list)
+    return stat_description_records(trans_stats, str(stat_name), stat_label, stat_list, fmt="{}")
+
+def self_consumption_records(
+    data_list,
+    table_name,
+    stat_label,
+    stat_list=ANNUAL_SC_STATS,
+    index_filter='generation_export'
+) -> list[dict]:
+    """Self-consumption extracted from a list of generation data"""
+    trans_stats, stat_list = _self_consumption_trans_stats(data_list, table_name, stat_list, index_filter)
+    return stat_description_records(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")
+
+def seasonal_consumption_records(
+    data_list,
+    table_name,
+    stat_label,
+    stat_list=ANNUAL_CONS_STATS
+) -> list[dict]:
+    """Seasonal consumption extracted from a list of consumption data"""
+    trans_stats, stat_list = _seasonal_consumption_trans_stats(data_list, table_name, stat_list)
+    return stat_description_records(trans_stats, str(table_name), stat_label, stat_list, fmt="{}")
+
+def event_and_date_records(
+    data_list,
+    event_name,
+    event_label,
+    event_value,
+    event_value_formatter,
+    date_label='On:',
+    event_date='datetime',
+    none_str='-',
+    nonedate_str='#/#/#',
+    trimdate=15
+) -> list[dict]:
+    """
+    A value row and a date row for an event. The date row holds zoomable
+    date cells.
+    """
+    comp_result = _comp_results(data_list, event_name)
+
+    val_row = {'variable': event_label, 'statistic': ''}
+    date_row = {'variable': event_label, 'statistic': date_label, '_align_end': True}
+    for i, x in enumerate(comp_result):
+        if x is None:
+            val_row[_config_key(i)] = none_str
+            date_row[_config_key(i)] = none_str
+            continue
+        val_row[_config_key(i)] = event_value_formatter(x.get(event_value))
+        date = x.get(event_date)[:-trimdate]
+        date_row[_config_key(i)] = {'label': date, 'start': date}
+
+    return [val_row, date_row]
+
+def event_and_daterange_records(
+    data_list,
+    event_name,
+    event_label,
+    event_value,
+    event_value_formatter,
+    range_label='From - To',
+    event_start='datetime_start',
+    event_end='datetime_end',
+    none_str='-',
+    nonedate_str='#/#/# - #/#/#',
+    trimdate=9
+) -> list[dict]:
+    """
+    A value row and a date range row for an event. The date row holds
+    zoomable date range cells.
+    """
+    comp_result = _comp_results(data_list, event_name)
+
+    val_row = {'variable': event_label, 'statistic': ''}
+    # '_wrap' gives the row room for the range to wrap onto a second line
+    date_row = {'variable': event_label, 'statistic': range_label, '_align_end': True, '_wrap': True}
+    for i, x in enumerate(comp_result):
+        if x is None:
+            val_row[_config_key(i)] = none_str
+            date_row[_config_key(i)] = nonedate_str
+            continue
+        val_row[_config_key(i)] = event_value_formatter(x.get(event_value))
+        start = x.get(event_start)[:-trimdate]
+        end = x.get(event_end)[:-trimdate]
+        date_row[_config_key(i)] = {'label': f'{start} - {end}', 'start': start, 'end': end}
 
     return [val_row, date_row]
 

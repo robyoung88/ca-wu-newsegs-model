@@ -75,6 +75,7 @@ def run_dsa(
     statistics: Sequence[DSA_FLOAT_STATISTIC] = get_args(DSA_FLOAT_STATISTIC),
     progress: Callable[[int, int], None] | None = None,
     cancel_status: Callable[[], bool] | None = None,
+    precomputed_deterministic: bool = False,
 ) -> pd.DataFrame:
     """_summary_
 
@@ -82,7 +83,8 @@ def run_dsa(
         mm (NewsegsMetaModel): _description_
         statistics (Sequence[DSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(DSA_FLOAT_STATISTIC).
         progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
-
+        precomputed_deterministic (Boolean): Metamodel is preloaded with valid determistic results.
+        
     Returns:
         pd.DataFrame: _description_
     """
@@ -107,12 +109,14 @@ def run_dsa(
     results = []
 
     # Run 0 - deterministic
-    for v in variables:
-        v.update_model(mdl)
-        v.update_model(fnc)
+    if not precomputed_deterministic:
+        for v in variables:
+            v.update_model(mdl)
+            v.update_model(fnc)
+
+        mdl.run()
+        fnc.run()
     
-    mdl.run()
-    fnc.run()
     results.append(
         make_dsa_result('deterministic', 'central', '-', mdl, fnc, statistics)
     )

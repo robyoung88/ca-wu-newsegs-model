@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 import datetime
 import json
+import time
 from typing import Callable
 
+from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
@@ -33,6 +35,7 @@ def execute_deterministic_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
 
     run_config = json.loads(request.payload)
@@ -46,53 +49,19 @@ def execute_deterministic_single_mm_run(
     else:
         raise KeyError(f'Metamodel {mm_id} not found for project {proj.id} - available values are {[x.id for x in proj.metamodels]}.')
 
-    # Ensure that the output tables get updated
-    #proj.table_config.revision += 1
-
-    n_steps = 3
-    step = 0
-    progress_callback(step, n_steps, f'Setting model variables.')
-
-    revisions = {
-        'grid': mm.model.grid.revision,
-        'generation': mm.model.generation.revision,
-        'consumption_storage': mm.model.consumption_storage.revision
-    }
-
-    mm.sync_model_with_changed_variables_deterministic()
-
-    if check_cancel_status():
-        raise InterruptedError(f'Process {run_id} has been cancelled.')
-
-    step += 1
-    progress_callback(step, n_steps, f'Running model.')
-
-    mm.model.run()
-    # TODO: May want to pull this into the run
-    #mm.model.table_config.revision += 1
-
-    if check_cancel_status():
-        raise InterruptedError(f'Process {run_id} has been cancelled.')
-
-    step += 1
-    progress_callback(step, n_steps, f'Running finance.')
-
-    mm.finance.run()
-    # TODO: May want to pull this into the run
-    #mm.finance.table_config.revision += 1
-
-    if check_cancel_status():
-        raise InterruptedError(f'Deterministic single configuration process {run_id} has been cancelled.')
-
-    step += 1
-    progress_callback(step, n_steps, f'Saving results.')
-
-    mm.model.grid.revision = revisions['grid']
-    mm.model.generation.revision = revisions['generation']
-    mm.model.consumption_storage.revision = revisions['consumption_storage']
-
-    result_provider.upsert_result('deterministic_grid', mm.model.grid, mm.model.get_grid_result(), request = request)
-    result_provider.upsert_result('deterministic_generation', mm.model.generation, mm.model.get_generation_result(), request = request)
-    result_provider.upsert_result('deterministic_consumption_storage', mm.model.consumption_storage, mm.model.get_consumption_storage_result(), request = request)
+    deterministic_run_metamodel(
+        mm,
+        proj,
+        request,
+        project_provider,
+        result_provider,
+        run_id,
+        progress_callback,
+        check_cancel_status,
+        start_step = 0,
+        total_steps = 2,
+        sequence_number = 1,
+        run_started_ns = started_ns,
+    )
 
     return 'ok'

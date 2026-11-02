@@ -1,6 +1,9 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 import time
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from dash import dcc, html, no_update
 from dash.exceptions import PreventUpdate
@@ -8,14 +11,18 @@ import numpy as np
 
 from useful_types import SequenceNotStr
 
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components.constants import VARIABLE_PARAMETER_KEYS
-from newsegsmodelapp.components import callback_utils
+from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelapp.components.icons import get_icon
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
-from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelapp.registers import register_input_handler
@@ -117,14 +124,23 @@ def update_single_parameter(
         new_val = callback_utils.get_triggered_value()
         if new_val is None:
             new_val = 0
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
-    variable_keys = {k: triggered_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
 
+    variable_keys = {k: triggered_id.get(k) for k in VARIABLE_PARAMETER_KEYS}
+    varid = make_varid(**variable_keys)
+    update_variable_keys = {k: v for k,v in variable_keys.items() if k in {'parameter_index', 'vector_location'}}
+    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Updating a single parameter')
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+
+    var_instance_id = lmm.variables[varid]
+    var = provider.variable_provider.get_variable(var_instance_id)
+    
     now = time.time_ns()
     
-    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = mm.update_variable_from_interface(
-        value = new_val, **variable_keys # pyright: ignore[reportArgumentType]
+    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = update_variable(
+        var, value = new_val, **update_variable_keys # pyright: ignore[reportArgumentType]
     )
 
     # Feed back current parameters
@@ -143,13 +159,12 @@ def update_single_parameter(
     for idx, id in enumerate(header_ids):
         try:
             content_creator = get_single_input_header_content_creator(
-                id['supersection'], id['section'], mm.model.model_type
+                id['supersection'], id['section'], lmm.model.model_type
             )
         except KeyError:
             content_creator = None
         if content_creator:
-            varid =  make_varid(**triggered_id)
-            return_dict['header_children'][idx] = content_creator(varid, mm)
+            return_dict['header_children'][idx] = content_creator(varid, var)
 
     # Update triggers
     for idx, id in enumerate(trigger_ids):
@@ -164,11 +179,30 @@ def update_single_parameter(
                 if psa_changed:
                     return_dict['trigger_data'][idx] = now
 
-    # Sync project to store
-    project_provider.upsert_component(proj)
+    if update_ok:
+        # Sync the variable
+        provider.variable_provider.upsert_variable(var)
 
-    # TODO: Feed back to inputs if the update is not ok (set invalid)
+        # Mark the model components as revised
+        table_components_to_revise = []
+        metamodels_to_revise = []
+        for mm in lproj.metamodels:
+            if var.id in set(mm.variables.values()):
+                table_components_to_revise.append(mm.table_config.id)
+                table_components_to_revise.append(mm.model.table_config.id)
+                table_components_to_revise.append(mm.finance.table_config.id)
+                metamodels_to_revise.append(mm.id)
+        table_components_to_revise.append(lproj.table_config.id)
+        
+        provider._component_provider.increment_revision(table_components_to_revise)
+        provider.metamodel_provider.increment_revision(metamodels_to_revise)
+        provider.increment_revision(lproj.id)
 
+        db_staleness.mark_inputs_changed(
+            metamodels_to_revise,
+            staleness.processes_affected(deterministic_changed, dsa_changed, psa_changed),
+        )
+    
     return return_dict
 
 def create_value_reset_button(
@@ -206,11 +240,15 @@ def _reset_value(
     if val is None:
         raise PreventUpdate
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Resetting a variable')
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
     varid = make_varid(**triggered_id)
-    var = mm.variables.get(varid)
+    var_uid = lmm.variables[varid]
+    var = provider.variable_provider.get_variable(var_uid)
+    
     if var is None:
         raise PreventUpdate
 
@@ -266,21 +304,23 @@ def _set_default_value(
     if val is None:
         raise PreventUpdate
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug("Getting lightweight project - Setting a variable's default value")
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
     varid = make_varid(**triggered_id)
-    var = mm.variables.get(varid)
+    var_uid = lmm.variables[varid]
+    var = provider.variable_provider.get_variable(var_uid)
+
     if var is None:
         raise PreventUpdate
 
     var.replace_default_parameters()
-    var.revision += 1
-    project_provider.upsert_component(proj)
-
+    provider.variable_provider.upsert_variable(var, force = True)
+    
     # No need for anything to happen
     return return_dict
-
 
 def create_blank_single_input_header_element(
     param_id: VariableInstanceParameterComponentID
@@ -303,24 +343,34 @@ def create_input_group_config_update_trigger(
 # Variable group cycling
 # -----------------------------------------------
 
-def get_metamodel_groups_for_var(proj: NewsegsProject, varid: str) -> list[set[int]]:
+def _variables_by_varid(
+    proj: LightweightNewsegsProject,
+    varid: str
+) -> list[str]:
+    var_uids = []
+    for lmm in proj.metamodels:
+        var_uid = lmm.variables.get(varid, None)
+        if var_uid is not None and var_uid not in var_uids:
+            var_uids.append(var_uid)
+    return var_uids
+
+def get_metamodel_groups_for_var(proj: LightweightNewsegsProject, varid: str) -> list[set[int]]:
     """
     Finds groups of metamodels (1-indexed) sharing the variable with `varid`.
     Returns a list of sets containing metamodel 1-based indices.
     """
-    var_to_mm_indices: dict[int, set[int]] = {}
-    if not varid in proj._variables_by_varid:
-        print(f'{varid} not in project variables - available keys are {proj._variables_by_varid.keys()}')
-        return []
-    for uid, var in proj._variables_by_varid[varid].items():
-        var_inst_id = id(var)
-        for idx, mm in enumerate(proj.metamodels, start = 1):
-            if varid in mm.variables and id(mm.variables[varid]) == var_inst_id:
-                var_to_mm_indices.setdefault(var_inst_id, set()).add(idx)
+    var_to_mm_indices: dict[str, set[int]] = {}
+    for idx, lmm in enumerate(proj.metamodels, start = 1):
+        if varid in lmm.variables:
+            var_to_mm_indices.setdefault(lmm.variables[varid], set()).add(idx)
             
     return list(var_to_mm_indices.values())
 
-def get_variable_sharing_status(proj, current_mm: NewsegsMetaModel, varid: str) -> tuple[str, str]:
+def get_variable_sharing_status(
+    proj: LightweightNewsegsProject,
+    current_mm: LightweightNewsegsMetaModel, 
+    varid: str
+) -> tuple[str, str]:
     """
     Determines status label and badge color scheme for a given variable.
     """
@@ -374,25 +424,26 @@ def _toggle_variable_sharing(
     if val is None:
         return return_dict
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+
     varid = make_varid(**triggered_id)
 
-    groups = get_metamodel_groups_for_var(proj, varid)
-    print(varid, ' ' , groups)
+    groups = get_metamodel_groups_for_var(lproj, varid)
     if not groups or len(groups) < 1 or (len(groups) == 1 and len(groups[0]) <= 1):
         return return_dict
     
-    current_mm_idx = proj.metamodels.index(mm) + 1
+    current_mm_idx = lproj.metamodels.index(lmm) + 1
+    old_var = project_provider.variable_provider.get_variable(lmm.variables[varid])
     
     # Locate current group index
     current_group_idx = next(i for i, g in enumerate(groups) if current_mm_idx in g)
-    print(current_group_idx)
 
     vars_to_delete = []
     if len(groups[current_group_idx]) == 1:
         # MM is alone in the group - will need to delete the variable as we exit.
-        vars_to_delete.append(mm.variables[varid].id)
+        vars_to_delete.append(lmm.variables[varid])
 
     # Cycle to the next group index
     next_group_idx = (current_group_idx + 1)# % len(groups)
@@ -400,36 +451,55 @@ def _toggle_variable_sharing(
         if len(groups[-1]) == 1:
             # Was independent and so should cycle to joining the first variable group
             next_group_idx = 0
-            var_uid = list(proj._variables_by_varid[varid].keys())[next_group_idx]
-            mm.variables[varid] = proj._variables_by_uid[var_uid]
-            mm.revision += 1
+            var_uid = _variables_by_varid(lproj, varid)[next_group_idx]
+            lmm.variables[varid] = var_uid
         else:
             # Should spawn a new variable
-            var = project_provider.variable_provider.duplicate_variable(mm.variables[varid].id)
-            mm.variables[varid] = var
-            mm.revision += 1
-            proj.add_variable(var)
+            var = project_provider.variable_provider.duplicate_variable(lmm.variables[varid])
+            lmm.variables[varid] = var.id
+            project_provider.add_variables_to_project(lproj.id, [var])
     else:
-        var_uid = list(proj._variables_by_varid[varid].keys())[next_group_idx]
-        mm.variables[varid] = proj._variables_by_uid[var_uid]
-        mm.revision += 1
+        var_uid = _variables_by_varid(lproj, varid)[next_group_idx]
+        lmm.variables[varid] = var_uid
 
     if vars_to_delete:
-        proj.delete_variable(vars_to_delete)
-        proj.revision += 1
-    
-    project_provider.upsert_component(proj)
+        project_provider.remove_variables_from_project(lproj.id, vars_to_delete)
+
+    # Update the variable junction table for the metamodel
+    var = project_provider.variable_provider.get_lightweight_variable(lmm.variables[varid])
+    project_provider.metamodel_provider.refresh_metamodel_variable_junction(
+        lmm,
+        [var]
+    )
+
+    # Invalidate tables
+    project_provider._component_provider.increment_revision(
+        [
+            lmm.table_config.id,
+            lproj.table_config.id
+        ]
+    )
+    project_provider.metamodel_provider.increment_revision(lmm.id)
+    project_provider.increment_revision(lproj.id)
+
+    db_staleness.mark_inputs_changed(
+        lmm.id,
+        staleness.processes_affected_by_variable_swap(
+            old_var, project_provider.variable_provider.get_variable(lmm.variables[varid])
+        ),
+    )
+
     if isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         project_provider.delete_orphan_variables()
 
     # Return update signals to refresh input card headers and values
 
     # Feed back current parameters
-    raw_params = mm.variables[varid].raw_parameters
+    rps = (var.raw_parameter_0, var.raw_parameter_1)
     for idx, id in enumerate(input_ids):
         if id['purpose'] == 'parameter':
             pi = id['parameter_index']
-            new_param = raw_params[pi] # pyright: ignore[reportCallIssue, reportArgumentType]
+            new_param = rps[pi] # pyright: ignore[reportCallIssue, reportArgumentType]
             if not isinstance(new_param, np.ndarray):
                 return_dict['input_values'][idx] = new_param
             else:
@@ -441,13 +511,13 @@ def _toggle_variable_sharing(
     for idx, id in enumerate(header_ids):
         try:
             content_creator = get_single_input_header_content_creator(
-                id['supersection'], id['section'], mm.model.model_type
+                id['supersection'], id['section'], lmm.model.model_type
             )
         except KeyError:
             content_creator = None
         if content_creator:
             varid =  make_varid(**triggered_id)
-            return_dict['header_children'][idx] = content_creator(varid, mm)
+            return_dict['header_children'][idx] = content_creator(varid, lmm)
 
     now = time.time_ns()
 
@@ -472,22 +542,29 @@ def _set_variable_optim_active(
     if val is None:
         raise PreventUpdate
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
-    varid = make_varid(**triggered_id)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug("Getting lightweight project - Toggling a variable's activation status for optimisation")
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
-    var = mm.variables.get(varid)
+    varid = make_varid(**triggered_id)
+    varprovider = cast(FromDatabaseVariableProvider, project_provider.variable_provider)
+    varuid =lmm.variables.get(varid)
+    if varuid is None:
+        raise PreventUpdate
+    var = varprovider.get_full_lightweight_variable(varuid)
+
     if var is None:
         raise PreventUpdate
 
     if var.optim_selected == val:
         raise PreventUpdate
 
-    var.optim_selected = True
-    proj.revision += 1
-    project_provider.upsert_component(proj)
+    var.optim_selected = val
+    varprovider.set_variable_metadata(var.id, 'optim_selected', var.optim_selected)
 
-    # Return update signals to refresh input card headers and values
+    provider.invalidate_cache_for_component(lproj.id)
+    db_staleness.mark_inputs_changed(staleness.metamodels_using_variable(lproj, varuid), 'optim')
     
     now = time.time_ns()
     # Update triggers in case there is any formatting that needs to be done.

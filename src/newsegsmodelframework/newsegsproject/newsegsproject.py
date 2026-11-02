@@ -4,9 +4,12 @@ A container and controller for metamodels and variables.
 Provides a class which encapsulates multiple NewSEGS metamodels, for multi-way
 sensitivity analysis.
 """
+import logging
+logger = logging.getLogger(__name__)
+
 from collections import OrderedDict
 import copy
-from typing import Any, Iterable, Optional, Sequence, override
+from typing import Any, Optional, Sequence, override
 import warnings
 from useful_types import SequenceNotStr
 
@@ -14,7 +17,11 @@ from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIX
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
 from newsegsmodelframework import newsegsmetamodel
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentProviderInterface, TableOwningNewsegsComponent
-from newsegsmodelframework.core.trackeddata import ComponentListProperty, ComponentProperty, ConfigurationMixin, DataWithRevision, ObservableList, RevisionNotifierMixin, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentListProperty, TableModifyingObservableList, TableModifyingObservableOrderedDict, recursive_remove_children, revision_dataclass
+from newsegsmodelframework.core.trackeddata import (
+    ComponentProperty, DataWithRevision, RevisionNotifierProtocol,
+    SubscriptionRevisionNotifierMixin, TableModifyingComponentListProperty, TableModifyingObservableList, 
+    TableModifyingObservableOrderedDict, revision_dataclass
+)
 from newsegsmodelframework.newsegssensitivity.dsa import DSAComponent
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable.variable import Variable
@@ -59,7 +66,7 @@ class ProjVarWatcher(RevisionNotifierProtocol):
                     found_uids.add(vid)
             lost_vars = var_uids - found_uids
             if lost_vars:
-                print(f'Removing variables from project: {lost_vars}')
+                logger.info('Removing variables from project: %s', lost_vars)
                 proj.delete_variable(list(lost_vars))
         # Otherwise, do nothing
 
@@ -77,7 +84,7 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
 
     metamodels = TableModifyingComponentListProperty(oftype = newsegsmetamodel.NewsegsMetaModel)
     dsa_config = ComponentProperty(default = DSAComponent, oftype = DSAComponent)
-    psa_config = ComponentProperty(default = DSAComponent, oftype = PSAComponent)
+    psa_config = ComponentProperty(default = PSAComponent, oftype = PSAComponent)
 
     _focussed_metamodel: int = 0
     _watcher: RevisionNotifierProtocol | None = None

@@ -1,10 +1,10 @@
 """Provides table definitions for application"""
 
 import datetime
+from typing import Literal
 import uuid6
 
 import sqlalchemy as sa
-from sqlalchemy import event as sa_event
 
 L_VARIABLE_UID = 38
 L_COMPONENT_UID = 42
@@ -52,10 +52,52 @@ variable_configs = sa.Table(
     metadata,
     sa.Column('id', sa.String(L_VARIABLE_UID), primary_key = True), # NB - this is the prefix+uuid of the object
     sa.Column('varid', sa.String), # The variable type identifier - e.g. {modelsection}.{key}.{subindex}
+    sa.Column('interface_section', sa.String),
+    sa.Column('interface_key', sa.String),
+    sa.Column('interface_subindex', sa.Integer),
     sa.Column('revision', sa.Integer), # The revision number - incremented on modification of _config
     sa.Column('component_type', sa.String),
+    sa.Column('variable_type', sa.String),
+    sa.Column('distribution', sa.String),
+    sa.Column('parameterisation_index', sa.Integer),
+
+    sa.Column('raw_parameter_0', sa.String, nullable = True),
+    sa.Column('raw_parameter_1', sa.String, nullable = True),
+    sa.Column('last_deterministic_value', sa.String, nullable = True),
+
+    sa.Column('dsa_show', sa.Boolean, default = True),
+    sa.Column('dsa_selectable', sa.Boolean, default = True),
+    sa.Column('dsa_selected', sa.Boolean, default = True),
+    sa.Column('dsa_bounds_type', sa.String, nullable = True),
+    sa.Column('dsa_lower', sa.String, nullable = True),
+    sa.Column('dsa_upper', sa.String, nullable = True),
+    sa.Column('dsa_value_lower', sa.String, nullable = True),
+    sa.Column('dsa_value_upper', sa.String, nullable = True),
+
+    sa.Column('psa_show', sa.Boolean, default = False),
+    sa.Column('psa_selectable', sa.Boolean, default = False),
+    sa.Column('psa_selected', sa.Boolean, default = False),
+    sa.Column('last_std', sa.String, nullable = True),
+    sa.Column('psa_ci_lower', sa.String, nullable = True),
+    sa.Column('psa_ci_upper', sa.String, nullable = True),
+
+    sa.Column('optim_show', sa.Boolean, default = False),
+    sa.Column('optim_selectable', sa.Boolean, default = False),
+    sa.Column('optim_selected', sa.Boolean, default = False),
+    sa.Column('optim_min', sa.String, nullable = True),
+    sa.Column('optim_max', sa.String, nullable = True),
+
     sa.Column('payload', sa.String),
+
     sa.Column('label', sa.String, nullable = True),
+    sa.Column('icon_name', sa.String, nullable = True),
+    sa.Column('unit', sa.String, default = ""),
+
+    sa.Column('interface_min', sa.Float, nullable = True),
+    sa.Column('interface_max', sa.Float, nullable = True),
+    sa.Column('interface_step', sa.Float, nullable = True),
+    sa.Column('formatter_dp', sa.Integer, nullable = True),
+
     sa.Column('retain', sa.Boolean, default = False),
 )
 
@@ -104,6 +146,7 @@ results = sa.Table(
     metadata,
     sa.Column('result_id', sa.Integer, primary_key = True, autoincrement = True),
     sa.Column('component_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
+    sa.Column('request_id', sa.Integer), # No need to put a FK constraint on this, is for convenience only
     sa.Column('run_id', sa.Integer), # No need to put a FK constraint on this, is for convenience only
     sa.Column('component_type', sa.String),
     sa.Column('component_class', sa.String),
@@ -145,6 +188,7 @@ em_configs = sa.Table(
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
     sa.Column('model_class', sa.String),
     sa.Column('model_version', sa.String),
+    sa.Column('model_type', sa.String),
     sa.Column('payload', sa.String),
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('label', sa.String, nullable = True),
@@ -237,6 +281,7 @@ metamodels = sa.Table(
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('label', sa.String, nullable = True),
     sa.Column('retain', sa.Boolean, default = False),
+    sa.Column('location', sa.String, nullable = True),
     sa.Column('lat', sa.Float, default = 53.0),
     sa.Column('lon', sa.Float, default = -3.0),
     sa.Column('n_units', sa.Float, default = 1.0)
@@ -407,43 +452,69 @@ snapshot_metamodel_variables = sa.Table(
 # Runs
 # -----------------------------------------------------------------------------
 
+RUN_STATUS = Literal[
+    'READY',
+    'CALCULATING',
+    'SUCCESS',
+    'FAILED',
+    'COMPLETED', # All steps and postprocessing applied
+]
+
 runs = sa.Table(
     'runs',
     metadata,
     sa.Column('run_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
-    sa.Column('model_type', sa.String),
-    sa.Column('request_id', sa.Integer),
-    sa.Column('request_label', sa.String),
-    sa.Column('request_class', sa.String),
-    sa.Column('request_type', sa.String),
-    sa.Column('payload', sa.String),
-    sa.Column('status', sa.String),
+    sa.Column('request_id', sa.Integer, sa.ForeignKey('requests.request_id')),
+    sa.Column('status', sa.String, default = 'READY'),
+
+    # Automatic run health columns
     sa.Column('created_at', sa.DateTime, server_default = sa.func.now()),
     sa.Column('modified_at', sa.DateTime, default = datetime.datetime.now, onupdate = datetime.datetime.now), # Do not use server_onupdate, as not all backends can handle it.
+    
+    # Run feedback
     sa.Column('progress', sa.Float, default = 0.0),
     sa.Column('progress_message', sa.String, nullable = True),
+
+    # Interaction from frontend 
     sa.Column('cancel_requested', sa.Boolean, default = False),
-    sa.Column('children_spawned', sa.Boolean, default = False)
 )
 
 # -----------------------------------------------------------------------------
 # Requests
 # -----------------------------------------------------------------------------
 
+REQUEST_STATUS = Literal[
+    'AWAITING DISPATCH',
+    'DISPATCHED',
+    'FAILED',
+    'CANCELLED',
+    'FULFILLED',
+]
+
 requests = sa.Table(
     'requests',
     metadata,
     sa.Column('request_id', sa.Integer, primary_key = True, autoincrement = True),
-    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
-    sa.Column('request_class', sa.String),
     sa.Column('request_type', sa.String),
-    sa.Column('payload', sa.String),
-    sa.Column('dispatched', sa.Boolean, default = False),
+
+    sa.Column('trigger_request_id', sa.Integer, default = -1),
+    sa.Column('trigger_request_type', sa.String),
+
     sa.Column('run_id', sa.Integer, nullable = True),
+
+    sa.Column('request_label', sa.String, default = ''),
+    sa.Column('request_class', sa.String),
+
+    sa.Column('project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id'), nullable = False),
+    sa.Column('model_type', sa.String),
+    
+    sa.Column('payload', sa.String),
+    sa.Column('status', sa.String(24), default = 'AWAITING DISPATCH'), # Should be a REQUEST_STATUS
+    
+    sa.Column('background_procedure', sa.Boolean, default = True),
+
     sa.Column('retry_number', sa.Integer, default = 0),
     sa.Column('max_retries', sa.Integer, default = 5),
-    sa.Column('completed', sa.Boolean, default = False)
 )
 
 # -----------------------------------------------------------------------------
@@ -455,6 +526,22 @@ sessions = sa.Table(
     metadata,
     sa.Column('session_id', sa.String, primary_key = True),
     sa.Column('active_project_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('projects.id')),
+)
+
+# -----------------------------------------------------------------------------
+# Process staleness
+# -----------------------------------------------------------------------------
+
+process_staleness = sa.Table(
+    'process_staleness',
+    metadata,
+    # No FK, so that removing a metamodel is not blocked by its staleness rows
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
+    sa.Column('process', sa.String(16), primary_key = True), # One of db_staleness.PROCESSES
+    # time.time_ns() of the latest input change meaningful to the process
+    sa.Column('inputs_changed_ns', sa.BigInteger, nullable = True),
+    # time.time_ns() at which the latest completed run of the process started
+    sa.Column('last_run_ns', sa.BigInteger, nullable = True),
 )
 
 # -----------------------------------------------------------------------------

@@ -9,7 +9,8 @@ from common import setup_script_env
 setup_script_env()
 
 from config import settings
-lookup_dir = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegscs.newsegscs import get_consumption_meters

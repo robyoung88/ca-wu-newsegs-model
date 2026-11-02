@@ -1,4 +1,9 @@
 """proxy between client and workers"""
+import logging
+if not logging.getLogger().hasHandlers():
+    import app_logging
+logger = logging.getLogger(__name__)
+
 import multiprocessing
 import time
 import zmq
@@ -20,6 +25,7 @@ import os
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 
 from newsegsmodelapp.backend import db
+from newsegsmodelapp.backend.db.db import write_transaction
 from newsegsmodelapp.backend.db.db_tables import runs
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
@@ -33,7 +39,10 @@ def run_proxy(server = DISPATCHSERVER, frontendport = FRONTENDPORT, backendport 
     backend = context.socket(zmq.DEALER)
     backend.bind(f'tcp://{server}:{backendport}')
     try:
-        print(f'Proxy establishing on {server} between {frontendport} and {backendport}')
+        logger.info(
+            'Proxy establishing on %s between %s and %s',
+            server, frontendport, backendport
+        )
         zmq.proxy(frontend, backend)
     except zmq.ContextTerminated:
         pass
@@ -64,10 +73,11 @@ def run_dispatcher(
         backendport = BACKENDPORT,
         db_path: str | None = None,
         stop_event = None,
+        clean_interval_s = 60,
     ):
     """Supervisor to the proxy and workers"""
 
-    engine = db.get_engine(db_path)
+    write_engine = db.get_engine(db_path = db_path, writer = True)
 
     # Start Proxy in the background
     proxy_process = multiprocessing.Process(
@@ -85,18 +95,20 @@ def run_dispatcher(
     # Start workers
     workers = {}
     workers_stop = {}
+    # Use spawn, not fork.
+    ctx = multiprocessing.get_context("spawn")
     for idx in range(num_workers):
-        wstop_event = multiprocessing.Event()
-        p = multiprocessing.Process(
+        wstop_event = ctx.Event()
+        p = ctx.Process(
             target = worker_process,
             args = (idx, worker_server, backendport, db_path, wstop_event)
         )
         p.start()
         workers[idx] = p
         workers_stop[idx] = wstop_event
-    
-    print("Supervisor online. Monitoring workers...")
 
+    logger.info('Supervisor online. Monitoring workers...')
+    last_cleaned = time.time()
     try:
         # The supervisor loop
         while stop_event is None or not stop_event.is_set():
@@ -104,11 +116,11 @@ def run_dispatcher(
             for idx in range(num_workers):
                 # Check if process has died
                 if not workers[idx].is_alive():
-                    print(f"CRITICAL: Worker {idx} died! Restarting...")
+                    logger.error('Worker %d died! Restarting...', idx)
 
                     # Spawn a replacement worker
-                    wstop_event = multiprocessing.Event()
-                    p = multiprocessing.Process(
+                    wstop_event = ctx.Event()
+                    p = ctx.Process(
                         target = worker_process,
                         args = (idx, worker_server, backendport, db_path, wstop_event)
                     )
@@ -118,7 +130,8 @@ def run_dispatcher(
 
             # Check if proxy has died
             if not proxy_process.is_alive():
-                print(f"CRITICAL: Proxy died! Restarting...")
+                logger.error('Proxy died! Restarting...')
+
                 proxy_process = multiprocessing.Process(
                     target = run_proxy,
                     kwargs = {
@@ -129,9 +142,12 @@ def run_dispatcher(
                 proxy_process.start()
 
             # Check for dead jobs
-            n_cleaned = _cleanup_dead_jobs(engine, DEAD_CALCULATION_INTERVAL_SECONDS)
-            if n_cleaned:
-                print(f'Killed {n_cleaned} jobs due to timeout')
+            now = time.time()
+            if now - last_cleaned > clean_interval_s:
+                n_cleaned = _cleanup_dead_jobs(write_engine, DEAD_CALCULATION_INTERVAL_SECONDS)
+                if n_cleaned:
+                    logger.warning('Killed %d jobs due to timeout', n_cleaned)
+                last_cleaned = now
 
             # Touch the heartbeat file
             HEARTBEAT_FILE.touch()
@@ -140,11 +156,11 @@ def run_dispatcher(
             time.sleep(SUPERVISOR_INTERVAL_SECONDS)
 
     except KeyboardInterrupt:
-        print('\nShutting down supervisor...')
-        
+        logger.info('Shutting down supervisor (Keyboard Interrupt)...')
+
     finally:
         # Ensure all subprocesses are terminated upon exit
-        print('Supervisor is shutting down cleanly...')
+        logger.info('Supervisor is shutting down cleanly...')
 
         # Set stop events to cancel ongoing jobs on next check_cancel_status()
         for st in workers_stop.values():
@@ -154,17 +170,17 @@ def run_dispatcher(
         try:
             _send_poison_pills(len(workers), server, backendport)
         except Exception as e:
-            print(f"Failed to send poison pills: {e}")
+            logger.error('Failed to send poison pills!', exc_info = True)
 
         # Check workers have ended processes, and send a terminate if not.
         for idx, p in workers.items():
             p.join(timeout = settings.get('WORKER_SHUTDOWN_TIMEOUT_S', 3))
             if p.is_alive():
-                print(f"Worker {idx} did not exit in time; terminating forcefully.")
+                logger.error('Worker %d did not exit in time; terminating forcefully', idx)
                 p.terminate()
                 p.join(timeout = 1)
 
-        engine.dispose()
+        write_engine.dispose()
 
         # Hard termination of the proxy process - no resources to worry about.
         if proxy_process.is_alive():
@@ -181,9 +197,8 @@ def _cleanup_dead_jobs(engine, dead_interval_seconds: int) -> int:
         )
     )
 
-    with engine.connect() as conn:
+    with write_transaction(engine) as conn:
         result = conn.execute(stmt)
-        conn.commit()
     return result.rowcount
 
 if __name__ == '__main__':

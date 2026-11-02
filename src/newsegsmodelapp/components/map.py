@@ -1,10 +1,18 @@
+import logging
+logger = logging.getLogger(__name__)
+
+import copy
 import json
+import time
 from typing import cast
 from pyproj import Transformer
 from dash import Dash, html, dcc, Input, Output, State, ALL, no_update
 from dash.exceptions import PreventUpdate
 import dash_leaflet as dl
 
+from newsegsmodelapp.backend.db import db_staleness
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.components import staleness
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
@@ -12,6 +20,13 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
+
+def _site_metamodel_id(site_location: str | None) -> str | None:
+    """Id of the configuration a 'site-location' store value belongs to, if recorded"""
+    try:
+        return json.loads(site_location).get('metamodel_id')
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 def create_map_layout(map_id='sitemap',
                       center=(53.165716, -3.728402)):
@@ -144,7 +159,15 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
             return no_update
         easting,northing = _trans_togb.transform(lat, lon)
-        new_site = json.dumps({'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing, 'name': site_name})
+        new_site = {'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing, 'name': site_name}
+        metamodel_id = _site_metamodel_id(current_site)
+        if metamodel_id:
+            new_site['metamodel_id'] = metamodel_id
+        new_site = json.dumps(new_site)
+        logger.debug(
+            'Site location inputs syncronised to store: lat/lon: (%s, %s); OSGB: (%s, %s)',
+            lat, lon, easting, northing
+        )
         if new_site == current_site:
             return no_update
         return new_site
@@ -153,6 +176,7 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         Output('site-lat-input', 'value'),
         Output('site-lon-input', 'value'),
         Output('site-name-input', 'value'),
+        Output('staleness-update-trigger', 'data', allow_duplicate = True),
 
         Input('site-location', 'data'),
         State('active-project-id', 'data'),
@@ -163,29 +187,79 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
             raise PreventUpdate
         try:
             coords = json.loads(site_loc)
-            lat = float(coords.get('lat', ''))
-            lon = float(coords.get('lon', ''))
+            lat = round(float(coords.get('lat', '')), 6)
+            lon = round(float(coords.get('lon', '')), 6)
             name = coords.get('name', no_update)
         except (TypeError, ValueError, json.JSONDecodeError, AttributeError):
             raise PreventUpdate
         
         newloc = modlocation.Location(lat, lon, name = name)
 
-        proj = app.project_provider.get_project(active_project_id)
-        mm = proj.get_focussed_metamodel()
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        logger.debug('Getting lightweight project - Updating configuration location to map location')
+        lproj = provider.get_lightweight_project(active_project_id)
+        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+
+        # A location still queued from the previously focussed configuration
+        # must not be written to the newly focussed one
+        if coords.get('metamodel_id', lmm.id) != lmm.id:
+            logger.debug(
+                'Ignoring site location for Metamodel ID %s; focussed Metamodel ID is %s',
+                coords.get('metamodel_id'), lmm.id
+            )
+            raise PreventUpdate
 
         modified = False
-        if not(newloc == mm.model.location):
-            mm.model.location = newloc
+        staleness_update = no_update
+        oldloc = copy.copy(lmm.location)
+        if not(newloc == lmm.location):
+            lmm.location = newloc
             modified = True
-        if not mm.model.location.name != name:
-            mm.model.location.name = name
+        if not lmm.location.name == name:
+            lmm.location.name = name
             modified = True
 
         if modified:
-            app.project_provider.upsert_component(proj, force = True)
+            model_provider = cast(
+                FromDatabaseNewsegsEMProvider,
+                provider.metamodel_provider._em_provider
+                )
+            mdl = model_provider.get_component(lmm.model.id)
+            mdl.location = lmm.location
+            model_provider.upsert_component(mdl, force = True, project_id = active_project_id)
+            app.project_provider.metamodel_provider.set_component_metadata(
+                lmm.id,
+                'location',
+                json.dumps(mdl.location.to_dict())
+            )
+            provider.metamodel_provider.set_component_metadata(
+                lmm.id, 'lat', mdl.location.lat, increment_revision = False, project_id = active_project_id
+            )
+            provider.metamodel_provider.set_component_metadata(
+                lmm.id, 'lon', mdl.location.lon, increment_revision = False, project_id = active_project_id,
+            )
+            provider.increment_revision(lproj.id)
+            provider.metamodel_provider.increment_revision(lmm.id)
+            provider._component_provider.increment_revision(
+                [
+                    lproj.table_config.id,
+                    lmm.table_config.id,
+                    lmm.model.table_config.id,
+                    lmm.finance.table_config.id,
+                ]
+            )
 
-        return f"{lat:.6f}", f"{lon:.6f}", name
+            logger.info(
+                'Location changed for Metamodel ID %s; %s -> %s',
+                lmm.id, oldloc, lmm.location
+            )
+
+            # Renaming the site alone has no effect on results
+            if (oldloc.lat, oldloc.lon) != (lmm.location.lat, lmm.location.lon):
+                db_staleness.mark_inputs_changed(lmm.id, staleness.processes_affected(deterministic = True))
+                staleness_update = time.time_ns()
+
+        return f"{lat:.6f}", f"{lon:.6f}", name, staleness_update
 
 def add_map_click_callback(app: NewsegsDash):
     @app.callback(
@@ -207,7 +281,9 @@ def add_map_click_callback(app: NewsegsDash):
             if not coordinates:
                 raise PreventUpdate
             lat, lon = coordinates.values()
-            easting,northing = _trans_togb.transform(lat, lon)
+            easting,northing = _trans_togb.transform(float(lat), float(lon))
+            logger.debug('Potential site location change to lat/lon: (%s, %s); OSGB: (%s, %s)',
+                         lat, lon, easting, northing)
             return json.dumps({'lat':lat,'lon':lon, 'easting': easting, 'northing': northing, 'name': current_name})
         else:
             return json.dumps({'lat':0,'lon':0, 'name': current_name})
@@ -252,11 +328,15 @@ def add_confirm_site_change_btn_callback(app: NewsegsDash):
 
         Input({'type': 'confirm-site-popup-btn', 'index': ALL}, 'n_clicks'),
         State('potential-site-location', 'data'),
+        State('site-location', 'data'),
         prevent_initial_call=True
     )
-    def change_site(click_data, json_latlon):
+    def change_site(click_data, json_latlon, current_site):
         if click_data[0] is None:
             return no_update
+        metamodel_id = _site_metamodel_id(current_site)
+        if metamodel_id and json_latlon:
+            json_latlon = json.dumps({**json.loads(json_latlon), 'metamodel_id': metamodel_id})
         return json_latlon
     return app
 
@@ -290,7 +370,12 @@ def add_site_change_callback(app) -> Dash:
         if not easting:
             easting, northing = _trans_togb.transform(pos[0], pos[1])
 
-        # Active focused marker
+        logger.debug(
+            'Site location is lat/lon: (%s, %s); OSGB: (%s, %s)',
+            pos[0], pos[1], easting, northing
+        )
+
+        # Active focussed marker
         focussed_marker = [
             dl.Marker(
                 id='site-marker',
@@ -299,27 +384,32 @@ def add_site_change_callback(app) -> Dash:
             )
         ]
 
-        # Non-focused metamodel markers (translucent)
+        # Non-focussed metamodel markers (translucent)
         other_markers = []
         if active_project_id:
             try:
-                proj = app.project_provider.get_project(active_project_id)
-                focussed_mm = proj.get_focussed_metamodel()
+                provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+                logger.debug('Getting lightweight project - Getting locations of all project metamodels for map')
+                lproj = provider.get_lightweight_project(active_project_id)
+                lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                 
-                for mm in proj.metamodels:
-                    if mm != focussed_mm and mm.model and mm.model.location:
-                        loc = mm.model.location
-                        other_markers.append(
-                            dl.Marker(
-                                position=[loc.lat, loc.lon],
-                                opacity=0.4,
-                                children=[
-                                    dl.Tooltip(getattr(loc, 'name', None) or getattr(mm, 'name', 'Other Configuration'))
-                                ]
+                for mm in lproj.metamodels:
+                    if mm != lmm and mm.location:
+                        loc = mm.location
+                        lat = loc.lat
+                        lon = loc.lon
+                        if lat and lon:
+                            other_markers.append(
+                                dl.Marker(
+                                    position=[lat, lon],
+                                    opacity=0.4,
+                                    children=[
+                                        dl.Tooltip(loc.name)
+                                    ]
+                                )
                             )
-                        )
             except Exception as e:
-                print(e)
+                logger.exception('Could not draw non-focussed metamodel markers', exc_info = True)
                 pass
         
         return (

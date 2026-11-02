@@ -6,7 +6,8 @@ import numpy.typing as npt
 from pathlib import Path
 
 from config import settings
-lookup_dir = Path(str(settings['SprakeDataLoc']))
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 CALIBRATION_DEGREE_DAYS = pd.read_excel(os.path.join(lookup_dir,
                                                      'calibration_heating_degree_days.xlsx'),

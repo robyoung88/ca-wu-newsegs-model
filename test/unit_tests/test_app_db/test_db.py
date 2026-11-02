@@ -13,14 +13,16 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 from newsegsmodelapp.backend.db import db_tables
+from newsegsmodelapp.backend.db.db import read_transaction
+from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 
 from config import settings
 from newsegsmodelapp import registers
-from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider, FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsFMProvider, FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
-from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
+from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider, FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsComponent
 from newsegsmodelframework.newsegsvariable.variable import ScalarVariable
@@ -41,15 +43,16 @@ class TestDatabaseStart(unittest.TestCase):
         from newsegsmodelapp.backend import db
         
         # Create all tables
-        db_tables.create_all_tables(db.get_engine())
+        db_tables.create_all_tables(db.get_engine(writer = True))
         
 
     @classmethod
     def tearDownClass(cls):
         from newsegsmodelapp.backend import db
-                
-        engine = db.get_engine(cls.db_path)
-        engine.dispose()
+
+        for writer in (False, True):
+            engine = db.get_engine(writer = writer, db_path = cls.db_path)
+            engine.dispose()
         
         cls.db_dir.cleanup()
 
@@ -60,8 +63,9 @@ class TestDatabaseStart(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary directory after each test."""
         from newsegsmodelapp.backend import db
-        engine = db.get_engine()
-        engine.dispose()
+        for writer in (False, True):
+            engine = db.get_engine(writer = writer)
+            engine.dispose()
 
         self.temp_dir.cleanup()
 
@@ -168,7 +172,7 @@ class TestDatabaseStart(unittest.TestCase):
             proj_2.metamodels[0].finance.id
         )
 
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
             nrow_components_pre = conn.execute(
                 sa.select(sa.func.count())
                 .select_from(tbls.component_configs)
@@ -184,7 +188,7 @@ class TestDatabaseStart(unittest.TestCase):
         proj.revision += 1
         proj_provider.upsert_component(proj)        
 
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
             nrow_components_post = conn.execute(
                 sa.select(sa.func.count())
                 .select_from(tbls.component_configs)
@@ -195,7 +199,7 @@ class TestDatabaseStart(unittest.TestCase):
         project_id = proj.id
 
         snapshot_id = db_snapshot.generic_snapshot_entity(
-            db.get_engine(),
+            db.get_engine(writer = True),
             tbls.metadata,
             'projects',
             project_id,
@@ -203,7 +207,7 @@ class TestDatabaseStart(unittest.TestCase):
         )
 
         # Check that the snapshot has been created
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine()) as conn:
            
             result = conn.execute(
                 tbls.snapshot_projects.select()
@@ -275,14 +279,14 @@ class TestDatabaseStart(unittest.TestCase):
 
         # Restore the snapshot
         new_ids = db_snapshot.generic_restore_snapshot(
-            db.get_engine(),
+            db.get_engine(writer = True),
             tbls.metadata,
             snapshot_id
         )
 
         new_project_id = list(new_ids['projects'].values())[0]
 
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine())as conn:
             r0 = conn.execute(
                 tbls.projects.select()
                 .where(tbls.projects.c.id == project_id)
@@ -548,6 +552,57 @@ class TestDatabaseStart(unittest.TestCase):
                     v2.deterministic_value
                 )
 
+    def test_db_lightweight_variable_provider(self):
+        from newsegsmodelapp.backend import db
+        one_of_each = variable_helpers.one_of_every_variable()
+
+        for var in one_of_each.values():
+            self.assertIsNotNone(var.deterministic_value)
+        
+        backend_var_provider = FromDatabaseVariableProvider(db.get_engine)
+ 
+        backend_var_provider.upsert_variable(list(one_of_each.values()))
+
+        for var in one_of_each.values():
+            self.assertFalse(var.modified)
+
+        varids = [x.id for x in one_of_each.values()]
+
+        def full_recovery(varids):
+            return backend_var_provider.get_variable(varids)
+
+        def lightweight_recovery(varids):
+            return backend_var_provider.get_lightweight_variable(varids)
+
+        def full_lightweight_recovery(varids):
+            return backend_var_provider.get_full_lightweight_variable(varids)
+
+        vars = full_recovery(varids)
+        self.assertEqual(len(vars), len(one_of_each))
+
+        vars = lightweight_recovery(varids)
+        self.assertEqual(len(vars), len(one_of_each))
+
+        vars = full_lightweight_recovery(varids)
+        self.assertEqual(len(vars), len(one_of_each))
+
+        TEST_RELATIVE_TIME = False
+        if TEST_RELATIVE_TIME:
+            import timeit
+            REPS = 100
+
+            t_full = timeit.timeit(lambda: full_recovery(varids), number = REPS, globals = globals())
+
+            t_light = timeit.timeit(lambda: lightweight_recovery(varids), number = REPS, globals = globals())
+
+            t_full_light = timeit.timeit(lambda: full_lightweight_recovery(varids), number = REPS, globals = globals())
+
+            print(t_full, t_full / t_full)
+
+            print(t_light, t_light / t_full)
+
+            print(t_full_light, t_full_light / t_full)
+
     def test_project_variable_syncronisation(self):
         import numpy.testing as nptest
 
@@ -748,6 +803,67 @@ class TestDatabaseStart(unittest.TestCase):
             mm2.finance.get_costs_series_discounted()
         )
 
+    def test_lightweight_provider(self):
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        
+        proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+        proj = PROJECT_FACTORIES['sprake']()
+
+        proj_provider.add_component(proj)
+
+        proj2 = proj_provider.get_project(proj.id)
+        lproj2 = proj_provider.get_lightweight_project(proj.id)
+
+        self.assertEqual(proj2.id, lproj2.id)
+        self.assertEqual(proj2.revision, lproj2.revision)
+        self.assertEqual(proj2.metamodels[0].id, lproj2.metamodels[0].id)
+        self.assertEqual(proj2.metamodels[0].revision, lproj2.metamodels[0].revision)
+        self.assertEqual(proj2.metamodels[0].model.id, lproj2.metamodels[0].model.id)
+        self.assertEqual(proj2.metamodels[0].model.revision, lproj2.metamodels[0].model.revision)
+        self.assertEqual(proj2.metamodels[0].model.grid.id, lproj2.metamodels[0].model.grid.id)
+        self.assertEqual(proj2.metamodels[0].model.grid.revision, lproj2.metamodels[0].model.grid.revision)
+        self.assertEqual(proj2.metamodels[0].model.generation.id, lproj2.metamodels[0].model.generation.id)
+        self.assertEqual(proj2.metamodels[0].model.generation.revision, lproj2.metamodels[0].model.generation.revision)
+        self.assertEqual(proj2.metamodels[0].model.consumption_storage.id, lproj2.metamodels[0].model.consumption_storage.id)
+        self.assertEqual(proj2.metamodels[0].model.consumption_storage.revision, lproj2.metamodels[0].model.consumption_storage.revision)
+        self.assertEqual(proj2.metamodels[0].finance.id, lproj2.metamodels[0].finance.id)
+        self.assertEqual(proj2.metamodels[0].finance.revision, lproj2.metamodels[0].finance.revision)
+
+        self.assertEqual(len(proj._variables_by_uid), len(proj2._variables_by_uid))
+        self.assertEqual(len(proj.metamodels[0].variables), len(proj2.metamodels[0].variables))
+        self.assertEqual(len(lproj2.metamodels[0].variables), len(proj2.metamodels[0].variables))
+
+        TEST_RELATIVE_TIME = True
+        if TEST_RELATIVE_TIME:
+            import timeit
+            REPS = 10
+
+            t_full = timeit.timeit(lambda: proj_provider.get_project(proj.id), number = REPS, globals = globals())
+            
+            t_light = timeit.timeit(lambda: proj_provider.get_lightweight_project(proj.id), number = REPS, globals = globals())
+
+            print(t_full, t_full / t_full)
+            
+            print(t_light, t_light / t_full)
+
+    # def test_metadata_revision(self):
+    #     """Ensure revised metadata increment revisions appropriately and are maintained on reconstruction."""
+    #     from newsegsmodelapp.backend import db
+    #     from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        
+    #     proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+    #     proj = PROJECT_FACTORIES['sprake']()
+
+    #     proj_provider.add_component(proj)
+
+    #     lproj = proj_provider.get_lightweight_project(proj.id)
+
+    #     mm_revision = lproj.metamodels[0].revision
+    #     proj_provider
+        
+            
+
     def test_modification_triggers(self):
         import time
         from newsegsmodelapp.backend import db
@@ -760,7 +876,7 @@ class TestDatabaseStart(unittest.TestCase):
         
         proj = PROJECT_FACTORIES['sprake']()
         proj_provider.add_component(proj)
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine()) as conn:
 
             init_values = tuple(conn.execute(
                 sa.select(
@@ -776,7 +892,7 @@ class TestDatabaseStart(unittest.TestCase):
         time.sleep(2)
         proj.revision += 1
         proj_provider.upsert_component(proj)
-        with db.get_engine().connect() as conn:
+        with read_transaction(db.get_engine()) as conn:
         
             updated_values = tuple(conn.execute(
                 sa.select(
@@ -850,17 +966,32 @@ class TestDatabaseStart(unittest.TestCase):
 
         proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
         result_provider = FromDatabaseResultProvider(db.get_engine, self.test_dir)
+        request_handler = FromDatabaseRequestHandler(db.get_engine)
 
-        engine = db.get_engine()
+        engine = db.get_engine(writer = True)
 
         proj = PROJECT_FACTORIES['sprake']()
+
+        # Test variable syncronisation increments revisions
+        mm = proj.metamodels[0]
+        mm.sync_model_with_changed_variables_deterministic()
+        proj.chain_syncronise()
+        mm.variables['gen_input.pv_capacity.0'].set_parameters((201.1))
+        mm.sync_model_with_changed_variables_deterministic()
+        self.assertTrue(mm.model.generation.modified)
+        self.assertTrue(mm.model.chain_modified)
+        self.assertFalse(mm.model.consumption_storage.modified)
+
         proj_provider.add_component(proj)
 
-        request_creator = registers.RUN_REQUEST_REGISTER.get('deterministic_run_metamodel')
-        self.assertIsNotNone(request_creator)
-        request = request_creator(proj.id, proj_provider) # pyright: ignore[reportOptionalCall]
+        request = request_handler.add_request(
+            'deterministic_run_metamodel',
+            proj.id,
+            proj_provider,
+            'run'
+        )
 
-        run_id = generate_claim_ticket(engine, request)
+        run_id, exists = generate_claim_ticket(engine, request)
 
         request.run_id = run_id
 
@@ -873,7 +1004,10 @@ class TestDatabaseStart(unittest.TestCase):
         def check_cancel_status():
             return False
 
-        is_ok = runner(request, proj_provider, result_provider, run_id, update_progress, check_cancel_status) # pyright: ignore[reportOptionalCall]
+        is_ok = runner(
+            request, proj_provider, result_provider, 
+            run_id, update_progress, check_cancel_status
+        ) # pyright: ignore[reportOptionalCall]
 
         self.assertEqual(is_ok, 'ok')
 
@@ -907,11 +1041,16 @@ class TestDatabaseStart(unittest.TestCase):
         self.assertTrue(all(x in [y[0] for y in postactions_from_reg.postprocess_procedures] for x in postprocess_list)) # pyright: ignore[reportOptionalMemberAccess]
 
         table_draws_done = set()
+        finance_pp_counter = 0
 
         for process_name in postprocess_list:
-            pp_req_provider = registers.POSTPROCESS_REQUEST_REGISTER.get(process_name)
-            self.assertIsNotNone(pp_req_provider, msg = f'Postprocess request generator not found for {process_name}')
-            pp_req = pp_req_provider(request) # pyright: ignore[reportOptionalCall]
+            pp_req = request_handler.add_request(
+                process_name,
+                proj.id,
+                proj_provider,
+                'postprocess',
+                triggering_request = request
+            )
             self.assertIsInstance(pp_req, registers.PostprocessRequest)
 
             proc = registers.get_postprocess_procedure(process_name, pp_req)
@@ -924,17 +1063,20 @@ class TestDatabaseStart(unittest.TestCase):
                 update_progress,
                 check_cancel_status
             )
+            
 
             self.assertEqual(is_ok, 'ok')
 
             postactions_from_reg = registers.POST_ACTION_REGISTER.get(pp_req.request_type)
             if postactions_from_reg is not None:
                 for td_artist_name in postactions_from_reg.table_draw_artists:
-                    td_req_func = registers.TABLE_DRAW_REQUEST_REGISTER.get(td_artist_name[0])
-                    if td_req_func:
-                        td_req = td_req_func(pp_req)
-                    else:
-                        td_req = pp_req
+                    td_req = request_handler.add_request(
+                        td_artist_name[0],
+                        proj.id,
+                        proj_provider,
+                        'tabledraw',
+                        triggering_request= pp_req
+                    )
 
                     td_artist = registers.get_table_draw(td_artist_name[0], pp_req)
                     if td_artist:
@@ -946,7 +1088,14 @@ class TestDatabaseStart(unittest.TestCase):
                             update_progress,
                             check_cancel_status,
                         )
-                        self.assertEqual(is_ok, 'ok')
+
+                        if not td_artist_name[0] == 'table_finance':
+                            self.assertEqual(is_ok, 'ok')
+                        elif finance_pp_counter == 2 and td_artist_name[0] == 'table_finance':
+                            self.assertEqual(is_ok, 'ok')
+                        else:
+                            finance_pp_counter += 1
+                            self.assertEqual(is_ok, 'missing')
                     table_draws_done.add(td_artist_name[0])
         
         result_getters = [
@@ -988,3 +1137,300 @@ class TestDatabaseStart(unittest.TestCase):
             res, rev = result_provider.get_result(tbl, proj.table_config, False)
 
             self.assertIsNotNone(res, msg = f'No table for {tbl}')
+
+    @staticmethod
+    def get_project_revision_state(project):
+        odict = {}
+        odict.update(
+            {
+                'project': project.revision,
+                'project.table_config': project.table_config.revision,
+                'project.dsa_config': project.dsa_config.revision,
+                'project.psa_config': project.psa_config.revision,
+                'project.metamodels_container': project.metamodels.revision,
+            }
+        )
+        for idx, mm in enumerate(project.metamodels):
+            mdl = mm.model
+            fnc = mm.finance
+            mm_dict = {
+                f'metamodel_{idx}': mm.revision,
+                f'metamodel_{idx}.table_config': mm.table_config.revision,
+                f'model_{idx}': mdl.revision,
+                f'model_{idx}.table_config': mdl.table_config.revision,
+                f'model_{idx}.grid': mdl.grid.revision,
+                f'model_{idx}.generation': mdl.generation.revision,
+                f'model_{idx}.consumption_storage': mdl.consumption_storage.revision,
+                f'finance_{idx}': fnc.revision,
+                f'finance_{idx}.table_config': fnc.table_config.revision,
+            }
+            odict.update(mm_dict)
+
+        return odict
+
+    @staticmethod
+    def get_project_modification_state(project):
+        odict = {}
+        odict.update(
+            {
+                'project': project.modified,
+                'project.table_config': project.table_config.modified,
+                'project.dsa_config': project.dsa_config.modified,
+                'project.psa_config': project.psa_config.modified,
+                'project.metamodels_container': project.metamodels.modified,
+            }
+        )
+        for idx, mm in enumerate(project.metamodels):
+            mdl = mm.model
+            fnc = mm.finance
+            mm_dict = {
+                f'metamodel_{idx}': mm.modified,
+                f'metamodel_{idx}.table_config': mm.table_config.modified,
+                f'model_{idx}': mdl.modified,
+                f'model_{idx}.table_config': mdl.table_config.modified,
+                f'model_{idx}.grid': mdl.grid.modified,
+                f'model_{idx}.generation': mdl.generation.modified,
+                f'model_{idx}.consumption_storage': mdl.consumption_storage.modified,
+                f'finance_{idx}': fnc.modified,
+                f'finance_{idx}.table_config': fnc.table_config.modified,
+            }
+            odict.update(mm_dict)
+
+        return odict
+
+    def test_process_revisions(self):
+        """Ensure that revisions are being incremented correctly through a process"""
+        import newsegsmodelapp.register_plugins
+        from newsegsmodelapp.backend import db
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+
+        proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+        result_provider = CachedFromDatabaseResultProvider(db.get_engine, self.test_dir)
+        request_handler = FromDatabaseRequestHandler(db.get_engine)
+
+        write_engine = db.get_engine(writer = True)
+
+        proj = PROJECT_FACTORIES['sprake']()
+
+        revisions = self.get_project_revision_state(proj)
+        modification_state = self.get_project_modification_state(proj)
+        for k, v in revisions.items():
+            self.assertEqual(v, 0, f'{k} revision incorrect.')
+        for k, v in modification_state.items():
+            self.assertTrue(v, f'{k} modification status incorrect.')
+
+        # Start from a fully synchronised system
+        mm = proj.metamodels[0]
+        mm.sync_model_with_changed_variables_deterministic()
+
+        new_revisions = self.get_project_revision_state(proj)
+        for k, v in new_revisions.items():
+            self.assertEqual(v, 0, f'{k} revision incorrect.')
+        
+        proj_provider.add_component(proj)
+
+        for i in range(2):
+            if i == 1:
+                # Alter some variables
+                var1 = proj.metamodels[0].variables['gen_input.wind_capacity.0']
+                var1.set_parameters((212.12,))
+
+                var2 = proj.metamodels[0].variables['import_costs.grid_import_var_per_unit.0']
+                var2.set_parameters(0.31, 0.1*0.31)
+
+                proj_provider.variable_provider.upsert_variable(var1)
+                proj_provider.variable_provider.upsert_variable(var2)
+                # Need to manually invalidate the project cache - this could cause issues!
+                proj_provider.invalidate_cache_for_component(proj.id)
+
+            proj_recovered = proj_provider.get_project(proj.id)
+            recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+            # Don't expect any modification of the model or finance until syncronisation
+            for k, v in recovered_revisions.items():
+                self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrect')
+
+            request = request_handler.add_request(
+                'deterministic_run_metamodel',
+                proj.id,
+                proj_provider,
+                'run'
+            )
+            
+            run_id, exists = generate_claim_ticket(write_engine, request)
+
+            request.run_id = run_id
+            
+            runner = registers.RUN_PROCEDURE_REGISTER.get(request.request_type)
+
+            def update_progress(step, total, message):
+                return
+
+            def check_cancel_status():
+                return False
+
+            # Initial run - deterministic single metamodel
+            is_ok = runner(
+                request, proj_provider, result_provider, 
+                run_id, update_progress, check_cancel_status
+            )
+
+            self.assertEqual(is_ok, 'ok')
+
+            # Recover project
+            proj_recovered = proj_provider.get_project(proj.id)
+            recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+            if i == 0:
+                # Do not expect a revision in any component, as there are no valid results yet.
+                for k, v in recovered_revisions.items():
+                    self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+            else:
+                # Expect a revision in everything downstream of generation.
+                for k, v in recovered_revisions.items():
+                    if k in (
+                        'project.table_config',
+                        'metamodel_0.table_config',
+                        'model_0',
+                        'model_0.table_config',
+                        'finance_0',
+                        'finance_0.table_config',
+                        #'model_0.grid',
+                        'model_0.generation',
+                        #'model_0.consumption_storage'
+                    ):
+                        self.assertEqual(v, new_revisions[k] + 1, f'{k} recovered revision not incremented')
+                    else:
+                        self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+
+            postactions_from_reg = cast(
+                registers.Postactions,
+                registers.POST_ACTION_REGISTER.get(request.request_type)
+            )
+
+            finance_pp_counter = 0
+
+            for pp_proc in postactions_from_reg.postprocess_procedures:
+                procedure_name = pp_proc[0]
+                new_req = request_handler.add_request(
+                    procedure_name,
+                    proj.id,
+                    proj_provider,
+                    'postprocess',
+                    triggering_request = request
+                )
+                procedure = registers.get_postprocess_procedure(procedure_name, new_req)
+
+                pp_run_id, exists = generate_claim_ticket(write_engine, new_req)
+                new_req.run_id = pp_run_id
+
+                is_ok = procedure(
+                    new_req, proj_provider, result_provider,
+                    pp_run_id, update_progress, check_cancel_status
+                )
+                self.assertEqual(is_ok, 'ok')
+
+                # Recover project
+                proj_recovered = proj_provider.get_project(proj.id)
+                recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+                if i == 0:
+                    # Again, expect no revisions
+                    for k, v in recovered_revisions.items():
+                        self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+                else:
+                    # Expect a revision in everything downstream of generation.
+                    for k, v in recovered_revisions.items():
+                        if k in (
+                            'project.table_config',
+                            'metamodel_0.table_config',
+                            'model_0',
+                            'model_0.table_config',
+                            'finance_0',
+                            'finance_0.table_config',
+                            #'model_0.grid',
+                            'model_0.generation',
+                            #'model_0.consumption_storage'
+                        ):
+                            self.assertEqual(v, new_revisions[k] + 1, f'{k} recovered revision not incremented')
+                        else:
+                            self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+
+                output_actions = cast(
+                    registers.Postactions,
+                    registers.POST_ACTION_REGISTER.get(new_req.request_type)
+                )
+
+                for output_proc in output_actions.table_draw_artists:
+                    op_proc_name = output_proc[0]
+                    op_req = request_handler.add_request(
+                        op_proc_name,
+                        proj.id,
+                        proj_provider,
+                        'tabledraw',
+                        triggering_request= new_req
+                    )
+
+                    op_procedure = registers.get_table_draw(op_proc_name, op_req)
+
+                    op_run_id, exists = generate_claim_ticket(write_engine, op_req)
+                    op_req.run_id = op_run_id
+
+                    is_ok = op_procedure(
+                        op_req, proj_provider, result_provider,
+                        run_id, update_progress, check_cancel_status
+                    )
+                    # Finance tables will not be immediately ok - will require all upstream postprocs to
+                    # be run first
+                    if not op_proc_name == 'table_finance':
+                        self.assertEqual(is_ok, 'ok')
+                    elif finance_pp_counter == 2 and op_proc_name == 'table_finance':
+                        self.assertEqual(is_ok, 'ok')
+                    else:
+                        finance_pp_counter += 1
+                        self.assertEqual(is_ok, 'missing')
+
+                    # Recover project
+                    proj_recovered = proj_provider.get_project(proj.id)
+                    recovered_revisions = self.get_project_revision_state(proj_recovered)
+
+                    if i == 0:
+                        # Again, expect no revisions
+                        for k, v in recovered_revisions.items():
+                            self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+                    else:
+                        # Expect a revision in everything downstream of generation.
+                        for k, v in recovered_revisions.items():
+                            if k in (
+                                'project.table_config',
+                                'metamodel_0.table_config',
+                                'model_0',
+                                'model_0.table_config',
+                                'finance_0',
+                                'finance_0.table_config',
+                                #'model_0.grid',
+                                'model_0.generation',
+                                #'model_0.consumption_storage'
+                            ):
+                                self.assertEqual(v, new_revisions[k] + 1, f'{k} recovered revision not incremented')
+                            else:
+                                self.assertEqual(v, new_revisions[k], f'{k} recovered revision incorrectly incremented')
+
+            # Check that outputs are for the correct revision
+            project_tables = [
+                'table_generation_wind_ann',
+                'table_generation_pv_ann',
+                'table_generation_combined_ann',
+                'table_consumption_ann',
+                'table_consumption_seasonal_ann',
+                'table_storage_ann',
+                'table_net_ann',
+                'table_net_seasonal_ann',
+                'table_finance_so_benefits_ann',
+                'table_finance_so_costs_ann',
+                'table_finance_so_value_ann',
+            ]
+            current_proj = proj_provider.get_lightweight_project(proj.id)
+            for tbl in project_tables:
+                res, rev = result_provider.get_result(tbl, current_proj.table_config, False)
+                self.assertIsNotNone(res, msg = f'No table for {tbl}')

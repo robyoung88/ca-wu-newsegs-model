@@ -1,0 +1,94 @@
+# Run:
+# docker-compose up --build
+services:
+  dash-app:
+    build: .
+    command: python src/app.py
+    ports:
+      - "8050:8050"
+    environment:
+      - PYTHONPATH=src
+      - DYNACONF_DB_PATH=/var/lib/sqlite_data/newsegs_db.db
+      - DYNACONF_RESULTS_STORE=/mnt/network_share/results_store
+      - DYNACONF_DB_BACKUP_PATH=/mnt/network_share/db_backups
+      - ENV_FOR_DYNACONF="production"
+    volumes:
+      # 1, The Code Mount (for Live Reloading)
+      - .:/app
+
+      # 2. The Database Mount (Simulates local persistent block storage)
+      # Creates a named Docker volume managed by Docker, not Windows.
+      - local_db_data:/var/lib/sqlite_data
+
+      # 3. File server mount (simulates deployment network drive)
+      # Maps a Windows folder to a mock mount point in Linux
+      - ${HOST_NETWORK_SHARE_PATH:-./mock_network_drive}:/mnt/network_share
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8050/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      zmq-dispatcher:
+        condition: service_healthy
+    restart: unless-stopped
+
+  zmq-dispatcher:
+    build: .
+    command: python src/newsegsmodelapp/backend/dispatcher.py
+    environment:
+      - PYTHONPATH=src
+      - DYNACONF_DB_PATH=/var/lib/sqlite_data/newsegs_db.db
+      - DYNACONF_RESULTS_STORE=/mnt/network_share/results_store
+      - DYNACONF_DB_BACKUP_PATH=/mnt/network_share/db_backups
+      - ENV_FOR_DYNACONF="production"
+    volumes:
+      - .:/app
+      - local_db_data:/var/lib/sqlite_data
+      - ${HOST_NETWORK_SHARE_PATH:-./mock_network_drive}:/mnt/network_share
+    healthcheck:
+      test: ["CMD-SHELL", "find /tmp/dispatcher_heartbeat.txt -mmin -0.25 | grep -q ."]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+  
+  maintenance-cron:
+    build: .
+    command: python src/newsegsmodelapp/backend/maintenance.py
+    environment:
+      - PYTHONPATH=src
+      - DYNACONF_DB_PATH=/var/lib/sqlite_data/newsegs_db.db
+      - DYNACONF_RESULTS_STORE=/mnt/network_share/results_store
+      - DYNACONF_DB_BACKUP_PATH=/mnt/network_share/db_backups
+      - ENV_FOR_DYNACONF="production"
+    volumes:
+      - .:/app
+      - local_db_data:/var/lib/sqlite_data
+      - ${HOST_NETWORK_SHARE_PATH:-./mock_network_drive}:/mnt/network_share
+    depends_on:
+      zmq-dispatcher:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    ports:
+      - "9090:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  sqlite-web:
+    image: coleifer/sqlite-web:latest
+    ports:
+      - "9080:8080"
+    volumes:
+      - local_db_data:/var/lib/sqlite_data
+    command: ["python", "-m", "sqlite_web", "/var/lib/sqlite_data/newsegs_db.db", "--port", "8080", "--host", "0.0.0.0"]
+    restart: unless-stopped
+
+volumes:
+  # Named volume managed by the Docker host engine
+  local_db_data:

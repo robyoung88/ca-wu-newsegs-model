@@ -2,7 +2,8 @@
 Functions and classes for performing probabilistic sensitivity analysis
 """
 from collections import namedtuple
-from typing import Any, Callable, Literal, NamedTuple, Sequence
+from dataclasses import field
+from typing import Any, Callable, Literal, NamedTuple, Sequence, override
 from typing import get_args
 import warnings
 
@@ -13,6 +14,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsfinance import NewsegsFinance
@@ -157,6 +159,7 @@ def run_psa(
     progress: Callable[[int, int], None] | None = None,
     cancel_status: Callable[[], bool] | None = None,
     include_deterministic: bool = True,
+    precomputed_deterministic: bool = False,
 ) -> pd.DataFrame:
     """_summary_
 
@@ -169,7 +172,8 @@ def run_psa(
         return_draws (bool, optional): _description_. Defaults to False.
         progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
         include_deterministic (bool, optional): _description_. Defaults to True.
-
+        precomputed_deterministic (Boolean): Metamodel is preloaded with valid determistic results.        
+        
     Returns:
         pd.DataFrame: _description_
     """
@@ -190,12 +194,13 @@ def run_psa(
         raise InterruptedError('PSA job cancelled')
     
     if include_deterministic:
-        for v in variables:
-            v.psa_active = False
-            v.update_model(mdl)
-            v.update_model(fnc)
-        mdl.run()
-        fnc.run()
+        if not precomputed_deterministic:
+            for v in variables:
+                v.psa_active = False
+                v.update_model(mdl)
+                v.update_model(fnc)
+            mdl.run()
+            fnc.run()
 
         res = make_psa_result(mm, mdl, fnc, statistics, return_draws)
         res['deterministic'] = True
@@ -249,26 +254,32 @@ def run_psa(
     results = pd.DataFrame(results)
     return results
 
+
+@revision_dataclass
+class PSAConfig(DataWithRevision):
+    samples: int = 1000
+    seed: int | None = None
+    return_draws: bool = False
+    include_deterministic: bool = False
+    statistics: list[PSA_FLOAT_STATISTIC] = field(default_factory = lambda: get_args(PSA_FLOAT_STATISTIC))
+
+
 class PSAComponent(NewsegsComponent):
     """A container for PSA settings"""
 
     component_type = 'psa'
 
-    samples: int = 100
-    seed: int | None = None
-    return_draws: bool = False
-    include_deterministic: bool = False
-    statistics: Sequence[PSA_FLOAT_STATISTIC] = get_args(PSA_FLOAT_STATISTIC)
+    @override
+    def _generate_config(self, *args, **kwargs) -> PSAConfig:
+        return PSAConfig(*args, **kwargs)
+    _config: PSAConfig
     
     def __init__(
         self,
+        *args,
         **kwargs
     ):
-        super().__init__(**kwargs)
-        for k, v in kwargs.items():
-            if hasattr(self, k):
-                setattr(self, k, v)
-            
+        super().__init__(*args, **kwargs)            
 
 def basic_psa_stats(
     psa_results: pd.DataFrame,

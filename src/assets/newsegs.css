@@ -67,6 +67,12 @@
     flex: 1 1 0%;
 }
 
+/* Input containers */
+.input-container {
+    content-visibility: auto;
+}
+
+
 /* Input fields */
 input.dynamic-step-field {
     float: right;

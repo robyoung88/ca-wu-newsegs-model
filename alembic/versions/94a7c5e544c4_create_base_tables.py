@@ -1,8 +1,8 @@
-"""Initial table creation
+"""Create base tables
 
-Revision ID: a69c531b6380
-Revises: 3d1ae6ac82f5
-Create Date: 2026-10-06 20:58:25.323186
+Revision ID: 94a7c5e544c4
+Revises: 
+Create Date: 2026-10-18 13:21:23.666677
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a69c531b6380'
-down_revision: Union[str, Sequence[str], None] = '3d1ae6ac82f5'
+revision: str = '94a7c5e544c4'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -36,10 +36,44 @@ def upgrade() -> None:
     op.create_table('variable_configs',
     sa.Column('id', sa.String(length=38), nullable=False),
     sa.Column('varid', sa.String(), nullable=True),
+    sa.Column('interface_section', sa.String(), nullable=True),
+    sa.Column('interface_key', sa.String(), nullable=True),
+    sa.Column('interface_subindex', sa.Integer(), nullable=True),
     sa.Column('revision', sa.Integer(), nullable=True),
     sa.Column('component_type', sa.String(), nullable=True),
+    sa.Column('variable_type', sa.String(), nullable=True),
+    sa.Column('distribution', sa.String(), nullable=True),
+    sa.Column('parameterisation_index', sa.Integer(), nullable=True),
+    sa.Column('raw_parameter_0', sa.String(), nullable=True),
+    sa.Column('raw_parameter_1', sa.String(), nullable=True),
+    sa.Column('last_deterministic_value', sa.String(), nullable=True),
+    sa.Column('dsa_show', sa.Boolean(), nullable=True),
+    sa.Column('dsa_selectable', sa.Boolean(), nullable=True),
+    sa.Column('dsa_selected', sa.Boolean(), nullable=True),
+    sa.Column('dsa_bounds_type', sa.String(), nullable=True),
+    sa.Column('dsa_lower', sa.String(), nullable=True),
+    sa.Column('dsa_upper', sa.String(), nullable=True),
+    sa.Column('dsa_value_lower', sa.String(), nullable=True),
+    sa.Column('dsa_value_upper', sa.String(), nullable=True),
+    sa.Column('psa_show', sa.Boolean(), nullable=True),
+    sa.Column('psa_selectable', sa.Boolean(), nullable=True),
+    sa.Column('psa_selected', sa.Boolean(), nullable=True),
+    sa.Column('last_std', sa.String(), nullable=True),
+    sa.Column('psa_ci_lower', sa.String(), nullable=True),
+    sa.Column('psa_ci_upper', sa.String(), nullable=True),
+    sa.Column('optim_show', sa.Boolean(), nullable=True),
+    sa.Column('optim_selectable', sa.Boolean(), nullable=True),
+    sa.Column('optim_selected', sa.Boolean(), nullable=True),
+    sa.Column('optim_min', sa.String(), nullable=True),
+    sa.Column('optim_max', sa.String(), nullable=True),
     sa.Column('payload', sa.String(), nullable=True),
     sa.Column('label', sa.String(), nullable=True),
+    sa.Column('icon_name', sa.String(), nullable=True),
+    sa.Column('unit', sa.String(), nullable=True),
+    sa.Column('interface_min', sa.Float(), nullable=True),
+    sa.Column('interface_max', sa.Float(), nullable=True),
+    sa.Column('interface_step', sa.Float(), nullable=True),
+    sa.Column('formatter_dp', sa.Integer(), nullable=True),
     sa.Column('retain', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -52,6 +86,7 @@ def upgrade() -> None:
     sa.Column('table_config_id', sa.String(length=42), nullable=True),
     sa.Column('model_class', sa.String(), nullable=True),
     sa.Column('model_version', sa.String(), nullable=True),
+    sa.Column('model_type', sa.String(), nullable=True),
     sa.Column('payload', sa.String(), nullable=True),
     sa.Column('revision', sa.Integer(), nullable=True),
     sa.Column('label', sa.String(), nullable=True),
@@ -80,6 +115,7 @@ def upgrade() -> None:
     op.create_table('results',
     sa.Column('result_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('component_config_id', sa.String(length=42), nullable=True),
+    sa.Column('request_id', sa.Integer(), nullable=True),
     sa.Column('run_id', sa.Integer(), nullable=True),
     sa.Column('component_type', sa.String(), nullable=True),
     sa.Column('component_class', sa.String(), nullable=True),
@@ -101,6 +137,7 @@ def upgrade() -> None:
     sa.Column('revision', sa.Integer(), nullable=True),
     sa.Column('label', sa.String(), nullable=True),
     sa.Column('retain', sa.Boolean(), nullable=True),
+    sa.Column('location', sa.String(), nullable=True),
     sa.Column('lat', sa.Float(), nullable=True),
     sa.Column('lon', sa.Float(), nullable=True),
     sa.Column('n_units', sa.Float(), nullable=True),
@@ -155,36 +192,21 @@ def upgrade() -> None:
     )
     op.create_table('requests',
     sa.Column('request_id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('project_id', sa.String(length=38), nullable=False),
-    sa.Column('request_class', sa.String(), nullable=True),
     sa.Column('request_type', sa.String(), nullable=True),
-    sa.Column('payload', sa.String(), nullable=True),
-    sa.Column('dispatched', sa.Boolean(), nullable=True),
+    sa.Column('trigger_request_id', sa.Integer(), nullable=True),
+    sa.Column('trigger_request_type', sa.String(), nullable=True),
     sa.Column('run_id', sa.Integer(), nullable=True),
-    sa.Column('retry_number', sa.Integer(), nullable=True),
-    sa.Column('max_retries', sa.Integer(), nullable=True),
-    sa.Column('completed', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
-    sa.PrimaryKeyConstraint('request_id')
-    )
-    op.create_table('runs',
-    sa.Column('run_id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('project_id', sa.String(length=38), nullable=False),
-    sa.Column('model_type', sa.String(), nullable=True),
-    sa.Column('request_id', sa.Integer(), nullable=True),
     sa.Column('request_label', sa.String(), nullable=True),
     sa.Column('request_class', sa.String(), nullable=True),
-    sa.Column('request_type', sa.String(), nullable=True),
+    sa.Column('project_id', sa.String(length=38), nullable=False),
+    sa.Column('model_type', sa.String(), nullable=True),
     sa.Column('payload', sa.String(), nullable=True),
-    sa.Column('status', sa.String(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
-    sa.Column('modified_at', sa.DateTime(), nullable=True),
-    sa.Column('progress', sa.Float(), nullable=True),
-    sa.Column('progress_message', sa.String(), nullable=True),
-    sa.Column('cancel_requested', sa.Boolean(), nullable=True),
-    sa.Column('children_spawned', sa.Boolean(), nullable=True),
+    sa.Column('status', sa.String(length=24), nullable=True),
+    sa.Column('background_procedure', sa.Boolean(), nullable=True),
+    sa.Column('retry_number', sa.Integer(), nullable=True),
+    sa.Column('max_retries', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
-    sa.PrimaryKeyConstraint('run_id')
+    sa.PrimaryKeyConstraint('request_id')
     )
     op.create_table('sessions',
     sa.Column('session_id', sa.String(), nullable=False),
@@ -199,6 +221,18 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
     sa.PrimaryKeyConstraint('snapshot_id')
+    )
+    op.create_table('runs',
+    sa.Column('run_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('request_id', sa.Integer(), nullable=True),
+    sa.Column('status', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('modified_at', sa.DateTime(), nullable=True),
+    sa.Column('progress', sa.Float(), nullable=True),
+    sa.Column('progress_message', sa.String(), nullable=True),
+    sa.Column('cancel_requested', sa.Boolean(), nullable=True),
+    sa.ForeignKeyConstraint(['request_id'], ['requests.request_id'], ),
+    sa.PrimaryKeyConstraint('run_id')
     )
     op.create_table('snapshot_component_configs',
     sa.Column('snapshot_id', sa.Integer(), nullable=False),
@@ -218,10 +252,44 @@ def upgrade() -> None:
     sa.Column('snapshot_id', sa.Integer(), nullable=False),
     sa.Column('id', sa.String(length=38), nullable=False),
     sa.Column('varid', sa.String(), nullable=True),
+    sa.Column('interface_section', sa.String(), nullable=True),
+    sa.Column('interface_key', sa.String(), nullable=True),
+    sa.Column('interface_subindex', sa.Integer(), nullable=True),
     sa.Column('revision', sa.Integer(), nullable=True),
     sa.Column('component_type', sa.String(), nullable=True),
+    sa.Column('variable_type', sa.String(), nullable=True),
+    sa.Column('distribution', sa.String(), nullable=True),
+    sa.Column('parameterisation_index', sa.Integer(), nullable=True),
+    sa.Column('raw_parameter_0', sa.String(), nullable=True),
+    sa.Column('raw_parameter_1', sa.String(), nullable=True),
+    sa.Column('last_deterministic_value', sa.String(), nullable=True),
+    sa.Column('dsa_show', sa.Boolean(), nullable=True),
+    sa.Column('dsa_selectable', sa.Boolean(), nullable=True),
+    sa.Column('dsa_selected', sa.Boolean(), nullable=True),
+    sa.Column('dsa_bounds_type', sa.String(), nullable=True),
+    sa.Column('dsa_lower', sa.String(), nullable=True),
+    sa.Column('dsa_upper', sa.String(), nullable=True),
+    sa.Column('dsa_value_lower', sa.String(), nullable=True),
+    sa.Column('dsa_value_upper', sa.String(), nullable=True),
+    sa.Column('psa_show', sa.Boolean(), nullable=True),
+    sa.Column('psa_selectable', sa.Boolean(), nullable=True),
+    sa.Column('psa_selected', sa.Boolean(), nullable=True),
+    sa.Column('last_std', sa.String(), nullable=True),
+    sa.Column('psa_ci_lower', sa.String(), nullable=True),
+    sa.Column('psa_ci_upper', sa.String(), nullable=True),
+    sa.Column('optim_show', sa.Boolean(), nullable=True),
+    sa.Column('optim_selectable', sa.Boolean(), nullable=True),
+    sa.Column('optim_selected', sa.Boolean(), nullable=True),
+    sa.Column('optim_min', sa.String(), nullable=True),
+    sa.Column('optim_max', sa.String(), nullable=True),
     sa.Column('payload', sa.String(), nullable=True),
     sa.Column('label', sa.String(), nullable=True),
+    sa.Column('icon_name', sa.String(), nullable=True),
+    sa.Column('unit', sa.String(), nullable=True),
+    sa.Column('interface_min', sa.Float(), nullable=True),
+    sa.Column('interface_max', sa.Float(), nullable=True),
+    sa.Column('interface_step', sa.Float(), nullable=True),
+    sa.Column('formatter_dp', sa.Integer(), nullable=True),
     sa.Column('retain', sa.Boolean(), nullable=True),
     sa.ForeignKeyConstraint(['snapshot_id'], ['snapshots.snapshot_id'], ),
     sa.PrimaryKeyConstraint('snapshot_id', 'id')
@@ -236,6 +304,7 @@ def upgrade() -> None:
     sa.Column('table_config_id', sa.String(length=42), nullable=True),
     sa.Column('model_class', sa.String(), nullable=True),
     sa.Column('model_version', sa.String(), nullable=True),
+    sa.Column('model_type', sa.String(), nullable=True),
     sa.Column('payload', sa.String(), nullable=True),
     sa.Column('revision', sa.Integer(), nullable=True),
     sa.Column('label', sa.String(), nullable=True),
@@ -289,6 +358,7 @@ def upgrade() -> None:
     sa.Column('snapshot_id', sa.Integer(), nullable=False),
     sa.Column('result_id', sa.Integer(), nullable=False),
     sa.Column('component_config_id', sa.String(length=42), nullable=True),
+    sa.Column('request_id', sa.Integer(), nullable=True),
     sa.Column('run_id', sa.Integer(), nullable=True),
     sa.Column('component_type', sa.String(), nullable=True),
     sa.Column('component_class', sa.String(), nullable=True),
@@ -312,6 +382,7 @@ def upgrade() -> None:
     sa.Column('revision', sa.Integer(), nullable=True),
     sa.Column('label', sa.String(), nullable=True),
     sa.Column('retain', sa.Boolean(), nullable=True),
+    sa.Column('location', sa.String(), nullable=True),
     sa.Column('lat', sa.Float(), nullable=True),
     sa.Column('lon', sa.Float(), nullable=True),
     sa.Column('n_units', sa.Float(), nullable=True),
@@ -366,9 +437,9 @@ def downgrade() -> None:
     op.drop_table('snapshot_em_configs')
     op.drop_table('snapshot_variable_configs')
     op.drop_table('snapshot_component_configs')
+    op.drop_table('runs')
     op.drop_table('snapshots')
     op.drop_table('sessions')
-    op.drop_table('runs')
     op.drop_table('requests')
     op.drop_table('project_variables')
     op.drop_table('project_metamodels')

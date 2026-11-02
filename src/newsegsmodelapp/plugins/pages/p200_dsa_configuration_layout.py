@@ -1,6 +1,9 @@
 """
 Functions for creating a deterministic sensitivity analysis layout
 """
+import logging
+logger = logging.getLogger(__name__)
+
 import base64
 from dataclasses import asdict, dataclass
 import io
@@ -24,6 +27,7 @@ from newsegsmodelapp.components import callback_utils, export, navigation
 
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import icons
+from newsegsmodelapp.components.staleness import create_staleness_indicator
 from newsegsmodelapp.types import Page
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -79,15 +83,33 @@ def create_dsa_header():
 
 def create_dsa_configuration_editor():
     return dbc.Col([
-        html.Div([
-            html.H2(
-                'DSA Configuration',
-                style = {'display': 'inline-flex',
-                         'margin-right': '20px'}
-            ),
+        html.Div(
+            [
+                html.H2(
+                    'DSA Configuration',
+                    style = {'display': 'inline-flex',
+                            'margin-right': '20px'}
+                ),
             ],
             style = {'vertical-align': 'baseline'}
-            ),
+        ),
+
+        html.Div(
+            id = {'type': 'input-section-header', 'supersection': 'dsa', 'section': 'dsa'},
+            style = {'display': 'none'}
+        ),
+        dcc.Interval(
+            id = {
+                'type': 'input-container-hydration-interval', 
+                'supersection': 'dsa', 
+                'section': 'dsa'
+            },
+            n_intervals = 1,
+            disabled = False,
+            max_intervals = 1,
+            interval = 50,
+        ),
+
         html.Div(
             id = {'type': 'input-container', 'supersection': 'dsa', 'section': 'dsa'}
         )
@@ -119,6 +141,7 @@ def create_optim_configuration_editor_header(**kwargs):
 
 def create_optim_configuration_editor(**kwargs):
     return dbc.Col([
+        *create_staleness_indicator(kwargs.get('page_type', PAGE_TYPE), 'optim'),
         create_optim_configuration_editor_header(**kwargs),
         dcc.Loading(
             [
@@ -166,10 +189,28 @@ def create_optim_configuration_editor(**kwargs):
                     section = 'tabledraw',
                     supersection = 'optim'
                 ),
+
+                html.Div(
+                    id = {'type': 'input-section-header', 'supersection': 'optim', 'section': 'optim'},
+                    style = {'display': 'none'}
+                ),
+
+                dcc.Interval(
+                    id = {
+                        'type': 'input-container-hydration-interval', 
+                        'supersection': 'optim', 
+                        'section': 'optim'
+                    },
+                    n_intervals = 1,
+                    disabled = False,
+                    max_intervals = 1,
+                    interval = 50,
+                ),
+                
                 
                 dbc.Row(
                     id = {'type': 'input-container', 'supersection': 'optim', 'section': 'optim'}
-                ), 
+                ),
             ] + optim_process_components(**kwargs),
             delay_show = 300, 
         )
@@ -296,7 +337,7 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
             ), 
             html.Progress(
                 id={'type': 'progress-bar', 'page': config.page_type},
-                className='resize-handle resize-handle-progress',
+                className='feedback-strip feedback-strip-progress',
                 style = {'display': 'none'}
             ),
             dbc.Tooltip(
@@ -539,11 +580,12 @@ def add_dsa_run_callbacks(app: NewsegsDash):
 
                                             proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
                                             proj.set_focussed_metamodel(mm_new.id)
-                                            proj.revision += 1
                                             app.project_provider.upsert_component(proj)
                                             
                                     except ValueError as e:
-                                        print(e)
+                                        logger.exception(
+                                            'Exception whilst uploading DSA results.', exc_info = True
+                                        )
                                         continue
                         
                         if mm_new:
@@ -561,20 +603,27 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                             case 'xlsx':
                                 result_df = pd.read_excel(results_file)
         except Exception as e:
-            print(e)
+            logger.exception(
+                'Exception whilst uploading DSA results.', exc_info = True
+            )
             raise PreventUpdate
         
         if result_df is None:
             # Should never be reached
-            print('No results in archive, but initial results file check has passed')
+            logger.exception(
+                'No results in uploaded DSA archive, but initial results file check passed.'
+            )
             return rval
         
         # Set the result_df as appropriate for a dsa result and trigger post-processing
         result_df = result_df.set_index(['variable', 'bound'])
         mm = proj.get_focussed_metamodel()
+        # Will allow a manual revision increment here as no need to disrupt the upstream project revision number.
         mm.table_config.revision += 1
         mark_stale = mm_new is None
-        app.results_provider.upsert_result('dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale)
+        app.results_provider.upsert_result(
+            'dsa_single_metamodel', mm.table_config, result_df, mark_stale = mark_stale
+        )
 
         # Spoof a dsa run request to register requests for post dsa run procedures
         rr_generator = registers.RUN_REQUEST_REGISTER['dsa_run_metamodel']
@@ -607,14 +656,14 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         if not click:
             raise PreventUpdate
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'dsa_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
         )
 
-        return request_id
+        return request.request_id
 
 def add_optim_run_callbacks(app: NewsegsDash):
 
@@ -693,7 +742,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
         if stat is not None and not isinstance(stat, str) and len(stat):
             kwargs['statistic'] = stat[0]
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'optim_run_metamodel',
             active_project_id,
             app.project_provider,
@@ -701,7 +750,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
             kwargs
         )
 
-        return dict(trigger = request_id)
+        return dict(trigger = request.request_id)
 
     # Marginal statistic plot draw
     @app.callback(
@@ -748,7 +797,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
         if isinstance(triggered_id, str):
             raise TypeError('Can only trigger with an object specifing the variable to plot')
 
-        request_id = app.request_handler.add_request(
+        request = app.request_handler.add_request(
             'table_optim_metamodel', # TODO: Improve this key
             active_project_id,
             app.project_provider,
@@ -760,7 +809,7 @@ def add_optim_run_callbacks(app: NewsegsDash):
             )
         )
 
-        return dict(trigger = request_id)
+        return dict(trigger = request.request_id)
 
     @app.callback(
         Output('active-project-id', 'data'),

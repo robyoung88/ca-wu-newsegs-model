@@ -6,7 +6,7 @@ from collections import OrderedDict
 import copy
 from dataclasses import dataclass, fields, asdict
 import re
-from typing import Any, Callable, Collection, Iterable, Mapping, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
+from typing import Any, Callable, Collection, Iterable, Literal, Mapping, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
 from typing_extensions import Self
 import warnings
 import uuid as mod_uuid
@@ -32,8 +32,18 @@ class RevisionNotifierProtocol(Protocol):
     def _notify_change(self, trigger: Any | None = None, **kwargs): ...
     
 
-class RevisionNotifierMixin(RevisionNotifierProtocol):
+NOTIFY_STATE = Literal[
+    'broadcast',
+    'local',
+    'disabled',
+]
+
+class RevisionNotifierMixin():
     """Handles part-child notifications and revision counts"""
+
+    _rn_config = {
+        'notify': 'broadcast'
+    }
     
     def __init__(
         self, 
@@ -70,6 +80,12 @@ class RevisionNotifierMixin(RevisionNotifierProtocol):
                 
                 return
 
+    @classmethod
+    def _set_notification_state(cls, state: NOTIFY_STATE = 'broadcast'):
+        prevstate = cls._rn_config['notify']
+        cls._rn_config['notify'] = state
+        return prevstate
+
     @property
     def revision(self) -> int:
         return self._revision
@@ -79,6 +95,9 @@ class RevisionNotifierMixin(RevisionNotifierProtocol):
         self._revision = revision
 
     def _notify_change(self, trigger: Any | None = None, **kwargs):
+        if self._rn_config['notify'] == 'disabled':
+            return
+        
         if not hasattr(self, '_revision'):
             self._revision = 0
         if not self.modified:
@@ -186,17 +205,16 @@ def revision_dataclass(cls: Type[T]) -> Type[T]:
     return cls
 
 
-# Disabling this check for now, as it causes a conflict with the Protocol definition
-# class RevisionDataMeta(type):
-#     """Metaclass to enforce `@revision_dataclass` decoration."""
-#     def __call__(cls, *args, **kwargs):
-#         # Enforce check on first instantiation/usage of the class
-#         if not getattr(cls, "_is_revision_dataclass", False):
-#             raise TypeError(
-#                 f"Class '{cls.__name__}' inherits from DataWithRevision "
-#                 f"but is missing the @revision_dataclass decorator."
-#             )
-#         return super().__call__(*args, **kwargs)
+class RevisionDataMeta(type):
+    """Metaclass to enforce `@revision_dataclass` decoration."""
+    def __call__(cls, *args, **kwargs):
+        # Enforce check on first instantiation/usage of the class
+        if not getattr(cls, "_is_revision_dataclass", False):
+            raise TypeError(
+                f"Class '{cls.__name__}' inherits from DataWithRevision "
+                f"but is missing the @revision_dataclass decorator."
+            )
+        return super().__call__(*args, **kwargs)
 
 
 def wrap_value(val: Any, parent: RevisionNotifierProtocol) -> Any:
@@ -256,7 +274,8 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
     def _notify_change(self, trigger: Any | None = None, broadcast: bool = True, **kwargs):
         trigger = self if trigger is None else trigger
         super()._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
-        if broadcast:
+
+        if self._rn_config['notify'] == 'broadcast' and broadcast:
             for subscriber in self._subscribers:
                 subscriber._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
 
@@ -289,7 +308,7 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
         return odict
 
 
-class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin):#, metaclass = RevisionDataMeta):
+class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.SerialiseToDictMixin, metaclass = RevisionDataMeta):
     """Base class for all revision-tracked dataclasses."""
     _constructor_class = 'DataWithRevision'
     _excluded_attributes = serialisation.SerialiseToDictMixin._excluded_attributes.union({'_children', '_subscribers'})

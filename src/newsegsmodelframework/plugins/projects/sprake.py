@@ -3,6 +3,7 @@ import os
 import pickle
 from typing import cast
 
+from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsmodel import newsegsmodel
 from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
@@ -64,30 +65,34 @@ def _create_default_variables() -> list[variable.Variable]:
 
 @register_project_factory(MODEL_TYPE)
 def sprake_project_factory():
-    mdl = _create_default_model()
-    fnc = _create_default_finance()
-    # Do we want to randomise the ids? Leave as it at the moment,
-    # but bear this in mind.
-    fnc.set_model(mdl)
+    prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+    try:
+        mdl = _create_default_model()
+        fnc = _create_default_finance()
+        # Do we want to randomise the ids? Leave as it at the moment,
+        # but bear this in mind.
+        fnc.set_model(mdl)
 
-    variables = _create_default_variables()
+        variables = _create_default_variables()
 
-    proj = newsegsproject.NewsegsProject(
-        default_variables = variables,
-        model_type = 'sprake',
-        model_version = mdl.version
-    )
+        proj = newsegsproject.NewsegsProject(
+            default_variables = variables,
+            model_type = 'sprake',
+            model_version = mdl.version
+        )
 
-    varids = proj.get_varids()
-    mm = newsegsmetamodel.NewsegsMetaModel(
-        mdl,
-        fnc,
-        variables = [proj.get_default_variable(x) for x in varids]
-    )
-    _reset_revision(mm)
+        varids = proj.get_varids()
+        mm = newsegsmetamodel.NewsegsMetaModel(
+            mdl,
+            fnc,
+            variables = [proj.get_default_variable(x) for x in varids]
+        )
+        _reset_revision(mm)
 
-    proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]
+        proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]
 
-    _reset_revision(proj)
+        _reset_revision(proj)
+    finally:
+        RevisionNotifierMixin._set_notification_state(prevstate)
 
     return proj

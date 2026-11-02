@@ -1,0 +1,10 @@
+# Ignore local environment files
+.env
+.env.*
+
+# Ignore git and standard temp files
+.git
+.gitignore
+__pycache__
+*.pyc
+.pytest_cache

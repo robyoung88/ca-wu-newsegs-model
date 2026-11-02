@@ -1,4 +1,6 @@
 """Register restult container and result header container content creators"""
+import logging
+logger = logging.getLogger(__name__)
 
 from typing import Callable
 
@@ -6,9 +8,10 @@ import dash
 from dash import html
 import pandas as pd
 
-from newsegsmodelapp.components import icons
+from newsegsmodelapp.components import icons, staleness
 from newsegsmodelapp.registers import register_result_container_content_creator, register_result_section_header_content_creator, register_table_subindex_map
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
@@ -214,10 +217,8 @@ def _(
 # Header content
 # -----------------------------------------------
 
-RESULT_HEADER_SINGLE_CONFIG_CLASS = 'result-header-single-config'
-
 def _make_headers_for_multiple_configs(
-    proj: NewsegsProject,
+    lproj: LightweightNewsegsProject,
     result_provider: NewsegsResultProviderInterface,
     result_key,
     content_generator: Callable,
@@ -225,15 +226,15 @@ def _make_headers_for_multiple_configs(
     ann_hori_toggle: bool = True,
 ):
     rval = []
-    focussed_mm = proj.get_focussed_metamodel()
-    for idx, mm in enumerate(proj.metamodels):
+    states = staleness.get_process_states(lproj.metamodels, 'deterministic')
+    for idx, lmm in enumerate(lproj.metamodels):
         match table_identifier:
             case 'model':
-                mod = mm.model.table_config
+                mod = lmm.model.table_config
             case 'finance':
-                mod = mm.finance.table_config
+                mod = lmm.finance.table_config
             case _:
-                mod = mm.table_config
+                mod = lmm.table_config
         
         
         mm_icon = icons.get_icon(
@@ -242,23 +243,31 @@ def _make_headers_for_multiple_configs(
         )
 
         res, rev = result_provider.get_result(result_key, mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            result_key, mod.id, mod.revision, rev
+        )
 
         if res is not None:
             cntnt = [mm_icon] + content_generator(res, ann_hori_toggle)
         else:
             cntnt = [mm_icon] + ['- No data']
         
-        cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
-        if rev != mod.revision:
-            cn += ' stale'
-        if mm != focussed_mm:
-            cn += ' unfocussed'
+        cn = staleness.result_header_class_name(states[lmm.id], lmm.id == lproj.focussed_metamodel_id)
         
-        rval.append(html.Div(cntnt, className = cn, id = {
-            'type':'result-header-single-config',
-            'table': result_key,
-            'metamodel': mm.id
-        }))
+        rval.append(html.Div(
+            cntnt, 
+            className = cn, 
+            id = {
+                'type':'result-header-single-config',
+                'table': result_key,
+                'metamodel': lmm.id
+            },
+            **{
+                'data-parent-component': mod.id,
+                'data-parent-component-revision': rev
+            }
+            ))
 
     return rval
 
@@ -317,10 +326,11 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of key
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
+    lproj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
-        proj,
+        lproj,
         result_provider,
         key_,
         _make_generation_result_header,
@@ -376,7 +386,8 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
+    proj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
         proj,
@@ -433,7 +444,8 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
+    proj = proj_provider.get_lightweight_project(proj_id)
 
     rval = _make_headers_for_multiple_configs(
         proj,
@@ -477,12 +489,16 @@ def _make_net_result_header(
         stat='sum'
     else:
         stat='mean'
-        
-    ms = (
-        pd.DataFrame
-        .from_dict(res['meter_summaries'], orient='columns')
-        .set_index(['variable', 'statistic'])
-    )
+
+    ms = res.get('meter_summaries')
+    if ms is None:
+        return _content_function()
+    if not isinstance(ms, pd.DataFrame):
+        ms = (
+            pd.DataFrame
+            .from_dict(ms, orient='columns')
+            .set_index(['variable', 'statistic'])
+        )
     energy_export = ms.loc[('grid_export',stat),'value']
     energy_import = ms.loc[('grid_import',stat),'value']
     storage_loss = ms.loc[('storage_loss',stat),'value']
@@ -497,7 +513,8 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
+    proj = proj_provider.get_lightweight_project(proj_id)
     rval = _make_headers_for_multiple_configs(
         proj,
         result_provider,
@@ -509,12 +526,6 @@ def _(
 
     return rval
 
-
-    mm = proj.get_focussed_metamodel()
-    mod = mm.model.table_config
-
-    res, rev = result_provider.get_result(key_, mod)
-    return _make_net_result_header(res, ann_hori_toggle)
 
 SECTION = 'tabledraw'
 KEY = 'table_finance'
@@ -566,13 +577,14 @@ def _(
     ann_hori_toggle: bool = True,
     key_: str = KEY # Using default argument trick to force evaluation of section
 ) -> list[dash.development.base_component.Component]:
-    proj = proj_provider.get_project(proj_id)
+    logger.debug('Getting lightweight project - Creating Result Section Header [%s] contents', key_)
+    lproj = proj_provider.get_lightweight_project(proj_id)
 
     # This one needs to be bespoke, as header is constructed from multiple postprocess keys
     rval = []
-    focussed_mm = proj.get_focussed_metamodel()
-    for idx, mm in enumerate(proj.metamodels):
-        mod = mm.finance.table_config
+    states = staleness.get_process_states(lproj.metamodels, 'deterministic')
+    for idx, lmm in enumerate(lproj.metamodels):
+        mod = lmm.finance.table_config
         
         mm_icon = icons.get_icon(
             f'config-{idx + 1}',
@@ -580,21 +592,37 @@ def _(
         )
 
         res_benefits, rev_benefits = result_provider.get_result('postproc_finance_benefits', mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            'postproc_finance_benefits', mod.id, mod.revision, rev_benefits
+        )
         res_costs, rev_costs = result_provider.get_result('postproc_finance_costs', mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            'postproc_finance_costs', mod.id, mod.revision, rev_costs
+        )
         res_value, rev_value = result_provider.get_result('postproc_finance_value', mod)
+        logger.debug(
+            'Result Header Content Creator obtained Result Type = %s; for Component ID = %s; Component Revision is %s; Result revision is %s;',
+            'postproc_finance_value', mod.id, mod.revision, rev_value
+        )
 
         cntnt = [mm_icon] + _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
 
-        cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
-        if rev_benefits != mod.revision or rev_costs != mod.revision or rev_value != mod.revision:
-            cn += ' stale'
-        if mm != focussed_mm:
-            cn += ' unfocussed'
+        cn = staleness.result_header_class_name(states[lmm.id], lmm.id == lproj.focussed_metamodel_id)
 
-        rval.append(html.Div(cntnt, className = cn, id = {
-            'type':'result-header-single-config',
-            'table': key_,
-            'metamodel': mm.id
-        }))
+        rval.append(html.Div(
+            cntnt, 
+            className = cn, 
+            id = {
+                'type':'result-header-single-config',
+                'table': key_,
+                'metamodel': lmm.id
+            },
+            **{
+                'data-parent-component': mod.id,
+                'data-parent-component-revision': rev_value # TODO: use min
+            }
+        ))
 
     return rval

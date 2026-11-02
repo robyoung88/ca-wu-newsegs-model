@@ -1,9 +1,11 @@
-
 """Register input container and input header container content creators for psa supersection"""
+import logging
+logger = logging.getLogger(__name__)
+
 import copy
 import json
 import time
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import dash
 from dash.exceptions import PreventUpdate
@@ -11,17 +13,23 @@ from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components.variable_identification import VariableInstanceComponentID, VariableInstanceParameterComponentID
+from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
+from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.components.composite_input_components import generic_create_psa_input_container_contents
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
+from newsegsmodelapp.backend.db import db_staleness
+from newsegsmodelapp.components import staleness
 from newsegsmodelapp.registers import register_input_container_content_creator, register_input_handler, register_single_input_header_content_creator
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 MODEL_TYPE = 'sprake'
 @register_input_container_content_creator('psa', None, MODEL_TYPE)
@@ -29,17 +37,20 @@ def _(
     proj_id: str,
     proj_provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
+    provider = cast(FromDatabaseNewsegsProjectProvider, proj_provider)
+    logger.debug('Getting lightweight project - Creating PSA Input Container contents')
+    lproj = provider.get_lightweight_project(proj_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     return generic_create_psa_input_container_contents(
-        get_focussed_metamodel(proj_id, proj_provider)
+        lmm, provider.variable_provider
     )
 
 @register_single_input_header_content_creator('psa', None, MODEL_TYPE)
 def _(
     varid: str,
-    metamodel: NewsegsMetaModel
+    var: variable.Variable | FullLightweightVariable,
 ) -> list[dash.development.base_component.Component]:
-    var = metamodel.variables.get(varid)
-    if not var or not isinstance(var, variable.Variable):
+    if not var or not isinstance(var, (variable.Variable, FullLightweightVariable)):
         return []
     return var_dc.create_psa_header(var) # pyright: ignore[reportArgumentType]
 
@@ -48,24 +59,26 @@ def _(
     proj_id: str,
     proj_provider: NewsegsProjectProviderInterface,
 ) -> list[dash.development.base_component.Component]:
-    
-    proj = proj_provider.get_project(proj_id)
-    if not proj:
+    provider = cast(FromDatabaseNewsegsProjectProvider, proj_provider)
+    logger.debug('Getting lightweight project - Creating PSA Settings Input Container contents')
+    lproj = provider.get_lightweight_project(proj_id)
+    psa_config = provider._component_provider.get_component(lproj.psa_config.id)
+    if not psa_config:
         return []
     return [
-        n_samples_input(proj),
-        random_seed_input(proj),
-        return_draws_input(proj)
+        n_samples_input(psa_config),
+        random_seed_input(psa_config),
+        return_draws_input(psa_config)
     ]
     
 
 def n_samples_input(
-        proj: NewsegsProject,
-        id = VariableInstanceParameterComponentID(
-            'single-input-config', 'psa-settings',
-            'psa', 'psa-settings',
-            'samples', 0
-        )):
+    psa_config: PSAComponent,
+    id = VariableInstanceParameterComponentID(
+        'single-input-config', 'psa-settings',
+        'psa', 'psa-settings',
+        'samples', 0
+    )):
     overall_id = id
 
     header_id = copy.copy(id)
@@ -83,7 +96,7 @@ def n_samples_input(
             dbc.Input(
                 overall_id.as_dict(),
                 placeholder = 'N',
-                value = proj.psa_config.samples,
+                value = psa_config.samples,
                 min = 0,
                 max = 10000,
                 step = 1,
@@ -96,7 +109,7 @@ def n_samples_input(
     )
 
 def random_seed_input(
-    proj: NewsegsProject,
+    psa_config: PSAComponent,
     id = VariableInstanceParameterComponentID(
         'single-input-config', 'psa-settings',
         'psa', 'psa-settings',
@@ -119,7 +132,7 @@ def random_seed_input(
             dbc.Input(
                 overall_id.as_dict(),
                 placeholder = 'N',
-                value = proj.psa_config.seed,
+                value = psa_config.seed,
                 min = 0,
                 max = 10000,
                 step = 1,
@@ -132,7 +145,7 @@ def random_seed_input(
     )
 
 def return_draws_input(
-    proj: NewsegsProject,
+    psa_config: PSAComponent,
     id = VariableInstanceParameterComponentID(
         'single-input-config', 'psa-settings',
         'psa', 'psa-settings',
@@ -152,7 +165,7 @@ def return_draws_input(
         html.H4('Keep drawn parameters:', id = header_id.as_dict()),
         daq.ToggleSwitch(
             id = overall_id.as_dict(),
-            value = proj.psa_config.return_draws,
+            value = psa_config.return_draws,
             size = 36,
             className = 'input-toggle',
         ),
@@ -178,34 +191,40 @@ def handle_psa_settings(
         if new_val is None and triggered_id['key'] != 'seed':
             new_val = 0
 
-    proj = project_provider.get_project(active_project_id)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Handling PSA settings change')
+    lproj = provider.get_lightweight_project(active_project_id)
+    psa_config = provider._component_provider.get_component(lproj.psa_config.id)
 
     now = time.time_ns()
 
+    r0 = psa_config.revision
     modified = False
     match triggered_id['key']:
         case 'seed':
-            if proj.psa_config.seed != new_val:
-                proj.psa_config.seed = new_val
-                proj.psa_config.revision += 1
-                modified = True
+            if psa_config.seed != new_val:
+                old_val = psa_config.seed
+                psa_config.seed = new_val
         case 'samples':
-            new_val = max(min(int(new_val), 10000), 10) # pyright: ignore[reportArgumentType]
-            if proj.psa_config.samples != int(new_val):
-                proj.psa_config.samples = int(new_val)
-                proj.psa_config.revision += 1
-                modified = True
+            new_val = max(min(int(new_val), 10000), 10) 
+            if psa_config.samples != int(new_val):
+                old_val = psa_config.samples
+                psa_config.samples = int(new_val)
         case 'return_draws':
-            if proj.psa_config.return_draws != new_val:
-                proj.psa_config.return_draws = new_val # pyright: ignore[reportAttributeAccessIssue]
-                proj.psa_config.revision += 1
-                modified = True
+            if psa_config.return_draws != new_val:
+                old_val = psa_config.return_draws
+                psa_config.return_draws = new_val 
         case _:
-            print (f'No handler for key {triggered_id["key"]}')
+            logger.exception('No PSA setting handler for key: %s', triggered_id['key'])
 
-
+    modified = psa_config.revision != r0
     if not modified:
         return return_dict
+
+    logger.debug(
+        'PSA setting changed - %s: %s -> %s',
+        triggered_id["key"], old_val, new_val
+    )
 
     # Feed back current parameters
     for idx, id in enumerate(input_ids):
@@ -215,9 +234,19 @@ def handle_psa_settings(
      # Update triggers
     for idx, id in enumerate(trigger_ids):
         return_dict['trigger_data'][idx] = now
-  
-    # Sync project to store
-    project_provider.upsert_component(proj)
+
+    # Sync configuration to store
+    provider._component_provider.upsert_component(psa_config, project_id = active_project_id)
+    
+    # TODO: Invalidate only PSA outputs
+    # Currently, we have to invalidate all outputs even though these
+    # settings only apply to the PSA.
+    provider._component_provider.increment_revision(lproj.table_config.id)
+    
+    provider.increment_revision(lproj.id)
+
+    # PSA settings are held for the project, so apply to every configuration
+    db_staleness.mark_inputs_changed([x.id for x in lproj.metamodels], 'psa')
 
     return return_dict
 
@@ -236,10 +265,15 @@ def handle_psa_active(
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Handling PSA activation change')
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = cast(LightweightNewsegsMetaModel, lproj.metamodels[lproj.focussed_metamodel_index])
+
     varid =  make_varid(**triggered_id)
-    var = mm.variables.get(varid)
+    var_uid = lmm.variables[varid]
+    var = project_provider.variable_provider.get_variable(var_uid)
+    
     if not var or new_val == var.psa_selected:
         return return_dict
 
@@ -256,7 +290,18 @@ def handle_psa_active(
             case 'psa':
                 return_dict['trigger_data'][idx] = trig_val
 
-    # Sync project to store
-    project_provider.upsert_component(proj)
+    # Sync variable
+    project_provider.variable_provider.upsert_variable(var)
+
+    # Don't need to invalidate metamodels, as PSA will run anyway,
+    # but do need to invalidate at project level
+    # TODO: Invalidate only PSA outputs
+    # Currently, we have to invalidate all outputs even though these
+    # settings only apply to the PSA.
+    provider._component_provider.increment_revision(lproj.table_config.id)
+    
+    provider.increment_revision(lproj.id)
+
+    db_staleness.mark_inputs_changed(staleness.metamodels_using_variable(lproj, var_uid), 'psa')
     
     return return_dict

@@ -1,6 +1,12 @@
 """A worker process for performing background computations."""
+import logging
+import random
+import time
+logger = logging.getLogger(__name__)
+
 import copy
 import pickle
+from sqlalchemy.exc import OperationalError
 from typing import cast
 
 import zmq
@@ -18,13 +24,18 @@ BACKENDPORT = str(settings['BACKENDPORT'])
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_tables import runs
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_status, update_calculation_progress, get_cancel_status, set_status_completed, set_status_failed
+from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_request_status, update_calculation_progress, get_cancel_status, set_status_success, set_status_failed
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported
 import newsegsmodelapp.registers as registers
 
+import os
+
 POISON_PILL = b"__STOP__"
+
+class RunAlreadyExistsError(BaseException):
+    pass
 
 def worker_process(
     worker_id: str,
@@ -38,9 +49,10 @@ def worker_process(
     socket.setsockopt(zmq.RCVTIMEO, settings.get('WORKER_RECEIVE_TIMEOUT_MS', -1))
     socket.connect(f'tcp://{server}:{port}')
 
-    print(f'Worker {worker_id} listening on {server}:{port}')
+    logger.info('Worker %d listening on %s:%s', worker_id, server, port)
 
-    engine = db.get_engine(db_path)
+    write_engine = db.get_engine(writer = True, db_path = db_path)
+    read_engine = db.get_engine(writer = False, db_path = db_path)
 
     proj_provider = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
     result_provider = CachedFromDatabaseResultProvider(db.get_engine, RESULTS_STORE)
@@ -52,7 +64,7 @@ def worker_process(
 
                 # Handle poison pill
                 if frames[-1] == POISON_PILL:
-                    print(f'Worker {worker_id} received poison pill. Shutting down...')
+                    logger.info('Worker %d received poison pill. Shutting down...', worker_id)
                     break
 
                 # Extract envelope frames and payload frame
@@ -61,17 +73,52 @@ def worker_process(
 
                 request = cast(registers.RunRequest, pickle.loads(payload_bytes))
 
-                job_id = generate_claim_ticket(engine, request)
+                job_id, job_exists = generate_claim_ticket(write_engine, request)
 
                 response_data = {
                     'status': 'started',
-                    'worker': worker_id,
+                    'worker': worker_id if not job_exists else None,
                     'job_id': job_id,
+                    'prexisting': job_exists
                 }
 
                 response_bytes = pickle.dumps(response_data)
 
-                socket.send_multipart(client_envelope + [response_bytes])
+                retries = 5
+                # TODO: Sort out this mess. What's it to do with the database?
+                
+                while retries > 0:
+                    try:
+                        socket.send_multipart(client_envelope + [response_bytes])
+                        send_completed = True
+                        break
+                    except OperationalError:
+                        retries -= 1
+                        continue
+                    except Exception as e:
+                        raise e
+                else:
+                    send_completed = False
+
+                if not send_completed:
+                    try:
+                        socket.setsockopt(zmq.LINGER, 0)
+                        socket.close()
+                    except:
+                        pass
+                    socket = context.socket(zmq.REP)
+                    socket.connect(f'tcp://{server}:{port}')
+                    raise ValueError(f'Cannot send claim ticket back to client - database is unresponsive.')
+
+                if job_exists:
+                    # Loop back
+                    raise RunAlreadyExistsError
+
+                logger.info(
+                    'Worker %d initiating procedure %s for Request ID = %d; Run ID = %d, Triggering Request ID = %d',
+                    worker_id, request.request_type, request.request_id,
+                    job_id, request.trigger_request_id
+                )
 
                 try:
                     if job_id is None:
@@ -91,20 +138,23 @@ def worker_process(
 
                     def update_progress(step, total, message):
                         # Update SQLite with the new progress
-                        return update_calculation_progress(engine, job_id, step, total, message)
+                        return update_calculation_progress(write_engine, job_id, step, total, message)
                         
                     def check_cancel_status() -> bool:
                         """Return True if cancel_requested where result_id == job_id."""
                         # Check if supervisor would like worker to terminate.
                         if stop_event is not None and stop_event.is_set():
                             # Set the job to cancelled and then return true
-                            set_cancel_status(engine, job_id)
+                            set_cancel_request_status(write_engine, job_id, True)
                             return True
                         else:
-                            return get_cancel_status(engine, job_id)
+                            return get_cancel_status(read_engine, job_id)
 
                     rq = copy.copy(request)
                     rq.run_id = job_id
+
+                    # Hold back to allow the client to mark the job(s) as dispatched
+                    time.sleep(settings.get('WORKER_HOLDBACK_TIME_S', 0.00) + random.random() * settings.get('WORKER_HOLDBACK_JITTER', 0.00) )
                     
                     is_ok = runner(
                         rq,
@@ -115,24 +165,41 @@ def worker_process(
                         check_cancel_status,
                     )
 
-                    # Update the database with the final status and file pointer
-                    set_status_completed(engine, job_id)
-                    print(f"Worker {worker_id} finished Job {job_id} with message {is_ok}. Ready for next request.")
+                    # Update the database marking the run successful
+                    set_status_success(write_engine, job_id)
+                    logger.info(
+                        'Worker %d Completed procedure %s for Request ID = %d; with message %s; Run ID = %d; Triggering Request ID = %d. Ready for next request.',
+                        worker_id, request.request_type, request.request_id, is_ok,
+                        job_id, request.trigger_request_id
+                    )
 
                 except Exception as e:
-                    set_status_failed(engine, job_id, str(e))
-
-                    print(f"Worker {worker_id} failed Job {job_id}. Error {e}.")
+                    set_status_failed(write_engine, job_id, str(e))
+                    logger.warning(
+                        'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d; Triggering Request ID = %d;',
+                        worker_id, rq.request_type, rq.request_id,
+                        job_id, rq.trigger_request_id,
+                        exc_info = True
+                    )
             
-            except zmq.Again:
+            except (zmq.Again, RunAlreadyExistsError):
                 # Timeout hit (no message in 1 sec). Re-evaluate stop_event loop condition.
                 continue
             except Exception as e:
-                print(f"Worker {worker_id} encountered an error: {e}")
+                try:
+                    socket.setsockopt(zmq.LINGER, 0)
+                    socket.close()
+                except:
+                    pass
+                socket = context.socket(zmq.REP)
+                socket.connect(f'tcp://{server}:{port}')
+                logger.error('Worker %d encountered an error', worker_id, exc_info = True)
             # Process loops back to recv, signalling to dealer that worker is free
-    
+
+
     finally:
-        print(f'Worker {worker_id} disposing engine.')
-        engine.dispose()
+        logger.info('Worker %d disposing engines and closing sockets.', worker_id)
+        write_engine.dispose()
+        read_engine.dispose()
         socket.close()
         context.term()

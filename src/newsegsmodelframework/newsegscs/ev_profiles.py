@@ -9,7 +9,8 @@ import pandas as pd
 from newsegsmodelframework.util.holiday_helpers import get_holiday_df
 
 from config import settings
-lookup_dir = settings.get('SprakeDataLoc')
+from newsegsmodelframework import STATICDATA
+lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 
 # Profile data is the proportion of annual residential consumption for EV per period
 # in periods of one hour through 2017

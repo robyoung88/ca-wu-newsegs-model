@@ -1,16 +1,17 @@
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
+from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 def get_result_list(
     result_type: str,
-    project: NewsegsProject,
+    lproject: LightweightNewsegsProject,
     result_provider: NewsegsResultProviderInterface,
     allow_stale: bool = True
 ) -> tuple[list, bool]:
     is_finance = 'finance' in result_type
     results_list = []
     any_stale = False
-    for mm in project.metamodels:
+    for mm in lproject.metamodels:
         if is_finance:
             component = mm.finance.table_config
         else:

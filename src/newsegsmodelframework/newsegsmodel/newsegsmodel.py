@@ -3,6 +3,9 @@ Abstract base class for NewSEGS model
 """
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
 from abc import abstractmethod
 from typing import Any, Optional, Type, override
 
@@ -73,6 +76,7 @@ class NewsegsModel(
     """
     
     _name = 'NewSEGS Energy Model'
+    model_type: str = 'abstractenergymodel'
     _version = '0.0.1'
     _id_prefix = COMPONENT_PREFIXES['em']
 
@@ -436,7 +440,12 @@ class NewsegsModel(
             raise ValueError('Revision incremented during model set: from {r0} to {self.revision}')
 
 
-    def reattach_results(self, results_provider: NewsegsResultProviderInterface, allow_stale = True, run_id: int = -1) -> bool:
+    def reattach_results(
+            self,
+            results_provider: NewsegsResultProviderInterface,
+            allow_stale = True, 
+            request_id: int = -1
+        ) -> bool:
         """
         
         Returns:
@@ -447,9 +456,9 @@ class NewsegsModel(
         try:
             res_ = None
             rev_ = None
-            if run_id != -1:
-                res_, rev_ = results_provider.get_run_result(
-                    'deterministic_grid', run_id, self.grid
+            if request_id != -1:
+                res_, rev_ = results_provider.get_request_result(
+                    'deterministic_grid', request_id, self.grid
                 )
             
             if res_ is None:
@@ -462,15 +471,19 @@ class NewsegsModel(
 
             any_stale = any_stale or res_ is None or self._grid_result_revision != self.grid.revision
         except Exception as e:
-            print (e)
+            logger.exception(
+                'Exception obtaining grid result for module: %s',
+                self.grid.id,
+                exc_info = True
+            )
             any_stale = True
 
         try:
             res_ = None
             rev_ = None
-            if run_id != -1:
-                res_, rev_ = results_provider.get_run_result(
-                    'deterministic_generation', run_id, self.generation
+            if request_id != -1:
+                res_, rev_ = results_provider.get_request_result(
+                    'deterministic_generation', request_id, self.generation
                 )
             
             if res_ is None:
@@ -483,15 +496,19 @@ class NewsegsModel(
 
             any_stale = any_stale or res_ is None or self._generation_result_revision != self.generation.revision
         except Exception as e:
-            print (e)
+            logger.exception(
+                'Exception obtaining generation result for module: %s',
+                self.generation.id,
+                exc_info = True
+            )
             any_stale = True
 
         try:
             res_ = None
             rev_ = None
-            if run_id != -1:
-                res_, rev_ = results_provider.get_run_result(
-                    'deterministic_consumption_storage', run_id, self.consumption_storage
+            if request_id != -1:
+                res_, rev_ = results_provider.get_request_result(
+                    'deterministic_consumption_storage', request_id, self.consumption_storage
                 )
             
             if res_ is None:
@@ -504,18 +521,14 @@ class NewsegsModel(
 
             any_stale = any_stale or res_ is None or self._cs_result_revision != self.consumption_storage.revision
         except Exception as e:
-            print(e)
+            logger.exception(
+                'Exception obtaining consumption storage result for module: %s',
+                self.consumption_storage.id,
+                exc_info = True
+            )
             any_stale = True
             
         return any_stale
         
     def __hash__(self) -> int:
         return self._last_hash
-
-# NewsegsModel._excluded_attributes = tuple(
-#     newsegscomponent.NewsegsComponent._excluded_attributes
-# ) + (
-#     '_grid', '_generation', '_consumption_storage',
-#     '_generation_result', '_grid_result', '_cs_result',
-#     '_table_config'
-# )

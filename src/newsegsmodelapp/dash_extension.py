@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, List, Sequence, override
 
-from dash import Dash
+from dash import CeleryManager, Dash, DiskcacheManager
 from dash.dash import _default_index
 from dash.dependencies import Input, State
 from dash.types import RendererHooks
@@ -18,12 +18,14 @@ class NewsegsDash(Dash):
         project_provider: NewsegsProjectProviderInterface,
         results_provider: NewsegsResultProviderInterface,
         request_handler: RequestHandlerInterface,
+        #background_callback_manager: DiskcacheManager | CeleryManager,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self._project_provider = project_provider
         self._results_provider = results_provider
         self._request_handler = request_handler
+        #self._bcm = background_callback_manager
 
     @property
     def project_provider(self) -> NewsegsProjectProviderInterface:
@@ -36,4 +38,8 @@ class NewsegsDash(Dash):
     @property
     def request_handler(self) -> RequestHandlerInterface:
         return self._request_handler
+
+    # @property
+    # def background_callback_manager(self) -> DiskcacheManager | CeleryManager:
+    #     return self._bcm
     

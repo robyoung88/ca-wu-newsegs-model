@@ -4,13 +4,14 @@ from typing import cast
 from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 def create_psa_input(
-    var: variable.Variable
+    var: FullLightweightVariable
 ):
     if not var.psa_show:
         return None
-    match var.distribution.distribution:
+    match var.distribution:
         case 'constant':
             is_scalar = True
             creation_func = var_dc.create_psa_input_scalar_constant
@@ -30,8 +31,8 @@ def create_psa_input(
             raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
         
     if is_scalar:
-        var = cast(variable.NumericScalarVariable, var)
+        #var = cast(variable.NumericScalarVariable, var)
         return creation_func(var)
     else:
-        raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+        raise ValueError(f'Distribution {var.distribution} not currently supported')
     

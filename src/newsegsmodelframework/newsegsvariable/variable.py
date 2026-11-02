@@ -13,6 +13,7 @@ from matplotlib.pylab import Generator
 import numpy as np
 import numpy.typing as npt
 from useful_types import SequenceNotStr
+from scipy.stats import gamma
 
 from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import serialisation
@@ -2079,7 +2080,7 @@ def _gamma_interval(
 ) -> tuple[float, float]:
     if len(parameters) != 2:
         raise TypeError(f'Gamma requires two parameters, {len(parameters)} provided')
-    from scipy.stats import gamma
+    
     return gamma.interval(interval, a = parameters[0], scale = parameters[1])
 
 # CAUTION! Scipy incorrectly refers to the exponential gamma as the loggamma.
@@ -3282,6 +3283,8 @@ class Variable(
     """
     Is the variable to be shown in the opimisation configuration container?
     """
+    optim_min = 0
+    optim_max = None
 
     variable_type: VARIABLE_TYPE = 'scalar'
     _label: str | None = None
@@ -3999,7 +4002,7 @@ class NumericScalarVariable(ScalarVariable):
         if v is None:
             raise TypeError(f'DSA bound should be a numeric value, got None')
         if not isinstance(v, ScalarNumParam):
-            raise TypeError(f'DSA bound should be a numeric value, is type{v}')
+            raise TypeError(f'DSA bound should be a numeric value, is {type(v)}')
         return v
 
     @property
@@ -4690,3 +4693,13 @@ def variable_uid(variable: Variable) -> str | list[str]:
             return list([lambda x,y: str(y) + "." + str(x) + "." + str(variable.interface_subindex) for x,y in zip(variable.interface_key, variable.interface_section)]) # type: ignore
     else:
         return str(variable.interface_section) + "." + str(variable.interface_key) + "." + str(variable.interface_subindex)
+
+def varible_uid_to_dict(varid: str):
+    ss = varid.split('.')
+    if not len(ss) == 3:
+        raise ValueError(f'{varid} is not a valid variable id')
+    return dict(
+        interface_section = ss[0],
+        interface_key = ss[1],
+        interface_subindex = ss[2],
+    )

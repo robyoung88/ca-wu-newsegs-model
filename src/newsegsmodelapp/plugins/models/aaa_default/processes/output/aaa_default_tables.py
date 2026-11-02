@@ -1,10 +1,14 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from dataclasses import asdict
 import json
-from typing import Callable
+from typing import Callable, cast
 
 import dash_ag_grid as dag
 from dash import html
 
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components.stats import tornado_plot
 from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request, register_table_getter
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -13,6 +17,16 @@ from newsegsmodelframework.newsegssensitivity import common as sensitivity, opti
 
 from . import result_tables_sprake
 from .get_result_list import get_result_list
+
+def _get_metamodel_from_proj_by_id(mm_id, lproj):
+    for mm in lproj.metamodels:
+        if mm.id == mm_id:
+            break
+    else:
+        mm = None
+    if mm is None:
+        raise ValueError(f'Metamodel {mm_id} not found for project {lproj.id}')
+    return mm
 
 def _table_draw_request_factory(postproc_request_type: str, **kwargs):
     _update_kwargs = {k:v for k,v in kwargs.items()}
@@ -23,7 +37,8 @@ def _table_draw_request_factory(postproc_request_type: str, **kwargs):
         rdict['request_type'] = postproc_request_type
         rdict['trigger_request_type'] = request_type
         # The trigger should be carried forward from the inciting event
-        rdict['trigger_run_id'] = request.trigger_run_id if request.trigger_run_id != -1 else rdict.pop('run_id', -1)
+        rdict['trigger_request_id'] = request.trigger_request_id if request.trigger_request_id != -1 else rdict.pop('request_id', -1)
+        _ = rdict.pop('run_id', -1)
         if config:
             payload = rdict.get('payload', '{}')
             try:
@@ -66,26 +81,32 @@ def _make_generation_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_generation'
-    proj = project_provider.get_project(request.project_id)
+    table_name = 'table_generation_wind'
 
-    res, stale = get_result_list(result_type, proj, result_provider, True)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    res, stale = get_result_list(result_type, lproj, result_provider, True)
 
     wind_results = [
         result_tables_sprake.create_wind_results(res, True),
         result_tables_sprake.create_wind_results(res, False),
     ]
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
                     
-    table_name = 'table_generation_wind'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         wind_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         wind_results[1],
         mark_stale = stale,
         request = request
@@ -99,14 +120,14 @@ def _make_generation_tables_sprake(
     table_name = 'table_generation_pv'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         pv_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         pv_results[1],
         mark_stale = stale,
         request = request
@@ -120,14 +141,14 @@ def _make_generation_tables_sprake(
     table_name = 'table_generation_combined'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         combined_generation_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         combined_generation_results[1],
         mark_stale = stale,
         request = request
@@ -147,25 +168,32 @@ def _make_consumption_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_consumption'
-    proj = project_provider.get_project(request.project_id)
+    table_name = 'table_consumption'
 
-    res, stale = get_result_list(result_type, proj, result_provider, True)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    res, stale = get_result_list(result_type, lproj, result_provider, True)
 
     consumption_results = [
         result_tables_sprake.create_cons_results(res, True),
         result_tables_sprake.create_cons_results(res, False)
     ]
-    table_name = 'table_consumption'
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
+    
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         consumption_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         consumption_results[1],
         mark_stale = stale,
         request = request
@@ -175,17 +203,18 @@ def _make_consumption_tables_sprake(
         result_tables_sprake.create_seasonal_cons_results(res, True),
         result_tables_sprake.create_seasonal_cons_results(res, False),
     ]
+
     table_name = 'table_consumption_seasonal'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         seasonal_consumption_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         seasonal_consumption_results[1],
         mark_stale = stale,
         request = request
@@ -204,25 +233,32 @@ def _make_storage_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_storage'
-    proj = project_provider.get_project(request.project_id)
+    table_name = 'table_storage'
 
-    res,stale = get_result_list(result_type, proj, result_provider, True)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    res,stale = get_result_list(result_type, lproj, result_provider, True)
 
     storage_results = [
         result_tables_sprake.create_stor_results(res, True),
         result_tables_sprake.create_stor_results(res, False)
     ]
-    table_name = 'table_storage'
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
+
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         storage_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         storage_results[1],
         mark_stale = stale,
         request = request
@@ -242,25 +278,32 @@ def _make_net_tables_sprake(
     check_cancel_status: Callable[[], bool],
 ) -> str:
     result_type = 'postproc_net'
-    proj = project_provider.get_project(request.project_id)
+    table_name = 'table_net'
 
-    res, stale = get_result_list(result_type, proj, result_provider, True)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', table_name)
+    lproj = provider.get_lightweight_project(request.project_id)
+
+    res, stale = get_result_list(result_type, lproj, result_provider, True)
 
     net_results = [
         result_tables_sprake.create_net_results(res, True),
         result_tables_sprake.create_net_results(res, False)
     ]
-    table_name = 'table_net'
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
+
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         net_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         net_results[1],
         mark_stale = stale,
         request = request
@@ -270,17 +313,18 @@ def _make_net_tables_sprake(
         result_tables_sprake.create_seasonal_net_results(res, True),
         result_tables_sprake.create_seasonal_net_results(res, False),
     ]
+
     table_name = 'table_net_seasonal'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         seasonal_net_results[0],
         mark_stale = stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         seasonal_net_results[1],
         mark_stale = stale,
         request = request
@@ -299,78 +343,217 @@ def _make_finance_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
 
-    # TODO: Check which of these actually needs reprocessing, as we have multiple
-    # triggers.
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_finance')
+    lproj = provider.get_lightweight_project(request.project_id)
 
-    benefits, b_stale = get_result_list(
-        'postproc_finance_benefits', proj,
-        result_provider, True
-    )
+    if request.trigger_request_id != request.request_id and request.trigger_request_id != -1:
+        # Have a downstream request. Only run full logic if
+        # 1) All upstream tables have been created
+        # 2) Downstream tables have not been made for this run
+
+        # As (2) is the fastest to check, we will do that first
+        op_table_names = (
+            'table_finance_so_benefits_ann',
+            'table_finance_so_costs_ann',
+            'table_finance_so_value_ann'
+        )
+        all_op_exist = True
+        for tbl_nm in op_table_names:
+            res_id = result_provider.result_exists(
+                tbl_nm, request.trigger_request_id,
+                lproj.table_config
+            )
+            if res_id is False:
+                all_op_exist = False
+                break
+
+        if all_op_exist:
+            # Can safely exit
+            return 'ok'
+        
+        # Now check that all upstream tables are created
+        
+        try:
+            request_dict = json.loads(request.payload)
+        except:
+            request_dict = {}
+
+        mm_ids = request_dict.get('metamodel_id', None)
+
+        if mm_ids is None:
+            mm_ids = [x.id for x in lproj.metamodels]
+        else:
+            mm_ids = [mm_ids]
+
+        # Sublists hold results for the currently run metamodel if on a single metamodel run,
+        # or all metamodels if on a full project run (and so are not sublists but full lists)
+        benefit_result_sublist = []
+        b_stale = False
+        
+        cost_result_sublist = []
+        c_stale = False
+        
+        value_result_sublist = []
+        v_stale = False
+
+        for mm_id in mm_ids:
+            lmm = lproj.metamodels[[x.id for x in lproj.metamodels].index(mm_id)]
+            
+            pp_fnc_ben = result_provider.result_exists(
+                'postproc_finance_benefits', 
+                request.trigger_request_id,
+                lmm.finance.table_config
+            )
+            if pp_fnc_ben == False:
+                return 'missing'
+            res, rev = result_provider.get_result_by_id(pp_fnc_ben)
+            benefit_result_sublist.append(res)
+            b_stale = b_stale or rev != lmm.finance.table_config.revision
+
+            pp_fnc_costs = result_provider.result_exists(
+                'postproc_finance_costs', 
+                request.trigger_request_id,
+                lmm.finance.table_config
+            )
+            if pp_fnc_costs == False:
+                return 'missing'
+            res, rev = result_provider.get_result_by_id(pp_fnc_costs)
+            cost_result_sublist.append(res)
+            c_stale = c_stale or rev != lmm.finance.table_config.revision
+
+            pp_fnc_value = result_provider.result_exists(
+                'postproc_finance_value', 
+                request.trigger_request_id,
+                lmm.finance.table_config
+            )
+            if pp_fnc_value == False:
+                return 'missing'
+            res, rev = result_provider.get_result_by_id(pp_fnc_value)
+            value_result_sublist.append(res)
+            v_stale = v_stale or rev != lmm.finance.table_config.revision
+
+        # As we have made it this far, continue with production of tables
+        jdx = 0
+        
+        if len(mm_ids) != len(lproj.metamodels):
+            benefits = []
+            costs = []
+            value = []
+            for lmm in lproj.metamodels:
+                if lmm.id in mm_ids:
+                    benefits.append(benefit_result_sublist[jdx])
+                    costs.append(cost_result_sublist[jdx])
+                    value.append(value_result_sublist[jdx])
+                    jdx += 1
+                else:
+                    # Benefits
+                    res, rev = result_provider.get_result(
+                        'postproc_finance_benefits', lmm.finance.table_config,
+                        allow_stale = True
+                    )
+                    benefits.append(res)
+                    b_stale = b_stale or rev is None or rev != lmm.finance.table_config.revision
+
+                    # Costs
+                    res, rev = result_provider.get_result(
+                        'postproc_finance_costs', lmm.finance.table_config,
+                        allow_stale = True
+                    )
+                    costs.append(res)
+                    c_stale = c_stale or rev is None or rev != lmm.finance.table_config.revision
+
+                    # Value
+                    res, rev = result_provider.get_result(
+                        'postproc_finance_value', lmm.finance.table_config,
+                        allow_stale = True
+                    )
+                    value.append(res)
+                    v_stale = v_stale or rev is None or rev != lmm.finance.table_config.revision
+        else:
+            benefits = benefit_result_sublist
+            costs = cost_result_sublist
+            value = value_result_sublist
+
+    else:
+        # If a request is generated from the front-end, always just try to make a table
+        benefits, b_stale = get_result_list(
+            'postproc_finance_benefits', lproj,
+            result_provider, True
+        )
+
+        costs, c_stale = get_result_list(
+            'postproc_finance_costs', lproj,
+            result_provider, True
+        )
+
+        value, v_stale = get_result_list(
+            'postproc_finance_value', lproj,
+            result_provider, True
+        )
+
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
+
     benefits_results = [
         result_tables_sprake.create_so_benefits_results(benefits, True),
         result_tables_sprake.create_so_benefits_results(benefits, False)
     ]
+
     table_name = 'table_finance_so_benefits'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         benefits_results[0],
         mark_stale = b_stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         benefits_results[1],
         mark_stale = b_stale,
         request = request
     )
-    
-    costs, c_stale = get_result_list(
-        'postproc_finance_costs', proj,
-        result_provider, True
-    )
+
     costs_results = [
         result_tables_sprake.create_so_costs_results(costs, True),
         result_tables_sprake.create_so_costs_results(costs, False),
     ]
+
     table_name = 'table_finance_so_costs'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         costs_results[0],
         mark_stale = c_stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         costs_results[1],
         mark_stale = c_stale,
         request = request
     )
 
-    value, v_stale = get_result_list(
-        'postproc_finance_value', proj,
-        result_provider, True
-    )
     value_results = [
         result_tables_sprake.create_so_value_results(value, True),
         result_tables_sprake.create_so_value_results(value, False),
     ]
+    
     table_name = 'table_finance_so_value'
     result_provider.upsert_result(
         table_name + '_ann',
-        proj.table_config,
+        table_component,
         value_results[0],
         mark_stale = v_stale,
         request = request
     )
     result_provider.upsert_result(
         table_name + '_hori',
-        proj.table_config,
+        table_component,
         value_results[1],
         mark_stale = v_stale,
         request = request
@@ -389,21 +572,31 @@ def _make_dsa_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
+    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_dsa_metamodel')
+    lproj = provider.get_lightweight_project(request.project_id)
             
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
         raise ValueError('Metamodel ID not provided for single run.')
-    mm = proj.get_metamodel_by_id(mm_id)
 
-    raw_table, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config, allow_stale = False)
+    mm = _get_metamodel_from_proj_by_id(mm_id, lproj)
+     
+    raw_table, rev = result_provider.get_result(
+        'postproc_dsa_single_metamodel_data', mm.table_config,
+        allow_stale = False
+    )
     if raw_table is None:
         return 'missing'
     stale = mm.table_config.revision != rev
 
     dsa_statistics = list(sensitivity.DSA_STATISTIC_LABELS.keys())
 
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
+    
     table_name = 'table_dsa_metamodel'
     for stat in dsa_statistics:
         otable = (
@@ -427,9 +620,10 @@ def _make_dsa_tables_sprake(
             rowData = otable.to_dict('records'),
             columnDefs = columnDefs
         )
+
         result_provider.upsert_result(
             table_name + '_' + stat,
-            mm.table_config,
+            table_component,
             res,
             mark_stale = stale,
             request = request
@@ -447,13 +641,16 @@ def _get_dsa_metamodel_table(
     stat = table_options.get('statistic')
     subindex = table_options['subindex']
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
+    lproj = project_provider.get_lightweight_project(active_project_id)
+    logger.debug('Getting lightweight project - Table Getter [%s]', 'table_dsa_metamodel')
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
     match int(subindex):
         case 1:
             #Tornado!
-            dsa_df, rev = result_provider.get_result('postproc_dsa_single_metamodel_data', mm.table_config)
+            dsa_df, rev = result_provider.get_result(
+                'postproc_dsa_single_metamodel_data', lmm.table_config
+            )
             #dsa_df, rev = result_provider.get_result('dsa_single_metamodel', mm.table_config)
             if dsa_df is None:
                 return None, None
@@ -461,7 +658,9 @@ def _get_dsa_metamodel_table(
             if not set(dsa_df.index.names) == set(index_vars):
                 dsa_df = dsa_df.set_index(index_vars)
 
-            label_df, _ = result_provider.get_result('postproc_dsa_single_metamodel_labels', mm.table_config)
+            label_df, _ = result_provider.get_result(
+                'postproc_dsa_single_metamodel_labels', lmm.table_config,
+            )
 
             stat = 'net_present_value_undiscounted' if not stat else stat
             plot = tornado_plot(dsa_df, label_df, stat)
@@ -472,9 +671,9 @@ def _get_dsa_metamodel_table(
             else:
                 table_name = 'table_dsa_metamodel'
 
-            proj = project_provider.get_project(active_project_id)
-            mm = proj.get_focussed_metamodel()
-            return result_provider.get_result(table_name, mm.table_config, True)
+            return result_provider.get_result(
+                table_name, lmm.table_config, True
+            )
 
 TABLE_SECTION = 'table_optim_metamodel' # TODO: Improve this key
 _request_plot_marginal_optim = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
@@ -487,6 +686,7 @@ def _trigger_plot_marginal_optim(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    # NB - use full representation of project, as variables must be syncronised
     # Set partial calling options into the store so that the plotter can get them
     proj = project_provider.get_project(request.project_id)
 
@@ -533,9 +733,6 @@ def _trigger_plot_marginal_optim(
 
     fig = optim.statistic_across_margin_plot(plot_df, mm)
 
-    #proj.table_config.revision += 1
-    #project_provider.upsert_component(proj)
-
     result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig, request = request)
 
     return 'ok'
@@ -547,9 +744,12 @@ def _plot_marginal_optim(
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface
 ):
-    
-    proj = project_provider.get_project(active_project_id)
-    fig, rev = result_provider.get_result('plot_marginal_optim', proj.table_config)
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Table Getter [%s]', 'table_optim_metamodel')
+    lproj = provider.get_lightweight_project(active_project_id)
+    fig, rev = result_provider.get_result(
+        'plot_marginal_optim', lproj.table_config,
+    )
 
     return fig, rev
 
@@ -564,8 +764,14 @@ def _make_postopt_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
-    optdict, _ = result_provider.get_result('optimisation_result', proj.table_config)
+
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_postopt_metamodel')
+    lproj = provider.get_lightweight_project(request.project_id)
+    
+    optdict, _ = result_provider.get_result(
+        'optimisation_result', lproj.table_config
+    )
 
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
@@ -578,8 +784,6 @@ def _make_postopt_tables_sprake(
             html.H4('Success'),
             str(optdict['opt'])
         ]
-
-        project_provider.upsert_component(proj)
     else:
         opt = optdict['opt']
         table_data = [
@@ -589,7 +793,10 @@ def _make_postopt_tables_sprake(
             str(opt),
         ]
 
-        result_provider.upsert_result('table_postopt_metamodel', proj.table_config, table_data, request=request)
+    result_provider.upsert_result(
+        'table_postopt_metamodel', lproj.table_config.id, 
+        table_data, request=request
+    )
 
     return 'ok'
 
@@ -604,15 +811,21 @@ def _make_psa_tables_sprake(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    proj = project_provider.get_project(request.project_id)
+    
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Creating Table [%s]', 'table_psa_metamodel')
+    lproj = provider.get_lightweight_project(request.project_id)
             
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
     if not mm_id:
         raise ValueError('Metamodel ID not provided for single run.')
-    mm = proj.get_metamodel_by_id(mm_id)
+    mm = _get_metamodel_from_proj_by_id(mm_id, lproj)
 
-    raw_table, rev = result_provider.get_result('postproc_psa_single_metamodel_data', mm.table_config, allow_stale = False)
+    raw_table, rev = result_provider.get_result(
+        'postproc_psa_single_metamodel_data', mm.table_config,
+        allow_stale = False
+    )
     if raw_table is None:
         return 'missing'
     any_stale = mm.table_config.revision != rev
@@ -649,7 +862,10 @@ def _make_psa_tables_sprake(
         tbl1   
     )
 
-    npv_data, rev_ppv = result_provider.get_result('postproc_psa_single_metamodel_prob_positive_npv', mm.table_config, allow_stale = False)
+    npv_data, rev_ppv = result_provider.get_result(
+        'postproc_psa_single_metamodel_prob_positive_npv',
+        mm.table_config, allow_stale = False
+    )
     if npv_data is None:
         return 'missing'
 
@@ -664,7 +880,10 @@ def _make_psa_tables_sprake(
     ]
     rval.extend(pnpv)
 
-    result_provider.upsert_result('table_psa_metamodel', mm.table_config, html.Div(rval), mark_stale = any_stale, request=request)
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
+
+    result_provider.upsert_result('table_psa_metamodel', table_component, html.Div(rval), mark_stale = any_stale, request=request)
     
     return 'ok'
 
@@ -677,9 +896,10 @@ def _get_psa_metamodel_table(
 ):
     subindex = table_options['subindex']
 
-    proj = project_provider.get_project(active_project_id)
-    mm = proj.get_focussed_metamodel()
-
+    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
+    logger.debug('Getting lightweight project - Table Getter [%s]', 'table_psa_metamodel')
+    lproj = provider.get_lightweight_project(active_project_id)
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     match int(subindex):
         case 1:
             return None, None
@@ -687,7 +907,7 @@ def _get_psa_metamodel_table(
             
             table_name = 'table_psa_metamodel'
 
-            proj = project_provider.get_project(active_project_id)
-            mm = proj.get_focussed_metamodel()
-            return result_provider.get_result(table_name, mm.table_config, True)
+            return result_provider.get_result(
+                table_name, lmm.table_config, True
+            )
         

@@ -1,0 +1,45 @@
+name: ca-wu-newsegs-mod
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - alembic=1.20.0
+  - arrow
+  - cachetools
+  - cpython=3.13.14
+  - dash=4.4.1
+  - dash-bootstrap-components=2.0.4
+  - dash-daq=0.6.0
+  - dash-extensions=2.0.6
+  - dash-iconify=0.1.2
+  - dash-leaflet=1.0.15
+  - decorator
+  - debugpy
+  - dynaconf=3.3.3
+  - holidays
+  - pathvalidate
+  - pip=26.1.2
+  - plotly=6.9.0
+  - plotly-resampler
+  - pvlib=0.16.1
+  - pyproj
+  - proj-data
+  - pytz
+  - blas=2.311=openblas
+  - matplotlib=3.11.2
+  - numpy=2.5.3
+  - openblas=0.3.34
+  - pandas=3.0.6
+  - python=3.13.12
+  - pyarrow
+  - pyzmq=27.1.0
+  - quarto=1.9.38
+  - scipy=1.18.1
+  - sqlalchemy=2.1.3
+  - sqlite=3.53.4
+  - zeromq=4.3.5
+  - flask-caching
+  - schedule
+  - uuid6
+  - openpyxl
+  - fasteners

@@ -161,7 +161,7 @@ def run_optimisation(
     else:
         opt = scipy_opt.minimize(optfunc, x0, method = method, callback = cback)
 
-    if cancel_status:
+    if cancel_status():
         raise InterruptedError('Optimisation cancelled')
 
     if opt.success:

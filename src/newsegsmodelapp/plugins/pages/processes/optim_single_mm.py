@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 import datetime
 import json
+import time
 from typing import Callable, cast
 
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -37,6 +39,7 @@ def execute_optim_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
@@ -122,6 +125,7 @@ def execute_optim_single_mm_run(
     }
     
     result_provider.upsert_result('optimisation_result', proj.table_config, rval, request = request)
+    db_staleness.record_process_run(mm_id, 'optim', started_ns)
     if isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         project_provider.delete_orphan_variables()
 

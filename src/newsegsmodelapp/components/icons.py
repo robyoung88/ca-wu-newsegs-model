@@ -331,11 +331,3 @@ def get_icon(icon_name: None | SequenceNotStr[str] | str = None,
                     return html.Span(ilist)
     
     return []
-
-def unescape_html_icons(html_text):
-    return (
-        html_text
-        .replace('<th>&lt;','<th><')
-        .replace('"&gt;&lt;','"><')
-        .replace('i&gt;', 'i>')
-    )

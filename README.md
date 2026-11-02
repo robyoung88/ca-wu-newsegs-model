@@ -21,9 +21,17 @@ conda env create -f conda-lock.yml
 
 There are a small number of `pip` dependencies that must be installed after creating this environment:
 
-- `dash-ag-grid`
-- `diskcache`
-- `useful-types`
+- apache-hamilton==1.90.0
+- dash-ag-grid==35.3.0
+- dill==0.4.1
+- diskcache==5.6.3
+- multiprocess==0.70.19
+- mypy-extensions==1.1.0
+- objprint==0.3.0
+- py-spy==0.4.2 (Optional)
+- typing-inspect==0.9.0
+- useful-types==0.2.1
+- viztracer==1.1.1 (Optional)
 
 ## Environment variables
 
@@ -1391,6 +1399,15 @@ MetaModels are modified by one of several events.
 - The deletion of a MetaModel
 
 
+## Profiling
+
+For profiling, use viztracer:
+
+```{bash}
+& C:\Users\Robert.Young\anaconda3\envs\ca-wu-newsegs-mod\python.exe -m viztracer --log_async --min_duration 500 -o trace.json c:/Users/Robert.Young/Dev/ca-wu-newsegs-model/src/app.py    
+```
+
+Results can be viewed at https://www.speedscope.app/ or https://ui.perfetto.dev/.
 
 ## Licence
 This software is available under the [MIT License](LICENCE).

@@ -16,6 +16,7 @@ from config import settings
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend import dispatcher
+from newsegsmodelapp.backend.db.db import read_transaction
 from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 
@@ -36,7 +37,7 @@ class TestProxy(unittest.TestCase):
         metadata = tbls.metadata
 
         # Create all tables
-        metadata.create_all(db.get_engine())
+        metadata.create_all(db.get_engine(writer = True))
 
         cls.context = zmq.Context.instance()
         # Bind frontend and backend on dynamically allocated ports (port=0)
@@ -74,9 +75,9 @@ class TestProxy(unittest.TestCase):
         cls.dispatcher_thread.join(timeout=10.0)
         cls.context.term()
 
-        engine = db.get_engine(cls.db_path)
-        print(engine.url)
-        engine.dispose()
+        for writer in (True, False):
+            engine = db.get_engine(writer = writer, db_path = cls.db_path)
+            engine.dispose()
 
         cls.db_dir.cleanup()
 
@@ -153,7 +154,7 @@ class TestProxy(unittest.TestCase):
                 )
                 .where(tbls.runs.c.run_id.in_(job_id))
             )
-            with db.get_engine().connect() as conn:
+            with read_transaction(db.get_engine()) as conn:
                 rows = conn.execute(stmt).all()
 
             if len(rows) < 1:
