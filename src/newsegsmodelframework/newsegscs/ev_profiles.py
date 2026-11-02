@@ -1,7 +1,6 @@
 """Helper functions for aligning timeseries with EV charging profile data."""
 
 import os
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -84,17 +83,15 @@ def characterise_profile_data(
     holiday_subdiv = 'ENG'
 ):
     
-    """Characterise profile data.
-
-    TODO: Add a description.
+    """Average the EV charging profile by time of day, month and type of day.
 
     Args:
-        profile_data: TODO.
-        holiday_country: TODO.
-        holiday_subdiv: TODO.
+        profile_data: Dataframe of the profile data.
+        holiday_country: Country code of the holidays.
+        holiday_subdiv: Subdivision code of the holidays.
 
     Returns:
-        TODO.
+        The mean residential profile.
     """
     return (
         profile_data.pipe(characterise_dates_evprofile, holiday_country, holiday_subdiv)
@@ -114,16 +111,14 @@ PROFILE_DATA_CHARACTERISED = pd.read_parquet(
 # TODO: This function takes too long
 def ev_profiles_for_time_spans(time_spans,
                                profile_data=PROFILE_DATA_CHARACTERISED):
-    """Ev profiles for time spans.
-
-    TODO: Add a description.
+    """Fraction of the daily EV charging in each of the time spans, by month and type of day, from the profile.
 
     Args:
-        time_spans: TODO.
-        profile_data: TODO.
+        time_spans: Dataframe of the start and end second of the day of each timestep.
+        profile_data: Dataframe of the profile data.
 
     Returns:
-        TODO.
+        Dataframe of the fraction for each time span.
     """
     import sqlite3
     

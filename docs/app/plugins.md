@@ -194,3 +194,9 @@ success.
 ::: newsegsmodelapp.types
 
 ::: newsegsmodelapp.dash_extension
+
+## Plugin modules
+
+::: newsegsmodelapp.plugins
+    options:
+        show_submodules: true

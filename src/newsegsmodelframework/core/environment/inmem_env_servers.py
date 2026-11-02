@@ -2,7 +2,6 @@
 from __future__ import annotations
 from typing import Any, Sequence, cast, overload, override
 
-from useful_types import SequenceNotStr
 # Very simple environment servers that provide in-memory stores for timeseries data which are returned on request
 
 from newsegsmodelframework.core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment

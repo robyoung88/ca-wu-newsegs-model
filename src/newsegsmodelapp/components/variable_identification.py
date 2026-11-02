@@ -1,6 +1,6 @@
-"""Variable identification module.
+"""Identifying the components of variables.
 
-TODO: Describe the purpose of the module.
+The ids of the components of the interface are dictionaries; these dataclasses make and read them for the components of a variable.
 """
 from dataclasses import dataclass
 from typing import override
@@ -26,17 +26,17 @@ class VariableComponentID(SerialisableDataclass):
         type: str = 'notype',
         supersection: str = 'deterministic',
     ):
-        """From variable.
+        """Create the id of a component of a variable.
 
-        TODO: Add a description.
+        The section and key are those of the variable (the first, if it has several).
 
         Args:
-            var: TODO.
-            type: TODO.
-            supersection: TODO.
+            var: The variable.
+            type: The type field of the component id.
+            supersection: The supersection of the container.
 
         Returns:
-            TODO.
+            The id.
         """
         section = var.interface_section
         section = 'None' if section is None else section
@@ -61,17 +61,17 @@ class VariableComponentID(SerialisableDataclass):
         type: str = 'notype',
         supersection: str = 'deterministic',
     ):
-        """From lightweight variable.
+        """Create the id of a component of a lightweight variable.
 
-        TODO: Add a description.
+        The section and key are those of the variable (the first, if it has several).
 
         Args:
-            var: TODO.
-            type: TODO.
-            supersection: TODO.
+            var: The variable.
+            type: The type field of the component id.
+            supersection: The supersection of the container.
 
         Returns:
-            TODO.
+            The id.
         """
         section = var.interface_section
         section = 'None' if section is None else section
@@ -92,9 +92,7 @@ class VariableComponentID(SerialisableDataclass):
 
 @dataclass
 class VariableInstanceComponentID(VariableComponentID):
-    """Variable Instance Component ID.
-
-    TODO: Add a description.
+    """Identification of a component of a variable instance: adds the subindex, which distinguishes instances of the same key.
     """
     subindex: int|str = 0
 
@@ -124,9 +122,7 @@ class VariableInstanceComponentID(VariableComponentID):
 
 @dataclass
 class VariableInstanceParameterComponentID(VariableInstanceComponentID):
-    """Variable Instance Parameter Component ID.
-
-    TODO: Add a description.
+    """Identification of a component for one parameter of a variable instance: adds the index of the parameter and, for an array, the position within it.
     """
     parameter_index: int = 0
     vector_location: int = 0

@@ -1,6 +1,4 @@
-"""Configuration selector module.
-
-TODO: Describe the purpose of the module.
+"""The configuration selector: choosing, adding, duplicating, removing, uploading and downloading the configurations (metamodels) of a project.
 """
 import logging
 logger = logging.getLogger(__name__)
@@ -34,17 +32,17 @@ def create_config_selector_headerbutton(
     metamodel: LightweightNewsegsMetaModel | None = None,
     is_focussed: bool | None = None,
 ):
-    """Create config selector headerbutton.
+    """Create the button which focusses a configuration (metamodel) in the page header.
 
-    TODO: Add a description.
+    Outlined unless the configuration is the focussed one.
 
     Args:
-        config_index: TODO.
-        metamodel: TODO.
-        is_focussed: TODO.
+        config_index: Index of the configuration (metamodel) within the project.
+        metamodel: The lightweight metamodel.
+        is_focussed: Whether the configuration is the focussed metamodel.
 
     Returns:
-        TODO.
+        The button.
     """
     if is_focussed:
         do_outline = False
@@ -65,15 +63,13 @@ def create_config_selector_headerbutton(
     return contents
 
 def create_header_metamodel_input_container(supersection: str) -> html.Div:
-    """Create header metamodel input container.
-
-    TODO: Add a description.
+    """Create the container of the configuration buttons of the page header.
 
     Args:
-        supersection: TODO.
+        supersection: The supersection of the container.
 
     Returns:
-        TODO.
+        The container.
     """
     return html.Div(
         [
@@ -104,18 +100,18 @@ def create_single_configuration_selector_row(
     reference_size: int = 20,
 ):
     
-    """Create single configuration selector row.
+    """Create the row of the configuration selector for one configuration (metamodel).
 
-    TODO: Add a description.
+    The first configuration cannot be removed.
 
     Args:
-        config_index: TODO.
-        metamodel: TODO.
-        is_focussed: TODO.
-        reference_size: TODO.
+        config_index: Index of the configuration (metamodel) within the project.
+        metamodel: The lightweight metamodel.
+        is_focussed: Whether the configuration is the focussed metamodel.
+        reference_size: Size of the icons.
 
     Returns:
-        TODO.
+        The row.
     """
     if config_index < 1:
         primary_container = html.H1
@@ -260,12 +256,10 @@ def create_single_configuration_selector_row(
     )
 
 def create_configuration_selector():
-    """Create configuration selector.
-
-    TODO: Add a description.
+    """Create the configuration selector: the rows of the configurations of the project, and the download of their JSON.
 
     Returns:
-        TODO.
+        The layout.
     """
     return html.Div([
         
@@ -304,15 +298,10 @@ def _create_configuration_header_elements_for_metamodels(
 
 def add_configuration_selector_callbacks(app: NewsegsDash):
     # Populate
-    """Add configuration selector callbacks.
-
-    TODO: Add a description.
+    """Bind the callbacks of the configuration selector: showing, focussing, adding, duplicating, removing, uploading and downloading configurations.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-selector'}, 'children'),

@@ -249,16 +249,16 @@ class Location(serialisation.StateSerialiseToDictMixin):
         crs: str = 'EPSG:4326',
         name: str | None = None,
     ) -> T:
-        """Construct Location from explicit characteristics
+        """Construct a Location from explicit characteristics.
 
         Args:
-            lat (Real): Latitude of Location (decimal degrees)
-            lon (Real): _Longitude of Location (decimal degrees)
-            crs (_type_, optional): Coordinate reference system. Defaults to 'EPSG:4326'.
-            name (str | None, optional): Name of Location. Defaults to None.
+            lat: Latitude of the location (decimal degrees).
+            lon: Longitude of the location (decimal degrees).
+            crs: Coordinate reference system of the latitude and longitude.
+            name: Name of the location.
 
         Returns:
-            T: Location instance.
+            The location.
         """
 
         o = cls.from_none() # pyright: ignore[reportAttributeAccessIssue]

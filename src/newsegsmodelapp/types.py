@@ -1,10 +1,7 @@
-"""Types module.
-
-TODO: Describe the purpose of the module.
+"""Types of the pages of the app: `Page` and `LayoutConfiguration`.
 """
 from __future__ import annotations
 
-from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Callable, Union
 

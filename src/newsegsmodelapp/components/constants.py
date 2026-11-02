@@ -1,8 +1,9 @@
-"""Constants module.
+"""Constants shared by the components.
 
-TODO: Describe the purpose of the module.
+Attributes:
+    CONFIGURATION_UPDATE_TRIGGER_ID: Id of the store which signals that the configuration has changed.
+    VARIABLE_PARAMETER_KEYS: Identification keys required to update a single variable parameter.
 """
-from dash import ALL
 
 CONFIGURATION_UPDATE_TRIGGER_ID = 'configuration-update-trigger'
 

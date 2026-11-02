@@ -1,17 +1,14 @@
-"""
-Get the reduced class name of the current object
+"""Helpers for classes.
 """
 import re
 
 def get_class(obj: object):
-    """Get class.
-
-    TODO: Add a description.
+    """The name of the class of an object.
 
     Args:
-        obj: TODO.
+        obj: The object to encode.
 
     Returns:
-        TODO.
+        The class name.
     """
     return re.search(r"\.(\w+)\'>$", str(type(obj))).group(1)

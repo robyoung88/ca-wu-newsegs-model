@@ -1,6 +1,4 @@
-"""Dhw profiles module.
-
-TODO: Describe the purpose of the module.
+"""Domestic hot water demand profiles.
 """
 # Helper functions for aligning timeseries with DHW profile data
 
@@ -24,16 +22,14 @@ PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
                         end_day_seconds = lambda df: df['start_day_seconds'].shift(-1, fill_value = df['start_day_seconds'].iloc[-1] + (df['start_day_seconds'].iloc[1] - df['start_day_seconds'].iloc[0])))
 
 def profiles_for_time_spans(time_spans, profile_data):
-    """Profiles for time spans.
-
-    TODO: Add a description.
+    """Fraction of the daily hot water heat demand in each of the time spans, from the profile.
 
     Args:
-        time_spans: TODO.
-        profile_data: TODO.
+        time_spans: Dataframe of the start and end second of the day of each timestep.
+        profile_data: Dataframe of the profile data.
 
     Returns:
-        TODO.
+        Dataframe of the fraction for each time span.
     """
     import sqlite3
 
@@ -70,18 +66,18 @@ def get_dhw_energy_consumption(datetimes,
                                profile_data=PROFILE_DATA
                                ):
     
-    """Get dhw energy consumption.
+    """Energy consumption for domestic hot water at each timestep.
 
-    TODO: Add a description.
+    The daily consumption varies seasonally about the reference by `seasonal_variance` and is distributed through the day by the profile.
 
     Args:
-        datetimes: TODO.
-        ref_daily_consumption: TODO.
-        seasonal_variance: TODO.
-        profile_data: TODO.
+        datetimes: Datetimes at the start of each timestep.
+        ref_daily_consumption: Reference daily hot water energy consumption of a household (kWh).
+        seasonal_variance: Fractional seasonal variation of the hot water consumption about the reference.
+        profile_data: Dataframe of the profile data.
 
     Returns:
-        TODO.
+        Series of consumption.
     """
     max_daily_consumption = ref_daily_consumption * (1.0+seasonal_variance)
     min_daily_consumption = ref_daily_consumption * (1.0-seasonal_variance)

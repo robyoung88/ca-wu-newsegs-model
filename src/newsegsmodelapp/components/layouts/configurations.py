@@ -1,6 +1,4 @@
-"""Configurations module.
-
-TODO: Describe the purpose of the module.
+"""Configuration of the cards of inputs and results of a page.
 """
 from dataclasses import dataclass
 from typing import Callable
@@ -10,18 +8,22 @@ from .null_layout import NULL_LAYOUT
 
 @dataclass
 class InputCardConfig:
-    """Input Card Config.
+    """Configuration of a card of inputs on a page.
 
-    TODO: Add a description.
+    Attributes:
+        creation_function: Function which creates the card.
+        block_width: Width of the card, in columns of the page grid.
     """
     creation_function: Callable = lambda: NULL_LAYOUT
     block_width: int = 6
 
 @dataclass
 class ResultCardConfig:
-    """Result Card Config.
+    """Configuration of a card of results on a page.
 
-    TODO: Add a description.
+    Attributes:
+        creation_function: Function which creates the card.
+        block_width: Width of the card, in columns of the page grid.
     """
     creation_function: Callable = lambda: NULL_LAYOUT
     block_width: int = 6

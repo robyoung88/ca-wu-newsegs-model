@@ -2,8 +2,7 @@
 from __future__ import annotations
 from dataclasses import asdict
 import time
-from typing import Any, cast, override, Mapping
-from numbers import Number
+from typing import Any, override, Mapping
 from functools import singledispatchmethod
 from functools import lru_cache
 
@@ -25,9 +24,20 @@ HOURS_IN_YEAR = 8760.0
 
 @revision_dataclass
 class SprakeFinanceConfig(newsegsfinance.NewsegsFinanceConfig):
-    """Sprake Finance Config.
+    """Configuration of the Sprake finance model: the discount rates and the unit costs.
 
-    TODO: Add a description.
+    Attributes:
+        wind_capex_per_kw: Capital cost of wind generation (per kW).
+        wind_om_per_kw_year: Annual operating and maintenance cost of wind generation (per kW).
+        pv_capex_per_kw: Capital cost of PV generation (per kW).
+        pv_om_per_kw_year: Annual operating and maintenance cost of PV generation (per kW).
+        bess_capex_per_kwh: Capital cost of battery storage (per kWh).
+        bess_om_per_kwh_year: Annual operating and maintenance cost of battery storage (per kWh).
+        resident_sc_per_unit_day: Standing charge to residents (per household per day).
+        resident_var_per_unit: Price to residents of electricity (per kWh).
+        grid_export_var_per_unit: Price received for electricity exported to the grid (per kWh).
+        grid_import_sc_per_day: Standing charge for the grid import (per day).
+        grid_import_var_per_unit: Price of electricity imported from the grid (per kWh).
     """
     wind_capex_per_kw: float = 1500.0
     wind_om_per_kw_year: float = 46.0
@@ -113,12 +123,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     
     @classmethod
     def from_none(cls):
-        """From none.
-
-        TODO: Add a description.
+        """Create a Sprake finance model with default values.
 
         Returns:
-            TODO.
+            The finance model.
         """
         return cls(0.0)
 
@@ -149,6 +157,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         self.last_update = time.time_ns()
         return super().run()
 
+    # REVIEW (unreferenced): no references to `get_default_unit_costs` found in src/, scripts/ or data/.
     @classmethod
     def get_default_unit_costs(cls) -> dict:
         """
@@ -191,78 +200,65 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     # Benefits
     @property
     def resident_receipts_undiscounted(self) -> pd.DataFrame:
-        """Resident receipts undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of receipts from residents (undiscounted). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_resident_receipts_undiscounted(self).copy()
 
+    # REVIEW (unreferenced): no references to `resident_receipts_discounted` found in src/, scripts/ or data/.
     @property
     def resident_receipts_discounted(self) -> pd.DataFrame:
-        """Resident receipts discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of receipts from residents (benefit discount applied). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_resident_receipts_discounted(self).copy()
         
     @property
     def ev_receipts_undiscounted(self) -> pd.DataFrame:
-        """Ev receipts undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of receipts from EV charging (undiscounted). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_ev_receipts_undiscounted(self).copy()
         
+    # REVIEW (unreferenced): no references to `ev_receipts_discounted` found in src/, scripts/ or data/.
     @property
     def ev_receipts_discounted(self) -> pd.DataFrame:
-        """Ev receipts discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of receipts from EV charging (benefit discount applied). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_ev_receipts_discounted(self).copy()
 
     @property
     def export_receipts_undiscounted(self) -> pd.DataFrame:
-        """Export receipts undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of receipts for electricity exported to the grid (undiscounted). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_export_receipts_undiscounted(self).copy()
 
+    # REVIEW (unreferenced): no references to `export_receipts_discounted` found in src/, scripts/ or data/.
     @property
     def export_receipts_discounted(self) -> pd.DataFrame:
-        """Export receipts discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of receipts for electricity exported to the grid (benefit discount applied). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_export_receipts_discounted(self).copy()
 
     @property
     def all_receipts_undiscounted(self) -> pd.DataFrame:
-        """All receipts undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all receipts (the benefits) (undiscounted).
         """
         return _deferred_get_all_receipts_undiscounted(self).copy()
         
     @property
     def all_receipts_discounted(self) -> pd.DataFrame:
-        """All receipts discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all receipts (the benefits) (benefit discount applied).
         """
         return _deferred_get_all_receipts_discounted(self).copy()
 
     def get_total_present_benefits_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get total present benefits undiscounted.
+        """The sum to horizon of undiscounted benefits.
 
-        TODO: Add a description.
+        The sum of all the benefits (receipts) up to the horizon, with no discount applied.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            Total benefits.
         """
         return _deferred_get_total_present_benefits_undiscounted(
             self,
@@ -270,15 +266,15 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         )
     
     def get_total_present_benefits_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get total present benefits discounted.
+        """The sum to horizon of discounted benefits.
 
-        TODO: Add a description.
+        The sum of all the benefits (receipts) up to the horizon, with the benefit discount applied.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            Total discounted benefits.
         """
         return _deferred_get_total_present_benefits_discounted(self, horizon)
         
@@ -286,17 +282,14 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     
     @property
     def import_costs_undiscounted(self) -> pd.DataFrame:
-        """Import costs undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of costs of electricity imported from the grid (undiscounted). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_import_costs_undiscounted(self).copy()
 
+    # REVIEW (unreferenced): no references to `import_costs_discounted` found in src/, scripts/ or data/.
     @property
     def import_costs_discounted(self) -> pd.DataFrame:
-        """Import costs discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of costs of electricity imported from the grid (cost discount applied). Calculated from the results of the NewSEGS Energy Model.
         """
         return _deferred_get_import_costs_discounted(self).copy()
     
@@ -310,6 +303,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_om_costs_generation_undiscounted(self).copy()
 
+    # REVIEW (unreferenced): no references to `om_costs_generation_discounted` found in src/, scripts/ or data/.
     @property
     def om_costs_generation_discounted(self) -> pd.DataFrame:
         """
@@ -330,6 +324,7 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_om_costs_storage_undiscounted(self).copy()
 
+    # REVIEW (unreferenced): no references to `om_costs_storage_discounted` found in src/, scripts/ or data/.
     @property
     def om_costs_storage_discounted(self) -> pd.DataFrame:
         """
@@ -347,11 +342,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_om_costs_billing_undiscounted(self).copy()
         
+    # REVIEW (unreferenced): no references to `om_costs_billing_discounted` found in src/, scripts/ or data/.
     @property
     def om_costs_billing_discounted(self) -> pd.DataFrame:
-        """Om costs billing discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of billing costs (cost discount applied).
         """
         return _deferred_get_om_costs_billing_discounted(self).copy()
     
@@ -362,27 +356,22 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_om_costs_other_undiscounted(self).copy()
 
+    # REVIEW (unreferenced): no references to `om_costs_other_discounted` found in src/, scripts/ or data/.
     @property
     def om_costs_other_discounted(self) -> pd.DataFrame:
-        """Om costs other discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of other operating and maintenance costs (cost discount applied).
         """
         return _deferred_get_om_costs_other_discounted(self).copy()
 
     @property
     def all_recurrent_costs_undiscounted(self) -> pd.DataFrame:
-        """All recurrent costs undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all recurrent costs (undiscounted).
         """
         return _deferred_get_all_recurrent_costs_undiscounted(self).copy()
 
     @property
     def all_recurrent_costs_discounted(self) -> pd.DataFrame:
-        """All recurrent costs discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all recurrent costs (cost discount applied).
         """
         return _deferred_get_all_recurrent_costs_discounted(self).copy()
 
@@ -393,27 +382,23 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_capex_costs_generation_undiscounted(self).copy()
         
+    # REVIEW (unreferenced): no references to `capex_costs_generation_discounted` found in src/, scripts/ or data/.
     @property
     def capex_costs_generation_discounted(self) -> pd.DataFrame:
-        """Capex costs generation discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of capital expenditure on generation (cost discount applied).
         """
         return _deferred_get_capex_costs_generation_discounted(self).copy()
 
     @property
     def capex_costs_storage_undiscounted(self) -> pd.DataFrame:
-        """Capex costs storage undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of capital expenditure on storage (undiscounted).
         """
         return _deferred_get_capex_costs_storage_undiscounted(self).copy()
         
+    # REVIEW (unreferenced): no references to `capex_costs_storage_discounted` found in src/, scripts/ or data/.
     @property
     def capex_costs_storage_discounted(self) -> pd.DataFrame:
-        """Capex costs storage discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of capital expenditure on storage (cost discount applied).
         """
         return _deferred_get_capex_costs_storage_discounted(self).copy()
 
@@ -424,11 +409,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_capex_costs_distribution_undiscounted(self).copy()
         
+    # REVIEW (unreferenced): no references to `capex_costs_distribution_discounted` found in src/, scripts/ or data/.
     @property
     def capex_costs_distribution_discounted(self) -> pd.DataFrame:
-        """Capex costs distribution discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of capital expenditure on distribution (cost discount applied).
         """
         return _deferred_get_capex_costs_distribution_discounted(self).copy()
 
@@ -439,11 +423,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_capex_costs_metering_undiscounted(self).copy()
         
+    # REVIEW (unreferenced): no references to `capex_costs_metering_discounted` found in src/, scripts/ or data/.
     @property
     def capex_costs_metering_discounted(self) -> pd.DataFrame:
-        """Capex costs metering discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of capital expenditure on metering (cost discount applied).
         """
         return _deferred_get_capex_costs_metering_discounted(self).copy()
 
@@ -454,193 +437,168 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         """
         return _deferred_get_capex_costs_other_undiscounted(self).copy()
     
+    # REVIEW (unreferenced): no references to `capex_costs_other_discounted` found in src/, scripts/ or data/.
     @property
     def capex_costs_other_discounted(self) -> pd.DataFrame:
-        """Capex costs other discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of other capital expenditure (cost discount applied).
         """
         return _deferred_get_capex_costs_other_discounted(self).copy()
 
     @property
     def all_capex_costs_undiscounted(self) -> pd.DataFrame:
-        """All capex costs undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all capital expenditure (undiscounted).
         """
         return _deferred_get_all_capex_costs_undiscounted(self).copy()
 
     @property
     def all_capex_costs_discounted(self) -> pd.DataFrame:
-        """All capex costs discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all capital expenditure (cost discount applied).
         """
         return _deferred_get_all_capex_costs_discounted(self).copy()
 
     @property
     def all_costs_undiscounted(self) -> pd.DataFrame:
-        """All costs undiscounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all costs, recurrent and capital (the columns of the systems are suffixed `_recurrent` and `_capex`) (undiscounted).
         """
         return _deferred_get_all_costs_undiscounted(self).copy()
         
     @property
     def all_costs_discounted(self) -> pd.DataFrame:
-        """All costs discounted.
-
-        TODO: Add a description.
+        """Frame of timeseries of all costs, recurrent and capital (the columns of the systems are suffixed `_recurrent` and `_capex`) (cost discount applied).
         """
         return _deferred_get_all_costs_discounted(self).copy()
         
     def get_total_present_costs_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get total present costs undiscounted.
+        """The sum to horizon of undiscounted costs.
 
-        TODO: Add a description.
+        The sum of all the costs up to the horizon, with no discount applied.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            Total costs.
         """
         return _deferred_get_total_present_costs_undiscounted(self)
         
     def get_total_present_costs_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get total present costs discounted.
+        """The sum to horizon of discounted costs.
 
-        TODO: Add a description.
+        The sum of all the costs up to the horizon, with the cost discount applied.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            Total discounted costs.
         """
         return _deferred_get_total_present_costs_discounted(self)
         
     # Summary vectors
     def get_benefits_series_undiscounted(self) -> pd.Series:
-        """Get benefits series undiscounted.
-
-        TODO: Add a description.
+        """All benefits collapsed to a single series indexed by datetime (without discount).
 
         Returns:
-            TODO.
+            The series, named `benefits`.
         """
         return _deferred_get_benefits_series_undiscounted(self).copy()
 
     def get_benefits_series_discounted(self) -> pd.Series:
-        """Get benefits series discounted.
-
-        TODO: Add a description.
+        """All benefits collapsed to a single series indexed by datetime (discounted).
 
         Returns:
-            TODO.
+            The series, named `benefits`.
         """
         return _deferred_get_benefits_series_discounted(self).copy()
             
     def get_costs_series_undiscounted(self) -> pd.Series:
-        """Get costs series undiscounted.
-
-        TODO: Add a description.
+        """All costs collapsed to a single series indexed by datetime (without discount).
 
         Returns:
-            TODO.
+            The series, named `costs`.
         """
         return _deferred_get_costs_series_undiscounted(self).copy()
 
     def get_costs_series_discounted(self) -> pd.Series:
-        """Get costs series discounted.
-
-        TODO: Add a description.
+        """All costs collapsed to a single series indexed by datetime (discounted).
 
         Returns:
-            TODO.
+            The series, named `costs`.
         """
         return _deferred_get_costs_series_discounted(self).copy()
 
     def get_benefits_costs_undiscounted(self) -> pd.DataFrame:
-        """Get benefits costs undiscounted.
-
-        TODO: Add a description.
+        """Undiscounted benefits and costs as the columns of a dataframe indexed by datetime.
 
         Returns:
-            TODO.
+            The dataframe with `benefits` and `costs` columns.
         """
         return _deferred_get_benefits_costs_undiscounted(self).copy()
     
     def get_benefits_costs_discounted(self) -> pd.DataFrame:
-        """Get benefits costs discounted.
-
-        TODO: Add a description.
+        """Discounted benefits and costs as the columns of a dataframe indexed by datetime.
 
         Returns:
-            TODO.
+            The dataframe with `benefits` and `costs` columns.
         """
         return _deferred_get_benefits_costs_discounted(self).copy()
 
     # Derived values
     def get_benefit_cost_ratio_undiscounted(self,  horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get benefit cost ratio undiscounted.
+        """The ratio of undiscounted benefits to undiscounted costs up to the horizon.
 
-        TODO: Add a description.
+        Where the costs are zero the ratio is infinite, signed as the benefits.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            The ratio.
         """
         return _deferred_get_benefit_cost_ratio_undiscounted(self)
         
     def get_benefit_cost_ratio_discounted(self,  horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get benefit cost ratio discounted.
+        """The ratio of discounted benefits to discounted costs up to the horizon.
 
-        TODO: Add a description.
+        Where the costs are zero the ratio is infinite, signed as the benefits.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            The ratio.
         """
         return _deferred_get_benefit_cost_ratio_discounted(self)
 
     def get_simple_payback_time_days(self) -> float:
-        """Get simple payback time days.
+        """The simple payback time in days.
 
-        TODO: Add a description.
+        The time from the start of the run until the cumulative undiscounted net revenue (receipts less recurrent costs) has repaid the capital expenditure. If this is not reached within the run it is extrapolated from the rate at which the debt is being reduced; it is infinite if the debt is not being reduced.
 
         Returns:
-            TODO.
+            The time in days.
         """
         return _deferred_get_simple_payback_time_days(self)
         
     def get_net_present_value_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get net present value undiscounted.
-
-        TODO: Add a description.
+        """The undiscounted net value to horizon: benefits less costs.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            The net value.
         """
         return _deferred_get_net_present_value_undiscounted(self, horizon)
 
     def get_net_present_value_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
-        """Get net present value discounted.
-
-        TODO: Add a description.
+        """The net present value to horizon: discounted benefits less discounted costs.
 
         Args:
-            horizon: TODO.
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
 
         Returns:
-            TODO.
+            The net present value.
         """
         return _deferred_get_net_present_value_discounted(self, horizon)
 

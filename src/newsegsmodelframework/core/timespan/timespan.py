@@ -8,7 +8,7 @@ import copy
 import datetime
 from datetime import timedelta, tzinfo
 from functools import singledispatchmethod
-from typing import Any, Type, TypeVar, TypeAlias, overload, override
+from typing import Any, TypeVar, TypeAlias, overload, override
 
 import numpy as np
 import numpy.typing as npt

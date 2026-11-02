@@ -1,8 +1,5 @@
-"""Constructors module.
-
-TODO: Describe the purpose of the module.
+"""Construction of a consumption and storage module from a dictionary.
 """
-from collections.abc import Mapping
 
 from newsegsmodelframework.newsegscs import newsegscs
 from newsegsmodelframework.newsegscs import sprakecs
@@ -11,18 +8,19 @@ _CS_MODULE_CONSTRUCTORS = {
     'SprakeCS': sprakecs.SprakeCS,
 }
 
+# REVIEW (redundant?): nothing calls `cs_module_from_dict`; the constructor registries in `core.constructors.registers` do this job.
 def cs_module_from_dict(
     ip: dict
 ) -> newsegscs.NewsegsCS:
-    """Cs module from dict.
+    """Create a consumption and storage module from its dictionary.
 
-    TODO: Add a description.
+    The dictionary names the `class` of the module.
 
     Args:
-        ip: TODO.
+        ip: Dictionary of the serialised module, including its `class`.
 
     Returns:
-        TODO.
+        The consumption and storage module.
     """
     classname = ip.pop('class')
     constructor = _CS_MODULE_CONSTRUCTORS.get(classname, None)

@@ -1,6 +1,4 @@
-"""Post sprake finance value results module.
-
-TODO: Describe the purpose of the module.
+"""Postprocessing of the value (net present value, benefit cost ratio and payback) of the Sprake finance model into the form shown in the interface.
 """
 import pandas as pd
 
@@ -9,8 +7,6 @@ from newsegsmodelframework.newsegsfinance.sprakefinance import SprakeFinance
 
 from newsegsmodelframework.newsegsstats import basic_summary_stats
 
-import dash
-from timeit import default_timer as timer
 
 def finance_value_results_to_interface_sprake(
     mdl: SprakeModel, # Unused

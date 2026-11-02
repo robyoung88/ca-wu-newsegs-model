@@ -1,6 +1,4 @@
-"""Results header module.
-
-TODO: Describe the purpose of the module.
+"""The headers of the results of the pages, with the buttons which run the analyses and download and upload their results.
 """
 from dash import dcc, html
 import dash_daq as daq
@@ -134,15 +132,13 @@ def create_results_header(page_type, **kwargs):
     )
 
 def create_results_header_dsa(**kwargs):
-    """Create results header dsa.
-
-    TODO: Add a description.
+    """Create the header of the results of the DSA page: the buttons to run the analysis and to download and upload its results.
 
     Args:
-        **kwargs: TODO.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        The header.
     """
     button_container_children = [
         dbc.Button(
@@ -208,15 +204,13 @@ def create_results_header_dsa(**kwargs):
     )
 
 def create_results_header_psa(**kwargs):
-    """Create results header psa.
-
-    TODO: Add a description.
+    """Create the header of the results of the PSA page: the buttons to run the analysis and to download and upload its results.
 
     Args:
-        **kwargs: TODO.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        The header.
     """
     button_container_children = [
         dbc.Button(

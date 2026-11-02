@@ -1,6 +1,4 @@
-"""Constructors module.
-
-TODO: Describe the purpose of the module.
+"""Construction of a grid module from a dictionary.
 """
 from collections.abc import Mapping
 
@@ -11,18 +9,19 @@ _GRID_MODULE_CONSTRUCTORS = {
     'SprakeGrid': sprakegrid.SprakeGrid,
 }
 
+# REVIEW (redundant?): nothing calls `grid_module_from_dict`; the constructor registries in `core.constructors.registers` do this job.
 def grid_module_from_dict(
     ip: Mapping
 ) -> newsegsgrid.NewsegsGrid:
-    """Grid module from dict.
+    """Create a grid module from its dictionary.
 
-    TODO: Add a description.
+    The dictionary names the `class` of the module.
 
     Args:
-        ip: TODO.
+        ip: Dictionary of the serialised module, including its `class`.
 
     Returns:
-        TODO.
+        The grid module.
     """
     classname = ip.pop('class')
     constructor = _GRID_MODULE_CONSTRUCTORS.get(classname, None)

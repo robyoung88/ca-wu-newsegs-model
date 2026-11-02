@@ -18,7 +18,7 @@ from abc import ABCMeta, abstractmethod
 import copy
 import json
 import time
-from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Optional, Protocol, Sequence, overload, override
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Optional, Sequence, overload, override
 import uuid as mod_uuid
 
 from useful_types import SequenceNotStr

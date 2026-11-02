@@ -36,15 +36,13 @@ from .processes.psa_process_components import psa_process_components
 PAGE_TYPE = 'psa'
 
 def create_psa_header(**kwargs):
-    """Create psa header.
-
-    TODO: Add a description.
+    """Create the header of the PSA page.
 
     Args:
-        **kwargs: TODO.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        The header.
     """
     return dbc.Container(
         [
@@ -85,12 +83,10 @@ def create_psa_header(**kwargs):
     )
 
 def create_psa_configuration_editor():
-    """Create psa configuration editor.
-
-    TODO: Add a description.
+    """Create the editor of the PSA: its settings, and the distributions of the variables.
 
     Returns:
-        TODO.
+        The editor.
     """
     return dbc.Col([
         html.Div([
@@ -149,9 +145,7 @@ def create_psa_configuration_editor():
 
 @dataclass
 class PSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
-    """PSA Configuration Layout Configuration.
-
-    TODO: Add a description.
+    """Layout configuration of the PSA page: the input and result cards and the navigation.
     """
     page_type: str = PAGE_TYPE
 
@@ -161,15 +155,13 @@ class PSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
     layout_results_header: Callable = results_header.create_results_header_psa
 
 def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
-    """Create psa layout.
-
-    TODO: Add a description.
+    """The layout of the PSA page: the editor of the PSA and its results.
 
     Args:
-        config: TODO.
+        config: The layout configuration of the page.
 
     Returns:
-        TODO.
+        The layout.
     """
     kwargs = asdict(config)
    
@@ -305,15 +297,10 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
     )
 
 def add_psa_run_callbacks(app: NewsegsDash):
-    """Add psa run callbacks.
-
-    TODO: Add a description.
+    """Bind the callbacks which run, cancel, download and upload the PSA.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         output = {

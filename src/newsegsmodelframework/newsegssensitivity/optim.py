@@ -3,7 +3,7 @@ Functions and classes for finding optimal system configurations
 """
 import copy
 from dataclasses import dataclass
-from typing import Callable, Collection, Iterable, Literal, Sequence, get_args
+from typing import Callable, Literal, Sequence, get_args
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,6 @@ from scipy import optimize as scipy_opt
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
-from newsegsmodelframework.newsegsvariable import variable
 
 _OPTIM_TARGET_STATISTIC = Literal[
     'net_present_value_discounted',
@@ -70,7 +69,15 @@ def _optim_float_statistic_mapper(
 
 @dataclass
 class OptimVariable:
-    """_summary_
+    """Specification of a variable to vary in an optimisation.
+
+    Attributes:
+        varid: The varid of the variable.
+        positive: Whether the variable must remain positive. Where no variable is bounded, a positive variable is searched on the log scale.
+        bounded: Whether the variable is limited to `lower` and `upper`.
+        lower: Lower limit of the variable.
+        upper: Upper limit of the variable.
+        param_index: Which parameter of the variable is varied; the first by default.
     """
     varid: str
     positive: bool = False
@@ -87,14 +94,25 @@ def run_optimisation(
     cancel_status: Callable[[], bool] | None = None,
     method: str = 'Nelder-Mead'
 ):
-    """_summary_
+    """Optimise the variables of a metamodel to maximise a statistic.
+
+    The parameter of each variable is varied by a scipy optimiser, running the NewSEGS Energy Model and finance model
+    for each trial. If any variable is bounded the search is on the natural scale with bounds; otherwise positive
+    variables are searched on the log scale. On success the metamodel is left with the optimal values.
 
     Args:
-        mm (NewsegsMetaModel): _description_
-        variables (Sequence[OptimVariable]): _description_
-        target (_OPTIM_TARGET_STATISTIC, optional): _description_. Defaults to 'net_present_value_discounted'.
-        progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
-        method (str, optional): _description_. Defaults to 'Nelder-Mead'.
+        mm: The metamodel.
+        variables: The variables to vary.
+        target: The statistic to maximise.
+        progress: Function reporting progress, called with the iteration and a count one or two larger; the total is not known in advance.
+        cancel_status: Function returning whether cancellation has been requested; checked after each iteration.
+        method: The scipy optimisation method.
+
+    Returns:
+        The scipy optimisation result.
+
+    Raises:
+        InterruptedError: if cancellation is requested.
     """
 
     if progress is None:
@@ -176,18 +194,21 @@ def evaluate_statistic_across_margin(
     upper: float,
     resolution: int    
 ) -> pd.DataFrame:
-    """_summary_
+    """Evaluate a statistic across a range of values of one variable, for a marginal plot.
+
+    The first parameter of the variable is set to `resolution + 1` evenly spaced values from `lower` to `upper`, and the
+    NewSEGS Energy Model and finance model are run for each. The original variable is restored afterwards.
 
     Args:
-        mm (NewsegsMetaModel): _description_
-        varid (str): _description_
-        stat (str): _description_
-        lower (float): _description_
-        upper (float): _description_
-        resolution (int): _description_
+        mm: The metamodel.
+        varid: The varid of the variable.
+        stat: The statistic to evaluate.
+        lower: Lowest value of the parameter.
+        upper: Highest value of the parameter.
+        resolution: Number of intervals between the lowest and highest values.
 
     Returns:
-        pd.DataFrame: _description_
+        Dataframe of the values of the parameter (a column named for the varid) and of the statistic.
     """
     # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
@@ -232,14 +253,14 @@ def statistic_across_margin_plot(
     plot_data,
     mm: NewsegsMetaModel
 ):
-    """_summary_
+    """Plot a statistic across a range of values of a variable.
 
     Args:
-        plot_data (_type_): _description_
-        mm (NewsegsMetaModel): _description_
+        plot_data: The result of `evaluate_statistic_across_margin`: the values of the variable and the statistic.
+        mm: The metamodel, used to label the axes.
 
     Returns:
-        _type_: _description_
+        The line plot (a plotly figure).
     """
     fig = px.line(
         plot_data,

@@ -8,18 +8,16 @@ from typing import cast
 import dash
 from dash import html
 from dash.exceptions import PreventUpdate
-from cachetools import LRUCache
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components import energy_balance_estimation
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel, get_focussed_metamodel
+from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel
 from newsegsmodelapp.components.composite_input_components import generic_create_deterministic_input_container_contents
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.registers import register_input_container_content_creator, register_input_section_header_content_creator
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegsvariable import variable
 
 from ...utils.update_energy_balance_sprake import update_estimated_energy_balance
 

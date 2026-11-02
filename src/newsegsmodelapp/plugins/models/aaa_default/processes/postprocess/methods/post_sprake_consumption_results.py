@@ -1,6 +1,4 @@
-"""Post sprake consumption results module.
-
-TODO: Describe the purpose of the module.
+"""Postprocessing of the results of the consumption of the Sprake model into the form shown in the interface, including the ADMD.
 """
 import numpy as np
 import pandas as pd
@@ -11,12 +9,10 @@ from newsegsmodelframework.core.timespan import SEASON_NAMES
 from newsegsmodelframework.newsegsstats.core import assign_year_index, assign_season_index, assign_day_index
 from newsegsmodelframework.newsegsstats.core import assign_delta_hours
 from newsegsmodelframework.newsegsstats import basic_summary_stats
-from newsegsmodelframework.newsegsstats import self_consumption
 from newsegsmodelframework.newsegsstats import locate_timeseries_extrema
 from newsegsmodelframework.newsegsstats import agg_meters_daily
 
 from newsegsmodelframework.util.admd_helpers import get_admd_model_driver
-from admdspenmw import ASHP_count
 from admdspenmw.model_config import default_model_config, default_model_inputs, default_model_outputs
 from newsegsmodelframework.newsegsstats import locate_timeseries_extrema
 from newsegsmodelframework.newsegscs import elexon_profiles
@@ -35,16 +31,16 @@ _ADMD_CONF = default_model_config.copy()
 _ADMD_DR = get_admd_model_driver(_ADMD_CONF)
 
 def calculate_sprake_admd(n_units, n_evs):
-    """Calculate sprake admd.
+    """Estimate the After Diversity Maximum Demand (ADMD) of a site of the Sprake model.
 
-    TODO: Add a description.
+    Assumes that every household has an 8 kW air source heat pump, and that every EV charger is at a household with a heat pump. Uses the ADMD calculation (`admdspenmw`).
 
     Args:
-        n_units: TODO.
-        n_evs: TODO.
+        n_units: Number of households.
+        n_evs: Number of EVs.
 
     Returns:
-        TODO.
+        The standard ADMD (kW).
     """
     site_details = {
         'N_customers': int(n_units),
@@ -70,15 +66,13 @@ def calculate_sprake_admd(n_units, n_evs):
     return o.get('ADMD_standard')
 
 def seasonal_and_profile_consumption_summary(grp):
-    """Seasonal and profile consumption summary.
-
-    TODO: Add a description.
+    """Summarise consumption annually and per day, by season and by profile.
 
     Args:
-        grp: TODO.
+        grp: Group of the consumption data.
 
     Returns:
-        TODO.
+        The summary dataframe.
     """
     summary_consumption_year = (
         grp

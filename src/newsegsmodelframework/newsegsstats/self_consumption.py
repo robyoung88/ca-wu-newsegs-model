@@ -2,7 +2,6 @@
 Summarise self-consumption data.
 """
 import copy
-from collections.abc import Iterable
 from typing import MutableSequence
 
 import numpy as np
@@ -26,13 +25,13 @@ def self_consume(generation: npt.NDArray,
     )
 
 def as_list(varlist: str|MutableSequence[str]|None) -> list[str]:
-    """_summary_
+    """A variable name or names as a list.
 
     Args:
-        varlist (str | MutableSequence[str] | None): _description_
+        varlist: A name, a sequence of names, or None.
 
     Returns:
-        list[str]: _description_
+        The names as a list; empty if None.
     """
     if varlist is None:
         return []
@@ -45,15 +44,18 @@ def selfcons_summary(
     unit_grouping_variables: str | MutableSequence[str] | None = None,
     agg_grouping_variables: str | MutableSequence[str] | None = None
 ):
-    """_summary_
+    """Summarise self-consumption and the proportion of generation that is self-consumed.
+
+    The data are totalled for each generator and combination of the grouping variables, and the proportion of generation self-consumed
+    is found. Then, if there are `unit_grouping_variables`, the totals are summarised across them by mean, minimum and maximum.
 
     Args:
-        df (pd.DataFrame): _description_
-        unit_grouping_variables (str | MutableSequence[str] | None, optional): _description_. Defaults to None.
-        agg_grouping_variables (str | MutableSequence[str] | None, optional): _description_. Defaults to None.
+        df: Dataframe of `production` and `self_consumption`, with a `generator` column and the grouping variables.
+        unit_grouping_variables: Variables whose categories are the units to summarise across (e.g. years): the result gives the mean, minimum and maximum over them.
+        agg_grouping_variables: Variables by which to keep the results separate (e.g. season).
 
     Returns:
-        _type_: _description_
+        The summary: totals if there are no unit grouping variables, otherwise the mean, minimum and maximum across the units.
     """
     unit_grouping_variables = as_list(unit_grouping_variables)
     agg_grouping_variables = as_list(agg_grouping_variables)

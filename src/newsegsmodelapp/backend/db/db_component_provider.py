@@ -1,6 +1,7 @@
-"""Db component provider module.
+"""Providers of components: the component tables, with a provider for each kind of component that owns children.
 
-TODO: Describe the purpose of the module.
+`FromDatabaseNewsegsComponentProvider` is the general provider; the NewSEGS Energy Model, finance model, metamodel and project providers extend it
+to handle the tables and children specific to each. The `Cached...` provider keeps recently loaded projects.
 """
 import logging
 logger = logging.getLogger(__name__)
@@ -44,9 +45,14 @@ from newsegsmodelframework.newsegsvariable.variableprovider import VariableProvi
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentManagerInterface
 ):
-    """From Database Newsegs Component Provider.
+    """Provider and store of components, in the component configs table.
 
-    TODO: Add a description.
+    Components are held as JSON payloads with the metadata (type, class, version, revision and label) in columns. Components which own child
+    components record their ids, and the children are fetched and reattached when the component is reconstructed. Lightweight descriptions of components
+    can be fetched without constructing them.
+
+    Args:
+        get_engine: Function returning the SQLAlchemy engine.
     """
     _table = tbls.component_configs
 
@@ -164,15 +170,15 @@ class FromDatabaseNewsegsComponentProvider(
     def get_lightweight_component(
         self, component_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
-        """Get lightweight component.
+        """Get the lightweight description of a component (or components).
 
-        TODO: Add a description.
+        Contains the information needed to display the component, without constructing it.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
 
         Returns:
-            TODO.
+            The lightweight component(s).
         """
         prevstate = RevisionNotifierMixin._set_notification_state('disabled')
         try:
@@ -254,6 +260,7 @@ class FromDatabaseNewsegsComponentProvider(
         self.upsert_component(component, force = True)
         return component.id
         
+    # REVIEW (unreferenced): no references to `get_default_component` found in src/, scripts/ or data/.
     @override
     def get_default_component(
         self,
@@ -295,13 +302,11 @@ class FromDatabaseNewsegsComponentProvider(
     def upsert_children(self, component: NewsegsComponent, force: bool = False):
         # Expect to override this for different types of component
         # to deal with different tables
-        """Upsert children.
-
-        TODO: Add a description.
+        """Insert or update the child components of a component.
 
         Args:
-            component: TODO.
-            force: TODO.
+            component: The component(s).
+            force: Write the component(s) even if their revisions have not changed.
         """
         component_children = component.get_components(component_group= 'component_configs')
         if component_children:
@@ -315,13 +320,15 @@ class FromDatabaseNewsegsComponentProvider(
         tbl: Optional[sa.Table] = None,
         project_id: Optional[str] = None,
     ) -> None:
-        """_summary_
+        """Insert or update a component, or components, in the store.
+
+        A component is written if it is not present, or if its revision differs from the saved revision (or `force`).
 
         Args:
-            component (NewsegsComponent | SequenceNotStr[NewsegsComponent]): _description_
-            force (bool, optional): _description_. Defaults to False.
-            tbl (Optional[sa.Table], optional): _description_. Defaults to None.
-            project_id (Optional[str], optional): Cache invalidate this project if upsert results in table change. Defaults to None.
+            component: The component or components.
+            force: Write the components even if their revisions have not changed.
+            tbl: The table to write to; the table of the provider by default.
+            project_id: Project whose cache to invalidate if the upsert changes a table.
         """
         if tbl is None:
             tbl = self._table
@@ -571,16 +578,14 @@ class FromDatabaseNewsegsComponentProvider(
         component_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
-        """Get component metadata.
-
-        TODO: Add a description.
+        """Get columns of the components table for a component (or components) without constructing them.
 
         Args:
-            component_id: TODO.
-            metadata_ids: TODO.
+            component_id: Id(s) of the component(s).
+            metadata_ids: Name(s) of the metadata fields wanted.
 
         Returns:
-            TODO.
+            Dictionary of the metadata, or a dictionary of these by id.
         """
         is_single_id = isinstance(component_id, (str, bytes))
         component_id = [component_id] if is_single_id else list(component_id)
@@ -685,9 +690,7 @@ class FromDatabaseNewsegsComponentProvider(
         return
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
-    """From Database Newsegs EM Provider.
-
-    TODO: Add a description.
+    """Provider and store of NewSEGS Energy Models (the `em_configs` table), with the modules and data that they own.
     """
     _table = tbls.em_configs
 
@@ -770,18 +773,17 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
         comp._syncronise()
         return comp
 
+    # REVIEW (unreferenced): no references to `get_lightweight_em` found in src/, scripts/ or data/.
     def get_lightweight_em(
             self, model_id: str | SequenceNotStr[str]
         ) -> LightweightNewsegsModel | SequenceNotStr[LightweightNewsegsModel]:
-        """Get lightweight em.
-
-        TODO: Add a description.
+        """Get the lightweight description of a NewSEGS Energy Model (or models).
 
         Args:
-            model_id: TODO.
+            model_id: Id(s) of the NewSEGS Energy Model(s).
 
         Returns:
-            TODO.
+            The lightweight model(s).
         """
         return self.get_lightweight_component(model_id)
     
@@ -869,9 +871,7 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
-    """From Database Newsegs FM Provider.
-
-    TODO: Add a description.
+    """Provider and store of finance models (the `fm_configs` table), with the data that they own.
     """
     _table = tbls.fm_configs
 
@@ -936,18 +936,17 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
         comp._syncronise()
         return comp
 
+    # REVIEW (unreferenced): no references to `get_lightweight_fm` found in src/, scripts/ or data/.
     def get_lightweight_fm(
         self, finance_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsFinance | SequenceNotStr[LightweightNewsegsFinance]:
-        """Get lightweight fm.
-
-        TODO: Add a description.
+        """Get the lightweight description of a finance model (or models).
 
         Args:
-            finance_id: TODO.
+            finance_id: Id(s) of the finance model(s).
 
         Returns:
-            TODO.
+            The lightweight finance model(s).
         """
         return self.get_lightweight_component(finance_id)
  
@@ -1032,9 +1031,7 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider):
-    """From Database Newsegs Metamodel Provider.
-
-    TODO: Add a description.
+    """Provider and store of metamodels (the `metamodels` table), with the NewSEGS Energy Models, finance models and variables that they own.
     """
     _table = tbls.metamodels
     _metamodel_variable_jct = tbls.metamodel_variables
@@ -1253,15 +1250,13 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     def get_lightweight_metamodel(
         self, metamodel_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsMetaModel | SequenceNotStr[LightweightNewsegsMetaModel]:
-        """Get lightweight metamodel.
-
-        TODO: Add a description.
+        """Get the lightweight description of a metamodel (or metamodels).
 
         Args:
-            metamodel_id: TODO.
+            metamodel_id: Id(s) of the metamodel(s).
 
         Returns:
-            TODO.
+            The lightweight metamodel(s).
         """
         return self.get_lightweight_component(metamodel_id)
 
@@ -1300,13 +1295,11 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         metamodel: NewsegsMetaModel | LightweightNewsegsMetaModel,
         variables: Sequence[Variable | LightweightVariable]
     ):
-        """Refresh metamodel variable junction.
-
-        TODO: Add a description.
+        """Rewrite the rows of the metamodel_variables table of a metamodel for a set of variables.
 
         Args:
-            metamodel: TODO.
-            variables: TODO.
+            metamodel: The metamodel.
+            variables: The variables.
         """
         varids = [x.varid if isinstance(x, LightweightVariable) else variable_uid(x) for x in variables]
         if not varids:
@@ -1506,9 +1499,9 @@ class FromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsComponentProvider,
     NewsegsProjectProviderInterface,
 ):
-    """From Database Newsegs Project Provider.
+    """Provider and store of projects (the `projects` table), with the metamodels and variables that they own, and of sessions and snapshots.
 
-    TODO: Add a description.
+    A project is the root of the data of a user: reconstructing it fetches its metamodels, their models and finance, and the variables.
     """
     _table = tbls.projects
     _project_metamodel_jct = tbls.project_metamodels
@@ -1682,15 +1675,13 @@ class FromDatabaseNewsegsProjectProvider(
     def get_lightweight_project(
         self, project_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsProject | SequenceNotStr[LightweightNewsegsProject]:
-        """Get lightweight project.
-
-        TODO: Add a description.
+        """Get the lightweight description of a project (or projects).
 
         Args:
-            project_id: TODO.
+            project_id: Id of the project.
 
         Returns:
-            TODO.
+            The lightweight project(s).
         """
         return self.get_lightweight_component(project_id)
 
@@ -1699,13 +1690,11 @@ class FromDatabaseNewsegsProjectProvider(
         project_id: str,
         variables: Sequence[Variable | LightweightVariable]
     ):
-        """Add variables to project.
-
-        TODO: Add a description.
+        """Add variables to the junction table of a project.
 
         Args:
-            project_id: TODO.
-            variables: TODO.
+            project_id: Id of the project.
+            variables: The variables.
         """
         new_entries = [
             {
@@ -1726,13 +1715,13 @@ class FromDatabaseNewsegsProjectProvider(
         project_id: str,
         variables: Sequence[Variable | LightweightVariable | str]
     ):
-        """Remove variables from project.
+        """Remove variables from the junction table of a project.
 
-        TODO: Add a description.
+        Variables may be given as variables or by id.
 
         Args:
-            project_id: TODO.
-            variables: TODO.
+            project_id: Id of the project.
+            variables: The variables.
         """
         var_uids = [x.id if not isinstance(x, str) else x for x in variables]
         clear_statement = (
@@ -1818,22 +1807,6 @@ class FromDatabaseNewsegsProjectProvider(
         force: bool = False,
         tbl: sa.Table | None = None
     ) -> None:
-        # Unlike other upsertions, projects require junction tables to be sorted.
-        # v_to_sync = list(project._variables_by_uid.values())
-        # vars_modified = any(x.modified or x.soft_dirty for x in v_to_sync)
-        # self.variable_provider.upsert_variable(v_to_sync)
-
-        # # As variables have all been upserted, we can sync all the metamodel variable lists
-        # for mm in project.metamodels:
-        #     mm.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
-        
-        #if vars_modified:
-        #    project.revision += 1
-        #    project.table_config.revision += 1
-        
-        # Metamodel upsert happens as part of upsert_children
-        #self.metamodel_provider.upsert_component(project.metamodels) # pyright: ignore[reportArgumentType]
-        # At this point, the metamodel list can be syncronised
         project.metamodels._syncronise() # pyright: ignore[reportAttributeAccessIssue]
         
         super().upsert_component(project, force, tbl)
@@ -1962,6 +1935,7 @@ class FromDatabaseNewsegsProjectProvider(
             odf = pd.read_sql(stmt, conn)
         return odf
 
+    # REVIEW (unreferenced): no references to `recover_session_project` found in src/, scripts/ or data/.
     @override
     def recover_session_project(
         self,
@@ -2085,13 +2059,11 @@ class FromDatabaseNewsegsProjectProvider(
         snapshot_id: int,
         snapshot_name: str
     ):
-        """Rename snapshot.
-
-        TODO: Add a description.
+        """Change the label of a snapshot.
 
         Args:
-            snapshot_id: TODO.
-            snapshot_name: TODO.
+            snapshot_id: Id of the snapshot.
+            snapshot_name: The new label of the snapshot.
         """
         stmt = (
             sa.update(tbls.snapshots)
@@ -2179,12 +2151,10 @@ class FromDatabaseNewsegsProjectProvider(
 
     def delete_orphan_variables(self) -> int:
 
-        """Delete orphan variables.
-
-        TODO: Add a description.
+        """Delete variables which no project or metamodel refers to.
 
         Returns:
-            TODO.
+            The number of variables deleted.
         """
         referenced_variable_ids = sa.union(
             sa.select(tbls.project_variables.c.variable_config_id),
@@ -2201,16 +2171,14 @@ class FromDatabaseNewsegsProjectProvider(
             return result.rowcount
 
     def create_project_snapshot(self, project_id: str, snapshot_label: str) -> int:
-        """Create project snapshot.
-
-        TODO: Add a description.
+        """Make a snapshot of a project and everything it owns.
 
         Args:
-            project_id: TODO.
-            snapshot_label: TODO.
+            project_id: Id of the project.
+            snapshot_label: Label of the snapshot.
 
         Returns:
-            TODO.
+            The id of the snapshot.
         """
         snapshot_id = db_snapshot.generic_snapshot_entity(
             self._get_engine(writer = True),
@@ -2223,16 +2191,16 @@ class FromDatabaseNewsegsProjectProvider(
         return snapshot_id
 
     def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
-        """Load project snapshot.
+        """Restore a snapshot of a project as a new project.
 
-        TODO: Add a description.
+        The snapshot is copied back with new ids; the original project is not changed.
 
         Args:
-            project_id: TODO.
-            snapshot_id: TODO.
+            project_id: Id of the project.
+            snapshot_id: Id of the snapshot.
 
         Returns:
-            TODO.
+            The restored project.
         """
         id_remap = db_snapshot.generic_restore_snapshot(
             self._get_engine(writer = True),
@@ -2243,13 +2211,11 @@ class FromDatabaseNewsegsProjectProvider(
         return self.get_project(new_project_id)
 
     def delete_project_snapshot(self, project_id: str, snapshot_id: int):
-        """Delete project snapshot.
-
-        TODO: Add a description.
+        """Delete a snapshot.
 
         Args:
-            project_id: TODO.
-            snapshot_id: TODO.
+            project_id: Id of the project.
+            snapshot_id: Id of the snapshot.
         """
         db_snapshot.delete_snapshot(self._get_engine(writer = True), tbls.metadata, snapshot_id)
 
@@ -2276,20 +2242,21 @@ class FromDatabaseNewsegsProjectProvider(
             res = conn.execute(stmt).scalar_one()
         return res
 
+    # REVIEW (unreferenced): no references to `touch_project` found in src/, scripts/ or data/.
     def touch_project(self, project_id: str):
-        """Touch project.
+        """Update the modification stamp of a project, without changing it.
 
-        TODO: Add a description.
+        Used so that caches of the project are invalidated.
 
         Args:
-            project_id: TODO.
+            project_id: Id of the project.
         """
         stmt = (
             sa.update(self._table)
             .where(self._table.c.id == project_id)
             .values(label=self._table.c.label)
         )
-        with read_transaction(self._get_engine()) as conn:
+        with read_transaction(self._get_engine(writer=True)) as conn:
             conn.execute(stmt)
 
 USE_DATAVERSION = True
@@ -2302,9 +2269,10 @@ class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
 ):
 
-    """Cached From Database Newsegs Project Provider.
+    """A `FromDatabaseNewsegsProjectProvider` which caches the projects it loads.
 
-    TODO: Add a description.
+    A cached project is returned if the database has not been written to since (SQLite `data_version`) or if the project's modification key is unchanged. Otherwise it is loaded
+    again. A lock prevents several threads loading the same project at once.
     """
     def _create_variable_provider(self) -> VariableProviderInterface:
         return CachedFromDatabaseVariableProvider(self._get_engine)
@@ -2469,12 +2437,10 @@ class CachedFromDatabaseNewsegsProjectProvider(
         return olist
 
     def invalidate_cache_for_component(self, component_id):
-        """Invalidate cache for component.
-
-        TODO: Add a description.
+        """Remove projects from the cache.
 
         Args:
-            component_id: TODO.
+            component_id: Id(s) of the component(s).
         """
         if isinstance(component_id, str):
             component_id = [component_id]
@@ -2485,15 +2451,13 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 del self._lightweight_project_cache[id_]        
 
 def get_component_critical_state(component):
-    """Get component critical state.
-
-    TODO: Add a description.
+    """The identity and state of revision of a component, for logging.
 
     Args:
-        component: TODO.
+        component: The component(s).
 
     Returns:
-        TODO.
+        Dictionary of the id, revision and modified flag.
     """
     return {
         'id': component.id,
@@ -2502,15 +2466,13 @@ def get_component_critical_state(component):
     }
 
 def get_observable_critical_state(observable):
-    """Get observable critical state.
-
-    TODO: Add a description.
+    """The state of revision of an observable container, for logging.
 
     Args:
-        observable: TODO.
+        observable: The observable container.
 
     Returns:
-        TODO.
+        Dictionary of the revision and modified flag.
     """
     return {
         'revision': observable.revision,
@@ -2518,15 +2480,13 @@ def get_observable_critical_state(observable):
     }
 
 def get_project_critical_state(project):
-    """Get project critical state.
-
-    TODO: Add a description.
+    """The state of revision of a project and the components it owns, for logging.
 
     Args:
-        project: TODO.
+        project: The project.
 
     Returns:
-        TODO.
+        Dictionary of the critical states.
     """
     odict = {}
     odict.update(

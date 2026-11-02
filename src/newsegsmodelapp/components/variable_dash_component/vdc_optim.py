@@ -1,6 +1,4 @@
-"""Vdc optim module.
-
-TODO: Describe the purpose of the module.
+"""Creation of the optimisation input of a variable.
 """
 from typing import cast
 
@@ -11,15 +9,13 @@ from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 def create_optim_input(
     var: variable.Variable
 ):
-    """Create optim input.
-
-    TODO: Add a description.
+    """Create the optimisation input of a variable.
 
     Args:
-        var: TODO.
+        var: The variable.
 
     Returns:
-        TODO.
+        The input.
     """
     if not var.optim_show:
         return None

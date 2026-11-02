@@ -1,13 +1,9 @@
-"""Db jobs module.
-
-TODO: Describe the purpose of the module.
+"""Updates of the runs table: progress, status and cancellation of the runs executed by workers.
 """
 import logging
 from typing import Sequence
 logger = logging.getLogger(__name__)
 
-from dataclasses import asdict
-import json
 
 import sqlalchemy as sa
 
@@ -84,14 +80,14 @@ def update_calculation_progress(engine: sa.Engine, job_id: int, step, total, mes
     write_with_retries(engine, stmt, base_sleep = 0.02)
 
 def set_cancel_request_status(engine: sa.Engine, job_id: int, status: bool = True):
-    """Set cancel request status.
+    """Set whether cancellation of a run has been requested.
 
-    TODO: Add a description.
+    The worker checks this to stop a run.
 
     Args:
-        engine: TODO.
-        job_id: TODO.
-        status: TODO.
+        engine: The SQLAlchemy engine.
+        job_id: Id of the run.
+        status: The status.
     """
     logger.info('Setting Run Cancel Request Status to %s: Run ID = %d;', status, job_id)
     stmt = (
@@ -102,16 +98,14 @@ def set_cancel_request_status(engine: sa.Engine, job_id: int, status: bool = Tru
     write_with_retries(engine, stmt)
 
 def get_cancel_status(engine: sa.Engine, job_id: int):
-    """Get cancel status.
-
-    TODO: Add a description.
+    """Whether cancellation of a run has been requested.
 
     Args:
-        engine: TODO.
-        job_id: TODO.
+        engine: The SQLAlchemy engine.
+        job_id: Id of the run.
 
     Returns:
-        TODO.
+        True if it has.
     """
     stmt = (
         sa.select(tbls.runs.c.cancel_requested)
@@ -158,14 +152,12 @@ def set_status_completed(engine: sa.Engine, run_id: int | Sequence[int]):
     write_with_retries(engine, stmt)
 
 def set_status_failed(engine: sa.Engine, job_id: int, message: str | None):
-    """Set status failed.
-
-    TODO: Add a description.
+    """Mark a run as failed, resetting its progress.
 
     Args:
-        engine: TODO.
-        job_id: TODO.
-        message: TODO.
+        engine: The SQLAlchemy engine.
+        job_id: Id of the run.
+        message: Message to record, or None.
     """
     logger.debug('Setting Run Status to "FAILED": Run ID = %d; Message = %s', job_id, message)
     update_vals = dict(

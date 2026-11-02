@@ -1,6 +1,4 @@
-"""Post psa results module.
-
-TODO: Describe the purpose of the module.
+"""Conversion of the results of a PSA into tables.
 """
 import pandas as pd
 
@@ -9,14 +7,12 @@ from newsegsmodelframework.newsegssensitivity import psa
 def psa_results_to_tables(
     psa_results: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Psa results to tables.
-
-    TODO: Add a description.
+    """Convert the results of a PSA into tables of summary statistics.
 
     Args:
-        psa_results: TODO.
+        psa_results: Dataframe of the results of the PSA.
 
     Returns:
-        TODO.
+        The tables.
     """
     return psa.basic_psa_stats(psa_results)

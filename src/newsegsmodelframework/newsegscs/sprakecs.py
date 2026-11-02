@@ -4,14 +4,11 @@ from dataclasses import asdict
 import datetime
 import os
 import copy
-from collections.abc import MutableMapping
-from typing import Optional, Union, cast, override
-from numbers import Number
+from typing import Union, cast, override
 from functools import lru_cache, singledispatchmethod
 
 import numpy as np
 import pandas as pd
-import numpy.typing as npt
 
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core.trackeddata import revision_dataclass
@@ -53,12 +50,10 @@ class SprakeCSResult(NewsegsModuleResult):
         self.set_storage_soc(storage_soc)
 
     def get_timespan(self) -> modtimespan.RegTimeSpan:
-        """Get timespan.
-
-        TODO: Add a description.
+        """The time span of the result.
 
         Returns:
-            TODO.
+            The time span.
         """
         return self._timespan
 
@@ -127,116 +122,95 @@ class SprakeCSResult(NewsegsModuleResult):
         return o_arr
 
     def get_meter_names(self):
-        """Get meter names.
-
-        TODO: Add a description.
+        """Names of the meters: the import of each load, and the storage and grid flows.
 
         Returns:
-            TODO.
+            The names.
         """
         return ('appliance_import', 'dhw_import', 'spaceheat_import', 'evcharge_import',
                 'storage_import', 'storage_export', 'storage_loss',
                 'grid_import', 'grid_export')
     
     def get_meter_types(self):
-        """Get meter types.
-
-        TODO: Add a description.
+        """Types of the meters: load, storage import and export, loss, and grid import and export.
 
         Returns:
-            TODO.
+            The types.
         """
         return ('load', 'load', 'load', 'load',
                 'import_storage', 'export_storage', 'loss',
                 'import', 'export')
 
     def get_dsm_names(self):
-        """Get dsm names.
-
-        TODO: Add a description.
+        """Names of the DSM values: the storage state of charge.
 
         Returns:
-            TODO.
+            The names.
         """
         return ('storage_soc',)
 
+    # REVIEW (unreferenced): nothing calls `get_dsm_types` (it implements the abstract `NewsegsModuleResult.get_dsm_types`).
     def get_dsm_types(self):
-        """Get dsm types.
-
-        TODO: Add a description.
+        """Types of the DSM values; the state of charge is a system state.
 
         Returns:
-            TODO.
+            The types.
         """
         return ('system_state',)
 
     def set_domestic_consumption(self, domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]]):
-        """Set domestic consumption.
-
-        TODO: Add a description.
+        """Set the consumption of each load.
 
         Args:
-            domestic_consumption: TODO.
+            domestic_consumption: Array of the consumption of each load (appliances, hot water, space heating, EV charging) at each timestep.
         """
         self._domestic_consumption = domestic_consumption
 
     def set_storage_import(self, storage_import:np.ndarray[tuple[int], np.dtype[np.number]]):
-        """Set storage import.
-
-        TODO: Add a description.
+        """Set the energy imported to storage.
 
         Args:
-            storage_import: TODO.
+            storage_import: Energy imported to storage at each timestep.
         """
         self._storage_import = storage_import
 
     def set_storage_export(self, storage_export:np.ndarray[tuple[int], np.dtype[np.number]]):
-        """Set storage export.
-
-        TODO: Add a description.
+        """Set the energy exported from storage.
 
         Args:
-            storage_export: TODO.
+            storage_export: Energy exported from storage at each timestep.
         """
         self._storage_export = storage_export
 
     def set_storage_loss(self, storage_loss:np.ndarray[tuple[int], np.dtype[np.number]]):
-        """Set storage loss.
-
-        TODO: Add a description.
+        """Set the energy lost by storage.
 
         Args:
-            storage_loss: TODO.
+            storage_loss: Energy lost by storage at each timestep.
         """
         self._storage_loss = storage_loss
 
     def set_grid_import(self, grid_import:np.ndarray[tuple[int], np.dtype[np.number]]):
-        """Set grid import.
-
-        TODO: Add a description.
+        """Set the energy imported from the grid.
 
         Args:
-            grid_import: TODO.
+            grid_import: Energy imported from the grid at each timestep.
         """
         self._grid_import = grid_import
 
     def set_grid_export(self, grid_export:np.ndarray[tuple[int], np.dtype[np.number]]):
-        """Set grid export.
-
-        TODO: Add a description.
+        """Set the energy exported to the grid.
 
         Args:
-            grid_export: TODO.
+            grid_export: Energy exported to the grid at each timestep.
         """
         self._grid_export = grid_export
 
     def set_storage_soc(self, storage_soc:np.ndarray[tuple[int], np.dtype[np.number]]):
-        """Set storage soc.
-
-        TODO: Add a description.
+        """Set the state of charge of storage.
 
         Args:
-            storage_soc: TODO.
+            storage_soc: State of charge of storage at each timestep.
         """
         self._storage_soc = storage_soc
 
@@ -263,17 +237,17 @@ def _get_sprake_appliance_consumption_reference_timeseries(start, periods, freq)
 def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
     #from newsegscs.elexon_profiles import get_elexon_consumption
     #cons = get_elexon_consumption(datetimes)
-    """Sprake appliance consumption.
+    """Electricity consumption of the appliances of the households at each timestep.
 
-    TODO: Add a description.
+    The reference profile reduced by `efficiency_reduction`, scaled by the number of households.
 
     Args:
-        datetimes: TODO.
-        efficiency_reduction: TODO.
-        n_households: TODO.
+        datetimes: Datetimes at the start of each timestep.
+        efficiency_reduction: Fractional reduction in appliance consumption from the reference.
+        n_households: Number of households.
 
     Returns:
-        TODO.
+        Array of consumption.
     """
     start = datetimes[0]
     periods = len(datetimes)
@@ -298,17 +272,17 @@ def _get_sprake_ev_consumption_reference_timeseries(start, periods, freq):
     )
 
 def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
-    """Sprake ev consumption.
+    """Electricity consumption of EV charging at each timestep.
 
-    TODO: Add a description.
+    The reference profile scaled by the annual consumption per EV and the number of EVs.
 
     Args:
-        datetimes: TODO.
-        annual_residential_consumption_per_ev: TODO.
-        n_evs: TODO.
+        datetimes: Datetimes at the start of each timestep.
+        annual_residential_consumption_per_ev: Annual energy consumption of an EV from residential charging (kWh).
+        n_evs: Number of electric vehicles.
 
     Returns:
-        TODO.
+        Array of consumption.
     """
     start = datetimes[0]
     periods = len(datetimes)
@@ -328,18 +302,18 @@ def _get_sprake_dhw_energy_consumption_reference_timeseries(start, periods, freq
     return cons
 
 def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
-    """Sprake dhw consumption.
+    """Electricity consumption for domestic hot water at each timestep.
 
-    TODO: Add a description.
+    The reference profile, varying seasonally about the reference daily consumption, scaled by the number of households.
 
     Args:
-        datetimes: TODO.
-        ref_daily_consumption: TODO.
-        seasonal_variance: TODO.
-        n_households: TODO.
+        datetimes: Datetimes at the start of each timestep.
+        ref_daily_consumption: Reference daily hot water energy consumption of a household (kWh).
+        seasonal_variance: Fractional seasonal variation of the hot water consumption about the reference.
+        n_households: Number of households.
 
     Returns:
-        TODO.
+        Array of consumption.
     """
     start = datetimes[0]
     periods = len(datetimes)
@@ -355,18 +329,18 @@ def _get_sprake_spaceheat_consumption_timeseries(start, periods, freq, hlp=1.1, 
     return cons
 
 def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_households=1000):
-    """Sprake spaceheat consumption.
+    """Electricity consumption for space heating at each timestep.
 
-    TODO: Add a description.
+    Derived from heating degree days, the heat loss parameter and the floor area, scaled by the number of households.
 
     Args:
-        datetimes: TODO.
-        hlp: TODO.
-        gfa: TODO.
-        n_households: TODO.
+        datetimes: Datetimes at the start of each timestep.
+        hlp: Heat loss parameter.
+        gfa: Gross floor area of a dwelling (m^2).
+        n_households: Number of households.
 
     Returns:
-        TODO.
+        Array of consumption.
     """
     start = datetimes[0]
     periods = len(datetimes)
@@ -377,9 +351,21 @@ def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_ho
 
 @revision_dataclass
 class SprakeCSConfig(NewsegsCSConfig):
-    """Sprake CS Config.
+    """Configuration of the Sprake consumption and storage module.
 
-    TODO: Add a description.
+    Attributes:
+        n_units: Number of households.
+        ev_per_unit: Number of EVs per household.
+        efficiency_reduction: Fractional reduction in appliance consumption from the reference.
+        annual_residential_consumption_per_ev: Annual energy consumption of an EV from residential charging (kWh).
+        ref_daily_consumption: Reference daily hot water energy consumption of a household (kWh).
+        seasonal_variance: Fractional seasonal variation of the hot water consumption about the reference.
+        hlp: Heat loss parameter of the dwellings.
+        gfa: Gross floor area of a dwelling (m^2).
+        timeseries_hdd_start: Start of the heating degree day series.
+        timeseries_model_start: The time in the model corresponding to the start of the degree day series.
+        storage_capacity: Capacity of storage (kWh).
+        storage_rte: Round trip efficiency of storage.
     """
     n_units: float = 100.0
     ev_per_unit: float = 1.2
@@ -432,12 +418,10 @@ class SprakeCS(NewsegsCS):
     
     @classmethod
     def from_none(cls):
-        """From none.
-
-        TODO: Add a description.
+        """Create a Sprake consumption and storage module with default values.
 
         Returns:
-            TODO.
+            The module.
         """
         if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
             spaceheat_params = {
@@ -458,71 +442,57 @@ class SprakeCS(NewsegsCS):
 
     @property
     def n_households(self) -> float:
-        """N households.
-
-        TODO: Add a description.
+        """Number of households.
         """
         return self.n_units
 
     @property
     def n_evs(self) -> float:
-        """N evs.
-
-        TODO: Add a description.
+        """Number of EVs.
         """
         return self.n_units * self.ev_per_unit
 
     def get_appliance_params(self):
-        """Get appliance params.
-
-        TODO: Add a description.
+        """The parameters of the appliance consumption.
 
         Returns:
-            TODO.
+            Dictionary of the parameters.
         """
         atts = ['efficiency_reduction', 'n_households']
         return {k: getattr(self, k) for k in atts}
 
     def get_ev_params(self):
-        """Get ev params.
-
-        TODO: Add a description.
+        """The parameters of the EV charging consumption.
 
         Returns:
-            TODO.
+            Dictionary of the parameters.
         """
         atts = ['annual_residential_consumption_per_ev', 'n_evs']
         return {k: getattr(self, k) for k in atts}
 
     def get_dhw_params(self):
-        """Get dhw params.
-
-        TODO: Add a description.
+        """The parameters of the domestic hot water consumption.
 
         Returns:
-            TODO.
+            Dictionary of the parameters.
         """
         atts = ['ref_daily_consumption', 'seasonal_variance', 'n_households']
         return {k: getattr(self, k) for k in atts}
 
     def get_sh_params(self):
-        """Get sh params.
-
-        TODO: Add a description.
+        """The parameters of the space heating consumption.
 
         Returns:
-            TODO.
+            Dictionary of the parameters.
         """
         atts = ['hlp', 'gfa', 'n_households']
         return {k: getattr(self, k) for k in atts}
 
     def get_storage_params(self):
-        """Get storage params.
-
-        TODO: Add a description.
+        """The parameters of the storage.
 
         Returns:
-            TODO.
+            Dictionary of the parameters.
         """
         atts = ['storage_capacity', 'storage_rte']
         return {k: getattr(self, k) for k in atts}
@@ -532,16 +502,19 @@ class SprakeCS(NewsegsCS):
         timespan: modtimespan.TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> SprakeCSResult:
-        """Run.
+        """Run the consumption and storage module over a time span.
 
-        TODO: Add a description.
+        The loads - appliances, hot water, space heating and EV charging - are calculated from their profiles. Storage is
+        charged only by over-generation (the generation of the NewSEGS Energy Model less the loads) and discharged
+        by under-generation, applying the round trip efficiency on discharge. Any remainder is exported to or
+        imported from the grid. With no storage capacity all the over- or under-generation goes to the grid.
 
         Args:
-            timespan: TODO.
-            run_start: TODO.
+            timespan: The period of time to run.
+            run_start: Time at which the run started; defaults to now.
 
         Returns:
-            TODO.
+            The result, with the meters of the loads, storage and grid, and the state of charge of storage.
         """
         super().run(timespan, run_start)
         if not isinstance(timespan, modtimespan.RegTimeSpan):

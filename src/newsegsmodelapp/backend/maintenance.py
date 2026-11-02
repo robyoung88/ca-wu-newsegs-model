@@ -37,5 +37,3 @@ if __name__ == '__main__':
     while True:
         schedule.run_pending()
         time.sleep(300) # Wake every 5 minutes to check the schedule.
-
-# TODO: Once under a docker container, have the container launch and monitor this process

@@ -1,6 +1,4 @@
-"""Requesthanderinterface module.
-
-TODO: Describe the purpose of the module.
+"""The `RequestHandlerInterface`: the interface for creating requests for background procedures and following their state.
 """
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Sequence, overload
@@ -54,6 +52,7 @@ class RequestHandlerInterface(metaclass = ABCMeta):
             - "DISPATCHED" (i.e. with a run assigned and without having processed a completion of that run)
         """
 
+    # REVIEW (unreferenced): no references to `get_new_requests` found in src/, scripts/ or data/.
     @abstractmethod
     def get_new_requests(
         self,
@@ -65,6 +64,7 @@ class RequestHandlerInterface(metaclass = ABCMeta):
             [list[RunRequest]] Requests not dispatched.
         """
 
+    # REVIEW (unreferenced): no references to `mark_dispatched` found in src/, scripts/ or data/.
     @abstractmethod
     def mark_dispatched(
         self,

@@ -1,6 +1,4 @@
-"""Input sections sprake module.
-
-TODO: Describe the purpose of the module.
+"""The input sections of the deterministic (site configuration) page for the Sprake model.
 """
 
 from newsegsmodelapp.components import icons

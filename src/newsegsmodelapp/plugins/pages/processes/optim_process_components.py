@@ -1,6 +1,4 @@
-"""Optim process components module.
-
-TODO: Describe the purpose of the module.
+"""Components needed by the optimisation process.
 """
 
 from dash import dcc, html
@@ -9,15 +7,13 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelframework.newsegssensitivity import optim
 
 def optim_process_components(**kwargs):
-    """Optim process components.
-
-    TODO: Add a description.
+    """Create the components needed by the optimisation process, such as the modal which asks for confirmation before it is started.
 
     Args:
-        **kwargs: TODO.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        List of components.
     """
     return [
         dbc.Modal(

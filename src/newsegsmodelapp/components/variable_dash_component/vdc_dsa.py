@@ -1,6 +1,4 @@
-"""Vdc dsa module.
-
-TODO: Describe the purpose of the module.
+"""Creation of the DSA input of a variable.
 """
 
 from typing import cast
@@ -12,15 +10,15 @@ from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 def create_dsa_input(
     var: variable.Variable
 ):
-    """Create dsa input.
+    """Create the DSA input of a variable.
 
-    TODO: Add a description.
+    Dispatches on the distribution of the variable. Nothing is created if the variable is not to be shown.
 
     Args:
-        var: TODO.
+        var: The variable.
 
     Returns:
-        TODO.
+        The input, or nothing.
     """
     if not var.dsa_show:
         return []

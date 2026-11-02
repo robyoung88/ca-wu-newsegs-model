@@ -1,6 +1,7 @@
-"""Aaa default tables module.
+"""The table drawing and table getting procedures of the `sprake` model type.
 
-TODO: Describe the purpose of the module.
+Each procedure, registered for a table section and started when a postprocess procedure completes, draws the table data of a kind of result - grid, generation, consumption, storage,
+net flows, finance, DSA, PSA and optimisation - and stores it.
 """
 import logging
 logger = logging.getLogger(__name__)

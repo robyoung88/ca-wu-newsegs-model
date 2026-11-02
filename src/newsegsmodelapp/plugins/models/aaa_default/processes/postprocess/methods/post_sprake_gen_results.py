@@ -9,7 +9,7 @@ import pandas as pd
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import get_generation_meters
 from newsegsmodelframework.core.timespan import SEASON_NAMES
-from newsegsmodelframework.newsegsstats.core import assign_year_index, assign_season_index
+from newsegsmodelframework.newsegsstats.core import assign_year_index
 from newsegsmodelframework.newsegsstats import basic_summary_stats
 from newsegsmodelframework.newsegsstats import categorise_meter
 from newsegsmodelframework.newsegsstats import time_in_range
@@ -210,6 +210,7 @@ def gen_results_to_interface_sprake(
 
     return results_to_interface
 
+# REVIEW (unreferenced): no references to `gen_results_to_interface_sprake_factory` found in src/, scripts/ or data/.
 def gen_results_to_interface_sprake_factory(app):
     """
     Wrap gen_results_to_interface_sprake in a function taking the model hash.

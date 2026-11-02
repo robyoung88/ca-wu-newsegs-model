@@ -1,6 +1,4 @@
-"""P000 model selection layout module.
-
-TODO: Describe the purpose of the module.
+"""The model selection page: the first page of the app, from which a model type is chosen.
 """
 import logging
 logger = logging.getLogger(__name__)
@@ -88,29 +86,22 @@ model_selection_layout = dbc.Container([
 ])
 
 def create_model_selection_layout(config: LayoutConfiguration) -> ComponentType:
-    """Create model selection layout.
-
-    TODO: Add a description.
+    """The layout of the model selection page.
 
     Args:
-        config: TODO.
+        config: The layout configuration of the page.
 
     Returns:
-        TODO.
+        The layout.
     """
     return model_selection_layout
 
 def assign_callbacks(app: NewsegsDash):
 
-    """Assign callbacks.
-
-    TODO: Add a description.
+    """Bind the callbacks of the model selection page: choosing a model type navigates to its landing page.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output('url', 'pathname'),

@@ -1,8 +1,5 @@
-"""Stats module.
-
-TODO: Describe the purpose of the module.
+"""Presentation of statistics of results: formatters, and tables of the statistics of several configurations side by side.
 """
-from typing import List
 from collections.abc import Callable, Mapping, Iterable
 
 from functools import reduce, partial
@@ -43,16 +40,14 @@ def format_val_and_proportion(
     val,
     prop
 ):
-    """Format val and proportion.
-
-    TODO: Add a description.
+    """Format a value with a proportion, as `value (proportion)`.
 
     Args:
-        val: TODO.
-        prop: TODO.
+        val: The value.
+        prop: The proportion.
 
     Returns:
-        TODO.
+        The string.
     """
     return f'{val:,.0f} ({prop:0.1%})'
 
@@ -60,16 +55,14 @@ def format_twoval(
     val1,
     val2
 ):
-    """Format twoval.
-
-    TODO: Add a description.
+    """Format two values, as `value1 | value2`.
 
     Args:
-        val1: TODO.
-        val2: TODO.
+        val1: First value.
+        val2: Second value.
 
     Returns:
-        TODO.
+        The string.
     """
     return f'{val1:,.0f} | {val2:,.0f}'
 
@@ -81,33 +74,30 @@ def format_val_and_proportion_with_range(
     min_prop,
     max_prop
 ):
-    """Format val and proportion with range.
-
-    TODO: Add a description.
+    """Format a mean value and proportion with their minimum and maximum.
 
     Args:
-        mean_val: TODO.
-        min_val: TODO.
-        max_val: TODO.
-        mean_prop: TODO.
-        min_prop: TODO.
-        max_prop: TODO.
+        mean_val: Mean value.
+        min_val: Minimum value.
+        max_val: Maximum value.
+        mean_prop: Mean proportion.
+        min_prop: Minimum proportion.
+        max_prop: Maximum proportion.
 
     Returns:
-        TODO.
+        The string.
     """
     return f'{mean_val:,.0f} ({min_val:,.0f}, {max_val:,.0f}) - {mean_prop:,.1%} ({min_prop:,.1%}, {max_prop:,.1%})'
 
+# REVIEW (unreferenced): no references to `annual_selfconsumption_format` found in src/, scripts/ or data/.
 def annual_selfconsumption_format(rw):
-    """Annual selfconsumption format.
-
-    TODO: Add a description.
+    """Format the annual self-consumption and its proportion of generation, with ranges, from a row of statistics.
 
     Args:
-        rw: TODO.
+        rw: A row of the statistics table.
 
     Returns:
-        TODO.
+        The string.
     """
     return format_val_and_proportion_with_range(
         rw[('self_consumption', 'mean')],
@@ -119,16 +109,14 @@ def annual_selfconsumption_format(rw):
         )
 
 def annual_selfconsumption_format_single(rw, stat='mean'):
-    """Annual selfconsumption format single.
-
-    TODO: Add a description.
+    """Format the annual self-consumption and its proportion of generation, for one statistic.
 
     Args:
-        rw: TODO.
-        stat: TODO.
+        rw: A row of the statistics table.
+        stat: The statistic to use.
 
     Returns:
-        TODO.
+        The string.
     """
     return format_val_and_proportion(
         rw[('self_consumption', stat)].iloc[0],
@@ -136,15 +124,13 @@ def annual_selfconsumption_format_single(rw, stat='mean'):
         )
 
 def annual_consumption_format_single(rw):
-    """Annual consumption format single.
-
-    TODO: Add a description.
+    """Format the annual consumption and the consumption per day.
 
     Args:
-        rw: TODO.
+        rw: A row of the statistics table.
 
     Returns:
-        TODO.
+        The string.
     """
     return format_twoval(
         rw['consumption'].iloc[0],
@@ -380,75 +366,68 @@ DEFAULT_DAYS_IN_RANGE_STATS = [
     ]
 
 def DEFAULT_STAT_FORMATTER(stat_dict):
-    """DEFAULT STAT FORMATTER.
-
-    TODO: Add a description.
+    """Default formatter of a dictionary of statistics: its string.
 
     Args:
-        stat_dict: TODO.
+        stat_dict: Dictionary of the statistics.
 
     Returns:
-        TODO.
+        The string.
     """
     return str(stat_dict)
 
 def recursive_get(d, *keys):
-    """Recursive get.
+    """Follow a sequence of keys through nested dictionaries.
 
-    TODO: Add a description.
+    A missing key gives an empty dictionary.
 
     Args:
-        d: TODO.
-        *keys: TODO.
+        d: Dictionary of the statistics, or None.
+        *keys: The keys to follow.
 
     Returns:
-        TODO.
+        The value found.
     """
     return reduce(lambda c, k: c.get(k, {}), keys, d)
 
 def hours_in_range_formatter(d):
-    """Hours in range formatter.
-
-    TODO: Add a description.
+    """Format the hours spent within a power range, with the fraction of the horizon.
 
     Args:
-        d: TODO.
+        d: Dictionary of the statistics, or None.
 
     Returns:
-        TODO.
+        The string.
     """
     if d is None:
         return "( -  kW) - (%)"
     return f"({d.get('min_power'):,.0f} - {d.get('max_power'):,.0f}) {d.get('hours'):,.1f} ({d.get('horizon_fraction'):,.1%})"
 
 def days_in_range_formatter(d):
-    """Days in range formatter.
-
-    TODO: Add a description.
+    """Format the days spent within a range of daily energy, with the fraction of the horizon.
 
     Args:
-        d: TODO.
+        d: Dictionary of the statistics, or None.
 
     Returns:
-        TODO.
+        The string.
     """
     if d is None:
         return "( - kWh) - (%)"
     return f"({d.get('min_value'):,.0f} - {d.get('max_value'):,.0f}) {d.get('days'):,.0f} ({d.get('horizon_fraction'):,.1%})"
 
+# REVIEW (unreferenced): no references to `val_percent_formatter_factory` found in src/, scripts/ or data/.
 def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
-    """Val percent formatter factory.
-
-    TODO: Add a description.
+    """Make a formatter of a value and a fraction in a dictionary, as `value (percent)`.
 
     Args:
-        value_id: TODO.
-        fraction_id: TODO.
-        value_dp: TODO.
-        fraction_dp: TODO.
+        value_id: Key of the value in the dictionary.
+        fraction_id: Key of the fraction in the dictionary.
+        value_dp: Decimal places of the value.
+        fraction_dp: Decimal places of the fraction.
 
     Returns:
-        TODO.
+        The formatter, a function of the dictionary.
     """
     fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
     def val_percent_formatter(d):
@@ -457,19 +436,20 @@ def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp
         return fmt.format(d.get(value_id),d.get(fraction_id))
     return val_percent_formatter
 
+# REVIEW (unreferenced): no references to `recursive_val_percent_formatter_factory` found in src/, scripts/ or data/.
 def recursive_val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
-    """Recursive val percent formatter factory.
+    """Make a formatter of a value and a fraction in nested dictionaries, as `value (percent)`.
 
-    TODO: Add a description.
+    The ids are sequences of keys, followed through the dictionaries.
 
     Args:
-        value_id: TODO.
-        fraction_id: TODO.
-        value_dp: TODO.
-        fraction_dp: TODO.
+        value_id: Key of the value in the dictionary.
+        fraction_id: Key of the fraction in the dictionary.
+        value_dp: Decimal places of the value.
+        fraction_dp: Decimal places of the fraction.
 
     Returns:
-        TODO.
+        The formatter, a function of the dictionary.
     """
     fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
     def val_percent_formatter(d):
@@ -483,17 +463,15 @@ def as_df(
     orient: str = 'columns',
     index_variables: list = ['variable', 'statistic']
 ) -> pd.DataFrame | None:
-    """As df.
-
-    TODO: Add a description.
+    """Convert statistics to a dataframe indexed by the index variables.
 
     Args:
-        df: TODO.
-        orient: TODO.
-        index_variables: TODO.
+        df: The dataframe.
+        orient: Orientation of the data in a dictionary.
+        index_variables: Names of the index levels.
 
     Returns:
-        TODO.
+        The dataframe, or None if there are no statistics.
     """
     if df is None:
         return None
@@ -528,20 +506,18 @@ def present_single_scalar(
     none_str = '-'
 ) -> pd.DataFrame:
     
-    """Present single scalar.
-
-    TODO: Add a description.
+    """Present one scalar of each configuration as a single row of a table, with a column for each configuration.
 
     Args:
-        data_list: TODO.
-        value_name: TODO.
-        variable_label: TODO.
-        statistic_label: TODO.
-        fmt: TODO.
-        none_str: TODO.
+        data_list: Statistics of each configuration (metamodel), or None where there are none.
+        value_name: Key of the value in the statistics.
+        variable_label: Label of the variable in the table.
+        statistic_label: Label of the statistic in the table.
+        fmt: Format string for the values.
+        none_str: String shown where there is no value.
 
     Returns:
-        TODO.
+        The dataframe.
     """
     src_data = [x.get(value_name) if x is not None else None for x in data_list]
 
@@ -564,21 +540,19 @@ def present_paired_scalars(
     fmt='{:,.2f} ({:,.1%})',
     none_str = '-'
 ) -> pd.DataFrame:
-    """Present paired scalars.
-
-    TODO: Add a description.
+    """Present a scalar and a related scalar (e.g. a value and its proportion) of each configuration as a single row of a table.
 
     Args:
-        data_list: TODO.
-        value1_name: TODO.
-        value2_name: TODO.
-        variable_label: TODO.
-        statistic_label: TODO.
-        fmt: TODO.
-        none_str: TODO.
+        data_list: Statistics of each configuration (metamodel), or None where there are none.
+        value1_name: See the description.
+        value2_name: See the description.
+        variable_label: Label of the variable in the table.
+        statistic_label: Label of the statistic in the table.
+        fmt: Format string for the values.
+        none_str: String shown where there is no value.
 
     Returns:
-        TODO.
+        The dataframe.
     """
     src_data_1 = [x.get(value1_name) if x is not None else None for x in data_list]
     src_data_2 = [x.get(value2_name) if x is not None else None for x in data_list]
@@ -603,22 +577,20 @@ def present_single_stat_per_row(
     statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER
 ) -> pd.DataFrame:
 
-    """Present single stat per row.
-
-    TODO: Add a description.
+    """Present statistics of variables in a table with a row for each variable and statistic and a column for each configuration.
 
     Args:
-        data_list: TODO.
-        table_name: TODO.
-        variable_names: TODO.
-        statistic_names: TODO.
-        fmt: TODO.
-        none_str: TODO.
-        variable_mapper: TODO.
-        statistic_mapper: TODO.
+        data_list: Statistics of each configuration (metamodel), or None where there are none.
+        table_name: Key of the table in the statistics.
+        variable_names: Names of the variables to show.
+        statistic_names: Names of the statistics to show.
+        fmt: Format string for the values.
+        none_str: String shown where there is no value.
+        variable_mapper: Mapping or function from variable names to labels.
+        statistic_mapper: Mapping or function from statistic names to labels.
 
     Returns:
-        TODO.
+        The dataframe; empty if there are no statistics.
     """
     valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
     if len(valid_config_indexes) == 0:
@@ -681,25 +653,23 @@ def present_paired_seasonal_stats(
     statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER,
     season_mapper: None|Callable|Mapping = DEFAULT_SEASON_MAPPER,
 ) -> pd.DataFrame:
-    """Present paired seasonal stats.
-
-    TODO: Add a description.
+    """Present two related seasonal statistics (e.g. a value and its proportion) in a table with a row for each variable, season and statistic and a column for each configuration.
 
     Args:
-        data_list: TODO.
-        table1_name: TODO.
-        table2_name: TODO.
-        variable_names: TODO.
-        statistic_names: TODO.
-        season_indices: TODO.
-        fmt: TODO.
-        none_str: TODO.
-        variable_mapper: TODO.
-        statistic_mapper: TODO.
-        season_mapper: TODO.
+        data_list: Statistics of each configuration (metamodel), or None where there are none.
+        table1_name: Key of the first table in the statistics.
+        table2_name: Key of the second table in the statistics.
+        variable_names: Names of the variables to show.
+        statistic_names: Names of the statistics to show.
+        season_indices: Indices of the seasons to show.
+        fmt: Format string for the values.
+        none_str: String shown where there is no value.
+        variable_mapper: Mapping or function from variable names to labels.
+        statistic_mapper: Mapping or function from statistic names to labels.
+        season_mapper: Mapping or function from season index to label.
 
     Returns:
-        TODO.
+        The dataframe; empty if there are no statistics.
     """
     valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
     if len(valid_config_indexes) == 0:
@@ -1124,17 +1094,17 @@ def tornado_plot(
     label_df,
     statistic = 'net_present_value_undiscounted'
 ):
-    """Tornado plot.
+    """Draw a tornado plot of the results of a deterministic sensitivity analysis.
 
-    TODO: Add a description.
+    The variables are sorted by the size of the interval of the statistic.
 
     Args:
-        dsa_df: TODO.
-        label_df: TODO.
-        statistic: TODO.
+        dsa_df: Dataframe of the results of the sensitivity analysis.
+        label_df: Dataframe of the labels of the variables.
+        statistic: The statistic to plot.
 
     Returns:
-        TODO.
+        The figure.
     """
     plot_data = (
         dsa_df

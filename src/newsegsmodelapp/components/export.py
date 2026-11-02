@@ -1,6 +1,4 @@
-"""Export module.
-
-TODO: Describe the purpose of the module.
+"""Export of results of the deterministic run, DSA and PSA, for download.
 """
 import io
 import json
@@ -68,22 +66,22 @@ def export_results(
     format_option: str = 'csv',
     result_level: Optional[str] = None,
 ):
-    """Export results.
+    """Export the results of a deterministic run, or a DSA or PSA, of a project.
 
-    TODO: Add a description.
+    Raises `NotImplementedError` for combinations that are not yet supported, such as DSA at project level.
 
     Args:
-        result_type: TODO.
-        project_provider: TODO.
-        result_provider: TODO.
-        project_id: TODO.
-        metamodel_id: TODO.
-        contents_option: TODO.
-        format_option: TODO.
-        result_level: TODO.
+        result_type: The type of analysis: `det`, `dsa` or `psa`.
+        project_provider: Provider of projects, metamodels and variables.
+        result_provider: Provider of results.
+        project_id: Id of the project.
+        metamodel_id: Id of the metamodel.
+        contents_option: What to export.
+        format_option: The format of the file.
+        result_level: The level of the results (project or metamodel).
 
     Returns:
-        TODO.
+        The data to download.
     """
     proj = project_provider.get_project(project_id)
     match result_type:

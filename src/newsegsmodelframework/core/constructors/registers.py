@@ -7,7 +7,7 @@ occur at runtime.
 """
 import inspect
 from types import ModuleType
-from typing import Any, Callable, Literal, Type
+from typing import Any, Callable, Type
 
 from newsegsmodelframework.core.serialisation import T
 
@@ -69,6 +69,17 @@ def get_subclasses_in_module(
                 continue
     return odict
 
+def _import_modules(*names: str) -> list[ModuleType]:
+    """Import modules by name.
+
+    The registries search the modules that define the classes, rather than the packages that
+    re-export them, so that the registries do not depend upon what the packages expose.
+    """
+    import importlib
+    return [importlib.import_module(name) for name in names]
+
+_FW = 'newsegsmodelframework.'
+
 CONSTRUCTOR_CLASS_REGISTER: dict[str, Callable[[], dict[str, object] | dict[str, NakedConstructor]]] = {}
 
 def register_constructor_class(cc_name: str):
@@ -120,25 +131,27 @@ def get_datawithrevision_register():
     Configuration data classes
     """
     from newsegsmodelframework.core import newsegscomponent
-    import newsegsmodelframework.newsegsmodel as newsegsmodel
-    import newsegsmodelframework.newsegsfinance as newsegsfinance
-    from newsegsmodelframework.core.generation import generators
-    import newsegsmodelframework.newsegsgrid as newsegsgrid
-    import newsegsmodelframework.newsegsgeneration as newsegsgeneration
-    import newsegsmodelframework.newsegscs as newsegscs
     import newsegsmodelframework.newsegsvariable as newsegsvariable
-    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
-    import newsegsmodelframework.newsegsproject as newsegsproject
-    import newsegsmodelframework.core.trackeddata as trackeddata
-    import newsegsmodelframework.newsegssensitivity as newsegssensitivity
     CONSTRUCTORS = {}
-    for pymod in [
-        newsegscomponent, newsegsmodel, newsegsfinance, 
-        generators, newsegsgrid, newsegsgeneration, 
-        newsegscs, newsegsvariable, newsegsmetamodel, 
-        newsegsproject, trackeddata, 
-        newsegssensitivity
-    ]:
+    for pymod in _import_modules(
+        _FW + 'core.newsegscomponent',
+        _FW + 'core.trackeddata',
+        _FW + 'core.generation.generators',
+        _FW + 'newsegsmodel.newsegsmodel',
+        _FW + 'newsegsmodel.sprakemodel',
+        _FW + 'newsegsfinance.newsegsfinance',
+        _FW + 'newsegsfinance.sprakefinance',
+        _FW + 'newsegsgrid.newsegsgrid',
+        _FW + 'newsegsgrid.sprakegrid',
+        _FW + 'newsegsgeneration.newsegsgeneration',
+        _FW + 'newsegsgeneration.sprakegeneration',
+        _FW + 'newsegscs.newsegscs',
+        _FW + 'newsegscs.sprakecs',
+        _FW + 'newsegsmetamodel.newsegsmetamodel',
+        _FW + 'newsegsproject.newsegsproject',
+        _FW + 'newsegssensitivity.dsa',
+        _FW + 'newsegssensitivity.psa',
+    ) + [newsegsvariable]:
         CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.DataWithRevision)
         )
@@ -151,15 +164,20 @@ def get_newsegscomponent_register():
     Non-NewsegsModule classes that are NewsegsComponents
     """
     from newsegsmodelframework.core import newsegscomponent
-    import newsegsmodelframework.newsegsmodel as newsegsmodel
-    import newsegsmodelframework.newsegsfinance as newsegsfinance
     import newsegsmodelframework.newsegsvariable as newsegsvariable
-    import newsegsmodelframework.newsegssensitivity as newsegssensitivity
-    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
-    import newsegsmodelframework.newsegsproject as newsegsproject
     
     COMPONENT_CONSTRUCTORS = {}
-    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent, newsegssensitivity, newsegsmetamodel, newsegsproject]:
+    for pymod in _import_modules(
+        _FW + 'newsegsmodel.newsegsmodel',
+        _FW + 'newsegsmodel.sprakemodel',
+        _FW + 'newsegsfinance.newsegsfinance',
+        _FW + 'newsegsfinance.sprakefinance',
+        _FW + 'core.newsegscomponent',
+        _FW + 'newsegssensitivity.dsa',
+        _FW + 'newsegssensitivity.psa',
+        _FW + 'newsegsmetamodel.newsegsmetamodel',
+        _FW + 'newsegsproject.newsegsproject',
+    ):
         COMPONENT_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.NewsegsComponent)
         )
@@ -178,12 +196,16 @@ def get_newsegsmodule_register():
     All also inherit from NewsegsComponent, but we aim to slim down the registers.
     """
     from newsegsmodelframework.core import newsegsmodule
-    import newsegsmodelframework.newsegsgeneration as newsegsgeneration
-    import newsegsmodelframework.newsegsgrid as newsegsgrid
-    import newsegsmodelframework.newsegscs as newsegscs
 
     MODULE_CONSTRUCTORS = {}
-    for pymod in [newsegsgeneration, newsegsgrid, newsegscs]:
+    for pymod in _import_modules(
+        _FW + 'newsegsgeneration.newsegsgeneration',
+        _FW + 'newsegsgeneration.sprakegeneration',
+        _FW + 'newsegsgrid.newsegsgrid',
+        _FW + 'newsegsgrid.sprakegrid',
+        _FW + 'newsegscs.newsegscs',
+        _FW + 'newsegscs.sprakecs',
+    ):
         MODULE_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegsmodule.NewsegsModule)
         )

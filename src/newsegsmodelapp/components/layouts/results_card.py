@@ -1,6 +1,4 @@
-"""Results card module.
-
-TODO: Describe the purpose of the module.
+"""The card which holds results.
 """
 import dash
 from dash import html
@@ -15,21 +13,21 @@ def create_results_table_card(
     header_section: str | None = None,
     header_key: str | None = None,
 ):
-    """Create results table card.
+    """Create a card to hold a table of results.
 
-    TODO: Add a description.
+    The body is a container filled by callbacks with the results registered for the supersection and section.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        key: TODO.
-        title: TODO.
-        className: TODO.
-        header_section: TODO.
-        header_key: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The interface section of the variable.
+        key: The interface key of the variable.
+        title: Title of the card.
+        className: Further CSS classes.
+        header_section: Section of the header; that of the card by default.
+        header_key: Key of the header; that of the card by default.
 
     Returns:
-        TODO.
+        The card.
     """
     header_section = section if header_section is None else header_section
     header_key = key if header_key is None else header_key

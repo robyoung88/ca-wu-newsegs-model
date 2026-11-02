@@ -3,20 +3,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 import copy
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 import json
-from typing import Any, Callable, Optional, Protocol, Sequence, cast
+from typing import Any, Callable, Optional, Protocol, cast
 
 from dash.development.base_component import Component as DashComponent
-import sqlalchemy as sa
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelapp.types import LayoutConfiguration, Page
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
-from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
-from newsegsmodelframework.newsegsproject import NewsegsProject, NewsegsProjectProviderInterface
+from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 from newsegsmodelapp.backend.db import db_tables as tbls
 
@@ -35,7 +32,7 @@ def add_page(page: Page):
     Add a Page to the PAGE_REGISTER
 
     Raises:
-        KeyError - if name already present in register
+        KeyError: if a page with the same id is already registered.
     """
     page_id = page.id
     if page_id in PAGE_REGISTER:
@@ -44,15 +41,15 @@ def add_page(page: Page):
     add_page_layout_configuration(page.default_configuration, page.id)
 
 def get_page(page_id: str):
-    """Get page.
+    """Get a page by id.
 
-    TODO: Add a description.
+    Raises `KeyError` if it is not registered.
 
     Args:
-        page_id: TODO.
+        page_id: Id of the page.
 
     Returns:
-        TODO.
+        The page.
     """
     page = PAGE_REGISTER.get(page_id)
     if page is None:
@@ -66,13 +63,13 @@ def add_page_layout_configuration_class(
     configuration_class,
     page_name: str,
 ):
-    """Add page layout configuration class.
+    """Register the class of the layout configuration of a page.
 
-    TODO: Add a description.
+    Raises `TypeError` if a different class has already been registered for the page.
 
     Args:
-        configuration_class: TODO.
-        page_name: TODO.
+        configuration_class: Class of the layout configuration.
+        page_name: Name (id) of the page.
     """
     if page_name in PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER:
         if configuration_class != PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER[page_name]:
@@ -108,16 +105,16 @@ def get_page_layout_configuration(
     page_name: str,
     model_type: str = 'default'
 ):
-    """Get page layout configuration.
+    """Get the layout configuration of a page for a model type.
 
-    TODO: Add a description.
+    The configuration registered for the model type; otherwise a copy of the default configuration of the page for that model type. Raises `KeyError` if the page has no default configuration.
 
     Args:
-        page_name: TODO.
-        model_type: TODO.
+        page_name: Name (id) of the page.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The configuration (a copy for the default model type).
     """
     key_default = (page_name, 'default')
     default_config = PAGE_LAYOUT_CONFIGURATION_REGISTER.get(key_default)
@@ -135,16 +132,15 @@ def get_page_layout_configuration(
         return conf
     return specific_config
 
+# REVIEW (unreferenced): no references to `get_page_layout_configuration_class` found in src/, scripts/ or data/.
 def get_page_layout_configuration_class(page_name: str):
-    """Get page layout configuration class.
-
-    TODO: Add a description.
+    """Get the class of the layout configuration of a page.
 
     Args:
-        page_name: TODO.
+        page_name: Name (id) of the page.
 
     Returns:
-        TODO.
+        The class.
     """
     return PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER.get(page_name, type(LayoutConfiguration))
 
@@ -192,17 +188,19 @@ and any other elements that are included in the call.
 """
 
 def register_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
-    """Register input handler.
+    """Decorator which registers a function which handles a change in an input.
 
-    TODO: Add a description.
+    Keyed by the purpose and type of the triggering component, and the model type. See `INPUT_HANDLERS` for the arguments and return of the function.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        purpose: TODO.
-        type_: TODO.
-        model_type: TODO.
+        purpose: The purpose of the triggering component (the `purpose` field of its id).
+        type_: The type of the triggering component (the `type` field of its id), or None for any.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     type_ = 'ALL' if type_ is None else type_
     key = (purpose, type_, model_type)
@@ -218,17 +216,17 @@ def register_input_handler(purpose: str, type_: str | None = None, model_type: s
     return decorated
 
 def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
-    """Get input handler.
+    """Get the handler of a change in an input.
 
-    TODO: Add a description.
+    Falls back to the `default` model type. Raises `KeyError` if nothing is found.
 
     Args:
-        purpose: TODO.
-        type_: TODO.
-        model_type: TODO.
+        purpose: The purpose of the triggering component (the `purpose` field of its id).
+        type_: The type of the triggering component (the `type` field of its id), or None for any.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The handler function.
     """
     getter = _three_param_key_getter_with_fallback(INPUT_HANDLERS, return_type_description = 'input handler') # pyright: ignore[reportArgumentType]
     return getter(purpose, type_, model_type)
@@ -240,9 +238,13 @@ def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 
 
 @dataclass
 class Postactions(SerialisableDataclass):
-    """Postactions.
+    """What to undertake after a request has completed.
 
-    TODO: Add a description.
+    Attributes:
+        action_type: The name of the request which, when complete, triggers the actions.
+        run_procedures: Names of the run procedures to start.
+        postprocess_procedures: Postprocess procedures to start, as `(name, model_type)`.
+        table_draw_artists: Table draw procedures to start, as `(name, model_type)`.
     """
     action_type: str
     run_procedures: set[str] = field(default_factory = set)
@@ -259,9 +261,23 @@ be found in RUN_PROCEDURE_REGISTER.)
 
 @dataclass
 class RunRequest(SerialisableDataclass):
-    """Run Request.
+    """A request for a procedure to be run in the background.
 
-    TODO: Add a description.
+    Requests are written to the database by the front end, and executed by a worker.
+
+    Attributes:
+        request_id: Id of the request in the database.
+        request_type: Name of the procedure to run; selects the registered run procedure.
+        trigger_request_id: Id of the request whose completion triggered this one, if any.
+        trigger_request_type: Type of the request whose completion triggered this one.
+        run_id: Id of the run which is executing the request.
+        request_label: Description of the request, for display.
+        request_class: `run`, `postprocess` or `tabledraw`.
+        project_id: Id of the project that the request concerns.
+        model_type: The model type of the project.
+        payload: JSON string of the arguments of the procedure.
+        status: Status of the request.
+        background_procedure: Whether the request is executed by a worker rather than the front end.
     """
     request_id: int = -1
     request_type: str = ''
@@ -283,9 +299,7 @@ class RunRequest(SerialisableDataclass):
     background_procedure: bool = True 
 
 class RunRequestHandler(Protocol):
-    """Run Request Handler.
-
-    TODO: Add a description.
+    """Protocol of a function which creates a `RunRequest` for a project, e.g. in response to a user action.
     """
     def __call__(
         self,
@@ -387,16 +401,12 @@ def register_run_procedure(
 
 @dataclass
 class PostprocessRequest(RunRequest):
-    """Postprocess Request.
-
-    TODO: Add a description.
+    """A `RunRequest` for a postprocessing procedure, created when another request completes.
     """
     request_class: str = 'postprocess'
 
 class PostprocessRequestHandler(Protocol):
-    """Postprocess Request Handler.
-
-    TODO: Add a description.
+    """Protocol of a function which creates a `PostprocessRequest` when another request completes.
     """
     def __call__(
         self,
@@ -455,17 +465,19 @@ def register_postprocess_procedure(
         name: str, model_type: str = 'default',
         triggers: SequenceNotStr[str] = []
     ):
-    """Register postprocess procedure.
+    """Decorator which registers a postprocessing procedure.
 
-    TODO: Add a description.
+    Keyed by the name of the procedure and the model type. The procedure is wrapped so that it logs when it starts and completes. Each of `triggers` is the name of a request whose completion starts the procedure (via `POST_ACTION_REGISTER`). See `POSTPROCESS_REGISTER` for the arguments of the procedure.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        name: TODO.
-        model_type: TODO.
-        triggers: TODO.
+        name: Name of the object.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+        triggers: Names of the requests whose completion triggers the procedure.
 
     Returns:
-        TODO.
+        The decorator.
     """
     key = (name, model_type)
     if isinstance(triggers, str):
@@ -500,16 +512,16 @@ def register_postprocess_procedure(
     return decorated
 
 def get_postprocess_procedure(procedure: str, request: RunRequest):
-    """Get postprocess procedure.
+    """Get the postprocessing procedure for a request.
 
-    TODO: Add a description.
+    The procedure registered for the model type of the request, otherwise the `default`. Raises `KeyError` if there is none.
 
     Args:
-        procedure: TODO.
-        request: TODO.
+        procedure: Name of the procedure.
+        request: The request which triggered the procedure.
 
     Returns:
-        TODO.
+        The procedure.
     """
     proc = POSTPROCESS_REGISTER.get((procedure, request.model_type))
     if proc is None:
@@ -527,16 +539,12 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 
 @dataclass
 class TableDrawRequest(RunRequest):
-    """Table Draw Request.
-
-    TODO: Add a description.
+    """A `RunRequest` for a table drawing procedure, created when another request completes.
     """
     request_class: str = 'tabledraw'
 
 class TableDrawRequestHandler(Protocol):
-    """Table Draw Request Handler.
-
-    TODO: Add a description.
+    """Protocol of a function which creates a `TableDrawRequest` when another request completes.
     """
     def __call__(
         self,
@@ -597,17 +605,19 @@ def register_table_draw(
     name: str, model_type: str = 'default',
     triggers: SequenceNotStr[str] = []
 ):
-    """Register table draw.
+    """Decorator which registers a procedure which draws the data of a table.
 
-    TODO: Add a description.
+    Keyed by the table section and the model type. The procedure is wrapped so that it logs when it starts and completes. Each of `triggers` is the name of a request whose completion starts the procedure (via `POST_ACTION_REGISTER`). See `TABLE_DRAW_REGISTER` for the arguments of the procedure.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        name: TODO.
-        model_type: TODO.
-        triggers: TODO.
+        name: Name of the object.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+        triggers: Names of the requests whose completion triggers the procedure.
 
     Returns:
-        TODO.
+        The decorator.
     """
     key = (name, model_type)
     if isinstance(triggers, str):
@@ -642,16 +652,16 @@ def register_table_draw(
     return decorated
 
 def get_table_draw(table_section: str, request: RunRequest):
-    """Get table draw.
+    """Get the table drawing procedure for a table section.
 
-    TODO: Add a description.
+    The procedure registered for the model type of the request, otherwise the `default`. Raises `KeyError` if there is none.
 
     Args:
-        table_section: TODO.
-        request: TODO.
+        table_section: Name of the table section.
+        request: The request which triggered the procedure.
 
     Returns:
-        TODO.
+        The procedure.
     """
     proc = TABLE_DRAW_REGISTER.get((table_section, request.model_type))
     if proc is None:
@@ -673,17 +683,17 @@ Keyed by a tuple of:
 """
 
 def register_table_subindex_map(map_: dict, name: str, model_type: str = 'default'):
-    """Register table subindex map.
+    """Register the mapping of subindices to the names of the items of a table.
 
-    TODO: Add a description.
+    Keyed by the table section and the model type. A map registered for a model type other than `default` is also the default, if there is none yet. Raises `KeyError` if one is already registered for the key.
 
     Args:
-        map_: TODO.
-        name: TODO.
-        model_type: TODO.
+        map_: Dictionary mapping subindices to names.
+        name: Name of the object.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The map.
     """
     key = (name, model_type)
     if model_type != 'default':
@@ -696,16 +706,16 @@ def register_table_subindex_map(map_: dict, name: str, model_type: str = 'defaul
     return map_
 
 def get_table_subindex_map(table_section:str, model_type: str = 'default'):
-    """Get table subindex map.
+    """Get the mapping of subindices to the names of the items of a table.
 
-    TODO: Add a description.
+    Falls back to the `default` model type. Raises `KeyError` if there is none.
 
     Args:
-        table_section: TODO.
-        model_type: TODO.
+        table_section: Name of the table section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The map.
     """
     key = (table_section, model_type)
     map_ = TABLE_SUBINDEX_MAPS.get(key)
@@ -732,17 +742,19 @@ def register_table_getter(
     name: str, model_type: str = 'default',
     triggers: SequenceNotStr[str] = []
 ):
-    """Register table getter.
+    """Decorator which registers a function which retrieves a custom table from the results provider.
 
-    TODO: Add a description.
+    Keyed by the table section and the model type. See `TABLE_GETTER_REGISTER`.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        name: TODO.
-        model_type: TODO.
-        triggers: TODO.
+        name: Name of the object.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+        triggers: Names of the requests whose completion triggers the procedure.
 
     Returns:
-        TODO.
+        The decorator.
     """
     key = (name, model_type)
     if isinstance(triggers, str):
@@ -761,16 +773,16 @@ def register_table_getter(
     return decorated
 
 def get_table_getter(table_section: str, model_type: str = 'default'):
-    """Get table getter.
+    """Get the function which retrieves a table.
 
-    TODO: Add a description.
+    Falls back to the `default` model type. Raises `KeyError` if there is none.
 
     Args:
-        table_section: TODO.
-        model_type: TODO.
+        table_section: Name of the table section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     proc = TABLE_GETTER_REGISTER.get((table_section, model_type))
     if proc is None:
@@ -782,16 +794,17 @@ def get_table_getter(table_section: str, model_type: str = 'default'):
     return proc
 
 
+# REVIEW (unreferenced): no references to `trigger_name_clash` found in src/, scripts/ or data/.
 def trigger_name_clash(purpose: str) -> bool:
-    """Trigger name clash.
+    """Whether a purpose is also the name of a run, postprocess or table draw request.
 
-    TODO: Add a description.
+    Used to avoid ambiguity between components and requests that share a name.
 
     Args:
-        purpose: TODO.
+        purpose: The purpose of the triggering component (the `purpose` field of its id).
 
     Returns:
-        TODO.
+        True if the name clashes.
     """
     return purpose in [*RUN_REQUEST_REGISTER.keys(), *POSTPROCESS_REQUEST_REGISTER.keys(), *TABLE_DRAW_REQUEST_REGISTER.keys()]
 
@@ -813,17 +826,19 @@ Keyed by a tuple of:
 """
 
 def register_input_container_content_creator(supersection: str, section: str | None, model_type: str):
-    """Register input container content creator.
+    """Decorator which registers a function which creates the input fields of an input container.
 
-    TODO: Add a description.
+    Keyed by the supersection (page or group of inputs), the section (`None` for all) and the model type.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        model_type: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     section = section if section else 'ALL'
     key = (supersection, section, model_type)
@@ -881,17 +896,17 @@ def get_input_container_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
-    """Get input container content creator.
+    """Get the function which creates the input fields of an input container.
 
-    TODO: Add a description.
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        model_type: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     getter = _three_param_key_getter_with_fallback(
         INPUT_CONTAINER_CONTENT_CREATORS,
@@ -918,17 +933,19 @@ Keyed by a tuple of:
 """
 
 def register_input_section_header_content_creator(supersection: str, section: str | None, model_type: str):
-    """Register input section header content creator.
+    """Decorator which registers a function which creates the header of a section of inputs.
 
-    TODO: Add a description.
+    Keyed by the supersection, the section (`None` for all) and the model type.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        model_type: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     section = section if section else 'ALL'
     key = (supersection, section, model_type)
@@ -948,17 +965,17 @@ def get_input_section_header_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
-    """Get input section header content creator.
+    """Get the function which creates the header of a section of inputs.
 
-    TODO: Add a description.
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        model_type: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     getter = _three_param_key_getter_with_fallback(
         INPUT_SECTION_HEADER_CONTENT_CREATORS,
@@ -989,17 +1006,19 @@ Functions take the variable id as string and the variable or up-to-date FullLigh
 def register_single_input_header_content_creator(
     supersection: str, section: str | None, model_type: str
 ):
-    """Register single input header content creator.
+    """Decorator which registers a function which creates the header of a single input.
 
-    TODO: Add a description.
+    Keyed by the supersection, the section (`None` for all) and the model type.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        model_type: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     section = 'ALL' if section is None else section
     key = (supersection, section, model_type)
@@ -1019,17 +1038,17 @@ def get_single_input_header_content_creator(
     section: str | None,
     model_type: str = 'default'
 ):
-    """Get single input header content creator.
+    """Get the function which creates the header of a single input.
 
-    TODO: Add a description.
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
 
     Args:
-        supersection: TODO.
-        section: TODO.
-        model_type: TODO.
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     getter = _three_param_key_getter_with_fallback(
         SINGLE_INPUT_HEADER_CONTENT_CREATORS,
@@ -1056,17 +1075,19 @@ Keyed by a tuple of:
 """
 
 def register_result_container_content_creator(key_: str, section: str | None, model_type: str):
-    """Register result container content creator.
+    """Decorator which registers a function which creates the content of a result container.
 
-    TODO: Add a description.
+    Keyed by the result key, the section (`None` for all) and the model type.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        key_: TODO.
-        section: TODO.
-        model_type: TODO.
+        key_: The key.
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     section = section if section else 'ALL'
     key = (key_, section, model_type)
@@ -1086,17 +1107,17 @@ def get_result_container_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
-    """Get result container content creator.
+    """Get the function which creates the content of a result container.
 
-    TODO: Add a description.
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
 
     Args:
-        key_: TODO.
-        section: TODO.
-        model_type: TODO.
+        key_: The key.
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     getter = _three_param_key_getter_with_fallback(
         RESULT_CONTAINER_CONTENT_CREATORS,
@@ -1124,17 +1145,19 @@ Keyed by a tuple of:
 """
 
 def register_result_section_header_content_creator(key_: str, section: str | None, model_type: str):
-    """Register result section header content creator.
+    """Decorator which registers a function which creates the header of a section of results.
 
-    TODO: Add a description.
+    Keyed by the result key, the section (`None` for all) and the model type.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        key_: TODO.
-        section: TODO.
-        model_type: TODO.
+        key_: The key.
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     section = section if section else 'ALL'
     key = (key_, section, model_type)
@@ -1154,17 +1177,17 @@ def get_result_section_header_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface, NewsegsResultProviderInterface, Optional[bool]], list[DashComponent]]:
-    """Get result section header content creator.
+    """Get the function which creates the header of a section of results.
 
-    TODO: Add a description.
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
 
     Args:
-        key_: TODO.
-        section: TODO.
-        model_type: TODO.
+        key_: The key.
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     getter = _three_param_key_getter_with_fallback(
         RESULT_SECTION_HEADER_CONTENT_CREATORS,
@@ -1196,16 +1219,18 @@ Functions take the active project id as string and a project provider.
 """
 
 def register_feedback_graph_artist(figure_key: str, model_type: str):
-    """Register feedback graph artist.
+    """Decorator which registers a function which draws a feedback graph.
 
-    TODO: Add a description.
+    Keyed by the figure key and the model type.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
 
     Args:
-        figure_key: TODO.
-        model_type: TODO.
+        figure_key: Key of the figure.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The decorator.
     """
     key = (figure_key, model_type)
     def decorated(func):
@@ -1220,16 +1245,16 @@ def register_feedback_graph_artist(figure_key: str, model_type: str):
     return decorated
 
 def get_feedback_graph_artist(figure_key: str, model_type: str = 'default'):
-    """Get feedback graph artist.
+    """Get the function which draws a feedback graph.
 
-    TODO: Add a description.
+    Falls back to the `default` model type. Raises `KeyError` if there is none.
 
     Args:
-        figure_key: TODO.
-        model_type: TODO.
+        figure_key: Key of the figure.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The function.
     """
     key = (figure_key, model_type)
     artist = FEEDBACK_GRAPH_ARTISTS.get(key)

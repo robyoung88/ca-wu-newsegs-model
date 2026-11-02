@@ -1,6 +1,4 @@
-"""Page layouts module.
-
-TODO: Describe the purpose of the module.
+"""Layouts of whole pages.
 """
 from typing import Union
 
@@ -17,18 +15,16 @@ def fourpane_layout(
     a2_contents: DashComponent,
     b2_contents: DashComponent,
 ):
-    """Fourpane layout.
-
-    TODO: Add a description.
+    """The four-pane layout of the pages: two panes, each with a header.
 
     Args:
-        a1_contents: TODO.
-        b1_contents: TODO.
-        a2_contents: TODO.
-        b2_contents: TODO.
+        a1_contents: Contents of the header of the left pane.
+        b1_contents: Contents of the header of the right pane.
+        a2_contents: Contents of the left pane.
+        b2_contents: Contents of the right pane.
 
     Returns:
-        TODO.
+        The layout.
     """
     return dbc.Container(
         [

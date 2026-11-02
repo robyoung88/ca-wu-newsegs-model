@@ -1,10 +1,9 @@
-"""Constants package.
+"""Constants of the framework.
 
-TODO: Describe what the package provides and its main public classes.
+Nothing is imported here: use the modules directly.
+
+Modules:
+    framework_constants: Prefixes of component ids and their groupings.
+    model_constants.json: Constants of the energy models (data, not a Python module).
 """
-from .framework_constants import *
-
-__all__ = [
-    'COMPONENT_PREFIXES',
-    'PREFIX_GROUPS',
-]
+__all__ = []

@@ -1,6 +1,6 @@
-"""Sprake module.
+"""Project plugin for the `sprake` model type.
 
-TODO: Describe the purpose of the module.
+Registers `sprake_project_factory`, which creates a project of the Sprake NewSEGS Energy Model.
 """
 import json
 import os
@@ -9,9 +9,7 @@ from typing import cast
 
 from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsmodel import newsegsmodel
-from newsegsmodelframework.newsegsmodel import sprakemodel
 from newsegsmodelframework.newsegsfinance import newsegsfinance
-from newsegsmodelframework.newsegsfinance import sprakefinance
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmetamodel import newsegsmetamodel
 import newsegsmodelframework.newsegsproject as newsegsproject
@@ -69,12 +67,14 @@ def _create_default_variables() -> list[variable.Variable]:
 
 @register_project_factory(MODEL_TYPE)
 def sprake_project_factory():
-    """Sprake project factory.
+    """Create a project of the Sprake model.
 
-    TODO: Add a description.
+    The project has one metamodel, of the Sprake NewSEGS Energy Model and finance model loaded from the
+    validated configurations in the `data` directory, with the default variables of the Sprake model.
+    Notifications of revision are disabled while it is built so that the project starts with no modifications.
 
     Returns:
-        TODO.
+        The project.
     """
     prevstate = RevisionNotifierMixin._set_notification_state('disabled')
     try:

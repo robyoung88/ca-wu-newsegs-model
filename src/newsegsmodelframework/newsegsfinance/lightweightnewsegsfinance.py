@@ -1,6 +1,4 @@
-"""Lightweightnewsegsfinance module.
-
-TODO: Describe the purpose of the module.
+"""The `LightweightNewsegsFinance` description of a finance model.
 """
 from typing import Optional
 
@@ -11,9 +9,7 @@ from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import Lightweig
 
 @revision_dataclass
 class LightweightNewsegsFinance(LightweightNewsegsComponent):
-    """Lightweight Newsegs Finance.
-
-    TODO: Add a description.
+    """Description of a finance model without the machinery to run it: its data, table configuration and, optionally, its NewSEGS Energy Model.
     """
     finance_data: LightweightNewsegsComponent
     table_config: LightweightNewsegsComponent

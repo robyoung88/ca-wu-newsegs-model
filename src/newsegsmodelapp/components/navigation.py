@@ -27,18 +27,18 @@ create_navbutton = partial(
 )
 
 def create_newsegs_model_navbutton(model_type, page_id, nav_label, nav_icon):
-    """Create newsegs model navbutton.
+    """Create the navigation button of a page.
 
-    TODO: Add a description.
+    A link to `/{model_type}/{page_id}`.
 
     Args:
-        model_type: TODO.
-        page_id: TODO.
-        nav_label: TODO.
-        nav_icon: TODO.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+        page_id: Id of the page.
+        nav_label: See the description.
+        nav_icon: See the description.
 
     Returns:
-        TODO.
+        The button.
     """
     return create_navbutton(
         nav_icon,
@@ -47,16 +47,15 @@ def create_newsegs_model_navbutton(model_type, page_id, nav_label, nav_icon):
         href = f'/{model_type}/{page_id}',
     )
 
+# REVIEW (unreferenced): no references to `create_nav_options` found in src/, scripts/ or data/.
 def create_nav_options(model_type: str):
-    """Create nav options.
-
-    TODO: Add a description.
+    """Create the options button.
 
     Args:
-        model_type: TODO.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The button.
     """
     return create_optionsbutton(
         [
@@ -91,16 +90,16 @@ def create_navigator_buttons(
         model_type: str = 'default',
         pages: Sequence[str] | None = None,
     ):
-    """Create navigator buttons.
+    """Create the navigation buttons of pages, and the button linking to the documentation.
 
-    TODO: Add a description.
+    All registered pages unless `pages` lists those to show.
 
     Args:
-        model_type: TODO.
-        pages: TODO.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+        pages: See the description.
 
     Returns:
-        TODO.
+        List of buttons.
     """
     if pages is None:
         pages = [x for x in registers.PAGE_REGISTER.keys()]
@@ -118,16 +117,14 @@ def create_navigation_component(
         model_type: str = 'default',
         pages: Sequence[str] | None = None,
     ):
-    """Create navigation component.
-
-    TODO: Add a description.
+    """Create the navigation bar.
 
     Args:
-        model_type: TODO.
-        pages: TODO.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+        pages: See the description.
 
     Returns:
-        TODO.
+        The navigation bar.
     """
     return html.Div(
         create_navigator_buttons(model_type, pages),

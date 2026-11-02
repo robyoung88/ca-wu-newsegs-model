@@ -1,10 +1,7 @@
-"""Get result list module.
-
-TODO: Describe the purpose of the module.
+"""Getting the results of all the metamodels of a project.
 """
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 def get_result_list(
     result_type: str,
@@ -12,18 +9,18 @@ def get_result_list(
     result_provider: NewsegsResultProviderInterface,
     allow_stale: bool = True
 ) -> tuple[list, bool]:
-    """Get result list.
+    """Get the result of each metamodel of a project, for results that are shown side by side.
 
-    TODO: Add a description.
+    The results are those of the table configuration of the model (or, for finance results, the finance model) of each metamodel.
 
     Args:
-        result_type: TODO.
-        lproject: TODO.
-        result_provider: TODO.
-        allow_stale: TODO.
+        result_type: The type of the result.
+        lproject: The lightweight project.
+        result_provider: Provider of results.
+        allow_stale: Allow results which are not for the present revision.
 
     Returns:
-        TODO.
+        The list of results, and whether any is stale (not for the present revision).
     """
     is_finance = 'finance' in result_type
     results_list = []

@@ -1,6 +1,4 @@
-"""Admd helpers module.
-
-TODO: Describe the purpose of the module.
+"""Helpers for running the ADMD calculation (`admdspenmw`) with Hamilton.
 """
 import os
 from pathlib import Path
@@ -9,9 +7,7 @@ os.chdir(libdir)
 from hamilton import registry; registry.disable_autoload
 from hamilton import driver
 import admdspenmw as admdcalc
-from admdspenmw.model_config import default_model_config, default_model_inputs, default_model_outputs
-import numpy as np
-import pandas as pd
+from admdspenmw.model_config import default_model_config
 from functools import cache
 
 @cache
@@ -24,15 +20,15 @@ def _get_default_admd_model_driver() -> driver.Driver:
     )
 
 def get_admd_model_driver(conf:dict) -> driver.Driver:
-    """Get admd model driver.
+    """Get a Hamilton driver of the ADMD calculation (`admdspenmw`) with a configuration.
 
-    TODO: Add a description.
+    The driver of the default configuration is cached.
 
     Args:
-        conf: TODO.
+        conf: Hamilton configuration.
 
     Returns:
-        TODO.
+        The driver.
     """
     if conf == default_model_config:
         return _get_default_admd_model_driver()

@@ -1,6 +1,7 @@
-"""Result file module.
+"""Saving and loading of results as files in the results store.
 
-TODO: Describe the purpose of the module.
+Each type of result is saved in a format suited to it (parquet for dataframes, JSON for dictionaries, text and pickle otherwise) by a function registered with
+`save_result`, and loaded by the loader registered for the extension of its file.
 """
 from functools import singledispatch
 import json
@@ -68,6 +69,7 @@ def _(text: str, root_filename: str) -> str:
     return filepath
 
 # 3. Helper to register custom handlers dynamically at runtime
+# REVIEW (unreferenced): no references to `register_saver` found in src/, scripts/ or data/.
 def register_saver(type_: type) -> Callable[[Callable[[Any, str], str]], Callable[[Any, str], str]]:
     """Decorator to register custom result savers dynamically."""
     def decorator(func: Callable[[Any, str], str]):

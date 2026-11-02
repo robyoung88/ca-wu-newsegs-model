@@ -9,7 +9,7 @@ from useful_types import SequenceNotStr
 
 from newsegsmodelframework.core import environmentserverinterface
 from newsegsmodelframework.core import resultsserverinterface
-from newsegsmodelframework.core import RunnableNewsegsComponent, NewsegsComponent
+from newsegsmodelframework.core import NewsegsComponent
 from newsegsmodelframework.core import newsegsmodeltimeinterface
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponentPersistenceInterface, NewsegsComponentProviderInterface, TableOwningRunnableNewsegsComponent
 

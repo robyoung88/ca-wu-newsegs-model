@@ -1,7 +1,6 @@
 """
 Functions and classes for performing probabilistic sensitivity analysis
 """
-from collections import namedtuple
 from dataclasses import field
 from typing import Any, Callable, Literal, NamedTuple, Sequence, override
 from typing import get_args
@@ -28,16 +27,14 @@ PSA_FLOAT_STATISTIC = Literal[
     'net_present_value_undiscounted',
     'net_present_value_discounted'
 ]
-"""_summary_
-"""
+"""The statistics of a run of the NewSEGS Energy Model and finance model that a PSA can calculate."""
 
 PSA_PLOT_TYPES = [
     'Scatter plot',
     'Cumulative probability',
     'Convergence'
 ]
-"""_summary_
-"""
+"""The types of plot of the results of a PSA."""
 
 PSA_STATISTIC_LABELS = {
     'total_present_costs_undiscounted': 'Total cost (undisc.)',
@@ -47,8 +44,7 @@ PSA_STATISTIC_LABELS = {
     'net_present_value_undiscounted': 'NPV (undisc.)',
     'net_present_value_discounted': 'NPV (disc.)'
 }
-"""_summary_
-"""
+"""Short labels of the statistics of a PSA, for plots."""
 
 _CONVERGENCE_STATISTICS = Literal[
     'Mean',
@@ -61,23 +57,26 @@ _CONVERGENCE_STATISTICS = Literal[
 ]
 
 CONVERGENCE_STATISTICS = get_args(_CONVERGENCE_STATISTICS)
-"""_summary_
-"""
+"""The statistics whose convergence, over the draws of a PSA, can be plotted."""
 
 def quantile_stderr_cum(
     x,
     p: float = 0.5,
     bw: float | None = None
 ):
-    """_summary_
+    """Standard error of the quantile of the first n values, for each n.
+
+    The standard error of a sample quantile is `sqrt(p (1 - p) / n) / f`, where `f` is the density at the quantile,
+    estimated by a Gaussian kernel density estimate. See
+    [quantileSE](https://github.com/kbroman/broman/blob/main/R/quantileSE.R).
 
     Args:
-        x (_type_): _description_
-        p (float, optional): _description_. Defaults to 0.5.
-        bw (float | None, optional): _description_. Defaults to None.
+        x: The sample, in order of draw.
+        p: The probability of the quantile; 0.5 is the median.
+        bw: Bandwidth of the kernel density estimate; by default chosen by scipy.
 
     Returns:
-        _type_: _description_
+        Array of the standard error after each draw.
     """
     # https://github.com/kbroman/broman/blob/main/R/quantileSE.R
     from scipy.stats import gaussian_kde
@@ -117,20 +116,20 @@ def make_psa_result(
     statistics: Sequence[PSA_FLOAT_STATISTIC],
     return_draws: bool = False,
 ):
-    """_summary_
+    """One row of the results of a PSA: a run of the NewSEGS Energy Model and finance model.
 
     Args:
-        mm (NewsegsMetaModel): _description_
-        mdl (NewsegsModel): _description_
-        fnc (NewsegsFinance): _description_
-        statistics (Sequence[PSA_FLOAT_STATISTIC]): _description_
-        return_draws (bool, optional): _description_. Defaults to False.
-
-    Raises:
-        TypeError: _description_
+        mm: The metamodel.
+        mdl: The NewSEGS Energy Model, after the run.
+        fnc: The finance model, after the run.
+        statistics: The statistics to take from the models.
+        return_draws: Whether to include the values drawn for each variable selected for PSA.
 
     Returns:
-        _type_: _description_
+        Dictionary of the statistics and, if requested, the values of the variables (a vector variable gives one entry for each value).
+
+    Raises:
+        TypeError: if a variable selected for PSA is neither a scalar nor a vector variable.
     """
     res: dict[str, Any] = {}
     if return_draws:
@@ -161,21 +160,29 @@ def run_psa(
     include_deterministic: bool = True,
     precomputed_deterministic: bool = False,
 ) -> pd.DataFrame:
-    """_summary_
+    """Run a probabilistic sensitivity analysis of a metamodel.
+
+    Each sample draws a value for every variable that is selected for PSA from its distribution, then runs the NewSEGS Energy Model
+    and finance model. Optionally the deterministic run is included first. Afterwards the variables are returned to their deterministic values.
 
     Args:
-        mm (NewsegsMetaModel): _description_
-        statistics (Sequence[PSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(PSA_FLOAT_STATISTIC).
-        samples (int, optional): _description_. Defaults to 100.
-        seed (int | None, optional): _description_. Defaults to None.
-        rng (np.random.Generator | None, optional): _description_. Defaults to None.
-        return_draws (bool, optional): _description_. Defaults to False.
-        progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
-        include_deterministic (bool, optional): _description_. Defaults to True.
-        precomputed_deterministic (Boolean): Metamodel is preloaded with valid determistic results.        
-        
+        mm: The metamodel.
+        statistics: The statistics to calculate for each run.
+        samples: The number of samples to draw.
+        seed: Seed of the random number generator, if none is provided.
+        rng: Random number generator; used in preference to the seed.
+        return_draws: Whether to return the values drawn for each variable.
+        progress: Function reporting progress, called with the number of runs completed and the total.
+        cancel_status: Function returning whether cancellation has been requested; checked before each sample.
+        include_deterministic: Whether to include the deterministic run (marked `deterministic`).
+        precomputed_deterministic: Whether the metamodel already holds valid results of the deterministic run, so that
+            it need not be repeated.
+
     Returns:
-        pd.DataFrame: _description_
+        Dataframe with a row for each run, and columns of the statistics, `deterministic` and `draw` (0 for the deterministic run).
+
+    Raises:
+        InterruptedError: if cancellation is requested.
     """
     variables = mm.variables.values()
     mdl = mm.model
@@ -257,9 +264,14 @@ def run_psa(
 
 @revision_dataclass
 class PSAConfig(DataWithRevision):
-    """PSA Config.
+    """Configuration of a probabilistic sensitivity analysis.
 
-    TODO: Add a description.
+    Attributes:
+        samples: Number of samples to draw.
+        seed: Seed of the random number generator; random if None.
+        return_draws: Whether to return the values drawn.
+        include_deterministic: Whether to include the deterministic run.
+        statistics: The statistics calculated from the samples.
     """
     samples: int = 1000
     seed: int | None = None
@@ -294,16 +306,17 @@ def basic_psa_stats(
         'net_present_value_discounted'
     ]
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """_summary_
+    """Summarise the results of a PSA.
 
     Args:
-        psa_results (pd.DataFrame): _description_
-        statistics (Sequence[PSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(PSA_FLOAT_STATISTIC).
-        quantiles (Sequence[float], optional): _description_. Defaults to [0.025, 0.975].
-        npv_statistics (list, optional): _description_. Defaults to [ 'net_present_value_undiscounted', 'net_present_value_discounted' ].
+        psa_results: The results of the PSA, from `run_psa`.
+        statistics: The statistics to summarise.
+        quantiles: Quantiles to report.
+        npv_statistics: The net present value statistics for which to find the probability of being positive.
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: _description_
+        A dataframe with a row for each statistic and columns of the deterministic value, the count, mean, median and standard deviation
+        of the samples, and the quantiles; and a dataframe of the probability that each net present value is positive.
     """
     res_det = (
         psa_results
@@ -354,9 +367,7 @@ def basic_psa_stats(
 ##### Generic Graph functions #####
 
 class BoundingBox(NamedTuple):
-    """Bounding Box.
-
-    TODO: Add a description.
+    """Bounding box of a set of points.
     """
     """"""
     xmin: float
@@ -366,13 +377,13 @@ class BoundingBox(NamedTuple):
 
 
 def get_null_psa_data(statistics: Sequence[str]) -> pd.DataFrame:
-    """_summary_
+    """Placeholder PSA results, to draw plots before there are results.
 
     Args:
-        statistics (Sequence[str]): _description_
+        statistics: The statistics for which to make data.
 
     Returns:
-        pd.DataFrame: _description_
+        A dataframe of two rows - one deterministic and one not - with every statistic equal to 1.
     """
     stat_dict = {
         x: [1, 1] for x in statistics
@@ -385,10 +396,7 @@ def get_null_psa_data(statistics: Sequence[str]) -> pd.DataFrame:
 ##### Scatter ######
 
 class PSAScatterData(NamedTuple):
-    """_summary_
-
-    Args:
-        NamedTuple (_type_): _description_
+    """NamedTuple of data for a PSA scatter plot
     """
     scatter_data: pd.DataFrame
     det_point: pd.Series
@@ -400,15 +408,17 @@ def psa_scatter_data(
     cost_statistic: str = 'total_present_costs_discounted',
     benefit_statistic: str = 'total_present_benefits_discounted'
 ) -> PSAScatterData:
-    """_summary_
+    """Data for the scatter plot of the costs and benefits of the samples of a PSA.
+
+    Each sample is categorised as cost effective (`CE`) if its benefits exceed its costs.
 
     Args:
-        psa_data (pd.DataFrame): _description_
-        cost_statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
-        benefit_statistic (str, optional): _description_. Defaults to 'total_present_benefits_discounted'.
+        psa_data: The results of the PSA.
+        cost_statistic: The statistic used as costs.
+        benefit_statistic: The statistic used as benefits.
 
     Returns:
-        PSAScatterData: _description_
+        The samples with their category, the deterministic point and the proportion of samples that are cost effective.
     """
     scatter_data = (
         psa_data
@@ -434,13 +444,16 @@ def psa_scatter_data(
     return PSAScatterData(scatter_data, det_point, ce_proportion)
 
 def psa_scatter_bounds(scatter_data: pd.DataFrame) -> BoundingBox:
-    """_summary_
+    """Bounds of the scatter plot of costs and benefits.
+
+    The plot is square, with padding around the extremes of the costs and benefits; a plot which is wholly positive or wholly negative
+    extends to just beyond zero.
 
     Args:
-        scatter_data (pd.DataFrame): _description_
+        scatter_data: The samples, with the costs and benefits in the first two columns.
 
     Returns:
-        BoundingBox: _description_
+        The bounding box.
     """
     all_max = float(scatter_data.iloc[:,0:2].max(axis=None)) # pyright: ignore[reportArgumentType]
     all_min = float(scatter_data.iloc[:,0:2].min(axis=None)) # pyright: ignore[reportArgumentType]
@@ -471,17 +484,20 @@ def psa_scatter(
     point_alpha: float = 0.2,
     show_proportion_ce: bool = True,
 ):
-    """_summary_
+    """Scatter plot of the costs and benefits of the samples of a PSA.
+
+    Samples are plotted against a line of equal costs and benefits, so that cost effective samples are those above it, and
+    the deterministic result is marked.
 
     Args:
-        psa_data (pd.DataFrame | None): _description_
-        cost_statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
-        benefit_statistic (str, optional): _description_. Defaults to 'total_present_benefits_discounted'.
-        point_alpha (float, optional): _description_. Defaults to 0.2.
-        show_proportion_ce (bool, optional): _description_. Defaults to True.
+        psa_data: The results of the PSA; None for an empty plot.
+        cost_statistic: The statistic used as costs.
+        benefit_statistic: The statistic used as benefits.
+        point_alpha: Opacity of the points.
+        show_proportion_ce: Whether to annotate the proportion of samples that are cost effective.
 
     Returns:
-        _type_: _description_
+        The plot (a plotly figure).
     """
     if psa_data is None:
         psa_data = get_null_psa_data([cost_statistic, benefit_statistic])
@@ -592,16 +608,16 @@ def psa_scatter_update(
     benefit_statistic: str = 'total_present_benefits_discounted',
     show_proportion_ce: bool = True
 ):
-    """_summary_
+    """Patch to update an existing scatter plot of a PSA with new results, without redrawing it.
 
     Args:
-        psa_data (pd.DataFrame | None): _description_
-        cost_statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
-        benefit_statistic (str, optional): _description_. Defaults to 'total_present_benefits_discounted'.
-        show_proportion_ce (bool, optional): _description_. Defaults to True.
+        psa_data: The results of the PSA; None to clear the plot.
+        cost_statistic: The statistic used as costs.
+        benefit_statistic: The statistic used as benefits.
+        show_proportion_ce: Whether the plot annotates the proportion of samples that are cost effective.
 
     Returns:
-        _type_: _description_
+        The patch (a Dash `Patch`) of the figure.
     """
     fig_patch = Patch()
 
@@ -678,13 +694,13 @@ def psa_scatter_update(
     return fig_patch
 
 def psa_scatter_controls(page: str):
-    """_summary_
+    """Controls of the scatter plot: whether the costs and benefits are discounted.
 
     Args:
-        page (str): _description_
+        page: The page that the controls are on, which is part of their ids.
 
     Returns:
-        _type_: _description_
+        List of components.
     """
     return [
         html.Div(
@@ -704,16 +720,16 @@ def psa_scatter_controls(page: str):
     ]
 
 def psa_scatter_arguments(plot_controls):
-    """_summary_
+    """Arguments of the scatter plot from the values of its controls.
 
     Args:
-        plot_controls (_type_): _description_
-
-    Raises:
-        ValueError: _description_
+        plot_controls: The ids and values of the controls, as given to a Dash callback.
 
     Returns:
-        _type_: _description_
+        Dictionary of `cost_statistic` and `benefit_statistic`, discounted by default.
+
+    Raises:
+        ValueError: if the discounting is not recognised.
     """
     discounting = 'discounted'
     for idx, id in enumerate(plot_controls['ids']):
@@ -736,10 +752,13 @@ def psa_scatter_arguments(plot_controls):
 ###### CDF #####
 
 class PSACDFData(NamedTuple):
-    """_summary_
+    """Data for the cumulative distribution plot of a statistic of a PSA.
 
-    Args:
-        NamedTuple (_type_): _description_
+    Attributes:
+        cdf_data: The samples in ascending order, with their cumulative probability.
+        det_value: The value of the statistic of the deterministic run.
+        min: Lowest sample.
+        max: Highest sample.
     """
     cdf_data: pd.DataFrame
     det_value: float
@@ -751,14 +770,14 @@ def psa_cdf_data(
     psa_data: pd.DataFrame,
     statistic: str
 ) -> PSACDFData:
-    """_summary_
+    """Data for the cumulative distribution plot of a statistic of a PSA.
 
     Args:
-        psa_data (pd.DataFrame): _description_
-        statistic (str): _description_
+        psa_data: The results of the PSA.
+        statistic: The statistic.
 
     Returns:
-        PSACDFData: _description_
+        The samples, the deterministic value and the range.
     """
     cdf_data = (
         psa_data
@@ -786,13 +805,13 @@ def psa_cdf_data(
     )
 
 def psa_cdf_bounds(cdf_data: PSACDFData) -> BoundingBox:
-    """_summary_
+    """Bounds of the cumulative distribution plot.
 
     Args:
-        cdf_data (PSACDFData): _description_
+        cdf_data: The data of the plot.
 
     Returns:
-        BoundingBox: _description_
+        The bounding box: the range of the samples, padded, and cumulative probabilities from 0 to 1.
     """
     min_x = cdf_data.min
     max_x = cdf_data.max
@@ -813,14 +832,16 @@ def psa_cdf(
     psa_data: pd.DataFrame | None,
     statistic: str = 'net_present_value_discounted'
 ):
-    """_summary_
+    """Plot of the cumulative distribution of a statistic of a PSA.
+
+    The deterministic value is marked.
 
     Args:
-        psa_data (pd.DataFrame | None): _description_
-        statistic (str, optional): _description_. Defaults to 'net_present_value_discounted'.
+        psa_data: The results of the PSA; None for an empty plot.
+        statistic: The statistic.
 
     Returns:
-        _type_: _description_
+        The plot (a plotly figure).
     """
     if psa_data is None:
         psa_data = get_null_psa_data([statistic,])
@@ -891,14 +912,14 @@ def psa_cdf_update(
     psa_data: pd.DataFrame | None,
     statistic: str = 'net_present_value_discounted',
 ):
-    """_summary_
+    """Patch to update an existing cumulative distribution plot with new results, without redrawing it.
 
     Args:
-        psa_data (pd.DataFrame | None): _description_
-        statistic (str, optional): _description_. Defaults to 'net_present_value_discounted'.
+        psa_data: The results of the PSA; None to clear the plot.
+        statistic: The statistic.
 
     Returns:
-        _type_: _description_
+        The patch (a Dash `Patch`) of the figure.
     """
     fig_patch = Patch()
 
@@ -948,13 +969,13 @@ def psa_cdf_update(
     return fig_patch
 
 def psa_cdf_controls(page: str):
-    """_summary_
+    """Controls of the cumulative distribution plot: which statistic is plotted.
 
     Args:
-        page (str): _description_
+        page: The page that the controls are on, which is part of their ids.
 
     Returns:
-        _type_: _description_
+        List of components.
     """
     return [
         html.Div(
@@ -973,13 +994,13 @@ def psa_cdf_controls(page: str):
     ]
 
 def psa_cdf_arguments(plot_controls):
-    """_summary_
+    """Arguments of the cumulative distribution plot from the values of its controls.
 
     Args:
-        plot_controls (_type_): _description_
+        plot_controls: The ids and values of the controls, as given to a Dash callback.
 
     Returns:
-        _type_: _description_
+        Dictionary of the `statistic`.
     """
     statistic = 'net_present_value_discounted'
     for idx, id in enumerate(plot_controls['ids']):
@@ -991,10 +1012,7 @@ def psa_cdf_arguments(plot_controls):
 ##### Convergence #####
 
 class PSAConvergenceData(NamedTuple):
-    """_summary_
-
-    Args:
-        NamedTuple (_type_): _description_
+    """NamedTuple of data for PSA convergence summaries
     """
     stat_data: pd.DataFrame
     final_stat: float
@@ -1004,18 +1022,20 @@ def psa_convergence_data(
     statistic: str,
     convergence_statistic: _CONVERGENCE_STATISTICS
 ):
-    """_summary_
+    """Data for the plot of the convergence of a statistic of a PSA over its draws.
+
+    For each draw, the value of the convergence statistic (e.g. the mean) of the samples so far, with its standard error.
 
     Args:
-        psa_data (pd.DataFrame): _description_
-        statistic (str): _description_
-        convergence_statistic (_CONVERGENCE_STATISTICS): _description_
-
-    Raises:
-        ValueError: _description_
+        psa_data: The results of the PSA.
+        statistic: The statistic of the model whose convergence is plotted.
+        convergence_statistic: The statistic of the samples: mean, variance, median or a decile or quartile.
 
     Returns:
-        _type_: _description_
+        The convergence of the statistic with its standard error at each draw, and its final value.
+
+    Raises:
+        ValueError: if the convergence statistic is not recognised.
     """
     raw_frame = (
         psa_data
@@ -1115,13 +1135,15 @@ def psa_convergence_data(
     )
 
 def psa_convergence_bounds(con_data: PSAConvergenceData):
-    """_summary_
+    """Bounds of the convergence plot.
+
+    The range of the draws, and of the cumulative statistic with its standard error, ignoring infinite values, padded.
 
     Args:
-        con_data (PSAConvergenceData): _description_
+        con_data: The data of the plot.
 
     Returns:
-        _type_: _description_
+        The bounding box.
     """
     min_x = con_data.stat_data['draw'].iloc[0]
     max_x = con_data.stat_data['draw'].iloc[-1]
@@ -1167,15 +1189,17 @@ def psa_convergence(
     statistic: str = 'total_present_costs_discounted',
     convergence_statistic: _CONVERGENCE_STATISTICS = 'Mean'
 ):
-    """_summary_
+    """Plot of the convergence of a statistic of a PSA over its draws.
+
+    Shows the statistic of the samples so far, its final value, and a band of its standard error.
 
     Args:
-        psa_data (pd.DataFrame | None): _description_
-        statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
-        convergence_statistic (_CONVERGENCE_STATISTICS, optional): _description_. Defaults to 'Mean'.
+        psa_data: The results of the PSA; None for an empty plot.
+        statistic: The statistic of the model whose convergence is plotted.
+        convergence_statistic: The statistic of the samples: mean, variance, median or a decile or quartile.
 
     Returns:
-        _type_: _description_
+        The plot (a plotly figure).
     """
     if psa_data is None:
         psa_data = get_null_psa_data([statistic])
@@ -1256,15 +1280,15 @@ def psa_convergence_update(
     statistic: str = 'total_present_costs_discounted',
     convergence_statistic: _CONVERGENCE_STATISTICS = 'Mean'
 ):
-    """_summary_
+    """Patch to update an existing convergence plot with new results, without redrawing it.
 
     Args:
-        psa_data (pd.DataFrame | None): _description_
-        statistic (str, optional): _description_. Defaults to 'total_present_costs_discounted'.
-        convergence_statistic (_CONVERGENCE_STATISTICS, optional): _description_. Defaults to 'Mean'.
+        psa_data: The results of the PSA; None to clear the plot.
+        statistic: The statistic of the model whose convergence is plotted.
+        convergence_statistic: The statistic of the samples.
 
     Returns:
-        _type_: _description_
+        The patch (a Dash `Patch`) of the figure.
     """
     fig_patch = Patch()
 
@@ -1313,13 +1337,13 @@ def psa_convergence_update(
     return fig_patch
 
 def psa_convergence_controls(page: str):
-    """_summary_
+    """Controls of the convergence plot: which statistic is plotted, and which statistic of its samples.
 
     Args:
-        page (str): _description_
+        page: The page that the controls are on, which is part of their ids.
 
     Returns:
-        _type_: _description_
+        List of components.
     """
     return [
         html.Div(
@@ -1345,13 +1369,13 @@ def psa_convergence_controls(page: str):
     ]
 
 def psa_convergence_arguments(plot_controls):
-    """_summary_
+    """Arguments of the convergence plot from the values of its controls.
 
     Args:
-        plot_controls (_type_): _description_
+        plot_controls: The ids and values of the controls, as given to a Dash callback.
 
     Returns:
-        _type_: _description_
+        Dictionary of the `statistic` and the `convergence_statistic`.
     """
     statistic = 'net_present_value_discounted'
     convergence_statistic = 'Mean'

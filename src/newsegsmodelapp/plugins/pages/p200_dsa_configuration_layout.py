@@ -43,12 +43,10 @@ from .processes.optim_process_components import optim_process_components
 PAGE_TYPE = 'dsa'
 
 def create_dsa_header():
-    """Create dsa header.
-
-    TODO: Add a description.
+    """Create the header of the DSA page.
 
     Returns:
-        TODO.
+        The header.
     """
     return dbc.Container(
         [
@@ -89,12 +87,10 @@ def create_dsa_header():
     )
 
 def create_dsa_configuration_editor():
-    """Create dsa configuration editor.
-
-    TODO: Add a description.
+    """Create the editor of the DSA: the inputs of the variables, with their bounds.
 
     Returns:
-        TODO.
+        The editor.
     """
     return dbc.Col([
         html.Div(
@@ -130,15 +126,13 @@ def create_dsa_configuration_editor():
     ])
 
 def create_optim_configuration_editor_header(**kwargs):
-    """Create optim configuration editor header.
-
-    TODO: Add a description.
+    """Create the header of the optimisation editor.
 
     Args:
-        **kwargs: TODO.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        The header.
     """
     button_container_children = [
         dbc.Button(
@@ -164,15 +158,13 @@ def create_optim_configuration_editor_header(**kwargs):
     )
 
 def create_optim_configuration_editor(**kwargs):
-    """Create optim configuration editor.
-
-    TODO: Add a description.
+    """Create the editor of the optimisation: the variables to vary, with their bounds.
 
     Args:
-        **kwargs: TODO.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        The editor.
     """
     return dbc.Col([
         *create_staleness_indicator(kwargs.get('page_type', PAGE_TYPE), 'optim'),
@@ -253,9 +245,7 @@ def create_optim_configuration_editor(**kwargs):
 
 @dataclass
 class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
-    """DSA Configuration Layout Configuration.
-
-    TODO: Add a description.
+    """Layout configuration of the DSA page: the input and result cards and the navigation.
     """
     page_type: str = PAGE_TYPE
 
@@ -266,15 +256,13 @@ class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
 
 def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
 
-    """Create dsa layout.
-
-    TODO: Add a description.
+    """The layout of the DSA page: the editors of the DSA and the optimisation, and their results.
 
     Args:
-        config: TODO.
+        config: The layout configuration of the page.
 
     Returns:
-        TODO.
+        The layout.
     """
     a1_contents = [
         dbc.Row([
@@ -405,15 +393,10 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
     )
 
 def add_dsa_run_callbacks(app: NewsegsDash):
-    """Add dsa run callbacks.
-
-    TODO: Add a description.
+    """Bind the callbacks which run, cancel, download and upload the DSA.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     if True:
         @app.callback(
@@ -726,15 +709,10 @@ def add_dsa_run_callbacks(app: NewsegsDash):
 def add_optim_run_callbacks(app: NewsegsDash):
 
     # Pre-run modal control
-    """Add optim run callbacks.
-
-    TODO: Add a description.
+    """Bind the callbacks which run and cancel the optimisation.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         output = {

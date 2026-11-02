@@ -226,17 +226,17 @@ def get_icon(icon_name: None | SequenceNotStr[str] | str = None,
              style_name: Literal['default', 'raw', 'unpadded'] = 'default'):
     
     # Icon for missing names:
-    """Get icon.
+    """Get an icon, or sequence of icons, by name.
 
-    TODO: Add a description.
+    The icons are Bootstrap icon font classes. A sequence of names gives icons with padding classes such that they appear as one group. An unknown name gives a warning icon.
 
     Args:
-        icon_name: TODO.
-        icon_class: TODO.
-        style_name: TODO.
+        icon_name: Name(s) of the icon(s), from `components.icons`.
+        icon_class: Further CSS classes of the icon.
+        style_name: Padding style: `default`, `unpadded` or `raw` (the class names only).
 
     Returns:
-        TODO.
+        An `html.I` component, or with `style_name = "raw"` the class names.
     """
     mi = "bi bi-exclamation-circle"
     # The bootstrap pad and margin classes for default styles

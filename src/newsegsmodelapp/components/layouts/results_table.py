@@ -1,6 +1,4 @@
-"""Results table module.
-
-TODO: Describe the purpose of the module.
+"""The grids of results, with a column for each configuration.
 """
 import dash_ag_grid as dag
 

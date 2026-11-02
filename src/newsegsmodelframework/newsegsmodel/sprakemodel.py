@@ -1,12 +1,13 @@
-"""Sprakemodel module.
+"""The Sprake NewSEGS Energy Model.
 
-TODO: Describe the purpose of the module.
+An implementation of the model of Dr David Sprake as a `NewsegsModel`, using `SprakeGeneration`, `SprakeGrid` and `SprakeCS`
+modules, an in-memory local environment holding the default Sprake weather data and no wider environment.
 """
 from __future__ import annotations
 from dataclasses import asdict, field
 import os
 import copy
-from typing import cast, override, Any
+from typing import cast, override
 from functools import singledispatchmethod, lru_cache
 
 import numpy as np
@@ -45,6 +46,7 @@ _DEFAULT_LOCATION = modlocation.Location(
     settings.get('SprakeValidationLon')
 )
 
+# REVIEW (unreferenced): no references to `_get_sprake_wind_speeds` found in src/, scripts/ or data/.
 @lru_cache
 def _get_sprake_wind_speeds():
     return(
@@ -66,12 +68,12 @@ def _get_sprake_wind_speeds():
 
 @lru_cache
 def get_sprake_environment_server():
-    """Get sprake environment server.
+    """The local environment server of the Sprake NewSEGS Energy Model.
 
-    TODO: Add a description.
+    An in-memory server holding the default wind speed, solar flux and temperature series of the Sprake model (cached).
 
     Returns:
-        TODO.
+        The server.
     """
     server = inmem_env_servers.InMemoryLocalEnv()
 
@@ -153,12 +155,12 @@ def get_sprake_environment_server():
     return server
 
 def get_sprake_wider_env_server():
-    """Get sprake wider env server.
+    """The wider environment server of the Sprake NewSEGS Energy Model.
 
-    TODO: Add a description.
+    The Sprake model does not use a wider environment, so a placeholder is used.
 
     Returns:
-        TODO.
+        The server.
     """
     return DummyWiderEnv()
 
@@ -168,9 +170,11 @@ def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
 
 @revision_dataclass
 class SprakeModelConfig(newsegsmodel.NewsegsModelConfig):
-    """Sprake Model Config.
+    """Configuration of the Sprake NewSEGS Energy Model.
 
-    TODO: Add a description.
+    Attributes:
+        timestep: Timestep of the model.
+        run_period: The time span over which the model is run.
     """
     timestep: pd.Timedelta = pd.Timedelta(_DEFAULT_TS)
     run_period: modtimespan.TimeSpan = field(default_factory = lambda: copy.copy(_DEFAULT_TIMESPAN))
@@ -296,34 +300,29 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     # We can do the from_none using the _from_str init
     @classmethod
     def from_none(cls):
-        """From none.
-
-        TODO: Add a description.
+        """Create a Sprake NewSEGS Energy Model with default modules.
 
         Returns:
-            TODO.
+            The model.
         """
         return cls('Sprake Energy Model')
 
+    # REVIEW (unreferenced): no references to `set_run_period` found in src/, scripts/ or data/.
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
-        """Set run period.
-
-        TODO: Add a description.
+        """Set the time span over which the model is run, with the timestep of the model.
 
         Args:
-            timespan: TODO.
+            timespan: The period of time to run.
         """
         new_timespan = modtimespan.RegTimeSpan(timespan)
         new_timespan.timestep = self.timestep
         self._config.run_period = new_timespan
         
     def get_run_period(self) -> modtimespan.TimeSpan:
-        """Get run period.
-
-        TODO: Add a description.
+        """The time span over which the model is run.
 
         Returns:
-            TODO.
+            The time span.
         """
         return self.run_period
     
@@ -343,9 +342,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @property
     def local_env(self) -> environment_servers.NewsegsLocalEnvironment:
-        """Local env.
-
-        TODO: Add a description.
+        """The local environment server; the default Sprake server is created on first use.
         """
         try:
             return self._local_environment_server
@@ -363,9 +360,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @property
     def wider_env(self) -> environment_servers.NewsegsWiderEnvironment:
-        """Wider env.
-
-        TODO: Add a description.
+        """The wider environment server; the default Sprake server is created on first use.
         """
         try:
             return self._wider_environment_server
@@ -381,12 +376,10 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._wider_environment_server = wider_env_server
 
     def get_default_timestep(self) -> pd.Timedelta:
-        """Get default timestep.
-
-        TODO: Add a description.
+        """The timestep of the model.
 
         Returns:
-            TODO.
+            The timestep.
         """
         return self.timestep
 
@@ -405,42 +398,37 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self.consumption_storage.location = loc
 
     def get_generation_result(self) -> NewsegsModuleResult:
-        """Get generation result.
-
-        TODO: Add a description.
+        """The result of the last run of the generation module.
 
         Returns:
-            TODO.
+            The result.
         """
         return self._generation_result
 
     def get_grid_result(self) -> NewsegsModuleResult:
-        """Get grid result.
-
-        TODO: Add a description.
+        """The result of the last run of the grid module.
 
         Returns:
-            TODO.
+            The result.
         """
         return self._grid_result
 
+    # REVIEW (redundant): duplicates `get_consumption_storage_result`, and no references to `get_cs_result` found in src/, scripts/ or data/.
     def get_cs_result(self) -> NewsegsModuleResult:
-        """Get cs result.
+        """The result of the last run of the consumption and storage module.
 
-        TODO: Add a description.
+        The same as `get_consumption_storage_result`.
 
         Returns:
-            TODO.
+            The result.
         """
         return self._cs_result
 
     def get_consumption_storage_result(self) -> NewsegsModuleResult:
-        """Get consumption storage result.
-
-        TODO: Add a description.
+        """The result of the last run of the consumption and storage module.
 
         Returns:
-            TODO.
+            The result.
         """
         return self._cs_result
 

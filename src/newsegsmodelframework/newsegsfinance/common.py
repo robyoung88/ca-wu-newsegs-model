@@ -1,5 +1,4 @@
 """Helper functions for NewsegsFinance."""
-import numpy as np
 import pandas as pd
 
 from newsegsmodelframework.core.timespan import year_index

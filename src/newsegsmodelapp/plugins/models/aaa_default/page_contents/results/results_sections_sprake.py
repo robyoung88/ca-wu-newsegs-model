@@ -1,6 +1,4 @@
-"""Results sections sprake module.
-
-TODO: Describe the purpose of the module.
+"""The results sections of the deterministic page for the Sprake model: which results are shown, in which cards.
 """
 from newsegsmodelapp.components.layouts.results_card import create_results_table_card
 from newsegsmodelapp.components import icons

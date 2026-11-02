@@ -1,9 +1,8 @@
-"""Requesthandler package.
+"""The interface of the creator and monitor of requests for background procedures.
 
-TODO: Describe what the package provides and its main public classes.
+Nothing is imported here: use the module directly.
+
+Modules:
+    requesthanderinterface: `RequestHandlerInterface`.
 """
-from .requesthanderinterface import RequestHandlerInterface
-
-__all__ = [
-    'RequestHandlerInterface',
-]
+__all__ = []

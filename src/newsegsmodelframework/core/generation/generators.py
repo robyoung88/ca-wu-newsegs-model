@@ -19,7 +19,7 @@ from __future__ import annotations
 import copy
 from dataclasses import asdict, field
 import json
-from typing import Any, Optional, SupportsIndex
+from typing import Any, Optional
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Collection, Iterable
@@ -32,7 +32,6 @@ import pandas as pd
 from pvlib.modelchain import ModelChain as PVLibModelChain
 
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location

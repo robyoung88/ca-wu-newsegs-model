@@ -1,25 +1,21 @@
 """Provides abstract base class for NewSEGS Generation Module."""
 
-from abc import abstractmethod
 from dataclasses import field
-from typing import Mapping, Sequence, override
+from typing import override
 
 import pandas as pd
 
-from newsegsmodelframework.core import NewsegsModule, newsegscomponent
-from newsegsmodelframework.core import generation
+from newsegsmodelframework.core import NewsegsModule
 from newsegsmodelframework.core.generation.generators import NewsegsGeneratorProperty
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core.newsegsmoduleresult import filter_meters
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithRevision, revision_dataclass
+from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 
 
 @revision_dataclass
 class NewsegsGenerationConfig(DataWithRevision):
-    """Newsegs Generation Config.
-
-    TODO: Add a description.
+    """Configuration of a generation module. The base class has none; implementations add their own.
     """
     location: modlocation.Location | list[modlocation.Location] = field(default_factory = modlocation.Location.from_none)
     """The location of the generators / power plants.

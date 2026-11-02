@@ -1,6 +1,4 @@
-"""Energy balance estimation module.
-
-TODO: Describe the purpose of the module.
+"""Rough estimates of the annual energy balance of a site, used to give feedback while inputs are edited.
 """
 
 from typing import cast
@@ -8,9 +6,10 @@ from typing import cast
 import pandas as pd
 
 class EstimatedEnergyBalance:
-    """Estimated Energy Balance.
+    """A rough estimate of the annual energy balance, and the maximum daily balance, of a site.
 
-    TODO: Add a description.
+    Generation and consumption are estimated from capacities, capacity factors and the number of households with simple formulae, so that the interface
+    can give feedback as inputs are changed without running a NewSEGS Energy Model. Each `set_...` method updates one line of the estimate.
     """
     def __init__(self):
         self.estimated_annual_energy_balance = pd.DataFrame([
@@ -71,14 +70,14 @@ class EstimatedEnergyBalance:
         ann_cf: float = 0.25,
         max_day_cf: float = 1.0
     ):
-        """Set wind generation.
+        """Estimate the generation from wind.
 
-        TODO: Add a description.
+        Annually, `8760 * ann_cf * cap`; on the maximum day, `24 * cap * max_day_cf`.
 
         Args:
-            cap: TODO.
-            ann_cf: TODO.
-            max_day_cf: TODO.
+            cap: Capacity (kW).
+            ann_cf: Annual capacity factor.
+            max_day_cf: Capacity factor on the day of the maximum.
         """
         self.estimated_annual_energy_balance.at['Wind', 'value'] = 8760 * ann_cf * cap
 
@@ -91,14 +90,14 @@ class EstimatedEnergyBalance:
         ann_cf: float = 0.125,
         max_day_cf: float = 0.33
     ):
-        """Set pv generation.
+        """Estimate the generation from PV.
 
-        TODO: Add a description.
+        Annually, `8760 * ann_cf * cap`; on the maximum day, `24 * cap * max_day_cf`.
 
         Args:
-            cap: TODO.
-            ann_cf: TODO.
-            max_day_cf: TODO.
+            cap: Capacity (kW).
+            ann_cf: Annual capacity factor.
+            max_day_cf: Capacity factor on the day of the maximum.
         """
         self.estimated_annual_energy_balance.at['PV', 'value'] = 8760 * ann_cf * cap
 
@@ -112,15 +111,15 @@ class EstimatedEnergyBalance:
         gfa,
         ann_hdd: float = 2000.0
     ):
-        """Set spaceheat consumption.
+        """Estimate the consumption for space heating.
 
-        TODO: Add a description.
+        Households times heat loss parameter times floor area times annual heating degree days, converted to kWh.
 
         Args:
-            n_units: TODO.
-            hlp: TODO.
-            gfa: TODO.
-            ann_hdd: TODO.
+            n_units: Number of households.
+            hlp: Heat loss parameter.
+            gfa: Gross floor area of a dwelling (m^2).
+            ann_hdd: Annual heating degree days.
         """
         self.estimated_annual_energy_balance.at['Space heat', 'value'] = n_units * hlp * gfa * ann_hdd * 24 / 1000.
         
@@ -132,26 +131,26 @@ class EstimatedEnergyBalance:
         ref_daily_consumption, 
         conversion_efficiency: float = 1.0
     ):
-        """Set dhw consumption.
+        """Estimate the consumption for domestic hot water.
 
-        TODO: Add a description.
+        Households times the reference daily consumption times 365, divided by the conversion efficiency.
 
         Args:
-            n_units: TODO.
-            ref_daily_consumption: TODO.
-            conversion_efficiency: TODO.
+            n_units: Number of households.
+            ref_daily_consumption: Reference daily hot water consumption of a household (kWh).
+            conversion_efficiency: Efficiency of conversion to hot water.
         """
         self.estimated_annual_energy_balance.at['Hot water', 'value'] = 365. * n_units * ref_daily_consumption / conversion_efficiency
         self._set_max_consumption()
     
     def set_direct_consumption(self, n_units, ann_demand_per_unit):
-        """Set direct consumption.
+        """Estimate the direct (appliance) consumption.
 
-        TODO: Add a description.
+        Households times the annual demand per household.
 
         Args:
-            n_units: TODO.
-            ann_demand_per_unit: TODO.
+            n_units: Number of households.
+            ann_demand_per_unit: Annual demand per household (kWh).
         """
         self.estimated_annual_energy_balance.at['Direct consumption', 'value'] = n_units * ann_demand_per_unit
         self._set_max_consumption()
@@ -162,14 +161,14 @@ class EstimatedEnergyBalance:
         annual_residential_consumption_per_ev, 
         n_evs_per_household
     ):
-        """Set ev consumption.
+        """Estimate the consumption for EV charging.
 
-        TODO: Add a description.
+        Households times the annual residential consumption per EV times the number of EVs per household.
 
         Args:
-            n_units: TODO.
-            annual_residential_consumption_per_ev: TODO.
-            n_evs_per_household: TODO.
+            n_units: Number of households.
+            annual_residential_consumption_per_ev: Annual residential charging consumption of an EV (kWh).
+            n_evs_per_household: Number of EVs per household.
         """
         self.estimated_annual_energy_balance.at['EV charging', 'value'] = n_units * annual_residential_consumption_per_ev * n_evs_per_household
         self._set_max_consumption()
@@ -178,11 +177,9 @@ class EstimatedEnergyBalance:
         self,
         storage_capacity
     ):
-        """Set storage capacity.
-
-        TODO: Add a description.
+        """Set the storage capacity of the estimate.
 
         Args:
-            storage_capacity: TODO.
+            storage_capacity: Storage capacity (kWh).
         """
         self.estimated_maximum_daily_balance.at['Storage size', 'value'] = storage_capacity

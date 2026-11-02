@@ -1,6 +1,4 @@
-"""Post dsa results module.
-
-TODO: Describe the purpose of the module.
+"""Conversion of the results of a DSA into tables.
 """
 import pandas as pd
 
@@ -63,15 +61,15 @@ def dsa_results_to_tables(
     dsa_data: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     
-    """Dsa results to tables.
+    """Convert the results of a DSA into tables.
 
-    TODO: Add a description.
+    The first row of the data is the deterministic run, the others the runs with each variable at its bounds. Raises `TypeError` if the data are not long enough.
 
     Args:
-        dsa_data: TODO.
+        dsa_data: Dataframe of the results of the DSA.
 
     Returns:
-        TODO.
+        The tables: the deterministic result, and the sensitivities with their labels.
     """
     if len(dsa_data) < 2:
         raise TypeError('dsa_data is not long enough')

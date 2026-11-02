@@ -1,16 +1,11 @@
-"""Variable dash component package.
+"""Inputs for the variables of a metamodel on the DSA, PSA and optimisation pages.
 
-TODO: Describe what the package provides and its main public classes.
+Nothing is imported here: use the modules directly.
+
+Modules:
+    vdc: The layouts and callbacks for the inputs of each kind of variable and page.
+    vdc_dsa: Creation of the DSA input of a variable.
+    vdc_psa: Creation of the PSA input of a variable.
+    vdc_optim: Creation of the optimisation input of a variable.
 """
-from .vdc import *
-from .vdc_dsa import create_dsa_input
-from .vdc_psa import create_psa_input
-
-__all__ = [
-    'create_dsa_input_scalar_constant',
-    'create_dsa_input_scalar_normal',
-    'create_dsa_input_scalar_beta',
-    'create_dsa_input_scalar_gamma',
-    'create_dsa_input',
-    'create_psa_input',
-]
+__all__ = []

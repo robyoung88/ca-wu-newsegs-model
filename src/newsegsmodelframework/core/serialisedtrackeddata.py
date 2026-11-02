@@ -1,9 +1,7 @@
 """Serialisation of components with a revision-tracked configuration.
 """
-import copy
-from typing import Any, Mapping, Sequence, Type, override
+from typing import Any, Mapping, override
 
-from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.serialisation import T, StateSerialiseToDictMixin
 from newsegsmodelframework.core.trackeddata import ComponentPropertyInterface, ConfigurationMixin, DataWithRevision
 

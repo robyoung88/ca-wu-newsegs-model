@@ -1,6 +1,4 @@
-"""Post sprake storage results module.
-
-TODO: Describe the purpose of the module.
+"""Postprocessing of the storage results of the Sprake model into the form shown in the interface.
 """
 import numpy as np
 

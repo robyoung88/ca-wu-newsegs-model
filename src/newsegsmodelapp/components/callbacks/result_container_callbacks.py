@@ -1,6 +1,4 @@
-"""Result container callbacks module.
-
-TODO: Describe the purpose of the module.
+"""Callbacks which fill the containers of results, in the sections registered for the model type, when results become available.
 """
 import logging
 logger = logging.getLogger(__name__)

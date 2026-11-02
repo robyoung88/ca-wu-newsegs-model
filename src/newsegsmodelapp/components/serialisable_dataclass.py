@@ -6,21 +6,19 @@ from dataclasses import asdict as dc_asdict
 
 @dataclass
 class SerialisableDataclass:
-    """Serialisable Dataclass.
-
-    TODO: Add a description.
+    """A dataclass which can be converted to and from a dictionary, e.g. for JSON.
     """
     @classmethod
     def from_dict(cls, env):      
-        """From dict.
+        """Create an instance from a dictionary.
 
-        TODO: Add a description.
+        Keys which are not parameters of the class are ignored.
 
         Args:
-            env: TODO.
+            env: Dictionary of the values.
 
         Returns:
-            TODO.
+            The instance.
         """
         return cls(**{
             k: v for k, v in env.items() 
@@ -28,11 +26,9 @@ class SerialisableDataclass:
         })
     
     def as_dict(self):
-        """As dict.
-
-        TODO: Add a description.
+        """The dataclass as a dictionary.
 
         Returns:
-            TODO.
+            The dictionary.
         """
         return dc_asdict(self)

@@ -4,8 +4,6 @@ Core functions used by multiple statistical procedures.
 from collections.abc import Collection
 import warnings
 
-import numpy as np
-import numpy.typing as npt
 import pandas as pd
 
 from newsegsmodelframework.core import SECONDS_TO_HOURS

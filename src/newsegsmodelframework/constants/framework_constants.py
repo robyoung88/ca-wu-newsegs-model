@@ -1,6 +1,9 @@
-"""Framework constants module.
+"""Constants of the framework.
 
-TODO: Describe the purpose of the module.
+Attributes:
+    COMPONENT_PREFIXES: Prefix of the ids of each kind of component.
+    PREFIX_GROUPS: Groups of prefixes, by the table that holds the components.
+    PREFIX_GROUP_KEY: The names of the groups.
 """
 from typing import Literal
 

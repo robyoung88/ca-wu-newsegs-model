@@ -1,6 +1,4 @@
-"""Map module.
-
-TODO: Describe the purpose of the module.
+"""The site selector: a map on which the location of a metamodel is chosen, with latitude, longitude and OSGB feedback.
 """
 import logging
 logger = logging.getLogger(__name__)
@@ -21,7 +19,6 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 
@@ -34,16 +31,16 @@ def _site_metamodel_id(site_location: str | None) -> str | None:
 
 def create_map_layout(map_id='sitemap',
                       center=(53.165716, -3.728402)):
-    """Create map layout.
+    """Create the site map.
 
-    TODO: Add a description.
+    A Leaflet map with a tile layer, on which a site can be chosen.
 
     Args:
-        map_id: TODO.
-        center: TODO.
+        map_id: Id of the map component.
+        center: Latitude and longitude of the centre of the map.
 
     Returns:
-        TODO.
+        List of components.
     """
     return [
         dl.Map(
@@ -64,12 +61,10 @@ def create_map_layout(map_id='sitemap',
         ]
 
 def create_latlon_input():
-    """Create latlon input.
-
-    TODO: Add a description.
+    """Create the fields for the latitude and longitude of the site.
 
     Returns:
-        TODO.
+        List of components.
     """
     return [
         html.Span(get_icon('latlon'), style={'fontSize':'1.5rem'}),
@@ -81,12 +76,10 @@ def create_latlon_input():
     ]
 
 def create_osgb_feedback():
-    """Create osgb feedback.
-
-    TODO: Add a description.
+    """Create the text which shows the OSGB easting and northing of the site.
 
     Returns:
-        TODO.
+        List of components.
     """
     return [
         html.Span(get_icon('osgb'), style={'fontSize':'1.3rem'}),
@@ -102,16 +95,14 @@ def create_site_selector_map(
     map_id='sitemap',
     center=(53.165716, -3.728402)
 ):
-    """Create site selector map.
-
-    TODO: Add a description.
+    """Create the site selector: the map, the latitude and longitude fields and the OSGB feedback.
 
     Args:
-        map_id: TODO.
-        center: TODO.
+        map_id: Id of the map component.
+        center: Latitude and longitude of the centre of the map.
 
     Returns:
-        TODO.
+        The layout.
     """
     elements = html.Div(
         [
@@ -179,15 +170,10 @@ def create_site_selector_map(
     return elements
 
 def add_latlon_sync_callbacks(app: NewsegsDash):
-    """Add latlon sync callbacks.
-
-    TODO: Add a description.
+    """Bind the callback which updates the site location from the latitude and longitude fields.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
@@ -312,15 +298,10 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         return f"{lat:.6f}", f"{lon:.6f}", name, staleness_update
 
 def add_map_click_callback(app: NewsegsDash):
-    """Add map click callback.
-
-    TODO: Add a description.
+    """Bind the callback which proposes a new site location when the map is double clicked.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output('potential-site-location', 'data'),
@@ -350,15 +331,10 @@ def add_map_click_callback(app: NewsegsDash):
 
 
 def add_potential_site_change_callback(app: NewsegsDash):
-    """Add potential site change callback.
-
-    TODO: Add a description.
+    """Bind the callback which asks for confirmation of a proposed new site location.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output('site-confirm-container', 'children', allow_duplicate=True),
@@ -393,15 +369,10 @@ def add_potential_site_change_callback(app: NewsegsDash):
                              )]
 
 def add_confirm_site_change_btn_callback(app: NewsegsDash):
-    """Add confirm site change btn callback.
-
-    TODO: Add a description.
+    """Bind the callback which accepts a proposed site location when it is confirmed.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
@@ -421,15 +392,10 @@ def add_confirm_site_change_btn_callback(app: NewsegsDash):
     return app
 
 def add_remove_confirm_popup(app):
-    """Add remove confirm popup.
-
-    TODO: Add a description.
+    """Bind the callback which removes the confirmation popup once the site has changed.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output('site-confirm-container', 'children'),
@@ -442,15 +408,13 @@ def add_remove_confirm_popup(app):
         return []
 
 def add_site_change_callback(app) -> Dash:
-    """Add site change callback.
-
-    TODO: Add a description.
+    """Bind the callback which moves the site marker and updates the OSGB feedback when the site location changes.
 
     Args:
-        app: TODO.
+        app: The Dash app.
 
     Returns:
-        TODO.
+        The app.
     """
     @app.callback(
         Output('site-marker-container', 'children'),
@@ -521,12 +485,10 @@ def add_site_change_callback(app) -> Dash:
     return app
 
 def add_site_selector_callbacks(app: NewsegsDash):
-    """Add site selector callbacks.
-
-    TODO: Add a description.
+    """Bind all the callbacks of the site selector.
 
     Args:
-        app: TODO.
+        app: The Dash app.
     """
     add_map_click_callback(app)
     add_latlon_sync_callbacks(app)

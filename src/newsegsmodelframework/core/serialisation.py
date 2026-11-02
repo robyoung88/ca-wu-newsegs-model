@@ -53,7 +53,7 @@ from __future__ import annotations
 import copy
 from datetime import tzinfo, datetime
 import json
-from typing import Any, Protocol, Sequence, Type, TypeAlias, TypeVar, override, runtime_checkable
+from typing import Any, Protocol, Sequence, Type, TypeAlias, TypeVar, runtime_checkable
 
 import pandas as pd
 

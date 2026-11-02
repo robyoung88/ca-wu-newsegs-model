@@ -1,4 +1,5 @@
-"""Callbacks resulting in some processing being undertaken."""
+"""Callbacks which result in processing being undertaken: creating requests from user actions, starting them and following their progress.
+"""
 import logging
 import threading
 logger = logging.getLogger(__name__)
@@ -7,14 +8,11 @@ import copy
 import json
 import pickle
 
-import sys
-import time
 from typing import Any, Sequence
 
 from dash import ALL, Input, NoUpdate, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 import sqlalchemy as sa
-from sqlalchemy.exc import OperationalError
 import zmq
 
 from config import settings
@@ -41,16 +39,16 @@ def send_to_dispatcher(
     payload, 
     retries: int = REQUEST_RETRIES
 ) -> dict:
-    """Send to dispatcher.
+    """Send a request to the dispatcher over ZeroMQ, and wait for its reply.
 
-    TODO: Add a description.
+    Retries up to `retries` times if the dispatcher does not reply within the timeout.
 
     Args:
-        payload: TODO.
-        retries: TODO.
+        payload: The request to send; pickled.
+        retries: Number of times to retry the dispatcher before giving up.
 
     Returns:
-        TODO.
+        The reply of the dispatcher (the run information), or None if the request was refused or the dispatcher could not be reached.
     """
     JOB_DISPATCH_TIMEOUT = settings.get('JOB_DISPATCH_TIMEOUT_MS', 200)
     context = zmq.Context()
@@ -117,19 +115,19 @@ def local_run_procedure(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface
 ):
-    """Local run procedure.
+    """Run a registered run procedure in the app process, instead of in a worker.
 
-    TODO: Add a description.
+    Used for requests that are not background procedures. Logs an exception and returns None if the procedure is not registered.
 
     Args:
-        procedure_name: TODO.
-        request: TODO.
-        engine: TODO.
-        project_provider: TODO.
-        results_provider: TODO.
+        procedure_name: Name of the procedure to run.
+        request: The request which triggered the procedure.
+        engine: SQLAlchemy engine.
+        project_provider: Provider of projects, metamodels and variables.
+        results_provider: Provider of results.
 
     Returns:
-        TODO.
+        The status message of the procedure.
     """
     runner = registers.RUN_PROCEDURE_REGISTER.get(procedure_name)
     if runner is None:
@@ -148,19 +146,19 @@ def local_run_postprocess(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface
 ):
-    """Local run postprocess.
+    """Run a registered postprocess procedure in the app process, instead of in a worker.
 
-    TODO: Add a description.
+    Logs an exception and returns None if the procedure is not registered.
 
     Args:
-        procedure_name: TODO.
-        request: TODO.
-        engine: TODO.
-        project_provider: TODO.
-        results_provider: TODO.
+        procedure_name: Name of the procedure to run.
+        request: The request which triggered the procedure.
+        engine: SQLAlchemy engine.
+        project_provider: Provider of projects, metamodels and variables.
+        results_provider: Provider of results.
 
     Returns:
-        TODO.
+        The status message of the procedure.
     """
     runner = registers.get_postprocess_procedure(procedure_name, request)
     if runner is None:
@@ -179,19 +177,19 @@ def local_run_table_draw(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface
 ):
-    """Local run table draw.
+    """Run a registered table draw procedure in the app process, instead of in a worker.
 
-    TODO: Add a description.
+    Logs an exception and returns None if the procedure is not registered.
 
     Args:
-        procedure_name: TODO.
-        request: TODO.
-        engine: TODO.
-        project_provider: TODO.
-        results_provider: TODO.
+        procedure_name: Name of the procedure to run.
+        request: The request which triggered the procedure.
+        engine: SQLAlchemy engine.
+        project_provider: Provider of projects, metamodels and variables.
+        results_provider: Provider of results.
 
     Returns:
-        TODO.
+        The status message of the procedure.
     """
     runner = registers.get_table_draw(procedure_name, request)
     if runner is None:
@@ -208,17 +206,17 @@ def spawn_job(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface,
 ) -> int | None:
-    """Spawn job.
+    """Start the run of a request: send it to the dispatcher if it is a background procedure, otherwise run it in the app.
 
-    TODO: Add a description.
+    If the dispatcher refuses a background request its run id is cleared and its status is not changed.
 
     Args:
-        request: TODO.
-        project_provider: TODO.
-        results_provider: TODO.
+        request: The request which triggered the procedure.
+        project_provider: Provider of projects, metamodels and variables.
+        results_provider: Provider of results.
 
     Returns:
-        TODO.
+        The id of the run, or None if the request was not started.
     """
     logger.info(
         'Spawning Run for Request ID %d; Type: %s;',
@@ -349,13 +347,13 @@ def generate_post_action_requests(
 def _get_run_statuses(
     ongoing_run_ids: list[str]
 ) -> dict[str, dict]:
-    """Critical status for ongoing Runs
+    """Critical status for ongoing runs.
 
     Args:
-        ongoing_run_ids (list[str]): _description_
+        ongoing_run_ids: Ids of the runs.
 
     Returns:
-        dict[str, dict]: _description_
+        The status, progress and progress message of each of the runs, by run id.
     """
     stmt = (
         sa.select(
@@ -375,15 +373,12 @@ def _get_run_statuses(
 
 def add_action_callbacks(app: NewsegsDash):
 
-    """Add action callbacks.
+    """Bind the callbacks which turn user actions into requests, start them, monitor their progress and trigger their post-actions.
 
-    TODO: Add a description.
+    The callbacks create requests with the functions registered for the actions, start new requests with `spawn_job`, poll the state of active requests and respawn failed requests while retries remain.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     def _respawn_run_for_request(
         request: registers.RunRequest,

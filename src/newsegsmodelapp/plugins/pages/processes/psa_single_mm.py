@@ -1,6 +1,4 @@
-"""Psa single mm module.
-
-TODO: Describe the purpose of the module.
+"""The probabilistic sensitivity analysis (PSA) of a single metamodel.
 """
 import logging
 logger = logging.getLogger(__name__)
@@ -23,9 +21,7 @@ REQUEST_TYPE = 'psa_run_metamodel'
 
 @dataclass
 class PSARunMetamodelRunRequest(RunRequest):
-    """PSA Run Metamodel Run Request.
-
-    TODO: Add a description.
+    """Request to run a PSA of a metamodel.
     """
     request_type: str = REQUEST_TYPE
 
@@ -49,20 +45,20 @@ def execute_psa_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
-    """Execute psa single mm run.
+    """Run a probabilistic sensitivity analysis of one metamodel, in a worker.
 
-    TODO: Add a description.
+    Runs the model for samples drawn from the distributions of the variables selected for PSA. Raises `ValueError` if no metamodel is named in the request and `KeyError` if it is not in the project.
 
     Args:
-        request: TODO.
-        project_provider: TODO.
-        result_provider: TODO.
-        run_id: TODO.
-        progress_callback: TODO.
-        check_cancel_status: TODO.
+        request: The request being executed.
+        project_provider: Provider of projects, metamodels and variables.
+        result_provider: Provider of results.
+        run_id: Id of the run.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message.
+        check_cancel_status: Function returning whether cancellation of the run has been requested.
 
     Returns:
-        TODO.
+        The status message, `ok` on success.
     """
     started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)

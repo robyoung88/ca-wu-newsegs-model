@@ -1,6 +1,4 @@
-"""Result group containers module.
-
-TODO: Describe the purpose of the module.
+"""Containers which group related results.
 """
 from dash import html
 

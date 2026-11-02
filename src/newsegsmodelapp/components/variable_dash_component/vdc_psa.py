@@ -1,11 +1,7 @@
-"""Vdc psa module.
-
-TODO: Describe the purpose of the module.
+"""Creation of the PSA input of a variable.
 """
 
-from typing import cast
 
-from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
@@ -13,15 +9,15 @@ from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLight
 def create_psa_input(
     var: FullLightweightVariable
 ):
-    """Create psa input.
+    """Create the PSA input of a variable.
 
-    TODO: Add a description.
+    Dispatches on the distribution of the variable. Nothing is created if the variable is not to be shown.
 
     Args:
-        var: TODO.
+        var: The variable.
 
     Returns:
-        TODO.
+        The input, or nothing.
     """
     if not var.psa_show:
         return None

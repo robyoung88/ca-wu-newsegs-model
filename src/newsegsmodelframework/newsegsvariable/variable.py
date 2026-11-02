@@ -76,7 +76,6 @@ import warnings
 
 from matplotlib.pylab import Generator
 import numpy as np
-import numpy.typing as npt
 from useful_types import SequenceNotStr
 from scipy.stats import gamma
 

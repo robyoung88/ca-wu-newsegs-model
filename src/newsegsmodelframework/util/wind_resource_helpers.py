@@ -1,8 +1,6 @@
-"""Wind resource helpers module.
-
-TODO: Describe the purpose of the module.
+"""Helpers for wind resource assessment from the New European Wind Atlas: wind speeds at a site and heights,
+compass point categories, and wind rose, energy rose and wind speed profile plots.
 """
-import os
 import itertools
 import numpy as np
 import pandas as pd
@@ -13,7 +11,6 @@ import seaborn as sns
 
 from newa import get_newa_micro_point, get_newa_meso_ts_point
 from scipy.stats import weibull_min
-from config import settings
 
 _bearing_names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 _bearing_max_angle = np.arange(len(_bearing_names)) * 360.0 / len(_bearing_names) + 0.5 * (360.0 / len(_bearing_names))
@@ -35,16 +32,17 @@ BEARING_POLAR_ANGLES = (pd.DataFrame.from_dict(BEARING_DICT,
 # 35 m height for 50 - 250 kW (e.g. Norvento nED 100)
 EVAL_HEIGHTS = [15, 35]
 
+# REVIEW (unreferenced): no references to `get_cp` found in src/, scripts/ or data/.
 def get_cp(file_name):
-    """Get cp.
+    """Read a power coefficient curve and return a function interpolating it.
 
-    TODO: Add a description.
+    The file is an Excel file with `wind_speed` and `coeff_power` columns. The function gives zero outside the range of the curve.
 
     Args:
-        file_name: TODO.
+        file_name: Path of the file.
 
     Returns:
-        TODO.
+        Function of wind speed returning the power coefficient.
     """
     cp_file = pd.read_excel(file_name)
     def interpolant(x):
@@ -59,17 +57,15 @@ def get_cp(file_name):
 def bearing_to_category(bearings,
                         categories=BEARING_DICT,
                         offset=None):
-    """Bearing to category.
-
-    TODO: Add a description.
+    """Categorise bearings into compass points.
 
     Args:
-        bearings: TODO.
-        categories: TODO.
-        offset: TODO.
+        bearings: Bearings in degrees.
+        categories: Dictionary of the maximum angle of each category.
+        offset: Offset (degrees) of the categories; by default half a category width.
 
     Returns:
-        TODO.
+        Ordered categorical of the compass points.
     """
     if offset is None:
         offset = (360.0 / len(categories)) / 2.0
@@ -83,15 +79,13 @@ def bearing_to_category(bearings,
     return o
 
 def expand_grid(data_dict):
-    """Expand grid.
-
-    TODO: Add a description.
+    """Dataframe of all combinations of the values in a dictionary.
 
     Args:
-        data_dict: TODO.
+        data_dict: Dictionary of the values of each column.
 
     Returns:
-        TODO.
+        The dataframe.
     """
     rows = itertools.product(*data_dict.values())
     return pd.DataFrame.from_records(rows, columns=data_dict.keys())
@@ -141,17 +135,17 @@ def get_alpha_distribution(newa_meso_data):
     return o2
 
 def get_alphas(wd_10, ws_10, alpha_dist):
-    """Get alphas.
+    """The wind shear exponent for each wind direction and speed.
 
-    TODO: Add a description.
+    Looked up from the distribution by compass point and wind speed bin.
 
     Args:
-        wd_10: TODO.
-        ws_10: TODO.
-        alpha_dist: TODO.
+        wd_10: Wind directions at 10 m.
+        ws_10: Wind speeds at 10 m.
+        alpha_dist: Distribution of the shear exponent by wind direction and speed bin.
 
     Returns:
-        TODO.
+        Array of shear exponents.
     """
     idf = (
         pd.DataFrame({
@@ -177,23 +171,23 @@ def get_wind_at_site(lat, lon,
                      return_working = False
                      ):
     
-    """Get wind at site.
+    """Wind speeds at a site, at heights, from the New European Wind Atlas.
 
-    TODO: Add a description.
+    Takes the mesoscale wind speed series at the reference height and maps its Weibull distribution onto the microscale Weibull distribution of the site, then scales the result to each site height by the power law with a shear exponent which depends upon the wind direction and speed.
 
     Args:
-        lat: TODO.
-        lon: TODO.
-        rng: TODO.
-        meso_reference_height: TODO.
-        micro_reference_height: TODO.
-        dt_start: TODO.
-        dt_stop: TODO.
-        site_heights: TODO.
-        return_working: TODO.
+        lat: Latitude (degrees).
+        lon: Longitude (degrees).
+        rng: Random number generator.
+        meso_reference_height: Height (m) of the mesoscale data used as reference.
+        micro_reference_height: Height (m) of the microscale data used as reference.
+        dt_start: Start of the period.
+        dt_stop: End of the period.
+        site_heights: Heights (m) at which to give the wind speeds.
+        return_working: Return the intermediate data as well.
 
     Returns:
-        TODO.
+        The wind speed series at each height; with `return_working`, a dictionary which also holds the intermediate data.
     """
     meso_data = get_newa_meso_ts_point(lat, lon,
                                        height=meso_reference_height, 
@@ -293,6 +287,7 @@ clrs = sns.color_palette("husl", len(WIND_ROSE_BINS)-1)
 ws_cats = pd.cut([], WIND_ROSE_BINS).categories
 windrose_catcols = dict(zip(ws_cats, clrs))
 
+# REVIEW (unreferenced): no references to `draw_wind_rose` found in src/, scripts/ or data/.
 def draw_wind_rose(wind_speeds, wind_directions, height_agl=None, figsize=(6.5,4)):
     """Draw a landscape wind rose with legend to the right and a note box.
 
@@ -367,6 +362,7 @@ power_cats = pd.cut([], POWER_BINS).categories
 power_cat_labels = dict(zip(power_cats,['< Cut-in',r'0%-25%',r'25%-50%',r'50%-75%',r'75%-100%','Max/Rated'] ))
 power_catcols = dict(zip(power_cats, clrs))
 
+# REVIEW (unreferenced): no references to `draw_energy_rose` found in src/, scripts/ or data/.
 def draw_energy_rose(wind_powers,
                      wind_directions,
                      height_agl=None, 
@@ -453,6 +449,7 @@ SOURCE_DICT = {
     'extrap': 'Vertically extrapolated'
 }
 
+# REVIEW (unreferenced): no references to `wind_speed_profile_box` found in src/, scripts/ or data/.
 def wind_speed_profile_box(profile_data, figsize=(6,4)):
     """Create a transposed box plot of wind speed versus height.
 

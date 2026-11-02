@@ -6,7 +6,7 @@ t1 = time.time()
 # Set up logging
 import logging
 if not logging.getLogger().hasHandlers():
-    import app_logging
+    import app_logging  # noqa: F401
 logger = logging.getLogger(__name__)
 
 import json
@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import uuid
 
-from dash import ALL, Dash, Input, Output, State, DiskcacheManager, CeleryManager
+from dash import Dash, Input, Output, State
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
 from flask import jsonify, send_from_directory
@@ -29,8 +29,8 @@ from newsegsmodelapp.components.navigation import DOCS_URL
 DEFAULT_DOCS_PATH = APP_ROOT.parent / 'site' # Where `mkdocs build` puts the documentation
 
 # PLUGINS
-import newsegsmodelframework.register_plugins
-import newsegsmodelapp.register_plugins # MUST be imported
+import newsegsmodelframework.register_plugins  # noqa: F401
+import newsegsmodelapp.register_plugins # MUST be imported  # noqa: F401
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend.db.db import init_db

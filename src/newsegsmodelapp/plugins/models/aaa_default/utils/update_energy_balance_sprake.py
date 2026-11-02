@@ -1,23 +1,18 @@
-"""Update energy balance sprake module.
-
-TODO: Describe the purpose of the module.
+"""Updating the estimated energy balance of the Sprake model from the inputs of a metamodel, for the feedback graphs.
 """
 import logging
 logger = logging.getLogger(__name__)
 
 from functools import partial
 import json
-from typing import cast
 
 import plotly.express as px
 
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components import energy_balance_estimation
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel, get_focussed_metamodel
+from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelapp import registers
 
 from newsegsmodelapp import APP_ROOT
@@ -36,17 +31,17 @@ def update_estimated_energy_balance(
     variableprovider: FromDatabaseVariableProvider,
     energy_balance: energy_balance_estimation.EstimatedEnergyBalance
 ) -> energy_balance_estimation.EstimatedEnergyBalance:
-    """Update estimated energy balance.
+    """Update an estimate of the energy balance from the inputs of a metamodel of the Sprake model.
 
-    TODO: Add a description.
+    Reads the last deterministic values of the capacities, households, heat loss parameter, floor area, hot water, appliance, EV and storage variables.
 
     Args:
-        mm: TODO.
-        variableprovider: TODO.
-        energy_balance: TODO.
+        mm: The lightweight metamodel.
+        variableprovider: Provider of variables.
+        energy_balance: The estimate to update.
 
     Returns:
-        TODO.
+        The updated estimate.
     """
     vars_required = (
         'gen_input.wind_capacity.0',

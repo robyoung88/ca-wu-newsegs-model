@@ -4,11 +4,9 @@ Classes and functions to enable automatic tracking of changes in members
 from abc import ABCMeta
 from collections import OrderedDict
 import copy
-from dataclasses import dataclass, fields, asdict
+from dataclasses import dataclass
 import re
-from typing import Any, Callable, Collection, Iterable, Literal, Mapping, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
-from typing_extensions import Self
-import warnings
+from typing import Any, Callable, Collection, Iterable, Literal, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
 import uuid as mod_uuid
 
 import numpy as np

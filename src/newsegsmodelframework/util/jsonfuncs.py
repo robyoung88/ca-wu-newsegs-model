@@ -1,6 +1,4 @@
-"""Jsonfuncs module.
-
-TODO: Describe the purpose of the module.
+"""Helpers for JSON.
 """
 import json
 
@@ -8,20 +6,16 @@ import numpy as np
 import pandas as pd
 
 class NumpyEncoder(json.JSONEncoder):
-    """Numpy Encoder.
-
-    TODO: Add a description.
+    """JSON encoder which can encode numpy arrays (as lists) and pandas timestamps (as strings).
     """
     def default(self, obj):
-        """Default.
-
-        TODO: Add a description.
+        """Encode objects which JSON cannot.
 
         Args:
-            obj: TODO.
+            obj: The object to encode.
 
         Returns:
-            TODO.
+            The JSON-serialisable form.
         """
         if isinstance(obj, np.ndarray):
             return obj.tolist()

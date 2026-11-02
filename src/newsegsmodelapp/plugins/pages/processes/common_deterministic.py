@@ -1,6 +1,4 @@
-"""Common deterministic module.
-
-TODO: Describe the purpose of the module.
+"""Running the deterministic model for a metamodel: the shared steps used by the single metamodel and whole project runs.
 """
 import logging
 logger = logging.getLogger(__name__)

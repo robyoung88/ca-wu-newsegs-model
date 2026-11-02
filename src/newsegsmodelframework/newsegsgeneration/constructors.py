@@ -1,6 +1,4 @@
-"""Constructors module.
-
-TODO: Describe the purpose of the module.
+"""Construction of a generation module from a dictionary.
 """
 import copy
 from typing import Any
@@ -12,18 +10,19 @@ _GENERATION_MODULE_CONSTRUCTORS = {
     'SprakeGeneration': sprakegeneration.SprakeGeneration,
 }
 
+# REVIEW (redundant?): nothing calls `generation_module_from_dict`; the constructor registries in `core.constructors.registers` do this job.
 def generation_module_from_dict(
     config: dict[str, Any]
 ) -> newsegsgeneration.NewsegsGeneration:
-    """Generation module from dict.
+    """Create a generation module from its dictionary.
 
-    TODO: Add a description.
+    The dictionary names the `class` of the module.
 
     Args:
-        config: TODO.
+        config: Dictionary of the serialised module, including its `class`.
 
     Returns:
-        TODO.
+        The generation module.
     """
     config = copy.copy(config)
     classname = config.pop('class')

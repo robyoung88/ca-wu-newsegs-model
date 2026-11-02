@@ -1,6 +1,4 @@
-"""Project selector module.
-
-TODO: Describe the purpose of the module.
+"""The project selector: choosing, creating, duplicating, renaming and deleting projects, and managing their snapshots.
 """
 import logging
 logger = logging.getLogger(__name__)
@@ -62,14 +60,12 @@ def rename_project(
     project_id: str,
     project_name: str,
 ):
-    """Rename project.
-
-    TODO: Add a description.
+    """Rename a project.
 
     Args:
-        project_provider: TODO.
-        project_id: TODO.
-        project_name: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+        project_name: The new name of the project.
     """
     project_provider.set_component_metadata(
         project_id,
@@ -82,17 +78,15 @@ def create_snapshot(
     project_id: str,
     snapshot_name: str,
 ) -> int:
-    """Create snapshot.
-
-    TODO: Add a description.
+    """Create a snapshot of a project.
 
     Args:
-        project_provider: TODO.
-        project_id: TODO.
-        snapshot_name: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+        snapshot_name: The label of the snapshot.
 
     Returns:
-        TODO.
+        The id of the snapshot.
     """
     return project_provider.create_project_snapshot(
         project_id, snapshot_name
@@ -102,16 +96,14 @@ def verify_project_exists(
     project_provider: NewsegsProjectProviderInterface,
     project_id: str
 ) -> bool:
-    """Verify project exists.
-
-    TODO: Add a description.
+    """Whether a project exists.
 
     Args:
-        project_provider: TODO.
-        project_id: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
 
     Returns:
-        TODO.
+        True if it does.
     """
     try:
         label = project_provider.get_component_metadata(
@@ -127,17 +119,15 @@ def load_snapshot(
     current_project_id: str,
     snapshot_id: str
 ) -> str | None:
-    """Load snapshot.
-
-    TODO: Add a description.
+    """Restore a snapshot of the current project as a new project.
 
     Args:
-        project_provider: TODO.
-        current_project_id: TODO.
-        snapshot_id: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        current_project_id: Id of the current project.
+        snapshot_id: Id of the snapshot.
 
     Returns:
-        TODO.
+        The id of the new project, or None if the snapshot is not found.
     """
     int_snapshot_id = int(snapshot_id)
     all_snapshots = project_provider.list_project_snapshots(current_project_id)
@@ -154,16 +144,14 @@ def new_project(
     project_provider: NewsegsProjectProviderInterface,
     model_type: str
 ) -> str:
-    """New project.
-
-    TODO: Add a description.
+    """Create a new project of a model type with the factory registered for it, and store it.
 
     Args:
-        project_provider: TODO.
-        model_type: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The id of the project.
     """
     from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
                     
@@ -177,16 +165,14 @@ def duplicate_project(
     project_provider: NewsegsProjectProviderInterface,
     current_project_id: str,
 ) -> str:
-    """Duplicate project.
-
-    TODO: Add a description.
+    """Duplicate a project and store the copy.
 
     Args:
-        project_provider: TODO.
-        current_project_id: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        current_project_id: Id of the current project.
 
     Returns:
-        TODO.
+        The id of the copy.
     """
     new_proj = cast(
         NewsegsProject, 
@@ -205,14 +191,12 @@ def rename_snapshot(
     snapshot_id: str,
     snapshot_name: str,
 ):
-    """Rename snapshot.
-
-    TODO: Add a description.
+    """Rename a snapshot.
 
     Args:
-        project_provider: TODO.
-        snapshot_id: TODO.
-        snapshot_name: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        snapshot_id: Id of the snapshot.
+        snapshot_name: The label of the snapshot.
     """
     if not isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         return
@@ -224,18 +208,18 @@ def delete_project(
     active_project_id: str,
     model_type: str,
 ) -> str | None:
-    """Delete project.
+    """Delete a project.
 
-    TODO: Add a description.
+    Raises `ValueError` if it cannot be deleted.
 
     Args:
-        project_provider: TODO.
-        delete_project_id: TODO.
-        active_project_id: TODO.
-        model_type: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        delete_project_id: Id of the project to delete.
+        active_project_id: Id of the active project.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
 
     Returns:
-        TODO.
+        The id of the project to make active: the active one if a different project was deleted; otherwise another.
     """
     returned = project_provider.delete_component(delete_project_id)
     if returned:
@@ -254,14 +238,12 @@ def delete_snapshot(
     project_id: str,
     delete_snapshot_id: str
 ):
-    """Delete snapshot.
-
-    TODO: Add a description.
+    """Delete a snapshot.
 
     Args:
-        project_provider: TODO.
-        project_id: TODO.
-        delete_snapshot_id: TODO.
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+        delete_snapshot_id: Id of the snapshot to delete.
     """
     int_dsi = int(delete_snapshot_id)
     project_provider.delete_project_snapshot(project_id, int_dsi)
@@ -271,12 +253,10 @@ def delete_snapshot(
 # -----------------------------------------------
 def create_project_selector():
     
-    """Create project selector.
-
-    TODO: Add a description.
+    """Create the project selector: choosing, creating, duplicating, renaming and deleting projects, and managing their snapshots.
 
     Returns:
-        TODO.
+        The layout.
     """
     def stores_and_dialogs() -> list[dash.development.base_component.Component]:
         return [
@@ -575,15 +555,10 @@ def create_project_selector():
 create_project_selector_block = create_project_selector
 
 def add_project_selector_callbacks(app: NewsegsDash):
-    """Add project selector callbacks.
-
-    TODO: Add a description.
+    """Bind the callbacks of the project selector.
 
     Args:
-        app: TODO.
-
-    Returns:
-        TODO.
+        app: The Dash app.
     """
     @app.callback(
         Output("collapse-controls", "is_open"),

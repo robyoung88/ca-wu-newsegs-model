@@ -29,9 +29,11 @@ from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVaria
 
 @revision_dataclass
 class NewsegsProjectConfig(DataWithRevision):
-    """Newsegs Project Config.
+    """Configuration of a project.
 
-    TODO: Add a description.
+    Attributes:
+        model_type: The type of model of the project (e.g. `sprake`).
+        model_version: The version of the model.
     """
     model_type: str = ''
     model_version: str = ''
@@ -39,9 +41,7 @@ class NewsegsProjectConfig(DataWithRevision):
 
 class ProjVarWatcher(RevisionNotifierProtocol):
     
-    """Proj Var Watcher.
-
-    TODO: Add a description.
+    """Watches the metamodels of a project, so that the project holds the variables of every metamodel when metamodels are added or removed.
     """
     def __init__(self, project: 'NewsegsProject'):
         self._project = project
@@ -135,17 +135,13 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
 
     @property
     def metamodel_ids(self) -> tuple[str, ...]:
-        """Metamodel ids.
-
-        TODO: Add a description.
+        """The ids of the metamodels, in order.
         """
         return tuple(mm.id for mm in self.metamodels)
 
     @property
     def watcher(self) -> RevisionNotifierProtocol:
-        """Watcher.
-
-        TODO: Add a description.
+        """The watcher which tracks changes to the metamodels; created on first use.
         """
         if self._watcher is None:
             self._watcher = ProjVarWatcher(self)
@@ -156,12 +152,12 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         self._watcher = watcher
 
     def get_focussed_metamodel_index(self) -> int:
-        """Get focussed metamodel index.
+        """The index of the focussed metamodel.
 
-        TODO: Add a description.
+        The focussed metamodel is the one displayed and run by the app. Raises `ValueError` if the project has no metamodels.
 
         Returns:
-            TODO.
+            The index.
         """
         if self._focussed_metamodel >= len(self.metamodels):
             if len(self.metamodels) == 0:
@@ -171,33 +167,29 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         return self._focussed_metamodel
 
     def set_focussed_metamodel_index(self, metamodel_index: int = 0):
-        """Set focussed metamodel index.
-
-        TODO: Add a description.
+        """Set the focussed metamodel by index.
 
         Args:
-            metamodel_index: TODO.
+            metamodel_index: Index of the metamodel within the project.
         """
         self.set_focussed_metamodel(metamodel_index = metamodel_index)
 
     def get_focussed_metamodel(self):
-        """Get focussed metamodel.
-
-        TODO: Add a description.
+        """The focussed metamodel.
 
         Returns:
-            TODO.
+            The metamodel.
         """
         return self.metamodels[self.get_focussed_metamodel_index()]
 
     def set_focussed_metamodel(self, metamodel_id: Optional[str] = None, metamodel_index: int = 0):
-        """Set focussed metamodel.
+        """Set the focussed metamodel by id or by index.
 
-        TODO: Add a description.
+        The id is used if given and found; otherwise the index, limited to the metamodels available.
 
         Args:
-            metamodel_id: TODO.
-            metamodel_index: TODO.
+            metamodel_id: Id of the metamodel.
+            metamodel_index: Index of the metamodel within the project.
         """
         if metamodel_id:
             for i, mm in enumerate(self.metamodels):
@@ -206,16 +198,17 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
                     return
         self._focussed_metamodel = max(0, min(len(self.metamodels)-1, metamodel_index))
 
+    # REVIEW (unreferenced): no references to `duplicate_metamodel` found in src/, scripts/ or data/.
     def duplicate_metamodel(self, metamodel_id: str) -> newsegsmetamodel.NewsegsMetaModel:
-        """Duplicate metamodel.
+        """Add a copy of a metamodel, with new ids, to the project.
 
-        TODO: Add a description.
+        Raises `ValueError` if the metamodel is not found.
 
         Args:
-            metamodel_id: TODO.
+            metamodel_id: Id of the metamodel.
 
         Returns:
-            TODO.
+            The copy.
         """
         try:
             wch = self.metamodel_ids.index(metamodel_id)
@@ -273,12 +266,12 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         return result
 
     def reattach_metamodels(self, provider: NewsegsComponentProviderInterface):
-        """Reattach metamodels.
+        """Reattach the metamodels of a project after it has been reconstructed.
 
-        TODO: Add a description.
+        The metamodels are found from the ids recorded when the project was serialised, and given the variables of the project. The revisions are preserved.
 
         Args:
-            provider: TODO.
+            provider: Provider from which to recover the components.
         """
         if not hasattr(self, '_metamodel_ids') or not self._metamodel_ids:
             return
@@ -294,15 +287,15 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         self.table_config.revision = tr0
 
     def get_metamodel_by_id(self, metamodel_id: str):
-        """Get metamodel by id.
+        """Get a metamodel by id.
 
-        TODO: Add a description.
+        Raises `KeyError` if it is not found.
 
         Args:
-            metamodel_id: TODO.
+            metamodel_id: Id of the metamodel.
 
         Returns:
-            TODO.
+            The metamodel.
         """
         for mm in self.metamodels:
             if mm.id == metamodel_id:
@@ -319,20 +312,19 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         for k, v in self._variables_by_varid.items():
             vrus[k] = list(v.keys())
 
+    # REVIEW (unreferenced): no references to `variable_to_store` found in src/, scripts/ or data/.
     def variable_to_store(
         self, 
         store_interface: VariablePersistenceInterface, 
         variable_id: Optional['str | SequenceNotStr[str]'] = None,
         force: bool = False,
     ):
-        """Variable to store.
-
-        TODO: Add a description.
+        """Write variables of the project to a store.
 
         Args:
-            store_interface: TODO.
-            variable_id: TODO.
-            force: TODO.
+            store_interface: The store to which the variables are written.
+            variable_id: Id(s) of the variable(s); all variables if None.
+            force: Write the variables even if their revisions have not changed.
         """
         if isinstance(variable_id, str):
             variable_id = [variable_id, ]

@@ -1,19 +1,17 @@
-"""Null layout module.
-
-TODO: Describe the purpose of the module.
+"""A layout which shows nothing.
 """
 from dash import html
 
 def NULL_LAYOUT(*args, **kwargs):
-    """NULL LAYOUT.
+    """A layout which shows nothing.
 
-    TODO: Add a description.
+    Used as the default `creation_function` of cards.
 
     Args:
-        *args: TODO.
-        **kwargs: TODO.
+        *args: Further positional arguments.
+        **kwargs: Further keyword arguments.
 
     Returns:
-        TODO.
+        An empty span.
     """
     return html.Span()

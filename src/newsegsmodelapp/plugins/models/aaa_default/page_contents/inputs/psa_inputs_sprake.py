@@ -8,23 +8,20 @@ import time
 from typing import Any, Optional, cast
 
 import dash
-from dash.exceptions import PreventUpdate
-from dash import dcc, html, no_update
+from dash import dcc, html
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
-from newsegsmodelapp.components.variable_identification import VariableInstanceComponentID, VariableInstanceParameterComponentID
+from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel, make_varid
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegssensitivity.psa import PSAComponent
 from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.components.composite_input_components import generic_create_psa_input_container_contents
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.components import staleness
 from newsegsmodelapp.registers import register_input_container_content_creator, register_input_handler, register_single_input_header_content_creator
@@ -79,16 +76,14 @@ def n_samples_input(
         'psa', 'psa-settings',
         'samples', 0
     )):
-    """N samples input.
-
-    TODO: Add a description.
+    """Create the input of the number of samples of the PSA.
 
     Args:
-        psa_config: TODO.
-        id: TODO.
+        psa_config: The PSA configuration of the project.
+        id: Identification of the component.
 
     Returns:
-        TODO.
+        The input.
     """
     overall_id = id
 
@@ -126,16 +121,14 @@ def random_seed_input(
         'psa', 'psa-settings',
         'seed', 0
 )):
-    """Random seed input.
-
-    TODO: Add a description.
+    """Create the input of the random seed of the PSA.
 
     Args:
-        psa_config: TODO.
-        id: TODO.
+        psa_config: The PSA configuration of the project.
+        id: Identification of the component.
 
     Returns:
-        TODO.
+        The input.
     """
     overall_id = id
 
@@ -173,16 +166,14 @@ def return_draws_input(
         'psa', 'psa-settings',
         'return_draws', 0
 )):
-    """Return draws input.
-
-    TODO: Add a description.
+    """Create the input which chooses whether the PSA returns the draws made.
 
     Args:
-        psa_config: TODO.
-        id: TODO.
+        psa_config: The PSA configuration of the project.
+        id: Identification of the component.
 
     Returns:
-        TODO.
+        The input.
     """
     overall_id = id
 
@@ -219,23 +210,23 @@ def handle_psa_settings(
     return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ):
-    """Handle psa settings.
+    """Input handler for a change to a setting of the PSA (number of samples, seed or return of draws).
 
-    TODO: Add a description.
+    Updates the PSA configuration of the project.
 
     Args:
-        triggered_id: TODO.
-        input_ids: TODO.
-        header_ids: TODO.
-        trigger_ids: TODO.
-        calling_dict: TODO.
-        active_project_id: TODO.
-        project_provider: TODO.
-        return_dict: TODO.
-        new_val: TODO.
+        triggered_id: The id of the component which triggered the callback.
+        input_ids: The ids of the input components of the callback.
+        header_ids: The ids of the header containers of the callback.
+        trigger_ids: The ids of the trigger stores of the callback.
+        calling_dict: Other keyword arguments of the calling callback.
+        active_project_id: Id of the active project.
+        project_provider: Provider of projects, metamodels and variables.
+        return_dict: Dictionary of the outputs of the callback, to be updated and returned.
+        new_val: The new value.
 
     Returns:
-        TODO.
+        The updated `return_dict`.
     """
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
@@ -313,23 +304,21 @@ def handle_psa_active(
     return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ) -> dict[str, Any]:
-    """Handle psa active.
-
-    TODO: Add a description.
+    """Input handler for a variable being selected or deselected for the PSA.
 
     Args:
-        triggered_id: TODO.
-        input_ids: TODO.
-        header_ids: TODO.
-        trigger_ids: TODO.
-        calling_dict: TODO.
-        active_project_id: TODO.
-        project_provider: TODO.
-        return_dict: TODO.
-        new_val: TODO.
+        triggered_id: The id of the component which triggered the callback.
+        input_ids: The ids of the input components of the callback.
+        header_ids: The ids of the header containers of the callback.
+        trigger_ids: The ids of the trigger stores of the callback.
+        calling_dict: Other keyword arguments of the calling callback.
+        active_project_id: Id of the active project.
+        project_provider: Provider of projects, metamodels and variables.
+        return_dict: Dictionary of the outputs of the callback, to be updated and returned.
+        new_val: The new value.
 
     Returns:
-        TODO.
+        The updated `return_dict`.
     """
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
