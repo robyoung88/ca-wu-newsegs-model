@@ -19,11 +19,22 @@ def dsa_process_components(**kwargs):
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle('Run DSA?')),
-                dbc.ModalBody("""
-                    Deterministic Sensitivity Analyses require multiple model runs 
-                    and can take minutes to hours to complete, dependent on model 
-                    complexity. Are you ready to continue?
-                """),
+                dbc.ModalBody([
+                    html.P("""
+                        Deterministic Sensitivity Analyses require multiple model runs
+                        and can take minutes to hours to complete, dependent on model
+                        complexity. Are you ready to continue?
+                    """),
+                    html.H3('Configurations to analyse:'),
+                    dcc.RadioItems(
+                        [
+                            {'label': 'Selected configuration', 'value': 'metamodel'},
+                            {'label': 'All configurations (for comparison)', 'value': 'project'},
+                        ],
+                        'metamodel',
+                        id = 'dsa-run-scope',
+                    ),
+                ]),
                 dbc.ModalFooter([
                     dbc.Button(
                         'OK',

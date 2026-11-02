@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping, Iterable
 
 from functools import reduce, partial
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -1089,30 +1090,145 @@ def event_and_daterange_records(
 
     return [val_row, date_row]
 
+# -----------------------------------------------
+# DSA tables and plots
+#
+# The DSA tables are those of post_dsa_results.dsa_results_to_tables: indexed
+# by 'variable' and 'statistic', with columns ('absolute', central / lower /
+# upper / interval) and ('delta', lower / upper). The same tables hold the
+# results of one configuration or the increments of a pairwise comparison.
+# -----------------------------------------------
+
+DSA_ALL_STATISTIC_LABELS = {**sensitivity.DSA_STATISTIC_LABELS, **sensitivity.DSA_PAIRWISE_STATISTIC_LABELS}
+"""Labels of the statistics of a DSA, individual and pairwise, by statistic."""
+
+DSA_BOUND_COLUMNS = ['central', 'lower', 'upper', 'interval']
+"""Columns of the absolute values of a DSA table, in the order that they are shown."""
+
+COMPARATOR_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948']
+"""Colors of the comparators (configurations) of a plot, in fixed order: a comparator keeps its color whatever is selected."""
+
+def filter_dsa_variables(dsa_df: pd.DataFrame, variables: Iterable[str] | None = None) -> pd.DataFrame:
+    """Keep the rows of a DSA table for the variables.
+
+    Args:
+        dsa_df: DSA table, indexed by 'variable' and 'statistic'.
+        variables: Labels of the variables to keep; None keeps all.
+
+    Returns:
+        The dataframe.
+    """
+    if variables is None:
+        return dsa_df
+    variables = set(variables)
+    return dsa_df.loc[dsa_df.index.get_level_values('variable').isin(variables), :]
+
+def dsa_statistic_table(
+    dsa_df: pd.DataFrame,
+    statistic: str,
+    variables: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    """Table of one statistic of a DSA: a row for each variable, with the central, lower and upper values and the interval.
+
+    Args:
+        dsa_df: DSA table, indexed by 'variable' and 'statistic'.
+        statistic: The statistic.
+        variables: Labels of the variables to show; None shows all.
+
+    Returns:
+        The dataframe, with a 'variable' column.
+    """
+    return (
+        filter_dsa_variables(dsa_df, variables)
+        .xs(statistic, level = 'statistic', axis = 0)
+        .xs('absolute', level = 0, axis = 1)
+        .loc[:, ['central', 'interval', 'lower', 'upper']]
+        .reset_index()
+    )
+
+def _sorted_dsa_variables(plot_frames: Iterable[pd.DataFrame]) -> list:
+    """Variables of the plot data of one or more DSAs, by the largest interval in any of them."""
+    intervals = pd.concat(
+        [x[('absolute', 'interval')].abs() for x in plot_frames], axis = 1
+    ).max(axis = 1, skipna = True)
+    return intervals.sort_values(ascending = False, na_position = 'last').index.tolist()
+
+def dsa_comparison_table(
+    dsa_dfs: Mapping[str, pd.DataFrame],
+    statistic: str,
+    variables: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    """Table of one statistic of the DSAs of several comparators side by side.
+
+    The variables are sorted by the largest interval of any comparator. A variable not varied by a comparator has
+    no values for it.
+
+    Args:
+        dsa_dfs: DSA tables, indexed by 'variable' and 'statistic', by the label of the comparator.
+        statistic: The statistic.
+        variables: Labels of the variables to show; None shows all.
+
+    Returns:
+        The dataframe, indexed by variable, with columns (comparator, bound) for each bound of `DSA_BOUND_COLUMNS`.
+    """
+    frames = {
+        k: filter_dsa_variables(v, variables).xs(statistic, level = 'statistic', axis = 0).xs('absolute', level = 0, axis = 1)
+        for k, v in dsa_dfs.items()
+    }
+    frames = {k: v for k, v in frames.items() if len(v)}
+    if not frames:
+        return pd.DataFrame()
+    order = _sorted_dsa_variables(
+        [pd.concat({'absolute': v}, axis = 1) for v in frames.values()]
+    )
+    otable = pd.concat(
+        {k: v.loc[:, DSA_BOUND_COLUMNS] for k, v in frames.items()}, axis = 1
+    )
+    otable.columns.names = ['comparator', 'bound']
+    return otable.loc[order, :]
+
+def _empty_dsa_figure(message: str = 'No DSA results to show'):
+    fig = go.Figure()
+    fig.add_annotation(text = message, showarrow = False, xref = 'paper', yref = 'paper', x = 0.5, y = 0.5)
+    fig.update_layout(template = 'plotly_white', xaxis_visible = False, yaxis_visible = False)
+    return fig
+
+def _dsa_plot_data(dsa_df, statistic, variables = None):
+    return (
+        filter_dsa_variables(dsa_df, variables)
+        .xs(statistic, axis = 0, level = 'statistic')
+        # Ratios may be infinite where the incremental costs are zero
+        .replace([np.inf, -np.inf], np.nan)
+    )
+
 def tornado_plot(
     dsa_df,
     label_df,
-    statistic = 'net_present_value_undiscounted'
+    statistic = 'net_present_value_undiscounted',
+    variables: Iterable[str] | None = None,
+    title: str = 'Lower and Upper DSA variation',
 ):
     """Draw a tornado plot of the results of a deterministic sensitivity analysis.
 
-    The variables are sorted by the size of the interval of the statistic.
+    The variables are sorted by the size of the interval of the statistic. The results may be those of one
+    configuration, or the increments of a pairwise comparison.
 
     Args:
         dsa_df: Dataframe of the results of the sensitivity analysis.
         label_df: Dataframe of the labels of the variables.
         statistic: The statistic to plot.
+        variables: Labels of the variables to plot; None plots all.
+        title: Title of the plot.
 
     Returns:
         The figure.
     """
-    plot_data = (
-        dsa_df
-        .xs(statistic, axis = 0, level = 'statistic')
-        .sort_values(
-            ('absolute', 'interval'),
-            ascending = False
-        )
+    plot_data = _dsa_plot_data(dsa_df, statistic, variables)
+    if not len(plot_data):
+        return _empty_dsa_figure()
+    plot_data = plot_data.sort_values(
+        ('absolute', 'interval'),
+        ascending = False
     )
 
     label_data = (
@@ -1196,8 +1312,8 @@ def tornado_plot(
     )
 
     fig.update_layout(
-        title='Lower and Upper DSA variation',
-        xaxis_title = sensitivity.DSA_STATISTIC_LABELS.get(statistic, statistic),
+        title=title,
+        xaxis_title = DSA_ALL_STATISTIC_LABELS.get(statistic, statistic),
         yaxis_title='Variable',
         barmode='overlay',
         template='plotly_white',
@@ -1206,5 +1322,105 @@ def tornado_plot(
     )
     fig.update_yaxes(autorange='reversed')
     #fig.show()
+
+    return fig
+
+def multi_tornado_plot(
+    dsa_dfs: Mapping[str, pd.DataFrame],
+    statistic: str = 'net_present_value_undiscounted',
+    variables: Iterable[str] | None = None,
+    label_dfs: Mapping[str, pd.DataFrame] | None = None,
+    color_indexes: Mapping[str, int] | None = None,
+    title: str = 'Lower and Upper DSA variation by configuration',
+):
+    """Draw a tornado plot of the results of the DSAs of several comparators, grouped by variable.
+
+    Each comparator has a bar for each variable, from its central value to its values at the lower (hatched) and
+    upper bounds, and a marker at its central value. The variables are sorted by the largest interval of any
+    comparator.
+
+    Args:
+        dsa_dfs: DSA tables, indexed by 'variable' and 'statistic', by the label of the comparator.
+        statistic: The statistic to plot.
+        variables: Labels of the variables to plot; None plots all.
+        label_dfs: Tables of the labels of the variables (the values at the bounds), by the label of the comparator.
+        color_indexes: Index of the color of each comparator in `COMPARATOR_COLORS`, so that a comparator keeps its
+            color whatever the selection; by default the order of `dsa_dfs`.
+        title: Title of the plot.
+
+    Returns:
+        The figure.
+    """
+    frames = {k: _dsa_plot_data(v, statistic, variables) for k, v in dsa_dfs.items()}
+    frames = {k: v for k, v in frames.items() if len(v)}
+    if not frames:
+        return _empty_dsa_figure()
+
+    order = _sorted_dsa_variables(frames.values())
+    label_dfs = label_dfs or {}
+    color_indexes = color_indexes or {k: i for i, k in enumerate(dsa_dfs)}
+
+    fig = go.Figure()
+    for comparator, plot_data in frames.items():
+        color = COMPARATOR_COLORS[color_indexes.get(comparator, 0) % len(COMPARATOR_COLORS)]
+        plot_data = plot_data.reindex(order)
+        central = plot_data[('absolute', 'central')].to_numpy(dtype = float)
+        lower = plot_data[('absolute', 'lower')].to_numpy(dtype = float)
+        upper = plot_data[('absolute', 'upper')].to_numpy(dtype = float)
+
+        values = {}
+        label_df = label_dfs.get(comparator)
+        if label_df is not None:
+            try:
+                values = (
+                    label_df
+                    .xs('variable_value', axis = 0, level = 'statistic')
+                    .xs('absolute', axis = 1, level = 0)
+                    .reindex(order)
+                )
+            except KeyError:
+                values = {}
+
+        def hover(bound):
+            texts = []
+            for var in order:
+                parts = [f'<b>{var}</b>', comparator]
+                if len(values) and bound in values.columns and pd.notna(values.loc[var, bound]):
+                    parts.append(f'{bound.capitalize()} value: {values.loc[var, bound]}')
+                texts.append('<br>'.join(parts))
+            return texts
+
+        for bound, bound_values, pattern in (('lower', lower, '/'), ('upper', upper, '')):
+            fig.add_trace(
+                go.Bar(
+                    x = bound_values - central,
+                    y = order,
+                    base = central,
+                    orientation = 'h',
+                    offsetgroup = comparator,
+                    legendgroup = comparator,
+                    name = f'{comparator} - {bound}',
+                    marker = dict(
+                        color = color,
+                        opacity = 0.55 if bound == 'lower' else 0.9,
+                        pattern = dict(shape = pattern, fgcolor = 'white', solidity = 0.3),
+                        line = dict(color = 'white', width = 1),
+                    ),
+                    hovertext = hover(bound),
+                    hovertemplate = '%{hovertext}<br>' + bound.capitalize() + ' result: %{x:,.2f} from central<extra></extra>',
+                )
+            )
+
+    fig.update_layout(
+        title = title,
+        xaxis_title = DSA_ALL_STATISTIC_LABELS.get(statistic, statistic),
+        yaxis_title = 'Variable',
+        barmode = 'group',
+        template = 'plotly_white',
+        height = max(400, 120 + 40 * len(order) * max(1, len(frames)) // 2),
+        margin = dict(l = 20, r = 20, t = 60, b = 20),
+        legend = dict(orientation = 'h', yanchor = 'bottom', y = 1.0, xanchor = 'left', x = 0),
+    )
+    fig.update_yaxes(autorange = 'reversed')
 
     return fig

@@ -8,7 +8,7 @@ import json
 # Ensure we can find modules
 
 
-from newsegsmodelframework.core import location
+from newsegsmodelframework.core.location import location
 
 class TestLocationEqualities(unittest.TestCase):
 

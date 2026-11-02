@@ -577,13 +577,31 @@ def add_input_container_callbacks(app: NewsegsDash):
                 # Sync variable and invalidate tables
                 provider.variable_provider.upsert_variable(var)
 
+                # Sync the selection onto the independent instances of the variable in the other metamodels,
+                # so that a whole-project DSA varies the same variables in every metamodel
+                changed_mm_ids = list(staleness.metamodels_using_variable(lproj, varuid))
+                for other_lmm in lproj.metamodels:
+                    other_varuid = other_lmm.variables.get(varid)
+                    if not other_varuid or other_varuid == varuid:
+                        continue
+                    other_var = provider.variable_provider.get_variable(other_varuid)
+                    if (
+                        not other_var
+                        or not (other_var.dsa_possible and other_var.dsa_selectable)
+                        or other_var.dsa_selected == new_val
+                    ):
+                        continue
+                    other_var.dsa_selected = new_val
+                    provider.variable_provider.upsert_variable(other_var)
+                    for mm_id in staleness.metamodels_using_variable(lproj, other_varuid):
+                        if mm_id not in changed_mm_ids:
+                            changed_mm_ids.append(mm_id)
+
                 provider.increment_revision(lproj.id)
                 provider._component_provider.increment_revision(
                     lproj.table_config.id
                 )
-                db_staleness.mark_inputs_changed(
-                    staleness.metamodels_using_variable(lproj, varuid), 'dsa'
-                )
+                db_staleness.mark_inputs_changed(changed_mm_ids, 'dsa')
 
             case _:
                 try:

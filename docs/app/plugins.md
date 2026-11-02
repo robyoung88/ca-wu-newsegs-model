@@ -30,6 +30,7 @@ newsegsmodelapp/plugins/
 │       ├── deterministic_single_mm.py
 │       ├── deterministic_run_project.py
 │       ├── dsa_single_mm.py
+│       ├── dsa_run_project.py             # whole-project DSA (every configuration)
 │       ├── psa_single_mm.py
 │       ├── optim_single_mm.py
 │       └── ...

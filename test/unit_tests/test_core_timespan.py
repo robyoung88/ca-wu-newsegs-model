@@ -10,7 +10,7 @@ import numpy.testing
 # Ensure we can find modules
 
 
-from newsegsmodelframework.core.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan, timespan_from_dict
+from newsegsmodelframework.core.timespan.timespan import TimeSpan, RegTimeSpan, OffsetRegTimeSpan, timespan_from_dict
 
 class TestBasicTimespan(unittest.TestCase):
     def test_null_construction(self):

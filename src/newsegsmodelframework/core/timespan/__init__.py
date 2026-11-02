@@ -16,6 +16,7 @@ from .timespan import (
     TimeSpan,
     RegTimeSpan,
     OffsetRegTimeSpan,
+    timespan_from_dict,
 )
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     'TimeSpan',
     'RegTimeSpan',
     'OffsetRegTimeSpan',
+    'timespan_from_dict'
 ]
