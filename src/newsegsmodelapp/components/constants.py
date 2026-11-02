@@ -1,4 +1,9 @@
-from dash import ALL
+"""Constants shared by the components.
+
+Attributes:
+    CONFIGURATION_UPDATE_TRIGGER_ID: Id of the store which signals that the configuration has changed.
+    VARIABLE_PARAMETER_KEYS: Identification keys required to update a single variable parameter.
+"""
 
 CONFIGURATION_UPDATE_TRIGGER_ID = 'configuration-update-trigger'
 

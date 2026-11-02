@@ -1,3 +1,5 @@
+"""The request handler: creation and monitoring of requests for background procedures in the requests table.
+"""
 from dataclasses import asdict
 import logging
 logger = logging.getLogger(__name__)
@@ -28,6 +30,14 @@ _REQUEST_CLASSES = {
 
 
 class FromDatabaseRequestHandler(RequestHandlerInterface):
+    """Creator and monitor of requests for background procedures, using the requests table.
+
+    The front end adds requests (`add_request`) and polls their state; the dispatcher claims new requests and marks them dispatched; the worker marks them
+    complete or failed.
+
+    Args:
+        get_engine: Function returning the SQLAlchemy engine.
+    """
     def __init__(
         self,
         get_engine: Callable[[], sa.Engine],
@@ -99,22 +109,22 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         config: dict | None = None,
         triggering_request: RunRequest | None = None
     ) -> RunRequest:
-        """_summary_
+        """Create a request for a procedure.
 
         Args:
-            request_type (str): _description_
-            request_class (str): _description_
-            get_runrequest_function (Callable): _description_
-            active_project_id (str): _description_
-            project_provider (NewsegsProjectProviderInterface): _description_
-            config (dict | None, optional): _description_. Defaults to None.
-            triggering_request (RunRequest | None, optional): _description_. Defaults to None.
-
-        Raises:
-            ValueError: If request procedure class is not supported.
+            request_type: The type of the request; selects the registered procedure.
+            request_class: The class of the request: `run`, `postprocess` or `tabledraw`.
+            get_runrequest_function: The function which creates the request for the type.
+            active_project_id: Id of the active project.
+            project_provider: Provider of projects.
+            config: Configuration passed to the creating function.
+            triggering_request: The request whose completion triggered this one, for postprocess and table draw requests.
 
         Returns:
-            RunRequest: _description_
+            The request.
+
+        Raises:
+            ValueError: if the request class is not supported.
         """
         match request_class:
             case 'run':
@@ -216,6 +226,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             rows = conn.execute(stmt).fetchall()
         return [self._database_row_to_request(x) for x in rows]
 
+    # REVIEW (unreferenced): no references to `get_new_requests` found in src/, scripts/ or data/.
     @override
     def get_new_requests(
         self, 
@@ -235,11 +246,18 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             rows = conn.execute(stmt).fetchall()
         return [self._database_row_to_request(x) for x in rows]
 
+    # REVIEW (unreferenced): no references to `set_request_status` found in src/, scripts/ or data/.
     def set_request_status(
         self,
         request_id: int | Sequence[int],
         status: tbls.REQUEST_STATUS
     ):
+        """Set the status of a request (or requests).
+
+        Args:
+            request_id: Id of the request.
+            status: The status.
+        """
         if isinstance(request_id, int):
             request_id = [request_id,]
 
@@ -250,6 +268,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         )
         write_with_retries(self._get_engine(writer = True), stmt)
 
+    # REVIEW (unreferenced): no references to `mark_dispatched` found in src/, scripts/ or data/.
     @override
     def mark_dispatched(
         self, 

@@ -1,39 +1,25 @@
-"""
-Representations of energy converters for use in NewsegsGeneration.
+"""Representations of energy converters (generators) for use in `NewsegsGeneration`.
 
-A collection of classes used for representation of converters of environmental
-to electrical energy which may be used as part of composition of a 
-NewsegsGeneration module.
+Generators convert environmental conditions, served by the model, into electrical power over a time span.
+The classes are:
 
-Exports:
-    ABCElecGenerator: Abstract base class for all generators.
-    WindTurbineElecGenerator: Simple WTG using a Cp curve for transformation
-                              of average wind speeds (e.g. 10 min).
-    PowerPlantHomogeneousWind: Scaling of WindTurbineElecGenerator to represent
-                               a Real of independent homogeneous wind
-                               turbines across a homogeneous site.
-    ABCPVElecGenerator: Extension of ABCElecGenerator as an abstract base class
-                        for solar photovoltaic generators.
-    SprakePVElecGenerator: Extension of ABCPVElecGenerator using the simple PV
-                           model of Sprake dependent only upon horizontal flux.
-    PowerPlantHomogeneousPV: Scaling of an ABCPVElecGenerator to represent
-                             a Real of independent modules across a 
-                             homogeneous site.
-    PowerPlantHeterogeneousGenerators: Composition of a Real of 
-                                       ABCElecGenerators.
-    
-    GENERATOR_CONSTRUCTORS: A dictionary of all the implementations of
-                            ABCElecGenerator defined in this module.
+- `ABCElecGenerator`: abstract base class of all generators.
+- `WindTurbineElecGenerator`: a wind turbine using a Cp curve to transform wind speeds (e.g. 10 minute averages).
+- `PowerPlantHomogeneousWind`: a number of identical, independent wind turbines at a homogeneous site.
+- `ABCPVElecGenerator`: abstract base class of photovoltaic generators.
+- `SprakePVGISElecGenerator`: a PV generator which uses pvlib with the Sprake default assumptions.
+- `PowerPlantHomogeneousPV`: a number of identical, independent PV arrays at a homogeneous site.
+- `PowerPlantHeterogeneousGenerators`: a collection of different generators.
 
-    generator_from_dict: Returns a generator when provided its dictionary
-                         representation (from .to_dict() method).
+Each has a configuration class (`...Config`) which holds its revision-tracked state.
+`generator_from_dict` creates a generator from its dictionary.
 """
 from __future__ import annotations
 
 import copy
 from dataclasses import asdict, field
 import json
-from typing import Any, Optional, SupportsIndex
+from typing import Any, Optional
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Collection, Iterable
@@ -46,7 +32,6 @@ import pandas as pd
 from pvlib.modelchain import ModelChain as PVLibModelChain
 
 from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterface
-from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location
@@ -80,6 +65,8 @@ def _cp_interpolant_factory(
 
 @revision_dataclass
 class ABCElecGeneratorConfig(DataWithRevision):
+    """Configuration of an electricity generator: its location.
+    """
     location: location.Location = field(default_factory = location.Location.from_none)
 
 
@@ -188,6 +175,8 @@ class NewsegsGeneratorProperty(ComponentProperty):
 
 @revision_dataclass
 class ABCScalingPowerPlantConfig(ABCElecGeneratorConfig):
+    """Configuration of a power plant of identical units: adds the number of units `n`.
+    """
     n: float = 1.
 
 
@@ -218,6 +207,18 @@ _wteg_default_cp_curve = np.asarray(
 
 @revision_dataclass
 class WindTurbineElecGeneratorConfig(ABCElecGeneratorConfig):
+    """Configuration of a wind turbine generator.
+
+    Attributes:
+        location: Location of the turbine, with its height.
+        default_cp_curve: Default array of wind speed - Cp pairs.
+        cut_in: Wind speed (m/s) below which the turbine does not generate.
+        cut_out: Wind speed (m/s) above which the turbine shuts down.
+        rated_power: Rated power (kW).
+        swept_area: Swept area of the rotor (m^2).
+        hub_height: Height of the rotor centre (m).
+        cp: Function giving the power coefficient at a wind speed; derived from the Cp curve.
+    """
     location: location.RaisedLocation = field(default_factory = location.RaisedLocation.from_none) # pyright: ignore[reportIncompatibleVariableOverride]
     
     default_cp_curve: np.ndarray = field(default_factory = lambda: copy.copy(_wteg_default_cp_curve))
@@ -389,6 +390,11 @@ class WindTurbineElecGenerator(ABCElecGenerator):
     
     @classmethod
     def from_none(cls) -> WindTurbineElecGenerator:
+        """Create a generator with default values.
+
+        Returns:
+            The generator.
+        """
         return cls(_wteg_default_cp_curve)
 
     @property
@@ -434,6 +440,8 @@ class WindTurbineElecGenerator(ABCElecGenerator):
 
     @property
     def location(self) -> location.RaisedLocation:
+        """Location of the turbine, with its height.
+        """
         return self._config.location
 
     @location.setter
@@ -593,6 +601,13 @@ def WindTurbineElecGenerator_from_other(
     self,
     other: WindTurbineElecGenerator
 ) -> None:
+    """Initialise as a copy of another `WindTurbineElecGenerator`.
+
+    Copies the name, the model and the configuration.
+
+    Args:
+        other: The object to copy.
+    """
     super(WindTurbineElecGenerator, self).__init__()
     self.name = other.name
     try:
@@ -626,6 +641,8 @@ class NewsegsWTGeneratorProperty(NewsegsGeneratorProperty):
 
 @revision_dataclass
 class PowerPlantHomogeneousWindConfig(ABCScalingPowerPlantConfig):
+    """Configuration of a power plant of identical wind turbines.
+    """
     ...
 
 
@@ -672,6 +689,11 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
     
     @classmethod
     def from_none(cls) -> PowerPlantHomogeneousWind:
+        """Create a generator with default values.
+
+        Returns:
+            The generator.
+        """
         return cls(WindTurbineElecGenerator.from_none())
 
     @property
@@ -725,6 +747,8 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
 
     @property
     def n_turbines(self) -> float:
+        """Number of turbines.
+        """
         return self.n
 
     @n_turbines.setter
@@ -736,6 +760,8 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
 
     @property
     def nameplate_capacity(self):
+        """Total nameplate capacity (kW) of the turbines.
+        """
         return self.turbine.rated_power * self.n
 
     @override
@@ -748,12 +774,24 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
 
     @property
     def swept_area(self):
+        """Total swept area (m^2) of the turbines.
+        """
         return self.turbine.swept_area * self.n
     
     def run(
             self, 
             timespan: modtimespan.TimeSpan
         ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
+        """Generation of the power plant over the time span.
+
+        Is the number of turbines times the generation of one turbine.
+
+        Args:
+            timespan: The period of time.
+
+        Returns:
+            Array of generation by timestep.
+        """
         return self.n * self.turbine.run(timespan)
 
     @classmethod
@@ -765,6 +803,18 @@ class PowerPlantHomogeneousWind(ABCScalingPowerPlant):
         name: str|None = None,
         model: NewsegsModelInterface | None = None,
     ) -> 'PowerPlantHomogeneousWind':
+        """Create a `PowerPlantHomogeneousWind` from its characteristics.
+
+        Args:
+            turbine: The turbine, of which there are `n`.
+            n: Number of turbines.
+            loc: Location of the power plant.
+            name: Name of the power plant.
+            model: The energy model which supplies environmental data.
+
+        Returns:
+            The generator.
+        """
         a = locals()
         del a['cls']
         del a['turbine']
@@ -777,6 +827,13 @@ def PowerPlantHomogeneousWind_from_other(
     self,
     other: PowerPlantHomogeneousWind
 ) -> None:
+    """Initialise as a copy of another `PowerPlantHomogeneousWind`.
+
+    Copies the name, the model and the configuration.
+
+    Args:
+        other: The object to copy.
+    """
     super(PowerPlantHomogeneousWind, self).__init__()
     self.name = other.name
     try:
@@ -799,6 +856,15 @@ def _default_pv_location():
 
 @revision_dataclass
 class ABCPVElecGeneratorConfig(ABCElecGeneratorConfig):
+    """Configuration of a PV generator.
+
+    Attributes:
+        location: Location of the array, with its azimuth and pitch.
+        peak_power: Peak power (kW).
+        total_area: Total area of the array, including its frame (m^2).
+        collector_area: Area of the collecting surface (m^2).
+        frame_factor: Ratio of collector area to total area.
+    """
     location: location.AspectLocation = field(default_factory = _default_pv_location) # pyright: ignore[reportIncompatibleVariableOverride]
 
     peak_power: float = 1.0
@@ -884,6 +950,11 @@ class ABCPVElecGenerator(ABCElecGenerator):
 
     @classmethod
     def from_none(cls) -> ABCPVElecGenerator:
+        """Create a generator with default values.
+
+        Returns:
+            The generator.
+        """
         return cls(1.0)
 
     @property
@@ -950,6 +1021,8 @@ class ABCPVElecGenerator(ABCElecGenerator):
 
     @property
     def location(self) -> location.AspectLocation:
+        """Location of the array, with its azimuth and pitch.
+        """
         return self._config.location
 
     @location.setter
@@ -984,6 +1057,20 @@ class ABCPVElecGenerator(ABCElecGenerator):
         model: NewsegsModelInterface | None = None
     ) -> T:
         
+        """Create a `PV generator` from its characteristics.
+
+        Args:
+            peak_power: Peak power (kW).
+            loc: Location of the array.
+            total_area: Total area including the frame (m^2).
+            collector_area: Area of the collecting surface (m^2).
+            frame_factor: Ratio of collector area to total area.
+            name: Name of the generator.
+            model: The energy model which supplies environmental data.
+
+        Returns:
+            The generator.
+        """
         a = locals()
         del a['cls']
         del a['peak_power']
@@ -998,6 +1085,13 @@ def ABCPVElecGenerator_from_other(
     self,
     other: ABCPVElecGenerator
 ) -> None:
+    """Initialise as a copy of another `ABCPVElecGenerator`.
+
+    Copies the name, the model and the configuration.
+
+    Args:
+        other: The object to copy.
+    """
     super(ABCPVElecGenerator, self).__init__()
     self.name = other.name
     try:
@@ -1012,6 +1106,12 @@ def ABCPVElecGenerator_from_other(
 
 @revision_dataclass
 class SprakePVGISElecGeneratorConfig(ABCPVElecGeneratorConfig):
+    """Configuration of the Sprake PV generator.
+
+    Attributes:
+        dc_efficiency: Efficiency of the DC wiring.
+        inverter_efficiency: Efficiency of the inverter.
+    """
     dc_efficiency: float = 0.98
     inverter_efficiency: float = 0.96
 
@@ -1076,6 +1176,11 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
 
     @classmethod
     def from_none(cls) -> SprakePVGISElecGenerator:
+        """Create a generator with default values.
+
+        Returns:
+            The generator.
+        """
         return cls(1.0)
         
     def _set_pvlib_location(self):
@@ -1139,6 +1244,16 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         self,
         timespan: modtimespan.TimeSpan
     ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]:
+        """Generation of the array over the time span, using pvlib.
+
+        Gets the horizontal solar flux, air temperature and wind speed from the model's local environment, estimates the solar position and splits the flux into direct and diffuse components (Erbs model), then runs a pvlib model chain with the module, temperature, loss and inverter parameters. Raises `ValueError` if the generator has no model.
+
+        Args:
+            timespan: The period of time.
+
+        Returns:
+            Array of generation by timestep.
+        """
         from pvlib.irradiance import erbs as pvlib_erbs
 
         if self.model is None:
@@ -1252,6 +1367,20 @@ class SprakePVGISElecGenerator(ABCPVElecGenerator):
         # o.inverter_efficiency = inverter_efficiency
 
         # Instead, we will use the sync method
+        """Create a `SprakePVGISElecGenerator` from its characteristics.
+
+        Args:
+            peak_power: Peak power (kW).
+            loc: Location of the array.
+            total_area: Total area including the frame (m^2).
+            collector_area: Area of the collecting surface (m^2).
+            frame_factor: Ratio of collector area to total area.
+            name: Name of the generator.
+            model: The energy model which supplies environmental data.
+
+        Returns:
+            The generator.
+        """
         a = locals()
         del a['cls']
         o = cls.from_none()
@@ -1265,6 +1394,13 @@ def SprakePVGISElecGenerator_from_other(
     self,
     other: SprakePVGISElecGenerator
 ) -> None:
+    """Initialise as a copy of another `SprakePVGISElecGenerator`.
+
+    Copies the name, the model and the configuration.
+
+    Args:
+        other: The object to copy.
+    """
     super(SprakePVGISElecGenerator, self).__init__(other) # pyright: ignore[reportCallIssue]
     self.name = other.name
     try:
@@ -1296,6 +1432,8 @@ class NewsegsPVGeneratorProperty(NewsegsGeneratorProperty):
 
 @revision_dataclass
 class PowerPlantHomogeneousPVConfig(ABCScalingPowerPlantConfig):
+    """Configuration of a power plant of identical PV arrays: adds the location.
+    """
     location: location.AspectLocation = field(default_factory = _default_pv_location) # pyright: ignore[reportIncompatibleVariableOverride]
 
 
@@ -1343,6 +1481,11 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
     
     @classmethod
     def from_none(cls) -> PowerPlantHomogeneousPV:
+        """Create a generator with default values.
+
+        Returns:
+            The generator.
+        """
         return cls(SprakePVGISElecGenerator.from_none())
 
     @property
@@ -1372,6 +1515,8 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
 
     @property
     def location(self) -> location.AspectLocation:
+        """Location of the power plant, with its azimuth and pitch.
+        """
         try:
             return self.pv_array.location
         except AttributeError:
@@ -1390,6 +1535,8 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
 
     @property
     def n_arrays(self) -> float:
+        """Number of PV arrays.
+        """
         return self.n
 
     @n_arrays.setter
@@ -1401,6 +1548,8 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
 
     @property
     def nameplate_capacity(self):
+        """Total nameplate capacity (kW) of the arrays.
+        """
         return self.pv_array.nameplate_capacity * self.n
 
     @override
@@ -1413,16 +1562,30 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
     
     @property
     def total_area(self):
+        """Total area of the arrays, including frames (m^2).
+        """
         return self.pv_array.total_area * self.n
     
     @property
     def collector_area(self):
+        """Total collector area of the arrays (m^2).
+        """
         return self.pv_array.collector_area * self.n
 
     def run(
         self,
         timespan: modtimespan.TimeSpan
     ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
+        """Generation of the power plant over the time span.
+
+        Is the number of arrays times the generation of one array.
+
+        Args:
+            timespan: The period of time.
+
+        Returns:
+            Array of generation by timestep.
+        """
         return self.n * self.pv_array.run(timespan)
 
     @classmethod
@@ -1435,6 +1598,18 @@ class PowerPlantHomogeneousPV(ABCScalingPowerPlant):
         model: NewsegsModelInterface | None = None,
     ) -> PowerPlantHomogeneousPV:
 
+        """Create a `PowerPlantHomogeneousPV` from its characteristics.
+
+        Args:
+            pv_array: The array, of which there are `n`.
+            n: Number of arrays.
+            loc: Location of the power plant.
+            name: Name of the power plant.
+            model: The energy model which supplies environmental data.
+
+        Returns:
+            The generator.
+        """
         a = locals()
         del a['cls']
         del a['pv_array']#
@@ -1450,6 +1625,13 @@ def PowerPlantHomogeneousPV_from_other(
     self,
     other: PowerPlantHomogeneousPV
 ) -> None:
+    """Initialise as a copy of another `PowerPlantHomogeneousPV`.
+
+    Copies the name, the model and the configuration.
+
+    Args:
+        other: The object to copy.
+    """
     super(PowerPlantHomogeneousPV, self).__init__()
     self.name = other.name
     try:
@@ -1480,6 +1662,8 @@ def _wrap_generator_value(val: Any, parent: ABCElecGenerator) -> Any:
         return ObservableGeneratorList(val, parent = parent) # pyright: ignore[reportArgumentType]
 
 class ObservableGeneratorList(ObservableList):
+    """Observable list of generators. Generators in the list are children of the owner, and take its model.
+    """
     ...
 
 
@@ -1511,6 +1695,8 @@ class NewsegsGeneratorListProperty(ComponentProperty):
 
 @revision_dataclass
 class PowerPlantHeterogeneousGeneratorsConfig(ABCElecGeneratorConfig):
+    """Configuration of a power plant of different generators; the location is that of its first generator.
+    """
     ...
 
 
@@ -1563,6 +1749,11 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
     
     @classmethod
     def from_none(cls) -> PowerPlantHeterogeneousGenerators:
+        """Create a power plant of default wind and PV plants.
+
+        Returns:
+            The power plant.
+        """
         return cls([
             PowerPlantHomogeneousWind.from_none(),
             PowerPlantHomogeneousPV.from_none(),
@@ -1570,6 +1761,8 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         
     @property
     def model(self) -> NewsegsModelInterface:
+        """The energy model of the generators; that of the first generator.
+        """
         try:
             return self.generators[0].model
         except IndexError:
@@ -1585,6 +1778,8 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
 
     @property
     def location(self) -> location.Location:
+        """The location of the first generator, or of the configuration if there are none.
+        """
         if len(self.generators):
             return self.generators[0].location
         return self._config.location
@@ -1597,18 +1792,30 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         self._config.location = loc
     
     def append(self, generator: ABCScalingPowerPlant) -> None:
+        """Add a generator to the end.
+
+        Args:
+            generator: The generator.
+        """
         self.generators.append(generator)
         # Currently, set all generators to same spot location?
         # No, leave as they are when they enter.
         # self.location = self._config.location
         
     def clear(self) -> None:
+        """Remove all generators.
+        """
         self.generators.clear()
 
     def extend(
             self, 
             other: PowerPlantHeterogeneousGenerators | Iterable[ABCScalingPowerPlant]
         ) -> None:
+        """Add generators to the end.
+
+        Args:
+            other: The object to copy.
+        """
         if isinstance(other, PowerPlantHeterogeneousGenerators):
             for gen in other.generators:
                 self.append(gen)
@@ -1617,15 +1824,36 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
                 self.append(gen)
     
     def insert(self, index: int, generator: ABCScalingPowerPlant) -> None:
+        """Insert a generator before an index.
+
+        Args:
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
+            generator: The generator.
+        """
         self.generators.insert(index, generator)
     
     def pop(self, index:int=-1) -> ABCElecGenerator:
+        """Remove and return a generator.
+
+        Args:
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
+
+        Returns:
+            The generator.
+        """
         return self.generators.pop(index)
 
     def __len__(self):
         return len(self.generators)
 
     def set_n(self, n: npt.ArrayLike):
+        """Set the number of units of each generator.
+
+        Raises `ValueError` if the length of `n` is not the number of generators.
+
+        Args:
+            n: Number of units.
+        """
         n = np.asarray(n).flatten()
         if len(n) != len(self):
             raise ValueError("`n` should be same length as `.generators`")
@@ -1637,6 +1865,16 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         timespan: modtimespan.TimeSpan
     ) -> np.ndarray[tuple[int,int], np.dtype[np.float64]]:
         # Verify that all are using the same model
+        """Generation of each generator over the time span.
+
+        All generators use the model of the first.
+
+        Args:
+            timespan: The period of time.
+
+        Returns:
+            Array of generation with a row for each generator and a column for each timestep.
+        """
         self.model = self.generators[0].model
 
         olist = [x.run(timespan) for x in self.generators]
@@ -1657,6 +1895,16 @@ class PowerPlantHeterogeneousGenerators(ABCElecGenerator):
         name: str | None = None,
         model: NewsegsModelInterface | None = None,
     ) -> PowerPlantHeterogeneousGenerators:
+        """Create a `PowerPlantHeterogeneousGenerators` from its characteristics.
+
+        Args:
+            generators: The generators.
+            name: Name of the power plant.
+            model: The energy model which supplies environmental data.
+
+        Returns:
+            The generator.
+        """
         a = locals()
         del a['cls']
         del a['generators']
@@ -1672,6 +1920,13 @@ def PowerPlantHeterogeneousGenerators_from_other(
     self,
     other: PowerPlantHeterogeneousGenerators
 ) -> None:
+    """Initialise as a copy of another `PowerPlantHeterogeneousGenerators`.
+
+    Copies the name, the model and the configuration.
+
+    Args:
+        other: The object to copy.
+    """
     super(PowerPlantHeterogeneousGenerators, self).__init__()
     self.name = other.name
     try:
@@ -1698,6 +1953,16 @@ GENERATOR_CONSTRUCTORS = {
 }
 
 def generator_from_dict(ip: dict[str, Any]) -> ABCElecGenerator:
+    """Create a generator from its dictionary.
+
+    The dictionary names the `class` of the generator.
+
+    Args:
+        ip: Dictionary of the serialised state, including the `class`.
+
+    Returns:
+        The generator.
+    """
     ip = copy.copy(ip)
     classname = ip.pop('class')
     if classname is None:

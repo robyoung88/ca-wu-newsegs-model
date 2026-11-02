@@ -1,3 +1,5 @@
+"""The probabilistic sensitivity analysis (PSA) of a single metamodel.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,8 @@ REQUEST_TYPE = 'psa_run_metamodel'
 
 @dataclass
 class PSARunMetamodelRunRequest(RunRequest):
+    """Request to run a PSA of a metamodel.
+    """
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
@@ -41,6 +45,21 @@ def execute_psa_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    """Run a probabilistic sensitivity analysis of one metamodel, in a worker.
+
+    Runs the model for samples drawn from the distributions of the variables selected for PSA. Raises `ValueError` if no metamodel is named in the request and `KeyError` if it is not in the project.
+
+    Args:
+        request: The request being executed.
+        project_provider: Provider of projects, metamodels and variables.
+        result_provider: Provider of results.
+        run_id: Id of the run.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message.
+        check_cancel_status: Function returning whether cancellation of the run has been requested.
+
+    Returns:
+        The status message, `ok` on success.
+    """
     started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
         

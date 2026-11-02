@@ -7,11 +7,17 @@ occur at runtime.
 """
 import inspect
 from types import ModuleType
-from typing import Any, Callable, Literal, Type
+from typing import Any, Callable, Type
 
 from newsegsmodelframework.core.serialisation import T
 
 class NakedConstructor:
+    """Interface of a class that can be constructed from a dictionary.
+
+    Registers hold, for each class name, an object with this interface. For NewSEGS classes it is the class itself
+    (they implement `from_dict`); for foreign types such as pandas timestamps it is a stand-in object whose
+    `from_dict` builds the instance.
+    """
     def to_dict(self) -> dict[str, Any]: ...
     def update(self, config: dict[str, Any]): ...
 
@@ -20,6 +26,14 @@ class NakedConstructor:
 
     @classmethod
     def from_dict(cls: Type[T], config: dict[str, Any]) -> T:
+        """Build an instance from its serialised dictionary.
+
+        Args:
+            config: Dictionary of the serialised state.
+
+        Returns:
+            The instance.
+        """
         ...
 
 def get_subclasses_in_module(
@@ -38,7 +52,14 @@ def get_subclasses_in_module(
             on these classes should result in an instance of the class.
     """
     odict = {}
-    for objname in pymod.__all__:
+    # A module with no `__all__` is searched for the public classes it defines
+    objnames = getattr(pymod, '__all__', None)
+    if objnames is None:
+        objnames = [
+            name for name, obj in vars(pymod).items()
+            if isinstance(obj, type) and obj.__module__ == pymod.__name__ and not name.startswith('_')
+        ]
+    for objname in objnames:
         obj = getattr(pymod, objname)
         if not inspect.isabstract(obj):
             try:
@@ -48,12 +69,23 @@ def get_subclasses_in_module(
                 continue
     return odict
 
+def _import_modules(*names: str) -> list[ModuleType]:
+    """Import modules by name.
+
+    The registries search the modules that define the classes, rather than the packages that
+    re-export them, so that the registries do not depend upon what the packages expose.
+    """
+    import importlib
+    return [importlib.import_module(name) for name in names]
+
+_FW = 'newsegsmodelframework.'
+
 CONSTRUCTOR_CLASS_REGISTER: dict[str, Callable[[], dict[str, object] | dict[str, NakedConstructor]]] = {}
 
 def register_constructor_class(cc_name: str):
     """Add a constructor class registry function to `CONSTRUCTOR_CLASS_REGISTER`
 
-    Registration is necessary to use [core.find_constructor][] for a new constructor_class
+    Registration is necessary to use [find_constructor][newsegsmodelframework.core.find_constructor] for a new constructor_class
     
     The decorated function should take no arguments, and return a dictionary
     of constructors for classes which implement a `.from_dict` constructor
@@ -64,7 +96,7 @@ def register_constructor_class(cc_name: str):
 
     Example:
         ```python
-        from core import register_constructor_class
+        from newsegsmodelframework.core.constructors.registers import register_constructor_class, get_subclasses_in_module
         
         @register_constructor_class('my_constructor_class')
         def get_mcc_constructors():
@@ -99,25 +131,27 @@ def get_datawithrevision_register():
     Configuration data classes
     """
     from newsegsmodelframework.core import newsegscomponent
-    import newsegsmodelframework.newsegsmodel as newsegsmodel
-    import newsegsmodelframework.newsegsfinance as newsegsfinance
-    import newsegsmodelframework.core.generation as generation
-    import newsegsmodelframework.newsegsgrid as newsegsgrid
-    import newsegsmodelframework.newsegsgeneration as newsegsgeneration
-    import newsegsmodelframework.newsegscs as newsegscs
     import newsegsmodelframework.newsegsvariable as newsegsvariable
-    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
-    import newsegsmodelframework.newsegsproject as newsegsproject
-    import newsegsmodelframework.core.trackeddata as trackeddata
-    import newsegsmodelframework.newsegssensitivity as newsegssensitivity
     CONSTRUCTORS = {}
-    for pymod in [
-        newsegscomponent, newsegsmodel, newsegsfinance, 
-        generation, newsegsgrid, newsegsgeneration, 
-        newsegscs, newsegsvariable, newsegsmetamodel, 
-        newsegsproject, trackeddata, 
-        newsegssensitivity
-    ]:
+    for pymod in _import_modules(
+        _FW + 'core.newsegscomponent',
+        _FW + 'core.trackeddata',
+        _FW + 'core.generation.generators',
+        _FW + 'newsegsmodel.newsegsmodel',
+        _FW + 'newsegsmodel.sprakemodel',
+        _FW + 'newsegsfinance.newsegsfinance',
+        _FW + 'newsegsfinance.sprakefinance',
+        _FW + 'newsegsgrid.newsegsgrid',
+        _FW + 'newsegsgrid.sprakegrid',
+        _FW + 'newsegsgeneration.newsegsgeneration',
+        _FW + 'newsegsgeneration.sprakegeneration',
+        _FW + 'newsegscs.newsegscs',
+        _FW + 'newsegscs.sprakecs',
+        _FW + 'newsegsmetamodel.newsegsmetamodel',
+        _FW + 'newsegsproject.newsegsproject',
+        _FW + 'newsegssensitivity.dsa',
+        _FW + 'newsegssensitivity.psa',
+    ) + [newsegsvariable]:
         CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.DataWithRevision)
         )
@@ -130,15 +164,20 @@ def get_newsegscomponent_register():
     Non-NewsegsModule classes that are NewsegsComponents
     """
     from newsegsmodelframework.core import newsegscomponent
-    import newsegsmodelframework.newsegsmodel as newsegsmodel
-    import newsegsmodelframework.newsegsfinance as newsegsfinance
     import newsegsmodelframework.newsegsvariable as newsegsvariable
-    import newsegsmodelframework.newsegssensitivity as newsegssensitivity
-    import newsegsmodelframework.newsegsmetamodel as newsegsmetamodel
-    import newsegsmodelframework.newsegsproject as newsegsproject
     
     COMPONENT_CONSTRUCTORS = {}
-    for pymod in [newsegsmodel, newsegsfinance, newsegscomponent, newsegssensitivity, newsegsmetamodel, newsegsproject]:
+    for pymod in _import_modules(
+        _FW + 'newsegsmodel.newsegsmodel',
+        _FW + 'newsegsmodel.sprakemodel',
+        _FW + 'newsegsfinance.newsegsfinance',
+        _FW + 'newsegsfinance.sprakefinance',
+        _FW + 'core.newsegscomponent',
+        _FW + 'newsegssensitivity.dsa',
+        _FW + 'newsegssensitivity.psa',
+        _FW + 'newsegsmetamodel.newsegsmetamodel',
+        _FW + 'newsegsproject.newsegsproject',
+    ):
         COMPONENT_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.NewsegsComponent)
         )
@@ -157,12 +196,16 @@ def get_newsegsmodule_register():
     All also inherit from NewsegsComponent, but we aim to slim down the registers.
     """
     from newsegsmodelframework.core import newsegsmodule
-    import newsegsmodelframework.newsegsgeneration as newsegsgeneration
-    import newsegsmodelframework.newsegsgrid as newsegsgrid
-    import newsegsmodelframework.newsegscs as newsegscs
 
     MODULE_CONSTRUCTORS = {}
-    for pymod in [newsegsgeneration, newsegsgrid, newsegscs]:
+    for pymod in _import_modules(
+        _FW + 'newsegsgeneration.newsegsgeneration',
+        _FW + 'newsegsgeneration.sprakegeneration',
+        _FW + 'newsegsgrid.newsegsgrid',
+        _FW + 'newsegsgrid.sprakegrid',
+        _FW + 'newsegscs.newsegscs',
+        _FW + 'newsegscs.sprakecs',
+    ):
         MODULE_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegsmodule.NewsegsModule)
         )
@@ -171,35 +214,51 @@ def get_newsegsmodule_register():
 
 @register_constructor_class('Generator')
 def get_generator_register():
-    from newsegsmodelframework.core import generation
+    """Register of the electricity generators: the concrete subclasses of `ABCElecGenerator`.
+
+    Returns:
+        Dictionary of constructors by class name.
+    """
+    from newsegsmodelframework.core.generation import generators
     
     GENERATOR_CONSTRUCTORS = {}
-    for pymod in [generation]:
+    for pymod in [generators]:
         GENERATOR_CONSTRUCTORS.update(
-            get_subclasses_in_module(pymod, generation.ABCElecGenerator)
+            get_subclasses_in_module(pymod, generators.ABCElecGenerator)
         )
     
     return GENERATOR_CONSTRUCTORS
 
 @register_constructor_class('Environment')
 def get_environment_register():
-    from newsegsmodelframework.core import environment
+    """Register of the environment servers: concrete subclasses of `NewsegsLocalEnvironment` and `NewsegsWiderEnvironment`.
+
+    Returns:
+        Dictionary of constructors by class name.
+    """
+    from newsegsmodelframework.core.environment import (
+        dummy_env_servers, environment_servers, inmem_env_servers
+    )
 
     ENVIRONMENT_CONSTRUCTORS = {}
-    for pymod in [environment]:
+    for pymod in [dummy_env_servers, inmem_env_servers]:
         ENVIRONMENT_CONSTRUCTORS.update(
-            get_subclasses_in_module(pymod, environment.NewsegsLocalEnvironment)
+            get_subclasses_in_module(pymod, environment_servers.NewsegsLocalEnvironment)
         )
-    for pymod in [environment]:
         ENVIRONMENT_CONSTRUCTORS.update(
-            get_subclasses_in_module(pymod, environment.NewsegsWiderEnvironment)
+            get_subclasses_in_module(pymod, environment_servers.NewsegsWiderEnvironment)
         )
     
     return ENVIRONMENT_CONSTRUCTORS
 
 @register_constructor_class('Location')
 def get_location_register():
-    from newsegsmodelframework.core import location
+    """Register of the locations: concrete subclasses of `Location`.
+
+    Returns:
+        Dictionary of constructors by class name.
+    """
+    from newsegsmodelframework.core.location import location
 
     LOCATION_CONSTRUCTORS = {}
     for pymod in [location]:
@@ -209,7 +268,12 @@ def get_location_register():
 
 @register_constructor_class('TimeSpan')
 def get_timespan_register():
-    from newsegsmodelframework.core import timespan
+    """Register of the time spans: concrete subclasses of `TimeSpan`.
+
+    Returns:
+        Dictionary of constructors by class name.
+    """
+    from newsegsmodelframework.core.timespan import timespan
 
     TIMESPAN_CONSTRUCTORS = {}
     for pymod in [timespan]:
@@ -219,6 +283,11 @@ def get_timespan_register():
 
 @register_constructor_class('Timestamp')
 def get_timestamp_register():
+    """Register of the constructor of a pandas `Timestamp` from its dictionary.
+
+    Returns:
+        Dictionary with the constructor.
+    """
     import pandas as pd
     def timestamp_from_dict(config: dict[str, Any]) -> pd.Timestamp:
         config = config.copy()
@@ -235,6 +304,11 @@ def get_timestamp_register():
 
 @register_constructor_class('Timedelta')
 def get_timedelta_register():
+    """Register of the constructor of a pandas `Timedelta` from its dictionary.
+
+    Returns:
+        Dictionary with the constructor.
+    """
     import pandas as pd
 
     def timedelta_from_dict(config: dict[str, Any]) -> pd.Timedelta:
@@ -251,6 +325,11 @@ def get_timedelta_register():
 
 @register_constructor_class('datetime')
 def get_datetime_register():
+    """Register of the constructor of a `datetime.datetime` from its dictionary (an ISO format string).
+
+    Returns:
+        Dictionary with the constructor.
+    """
     import datetime
 
     def datetime_from_dict(config: dict[str, Any]) -> datetime.datetime:
@@ -267,7 +346,12 @@ def get_datetime_register():
 
 @register_constructor_class('PVLib')
 def get_pvlib_register():
-    from newsegsmodelframework.core import location
+    """Register of the pvlib location wrappers: concrete subclasses of `PVLibLocation`.
+
+    Returns:
+        Dictionary of constructors by class name.
+    """
+    from newsegsmodelframework.core.location import location
 
     LOCATION_CONSTRUCTORS = {}
     for pymod in [location]:
@@ -277,6 +361,11 @@ def get_pvlib_register():
 
 @register_constructor_class('Variable')
 def get_variable_register():
+    """Register of the variables; the same classes as the component register, which includes the variable constructors.
+
+    Returns:
+        Dictionary of constructors by class name.
+    """
     return CONSTRUCTOR_CLASS_REGISTER['NewsegsComponent']()
 
 # Storage for classes dynamically added at runtime

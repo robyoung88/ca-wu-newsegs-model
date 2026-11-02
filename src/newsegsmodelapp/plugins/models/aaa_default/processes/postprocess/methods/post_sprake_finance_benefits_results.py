@@ -1,3 +1,5 @@
+"""Postprocessing of the benefits of the Sprake finance model into the form shown in the interface.
+"""
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegsfinance.sprakefinance import SprakeFinance
 

@@ -68,6 +68,7 @@ DEFAULT_ICONS = {
     'results-download': 'bi bi-table',
     'show-graph': 'bi bi-graph-up',
     'nav-options': 'bi bi-list',
+    'nav-help': 'bi bi-question-circle',
     'nav-landing': 'bi bi-card-text',
     'nav-system-config': 'bi bi-sliders2-vertical',
     'nav-dsa-config': 'bi bi-tornado',
@@ -225,6 +226,18 @@ def get_icon(icon_name: None | SequenceNotStr[str] | str = None,
              style_name: Literal['default', 'raw', 'unpadded'] = 'default'):
     
     # Icon for missing names:
+    """Get an icon, or sequence of icons, by name.
+
+    The icons are Bootstrap icon font classes. A sequence of names gives icons with padding classes such that they appear as one group. An unknown name gives a warning icon.
+
+    Args:
+        icon_name: Name(s) of the icon(s), from `components.icons`.
+        icon_class: Further CSS classes of the icon.
+        style_name: Padding style: `default`, `unpadded` or `raw` (the class names only).
+
+    Returns:
+        An `html.I` component, or with `style_name = "raw"` the class names.
+    """
     mi = "bi bi-exclamation-circle"
     # The bootstrap pad and margin classes for default styles
     default_pad_class = 'p-1 m-2'

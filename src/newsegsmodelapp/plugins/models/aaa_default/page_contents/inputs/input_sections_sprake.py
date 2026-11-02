@@ -1,3 +1,5 @@
+"""The input sections of the deterministic (site configuration) page for the Sprake model.
+"""
 
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.components.layouts.input_card import create_input_card

@@ -1,9 +1,10 @@
+"""The deterministic run of every metamodel of a project.
+"""
 from dataclasses import dataclass
 import datetime
 import time
 from typing import Callable, cast
 
-import sqlalchemy as sa
 
 from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
@@ -15,10 +16,22 @@ REQUEST_TYPE = 'deterministic_run_project'
 
 @dataclass
 class DeterministicRunProjectRunRequest(RunRequest):
+    """Request to run the NewSEGS Energy Model and finance model of every metamodel of a project.
+    """
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
 def request_deterministic_run_project(project_id: str, project_provider: NewsegsProjectProviderInterface, config: dict|None = None):
+    """Create the request for the deterministic run of every metamodel of a project.
+
+    Args:
+        project_id: Id of the project.
+        project_provider: Provider of projects, metamodels and variables.
+        config: The layout configuration of the page.
+
+    Returns:
+        The request.
+    """
     return DeterministicRunProjectRunRequest(
         project_id = project_id,
         request_label = 'Deterministic project run - ' + str(datetime.datetime.now())
@@ -33,6 +46,21 @@ def execute_deterministic_run_project(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    """Run every metamodel of a project, in turn, in a worker.
+
+    Reports progress by step, and stops if cancellation is requested.
+
+    Args:
+        request: The request being executed.
+        project_provider: Provider of projects, metamodels and variables.
+        result_provider: Provider of results.
+        run_id: Id of the run.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message.
+        check_cancel_status: Function returning whether cancellation of the run has been requested.
+
+    Returns:
+        The status message, `ok` on success.
+    """
     started_ns = time.time_ns()
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 

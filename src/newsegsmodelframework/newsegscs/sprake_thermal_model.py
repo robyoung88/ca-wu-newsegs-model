@@ -1,9 +1,10 @@
+"""The space heating demand model of the Sprake model: heating degree days, heat loss parameter and the daily profile.
+"""
 import os
 import numpy as np
 import pandas as pd
 import numpy.typing as npt
 
-from pathlib import Path
 
 from config import settings
 from newsegsmodelframework import STATICDATA
@@ -31,14 +32,33 @@ PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
                         start_day_seconds = lambda df: df['timestamp'].dt.total_seconds(),
                         end_day_seconds = lambda df: df['start_day_seconds'].shift(-1, fill_value = df['start_day_seconds'].iloc[-1] + (df['start_day_seconds'].iloc[1] - df['start_day_seconds'].iloc[0])))
 
+# REVIEW (unreferenced): no references to `calibrate_hlp` found in src/, scripts/ or data/.
 def calibrate_hlp(target_specific_heat_loss: float = 52.0, #kWh/m²/yr
                   calibration_degree_days: npt.ArrayLike = np.asarray(CALIBRATION_DEGREE_DAYS['hdd_15_5'].values)
                   ) -> float:
     # degree days to degree hours
+    """The heat loss parameter that gives a target annual specific heat loss.
+
+    Args:
+        target_specific_heat_loss: Specific heat loss (kWh/m^2/year) to calibrate to.
+        calibration_degree_days: Degree days of the calibration year.
+
+    Returns:
+        The heat loss parameter.
+    """
     dh = 24.0 * np.sum(calibration_degree_days)
     return target_specific_heat_loss / (dh / 1000.0)
 
 def profiles_for_time_spans(time_spans, profile_data):
+    """Fraction of the daily space heating demand in each of the time spans, from the profile.
+
+    Args:
+        time_spans: Dataframe of the start and end second of the day of each timestep.
+        profile_data: Dataframe of the profile data.
+
+    Returns:
+        Dataframe of the fraction for each time span.
+    """
     import sqlite3
 
     with sqlite3.connect(':memory:') as conn:
@@ -74,6 +94,20 @@ def get_spaceheat_energy_consumption(datetimes,
                                      hdd:pd.DataFrame=TIMESERIES_DEGREE_DAYS,
                                      profile_data:pd.DataFrame=PROFILE_DATA
                                      ):
+    """Energy consumption for space heating at each timestep.
+
+    The demand of each day is the heating degree days (to 15.5 degrees C) times the floor area times the heat loss parameter (W/m^2/K), converted to kWh, and is distributed through the day by the profile. Raises `ValueError` if the datetimes are outside of the degree day data.
+
+    Args:
+        datetimes: Datetimes at the start of each timestep.
+        hlp: Heat loss parameter.
+        gfa: Gross floor area of a dwelling (m^2).
+        hdd: Dataframe of heating degree days.
+        profile_data: Dataframe of the profile data.
+
+    Returns:
+        Series of consumption.
+    """
     oframe = (
         pd.DataFrame(
             {'datetime': pd.to_datetime(datetimes)}

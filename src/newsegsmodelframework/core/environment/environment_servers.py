@@ -1,15 +1,13 @@
 """Abstract base classes for environmental data providers."""
 from abc import ABCMeta, abstractmethod
-from typing import Any, Literal, Union, Sequence, SupportsFloat, overload
+from typing import Any, Literal, Union, Sequence, overload
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 
 from newsegsmodelframework.core import serialisation
 from newsegsmodelframework.core import Location,RaisedLocation,AspectLocation
 from newsegsmodelframework.core import TimeSpan
-from newsegsmodelframework.util import classfuncs
 
 RealArrayLike = Union[
     int, 

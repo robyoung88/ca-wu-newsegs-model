@@ -77,6 +77,7 @@ def in_range_intervals_unclosed(
 
     return intervals
 
+# REVIEW (unreferenced): no references to `continuous_time_in_range` found in src/, scripts/ or data/.
 def continuous_time_in_range(
     timeseries: pd.Series,
     minimum: float,
@@ -84,17 +85,17 @@ def continuous_time_in_range(
     include_lower: bool = True,
     include_upper: bool = False
 ) -> pd.DataFrame:
-    """_summary_
+    """Each continuous interval for which a timeseries remains within a range.
 
     Args:
-        timeseries (pd.Series): _description_
-        minimum (float): _description_
-        maximum (float): _description_
-        include_lower (bool, optional): _description_. Defaults to True.
-        include_upper (bool, optional): _description_. Defaults to False.
+        timeseries: The timeseries.
+        minimum: Lower limit of the range.
+        maximum: Upper limit of the range.
+        include_lower: Whether the lower limit is within the range.
+        include_upper: Whether the upper limit is within the range.
 
     Returns:
-        pd.DataFrame: _description_
+        Dataframe of the `datetime_start`, `datetime_end` and `hours` of each interval, in order of end.
     """
 
     kwargs = locals()
@@ -146,17 +147,19 @@ def max_continuous_time_in_range(
     include_lower: bool = True,
     include_upper: bool = False
 ) -> dict:
-    """_summary_
+    """The longest continuous interval for which a timeseries remains within a range.
+
+    If there are several of the same length, the first is chosen. If the timeseries is never within the range, the interval is of zero length at its start.
 
     Args:
-        timeseries (pd.Series): _description_
-        minimum (float): _description_
-        maximum (float): _description_
-        include_lower (bool, optional): _description_. Defaults to True.
-        include_upper (bool, optional): _description_. Defaults to False.
+        timeseries: The timeseries.
+        minimum: Lower limit of the range.
+        maximum: Upper limit of the range.
+        include_lower: Whether the lower limit is within the range.
+        include_upper: Whether the upper limit is within the range.
 
     Returns:
-        dict: _description_
+        Dictionary of the `datetime_start` and `datetime_end` of the interval, as strings, and its `hours`.
     """
 
     kwargs = locals()

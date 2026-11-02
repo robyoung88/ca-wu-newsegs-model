@@ -1,3 +1,7 @@
+"""Identifying the components of variables.
+
+The ids of the components of the interface are dictionaries; these dataclasses make and read them for the components of a variable.
+"""
 from dataclasses import dataclass
 from typing import override
 
@@ -22,6 +26,18 @@ class VariableComponentID(SerialisableDataclass):
         type: str = 'notype',
         supersection: str = 'deterministic',
     ):
+        """Create the id of a component of a variable.
+
+        The section and key are those of the variable (the first, if it has several).
+
+        Args:
+            var: The variable.
+            type: The type field of the component id.
+            supersection: The supersection of the container.
+
+        Returns:
+            The id.
+        """
         section = var.interface_section
         section = 'None' if section is None else section
         if not isinstance(section, str):
@@ -45,6 +61,18 @@ class VariableComponentID(SerialisableDataclass):
         type: str = 'notype',
         supersection: str = 'deterministic',
     ):
+        """Create the id of a component of a lightweight variable.
+
+        The section and key are those of the variable (the first, if it has several).
+
+        Args:
+            var: The variable.
+            type: The type field of the component id.
+            supersection: The supersection of the container.
+
+        Returns:
+            The id.
+        """
         section = var.interface_section
         section = 'None' if section is None else section
         if not isinstance(section, str):
@@ -64,6 +92,8 @@ class VariableComponentID(SerialisableDataclass):
 
 @dataclass
 class VariableInstanceComponentID(VariableComponentID):
+    """Identification of a component of a variable instance: adds the subindex, which distinguishes instances of the same key.
+    """
     subindex: int|str = 0
 
     @override
@@ -92,6 +122,8 @@ class VariableInstanceComponentID(VariableComponentID):
 
 @dataclass
 class VariableInstanceParameterComponentID(VariableInstanceComponentID):
+    """Identification of a component for one parameter of a variable instance: adds the index of the parameter and, for an array, the position within it.
+    """
     parameter_index: int = 0
     vector_location: int = 0
     purpose: str = 'parameter'

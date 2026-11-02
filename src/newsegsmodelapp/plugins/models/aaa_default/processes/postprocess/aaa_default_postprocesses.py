@@ -1,11 +1,14 @@
+"""The postprocess procedures of the `sprake` model type.
+
+Each procedure, registered for a name and started when a run completes, converts the results of the run of a NewSEGS Energy Model or finance model - or
+the DSA or PSA - into the form shown in the interface (summary statistics, in tables), with the functions of `postprocess.methods`.
+"""
 from dataclasses import asdict
 import json
 from typing import Callable, cast
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsMetamodelProvider, FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.registers import PostprocessRequest, RunRequest, register_postprocess_procedure, register_postprocess_request
-from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
-from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface

@@ -20,3 +20,8 @@ div.newsegs-navbar {
 .newsegs-project-selector .header {
     width: 100%;
 }
+
+/* The documentation link spans the width of the navbar rather than sitting in a grid column */
+div.newsegs-navbar .newsegs-docs-button {
+    grid-column: 1 / -1;
+}

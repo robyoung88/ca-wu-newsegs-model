@@ -8,11 +8,9 @@ from typing import cast
 import dash
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 
 from newsegsmodelapp.components.composite_input_components import generic_create_dsa_input_container_contents
-from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelapp.registers import register_input_container_content_creator, register_single_input_header_content_creator
 from newsegsmodelframework.newsegsvariable import variable

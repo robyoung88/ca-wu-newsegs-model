@@ -51,31 +51,60 @@ class NewsegsModuleResult(metaclass = ABCMeta):
     @property
     @abstractmethod
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
+        """Array of the meter values (energy flows) of the run, with a row for each meter and a column for each timestep.
+        """
         ...
 
     @property
     @abstractmethod
     def dsm(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
+        """Array of the DSM (system state) values of the run, with a row for each value and a column for each timestep.
+        """
         ...
         
     @abstractmethod
     def get_meter_names(self) -> Sequence[str]:
+        """Names of the meters, in the order of the rows of `meters`.
+
+        Returns:
+            The names.
+        """
         ...
 
     @abstractmethod
     def get_meter_types(self) -> Sequence[str]:
+        """Types of the meters, in the order of the rows of `meters`.
+
+        Returns:
+            The types.
+        """
         ...
 
     @abstractmethod
     def get_dsm_names(self) -> Sequence[str]:
+        """Names of the DSM values, in the order of the rows of `dsm`.
+
+        Returns:
+            The names.
+        """
         ...
 
     @abstractmethod
     def get_dsm_types(self) -> Sequence[str]:
+        """Types of the DSM values, in the order of the rows of `dsm`.
+
+        Returns:
+            The types.
+        """
         ...
 
     @abstractmethod
     def get_timespan(self) -> RegTimeSpan:
+        """The time span of the run.
+
+        Returns:
+            The time span; the columns of `meters` and `dsm` are its timesteps.
+        """
         ...
 
     def meters_to_pandas(self) -> pd.DataFrame:
@@ -105,6 +134,16 @@ class NewsegsModuleResult(metaclass = ABCMeta):
 
 @lru_cache
 def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
+    """Convert the meters of a result to a dataframe, with a column for each meter indexed by time.
+
+    Cached on the result.
+
+    Args:
+        res: The result.
+
+    Returns:
+        The dataframe; empty if there are no meters.
+    """
     data = res.meters.T
     if len(data) == 0:
         return pd.DataFrame()
@@ -118,6 +157,16 @@ def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
 
 @lru_cache
 def defer_dsm_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
+    """Convert the DSM values of a result to a dataframe, with a column for each value indexed by time.
+
+    Cached on the result.
+
+    Args:
+        res: The result.
+
+    Returns:
+        The dataframe; empty if there are no DSM values.
+    """
     data = res.dsm.T
     if len(data) == 0:
         return pd.DataFrame()

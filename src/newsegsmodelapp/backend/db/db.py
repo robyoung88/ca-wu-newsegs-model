@@ -8,11 +8,9 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from collections.abc import Generator
-import threading
 
 from alembic.config import Config as AlembicConfig
 from pathlib import Path
-import fasteners
 import sqlalchemy as sa
 from sqlalchemy.exc import OperationalError, DBAPIError
 from sqlalchemy import event
@@ -135,17 +133,21 @@ def create_db(
     return True
 
 def run_migrations():
-    """Check database version and execute pending SQL migration scripts
-    
-    Args:
-        from_none (bool) - Ignore version number and apply full migration path.
-    """
+    """Apply the pending Alembic migrations, bringing the database up to date."""
     from alembic import command
     from newsegsmodelapp import APP_ROOT
     alembic_cfg = AlembicConfig(APP_ROOT.parent / 'alembic.ini')
     command.upgrade(alembic_cfg, 'head')
 
 def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
+    """Make sure the application database exists and is up to date.
+
+    If the database file is missing it is recovered from a backup or created; otherwise the migrations are applied. Raises `FileNotFoundError` if it cannot be found or created.
+
+    Args:
+        db_path: Path of the database file.
+        recovery_path: Directory from which a missing database is recovered.
+    """
     db_file_status = retrieve_db_file(db_path, recovery_path)
     match db_file_status:
         case 'missing':

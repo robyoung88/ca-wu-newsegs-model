@@ -13,11 +13,7 @@ WIND_PRODUCTION_CATEGORIES = pd.DataFrame(
         'cf_max': [0.05, 0.25, 0.5, 0.75, 0.95, 9.99] # NB - high but finite final bin edge
     }
 )
-"""_summary_
-
-Returns:
-    _type_: _description_
-"""
+"""Categories of wind production by capacity factor, as the lower and upper bounds (`cf_min`, `cf_max`) of each. The final upper edge is high but finite."""
 
 SOLAR_PRODUCTION_CATEGORIES = pd.DataFrame(
     {
@@ -25,8 +21,7 @@ SOLAR_PRODUCTION_CATEGORIES = pd.DataFrame(
         'frac_maxday_max': [0.05, 0.25, 0.5, 0.75, 0.95, 9.99] # NB - high but finite final bin edge
     }
 )
-"""_summary_
-"""
+"""Categories of solar production by fraction of the maximum daily production, as the lower and upper bounds (`frac_maxday_min`, `frac_maxday_max`) of each. The final upper edge is high but finite."""
 
 def categorise_meter_by_capacity(
     meter_timeseries: pd.DataFrame|pd.Series,

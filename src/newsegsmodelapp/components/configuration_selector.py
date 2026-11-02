@@ -1,3 +1,5 @@
+"""The configuration selector: choosing, adding, duplicating, removing, uploading and downloading the configurations (metamodels) of a project.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,18 @@ def create_config_selector_headerbutton(
     metamodel: LightweightNewsegsMetaModel | None = None,
     is_focussed: bool | None = None,
 ):
+    """Create the button which focusses a configuration (metamodel) in the page header.
+
+    Outlined unless the configuration is the focussed one.
+
+    Args:
+        config_index: Index of the configuration (metamodel) within the project.
+        metamodel: The lightweight metamodel.
+        is_focussed: Whether the configuration is the focussed metamodel.
+
+    Returns:
+        The button.
+    """
     if is_focussed:
         do_outline = False
     else:
@@ -49,6 +63,14 @@ def create_config_selector_headerbutton(
     return contents
 
 def create_header_metamodel_input_container(supersection: str) -> html.Div:
+    """Create the container of the configuration buttons of the page header.
+
+    Args:
+        supersection: The supersection of the container.
+
+    Returns:
+        The container.
+    """
     return html.Div(
         [
             dbc.Button(
@@ -78,6 +100,19 @@ def create_single_configuration_selector_row(
     reference_size: int = 20,
 ):
     
+    """Create the row of the configuration selector for one configuration (metamodel).
+
+    The first configuration cannot be removed.
+
+    Args:
+        config_index: Index of the configuration (metamodel) within the project.
+        metamodel: The lightweight metamodel.
+        is_focussed: Whether the configuration is the focussed metamodel.
+        reference_size: Size of the icons.
+
+    Returns:
+        The row.
+    """
     if config_index < 1:
         primary_container = html.H1
         show_remove = False
@@ -221,6 +256,11 @@ def create_single_configuration_selector_row(
     )
 
 def create_configuration_selector():
+    """Create the configuration selector: the rows of the configurations of the project, and the download of their JSON.
+
+    Returns:
+        The layout.
+    """
     return html.Div([
         
         html.Div(
@@ -258,6 +298,11 @@ def _create_configuration_header_elements_for_metamodels(
 
 def add_configuration_selector_callbacks(app: NewsegsDash):
     # Populate
+    """Bind the callbacks of the configuration selector: showing, focussing, adding, duplicating, removing, uploading and downloading configurations.
+
+    Args:
+        app: The Dash app.
+    """
     @app.callback(
         Output({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-selector'}, 'children'),
         Output({

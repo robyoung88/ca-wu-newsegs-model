@@ -1,3 +1,5 @@
+"""The card which holds results.
+"""
 import dash
 from dash import html
 import dash_bootstrap_components as dbc
@@ -11,6 +13,22 @@ def create_results_table_card(
     header_section: str | None = None,
     header_key: str | None = None,
 ):
+    """Create a card to hold a table of results.
+
+    The body is a container filled by callbacks with the results registered for the supersection and section.
+
+    Args:
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The interface section of the variable.
+        key: The interface key of the variable.
+        title: Title of the card.
+        className: Further CSS classes.
+        header_section: Section of the header; that of the card by default.
+        header_key: Key of the header; that of the card by default.
+
+    Returns:
+        The card.
+    """
     header_section = section if header_section is None else header_section
     header_key = key if header_key is None else header_key
     if className is not None:

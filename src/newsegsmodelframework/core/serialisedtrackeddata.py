@@ -1,7 +1,7 @@
-import copy
-from typing import Any, Mapping, Sequence, Type, override
+"""Serialisation of components with a revision-tracked configuration.
+"""
+from typing import Any, Mapping, override
 
-from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.serialisation import T, StateSerialiseToDictMixin
 from newsegsmodelframework.core.trackeddata import ComponentPropertyInterface, ConfigurationMixin, DataWithRevision
 
@@ -10,6 +10,12 @@ class SerialisedConfigurationMixin(
     ConfigurationMixin,
     StateSerialiseToDictMixin
 ):
+    """Mixin for components whose state is mostly held in a `_config` object with revision tracking.
+
+    Combines `ConfigurationMixin` (which holds the configuration as `_config` and exposes its fields as attributes
+    of the component) with `StateSerialiseToDictMixin` (which serialises the component to a dictionary). When a component is
+    restored from a dictionary, the `_config` entry is restored first.
+    """
     @override
     def _preupdate_from_dict(self, config):
         super()._preupdate_from_dict(config)

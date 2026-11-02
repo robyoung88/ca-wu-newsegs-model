@@ -1,3 +1,5 @@
+"""Layouts of whole pages.
+"""
 from typing import Union
 
 import dash
@@ -13,6 +15,17 @@ def fourpane_layout(
     a2_contents: DashComponent,
     b2_contents: DashComponent,
 ):
+    """The four-pane layout of the pages: two panes, each with a header.
+
+    Args:
+        a1_contents: Contents of the header of the left pane.
+        b1_contents: Contents of the header of the right pane.
+        a2_contents: Contents of the left pane.
+        b2_contents: Contents of the right pane.
+
+    Returns:
+        The layout.
+    """
     return dbc.Container(
         [
             # Block A1: Left Pane Header

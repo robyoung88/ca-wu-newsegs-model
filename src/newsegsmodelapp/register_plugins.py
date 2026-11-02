@@ -23,10 +23,22 @@ def load_plugins_recursive(package):
 # Pages must be loaded before contents
 import newsegsmodelapp.plugins.pages as pages
 def load_pages_plugins():
+    """Import every module under `newsegsmodelapp.plugins.pages`, so that the pages are registered.
+
+    Returns:
+        Dictionary of the modules by name.
+    """
     return load_plugins_recursive(pages)
 
 import newsegsmodelapp.plugins.models as models
 def load_models_plugins():
+    """Import every module under `newsegsmodelapp.plugins.models`, so that the model contents are registered.
+
+    Must follow `load_pages_plugins`: model plugins configure pages.
+
+    Returns:
+        Dictionary of the modules by name.
+    """
     return load_plugins_recursive(models)
 
 load_pages_plugins()
@@ -35,6 +47,11 @@ load_models_plugins()
 
 import newsegsmodelapp.components as components
 def load_components():
+    """Import the modules directly under `newsegsmodelapp.components`, so that their input handlers and other registrations are made.
+
+    Returns:
+        Dictionary of the modules by name.
+    """
     d = {}
     for info in pkgutil.iter_modules(
         components.__path__, prefix = 'newsegsmodelapp.components.'

@@ -11,7 +11,7 @@ The layout should provide:
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, State, html
 from dash.exceptions import PreventUpdate
 
 from newsegsmodelapp import registers
@@ -34,6 +34,8 @@ PAGE_TYPE = 'site-config'
 
 @dataclass
 class ModelConfigurationLayoutConfiguration(LayoutConfiguration):
+    """Layout configuration of the site configuration page: the input and result cards, the navigation, and the header.
+    """
     page_type: str = PAGE_TYPE
 
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
@@ -55,6 +57,14 @@ class ModelConfigurationLayoutConfiguration(LayoutConfiguration):
 
 def create_model_configuration_layout(config: ModelConfigurationLayoutConfiguration) -> ComponentType:
 
+    """The layout of the site configuration page: the inputs of the model, and the results of the deterministic run.
+
+    Args:
+        config: The layout configuration of the page.
+
+    Returns:
+        The layout.
+    """
     model_input_sections = []
     for sec in config.model_input_sections:
         model_input_sections.append(
@@ -156,6 +166,11 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
     )
 
 def add_deterministic_run_callbacks(app: NewsegsDash):
+    """Bind the callbacks which run the model for the focussed configuration, or for all configurations of the project.
+
+    Args:
+        app: The Dash app.
+    """
     @app.callback(
         Output('trigger-check-requests', 'data', allow_duplicate = True),
         Input('btn-action-deterministic-run-metamodel', 'n_clicks'),

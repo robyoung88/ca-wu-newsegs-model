@@ -1409,5 +1409,18 @@ For profiling, use viztracer:
 
 Results can be viewed at https://www.speedscope.app/ or https://ui.perfetto.dev/.
 
+## Documentation
+
+The documentation is built with [MkDocs](https://www.mkdocs.org) from the markdown in `docs/` and the docstrings in `src/`.
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs serve   # live preview at http://127.0.0.1:8000
+mkdocs build   # writes static HTML to site/
+```
+
+- On pushes to `main` the `publish documentation` workflow deploys the site to the `gh-pages` branch (GitHub Pages must be set to deploy from that branch).
+- The running app serves the built HTML from `site/` (or `DOCS_PATH`) at `/documentation/`; the Docker image builds it automatically.
+
 ## Licence
 This software is available under the [MIT License](LICENCE).

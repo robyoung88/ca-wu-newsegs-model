@@ -15,10 +15,31 @@ from newsegsmodelapp.types import Page
 PAGE_TYPE = 'landing'
 
 def create_landing_header(**kwargs):
+    """Create the header of the landing page.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        The header.
+    """
     return html.H1(kwargs.get('head_text', ''))
 
 @dataclass
 class LandingLayoutConfiguration(registers.LayoutConfiguration):
+    """Layout configuration of the landing page.
+
+    Attributes:
+        layout_navigation: Function creating the navigation bar.
+        layout_top: Function creating the header.
+        width_head: Width of the header, in columns.
+        width_body: Width of the body text, in columns.
+        width_assumptions: Width of the assumptions, in columns.
+        head_text: Heading of the page.
+        body_text: Markdown of the body text.
+        model_diagram: Source of the model diagram, or a function returning it.
+        assumptions_text: Markdown of the assumptions.
+    """
     page_type: str = PAGE_TYPE
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
     layout_top: Callable[[], Any] = create_landing_header
@@ -32,6 +53,14 @@ class LandingLayoutConfiguration(registers.LayoutConfiguration):
 
 def create_landing_layout(config: LandingLayoutConfiguration):
 
+    """The layout of the landing page: the description of the model, its diagram and its assumptions.
+
+    Args:
+        config: The layout configuration of the page.
+
+    Returns:
+        The layout.
+    """
     header = dbc.Row([
         dbc.Col(
             config.layout_navigation(config.model_type),

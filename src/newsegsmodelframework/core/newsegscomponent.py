@@ -18,7 +18,7 @@ from abc import ABCMeta, abstractmethod
 import copy
 import json
 import time
-from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Optional, Protocol, Sequence, overload, override
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Optional, Sequence, overload, override
 import uuid as mod_uuid
 
 from useful_types import SequenceNotStr
@@ -66,6 +66,13 @@ class NewsegsComponent(
 
     @classmethod
     def set_state_exclusion_policy(cls, excludes: _STATE_EXCLUDES = 'excluded_and_components'):
+        """Set which attributes are left out of the dictionary made by `to_dict`.
+
+        Applies to the class. The default leaves out the attributes which are themselves components, which are stored separately; `to_dict_repr` temporarily includes them.
+
+        Args:
+            excludes: `'excluded'` omits the attributes excluded from the state; `'excluded_and_components'` also omits the attributes which are components, which are saved and reattached separately.
+        """
         cls._serialisation_settings['state_excludes'] = excludes
 
     def __init__(self, *args, name: Optional[str] = None, **kwargs):
@@ -77,6 +84,8 @@ class NewsegsComponent(
             
     @property
     def name(self) -> str:
+        """Name of the type of component.
+        """
         return self._name
     
     @name.setter
@@ -85,10 +94,14 @@ class NewsegsComponent(
 
     @property
     def version(self) -> str:
+        """Version of the component; changes when the structure of the configuration changes.
+        """
         return self._version
 
     @property
     def config(self) -> DataWithRevision:
+        """The revision-tracked configuration object.
+        """
         return self._config
 
     @override
@@ -113,6 +126,11 @@ class NewsegsComponent(
         return odict
 
     def json_dumps_repr(self) -> str:
+        """Serialise the representation made by `to_dict_repr` (including child components) to a JSON string.
+
+        Returns:
+            The JSON string.
+        """
         return json.dumps(self.to_dict_repr(), cls = jsonfuncs.NumpyEncoder)
     
     def _repr_represent(self, value):
@@ -280,10 +298,16 @@ class NewsegsComponent(
 
     @property
     def dirty(self):
+        """Whether the component, or any of its children, has been modified since it was last synchronised with storage.
+        """
         return self.chain_modified
     
 
 class RunnableNewsegsComponent(NewsegsComponent):
+    """A component which can be run to give results.
+
+    Records the time of the last run. The results of a run are accessed through the properties of the component.
+    """
     last_run: float = 0.0
 
     def run(self) -> Any:
@@ -318,18 +342,51 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        """Get the component with an id, or components with a sequence of ids.
+
+        Args:
+            component_id: Id(s) of the component(s).
+
+        Returns:
+            The component, or sequence of components.
+        """
         ...
 
     @abstractmethod
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
+        """Make a copy of a component with new ids.
+
+        Args:
+            component_id: Id(s) of the component(s).
+
+        Returns:
+            The new component.
+        """
         ...
 
     @abstractmethod
     def add_component(self, component: NewsegsComponent) -> str:
+        """Add a component to the provider.
+
+        Args:
+            component: The component.
+
+        Returns:
+            The id of the component.
+        """
         ...
 
     @abstractmethod
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsComponent:
+        """Get the default component of a type.
+
+        Args:
+            component_type: The type of the component (e.g. `model`, `finance`).
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
+
+        Returns:
+            The component.
+        """
         ...
 
     @abstractmethod
@@ -338,6 +395,15 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
         component_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get metadata of components, e.g. the label or revision, without constructing them.
+
+        Args:
+            component_id: Id(s) of the component(s).
+            metadata_ids: Name(s) of the metadata field(s) wanted.
+
+        Returns:
+            Dictionary of metadata for a single component, or a dictionary of these by component id.
+        """
         ...
 
     @abstractmethod
@@ -387,10 +453,14 @@ class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
         """
 
 class NewsegsComponentManagerInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
+    """A component provider which can also persist components: the interface of a store.
+    """
     ...
 
 
 class DictionaryComponentProvider(NewsegsComponentProviderInterface):
+    """Component provider which holds the components in a dictionary by id.
+    """
     def __init__(
         self,
         comp_dict: dict
@@ -409,6 +479,16 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self, 
         component_id: str | SequenceNotStr[str]
     ) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        """Get the component with an id, or components with a sequence of ids.
+
+        Raises `KeyError` if a component is not found.
+
+        Args:
+            component_id: Id(s) of the component(s).
+
+        Returns:
+            The component, or list of components.
+        """
         if isinstance(component_id, str):
             return self.comp_dict[component_id]
         else:
@@ -418,6 +498,14 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self, 
         component_id: str | NewsegsComponent
     ) -> NewsegsComponent:
+        """Make a deep copy of a component.
+
+        Args:
+            component_id: Id(s) of the component(s).
+
+        Returns:
+            The copy.
+        """
         if isinstance(component_id, str):
             return copy.deepcopy(self.comp_dict[component_id])
         else:
@@ -427,6 +515,14 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self,
         component: NewsegsComponent
     ) -> str:
+        """Add a component to the dictionary under its id.
+
+        Args:
+            component: The component.
+
+        Returns:
+            The id of the component.
+        """
         self.comp_dict[component.id] = component
         return component.id
 
@@ -435,6 +531,17 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         component_type: str, 
         index: int = -1
     ) -> NewsegsComponent:
+        """Get the first component held.
+
+        The type and index are ignored.
+
+        Args:
+            component_type: The type of the component (e.g. `model`, `finance`).
+            index: Which instance of the component type to return, in the order added; -1 is the most recent.
+
+        Returns:
+            The component.
+        """
         return next(iter(self.comp_dict.values()))
     
     def get_component_metadata(
@@ -442,11 +549,27 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         component_id: str | SequenceNotStr[str], 
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Not supported: there is no metadata.
+
+        Args:
+            component_id: Id(s) of the component(s).
+            metadata_ids: Name(s) of the metadata field(s) wanted.
+
+        Returns:
+            A dictionary with a message.
+        """
         return {'message': 'No metadata'}
 
     def set_component_metadata(
         self, component_id: str, metadata_id: str, metadata_value: Any
     ):
+        """Not supported: does nothing.
+
+        Args:
+            component_id: Id(s) of the component(s).
+            metadata_id: Name of the metadata field.
+            metadata_value: The value to set.
+        """
         ...
 
     @override

@@ -27,6 +27,7 @@ def year_season_to_seasonal_stats(df: pd.DataFrame,
 
     return grouped_default_stats(df, 'season_index', agg_operations)
 
+# REVIEW (unreferenced): no references to `index_by_season_year` found in src/, scripts/ or data/.
 def index_by_season_year(df: pd.DataFrame) -> pd.DataFrame:
     """
     Ensure that the index of a data frame is set to year and season indices
@@ -80,6 +81,7 @@ def _prepare_meters_with_indices(meters: pd.DataFrame|pd.Series) -> pd.DataFrame
     
     return meters.loc[meters['year_index']>=0, :]
 
+# REVIEW (unreferenced): no references to `summarise_meters_by_season` found in src/, scripts/ or data/.
 def summarise_meters_by_season(meters: pd.DataFrame) -> pd.DataFrame:
     """
     Summary stats for a meter df by season (including Year), stats over years.

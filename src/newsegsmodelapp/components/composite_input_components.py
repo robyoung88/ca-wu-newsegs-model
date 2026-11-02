@@ -11,10 +11,7 @@ from newsegsmodelapp.components.variable_dash_component.vdc_optim import create_
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
-from newsegsmodelframework.newsegsvariable import variable
 
 
 def generic_create_deterministic_input_container_contents(
@@ -23,6 +20,19 @@ def generic_create_deterministic_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
     variableprovider: FromDatabaseVariableProvider,
 ) -> list[dash.development.base_component.Component]:
+    """Create the inputs of a section for the deterministic run of a metamodel.
+
+    One input for each variable of the metamodel whose interface section is `section`.
+
+    Args:
+        section: The section.
+        lproj: The lightweight project.
+        lmm: The lightweight metamodel.
+        variableprovider: Provider of variables.
+
+    Returns:
+        List of components.
+    """
     contents = []
     var_uids = list(lmm.variables.values())
     lwvars = variableprovider.get_lightweight_variable(var_uids)
@@ -63,6 +73,17 @@ def generic_create_dsa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
     variable_provider: FromDatabaseVariableProvider
 ) -> list[dash.development.base_component.Component]:
+    """Create the inputs for the deterministic sensitivity analysis of a metamodel.
+
+    One DSA input for each variable of the metamodel.
+
+    Args:
+        lmm: The lightweight metamodel.
+        variable_provider: Provider of variables.
+
+    Returns:
+        List of components.
+    """
     contents = []
     vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
     for var in vars:
@@ -74,6 +95,17 @@ def generic_create_psa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
     variable_provider: FromDatabaseVariableProvider
 ) -> list[dash.development.base_component.Component]:
+    """Create the inputs for the probabilistic sensitivity analysis of a metamodel.
+
+    One PSA input for each variable of the metamodel.
+
+    Args:
+        lmm: The lightweight metamodel.
+        variable_provider: Provider of variables.
+
+    Returns:
+        List of components.
+    """
     contents = []
     vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
     for var in vars:
@@ -84,6 +116,16 @@ def generic_create_psa_input_container_contents(
 def generic_create_optim_input_container_contents(
     mm: NewsegsMetaModel,
 ) -> list[dash.development.base_component.Component]:
+    """Create the inputs for the optimisation of a metamodel.
+
+    One optimisation input for each variable of the metamodel.
+
+    Args:
+        mm: The metamodel.
+
+    Returns:
+        List of components.
+    """
     contents = []
     for var in mm.variables.values():
         contents.append(create_optim_input(var))

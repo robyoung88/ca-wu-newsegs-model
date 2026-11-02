@@ -1,5 +1,7 @@
-"""
-Layout and callbacks for interfacing with Variables
+"""Layouts and callbacks for interfacing with the `Variable`s of a metamodel.
+
+The deterministic, DSA, PSA and optimisation pages each show every variable in the form suited to the page: for DSA, its value and bounds; for PSA, its
+distribution and the parameters of that distribution; for optimisation, its bounds. The `create_...` functions build these inputs, and the `compose_...` functions assemble them from their parts.
 """
 from typing import Any, Sequence
 from collections import OrderedDict
@@ -29,6 +31,17 @@ def create_dsa_input_scalar_numeric_header(
     lower,
     upper,
 ):
+    """Create the header of the DSA input of a numeric scalar variable: its label, value and bounds.
+
+    Args:
+        label: Label of the variable.
+        value: Central value.
+        lower: Lower bound.
+        upper: Upper bound.
+
+    Returns:
+        The header.
+    """
     value = _autoformat(value)
     lower = _autoformat(lower)
     upper = _autoformat(upper)
@@ -60,12 +73,24 @@ def create_dsa_input_scalar_numeric_header(
         )
     ]
 
+# REVIEW (unreferenced): no references to `create_dsa_input_vector_numeric_header` found in src/, scripts/ or data/.
 def create_dsa_input_vector_numeric_header(
         label: str,
         type_id: str,
         key: str,
         section: str | None = None,
 ): 
+    """Create the header of the DSA input of a numeric vector variable.
+
+    Args:
+        label: Label of the variable.
+        type_id: The type field of the component ids.
+        key: The interface key of the variable.
+        section: The interface section of the variable.
+
+    Returns:
+        The header.
+    """
     return [
         html.H4(
             label,
@@ -100,6 +125,7 @@ def create_dsa_input_vector_numeric_header(
         )
     ]
 
+# REVIEW (unreferenced): no references to `create_dsa_input_vector_parameter_input` found in src/, scripts/ or data/.
 def create_dsa_input_vector_parameter_input(
     parameter_names: str | Sequence[str] | OrderedDict[str, Sequence[str]],
     parameter_types: Sequence[variable.PARAMETER_TYPE],
@@ -107,6 +133,18 @@ def create_dsa_input_vector_parameter_input(
     key: str,
     section: str | None = None,
 ):
+    """Create the inputs of the parameters of a vector variable.
+
+    Args:
+        parameter_names: Names of the parameters.
+        parameter_types: Types of the parameters.
+        type_id: The type field of the component ids.
+        key: The interface key of the variable.
+        section: The interface section of the variable.
+
+    Returns:
+        The inputs.
+    """
     are_scalars = [i for i, x in enumerate(parameter_types) if x == 'scalar']
     are_vectors = [i for i, x in enumerate(parameter_types) if x == 'vector']
     are_matrices = [i for i, x in enumerate(parameter_types) if x == 'matrix']
@@ -218,6 +256,17 @@ def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
     var: FullLightweightVariable,
 ):
+    """Create the inputs of the lower and upper DSA bounds of a scalar variable.
+
+    The form of the inputs depends upon the type of bound: absolute, offset, relative or interval.
+
+    Args:
+        bounds_type: How the DSA bounds are specified.
+        var: The variable.
+
+    Returns:
+        The inputs.
+    """
     type_id_lower = f'input-dsabound-lower'
     type_id_upper = f'input-dsabound-upper'
 
@@ -276,6 +325,7 @@ def create_dsa_bounds_inputs_scalar(
                 ])
             ] 
         
+# REVIEW (unreferenced): no references to `create_dsa_bounds_input_vector` found in src/, scripts/ or data/.
 def create_dsa_bounds_input_vector(
     bounds_type: variable.DSA_BOUNDS_TYPE,
     type_id: str,
@@ -284,6 +334,17 @@ def create_dsa_bounds_input_vector(
     #var: variable.Variable
 ):
     
+    """Create the inputs of the lower and upper DSA bounds of a vector variable.
+
+    Args:
+        bounds_type: How the DSA bounds are specified.
+        type_id: The type field of the component ids.
+        key: The interface key of the variable.
+        section: The interface section of the variable.
+
+    Returns:
+        The inputs.
+    """
     def make_input(placeholder: Any):
         return dbc.Input(type = 'number', debounce = True, placeholder = placeholder) # pyright: ignore[reportCallIssue]
     
@@ -332,6 +393,18 @@ def create_dsa_bound_type_selector(
     selected_bound,
     var: variable.Variable,
 ):
+    """Create the selector of the type of DSA bound.
+
+    Offers the bound types that the distribution permits.
+
+    Args:
+        permitted_dsa_bounds: The kinds of DSA bound that the distribution permits.
+        selected_bound: The kind of bound currently selected.
+        var: The variable.
+
+    Returns:
+        The selector.
+    """
     id_ = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-dropdown',
@@ -355,6 +428,18 @@ def compose_dsa_input(
     dsa_bound_component,
     var: variable.Variable,
 ):
+    """Compose the DSA input of a variable from its parts.
+
+    Args:
+        header_component: The header.
+        parameter_component: The component for the parameters of the distribution.
+        dsa_bound_type_selector: The selector of the type of bound.
+        dsa_bound_component: The component for the bounds.
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     overall_input_id = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-component',
@@ -431,6 +516,7 @@ def _default_formatter_scalar(dp: int):
     fstring = '{:,.' + f'{dp:d}'+'f}'   
     return fstring.format
 
+# REVIEW (unreferenced): no references to `_default_formatter_vector` found in src/, scripts/ or data/.
 def _default_formatter_vector(dp: int):
     fstring = '{:,.' + f'{dp:d}'+'f}'
     def formatter(seq: variable.NumericVectorParam) -> Sequence[str]:
@@ -440,6 +526,14 @@ def _default_formatter_vector(dp: int):
 def create_dsa_header(
     var: variable.Variable | FullLightweightVariable,
 ):
+    """Create the header of the DSA input of a variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The header.
+    """
     is_lvar = isinstance(var, FullLightweightVariable)
 
     dist = var.distribution if is_lvar else var.distribution.distribution
@@ -476,6 +570,14 @@ def create_dsa_header(
 def create_dsa_input_scalar_constant(
     var: variable.ScalarVariable,
 ):
+    """Create the DSA input of a constant scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return compose_dsa_input(
         create_dsa_header(var),
         [
@@ -503,6 +605,14 @@ def create_dsa_input_scalar_constant(
 def create_dsa_input_scalar_normal(
     var: variable.NumericScalarVariable,
 ):
+    """Create the DSA input of a normally distributed scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return compose_dsa_input(
         create_dsa_header(var),
         [
@@ -531,6 +641,14 @@ def create_dsa_input_scalar_normal(
 def create_dsa_input_scalar_beta(
     var: variable.NumericScalarVariable,
 ):
+    """Create the DSA input of a beta distributed scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return compose_dsa_input(
         create_dsa_header(var),
         [
@@ -558,6 +676,14 @@ def create_dsa_input_scalar_beta(
 def create_dsa_input_scalar_gamma(
     var: variable.NumericScalarVariable,
 ):
+    """Create the DSA input of a gamma distributed scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
         create_dsa_header(var),
@@ -590,6 +716,18 @@ def create_psa_input_scalar_numeric_header(
     ci95_lower,
     ci95_upper,
 ):
+    """Create the header of the PSA input of a numeric scalar variable: its label, mean, standard deviation and 95% confidence interval.
+
+    Args:
+        label: Label of the variable.
+        mean_value: Mean value.
+        std_value: Standard deviation.
+        ci95_lower: Lower limit of the 95% confidence interval.
+        ci95_upper: Upper limit of the 95% confidence interval.
+
+    Returns:
+        The header.
+    """
     mean_value = _autoformat(mean_value)
     std_value = _autoformat(std_value)
     ci95_lower = _autoformat(ci95_lower)
@@ -625,6 +763,14 @@ def create_psa_input_scalar_numeric_header(
 def create_psa_header(
     var: variable.Variable | FullLightweightVariable,
 ):
+    """Create the header of the PSA input of a variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The header.
+    """
     is_lvar = isinstance(var, FullLightweightVariable)
     dist = var.distribution if is_lvar else var.distribution.distribution
     if dist == 'constant':
@@ -667,6 +813,14 @@ def create_psa_header(
 def create_psa_distribution_component(
     var: variable.Variable|FullLightweightVariable
 ):
+    """Create the component which shows the distribution of a variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The component.
+    """
     if isinstance(var, FullLightweightVariable):
         distname = var.distribution.title()
     else:
@@ -690,6 +844,17 @@ def compose_psa_input(
     parameter_component,
     var: variable.Variable,
 ):
+    """Compose the PSA input of a variable from its parts.
+
+    Args:
+        header_component: The header.
+        distribution_component: The component showing the distribution.
+        parameter_component: The component for the parameters of the distribution.
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     overall_input_id = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-component',
@@ -753,6 +918,14 @@ def compose_psa_input(
 def create_psa_input_scalar_constant(
     var: variable.ScalarVariable,
 ):
+    """Create the PSA input of a constant scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return compose_psa_input(
         create_psa_header(var),
         create_psa_distribution_component(var),
@@ -769,6 +942,14 @@ def create_psa_input_scalar_constant(
 def create_psa_input_twoparam(
     var: variable.NumericScalarVariable,    
 ):
+    """Create the PSA input of a numeric scalar variable described by two parameters.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return compose_psa_input(
         create_psa_header(var),
         create_psa_distribution_component(var),
@@ -788,16 +969,40 @@ def create_psa_input_twoparam(
 def create_psa_input_scalar_normal(
     var: variable.NumericScalarVariable,
 ):
+    """Create the PSA input of a normally distributed scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return create_psa_input_twoparam(var)
 
 def create_psa_input_scalar_beta(
     var: variable.NumericScalarVariable,
 ):
+    """Create the PSA input of a beta distributed scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return create_psa_input_twoparam(var)
 
 def create_psa_input_scalar_gamma(
     var: variable.NumericScalarVariable,
 ):
+    """Create the PSA input of a gamma distributed scalar variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return create_psa_input_twoparam(var)
 
 def compose_optim_input(
@@ -807,6 +1012,16 @@ def compose_optim_input(
     bound_inputs,
     var
 ):
+    """Compose the optimisation input of a variable from its parts.
+
+    Args:
+        header: The header.
+        bound_inputs: The inputs of the bounds.
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     toggle_id = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-toggle',
@@ -873,6 +1088,15 @@ def compose_optim_input(
     )
 
 def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.NumericScalarVariable | None = None):
+    """Create the header of the optimisation input of a variable.
+
+    Args:
+        var: The variable.
+        refvar: A variable whose bounds this one refers to.
+
+    Returns:
+        The header.
+    """
     if var.distribution.distribution == 'constant':
         fmt = _autoformat
     else:
@@ -949,7 +1173,16 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
         )
     ]
 
+# REVIEW (unreferenced): no references to `create_positive_toggle` found in src/, scripts/ or data/.
 def create_positive_toggle(var):
+    """Create the toggle which restricts the optimisation of a variable to positive values.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The toggle.
+    """
     toggleid = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-toggle',
@@ -970,7 +1203,16 @@ def create_positive_toggle(var):
         className = 'optim-toggle-row',
     )
 
+# REVIEW (unreferenced): no references to `create_bounded_toggle` found in src/, scripts/ or data/.
 def create_bounded_toggle(var):
+    """Create the toggle which bounds the optimisation of a variable above.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The toggle.
+    """
     toggleid = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-toggle',
@@ -992,6 +1234,14 @@ def create_bounded_toggle(var):
     )
 
 def create_optim_bound_inputs(var: variable.ScalarVariable):
+    """Create the inputs of the lower and upper bounds of the optimisation of a variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The inputs.
+    """
     variable_id_lower = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'single-input-config',
@@ -1039,6 +1289,14 @@ def create_optim_bound_inputs(var: variable.ScalarVariable):
 def create_optim_input(
     var: variable.NumericScalarVariable,
 ):
+    """Create the optimisation input of a variable.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input.
+    """
     return compose_optim_input(
         create_optim_header(var),
         #create_positive_toggle(var),

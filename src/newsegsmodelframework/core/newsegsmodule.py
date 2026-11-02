@@ -44,6 +44,17 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         timespan:TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> NewsegsModuleResult:
+        """Run the module over a time span.
+
+        Subclasses extend this, calling it first so that the time of the run is recorded.
+
+        Args:
+            timespan: The period of time.
+            run_start: See the description.
+
+        Returns:
+            The result of the run.
+        """
         if run_start is None:
             run_start = datetime.datetime.now()
         self.last_run = run_start

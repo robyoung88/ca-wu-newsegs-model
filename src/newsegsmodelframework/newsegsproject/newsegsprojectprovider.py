@@ -12,6 +12,8 @@ from newsegsmodelframework.newsegsvariable.variableprovider import VariableManag
 ON_MISSING_OPTION = Literal['last', 'create', 'none']
 
 class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
+    """Interface of a store and provider of projects, with their sessions and snapshots.
+    """
     metamodel_provider: NewsegsComponentManagerInterface
     variable_provider: VariableManagerInterface
 
@@ -23,6 +25,7 @@ class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
     ) -> pd.DataFrame:
         """Provide a list of available projects as a pandas dataframe"""
 
+    # REVIEW (unreferenced): no references to `recover_session_project` found in src/, scripts/ or data/.
     @abstractmethod
     def recover_session_project(
         self,
@@ -65,6 +68,14 @@ class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
         """Delete a specific snapshot"""
 
     def get_project(self, project_id: str) -> NewsegsProject:
+        """Get a project by id.
+
+        Args:
+            project_id: See the description.
+
+        Returns:
+            The project.
+        """
         return cast(NewsegsProject, self.get_component(project_id))
 
     @abstractmethod

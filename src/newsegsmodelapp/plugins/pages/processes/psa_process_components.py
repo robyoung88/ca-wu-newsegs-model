@@ -1,8 +1,18 @@
+"""Components needed by the PSA process.
+"""
 from dash import dcc, html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def psa_process_components(**kwargs):
+    """Create the components needed by the PSA process, such as the modal which asks for confirmation before a PSA is started.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        List of components.
+    """
     return [
         dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'psa_input_change'}, data = []),
         dbc.Modal(

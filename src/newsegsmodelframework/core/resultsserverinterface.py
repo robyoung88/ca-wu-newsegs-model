@@ -8,6 +8,8 @@ from abc import ABCMeta, abstractmethod
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 
 class ResultServerInterface(metaclass = ABCMeta):
+    """Interface of an object, such as an energy model, which serves the results of the runs of its modules.
+    """
     @abstractmethod
     def get_generation_result(self) -> NewsegsModuleResult:
         """

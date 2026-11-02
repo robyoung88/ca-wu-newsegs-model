@@ -2,7 +2,6 @@
 from __future__ import annotations
 from typing import Any, Sequence, cast, overload, override
 
-from useful_types import SequenceNotStr
 # Very simple environment servers that provide in-memory stores for timeseries data which are returned on request
 
 from newsegsmodelframework.core.environment import NewsegsLocalEnvironment,NewsegsWiderEnvironment
@@ -190,12 +189,31 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
                        location:RaisedLocation,
                        timespan:OffsetRegTimeSpan):
         # Only store a single series for temperature
+        """Store a series of external (air) temperatures.
+
+        A single series is held for all locations.
+
+        Args:
+            external_temperature: Temperatures (degrees C) at each timestep of `timespan`.
+            location: The location.
+            timespan: The period of time.
+        """
         self._external_temperature_series[None] = {
             'timespan': timespan,
             'timeseries': external_temperature
         }
 
     def access_external_temperature_series(self,location:Location):
+        """The stored external temperature series.
+
+        The location is ignored: one series is held.
+
+        Args:
+            location: The location.
+
+        Returns:
+            Dictionary of the `timespan` and the `timeseries`.
+        """
         return self._external_temperature_series[None]
 
     @override
@@ -225,6 +243,15 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         location: AspectLocation,
         timespan: OffsetRegTimeSpan
     ):
+        """Store a series of solar flux on a plane with the azimuth and pitch of an `AspectLocation`.
+
+        Series are held by azimuth and pitch.
+
+        Args:
+            solar_flux: Solar flux on the plane at each timestep of `timespan`.
+            location: The location.
+            timespan: The period of time.
+        """
         az = location.azimuth
         pitch = location.pitch
         if not az in self._solar_flux_on_plane_series.keys():
@@ -236,6 +263,14 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         }
 
     def access_solar_flux_on_plane_series(self,location:AspectLocation):
+        """The stored solar flux series for the azimuth and pitch of an `AspectLocation`.
+
+        Args:
+            location: The location.
+
+        Returns:
+            Dictionary of the `timespan` and the `timeseries`, or None if there is no series for that plane.
+        """
         az = location.azimuth
         pitch = location.pitch
         azd = self._solar_flux_on_plane_series.get(az, None)
@@ -337,6 +372,8 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
+    """Wider environment which holds its temperature and horizontal solar flux series in memory.
+    """
     _version = '0.0.1'
     _name = 'Wider environment'
 
@@ -349,6 +386,12 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         effective_temperatures: npt.ArrayLike,
         timespan: OffsetRegTimeSpan
     ):
+        """Store the series of effective temperatures of the wider environment.
+
+        Args:
+            effective_temperatures: Effective temperature at each timestep of `timespan`.
+            timespan: The period of time.
+        """
         self._temperature_series = {
             'timespan': timespan,
             'timeseries': effective_temperatures
@@ -374,6 +417,12 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         horizontal_solar_flux: npt.ArrayLike,
         timespan = OffsetRegTimeSpan
     ):
+        """Store the series of horizontal solar flux of the wider environment.
+
+        Args:
+            horizontal_solar_flux: Horizontal solar flux at each timestep of `timespan`.
+            timespan: The period of time.
+        """
         self._horizontal_solar_flux_series = {
             'timespan': timespan,
             'timeseries': horizontal_solar_flux

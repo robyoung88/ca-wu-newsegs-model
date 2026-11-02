@@ -249,16 +249,16 @@ class Location(serialisation.StateSerialiseToDictMixin):
         crs: str = 'EPSG:4326',
         name: str | None = None,
     ) -> T:
-        """Construct Location from explicit characteristics
+        """Construct a Location from explicit characteristics.
 
         Args:
-            lat (Real): Latitude of Location (decimal degrees)
-            lon (Real): _Longitude of Location (decimal degrees)
-            crs (_type_, optional): Coordinate reference system. Defaults to 'EPSG:4326'.
-            name (str | None, optional): Name of Location. Defaults to None.
+            lat: Latitude of the location (decimal degrees).
+            lon: Longitude of the location (decimal degrees).
+            crs: Coordinate reference system of the latitude and longitude.
+            name: Name of the location.
 
         Returns:
-            T: Location instance.
+            The location.
         """
 
         o = cls.from_none() # pyright: ignore[reportAttributeAccessIssue]
@@ -388,6 +388,8 @@ class RaisedLocation(Location):
     
     @property
     def height_agl(self) -> float:
+        """Height above ground level (m).
+        """
         return self._height
     
     @height_agl.setter
@@ -579,6 +581,8 @@ class AspectLocation(RaisedLocation):
     
     @property
     def azimuth(self) -> float:
+        """Compass direction that the surface faces (degrees).
+        """
         return self._azimuth
     
     @azimuth.setter
@@ -587,6 +591,8 @@ class AspectLocation(RaisedLocation):
     
     @property
     def pitch(self) -> float:
+        """Tilt of the surface from horizontal (degrees).
+        """
         return self._pitch
     
     @pitch.setter
@@ -761,6 +767,21 @@ class PVLibPVSystem(
 
 @lru_cache
 def cached_get_solarposition(t0, periods, freq, lat, lon, method: str = 'nrel_numba'):
+    """Solar position (cached) at times given by a start, number of periods and frequency.
+
+    Uses `pvlib.solarposition.get_solarposition`; results are cached because they are requested repeatedly for the same site and period.
+
+    Args:
+        t0: Start time.
+        periods: Number of periods.
+        freq: Frequency of the periods (a pandas offset alias).
+        lat: Latitude (degrees).
+        lon: Longitude (degrees).
+        method: The solar position algorithm of pvlib.
+
+    Returns:
+        Dataframe of solar position.
+    """
     from pvlib.solarposition import get_solarposition
     import pandas as pd
     times = pd.date_range(start = t0, periods = periods, freq = freq)

@@ -1,8 +1,13 @@
+"""The Sprake NewSEGS Energy Model.
+
+An implementation of the model of Dr David Sprake as a `NewsegsModel`, using `SprakeGeneration`, `SprakeGrid` and `SprakeCS`
+modules, an in-memory local environment holding the default Sprake weather data and no wider environment.
+"""
 from __future__ import annotations
 from dataclasses import asdict, field
 import os
 import copy
-from typing import cast, override, Any
+from typing import cast, override
 from functools import singledispatchmethod, lru_cache
 
 import numpy as np
@@ -41,6 +46,7 @@ _DEFAULT_LOCATION = modlocation.Location(
     settings.get('SprakeValidationLon')
 )
 
+# REVIEW (unreferenced): no references to `_get_sprake_wind_speeds` found in src/, scripts/ or data/.
 @lru_cache
 def _get_sprake_wind_speeds():
     return(
@@ -62,6 +68,13 @@ def _get_sprake_wind_speeds():
 
 @lru_cache
 def get_sprake_environment_server():
+    """The local environment server of the Sprake NewSEGS Energy Model.
+
+    An in-memory server holding the default wind speed, solar flux and temperature series of the Sprake model (cached).
+
+    Returns:
+        The server.
+    """
     server = inmem_env_servers.InMemoryLocalEnv()
 
     ### Wind
@@ -142,6 +155,13 @@ def get_sprake_environment_server():
     return server
 
 def get_sprake_wider_env_server():
+    """The wider environment server of the Sprake NewSEGS Energy Model.
+
+    The Sprake model does not use a wider environment, so a placeholder is used.
+
+    Returns:
+        The server.
+    """
     return DummyWiderEnv()
 
 def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
@@ -150,6 +170,12 @@ def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
 
 @revision_dataclass
 class SprakeModelConfig(newsegsmodel.NewsegsModelConfig):
+    """Configuration of the Sprake NewSEGS Energy Model.
+
+    Attributes:
+        timestep: Timestep of the model.
+        run_period: The time span over which the model is run.
+    """
     timestep: pd.Timedelta = pd.Timedelta(_DEFAULT_TS)
     run_period: modtimespan.TimeSpan = field(default_factory = lambda: copy.copy(_DEFAULT_TIMESPAN))
 
@@ -274,14 +300,30 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     # We can do the from_none using the _from_str init
     @classmethod
     def from_none(cls):
+        """Create a Sprake NewSEGS Energy Model with default modules.
+
+        Returns:
+            The model.
+        """
         return cls('Sprake Energy Model')
 
+    # REVIEW (unreferenced): no references to `set_run_period` found in src/, scripts/ or data/.
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
+        """Set the time span over which the model is run, with the timestep of the model.
+
+        Args:
+            timespan: The period of time to run.
+        """
         new_timespan = modtimespan.RegTimeSpan(timespan)
         new_timespan.timestep = self.timestep
         self._config.run_period = new_timespan
         
     def get_run_period(self) -> modtimespan.TimeSpan:
+        """The time span over which the model is run.
+
+        Returns:
+            The time span.
+        """
         return self.run_period
     
     @property
@@ -300,6 +342,8 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @property
     def local_env(self) -> environment_servers.NewsegsLocalEnvironment:
+        """The local environment server; the default Sprake server is created on first use.
+        """
         try:
             return self._local_environment_server
         except AttributeError:
@@ -316,6 +360,8 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @property
     def wider_env(self) -> environment_servers.NewsegsWiderEnvironment:
+        """The wider environment server; the default Sprake server is created on first use.
+        """
         try:
             return self._wider_environment_server
         except AttributeError:
@@ -330,6 +376,11 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._wider_environment_server = wider_env_server
 
     def get_default_timestep(self) -> pd.Timedelta:
+        """The timestep of the model.
+
+        Returns:
+            The timestep.
+        """
         return self.timestep
 
     @property
@@ -347,15 +398,38 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self.consumption_storage.location = loc
 
     def get_generation_result(self) -> NewsegsModuleResult:
+        """The result of the last run of the generation module.
+
+        Returns:
+            The result.
+        """
         return self._generation_result
 
     def get_grid_result(self) -> NewsegsModuleResult:
+        """The result of the last run of the grid module.
+
+        Returns:
+            The result.
+        """
         return self._grid_result
 
+    # REVIEW (redundant): duplicates `get_consumption_storage_result`, and no references to `get_cs_result` found in src/, scripts/ or data/.
     def get_cs_result(self) -> NewsegsModuleResult:
+        """The result of the last run of the consumption and storage module.
+
+        The same as `get_consumption_storage_result`.
+
+        Returns:
+            The result.
+        """
         return self._cs_result
 
     def get_consumption_storage_result(self) -> NewsegsModuleResult:
+        """The result of the last run of the consumption and storage module.
+
+        Returns:
+            The result.
+        """
         return self._cs_result
 
     @override

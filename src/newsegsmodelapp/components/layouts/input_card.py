@@ -1,3 +1,5 @@
+"""The card which holds inputs.
+"""
 import dash
 from dash import dcc, html
 
@@ -9,6 +11,19 @@ def create_input_card(
     title: list[dash.development.base_component.Component | str],
     className: str | None = None
 ):
+    """Create a card to hold inputs.
+
+    The body is an input container, filled by callbacks with the inputs registered for the supersection and section.
+
+    Args:
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The interface section of the variable.
+        title: Title of the card.
+        className: Further CSS classes.
+
+    Returns:
+        The card.
+    """
     if className is not None:
         container_class_name = 'input-container ' + className
     else:

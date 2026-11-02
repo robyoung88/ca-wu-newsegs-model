@@ -1,3 +1,5 @@
+"""The grids of results, with a column for each configuration.
+"""
 import dash_ag_grid as dag
 
 from newsegsmodelapp.components import icons

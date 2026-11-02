@@ -7,13 +7,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 from abc import abstractmethod
-from typing import Any, Optional, Type, override
+from typing import Any, Optional, override
 
 from newsegsmodelframework.constants.framework_constants import COMPONENT_PREFIXES
 from newsegsmodelframework.core import newsegscomponent
 from newsegsmodelframework.core import location as modlocation
 from newsegsmodelframework.core import TimeSpan
-from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.core.newsegsmodule import NewsegsModule
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.core.serialisation import T
@@ -25,6 +24,8 @@ from newsegsmodelframework.newsegscs import NewsegsCS
 from newsegsmodelframework.core import newsegsmodelinterface
 
 class NewsegsModelProperty(ComponentProperty):
+    """Property for a module (grid, generation or consumption and storage) of a NewSEGS Energy Model; assigning a module attaches it to the model.
+    """
     @override
     def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'): # pyright: ignore[reportIncompatibleMethodOverride]
         if not isinstance(instance, NewsegsModel):
@@ -44,35 +45,30 @@ class NewsegsModelData(newsegscomponent.NewsegsComponent):
 
 @revision_dataclass
 class NewsegsModelConfig(DataWithRevision):
+    """Configuration of a NewSEGS Energy Model. The base class has none; implementations add their own.
+    """
     ...
 
 
 class NewsegsModel(
     newsegsmodelinterface.NewsegsModelInterface
 ):
-    """
-    Abstract base class of NewSEGS energy model
+    """Abstract base class of a NewSEGS Energy Model.
 
-    Holder for three submodules:
-    - NewsegsGeneration
-    - NewsegsGrid
-    - NewsegsCS (Consumption and Storage)
+    A NewSEGS Energy Model is the composition of three modules, with the environment servers that
+    serve them weather data:
 
-    Provides access to two environment servers providing data on weather conditions:
-    - NewsegsLocalEnvironment
-    - NewsegsWiderEnvironment
+    - `NewsegsGeneration` - on-site generation;
+    - `NewsegsGrid` - the exchange with the wider grid;
+    - `NewsegsCS` - consumption and storage.
 
-    Also holds global model settings (e.g. time horizon)
+    It also holds the settings of the whole model, such as the time over which it is run. Running the model runs
+    the modules, in order, and keeps their results. Subclasses (such as `SprakeModel`) supply the
+    modules, the environment servers and the run procedure.
 
-    Provides method to run model
-
-    Holds and provides results for the current configuration after run
-
-    In implementation, the model should not ideally not hold configuration for submodules, but
-    provide access to those submodules.
-
-    When restoring state from dictionary, then the configuration of the submodules should be
-    passed down
+    A NewSEGS Energy Model is the counterpart of a finance model (`NewsegsFinance`), which values its results; a
+    `NewsegsMetaModel` binds the two. When restoring a model from a dictionary, the configuration of
+    the modules is passed down to them; a model need not hold the configuration of its modules itself.
     """
     
     _name = 'NewSEGS Energy Model'
@@ -107,8 +103,11 @@ class NewsegsModel(
             
     @property
     def model_version(self) -> str:
+        """Version of the NewSEGS Energy Model.
+        """
         return self.version
 
+    # REVIEW (unreferenced): no references to `set_run_period` found in src/, scripts/ or data/.
     @abstractmethod
     def set_run_period(self, timespan: TimeSpan):
         """
@@ -150,6 +149,7 @@ class NewsegsModel(
     def mod_generation(self, generation_module: NewsegsGeneration):
         self.generation = generation_module
 
+    # REVIEW (unreferenced): no references to `update_generation` found in src/, scripts/ or data/.
     def update_generation(self, generation_config: dict[str, Any]) -> None:
         """
         Synchronise the generation module with a config dictionary.
@@ -198,6 +198,7 @@ class NewsegsModel(
     def mod_grid(self, grid_module: NewsegsGrid):
         self.grid = grid_module
     
+    # REVIEW (unreferenced): no references to `update_grid` found in src/, scripts/ or data/.
     def update_grid(self, grid_config: dict[str, Any]) -> None:
         """
         Synchronise the grid module with a config dictionary
@@ -246,6 +247,7 @@ class NewsegsModel(
     def mod_cs(self, cs_module: NewsegsCS):
         self.consumption_storage = cs_module
     
+    # REVIEW (unreferenced): no references to `update_consumption_storage` found in src/, scripts/ or data/.
     def update_consumption_storage(self, cs_config: dict[str, Any]) -> None:
         """
         Synchronise the consumption and storage module with a config dictionary
@@ -377,10 +379,18 @@ class NewsegsModel(
         
     #     return super().update(config)
 
+    # REVIEW (unreferenced): no references to `reattach_grid` found in src/, scripts/ or data/.
     def reattach_grid(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach the grid module of a NewSEGS Energy Model after it has been reconstructed.
+
+        The grid module is found by its id, which was recorded when the model was serialised. Raises `AttributeError` if there is none and `TypeError` if the provider does not return a grid module.
+
+        Args:
+            component_provider: Provider from which to recover the component.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('grid', '') == '':
             raise AttributeError('This Energy Model has no grid module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('grid', ''))
@@ -388,10 +398,18 @@ class NewsegsModel(
             raise TypeError(f'component_provider did not provide a grid module for key {self._component_ids.get('grid', '')}')
         self.grid = comp
 
+    # REVIEW (unreferenced): no references to `reattach_generation` found in src/, scripts/ or data/.
     def reattach_generation(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach the generation module of a NewSEGS Energy Model after it has been reconstructed.
+
+        The generation module is found by its id, which was recorded when the model was serialised. Raises `AttributeError` if there is none and `TypeError` if the provider does not return a generation module.
+
+        Args:
+            component_provider: Provider from which to recover the component.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('generation', '') == '':
             raise AttributeError('This Energy Model has no generation module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('generation',''))
@@ -399,10 +417,18 @@ class NewsegsModel(
             raise TypeError(f'component_provider did not provide a generation module for key {self._component_ids.get('generation','')}')
         self.generation = comp
 
+    # REVIEW (unreferenced): no references to `reattach_consumption_storage` found in src/, scripts/ or data/.
     def reattach_consumption_storage(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach the consumption and storage module of a NewSEGS Energy Model after it has been reconstructed.
+
+        The module is found by its id, which was recorded when the model was serialised. Raises `AttributeError` if there is none and `TypeError` if the provider does not return a consumption and storage module.
+
+        Args:
+            component_provider: Provider from which to recover the component.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('consumption_storage', '') == '':
             raise AttributeError('This Energy Model has no consumption_storage module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('consumption_storage', ''))
@@ -410,10 +436,18 @@ class NewsegsModel(
             raise TypeError(f'component_provider did not provide a consumption_storage module for key {self._component_ids.get('consumption_storage', '')}')
         self.consumption_storage = comp
 
+    # REVIEW (unreferenced): no references to `reattach_table_config` found in src/, scripts/ or data/.
     def reattach_table_config(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach the table configuration of a NewSEGS Energy Model after it has been reconstructed.
+
+        The table configuration is found by its id, which was recorded when the model was serialised. Raises `AttributeError` if there is none and `TypeError` if the provider does not return a table configuration.
+
+        Args:
+            component_provider: Provider from which to recover the component.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('table_config', '') == '':
             raise AttributeError('This Energy Model has no table_config module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('table_config', ''))

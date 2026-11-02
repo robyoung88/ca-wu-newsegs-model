@@ -1,6 +1,5 @@
 """Provides abstract base class for NewSEGS Consumption and Storage Module."""
 
-from abc import abstractmethod
 from dataclasses import field
 from typing import override
 
@@ -13,6 +12,8 @@ from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_da
 
 @revision_dataclass
 class NewsegsCSConfig(DataWithRevision):
+    """Configuration of a consumption and storage module. The base class has none; implementations add their own.
+    """
     location: modlocation.Location = field(default_factory = modlocation.Location.from_none)
     """
     A generalised location for the module.

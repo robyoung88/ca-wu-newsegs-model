@@ -43,6 +43,11 @@ from .processes.optim_process_components import optim_process_components
 PAGE_TYPE = 'dsa'
 
 def create_dsa_header():
+    """Create the header of the DSA page.
+
+    Returns:
+        The header.
+    """
     return dbc.Container(
         [
             dbc.Row(
@@ -82,6 +87,11 @@ def create_dsa_header():
     )
 
 def create_dsa_configuration_editor():
+    """Create the editor of the DSA: the inputs of the variables, with their bounds.
+
+    Returns:
+        The editor.
+    """
     return dbc.Col([
         html.Div(
             [
@@ -116,6 +126,14 @@ def create_dsa_configuration_editor():
     ])
 
 def create_optim_configuration_editor_header(**kwargs):
+    """Create the header of the optimisation editor.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        The header.
+    """
     button_container_children = [
         dbc.Button(
             'Optimise',
@@ -140,6 +158,14 @@ def create_optim_configuration_editor_header(**kwargs):
     )
 
 def create_optim_configuration_editor(**kwargs):
+    """Create the editor of the optimisation: the variables to vary, with their bounds.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        The editor.
+    """
     return dbc.Col([
         *create_staleness_indicator(kwargs.get('page_type', PAGE_TYPE), 'optim'),
         create_optim_configuration_editor_header(**kwargs),
@@ -219,6 +245,8 @@ def create_optim_configuration_editor(**kwargs):
 
 @dataclass
 class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
+    """Layout configuration of the DSA page: the input and result cards and the navigation.
+    """
     page_type: str = PAGE_TYPE
 
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
@@ -228,6 +256,14 @@ class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
 
 def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
 
+    """The layout of the DSA page: the editors of the DSA and the optimisation, and their results.
+
+    Args:
+        config: The layout configuration of the page.
+
+    Returns:
+        The layout.
+    """
     a1_contents = [
         dbc.Row([
             dbc.Col(
@@ -357,6 +393,11 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
     )
 
 def add_dsa_run_callbacks(app: NewsegsDash):
+    """Bind the callbacks which run, cancel, download and upload the DSA.
+
+    Args:
+        app: The Dash app.
+    """
     if True:
         @app.callback(
             output = {
@@ -668,6 +709,11 @@ def add_dsa_run_callbacks(app: NewsegsDash):
 def add_optim_run_callbacks(app: NewsegsDash):
 
     # Pre-run modal control
+    """Bind the callbacks which run and cancel the optimisation.
+
+    Args:
+        app: The Dash app.
+    """
     @app.callback(
         output = {
             'modal': {

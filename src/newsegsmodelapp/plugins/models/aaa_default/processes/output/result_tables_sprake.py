@@ -104,6 +104,17 @@ def create_wind_results(wind_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(wind_data), 'table_generation_wind', annual)
 
 def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
+    """Create the table of the results of PV generation.
+
+    With no data, the table is empty.
+
+    Args:
+        pv_data: Statistics of PV generation, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     pv_data = _as_data_list(pv_data)
 
     if (annual):
@@ -169,6 +180,15 @@ def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(pv_data), 'table_generation_pv', annual)
 
 def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid:
+    """Create the table of the results of all generation.
+
+    Args:
+        gen_data: Statistics of generation, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     gen_data = _as_data_list(gen_data)
 
     if (annual):
@@ -233,6 +253,15 @@ def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid
     return _create_grid(records, len(gen_data), 'table_generation_combined', annual)
 
 def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
+    """Create the table of the results of storage.
+
+    Args:
+        stor_data: Statistics of storage, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     stor_data = _as_data_list(stor_data)
 
     if (annual):
@@ -369,6 +398,15 @@ def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(stor_data), 'table_storage', annual)
 
 def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
+    """Create the table of the results of consumption.
+
+    Args:
+        cons_data: Statistics of consumption, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     cons_data = _as_data_list(cons_data)
 
     if annual:
@@ -487,6 +525,15 @@ def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(cons_data), 'table_consumption', annual)
 
 def create_seasonal_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
+    """Create the table of the results of consumption by season.
+
+    Args:
+        cons_data: Statistics of consumption, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     cons_data = _as_data_list(cons_data)
 
     if (annual):
@@ -539,6 +586,15 @@ def create_seasonal_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
 
 def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create the table of the results of the net energy flows (self-consumption, import and export).
+
+    Args:
+        net_data: Statistics of the net energy flows, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     net_data = _as_data_list(net_data)
 
     if (annual):
@@ -579,6 +635,15 @@ def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
 
 def create_seasonal_net_results(net_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create the table of the results of the net energy flows by season.
+
+    Args:
+        net_data: Statistics of the net energy flows, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     net_data = _as_data_list(net_data)
 
     if (annual):
@@ -639,6 +704,15 @@ def create_seasonal_net_results(net_data=None, annual=True) -> dag.AgGrid:
 
 def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create the table of the benefits of the finance model.
+
+    Args:
+        econ_data: Statistics of the economic results, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     econ_data = _as_data_list(econ_data)
 
     if (annual):
@@ -696,6 +770,15 @@ def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
 
 def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create the table of the costs of the finance model.
+
+    Args:
+        econ_data: Statistics of the economic results, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     econ_data = _as_data_list(econ_data)
 
     if (annual):
@@ -770,6 +853,15 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
 
 def create_so_value_results(econ_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create the table of the value (benefits, costs and net present value) of the finance model.
+
+    Args:
+        econ_data: Statistics of the economic results, or None.
+        annual: Whether to give annual statistics (otherwise over the horizon).
+
+    Returns:
+        The table (AG Grid).
+    """
     econ_data = _as_data_list(econ_data)
 
     simple_stats = newsegsbrowser_stats.present_single_stat_per_row(

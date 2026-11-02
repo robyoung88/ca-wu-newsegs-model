@@ -1,9 +1,16 @@
+"""Interface for providing and storing the results of components.
+"""
 from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 
 class NewsegsResultProviderInterface(metaclass = ABCMeta):
+    """Interface of a store of the results of running components.
+
+    A result is held under the component that produced it, and the result type. Results may be marked
+    stale when the configuration of the component changes.
+    """
     @abstractmethod
     def upsert_result(self,
         result_type: str,

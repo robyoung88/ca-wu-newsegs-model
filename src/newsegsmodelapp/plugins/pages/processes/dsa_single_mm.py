@@ -1,3 +1,5 @@
+"""The deterministic sensitivity analysis (DSA) of a single metamodel.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,8 @@ REQUEST_TYPE = 'dsa_run_metamodel'
 
 @dataclass
 class DSARunMetamodelRunRequest(RunRequest):
+    """Request to run a DSA of a metamodel.
+    """
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
@@ -40,6 +44,21 @@ def execute_dsa_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    """Run a deterministic sensitivity analysis of one metamodel, in a worker.
+
+    Runs the model with each selected variable at its bounds in turn. Raises `ValueError` if no metamodel is named in the request and `KeyError` if it is not in the project.
+
+    Args:
+        request: The request being executed.
+        project_provider: Provider of projects, metamodels and variables.
+        result_provider: Provider of results.
+        run_id: Id of the run.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message.
+        check_cancel_status: Function returning whether cancellation of the run has been requested.
+
+    Returns:
+        The status message, `ok` on success.
+    """
     started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
 

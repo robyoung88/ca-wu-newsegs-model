@@ -1,10 +1,10 @@
-import copy
+"""Helpers for Dash callbacks, such as finding the value of the component that triggered a callback.
+"""
 import json
 from typing import Any
 
 import dash
 from dash import ctx, no_update
-from dash.exceptions import PreventUpdate
 
 def get_options(
     option_ids: list[dict[str, str]],
@@ -56,6 +56,7 @@ def get_options_nopage(
             odict[id['key']] = val
     return odict
 
+# REVIEW (unreferenced): no references to `get_variable_keyed_data` found in src/, scripts/ or data/.
 def get_variable_keyed_data(
     section: str,
     key: str,
@@ -111,6 +112,7 @@ def get_triggered_value() -> Any:
             break
     return val
 
+# REVIEW (unreferenced): no references to `update_return_list` found in src/, scripts/ or data/.
 def update_return_list(
     update_id: dict[str, Any],
     update_value: Any,
@@ -157,6 +159,15 @@ def create_noupdate_return() -> Any:
     return _create_noupdate_return(ctx.outputs_list)
 
 def intersection_values_match(d1, d2):
+    """Whether two dictionaries agree on the keys that they share.
+
+    Args:
+        d1: First dictionary.
+        d2: Second dictionary.
+
+    Returns:
+        True if the values of every shared key are equal.
+    """
     return all(d1[k] == d2[k] for k in (d1.keys() & d2.keys()))
 
 def _find_output_locations(

@@ -548,5 +548,11 @@ process_staleness = sa.Table(
 # Table creation
 # -----------------------------------------------------------------------------
 
+# REVIEW (unreferenced): no references to `create_all_tables` found in src/, scripts/ or data/.
 def create_all_tables(engine: sa.Engine):
+    """Create all the tables of the application in a database.
+
+    Args:
+        engine: The SQLAlchemy engine.
+    """
     metadata.create_all(engine)

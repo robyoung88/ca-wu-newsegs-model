@@ -1,3 +1,5 @@
+"""Postprocessing of the net energy flows (self-consumption, import and export) of the Sprake model into the form shown in the interface.
+"""
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegsgeneration import newsegsgeneration
 from newsegsmodelframework.newsegscs import newsegscs

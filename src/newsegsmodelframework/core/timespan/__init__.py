@@ -1,17 +1,27 @@
+"""Blocks of time and the constants and index functions used with them.
+
+The classes (`TimeSpan`, `RegTimeSpan`, `OffsetRegTimeSpan`) and the functions that index
+datetimes by year, season, month, day and peak period are defined in the `timespan` module.
 """
-Ways of defining and comparing blocks of time.
-"""
-from .timespan import *
+from .timespan import (
+    SECONDS_TO_HOURS,
+    SEASON_NAMES,
+    PEAK_PERIODS,
+    delta_days,
+    year_index,
+    season_index,
+    month_index,
+    day_index,
+    peaktime_index,
+    TimeSpan,
+    RegTimeSpan,
+    OffsetRegTimeSpan,
+)
 
 __all__ = [
-    'SECONDS_IN_DAY',
     'SECONDS_TO_HOURS',
-    'SECONDS_TO_DAYS',
-    'NANOSECONDS_TO_DAYS',
     'SEASON_NAMES',
     'PEAK_PERIODS',
-    'TimedeltaScalar',
-    'TimeZoneScalar',
     'delta_days',
     'year_index',
     'season_index',
@@ -20,5 +30,5 @@ __all__ = [
     'peaktime_index',
     'TimeSpan',
     'RegTimeSpan',
-    'OffsetRegTimeSpan'
+    'OffsetRegTimeSpan',
 ]

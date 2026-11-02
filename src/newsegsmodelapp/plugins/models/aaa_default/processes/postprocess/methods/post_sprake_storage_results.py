@@ -1,3 +1,5 @@
+"""Postprocessing of the storage results of the Sprake model into the form shown in the interface.
+"""
 import numpy as np
 
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel

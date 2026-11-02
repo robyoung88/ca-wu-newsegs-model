@@ -1,3 +1,7 @@
+"""Snapshots: copies of a project and everything it owns, held in the `snapshot_` tables so that the project can be restored later.
+
+See the database page of the documentation for the tables.
+"""
 from typing import Any
 import uuid
 import warnings

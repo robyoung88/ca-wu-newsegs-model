@@ -1,29 +1,6 @@
-"""
-A container and controller for models and variables.
+"""The `NewsegsMetaModel` component and its configuration.
 
-Provides a class which encapsulates several structures and methods used for 
-NewSEGS modelling.
-
-Principally, this NewsegsMetaModel class holds:
-    - A reference to a NewsegsModel
-    - A reference to a NewsegsFinance which itself references the NewsegsModel
-    - A series of Variables which locate the values in the NewsegsModel and 
-      NewsegsFinance
-The Metamodel can be set into a state:
-    - Deterministic run
-    - Deterministic probability analysis
-    - Probabilisitic sensitivity analysis
-Its state is used to control the behaviour of its Variables and to propagate 
-live values into its NewsegsModel and NewsegsFinance. These models can then be
-run and values extracted.
-
-For a dsa run, a (small) number of statistics must be nominated to be held in a
-dataframe which will be accessible after completion; each row will correspond
-to a change in a single Variable.
-
-For a psa run, a (small) number of statistics must be nominated to be held in a
-dataframe which will be accessible after completion; each row will correspond
-to a sample across all enabled PSA variables.
+Also contains `MMVarWatcher`, which keeps the metamodel informed of changes to its variables.
 """
 import copy
 import datetime
@@ -68,11 +45,20 @@ def make_varid(
    
 
 class MMVarWatcher(RevisionNotifierProtocol):
+    """Watches the variables of a metamodel.
+
+    Notified when the variables of the metamodel change, so that the metamodel can keep a record of
+    which variables have been synchronised with its NewSEGS Energy Model and finance model.
+    """
     def __init__(self, metamodel: 'NewsegsMetaModel'):
         self._metamodel = metamodel
         self._held_ids = {}
 
     def update_held_ids(self):
+        """Update the record of the variables of the metamodel.
+
+        Variables which have been removed are forgotten, and new variables are marked as needing to be synchronised with the models.
+        """
         mm = self._metamodel
         previous_varids = set(self._held_ids.keys())
         extant_varids = set(mm.variables.keys())
@@ -115,10 +101,41 @@ class MMVarWatcher(RevisionNotifierProtocol):
 
 @revision_dataclass
 class NewsegsMetaModelConfig(DataWithRevision):
+    """Configuration of a `NewsegsMetaModel`.
+
+    The metamodel has no configuration of its own: its state is held in its model,
+    finance and variables.
+    """
     ...
 
 class NewsegsMetaModel(TableOwningNewsegsComponent):
-    """A container and controller for models and variables."""
+    """A container and controller for models and variables.
+
+    Principally, a NewsegsMetaModel holds:
+
+    - A reference to a NewsegsModel
+    - A reference to a NewsegsFinance which itself references the NewsegsModel
+    - A series of Variables which locate the values in the NewsegsModel and
+      NewsegsFinance
+
+    The metamodel can be set into a state:
+
+    - Deterministic run
+    - Deterministic probability analysis
+    - Probabilistic sensitivity analysis
+
+    Its state is used to control the behaviour of its Variables and to propagate
+    live values into its NewsegsModel and NewsegsFinance. These models can then be
+    run and values extracted.
+
+    For a dsa run, a (small) number of statistics must be nominated to be held in a
+    dataframe which will be accessible after completion; each row will correspond
+    to a change in a single Variable.
+
+    For a psa run, a (small) number of statistics must be nominated to be held in a
+    dataframe which will be accessible after completion; each row will correspond
+    to a sample across all enabled PSA variables.
+    """
 
     model_id: str
     finance_id: str
@@ -168,6 +185,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     @property
     def watcher(self) -> RevisionNotifierProtocol:
+        """The watcher which tracks changes to the variables; created on first use.
+        """
         if self._watcher is None:
             self._watcher = MMVarWatcher(self)
         return self._watcher
@@ -176,6 +195,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     def watcher(self, watcher: RevisionNotifierProtocol):
         self._watcher = watcher
         
+    # REVIEW (unreferenced): no references to `reattach_model` found in src/, scripts/ or data/.
     def reattach_model(
         self,
         model_provider: Mapping[str, NewsegsModelInterface]
@@ -222,6 +242,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
             pass
         self.revision = r0
 
+    # REVIEW (unreferenced): no references to `reattach_finance` found in src/, scripts/ or data/.
     def reattach_finance(self, finance_provider: Mapping[str, NewsegsFinanceInterface]) -> None:
         """Reattach the associated NewsegsFinance instance after metamodel reconstruction.
         
@@ -272,6 +293,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     def variable_ids(self) -> tuple[dict[str, str], ...]:
         # As variables cannot exist until table_config has been reattached,
         # only search for _variable_ids during child uid update
+        """The varid and the id of each variable of the metamodel.
+        """
         if self.table_config is None:
             return getattr(self, '_variable_ids', ())
         if len(self.variables) == 0 and hasattr(self, '_variable_ids'):
@@ -304,6 +327,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         self.table_config.revision = tr0
         
 
+    # REVIEW (unreferenced): no references to `reattach_table_config` found in src/, scripts/ or data/.
     def reattach_table_config(self, component_provider: Mapping[str, NewsegsComponent]):
         """Reattach the associated TableConfig instance after metamodel reconstruction.
         
@@ -323,6 +347,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
             raise TypeError(f'component_provider did not provide a TableConfigNewsegsComponent for key {self._table_config_id}')
         self.table_config = tc
     
+    # REVIEW (unreferenced): no references to `update_variable_from_interface` found in src/, scripts/ or data/.
     def update_variable_from_interface(
         self,
         section: str,
@@ -395,6 +420,13 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     def sync_model_with_changed_variables_deterministic(
         self
     ) -> set[str]:
+        """Update the NewSEGS Energy Model and finance model with the deterministic values of any variables that have changed.
+
+        Variables are compared by revision with the last synchronisation. The results tables of the models affected are invalidated.
+
+        Returns:
+            The types of model (`model`, `finance`) that were affected.
+        """
         affected_models = set()
         for varid, var in self.variables.items():
             if self._variables_last_model_sync.get(varid, -1) != var.revision:
@@ -508,6 +540,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         result.table_config.revision = self.table_config.revision
         return result
 
+    # REVIEW (unreferenced): no references to `to_config` found in src/, scripts/ or data/.
     def to_config(self) -> dict[str, str|int|float]:
         """
         Simplify metamodel to a simple dictionary for passing around.
@@ -520,6 +553,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
             'last_modified': self._last_modified.isoformat()
         }
     
+    # REVIEW (unreferenced): no references to `generate_new_config` found in src/, scripts/ or data/.
     @classmethod
     def generate_new_config(cls) -> dict[str, str|int|float]:
         """

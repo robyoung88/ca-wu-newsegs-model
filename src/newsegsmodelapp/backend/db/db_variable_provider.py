@@ -1,3 +1,5 @@
+"""Providers of variables: the variables table.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,14 @@ _VARIABLE_MODEL_SECTION_MAP = {
 def variable_to_raw_table_data(
     variable: Variable
 ) -> dict:
+    """The values of the columns of the variables table for a variable.
+
+    Args:
+        variable: The variable.
+
+    Returns:
+        Dictionary of the column values.
+    """
     model_sec = (
         _VARIABLE_MODEL_SECTION_MAP
         .get(variable.configuration_type, {})
@@ -181,6 +191,14 @@ def _variable_from_dict(constr_dict: dict) -> Variable:
     )
 
 class FromDatabaseVariableProvider(VariableManagerInterface):
+    """Provider and store of variables, in the variables table.
+
+    Variables can be fetched in full, as a `LightweightVariable` (the information needed to display it) or as a `FullLightweightVariable`
+    (which adds the control information for DSA, PSA and optimisation).
+
+    Args:
+        get_engine: Function returning the SQLAlchemy engine.
+    """
     _table = tbls.variable_configs
 
     _lightweight_variable_columns = tuple(
@@ -371,6 +389,14 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         ...
     
     def get_variable(self, instance_id: str | SequenceNotStr[str]) -> Variable | SequenceNotStr[Variable]:
+        """Get the variable with an instance id, or variables with a sequence of ids.
+
+        Args:
+            instance_id: Id(s) of the variable instance(s).
+
+        Returns:
+            The variable, or list of variables.
+        """
         is_sequence = False
         if isinstance(instance_id, str):
             stmt = (
@@ -397,6 +423,14 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         self, 
         instance_id: str | SequenceNotStr[str]
     ) -> LightweightVariable | SequenceNotStr[LightweightVariable]:
+        """Get the lightweight description of a variable (or variables).
+
+        Args:
+            instance_id: Id(s) of the variable instance(s).
+
+        Returns:
+            The lightweight variable(s).
+        """
         is_sequence = False
         if isinstance(instance_id, str):
             stmt = (
@@ -425,6 +459,14 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         self, 
         instance_id: str | SequenceNotStr[str]
     ) -> FullLightweightVariable | SequenceNotStr[FullLightweightVariable]:
+        """Get the lightweight description of a variable (or variables), with its control information.
+
+        Args:
+            instance_id: Id(s) of the variable instance(s).
+
+        Returns:
+            The full lightweight variable(s).
+        """
         is_sequence = False
         if isinstance(instance_id, str):
             stmt = (
@@ -448,6 +490,17 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         return [varmap[x] for x in instance_id]
 
     def get_default_variable(self, variable_id: str, index: int = -1) -> Variable:
+        """Get the default instance of a variable by varid.
+
+        The default is the most recently added by default.
+
+        Args:
+            variable_id: Id of the variable.
+            index: See the description.
+
+        Returns:
+            The variable.
+        """
         stmt = (
             self._table.select()
             .where(self._table.c.varid == variable_id)
@@ -463,6 +516,14 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         return _variable_from_json(row.payload)
 
     def duplicate_variable(self, instance_id: str) -> Variable:
+        """Make a copy of a variable with a new id, and add it to the store.
+
+        Args:
+            instance_id: Id(s) of the variable instance(s).
+
+        Returns:
+            The copy.
+        """
         v1 = self.get_variable(instance_id)
         v2 = cast(Variable, copy.deepcopy(v1))
         v2.id = v2.generate_new_id()
@@ -474,6 +535,14 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         return v2
 
     def add_variable(self, var: Variable) -> str:
+        """Add a variable to the store.
+
+        Args:
+            var: The variable.
+
+        Returns:
+            The id of the variable.
+        """
         vardata = variable_to_raw_table_data(var)
         stmt = (tbls.variable_configs.insert().values(vardata))
         with write_transaction(self._get_engine(writer = True)) as conn:
@@ -485,6 +554,11 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         return res.inserted_primary_key[0] # pyright: ignore[reportOptionalSubscript]
 
     def get_varids(self) -> tuple[str, ...]:
+        """The varids of the variables in the store.
+
+        Returns:
+            Tuple of varids.
+        """
         stmt = sa.select(tbls.variable_configs.c.varid).distinct()
         with read_transaction(self._get_engine()) as conn:
             varids = conn.scalars(stmt)
@@ -614,6 +688,15 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         instance_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get columns of the variables table for a variable (or variables) without constructing them.
+
+        Args:
+            instance_id: Id(s) of the variable instance(s).
+            metadata_ids: Name(s) of the metadata fields wanted.
+
+        Returns:
+            Dictionary of the metadata, or a dictionary of these by id.
+        """
         is_single_id = isinstance(instance_id, (str, bytes))
         instance_id = [instance_id] if is_single_id else list(instance_id)
 
@@ -646,6 +729,13 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         metadata_value: Any
     ):
         
+        """Directly set a column of the variables table. Use with caution.
+
+        Args:
+            instance_id: Id(s) of the variable instance(s).
+            metadata_id: Name of the metadata field.
+            metadata_value: The value to set.
+        """
         pk_col = list(self._table.primary_key.columns)[0]
         update_col = self._table.c[metadata_id]
 
@@ -680,6 +770,8 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
 class CachedFromDatabaseVariableProvider(
     FromDatabaseVariableProvider
 ):
+    """A `FromDatabaseVariableProvider` which keeps recently loaded variables, and lightweight variables, in LRU caches.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._variable_cache = LRUCache(maxsize = 100)

@@ -12,7 +12,6 @@ from typing import cast
 import zmq
 
 from pathlib import Path
-import sqlalchemy as sa
 
 from config import settings
 RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
@@ -22,19 +21,19 @@ DISPATCHSERVER = settings['DISPATCHSERVERS'][0]
 BACKENDPORT = str(settings['BACKENDPORT'])
 
 from newsegsmodelapp.backend import db
-from newsegsmodelapp.backend.db.db_tables import runs
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_request_status, update_calculation_progress, get_cancel_status, set_status_success, set_status_failed
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 
-import newsegsmodelapp.register_plugins # Ensure this always gets imported
+import newsegsmodelapp.register_plugins # Ensure this always gets imported  # noqa: F401
 import newsegsmodelapp.registers as registers
 
-import os
 
 POISON_PILL = b"__STOP__"
 
 class RunAlreadyExistsError(BaseException):
+    """Raised (as an exception which is not caught by ordinary handlers) when a run already exists for a request, so that the request is not run twice.
+    """
     pass
 
 def worker_process(
@@ -44,6 +43,19 @@ def worker_process(
     db_path: str | None = None, 
     stop_event = None
 ):
+    """The main loop of a worker process.
+
+    Connects to the dispatcher over ZeroMQ, and for each request received: creates a run, looks up the run, postprocess or table draw
+    procedure registered for the request, executes it with progress and cancellation callbacks, and records the outcome in the
+    database. Runs until `stop_event` is set or a stop message is received.
+
+    Args:
+        worker_id: Identifier of the worker, for logging.
+        server: Address of the dispatcher.
+        port: Port on which the dispatcher serves workers.
+        db_path: Path of the database file; the default if None.
+        stop_event: Event which, when set, tells the worker to stop.
+    """
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.setsockopt(zmq.RCVTIMEO, settings.get('WORKER_RECEIVE_TIMEOUT_MS', -1))

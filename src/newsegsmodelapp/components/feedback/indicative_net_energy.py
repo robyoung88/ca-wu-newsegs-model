@@ -1,3 +1,5 @@
+"""The graphs which give indicative feedback of the net energy of a site as its inputs are edited, from `EstimatedEnergyBalance`.
+"""
 from functools import partial
 
 from dash import dcc, html

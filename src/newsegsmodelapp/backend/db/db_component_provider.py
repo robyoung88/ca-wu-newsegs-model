@@ -1,3 +1,8 @@
+"""Providers of components: the component tables, with a provider for each kind of component that owns children.
+
+`FromDatabaseNewsegsComponentProvider` is the general provider; the NewSEGS Energy Model, finance model, metamodel and project providers extend it
+to handle the tables and children specific to each. The `Cached...` provider keeps recently loaded projects.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -40,6 +45,15 @@ from newsegsmodelframework.newsegsvariable.variableprovider import VariableProvi
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentManagerInterface
 ):
+    """Provider and store of components, in the component configs table.
+
+    Components are held as JSON payloads with the metadata (type, class, version, revision and label) in columns. Components which own child
+    components record their ids, and the children are fetched and reattached when the component is reconstructed. Lightweight descriptions of components
+    can be fetched without constructing them.
+
+    Args:
+        get_engine: Function returning the SQLAlchemy engine.
+    """
     _table = tbls.component_configs
 
     _lightweight_component_columns = tuple(
@@ -156,6 +170,16 @@ class FromDatabaseNewsegsComponentProvider(
     def get_lightweight_component(
         self, component_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
+        """Get the lightweight description of a component (or components).
+
+        Contains the information needed to display the component, without constructing it.
+
+        Args:
+            component_id: Id(s) of the component(s).
+
+        Returns:
+            The lightweight component(s).
+        """
         prevstate = RevisionNotifierMixin._set_notification_state('disabled')
         try:
             is_sequence = False
@@ -236,6 +260,7 @@ class FromDatabaseNewsegsComponentProvider(
         self.upsert_component(component, force = True)
         return component.id
         
+    # REVIEW (unreferenced): no references to `get_default_component` found in src/, scripts/ or data/.
     @override
     def get_default_component(
         self,
@@ -277,6 +302,12 @@ class FromDatabaseNewsegsComponentProvider(
     def upsert_children(self, component: NewsegsComponent, force: bool = False):
         # Expect to override this for different types of component
         # to deal with different tables
+        """Insert or update the child components of a component.
+
+        Args:
+            component: The component(s).
+            force: Write the component(s) even if their revisions have not changed.
+        """
         component_children = component.get_components(component_group= 'component_configs')
         if component_children:
             self.upsert_component(component_children, force = force)
@@ -289,13 +320,15 @@ class FromDatabaseNewsegsComponentProvider(
         tbl: Optional[sa.Table] = None,
         project_id: Optional[str] = None,
     ) -> None:
-        """_summary_
+        """Insert or update a component, or components, in the store.
+
+        A component is written if it is not present, or if its revision differs from the saved revision (or `force`).
 
         Args:
-            component (NewsegsComponent | SequenceNotStr[NewsegsComponent]): _description_
-            force (bool, optional): _description_. Defaults to False.
-            tbl (Optional[sa.Table], optional): _description_. Defaults to None.
-            project_id (Optional[str], optional): Cache invalidate this project if upsert results in table change. Defaults to None.
+            component: The component or components.
+            force: Write the components even if their revisions have not changed.
+            tbl: The table to write to; the table of the provider by default.
+            project_id: Project whose cache to invalidate if the upsert changes a table.
         """
         if tbl is None:
             tbl = self._table
@@ -545,6 +578,15 @@ class FromDatabaseNewsegsComponentProvider(
         component_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get columns of the components table for a component (or components) without constructing them.
+
+        Args:
+            component_id: Id(s) of the component(s).
+            metadata_ids: Name(s) of the metadata fields wanted.
+
+        Returns:
+            Dictionary of the metadata, or a dictionary of these by id.
+        """
         is_single_id = isinstance(component_id, (str, bytes))
         component_id = [component_id] if is_single_id else list(component_id)
 
@@ -648,6 +690,8 @@ class FromDatabaseNewsegsComponentProvider(
         return
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
+    """Provider and store of NewSEGS Energy Models (the `em_configs` table), with the modules and data that they own.
+    """
     _table = tbls.em_configs
 
     _lightweight_component_columns = tuple(
@@ -729,9 +773,18 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
         comp._syncronise()
         return comp
 
+    # REVIEW (unreferenced): no references to `get_lightweight_em` found in src/, scripts/ or data/.
     def get_lightweight_em(
             self, model_id: str | SequenceNotStr[str]
         ) -> LightweightNewsegsModel | SequenceNotStr[LightweightNewsegsModel]:
+        """Get the lightweight description of a NewSEGS Energy Model (or models).
+
+        Args:
+            model_id: Id(s) of the NewSEGS Energy Model(s).
+
+        Returns:
+            The lightweight model(s).
+        """
         return self.get_lightweight_component(model_id)
     
     @override
@@ -818,6 +871,8 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
+    """Provider and store of finance models (the `fm_configs` table), with the data that they own.
+    """
     _table = tbls.fm_configs
 
     _lightweight_component_columns = tuple(
@@ -881,9 +936,18 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
         comp._syncronise()
         return comp
 
+    # REVIEW (unreferenced): no references to `get_lightweight_fm` found in src/, scripts/ or data/.
     def get_lightweight_fm(
         self, finance_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsFinance | SequenceNotStr[LightweightNewsegsFinance]:
+        """Get the lightweight description of a finance model (or models).
+
+        Args:
+            finance_id: Id(s) of the finance model(s).
+
+        Returns:
+            The lightweight finance model(s).
+        """
         return self.get_lightweight_component(finance_id)
  
     @override
@@ -967,6 +1031,8 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider):
+    """Provider and store of metamodels (the `metamodels` table), with the NewSEGS Energy Models, finance models and variables that they own.
+    """
     _table = tbls.metamodels
     _metamodel_variable_jct = tbls.metamodel_variables
 
@@ -1184,6 +1250,14 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     def get_lightweight_metamodel(
         self, metamodel_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsMetaModel | SequenceNotStr[LightweightNewsegsMetaModel]:
+        """Get the lightweight description of a metamodel (or metamodels).
+
+        Args:
+            metamodel_id: Id(s) of the metamodel(s).
+
+        Returns:
+            The lightweight metamodel(s).
+        """
         return self.get_lightweight_component(metamodel_id)
 
     @override
@@ -1221,6 +1295,12 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         metamodel: NewsegsMetaModel | LightweightNewsegsMetaModel,
         variables: Sequence[Variable | LightweightVariable]
     ):
+        """Rewrite the rows of the metamodel_variables table of a metamodel for a set of variables.
+
+        Args:
+            metamodel: The metamodel.
+            variables: The variables.
+        """
         varids = [x.varid if isinstance(x, LightweightVariable) else variable_uid(x) for x in variables]
         if not varids:
             return
@@ -1419,6 +1499,10 @@ class FromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsComponentProvider,
     NewsegsProjectProviderInterface,
 ):
+    """Provider and store of projects (the `projects` table), with the metamodels and variables that they own, and of sessions and snapshots.
+
+    A project is the root of the data of a user: reconstructing it fetches its metamodels, their models and finance, and the variables.
+    """
     _table = tbls.projects
     _project_metamodel_jct = tbls.project_metamodels
     _project_variable_jct = tbls.project_variables
@@ -1591,6 +1675,14 @@ class FromDatabaseNewsegsProjectProvider(
     def get_lightweight_project(
         self, project_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsProject | SequenceNotStr[LightweightNewsegsProject]:
+        """Get the lightweight description of a project (or projects).
+
+        Args:
+            project_id: Id of the project.
+
+        Returns:
+            The lightweight project(s).
+        """
         return self.get_lightweight_component(project_id)
 
     def add_variables_to_project(
@@ -1598,6 +1690,12 @@ class FromDatabaseNewsegsProjectProvider(
         project_id: str,
         variables: Sequence[Variable | LightweightVariable]
     ):
+        """Add variables to the junction table of a project.
+
+        Args:
+            project_id: Id of the project.
+            variables: The variables.
+        """
         new_entries = [
             {
                 'project_id': project_id,
@@ -1617,6 +1715,14 @@ class FromDatabaseNewsegsProjectProvider(
         project_id: str,
         variables: Sequence[Variable | LightweightVariable | str]
     ):
+        """Remove variables from the junction table of a project.
+
+        Variables may be given as variables or by id.
+
+        Args:
+            project_id: Id of the project.
+            variables: The variables.
+        """
         var_uids = [x.id if not isinstance(x, str) else x for x in variables]
         clear_statement = (
             self._project_variable_jct.delete()
@@ -1701,22 +1807,6 @@ class FromDatabaseNewsegsProjectProvider(
         force: bool = False,
         tbl: sa.Table | None = None
     ) -> None:
-        # Unlike other upsertions, projects require junction tables to be sorted.
-        # v_to_sync = list(project._variables_by_uid.values())
-        # vars_modified = any(x.modified or x.soft_dirty for x in v_to_sync)
-        # self.variable_provider.upsert_variable(v_to_sync)
-
-        # # As variables have all been upserted, we can sync all the metamodel variable lists
-        # for mm in project.metamodels:
-        #     mm.variables._syncronise() # pyright: ignore[reportAttributeAccessIssue]
-        
-        #if vars_modified:
-        #    project.revision += 1
-        #    project.table_config.revision += 1
-        
-        # Metamodel upsert happens as part of upsert_children
-        #self.metamodel_provider.upsert_component(project.metamodels) # pyright: ignore[reportArgumentType]
-        # At this point, the metamodel list can be syncronised
         project.metamodels._syncronise() # pyright: ignore[reportAttributeAccessIssue]
         
         super().upsert_component(project, force, tbl)
@@ -1845,6 +1935,7 @@ class FromDatabaseNewsegsProjectProvider(
             odf = pd.read_sql(stmt, conn)
         return odf
 
+    # REVIEW (unreferenced): no references to `recover_session_project` found in src/, scripts/ or data/.
     @override
     def recover_session_project(
         self,
@@ -1968,6 +2059,12 @@ class FromDatabaseNewsegsProjectProvider(
         snapshot_id: int,
         snapshot_name: str
     ):
+        """Change the label of a snapshot.
+
+        Args:
+            snapshot_id: Id of the snapshot.
+            snapshot_name: The new label of the snapshot.
+        """
         stmt = (
             sa.update(tbls.snapshots)
             .where(tbls.snapshots.c.snapshot_id == snapshot_id)
@@ -2054,6 +2151,11 @@ class FromDatabaseNewsegsProjectProvider(
 
     def delete_orphan_variables(self) -> int:
 
+        """Delete variables which no project or metamodel refers to.
+
+        Returns:
+            The number of variables deleted.
+        """
         referenced_variable_ids = sa.union(
             sa.select(tbls.project_variables.c.variable_config_id),
             sa.select(tbls.metamodel_variables.c.variable_config_id)
@@ -2069,6 +2171,15 @@ class FromDatabaseNewsegsProjectProvider(
             return result.rowcount
 
     def create_project_snapshot(self, project_id: str, snapshot_label: str) -> int:
+        """Make a snapshot of a project and everything it owns.
+
+        Args:
+            project_id: Id of the project.
+            snapshot_label: Label of the snapshot.
+
+        Returns:
+            The id of the snapshot.
+        """
         snapshot_id = db_snapshot.generic_snapshot_entity(
             self._get_engine(writer = True),
             tbls.metadata,
@@ -2080,6 +2191,17 @@ class FromDatabaseNewsegsProjectProvider(
         return snapshot_id
 
     def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
+        """Restore a snapshot of a project as a new project.
+
+        The snapshot is copied back with new ids; the original project is not changed.
+
+        Args:
+            project_id: Id of the project.
+            snapshot_id: Id of the snapshot.
+
+        Returns:
+            The restored project.
+        """
         id_remap = db_snapshot.generic_restore_snapshot(
             self._get_engine(writer = True),
             tbls.metadata,
@@ -2089,6 +2211,12 @@ class FromDatabaseNewsegsProjectProvider(
         return self.get_project(new_project_id)
 
     def delete_project_snapshot(self, project_id: str, snapshot_id: int):
+        """Delete a snapshot.
+
+        Args:
+            project_id: Id of the project.
+            snapshot_id: Id of the snapshot.
+        """
         db_snapshot.delete_snapshot(self._get_engine(writer = True), tbls.metadata, snapshot_id)
 
     @override
@@ -2114,13 +2242,21 @@ class FromDatabaseNewsegsProjectProvider(
             res = conn.execute(stmt).scalar_one()
         return res
 
+    # REVIEW (unreferenced): no references to `touch_project` found in src/, scripts/ or data/.
     def touch_project(self, project_id: str):
+        """Update the modification stamp of a project, without changing it.
+
+        Used so that caches of the project are invalidated.
+
+        Args:
+            project_id: Id of the project.
+        """
         stmt = (
             sa.update(self._table)
             .where(self._table.c.id == project_id)
             .values(label=self._table.c.label)
         )
-        with read_transaction(self._get_engine()) as conn:
+        with read_transaction(self._get_engine(writer=True)) as conn:
             conn.execute(stmt)
 
 USE_DATAVERSION = True
@@ -2133,6 +2269,11 @@ class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
 ):
 
+    """A `FromDatabaseNewsegsProjectProvider` which caches the projects it loads.
+
+    A cached project is returned if the database has not been written to since (SQLite `data_version`) or if the project's modification key is unchanged. Otherwise it is loaded
+    again. A lock prevents several threads loading the same project at once.
+    """
     def _create_variable_provider(self) -> VariableProviderInterface:
         return CachedFromDatabaseVariableProvider(self._get_engine)
     
@@ -2296,6 +2437,11 @@ class CachedFromDatabaseNewsegsProjectProvider(
         return olist
 
     def invalidate_cache_for_component(self, component_id):
+        """Remove projects from the cache.
+
+        Args:
+            component_id: Id(s) of the component(s).
+        """
         if isinstance(component_id, str):
             component_id = [component_id]
         for id_ in component_id:
@@ -2305,6 +2451,14 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 del self._lightweight_project_cache[id_]        
 
 def get_component_critical_state(component):
+    """The identity and state of revision of a component, for logging.
+
+    Args:
+        component: The component(s).
+
+    Returns:
+        Dictionary of the id, revision and modified flag.
+    """
     return {
         'id': component.id,
         'revision': component.revision,
@@ -2312,12 +2466,28 @@ def get_component_critical_state(component):
     }
 
 def get_observable_critical_state(observable):
+    """The state of revision of an observable container, for logging.
+
+    Args:
+        observable: The observable container.
+
+    Returns:
+        Dictionary of the revision and modified flag.
+    """
     return {
         'revision': observable.revision,
         'modified': observable.modified
     }
 
 def get_project_critical_state(project):
+    """The state of revision of a project and the components it owns, for logging.
+
+    Args:
+        project: The project.
+
+    Returns:
+        Dictionary of the critical states.
+    """
     odict = {}
     odict.update(
         {

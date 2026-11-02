@@ -48,18 +48,18 @@ def make_dsa_result(
     fnc: NewsegsFinance,
     statistics: Sequence[DSA_FLOAT_STATISTIC]
 ) -> dict[str, Any]:
-    """_summary_
+    """One row of the results of a DSA: a run of the NewSEGS Energy Model and finance model.
 
     Args:
-        variable_changed (str): _description_
-        dsa_bound (str): _description_
-        variable_value (str): _description_
-        mdl (NewsegsModel): _description_
-        fnc (NewsegsFinance): _description_
-        statistics (Sequence[DSA_FLOAT_STATISTIC]): _description_
+        variable_changed: Name of the variable that was varied; `deterministic` for the central run.
+        dsa_bound: Which bound of the variable the run used: `lower`, `upper` or `central`.
+        variable_value: The value of the variable at the bound, as a string; `-` for the central run.
+        mdl: The NewSEGS Energy Model, after the run.
+        fnc: The finance model, after the run.
+        statistics: The statistics to take from the models.
 
     Returns:
-        dict[str, Any]: _description_
+        Dictionary of `variable`, `bound` and `value`, and the value of each statistic.
     """
     res: dict[str, Any] = {
         'variable': variable_changed,
@@ -77,16 +77,25 @@ def run_dsa(
     cancel_status: Callable[[], bool] | None = None,
     precomputed_deterministic: bool = False,
 ) -> pd.DataFrame:
-    """_summary_
+    """Run a deterministic (one-way) sensitivity analysis of a metamodel.
+
+    First the central run, with every variable at its deterministic value. Then, for each variable that is
+    selectable and selected for DSA, two runs: with the variable at its lower and at its upper bound, and all
+    others at their deterministic values. Afterwards every variable is returned to its deterministic value.
 
     Args:
-        mm (NewsegsMetaModel): _description_
-        statistics (Sequence[DSA_FLOAT_STATISTIC], optional): _description_. Defaults to get_args(DSA_FLOAT_STATISTIC).
-        progress (Callable[[int, int], None] | None, optional): _description_. Defaults to None.
-        precomputed_deterministic (Boolean): Metamodel is preloaded with valid determistic results.
-        
+        mm: The metamodel.
+        statistics: The statistics to calculate for each run.
+        progress: Function reporting progress, called with the number of runs completed and the total.
+        cancel_status: Function returning whether cancellation has been requested; checked before each variable.
+        precomputed_deterministic: Whether the metamodel already holds valid results of the deterministic run, so that
+            the central run need not be repeated.
+
     Returns:
-        pd.DataFrame: _description_
+        Dataframe with a row for each run, and columns `variable`, `bound`, `value` and the statistics.
+
+    Raises:
+        InterruptedError: if cancellation is requested.
     """
     variables = mm.variables.values()
     mdl = mm.model

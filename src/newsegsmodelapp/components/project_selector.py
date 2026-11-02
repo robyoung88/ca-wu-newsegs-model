@@ -1,3 +1,5 @@
+"""The project selector: choosing, creating, duplicating, renaming and deleting projects, and managing their snapshots.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,13 @@ def rename_project(
     project_id: str,
     project_name: str,
 ):
+    """Rename a project.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+        project_name: The new name of the project.
+    """
     project_provider.set_component_metadata(
         project_id,
         'label',
@@ -69,6 +78,16 @@ def create_snapshot(
     project_id: str,
     snapshot_name: str,
 ) -> int:
+    """Create a snapshot of a project.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+        snapshot_name: The label of the snapshot.
+
+    Returns:
+        The id of the snapshot.
+    """
     return project_provider.create_project_snapshot(
         project_id, snapshot_name
     )
@@ -77,6 +96,15 @@ def verify_project_exists(
     project_provider: NewsegsProjectProviderInterface,
     project_id: str
 ) -> bool:
+    """Whether a project exists.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+
+    Returns:
+        True if it does.
+    """
     try:
         label = project_provider.get_component_metadata(
             project_id, 'label'
@@ -91,6 +119,16 @@ def load_snapshot(
     current_project_id: str,
     snapshot_id: str
 ) -> str | None:
+    """Restore a snapshot of the current project as a new project.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        current_project_id: Id of the current project.
+        snapshot_id: Id of the snapshot.
+
+    Returns:
+        The id of the new project, or None if the snapshot is not found.
+    """
     int_snapshot_id = int(snapshot_id)
     all_snapshots = project_provider.list_project_snapshots(current_project_id)
     if not np.any(all_snapshots['snapshot_id'] == int_snapshot_id):
@@ -106,6 +144,15 @@ def new_project(
     project_provider: NewsegsProjectProviderInterface,
     model_type: str
 ) -> str:
+    """Create a new project of a model type with the factory registered for it, and store it.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+
+    Returns:
+        The id of the project.
+    """
     from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
                     
     factory = PROJECT_FACTORIES.get(model_type, PROJECT_FACTORIES['default'])
@@ -118,6 +165,15 @@ def duplicate_project(
     project_provider: NewsegsProjectProviderInterface,
     current_project_id: str,
 ) -> str:
+    """Duplicate a project and store the copy.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        current_project_id: Id of the current project.
+
+    Returns:
+        The id of the copy.
+    """
     new_proj = cast(
         NewsegsProject, 
         project_provider.duplicate_component(current_project_id)
@@ -135,6 +191,13 @@ def rename_snapshot(
     snapshot_id: str,
     snapshot_name: str,
 ):
+    """Rename a snapshot.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        snapshot_id: Id of the snapshot.
+        snapshot_name: The label of the snapshot.
+    """
     if not isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         return
     project_provider.rename_snapshot(int(snapshot_id), snapshot_name)
@@ -145,6 +208,19 @@ def delete_project(
     active_project_id: str,
     model_type: str,
 ) -> str | None:
+    """Delete a project.
+
+    Raises `ValueError` if it cannot be deleted.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        delete_project_id: Id of the project to delete.
+        active_project_id: Id of the active project.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+
+    Returns:
+        The id of the project to make active: the active one if a different project was deleted; otherwise another.
+    """
     returned = project_provider.delete_component(delete_project_id)
     if returned:
         raise ValueError('Project could not be deleted')
@@ -162,6 +238,13 @@ def delete_snapshot(
     project_id: str,
     delete_snapshot_id: str
 ):
+    """Delete a snapshot.
+
+    Args:
+        project_provider: Provider of projects, metamodels and variables.
+        project_id: Id of the project.
+        delete_snapshot_id: Id of the snapshot to delete.
+    """
     int_dsi = int(delete_snapshot_id)
     project_provider.delete_project_snapshot(project_id, int_dsi)
 
@@ -170,6 +253,11 @@ def delete_snapshot(
 # -----------------------------------------------
 def create_project_selector():
     
+    """Create the project selector: choosing, creating, duplicating, renaming and deleting projects, and managing their snapshots.
+
+    Returns:
+        The layout.
+    """
     def stores_and_dialogs() -> list[dash.development.base_component.Component]:
         return [
             # Delete project confirmation dialog
@@ -467,6 +555,11 @@ def create_project_selector():
 create_project_selector_block = create_project_selector
 
 def add_project_selector_callbacks(app: NewsegsDash):
+    """Bind the callbacks of the project selector.
+
+    Args:
+        app: The Dash app.
+    """
     @app.callback(
         Output("collapse-controls", "is_open"),
         Input("btn-toggle-controls", "n_clicks"),

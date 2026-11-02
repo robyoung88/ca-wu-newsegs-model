@@ -12,10 +12,8 @@ from newsegsmodelapp.components import icons, staleness
 from newsegsmodelapp.registers import register_result_container_content_creator, register_result_section_header_content_creator, register_table_subindex_map
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
-import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 # -----------------------------------------------
 # Contents

@@ -1,3 +1,5 @@
+"""Update one parameter of a variable and report what changed.
+"""
 from newsegsmodelframework.newsegsvariable.variable import Param, ScalarParam, Variable
 
 
@@ -10,16 +12,12 @@ def update_variable(
     """
     Update the addressed variable with the new value.
 
-    The Variable is addressed by {section}.{key}.{subindex} in the 
-    .variables OrderedDict. After identifying the variable, the nominated 
-    parameter index is updated with the scalar value; if the parameter is
-    an array type, it is addressed by its location in the flattened array
-    using the vector_location.
+    The nominated parameter index is updated with the scalar value; if the parameter is
+    an array type, it is addressed by its location in the flattened array using the
+    vector_location. If the variable rejects the change, its original parameters are restored.
 
     Args:
-        section: Interface section.
-        key: Variable specifier.
-        subindex: Index of multiple instances of specified Variable.
+        var: The variable to update.
         parameter_index: Index of metaparameter within Variable to update.
         vector_location: Index of scalar metaparameter within flattened array of array-type parameter.
         value: Value with which to update metaparameter.

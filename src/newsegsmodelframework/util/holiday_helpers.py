@@ -1,3 +1,5 @@
+"""Helpers for finding public holidays.
+"""
 import os
 from functools import lru_cache
 
@@ -9,6 +11,19 @@ _loaded_holidays = {}
 
 @lru_cache
 def get_holiday_df(start_year, end_year, holiday_country = 'GB', holiday_subdiv = 'WLS'):
+    """Dataframe of the holidays in a range of years, by day.
+
+    For Great Britain the holidays are read from the parquet files in the `data` directory; otherwise they come from the `holidays` package. Cached.
+
+    Args:
+        start_year: First year.
+        end_year: Last year.
+        holiday_country: Country code of the holidays.
+        holiday_subdiv: Subdivision code of the holidays.
+
+    Returns:
+        Dataframe indexed by day, flagging holidays.
+    """
     if holiday_country == 'GB':
         global _loaded_holidays
         hol_fn = 'gb_' + holiday_subdiv.lower() + '.parquet'

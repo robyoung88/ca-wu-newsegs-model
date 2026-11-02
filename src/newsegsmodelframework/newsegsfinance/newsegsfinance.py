@@ -21,6 +21,12 @@ class NewsegsFinanceData(NewsegsComponent):
 
 @revision_dataclass
 class NewsegsFinanceConfig(DataWithRevision):
+    """Configuration of a finance model.
+
+    Attributes:
+        benefit_discount_rate: Discount rate applied to benefits (receipts).
+        cost_discount_rate: Discount rate applied to costs.
+    """
     benefit_discount_rate: float = 0.
     cost_discount_rate: float = 0.
 
@@ -65,8 +71,11 @@ class NewsegsFinance(NewsegsFinanceInterface):
         self.finance_data = finance_data or NewsegsFinanceData()
         self.table_config = table_config or TableConfigNewsegsComponent()
     
+    # REVIEW (unreferenced): no references to `finance_version` found in src/, scripts/ or data/.
     @property
     def finance_version(self) -> str:
+        """Version of the finance model.
+        """
         return self.version
 
     def run(self):
@@ -82,11 +91,18 @@ class NewsegsFinance(NewsegsFinanceInterface):
         mdl: newsegsmodelinterface.NewsegsModelInterface,
         dirty: bool = True
     ) -> None:
+        """Attach the NewSEGS Energy Model whose results the finance model values.
+
+        Args:
+            mdl: The NewSEGS Energy Model.
+            dirty: Whether to mark the finance model as needing to be rerun.
+        """
         last_revision = self.revision
         self.model = mdl
         if not dirty:
             self._config._revision = last_revision
     
+    # REVIEW (unreferenced): no references to `set_discount_rates` found in src/, scripts/ or data/.
     def set_discount_rates(self, *drs:float, **kwdrs:float) -> None:
         """
         Set the benefit and cost discount rates
@@ -125,6 +141,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         total).
         """
     
+    # REVIEW (unreferenced): no references to `resident_receipts_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def resident_receipts_discounted(self) -> pd.DataFrame:
@@ -145,6 +162,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         total).
         """
 
+    # REVIEW (unreferenced): no references to `ev_receipts_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def ev_receipts_discounted(self) -> pd.DataFrame:
@@ -166,6 +184,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         payments.
         """
     
+    # REVIEW (unreferenced): no references to `export_receipts_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def export_receipts_discounted(self) -> pd.DataFrame:
@@ -222,6 +241,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         total).
         """
 
+    # REVIEW (unreferenced): no references to `import_costs_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def import_costs_discounted(self) -> pd.DataFrame:
@@ -242,6 +262,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         totals column: `costs`.
         """
 
+    # REVIEW (unreferenced): no references to `om_costs_generation_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def om_costs_generation_discounted(self) -> pd.DataFrame:
@@ -262,6 +283,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         totals column: `costs`.
         """
 
+    # REVIEW (unreferenced): no references to `om_costs_storage_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def om_costs_storage_discounted(self) -> pd.DataFrame:
@@ -281,6 +303,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         May be broken down, but should include a totals column: `costs`.
         """
 
+    # REVIEW (unreferenced): no references to `om_costs_billing_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def om_costs_billing_discounted(self) -> pd.DataFrame:
@@ -299,6 +322,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         May be broken down, but should include a totals column: `costs`.
         """
 
+    # REVIEW (unreferenced): no references to `om_costs_other_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def om_costs_other_discounted(self) -> pd.DataFrame:
@@ -342,6 +366,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         totals column: `costs`.
         """
 
+    # REVIEW (unreferenced): no references to `capex_costs_generation_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def capex_costs_generation_discounted(self) -> pd.DataFrame:
@@ -362,6 +387,7 @@ class NewsegsFinance(NewsegsFinanceInterface):
         totals column: `costs`.
         """
 
+    # REVIEW (unreferenced): no references to `capex_costs_storage_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def capex_costs_storage_discounted(self) -> pd.DataFrame:
@@ -375,59 +401,102 @@ class NewsegsFinance(NewsegsFinanceInterface):
     @property
     @abstractmethod
     def capex_costs_distribution_undiscounted(self) -> pd.DataFrame:
+        """Frame of timeseries of capital expenditure on distribution (undiscounted).
+        """
         ...
 
+    # REVIEW (unreferenced): no references to `capex_costs_distribution_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def capex_costs_distribution_discounted(self) -> pd.DataFrame:
+        """Frame of timeseries of capital expenditure on distribution (cost discount applied).
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_metering_undiscounted(self) -> pd.DataFrame:
+        """Frame of timeseries of capital expenditure on metering (undiscounted).
+        """
         ...
 
+    # REVIEW (unreferenced): no references to `capex_costs_metering_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def capex_costs_metering_discounted(self) -> pd.DataFrame:
+        """Frame of timeseries of capital expenditure on metering (cost discount applied).
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_other_undiscounted(self) -> pd.DataFrame:
+        """Frame of timeseries of other capital expenditure (undiscounted).
+        """
         ...
 
+    # REVIEW (unreferenced): no references to `capex_costs_other_discounted` found in src/, scripts/ or data/.
     @property
     @abstractmethod
     def capex_costs_other_discounted(self) -> pd.DataFrame:
+        """Frame of timeseries of other capital expenditure (cost discount applied).
+        """
         ...
 
     @property
     @abstractmethod
     def all_capex_costs_undiscounted(self) -> pd.DataFrame:
+        """Frame of timeseries of all capital expenditure (undiscounted).
+        """
         ...
 
     @property
     @abstractmethod
     def all_capex_costs_discounted(self) -> pd.DataFrame:
+        """Frame of timeseries of all capital expenditure (cost discount applied).
+        """
         ...
 
     @property
     @abstractmethod
     def all_costs_undiscounted(self) -> pd.DataFrame:
+        """Frame of timeseries of all costs, recurrent and capital (the columns of the systems are suffixed `_recurrent` and `_capex`) (undiscounted).
+        """
         ...
     
     @property
     @abstractmethod
     def all_costs_discounted(self) -> pd.DataFrame:
+        """Frame of timeseries of all costs, recurrent and capital (the columns of the systems are suffixed `_recurrent` and `_capex`) (cost discount applied).
+        """
         ...
 
     @abstractmethod
     def get_total_present_costs_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """The sum to horizon of undiscounted costs.
+
+        The sum of all the costs up to the horizon, with no discount applied.
+
+        Args:
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
+
+        Returns:
+            Total costs.
+        """
         ...
     
     @abstractmethod
     def get_total_present_costs_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """The sum to horizon of discounted costs.
+
+        The sum of all the costs up to the horizon, with the cost discount applied.
+
+        Args:
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
+
+        Returns:
+            Total discounted costs.
+        """
         ...
 
     # Summary vectors
@@ -461,31 +530,84 @@ class NewsegsFinance(NewsegsFinanceInterface):
 
     @abstractmethod
     def get_benefits_costs_undiscounted(self) -> pd.DataFrame:
+        """Undiscounted benefits and costs as the columns of a dataframe indexed by datetime.
+
+        Returns:
+            The dataframe with `benefits` and `costs` columns.
+        """
         ...
 
     @abstractmethod
     def get_benefits_costs_discounted(self) -> pd.DataFrame:
+        """Discounted benefits and costs as the columns of a dataframe indexed by datetime.
+
+        Returns:
+            The dataframe with `benefits` and `costs` columns.
+        """
         ...
 
     # Derived values
     @abstractmethod
     def get_benefit_cost_ratio_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """The ratio of undiscounted benefits to undiscounted costs up to the horizon.
+
+        Where the costs are zero the ratio is infinite, signed as the benefits.
+
+        Args:
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
+
+        Returns:
+            The ratio.
+        """
         ...
     
     @abstractmethod
     def get_benefit_cost_ratio_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """The ratio of discounted benefits to discounted costs up to the horizon.
+
+        Where the costs are zero the ratio is infinite, signed as the benefits.
+
+        Args:
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
+
+        Returns:
+            The ratio.
+        """
         ...
 
     @abstractmethod
     def get_simple_payback_time_days(self) -> float:
+        """The simple payback time in days.
+
+        The time from the start of the run until the cumulative undiscounted net revenue (receipts less recurrent costs) has repaid the capital expenditure. If this is not reached within the run it is extrapolated from the rate at which the debt is being reduced; it is infinite if the debt is not being reduced.
+
+        Returns:
+            The time in days.
+        """
         ...
     
     @abstractmethod
     def get_net_present_value_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """The undiscounted net value to horizon: benefits less costs.
+
+        Args:
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
+
+        Returns:
+            The net value.
+        """
         ...
     
     @abstractmethod
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
+        """The net present value to horizon: discounted benefits less discounted costs.
+
+        Args:
+            horizon: Time up to which to sum, as a timestamp or a timedelta from the start of the data; the end of the data if None.
+
+        Returns:
+            The net present value.
+        """
         ...
 
     def __hash__(self):

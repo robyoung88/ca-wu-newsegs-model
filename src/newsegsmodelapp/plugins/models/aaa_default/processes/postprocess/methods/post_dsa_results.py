@@ -1,3 +1,5 @@
+"""Conversion of the results of a DSA into tables.
+"""
 import pandas as pd
 
 def _melt_dsa(df, scale_label = 'absolute'):
@@ -59,6 +61,16 @@ def dsa_results_to_tables(
     dsa_data: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     
+    """Convert the results of a DSA into tables.
+
+    The first row of the data is the deterministic run, the others the runs with each variable at its bounds. Raises `TypeError` if the data are not long enough.
+
+    Args:
+        dsa_data: Dataframe of the results of the DSA.
+
+    Returns:
+        The tables: the deterministic result, and the sensitivities with their labels.
+    """
     if len(dsa_data) < 2:
         raise TypeError('dsa_data is not long enough')
 

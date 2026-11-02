@@ -1,3 +1,5 @@
+"""The optimisation of a single metamodel.
+"""
 from dataclasses import dataclass
 import datetime
 import json
@@ -17,6 +19,8 @@ REQUEST_TYPE = 'optim_run_metamodel'
 
 @dataclass
 class OptimRunMetamodelRunRequest(RunRequest):
+    """Request to optimise a metamodel.
+    """
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
@@ -39,6 +43,21 @@ def execute_optim_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    """Run the optimisation of one metamodel, in a worker.
+
+    Varies the variables selected for optimisation within their bounds. Raises `ValueError` if no metamodel is named in the request and `KeyError` if it is not in the project.
+
+    Args:
+        request: The request being executed.
+        project_provider: Provider of projects, metamodels and variables.
+        result_provider: Provider of results.
+        run_id: Id of the run.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message.
+        check_cancel_status: Function returning whether cancellation of the run has been requested.
+
+    Returns:
+        The status message, `ok` on success.
+    """
     started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
     run_config = json.loads(request.payload)

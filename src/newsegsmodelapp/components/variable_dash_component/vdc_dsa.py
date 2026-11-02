@@ -1,3 +1,5 @@
+"""Creation of the DSA input of a variable.
+"""
 
 from typing import cast
 
@@ -8,6 +10,16 @@ from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 def create_dsa_input(
     var: variable.Variable
 ):
+    """Create the DSA input of a variable.
+
+    Dispatches on the distribution of the variable. Nothing is created if the variable is not to be shown.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input, or nothing.
+    """
     if not var.dsa_show:
         return []
     match var.distribution:

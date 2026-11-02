@@ -1,3 +1,8 @@
+"""Settings for the `dynaconf` module.
+
+Used to ensure that `dynaconf` picks up settings from the correct file paths
+and responds to environment variables.
+"""
 
 from dynaconf import Dynaconf
 

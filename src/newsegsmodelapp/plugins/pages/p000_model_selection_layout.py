@@ -1,3 +1,5 @@
+"""The model selection page: the first page of the app, from which a model type is chosen.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -7,6 +9,7 @@ from dash import ALL, Input, Output, ctx, html
 from dash.exceptions import PreventUpdate
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+from newsegsmodelapp.components import navigation
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.types import ComponentType, LayoutConfiguration, Page
 from newsegsmodelapp import registers
@@ -68,15 +71,38 @@ model_selection_layout = dbc.Container([
         ]),  
     ], 
     className = 'd-flex justify-content-center',
-    )
+    ),
+    html.Div(
+        dbc.Button(
+            [html.I(className = 'bi bi-question-circle me-1'), 'Documentation'],
+            href = navigation.DOCS_URL,
+            external_link = True,
+            color = 'secondary',
+            outline = True,
+        ),
+        className = 'd-flex justify-content-center mt-4'
+    ),
        
 ])
 
 def create_model_selection_layout(config: LayoutConfiguration) -> ComponentType:
+    """The layout of the model selection page.
+
+    Args:
+        config: The layout configuration of the page.
+
+    Returns:
+        The layout.
+    """
     return model_selection_layout
 
 def assign_callbacks(app: NewsegsDash):
 
+    """Bind the callbacks of the model selection page: choosing a model type navigates to its landing page.
+
+    Args:
+        app: The Dash app.
+    """
     @app.callback(
         Output('url', 'pathname'),
         Input({'type': 'btn-model-type-selector', 'label': ALL}, 'n_clicks'),

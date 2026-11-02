@@ -1,3 +1,5 @@
+"""Components for the inputs of variable parameters: numeric fields and cards, reset and default buttons, and the handler of changes.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -5,7 +7,7 @@ import copy
 import time
 from typing import Any, Optional, cast
 
-from dash import dcc, html, no_update
+from dash import dcc, html
 from dash.exceptions import PreventUpdate
 import numpy as np
 
@@ -19,9 +21,7 @@ from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
-from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
@@ -37,6 +37,21 @@ def create_numeric_variable_parameter_input(
     max: int | float | None = None,
     step: int | float  = 1
 ):
+    """Create a numeric field for a parameter of a variable.
+
+    The field steps dynamically according to the step, and its id is that of the parameter.
+
+    Args:
+        param_id: Identification of the variable parameter that the component edits.
+        placeholder: Placeholder shown when the field is empty.
+        value: The value.
+        min: Minimum value of the field.
+        max: Maximum value of the field.
+        step: Step of the field.
+
+    Returns:
+        The input.
+    """
     input_id = param_id.as_dict()
 
     if float(int(step)) == float(step):
@@ -70,6 +85,26 @@ def create_numeric_card_variable_parameter_input(
     status_text: str = "Shared with all",
     status_colour: str = "success",
 ):
+    """Create a card with a labelled numeric field for a parameter of a variable.
+
+    The card has an icon, the field, optionally buttons to reset the value and set the default, and a badge showing whether the variable is shared.
+
+    Args:
+        icon_name: Name(s) of the icon(s), from `components.icons`.
+        label: The label.
+        param_id: Identification of the variable parameter that the component edits.
+        placeholder: Placeholder shown when the field is empty.
+        value: The value.
+        min: Minimum value of the field.
+        max: Maximum value of the field.
+        step: Step of the field.
+        reset_button: Whether to include the button which resets the value.
+        status_text: Text of the badge which shows whether the variable is shared.
+        status_colour: Bootstrap colour of the badge.
+
+    Returns:
+        The card.
+    """
     button_elements = []
     if reset_button:
 
@@ -120,6 +155,24 @@ def update_single_parameter(
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ) -> dict[str, Any]:
 
+    """Input handler for a change in a single parameter of a variable.
+
+    Updates the variable of the active project with the new value, and sets the outputs of the callback according to what the change affected - the deterministic value, the DSA bounds and the PSA statistics. Registered for the purpose `parameter` of `single-input-config` components.
+
+    Args:
+        triggered_id: The id of the component which triggered the callback.
+        input_ids: The ids of the input components of the callback.
+        header_ids: The ids of the header containers of the callback.
+        trigger_ids: The ids of the trigger stores of the callback.
+        calling_dict: Other keyword arguments of the calling callback.
+        active_project_id: Id of the active project.
+        project_provider: Provider of projects, metamodels and variables.
+        return_dict: Dictionary of the outputs of the callback, to be updated and returned.
+        new_val: The new value; by default the value of the triggering component.
+
+    Returns:
+        The updated `return_dict`.
+    """
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
         if new_val is None:
@@ -208,6 +261,14 @@ def update_single_parameter(
 def create_value_reset_button(
     param_id: VariableInstanceParameterComponentID
 ):
+    """Create the button which resets a parameter to its last saved value.
+
+    Args:
+        param_id: Identification of the variable parameter that the component edits.
+
+    Returns:
+        The button.
+    """
     button_id = copy.copy(param_id)
     button_id.type = 'input-action-button'
     button_id.purpose = 'value-reset'
@@ -271,6 +332,14 @@ def _reset_value(
 def create_value_set_default_button(
     param_id: VariableInstanceParameterComponentID
 ):
+    """Create the button which sets the current value of a parameter as its default.
+
+    Args:
+        param_id: Identification of the variable parameter that the component edits.
+
+    Returns:
+        The button.
+    """
     button_id = copy.copy(param_id)
     button_id.type = 'input-action-button'
     button_id.purpose = 'value-set-default'
@@ -325,6 +394,16 @@ def _set_default_value(
 def create_blank_single_input_header_element(
     param_id: VariableInstanceParameterComponentID
 ):
+    """Create an empty, hidden header element for a single input.
+
+    Gives the callbacks somewhere to write to when the input has no header.
+
+    Args:
+        param_id: Identification of the variable parameter that the component edits.
+
+    Returns:
+        The element.
+    """
     header_id = copy.copy(param_id)
     header_id.type = 'single-input-header'
     header_id.purpose = 'header'
@@ -334,6 +413,15 @@ def create_input_group_config_update_trigger(
     param_id: VariableInstanceParameterComponentID,
     purpose: str = 'trigger',
 ):
+    """Create the store which signals that the configuration of an input group has been updated.
+
+    Args:
+        param_id: Identification of the variable parameter that the component edits.
+        purpose: The purpose field of the component id.
+
+    Returns:
+        The store.
+    """
     trigger_id = copy.copy(param_id)
     trigger_id.type = 'input-group-config-update-trigger'
     trigger_id.purpose = purpose
@@ -397,6 +485,16 @@ def create_variable_status_badge(
     status_text: str = "Shared with all", 
     colour: str = "success"
 ):
+    """Create the badge which shows, and toggles, whether a variable is shared by all configurations.
+
+    Args:
+        param_id: Identification of the variable parameter that the component edits.
+        status_text: Text of the badge which shows whether the variable is shared.
+        colour: Bootstrap colour of the badge.
+
+    Returns:
+        The badge.
+    """
     badge_id = copy.copy(param_id)
     badge_id.type = 'input-action-button'
     badge_id.purpose = 'variable-status-toggle'

@@ -1,9 +1,19 @@
+"""Components needed by the DSA process.
+"""
 from dash import dcc, html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 
 def dsa_process_components(**kwargs):
+    """Create the components needed by the DSA process: the trigger store, and the modal which asks for confirmation before a DSA is started.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        List of components.
+    """
     return [
         dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'dsa_input_change'}, data = []),
         dbc.Modal(

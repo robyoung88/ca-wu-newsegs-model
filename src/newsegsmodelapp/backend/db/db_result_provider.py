@@ -1,3 +1,5 @@
+"""Providers of results: the database table of results and the results store on disk.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,15 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from cachetools import LRUCache
 
 class FromDatabaseResultProvider(NewsegsResultProviderInterface):
+    """Provider of the results of runs, from the results table and the results store.
+
+    The database holds the metadata (the component and revision the result belongs to, and the request and run that produced it) and the path of
+    the file; the data are in the results store on disk.
+
+    Args:
+        get_engine: Function returning the SQLAlchemy engine.
+        result_store: Directory of the results store.
+    """
     def __init__(
         self,
         get_engine: Callable[[], sa.Engine],
@@ -306,6 +317,14 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         self,
         result_id: int
     ) ->  tuple[Any, int] | tuple[None, None]:
+        """Get a result by its id.
+
+        Args:
+            result_id: Id of the result.
+
+        Returns:
+            The result and the revision of the component it was calculated for; `(None, None)` if there is no such result.
+        """
         stmt = (
             sa.select(self._table.c.result_file, self._table.c.component_config_revision)
             .where(self._table.c.result_id == result_id)
@@ -331,6 +350,19 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         parent_component: NewsegsComponent | LightweightNewsegsComponent | str,
         revision: Optional[int] = None,
     ) -> int | bool:
+        """Whether a result exists for a component, request and type.
+
+        If a revision is given, the result must be for that revision.
+
+        Args:
+            result_type: Type of the result.
+            request_id: Id of the request.
+            parent_component: The component (or its id) that the result belongs to.
+            revision: Revision of the component that the result was calculated for; any revision if None.
+
+        Returns:
+            The id of the result if there is one, otherwise False.
+        """
         stmt = (
             sa.select(
                 self._table.c.result_id,
@@ -380,6 +412,8 @@ class CachedFromDatabaseResultProvider(
     FromDatabaseResultProvider
 ):
     
+    """A `FromDatabaseResultProvider` which keeps recently loaded results in an LRU cache, so that results displayed repeatedly are not read from disk each time.
+    """
     def __init__(self, get_engine: Callable[[], sa.Engine], result_store: Path):
         super().__init__(get_engine, result_store)
         self._result_cache = LRUCache(maxsize = 128)

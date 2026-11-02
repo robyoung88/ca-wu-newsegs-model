@@ -1,3 +1,5 @@
+"""Components needed by the optimisation process.
+"""
 
 from dash import dcc, html
 
@@ -5,6 +7,14 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelframework.newsegssensitivity import optim
 
 def optim_process_components(**kwargs):
+    """Create the components needed by the optimisation process, such as the modal which asks for confirmation before it is started.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        List of components.
+    """
     return [
         dbc.Modal(
             [

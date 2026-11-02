@@ -11,9 +11,16 @@ from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInt
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject import NewsegsProject
 
-from newsegsmodelframework.newsegsvariable.variable import Variable, variable_uid
 
 def flatten(nested: list) -> list:
+    """Flatten a list of lists by one level.
+
+    Args:
+        nested: The list of lists.
+
+    Returns:
+        The flat list.
+    """
     return reduce(iconcat, nested, [])
 
 # -----------------------------------------------------------------------------

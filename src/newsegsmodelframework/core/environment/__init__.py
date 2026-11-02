@@ -1,14 +1,15 @@
-"""
-Classes for serving Environmental (weather) data.
+"""Servers of environmental (weather) data.
+
+The two base classes - the local environment of a site and the wider environment that affects
+electricity prices - are exposed here; the implementations are in the modules.
+
+Modules:
+    environment_servers: The base classes `NewsegsLocalEnvironment` and `NewsegsWiderEnvironment`.
+    inmem_env_servers: Implementations which hold their data in memory.
+    dummy_env_servers: Implementations which provide placeholder data.
 """
 from .environment_servers import NewsegsLocalEnvironment, NewsegsWiderEnvironment
-from .dummy_env_servers import DummyLocalEnv, DummyWiderEnv
-from .inmem_env_servers import InMemoryLocalEnv, InMemoryWiderEnv
 __all__ = [
     'NewsegsLocalEnvironment',
     'NewsegsWiderEnvironment',
-    'DummyLocalEnv',
-    'DummyWiderEnv',
-    'InMemoryLocalEnv',
-    'InMemoryWiderEnv',
 ]

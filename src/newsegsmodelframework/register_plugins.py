@@ -3,6 +3,13 @@ import importlib
 import pkgutil
 
 def load_project_factories():
+    """Load project factories.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     import newsegsmodelframework.plugins.projects
     pf_dict = {}
     for info in pkgutil.iter_modules(

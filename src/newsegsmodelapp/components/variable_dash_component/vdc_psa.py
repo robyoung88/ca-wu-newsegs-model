@@ -1,7 +1,7 @@
+"""Creation of the PSA input of a variable.
+"""
 
-from typing import cast
 
-from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
@@ -9,6 +9,16 @@ from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLight
 def create_psa_input(
     var: FullLightweightVariable
 ):
+    """Create the PSA input of a variable.
+
+    Dispatches on the distribution of the variable. Nothing is created if the variable is not to be shown.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The input, or nothing.
+    """
     if not var.psa_show:
         return None
     match var.distribution:

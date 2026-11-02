@@ -1,3 +1,5 @@
+"""Containers which group related results.
+"""
 from dash import html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc

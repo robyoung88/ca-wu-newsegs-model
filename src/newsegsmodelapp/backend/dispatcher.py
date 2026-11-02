@@ -1,7 +1,7 @@
 """proxy between client and workers"""
 import logging
 if not logging.getLogger().hasHandlers():
-    import app_logging
+    import app_logging  # noqa: F401
 logger = logging.getLogger(__name__)
 
 import multiprocessing
@@ -28,7 +28,7 @@ from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db import write_transaction
 from newsegsmodelapp.backend.db.db_tables import runs
 
-import newsegsmodelapp.register_plugins # Ensure this always gets imported
+import newsegsmodelapp.register_plugins # Ensure this always gets imported  # noqa: F401
 from newsegsmodelapp.backend.worker import worker_process, POISON_PILL
 
 def run_proxy(server = DISPATCHSERVER, frontendport = FRONTENDPORT, backendport = BACKENDPORT):

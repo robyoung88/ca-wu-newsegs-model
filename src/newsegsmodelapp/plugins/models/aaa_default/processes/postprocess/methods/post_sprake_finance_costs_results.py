@@ -1,3 +1,5 @@
+"""Postprocessing of the costs of the Sprake finance model into the form shown in the interface.
+"""
 import numpy as np
 import pandas as pd
 

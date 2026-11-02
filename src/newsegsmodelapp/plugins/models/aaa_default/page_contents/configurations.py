@@ -1,6 +1,10 @@
+"""Layout configurations of the pages for the `sprake` model type.
+
+Copies the default configuration of each page and sets the text, navigation, and the input and result cards for the Sprake model.
+"""
 import os
 import copy
-from typing import Any, cast
+from typing import cast
 
 import dash
 

@@ -1,8 +1,6 @@
 """Helper functions for aligning timeseries with elexon profile data."""
 
 import os
-import datetime
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -47,6 +45,14 @@ def get_start_elexon_spr(year:int) -> pd.Timestamp:
 # or "Late Summer" bank holiday. This is last Monday in August
 def get_august_bank_holiday(year) -> pd.Timestamp:
     # Step 1: get day of last date in August
+    """The date of the August bank holiday (the last Monday of August).
+
+    Args:
+        year: The year.
+
+    Returns:
+        The date.
+    """
     last_day = pd.Timestamp(f"{year}-08-31", tz='utc')
     dow = last_day.day_of_week
     # Step 2: back up to nearest Monday (day_of_week == 0, Monday = 0)

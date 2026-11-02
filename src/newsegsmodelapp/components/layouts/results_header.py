@@ -1,3 +1,5 @@
+"""The headers of the results of the pages, with the buttons which run the analyses and download and upload their results.
+"""
 from dash import dcc, html
 import dash_daq as daq
 
@@ -130,6 +132,14 @@ def create_results_header(page_type, **kwargs):
     )
 
 def create_results_header_dsa(**kwargs):
+    """Create the header of the results of the DSA page: the buttons to run the analysis and to download and upload its results.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        The header.
+    """
     button_container_children = [
         dbc.Button(
             'Run DSA',
@@ -194,6 +204,14 @@ def create_results_header_dsa(**kwargs):
     )
 
 def create_results_header_psa(**kwargs):
+    """Create the header of the results of the PSA page: the buttons to run the analysis and to download and upload its results.
+
+    Args:
+        **kwargs: Further keyword arguments.
+
+    Returns:
+        The header.
+    """
     button_container_children = [
         dbc.Button(
             'Run PSA',

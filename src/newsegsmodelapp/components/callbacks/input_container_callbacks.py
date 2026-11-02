@@ -17,7 +17,6 @@ from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegs
 from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.components import callback_utils, staleness
-from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.input_components import get_variable_sharing_status
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
