@@ -722,14 +722,33 @@ def add_psa_run_callbacks(app: NewsegsDash):
             raise ValueError(f'Plot functions not found for graph_type {graph_type}')
     
         plot_kwargs = plot_funcs['arguments'](plot_controls)
-    
+
+        # Results from before a statistic was added do not include it: draw an empty plot rather than fail
+        missing_statistics = [
+            v for v in plot_kwargs.values()
+            if isinstance(v, str) and v in psa.PSA_STATISTIC_LABELS and v not in psa_raw_data.columns
+        ]
+        if missing_statistics:
+            if full_draw:
+                rval['plot_header']['children'] = plot_funcs['controls'](plot_header['ids']['subindex'])
+            fig = plot_funcs['draw'](None, **plot_kwargs)
+            fig.update_layout(
+                title_text = 'Not in these PSA results - re-run the PSA to include '
+                    + ', '.join(psa.PSA_STATISTIC_LABELS[s] for s in missing_statistics)
+            )
+            rval['plot']['figures'] = fig
+            return rval
+
         if full_draw:
             rval['plot_header']['children'] = plot_funcs['controls'](plot_header['ids']['subindex'])
             
             rval['plot']['figures'] = plot_funcs['draw'](psa_raw_data, **plot_kwargs)
     
         else:
-            rval['plot']['figures'] = plot_funcs['update'](psa_raw_data, **plot_kwargs)
+            fig_patch = plot_funcs['update'](psa_raw_data, **plot_kwargs)
+            # Clear any message that the previous statistic was missing from the results
+            fig_patch['layout']['title']['text'] = ''
+            rval['plot']['figures'] = fig_patch
     
         return rval
 

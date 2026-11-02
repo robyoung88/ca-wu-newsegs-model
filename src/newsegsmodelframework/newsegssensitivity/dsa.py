@@ -10,6 +10,7 @@ from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsfinance import NewsegsFinance
+from newsegsmodelframework.newsegssensitivity.common import COST_FRAME_STATISTICS, total_of_cost_frame
 from newsegsmodelframework.newsegsvariable.variable import DSA_BOUND
 
 DSA_FLOAT_STATISTIC = Literal[
@@ -18,7 +19,11 @@ DSA_FLOAT_STATISTIC = Literal[
     'total_present_benefits_undiscounted',
     'total_present_benefits_discounted',
     'net_present_value_undiscounted',
-    'net_present_value_discounted'
+    'net_present_value_discounted',
+    'all_capex_costs_undiscounted',
+    'all_capex_costs_discounted',
+    'all_recurrent_costs_undiscounted',
+    'all_recurrent_costs_discounted',
 ]
 
 def _dsa_float_statistic_mapper(
@@ -26,6 +31,9 @@ def _dsa_float_statistic_mapper(
     mdl: NewsegsModel,
     fnc: NewsegsFinance
 ) -> float:
+    if stat in COST_FRAME_STATISTICS:
+        return total_of_cost_frame(getattr(fnc, stat))
+
     fnc_attrname = 'get_' + stat
     if hasattr(fnc, fnc_attrname):
         return getattr(fnc, fnc_attrname)()

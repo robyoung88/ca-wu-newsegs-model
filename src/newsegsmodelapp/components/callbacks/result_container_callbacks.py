@@ -339,12 +339,16 @@ def add_result_container_callbacks(app: NewsegsDash):
         rval = callback_utils.create_noupdate_return()
 
         update_all_tables = isinstance(trig_id, str) or trig_id == None
+        # Tables whose options were changed must be redrawn even if the revision is unchanged
+        option_changed_tables = set()
         if update_all_tables:
             tables_for_update = [x['id'] for x in ctx.outputs_grouping['table']]
         else:
             tables_for_update = []
             for trig in ctx.triggered:
                 trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
+                if trig.get('type') == 'result-table-option':
+                    option_changed_tables.add((trig['section'], trig['key']))
                 trig['purpose'] = 'container'
                 trig['type'] = 'result-table'
                 del trig['subindex']
@@ -396,7 +400,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             section = container_id['section']
             key = container_id['key']
             lookup = (section, key)
-            if rendered_ann_hori_state.get(lookup) is not None and rendered_ann_hori_state[lookup] == ann_hori_toggle:
+            if lookup not in option_changed_tables and rendered_ann_hori_state.get(lookup) is not None and rendered_ann_hori_state[lookup] == ann_hori_toggle:
                 if rendered_project.get(lookup) is not None and rendered_project[lookup] == active_project_id:
                     if rendered_revision.get(lookup) is not None and rendered_revision[lookup] == table_rev:
                         continue

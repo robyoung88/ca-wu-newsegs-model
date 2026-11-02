@@ -7,10 +7,11 @@ import unittest
 from pathlib import Path
 
 from newsegsmodelframework.newsegsmodel import SprakeModel
-from newsegsmodelframework.newsegsfinance import SprakeFinance
+from newsegsmodelframework.newsegsfinance.sprakefinance import SprakeFinance
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import psa
+from newsegsmodelframework.newsegssensitivity.common import COST_FRAME_STATISTICS
 
 from test.unit_tests.common import get_data_dir
 
@@ -126,6 +127,39 @@ class TestPSA(unittest.TestCase):
             len(set(psa_results.loc[:, 'HLP'].to_numpy())),
             11
         )
+
+    def test_cost_breakdown_psa(self):
+        mm = self.make_sprake_metamodel()
+        for v in mm.variables.values():
+            if v.model_parameter == 'hlp' or v.model_parameter == 'efficiency_reduction':
+                v.psa_selectable = True
+                v.psa_selected = True
+            else:
+                v.psa_selected = False
+
+        psa_results = psa.run_psa(mm, samples = 5)
+
+        # All statistics, including the capex and opex totals, are captured by default
+        for stat in psa.PSA_STATISTIC_LABELS:
+            self.assertIn(stat, psa_results.columns)
+
+        # Capex and opex together make up the total costs
+        for scale in ['undiscounted', 'discounted']:
+            for _, rw in psa_results.iterrows():
+                self.assertAlmostEqual(
+                    rw[f'all_capex_costs_{scale}'] + rw[f'all_recurrent_costs_{scale}'],
+                    rw[f'total_present_costs_{scale}'],
+                    places = 4
+                )
+
+        stats_table, _ = psa.basic_psa_stats(psa_results)
+        self.assertIn('all_capex_costs_discounted', stats_table.index)
+
+        # Results from before the capex and opex statistics were added can still be summarised
+        old_results = psa_results.drop(columns = list(COST_FRAME_STATISTICS))
+        stats_table, _ = psa.basic_psa_stats(old_results)
+        self.assertNotIn('all_capex_costs_discounted', stats_table.index)
+        self.assertIn('total_present_costs_discounted', stats_table.index)
 
     def test_longer_psa(self):
         mm = self.make_sprake_metamodel()
