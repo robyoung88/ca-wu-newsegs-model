@@ -34,6 +34,10 @@ PAGE_TYPE = 'site-config'
 
 @dataclass
 class ModelConfigurationLayoutConfiguration(LayoutConfiguration):
+    """Model Configuration Layout Configuration.
+
+    TODO: Add a description.
+    """
     page_type: str = PAGE_TYPE
 
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
@@ -55,6 +59,16 @@ class ModelConfigurationLayoutConfiguration(LayoutConfiguration):
 
 def create_model_configuration_layout(config: ModelConfigurationLayoutConfiguration) -> ComponentType:
 
+    """Create model configuration layout.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     model_input_sections = []
     for sec in config.model_input_sections:
         model_input_sections.append(
@@ -156,6 +170,16 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
     )
 
 def add_deterministic_run_callbacks(app: NewsegsDash):
+    """Add deterministic run callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('trigger-check-requests', 'data', allow_duplicate = True),
         Input('btn-action-deterministic-run-metamodel', 'n_clicks'),

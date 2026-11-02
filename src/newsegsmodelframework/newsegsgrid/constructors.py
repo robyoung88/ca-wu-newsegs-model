@@ -1,3 +1,7 @@
+"""Constructors module.
+
+TODO: Describe the purpose of the module.
+"""
 from collections.abc import Mapping
 
 from newsegsmodelframework.newsegsgrid import newsegsgrid
@@ -10,6 +14,16 @@ _GRID_MODULE_CONSTRUCTORS = {
 def grid_module_from_dict(
     ip: Mapping
 ) -> newsegsgrid.NewsegsGrid:
+    """Grid module from dict.
+
+    TODO: Add a description.
+
+    Args:
+        ip: TODO.
+
+    Returns:
+        TODO.
+    """
     classname = ip.pop('class')
     constructor = _GRID_MODULE_CONSTRUCTORS.get(classname, None)
     if constructor is None:

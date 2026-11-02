@@ -1,3 +1,7 @@
+"""Timeseries callbacks module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 import time
@@ -145,6 +149,16 @@ def _build_figure(mdl) -> FigureResampler | None:
     return fig
 
 def add_result_timeseries_callbacks(app: NewsegsDash):
+    """Add result timeseries callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     resampler.register_update_graph_callback(
         app=app,
         graph_id="graph-timeseries",

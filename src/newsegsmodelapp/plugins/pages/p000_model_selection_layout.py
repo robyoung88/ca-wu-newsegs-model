@@ -1,3 +1,7 @@
+"""P000 model selection layout module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -7,6 +11,7 @@ from dash import ALL, Input, Output, ctx, html
 from dash.exceptions import PreventUpdate
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+from newsegsmodelapp.components import navigation
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.types import ComponentType, LayoutConfiguration, Page
 from newsegsmodelapp import registers
@@ -68,15 +73,45 @@ model_selection_layout = dbc.Container([
         ]),  
     ], 
     className = 'd-flex justify-content-center',
-    )
+    ),
+    html.Div(
+        dbc.Button(
+            [html.I(className = 'bi bi-question-circle me-1'), 'Documentation'],
+            href = navigation.DOCS_URL,
+            external_link = True,
+            color = 'secondary',
+            outline = True,
+        ),
+        className = 'd-flex justify-content-center mt-4'
+    ),
        
 ])
 
 def create_model_selection_layout(config: LayoutConfiguration) -> ComponentType:
+    """Create model selection layout.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     return model_selection_layout
 
 def assign_callbacks(app: NewsegsDash):
 
+    """Assign callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('url', 'pathname'),
         Input({'type': 'btn-model-type-selector', 'label': ALL}, 'n_clicks'),

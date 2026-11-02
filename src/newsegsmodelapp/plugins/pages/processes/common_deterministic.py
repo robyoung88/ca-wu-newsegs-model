@@ -1,3 +1,7 @@
+"""Common deterministic module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 

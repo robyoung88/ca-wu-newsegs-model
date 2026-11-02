@@ -47,6 +47,16 @@ def get_start_elexon_spr(year:int) -> pd.Timestamp:
 # or "Late Summer" bank holiday. This is last Monday in August
 def get_august_bank_holiday(year) -> pd.Timestamp:
     # Step 1: get day of last date in August
+    """Get august bank holiday.
+
+    TODO: Add a description.
+
+    Args:
+        year: TODO.
+
+    Returns:
+        TODO.
+    """
     last_day = pd.Timestamp(f"{year}-08-31", tz='utc')
     dow = last_day.day_of_week
     # Step 2: back up to nearest Monday (day_of_week == 0, Monday = 0)

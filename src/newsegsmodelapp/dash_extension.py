@@ -1,3 +1,7 @@
+"""Dash extension module.
+
+TODO: Describe the purpose of the module.
+"""
 from typing import Any, Callable, Dict, List, Sequence, override
 
 from dash import CeleryManager, Dash, DiskcacheManager
@@ -11,6 +15,10 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 
 
 class NewsegsDash(Dash):
+    """Newsegs Dash.
+
+    TODO: Add a description.
+    """
     @override
     def __init__(
         self,
@@ -29,14 +37,26 @@ class NewsegsDash(Dash):
 
     @property
     def project_provider(self) -> NewsegsProjectProviderInterface:
+        """Project provider.
+
+        TODO: Add a description.
+        """
         return self._project_provider
 
     @property
     def results_provider(self) -> NewsegsResultProviderInterface:
+        """Results provider.
+
+        TODO: Add a description.
+        """
         return self._results_provider
 
     @property
     def request_handler(self) -> RequestHandlerInterface:
+        """Request handler.
+
+        TODO: Add a description.
+        """
         return self._request_handler
 
     # @property

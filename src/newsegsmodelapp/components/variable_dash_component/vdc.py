@@ -29,6 +29,19 @@ def create_dsa_input_scalar_numeric_header(
     lower,
     upper,
 ):
+    """Create dsa input scalar numeric header.
+
+    TODO: Add a description.
+
+    Args:
+        label: TODO.
+        value: TODO.
+        lower: TODO.
+        upper: TODO.
+
+    Returns:
+        TODO.
+    """
     value = _autoformat(value)
     lower = _autoformat(lower)
     upper = _autoformat(upper)
@@ -66,6 +79,19 @@ def create_dsa_input_vector_numeric_header(
         key: str,
         section: str | None = None,
 ): 
+    """Create dsa input vector numeric header.
+
+    TODO: Add a description.
+
+    Args:
+        label: TODO.
+        type_id: TODO.
+        key: TODO.
+        section: TODO.
+
+    Returns:
+        TODO.
+    """
     return [
         html.H4(
             label,
@@ -107,6 +133,20 @@ def create_dsa_input_vector_parameter_input(
     key: str,
     section: str | None = None,
 ):
+    """Create dsa input vector parameter input.
+
+    TODO: Add a description.
+
+    Args:
+        parameter_names: TODO.
+        parameter_types: TODO.
+        type_id: TODO.
+        key: TODO.
+        section: TODO.
+
+    Returns:
+        TODO.
+    """
     are_scalars = [i for i, x in enumerate(parameter_types) if x == 'scalar']
     are_vectors = [i for i, x in enumerate(parameter_types) if x == 'vector']
     are_matrices = [i for i, x in enumerate(parameter_types) if x == 'matrix']
@@ -218,6 +258,17 @@ def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
     var: FullLightweightVariable,
 ):
+    """Create dsa bounds inputs scalar.
+
+    TODO: Add a description.
+
+    Args:
+        bounds_type: TODO.
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     type_id_lower = f'input-dsabound-lower'
     type_id_upper = f'input-dsabound-upper'
 
@@ -284,6 +335,19 @@ def create_dsa_bounds_input_vector(
     #var: variable.Variable
 ):
     
+    """Create dsa bounds input vector.
+
+    TODO: Add a description.
+
+    Args:
+        bounds_type: TODO.
+        type_id: TODO.
+        key: TODO.
+        section: TODO.
+
+    Returns:
+        TODO.
+    """
     def make_input(placeholder: Any):
         return dbc.Input(type = 'number', debounce = True, placeholder = placeholder) # pyright: ignore[reportCallIssue]
     
@@ -332,6 +396,18 @@ def create_dsa_bound_type_selector(
     selected_bound,
     var: variable.Variable,
 ):
+    """Create dsa bound type selector.
+
+    TODO: Add a description.
+
+    Args:
+        permitted_dsa_bounds: TODO.
+        selected_bound: TODO.
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     id_ = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-dropdown',
@@ -355,6 +431,20 @@ def compose_dsa_input(
     dsa_bound_component,
     var: variable.Variable,
 ):
+    """Compose dsa input.
+
+    TODO: Add a description.
+
+    Args:
+        header_component: TODO.
+        parameter_component: TODO.
+        dsa_bound_type_selector: TODO.
+        dsa_bound_component: TODO.
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     overall_input_id = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-component',
@@ -440,6 +530,16 @@ def _default_formatter_vector(dp: int):
 def create_dsa_header(
     var: variable.Variable | FullLightweightVariable,
 ):
+    """Create dsa header.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     is_lvar = isinstance(var, FullLightweightVariable)
 
     dist = var.distribution if is_lvar else var.distribution.distribution
@@ -476,6 +576,16 @@ def create_dsa_header(
 def create_dsa_input_scalar_constant(
     var: variable.ScalarVariable,
 ):
+    """Create dsa input scalar constant.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return compose_dsa_input(
         create_dsa_header(var),
         [
@@ -503,6 +613,16 @@ def create_dsa_input_scalar_constant(
 def create_dsa_input_scalar_normal(
     var: variable.NumericScalarVariable,
 ):
+    """Create dsa input scalar normal.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return compose_dsa_input(
         create_dsa_header(var),
         [
@@ -531,6 +651,16 @@ def create_dsa_input_scalar_normal(
 def create_dsa_input_scalar_beta(
     var: variable.NumericScalarVariable,
 ):
+    """Create dsa input scalar beta.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return compose_dsa_input(
         create_dsa_header(var),
         [
@@ -558,6 +688,16 @@ def create_dsa_input_scalar_beta(
 def create_dsa_input_scalar_gamma(
     var: variable.NumericScalarVariable,
 ):
+    """Create dsa input scalar gamma.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     type_id = f'input-{var.configuration_type}-config'
     return compose_dsa_input(
         create_dsa_header(var),
@@ -590,6 +730,20 @@ def create_psa_input_scalar_numeric_header(
     ci95_lower,
     ci95_upper,
 ):
+    """Create psa input scalar numeric header.
+
+    TODO: Add a description.
+
+    Args:
+        label: TODO.
+        mean_value: TODO.
+        std_value: TODO.
+        ci95_lower: TODO.
+        ci95_upper: TODO.
+
+    Returns:
+        TODO.
+    """
     mean_value = _autoformat(mean_value)
     std_value = _autoformat(std_value)
     ci95_lower = _autoformat(ci95_lower)
@@ -625,6 +779,16 @@ def create_psa_input_scalar_numeric_header(
 def create_psa_header(
     var: variable.Variable | FullLightweightVariable,
 ):
+    """Create psa header.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     is_lvar = isinstance(var, FullLightweightVariable)
     dist = var.distribution if is_lvar else var.distribution.distribution
     if dist == 'constant':
@@ -667,6 +831,16 @@ def create_psa_header(
 def create_psa_distribution_component(
     var: variable.Variable|FullLightweightVariable
 ):
+    """Create psa distribution component.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     if isinstance(var, FullLightweightVariable):
         distname = var.distribution.title()
     else:
@@ -690,6 +864,19 @@ def compose_psa_input(
     parameter_component,
     var: variable.Variable,
 ):
+    """Compose psa input.
+
+    TODO: Add a description.
+
+    Args:
+        header_component: TODO.
+        distribution_component: TODO.
+        parameter_component: TODO.
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     overall_input_id = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-component',
@@ -753,6 +940,16 @@ def compose_psa_input(
 def create_psa_input_scalar_constant(
     var: variable.ScalarVariable,
 ):
+    """Create psa input scalar constant.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return compose_psa_input(
         create_psa_header(var),
         create_psa_distribution_component(var),
@@ -769,6 +966,16 @@ def create_psa_input_scalar_constant(
 def create_psa_input_twoparam(
     var: variable.NumericScalarVariable,    
 ):
+    """Create psa input twoparam.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return compose_psa_input(
         create_psa_header(var),
         create_psa_distribution_component(var),
@@ -788,16 +995,46 @@ def create_psa_input_twoparam(
 def create_psa_input_scalar_normal(
     var: variable.NumericScalarVariable,
 ):
+    """Create psa input scalar normal.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return create_psa_input_twoparam(var)
 
 def create_psa_input_scalar_beta(
     var: variable.NumericScalarVariable,
 ):
+    """Create psa input scalar beta.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return create_psa_input_twoparam(var)
 
 def create_psa_input_scalar_gamma(
     var: variable.NumericScalarVariable,
 ):
+    """Create psa input scalar gamma.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return create_psa_input_twoparam(var)
 
 def compose_optim_input(
@@ -807,6 +1044,18 @@ def compose_optim_input(
     bound_inputs,
     var
 ):
+    """Compose optim input.
+
+    TODO: Add a description.
+
+    Args:
+        header: TODO.
+        bound_inputs: TODO.
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     toggle_id = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-toggle',
@@ -873,6 +1122,17 @@ def compose_optim_input(
     )
 
 def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.NumericScalarVariable | None = None):
+    """Create optim header.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+        refvar: TODO.
+
+    Returns:
+        TODO.
+    """
     if var.distribution.distribution == 'constant':
         fmt = _autoformat
     else:
@@ -950,6 +1210,16 @@ def create_optim_header(var: variable.NumericScalarVariable, refvar: variable.Nu
     ]
 
 def create_positive_toggle(var):
+    """Create positive toggle.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     toggleid = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-toggle',
@@ -971,6 +1241,16 @@ def create_positive_toggle(var):
     )
 
 def create_bounded_toggle(var):
+    """Create bounded toggle.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     toggleid = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'input-toggle',
@@ -992,6 +1272,16 @@ def create_bounded_toggle(var):
     )
 
 def create_optim_bound_inputs(var: variable.ScalarVariable):
+    """Create optim bound inputs.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     variable_id_lower = VariableInstanceParameterComponentID.from_variable(
         var,
         type = 'single-input-config',
@@ -1039,6 +1329,16 @@ def create_optim_bound_inputs(var: variable.ScalarVariable):
 def create_optim_input(
     var: variable.NumericScalarVariable,
 ):
+    """Create optim input.
+
+    TODO: Add a description.
+
+    Args:
+        var: TODO.
+
+    Returns:
+        TODO.
+    """
     return compose_optim_input(
         create_optim_header(var),
         #create_positive_toggle(var),

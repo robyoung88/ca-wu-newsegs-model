@@ -1,3 +1,7 @@
+"""Result file module.
+
+TODO: Describe the purpose of the module.
+"""
 from functools import singledispatch
 import json
 import os

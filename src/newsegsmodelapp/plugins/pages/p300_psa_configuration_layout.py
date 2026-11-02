@@ -36,6 +36,16 @@ from .processes.psa_process_components import psa_process_components
 PAGE_TYPE = 'psa'
 
 def create_psa_header(**kwargs):
+    """Create psa header.
+
+    TODO: Add a description.
+
+    Args:
+        **kwargs: TODO.
+
+    Returns:
+        TODO.
+    """
     return dbc.Container(
         [
             dbc.Row(
@@ -75,6 +85,13 @@ def create_psa_header(**kwargs):
     )
 
 def create_psa_configuration_editor():
+    """Create psa configuration editor.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return dbc.Col([
         html.Div([
             html.H2(
@@ -132,6 +149,10 @@ def create_psa_configuration_editor():
 
 @dataclass
 class PSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
+    """PSA Configuration Layout Configuration.
+
+    TODO: Add a description.
+    """
     page_type: str = PAGE_TYPE
 
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
@@ -140,6 +161,16 @@ class PSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
     layout_results_header: Callable = results_header.create_results_header_psa
 
 def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
+    """Create psa layout.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     kwargs = asdict(config)
    
     a1_contents = [
@@ -274,6 +305,16 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
     )
 
 def add_psa_run_callbacks(app: NewsegsDash):
+    """Add psa run callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         output = {
             'modal': {

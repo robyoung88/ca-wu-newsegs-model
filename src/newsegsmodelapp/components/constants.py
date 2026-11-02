@@ -1,3 +1,7 @@
+"""Constants module.
+
+TODO: Describe the purpose of the module.
+"""
 from dash import ALL
 
 CONFIGURATION_UPDATE_TRIGGER_ID = 'configuration-update-trigger'

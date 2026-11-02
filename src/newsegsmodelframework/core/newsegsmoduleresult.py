@@ -51,31 +51,74 @@ class NewsegsModuleResult(metaclass = ABCMeta):
     @property
     @abstractmethod
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
+        """Meters.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def dsm(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
+        """Dsm.
+
+        TODO: Add a description.
+        """
         ...
         
     @abstractmethod
     def get_meter_names(self) -> Sequence[str]:
+        """Get meter names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_meter_types(self) -> Sequence[str]:
+        """Get meter types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_dsm_names(self) -> Sequence[str]:
+        """Get dsm names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_dsm_types(self) -> Sequence[str]:
+        """Get dsm types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_timespan(self) -> RegTimeSpan:
+        """Get timespan.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     def meters_to_pandas(self) -> pd.DataFrame:
@@ -105,6 +148,16 @@ class NewsegsModuleResult(metaclass = ABCMeta):
 
 @lru_cache
 def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
+    """Defer meters to pandas.
+
+    TODO: Add a description.
+
+    Args:
+        res: TODO.
+
+    Returns:
+        TODO.
+    """
     data = res.meters.T
     if len(data) == 0:
         return pd.DataFrame()
@@ -118,6 +171,16 @@ def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
 
 @lru_cache
 def defer_dsm_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
+    """Defer dsm to pandas.
+
+    TODO: Add a description.
+
+    Args:
+        res: TODO.
+
+    Returns:
+        TODO.
+    """
     data = res.dsm.T
     if len(data) == 0:
         return pd.DataFrame()

@@ -1,3 +1,7 @@
+"""Map module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,17 @@ def _site_metamodel_id(site_location: str | None) -> str | None:
 
 def create_map_layout(map_id='sitemap',
                       center=(53.165716, -3.728402)):
+    """Create map layout.
+
+    TODO: Add a description.
+
+    Args:
+        map_id: TODO.
+        center: TODO.
+
+    Returns:
+        TODO.
+    """
     return [
         dl.Map(
             id=map_id,
@@ -49,6 +64,13 @@ def create_map_layout(map_id='sitemap',
         ]
 
 def create_latlon_input():
+    """Create latlon input.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return [
         html.Span(get_icon('latlon'), style={'fontSize':'1.5rem'}),
         html.Span("(", style={'marginRight': '0.2rem'}),
@@ -59,6 +81,13 @@ def create_latlon_input():
     ]
 
 def create_osgb_feedback():
+    """Create osgb feedback.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return [
         html.Span(get_icon('osgb'), style={'fontSize':'1.3rem'}),
         html.Span("OSGB:", style={'marginRight': '0.2rem'}),
@@ -73,6 +102,17 @@ def create_site_selector_map(
     map_id='sitemap',
     center=(53.165716, -3.728402)
 ):
+    """Create site selector map.
+
+    TODO: Add a description.
+
+    Args:
+        map_id: TODO.
+        center: TODO.
+
+    Returns:
+        TODO.
+    """
     elements = html.Div(
         [
             dbc.Row([
@@ -139,6 +179,16 @@ def create_site_selector_map(
     return elements
 
 def add_latlon_sync_callbacks(app: NewsegsDash):
+    """Add latlon sync callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
         
@@ -262,6 +312,16 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         return f"{lat:.6f}", f"{lon:.6f}", name, staleness_update
 
 def add_map_click_callback(app: NewsegsDash):
+    """Add map click callback.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('potential-site-location', 'data'),
 
@@ -290,6 +350,16 @@ def add_map_click_callback(app: NewsegsDash):
 
 
 def add_potential_site_change_callback(app: NewsegsDash):
+    """Add potential site change callback.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('site-confirm-container', 'children', allow_duplicate=True),
 
@@ -323,6 +393,16 @@ def add_potential_site_change_callback(app: NewsegsDash):
                              )]
 
 def add_confirm_site_change_btn_callback(app: NewsegsDash):
+    """Add confirm site change btn callback.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('site-location', 'data', allow_duplicate=True),
 
@@ -341,6 +421,16 @@ def add_confirm_site_change_btn_callback(app: NewsegsDash):
     return app
 
 def add_remove_confirm_popup(app):
+    """Add remove confirm popup.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('site-confirm-container', 'children'),
 
@@ -352,6 +442,16 @@ def add_remove_confirm_popup(app):
         return []
 
 def add_site_change_callback(app) -> Dash:
+    """Add site change callback.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output('site-marker-container', 'children'),
         Output('site-osgb-easting-text', 'children'),
@@ -421,6 +521,13 @@ def add_site_change_callback(app) -> Dash:
     return app
 
 def add_site_selector_callbacks(app: NewsegsDash):
+    """Add site selector callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+    """
     add_map_click_callback(app)
     add_latlon_sync_callbacks(app)
     add_potential_site_change_callback(app)

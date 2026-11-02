@@ -1,3 +1,7 @@
+"""Update variable module.
+
+TODO: Describe the purpose of the module.
+"""
 from newsegsmodelframework.newsegsvariable.variable import Param, ScalarParam, Variable
 
 

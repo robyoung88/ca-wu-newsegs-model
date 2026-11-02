@@ -1,3 +1,7 @@
+"""Components package.
+
+TODO: Describe what the package provides and its main public classes.
+"""
 from .constants import *
 
 __all__ = [

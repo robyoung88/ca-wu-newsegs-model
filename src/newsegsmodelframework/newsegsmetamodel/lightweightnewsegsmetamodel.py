@@ -1,3 +1,4 @@
+"""The `LightweightNewsegsMetaModel` description of a metamodel."""
 from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightNewsegsComponent
 from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.trackeddata import TableModifyingObservableOrderedDict, revision_dataclass
@@ -7,6 +8,11 @@ from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import Lightweig
 
 @revision_dataclass
 class LightweightNewsegsMetaModel(LightweightNewsegsComponent):
+    """A description of a `NewsegsMetaModel` without the machinery to run it.
+
+    Holds the lightweight model, finance and variables, and the location, which is what is
+    needed to display and edit a metamodel without constructing the full model.
+    """
     name: str
     table_config: LightweightNewsegsComponent
     model: LightweightNewsegsModel 

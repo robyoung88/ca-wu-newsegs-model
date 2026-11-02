@@ -146,6 +146,14 @@ def run_migrations():
     command.upgrade(alembic_cfg, 'head')
 
 def init_db(db_path: str = DB_PATH, recovery_path: str | Path = DB_BACKUP_PATH):
+    """Init db.
+
+    TODO: Add a description.
+
+    Args:
+        db_path: TODO.
+        recovery_path: TODO.
+    """
     db_file_status = retrieve_db_file(db_path, recovery_path)
     match db_file_status:
         case 'missing':

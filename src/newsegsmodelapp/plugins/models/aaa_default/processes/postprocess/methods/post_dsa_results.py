@@ -1,3 +1,7 @@
+"""Post dsa results module.
+
+TODO: Describe the purpose of the module.
+"""
 import pandas as pd
 
 def _melt_dsa(df, scale_label = 'absolute'):
@@ -59,6 +63,16 @@ def dsa_results_to_tables(
     dsa_data: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     
+    """Dsa results to tables.
+
+    TODO: Add a description.
+
+    Args:
+        dsa_data: TODO.
+
+    Returns:
+        TODO.
+    """
     if len(dsa_data) < 2:
         raise TypeError('dsa_data is not long enough')
 

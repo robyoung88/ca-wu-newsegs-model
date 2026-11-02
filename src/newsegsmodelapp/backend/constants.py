@@ -1,3 +1,7 @@
+"""Constants module.
+
+TODO: Describe the purpose of the module.
+"""
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent

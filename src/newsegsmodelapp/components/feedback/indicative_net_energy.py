@@ -1,3 +1,7 @@
+"""Indicative net energy module.
+
+TODO: Describe the purpose of the module.
+"""
 from functools import partial
 
 from dash import dcc, html

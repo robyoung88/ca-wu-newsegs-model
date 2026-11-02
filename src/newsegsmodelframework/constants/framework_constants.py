@@ -1,3 +1,7 @@
+"""Framework constants module.
+
+TODO: Describe the purpose of the module.
+"""
 from typing import Literal
 
 

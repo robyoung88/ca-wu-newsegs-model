@@ -1,3 +1,7 @@
+"""Configuration selector module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,18 @@ def create_config_selector_headerbutton(
     metamodel: LightweightNewsegsMetaModel | None = None,
     is_focussed: bool | None = None,
 ):
+    """Create config selector headerbutton.
+
+    TODO: Add a description.
+
+    Args:
+        config_index: TODO.
+        metamodel: TODO.
+        is_focussed: TODO.
+
+    Returns:
+        TODO.
+    """
     if is_focussed:
         do_outline = False
     else:
@@ -49,6 +65,16 @@ def create_config_selector_headerbutton(
     return contents
 
 def create_header_metamodel_input_container(supersection: str) -> html.Div:
+    """Create header metamodel input container.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+
+    Returns:
+        TODO.
+    """
     return html.Div(
         [
             dbc.Button(
@@ -78,6 +104,19 @@ def create_single_configuration_selector_row(
     reference_size: int = 20,
 ):
     
+    """Create single configuration selector row.
+
+    TODO: Add a description.
+
+    Args:
+        config_index: TODO.
+        metamodel: TODO.
+        is_focussed: TODO.
+        reference_size: TODO.
+
+    Returns:
+        TODO.
+    """
     if config_index < 1:
         primary_container = html.H1
         show_remove = False
@@ -221,6 +260,13 @@ def create_single_configuration_selector_row(
     )
 
 def create_configuration_selector():
+    """Create configuration selector.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return html.Div([
         
         html.Div(
@@ -258,6 +304,16 @@ def _create_configuration_header_elements_for_metamodels(
 
 def add_configuration_selector_callbacks(app: NewsegsDash):
     # Populate
+    """Add configuration selector callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output({'type': 'metamodel-input-container', 'supersection': ALL, 'section': 'configuration-selector'}, 'children'),
         Output({

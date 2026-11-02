@@ -1,3 +1,7 @@
+"""Deterministic run project module.
+
+TODO: Describe the purpose of the module.
+"""
 from dataclasses import dataclass
 import datetime
 import time
@@ -15,10 +19,26 @@ REQUEST_TYPE = 'deterministic_run_project'
 
 @dataclass
 class DeterministicRunProjectRunRequest(RunRequest):
+    """Deterministic Run Project Run Request.
+
+    TODO: Add a description.
+    """
     request_type: str = REQUEST_TYPE
 
 @register_run_request(REQUEST_TYPE)
 def request_deterministic_run_project(project_id: str, project_provider: NewsegsProjectProviderInterface, config: dict|None = None):
+    """Request deterministic run project.
+
+    TODO: Add a description.
+
+    Args:
+        project_id: TODO.
+        project_provider: TODO.
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     return DeterministicRunProjectRunRequest(
         project_id = project_id,
         request_label = 'Deterministic project run - ' + str(datetime.datetime.now())
@@ -33,6 +53,21 @@ def execute_deterministic_run_project(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    """Execute deterministic run project.
+
+    TODO: Add a description.
+
+    Args:
+        request: TODO.
+        project_provider: TODO.
+        result_provider: TODO.
+        run_id: TODO.
+        progress_callback: TODO.
+        check_cancel_status: TODO.
+
+    Returns:
+        TODO.
+    """
     started_ns = time.time_ns()
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 

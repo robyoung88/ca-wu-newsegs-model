@@ -1,5 +1,7 @@
-"""
-Ways of defining and comparing blocks of time.
+"""Blocks of time and the constants and index functions used with them.
+
+The classes (`TimeSpan`, `RegTimeSpan`, `OffsetRegTimeSpan`) are defined in the `timespan`
+module.
 """
 from .timespan import *
 

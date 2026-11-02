@@ -1,3 +1,7 @@
+"""Configurations module.
+
+TODO: Describe the purpose of the module.
+"""
 import os
 import copy
 from typing import Any, cast

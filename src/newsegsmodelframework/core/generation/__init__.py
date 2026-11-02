@@ -1,5 +1,5 @@
 """
-Representations of energy converters for use in [NewsegsGeneration][/newsegsgeneration/#NewsegsGeneration].
+Representations of energy converters for use in `NewsegsGeneration`.
 """
 from .generators import *
 __all__ = [

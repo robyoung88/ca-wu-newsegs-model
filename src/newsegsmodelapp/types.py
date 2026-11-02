@@ -1,3 +1,7 @@
+"""Types module.
+
+TODO: Describe the purpose of the module.
+"""
 from __future__ import annotations
 
 from abc import ABCMeta
@@ -11,11 +15,26 @@ ComponentType = dash.development.base_component.ComponentType
 
 @dataclass
 class LayoutConfiguration:
+    """Settings that control how a page layout is drawn for a model type.
+
+    Pages subclass this to add their own settings; the layout function of the page is
+    called with the configuration registered for the model type being displayed.
+    """
     page_type: str
     model_type: str = 'default'
 
 @dataclass
 class Page():
+    """A page of the app.
+
+    Attributes:
+        id: Last element of the page URL (`/{model_type}/{id}`).
+        nav_label: Title of the page's navigation button.
+        nav_icon: Content of the page's navigation button.
+        layout: Function returning the page content for a layout configuration.
+        default_configuration: Configuration used for model types without their own.
+        attach_callbacks: Called once when the app is created to bind the page's callbacks.
+    """
     id: str
     nav_label: str
     nav_icon: DashChildComponent

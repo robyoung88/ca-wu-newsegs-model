@@ -4,26 +4,68 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - 'src/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
+    # Checks that the documentation builds, on pull requests as well as on main
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.13.12'
-      
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
       - name: Install dependencies
+        run: pip install -r requirements-docs.txt
+
+      # mkdocstrings reads the source statically (via griffe), so the packages do not
+      # need to be installed, or importable, to build the API reference.
+      - name: Build documentation
+        run: mkdocs build
+
+  deploy:
+    # Publishes to the gh-pages branch; GitHub Pages must be set to deploy from that branch
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Configure git
         run: |
-          pip install --upgrade pip
-          pip install .
-          pip install mkdocs mkdocs-material "mkdocstrings[python]"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force

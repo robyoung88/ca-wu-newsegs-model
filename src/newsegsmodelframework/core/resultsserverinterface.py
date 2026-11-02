@@ -8,6 +8,10 @@ from abc import ABCMeta, abstractmethod
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 
 class ResultServerInterface(metaclass = ABCMeta):
+    """Result Server Interface.
+
+    TODO: Add a description.
+    """
     @abstractmethod
     def get_generation_result(self) -> NewsegsModuleResult:
         """

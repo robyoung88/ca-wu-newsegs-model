@@ -1,3 +1,7 @@
+"""Result container callbacks module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 

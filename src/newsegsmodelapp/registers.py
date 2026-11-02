@@ -44,6 +44,16 @@ def add_page(page: Page):
     add_page_layout_configuration(page.default_configuration, page.id)
 
 def get_page(page_id: str):
+    """Get page.
+
+    TODO: Add a description.
+
+    Args:
+        page_id: TODO.
+
+    Returns:
+        TODO.
+    """
     page = PAGE_REGISTER.get(page_id)
     if page is None:
         raise KeyError(f'Page {page_id} is not present in register - available pages are {PAGE_REGISTER.keys()}')
@@ -56,6 +66,14 @@ def add_page_layout_configuration_class(
     configuration_class,
     page_name: str,
 ):
+    """Add page layout configuration class.
+
+    TODO: Add a description.
+
+    Args:
+        configuration_class: TODO.
+        page_name: TODO.
+    """
     if page_name in PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER:
         if configuration_class != PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER[page_name]:
             raise TypeError(f'LayoutConfiguration class has already been set for page {page_name} and is incompatible with {configuration_class}')
@@ -68,6 +86,11 @@ def add_page_layout_configuration(
     page_name: str,
     model_type: str = 'default'
 ):
+    """Register the layout configuration of a page for a model type.
+
+    Raises:
+        KeyError: if the page already has a configuration for a (non-default) model type.
+    """
     key = (page_name, model_type)
     if model_type != 'default':
         if key in PAGE_LAYOUT_CONFIGURATION_REGISTER:
@@ -85,6 +108,17 @@ def get_page_layout_configuration(
     page_name: str,
     model_type: str = 'default'
 ):
+    """Get page layout configuration.
+
+    TODO: Add a description.
+
+    Args:
+        page_name: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     key_default = (page_name, 'default')
     default_config = PAGE_LAYOUT_CONFIGURATION_REGISTER.get(key_default)
     if not default_config:
@@ -102,6 +136,16 @@ def get_page_layout_configuration(
     return specific_config
 
 def get_page_layout_configuration_class(page_name: str):
+    """Get page layout configuration class.
+
+    TODO: Add a description.
+
+    Args:
+        page_name: TODO.
+
+    Returns:
+        TODO.
+    """
     return PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER.get(page_name, type(LayoutConfiguration))
 
 # -------------------------------------------------------------------------
@@ -148,6 +192,18 @@ and any other elements that are included in the call.
 """
 
 def register_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
+    """Register input handler.
+
+    TODO: Add a description.
+
+    Args:
+        purpose: TODO.
+        type_: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     type_ = 'ALL' if type_ is None else type_
     key = (purpose, type_, model_type)
     def decorated(func):
@@ -162,6 +218,18 @@ def register_input_handler(purpose: str, type_: str | None = None, model_type: s
     return decorated
 
 def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 'default'):
+    """Get input handler.
+
+    TODO: Add a description.
+
+    Args:
+        purpose: TODO.
+        type_: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     getter = _three_param_key_getter_with_fallback(INPUT_HANDLERS, return_type_description = 'input handler') # pyright: ignore[reportArgumentType]
     return getter(purpose, type_, model_type)
 
@@ -172,6 +240,10 @@ def get_input_handler(purpose: str, type_: str | None = None, model_type: str = 
 
 @dataclass
 class Postactions(SerialisableDataclass):
+    """Postactions.
+
+    TODO: Add a description.
+    """
     action_type: str
     run_procedures: set[str] = field(default_factory = set)
     postprocess_procedures: set[tuple[str, str]] = field(default_factory = set)
@@ -187,6 +259,10 @@ be found in RUN_PROCEDURE_REGISTER.)
 
 @dataclass
 class RunRequest(SerialisableDataclass):
+    """Run Request.
+
+    TODO: Add a description.
+    """
     request_id: int = -1
     request_type: str = ''
     
@@ -207,6 +283,10 @@ class RunRequest(SerialisableDataclass):
     background_procedure: bool = True 
 
 class RunRequestHandler(Protocol):
+    """Run Request Handler.
+
+    TODO: Add a description.
+    """
     def __call__(
         self,
         project_id: str,
@@ -307,9 +387,17 @@ def register_run_procedure(
 
 @dataclass
 class PostprocessRequest(RunRequest):
+    """Postprocess Request.
+
+    TODO: Add a description.
+    """
     request_class: str = 'postprocess'
 
 class PostprocessRequestHandler(Protocol):
+    """Postprocess Request Handler.
+
+    TODO: Add a description.
+    """
     def __call__(
         self,
         trigger_request: RunRequest,
@@ -367,6 +455,18 @@ def register_postprocess_procedure(
         name: str, model_type: str = 'default',
         triggers: SequenceNotStr[str] = []
     ):
+    """Register postprocess procedure.
+
+    TODO: Add a description.
+
+    Args:
+        name: TODO.
+        model_type: TODO.
+        triggers: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (name, model_type)
     if isinstance(triggers, str):
         triggers = [triggers]
@@ -400,6 +500,17 @@ def register_postprocess_procedure(
     return decorated
 
 def get_postprocess_procedure(procedure: str, request: RunRequest):
+    """Get postprocess procedure.
+
+    TODO: Add a description.
+
+    Args:
+        procedure: TODO.
+        request: TODO.
+
+    Returns:
+        TODO.
+    """
     proc = POSTPROCESS_REGISTER.get((procedure, request.model_type))
     if proc is None:
         proc = POSTPROCESS_REGISTER.get((procedure, 'default'))
@@ -416,9 +527,17 @@ def get_postprocess_procedure(procedure: str, request: RunRequest):
 
 @dataclass
 class TableDrawRequest(RunRequest):
+    """Table Draw Request.
+
+    TODO: Add a description.
+    """
     request_class: str = 'tabledraw'
 
 class TableDrawRequestHandler(Protocol):
+    """Table Draw Request Handler.
+
+    TODO: Add a description.
+    """
     def __call__(
         self,
         trigger_request: RunRequest,
@@ -478,6 +597,18 @@ def register_table_draw(
     name: str, model_type: str = 'default',
     triggers: SequenceNotStr[str] = []
 ):
+    """Register table draw.
+
+    TODO: Add a description.
+
+    Args:
+        name: TODO.
+        model_type: TODO.
+        triggers: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (name, model_type)
     if isinstance(triggers, str):
         triggers = [triggers]
@@ -511,6 +642,17 @@ def register_table_draw(
     return decorated
 
 def get_table_draw(table_section: str, request: RunRequest):
+    """Get table draw.
+
+    TODO: Add a description.
+
+    Args:
+        table_section: TODO.
+        request: TODO.
+
+    Returns:
+        TODO.
+    """
     proc = TABLE_DRAW_REGISTER.get((table_section, request.model_type))
     if proc is None:
         proc = TABLE_DRAW_REGISTER.get((table_section, 'default'))
@@ -531,6 +673,18 @@ Keyed by a tuple of:
 """
 
 def register_table_subindex_map(map_: dict, name: str, model_type: str = 'default'):
+    """Register table subindex map.
+
+    TODO: Add a description.
+
+    Args:
+        map_: TODO.
+        name: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (name, model_type)
     if model_type != 'default':
         if key in TABLE_SUBINDEX_MAPS:
@@ -542,6 +696,17 @@ def register_table_subindex_map(map_: dict, name: str, model_type: str = 'defaul
     return map_
 
 def get_table_subindex_map(table_section:str, model_type: str = 'default'):
+    """Get table subindex map.
+
+    TODO: Add a description.
+
+    Args:
+        table_section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (table_section, model_type)
     map_ = TABLE_SUBINDEX_MAPS.get(key)
     if map_ is None:
@@ -567,6 +732,18 @@ def register_table_getter(
     name: str, model_type: str = 'default',
     triggers: SequenceNotStr[str] = []
 ):
+    """Register table getter.
+
+    TODO: Add a description.
+
+    Args:
+        name: TODO.
+        model_type: TODO.
+        triggers: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (name, model_type)
     if isinstance(triggers, str):
         triggers = [triggers]
@@ -584,6 +761,17 @@ def register_table_getter(
     return decorated
 
 def get_table_getter(table_section: str, model_type: str = 'default'):
+    """Get table getter.
+
+    TODO: Add a description.
+
+    Args:
+        table_section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     proc = TABLE_GETTER_REGISTER.get((table_section, model_type))
     if proc is None:
         proc = TABLE_GETTER_REGISTER.get((table_section, 'default'))
@@ -595,6 +783,16 @@ def get_table_getter(table_section: str, model_type: str = 'default'):
 
 
 def trigger_name_clash(purpose: str) -> bool:
+    """Trigger name clash.
+
+    TODO: Add a description.
+
+    Args:
+        purpose: TODO.
+
+    Returns:
+        TODO.
+    """
     return purpose in [*RUN_REQUEST_REGISTER.keys(), *POSTPROCESS_REQUEST_REGISTER.keys(), *TABLE_DRAW_REQUEST_REGISTER.keys()]
 
 # -------------------------------------------------------------------------
@@ -615,6 +813,18 @@ Keyed by a tuple of:
 """
 
 def register_input_container_content_creator(supersection: str, section: str | None, model_type: str):
+    """Register input container content creator.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     section = section if section else 'ALL'
     key = (supersection, section, model_type)
     def decorated(func):
@@ -671,6 +881,18 @@ def get_input_container_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    """Get input container content creator.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     getter = _three_param_key_getter_with_fallback(
         INPUT_CONTAINER_CONTENT_CREATORS,
         return_type_description = 'content creation function'
@@ -696,6 +918,18 @@ Keyed by a tuple of:
 """
 
 def register_input_section_header_content_creator(supersection: str, section: str | None, model_type: str):
+    """Register input section header content creator.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     section = section if section else 'ALL'
     key = (supersection, section, model_type)
     def decorated(func):
@@ -714,6 +948,18 @@ def get_input_section_header_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    """Get input section header content creator.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     getter = _three_param_key_getter_with_fallback(
         INPUT_SECTION_HEADER_CONTENT_CREATORS,
         return_type_description = 'input header content creation function'
@@ -743,6 +989,18 @@ Functions take the variable id as string and the variable or up-to-date FullLigh
 def register_single_input_header_content_creator(
     supersection: str, section: str | None, model_type: str
 ):
+    """Register single input header content creator.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     section = 'ALL' if section is None else section
     key = (supersection, section, model_type)
     def decorated(func):
@@ -761,6 +1019,18 @@ def get_single_input_header_content_creator(
     section: str | None,
     model_type: str = 'default'
 ):
+    """Get single input header content creator.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     getter = _three_param_key_getter_with_fallback(
         SINGLE_INPUT_HEADER_CONTENT_CREATORS,
         return_type_description = 'single input header content creation function'
@@ -786,6 +1056,18 @@ Keyed by a tuple of:
 """
 
 def register_result_container_content_creator(key_: str, section: str | None, model_type: str):
+    """Register result container content creator.
+
+    TODO: Add a description.
+
+    Args:
+        key_: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     section = section if section else 'ALL'
     key = (key_, section, model_type)
     def decorated(func):
@@ -804,6 +1086,18 @@ def get_result_container_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    """Get result container content creator.
+
+    TODO: Add a description.
+
+    Args:
+        key_: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     getter = _three_param_key_getter_with_fallback(
         RESULT_CONTAINER_CONTENT_CREATORS,
         return_type_description = 'content creation function'
@@ -830,6 +1124,18 @@ Keyed by a tuple of:
 """
 
 def register_result_section_header_content_creator(key_: str, section: str | None, model_type: str):
+    """Register result section header content creator.
+
+    TODO: Add a description.
+
+    Args:
+        key_: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     section = section if section else 'ALL'
     key = (key_, section, model_type)
     def decorated(func):
@@ -848,6 +1154,18 @@ def get_result_section_header_content_creator(
     section: str | None, 
     model_type: str = 'default'
 ) -> Callable[[str, NewsegsProjectProviderInterface, NewsegsResultProviderInterface, Optional[bool]], list[DashComponent]]:
+    """Get result section header content creator.
+
+    TODO: Add a description.
+
+    Args:
+        key_: TODO.
+        section: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     getter = _three_param_key_getter_with_fallback(
         RESULT_SECTION_HEADER_CONTENT_CREATORS,
         return_type_description = 'result header content creation function'
@@ -878,6 +1196,17 @@ Functions take the active project id as string and a project provider.
 """
 
 def register_feedback_graph_artist(figure_key: str, model_type: str):
+    """Register feedback graph artist.
+
+    TODO: Add a description.
+
+    Args:
+        figure_key: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (figure_key, model_type)
     def decorated(func):
         if model_type != 'default':
@@ -891,6 +1220,17 @@ def register_feedback_graph_artist(figure_key: str, model_type: str):
     return decorated
 
 def get_feedback_graph_artist(figure_key: str, model_type: str = 'default'):
+    """Get feedback graph artist.
+
+    TODO: Add a description.
+
+    Args:
+        figure_key: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     key = (figure_key, model_type)
     artist = FEEDBACK_GRAPH_ARTISTS.get(key)
     if artist:

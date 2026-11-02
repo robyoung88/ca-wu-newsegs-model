@@ -1,3 +1,7 @@
+"""Wind resource helpers module.
+
+TODO: Describe the purpose of the module.
+"""
 import os
 import itertools
 import numpy as np
@@ -32,6 +36,16 @@ BEARING_POLAR_ANGLES = (pd.DataFrame.from_dict(BEARING_DICT,
 EVAL_HEIGHTS = [15, 35]
 
 def get_cp(file_name):
+    """Get cp.
+
+    TODO: Add a description.
+
+    Args:
+        file_name: TODO.
+
+    Returns:
+        TODO.
+    """
     cp_file = pd.read_excel(file_name)
     def interpolant(x):
         return np.interp(x, cp_file['wind_speed'], cp_file['coeff_power'], left=0.0, right=0.0)
@@ -45,6 +59,18 @@ def get_cp(file_name):
 def bearing_to_category(bearings,
                         categories=BEARING_DICT,
                         offset=None):
+    """Bearing to category.
+
+    TODO: Add a description.
+
+    Args:
+        bearings: TODO.
+        categories: TODO.
+        offset: TODO.
+
+    Returns:
+        TODO.
+    """
     if offset is None:
         offset = (360.0 / len(categories)) / 2.0
     
@@ -57,6 +83,16 @@ def bearing_to_category(bearings,
     return o
 
 def expand_grid(data_dict):
+    """Expand grid.
+
+    TODO: Add a description.
+
+    Args:
+        data_dict: TODO.
+
+    Returns:
+        TODO.
+    """
     rows = itertools.product(*data_dict.values())
     return pd.DataFrame.from_records(rows, columns=data_dict.keys())
 
@@ -105,6 +141,18 @@ def get_alpha_distribution(newa_meso_data):
     return o2
 
 def get_alphas(wd_10, ws_10, alpha_dist):
+    """Get alphas.
+
+    TODO: Add a description.
+
+    Args:
+        wd_10: TODO.
+        ws_10: TODO.
+        alpha_dist: TODO.
+
+    Returns:
+        TODO.
+    """
     idf = (
         pd.DataFrame({
             'wd_10': wd_10,
@@ -129,6 +177,24 @@ def get_wind_at_site(lat, lon,
                      return_working = False
                      ):
     
+    """Get wind at site.
+
+    TODO: Add a description.
+
+    Args:
+        lat: TODO.
+        lon: TODO.
+        rng: TODO.
+        meso_reference_height: TODO.
+        micro_reference_height: TODO.
+        dt_start: TODO.
+        dt_stop: TODO.
+        site_heights: TODO.
+        return_working: TODO.
+
+    Returns:
+        TODO.
+    """
     meso_data = get_newa_meso_ts_point(lat, lon,
                                        height=meso_reference_height, 
                                        dt_start=dt_start, 

@@ -41,6 +41,17 @@ def send_to_dispatcher(
     payload, 
     retries: int = REQUEST_RETRIES
 ) -> dict:
+    """Send to dispatcher.
+
+    TODO: Add a description.
+
+    Args:
+        payload: TODO.
+        retries: TODO.
+
+    Returns:
+        TODO.
+    """
     JOB_DISPATCH_TIMEOUT = settings.get('JOB_DISPATCH_TIMEOUT_MS', 200)
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
@@ -106,6 +117,20 @@ def local_run_procedure(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface
 ):
+    """Local run procedure.
+
+    TODO: Add a description.
+
+    Args:
+        procedure_name: TODO.
+        request: TODO.
+        engine: TODO.
+        project_provider: TODO.
+        results_provider: TODO.
+
+    Returns:
+        TODO.
+    """
     runner = registers.RUN_PROCEDURE_REGISTER.get(procedure_name)
     if runner is None:
         logger.exception('Runner not found in RUN_PROCEDURE_REGISTER for procedure name: %s', procedure_name)
@@ -123,6 +148,20 @@ def local_run_postprocess(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface
 ):
+    """Local run postprocess.
+
+    TODO: Add a description.
+
+    Args:
+        procedure_name: TODO.
+        request: TODO.
+        engine: TODO.
+        project_provider: TODO.
+        results_provider: TODO.
+
+    Returns:
+        TODO.
+    """
     runner = registers.get_postprocess_procedure(procedure_name, request)
     if runner is None:
         logger.exception('Runner not found in POSTPROCESS_PROCEDURE_REGISTER for procedure name: %s', procedure_name)
@@ -140,6 +179,20 @@ def local_run_table_draw(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface
 ):
+    """Local run table draw.
+
+    TODO: Add a description.
+
+    Args:
+        procedure_name: TODO.
+        request: TODO.
+        engine: TODO.
+        project_provider: TODO.
+        results_provider: TODO.
+
+    Returns:
+        TODO.
+    """
     runner = registers.get_table_draw(procedure_name, request)
     if runner is None:
         logger.exception('Runner not found in TABLE_DRAW_REGISTER for procedure name: %s', procedure_name)
@@ -155,6 +208,18 @@ def spawn_job(
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface,
 ) -> int | None:
+    """Spawn job.
+
+    TODO: Add a description.
+
+    Args:
+        request: TODO.
+        project_provider: TODO.
+        results_provider: TODO.
+
+    Returns:
+        TODO.
+    """
     logger.info(
         'Spawning Run for Request ID %d; Type: %s;',
         request.request_id, request.request_type
@@ -310,6 +375,16 @@ def _get_run_statuses(
 
 def add_action_callbacks(app: NewsegsDash):
 
+    """Add action callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     def _respawn_run_for_request(
         request: registers.RunRequest,
     ) -> int | None:

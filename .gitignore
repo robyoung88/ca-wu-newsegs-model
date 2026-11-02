@@ -25,3 +25,6 @@ temp_*
 !.vscode/tasks.json
 
 *.log
+
+# Built documentation (mkdocs build)
+site/

@@ -1,3 +1,7 @@
+"""Callback utils module.
+
+TODO: Describe the purpose of the module.
+"""
 import copy
 import json
 from typing import Any
@@ -157,6 +161,17 @@ def create_noupdate_return() -> Any:
     return _create_noupdate_return(ctx.outputs_list)
 
 def intersection_values_match(d1, d2):
+    """Intersection values match.
+
+    TODO: Add a description.
+
+    Args:
+        d1: TODO.
+        d2: TODO.
+
+    Returns:
+        TODO.
+    """
     return all(d1[k] == d2[k] for k in (d1.keys() & d2.keys()))
 
 def _find_output_locations(

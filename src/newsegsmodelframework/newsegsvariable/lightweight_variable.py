@@ -1,3 +1,7 @@
+"""Lightweight variable module.
+
+TODO: Describe the purpose of the module.
+"""
 from dataclasses import KW_ONLY
 from typing import Any
 
@@ -6,6 +10,10 @@ from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_da
 
 @revision_dataclass
 class LightweightVariable(DataWithRevision):
+    """Lightweight Variable.
+
+    TODO: Add a description.
+    """
     id: str
     varid: str
     interface_section: str
@@ -32,6 +40,10 @@ class LightweightVariable(DataWithRevision):
 
 @revision_dataclass
 class FullLightweightVariable(DataWithRevision):
+    """Full Lightweight Variable.
+
+    TODO: Add a description.
+    """
     parameterisation_index: int
     component_type: str
 
@@ -59,6 +71,10 @@ class FullLightweightVariable(DataWithRevision):
 
     @property
     def configuration_type(self) -> str:
+        """Configuration type.
+
+        TODO: Add a description.
+        """
         if self.component_type in ('financedata'):
             return 'finance'
         return 'model'

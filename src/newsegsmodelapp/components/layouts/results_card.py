@@ -1,3 +1,7 @@
+"""Results card module.
+
+TODO: Describe the purpose of the module.
+"""
 import dash
 from dash import html
 import dash_bootstrap_components as dbc
@@ -11,6 +15,22 @@ def create_results_table_card(
     header_section: str | None = None,
     header_key: str | None = None,
 ):
+    """Create results table card.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        key: TODO.
+        title: TODO.
+        className: TODO.
+        header_section: TODO.
+        header_key: TODO.
+
+    Returns:
+        TODO.
+    """
     header_section = section if header_section is None else header_section
     header_key = key if header_key is None else header_key
     if className is not None:

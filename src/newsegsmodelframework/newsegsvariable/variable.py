@@ -139,6 +139,10 @@ def _multiparameter_partial_generation_broadcast(
 # NB - we don't really use the features of a Singleton here, as no Singletons have any instance parameters that are modified.
 # In the future, this may be stripped out and the classes re-composed.
 class Singleton(type):
+    """Singleton.
+
+    TODO: Add a description.
+    """
     _instances = {}
     def __call__(cls, *args: Any, **kwargs: Any) -> Singleton:
         if cls not in cls._instances:
@@ -184,14 +188,39 @@ class Parameterisation(metaclass = Singleton):
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return True
     
 
 class TwoParamParameterisation(Parameterisation):
     
+    """Two Param Parameterisation.
+
+    TODO: Add a description.
+    """
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
@@ -205,13 +234,43 @@ class TwoParamParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 class VectorParameterisation(Parameterisation):
 
+    """Vector Parameterisation.
+
+    TODO: Add a description.
+    """
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[VectorParam|MatrixNumParam, ...]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
@@ -225,9 +284,28 @@ class VectorParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[Param, ...], tuple[VectorParam|MatrixNumParam, ...]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
         
 class Distribution(metaclass = Singleton):
+    """Distribution.
+
+    TODO: Add a description.
+    """
     distribution : VARIABLE_DISTRIBUTION
     parameterisations: Sequence[Parameterisation]
     dsa_possible: bool = False
@@ -241,6 +319,16 @@ class Distribution(metaclass = Singleton):
 
     @classmethod
     def n_values(cls, var: Variable) -> int:
+        """N values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         try:
             if (
                 isinstance(var.parameters, str) 
@@ -269,41 +357,120 @@ class Distribution(metaclass = Singleton):
     @classmethod
     @abstractmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> Value:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> Value:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[Value, Value]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> Value:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> Value:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[Value, Value]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
@@ -337,12 +504,34 @@ class Distribution(metaclass = Singleton):
 
 
 class ScalarValuedDistribution(Distribution):
+    """Scalar Valued Distribution.
+
+    TODO: Add a description.
+    """
     @classmethod
     def n_values(cls, var: Variable) -> int:
+        """N values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return 1
     
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         if len(values) > 1 or len(values) < 1:
             raise TypeError(f'Single value expected, got {len(values)}')
         val = values[0]
@@ -354,16 +543,47 @@ class ScalarValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> ScalarParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> ScalarParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarParam, ScalarParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
@@ -431,6 +651,17 @@ class ScalarValuedDistribution(Distribution):
 
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarParam:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ScalarVariable):
             raise TypeError(f'Expected ScalarVariable, got {type(var)}')
         match bound:
@@ -456,15 +687,40 @@ class ScalarValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[ScalarParam, ScalarParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 
 class NumericScalarValuedDistribution(ScalarValuedDistribution):
+    """Numeric Scalar Valued Distribution.
+
+    TODO: Add a description.
+    """
     interval_function: Callable[[float, Sequence[ScalarNumParam]], tuple[float, float]]
     permitted_dsa_bounds = (
         'absolute',
@@ -476,6 +732,14 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         if len(values) > 1 or len(values) < 1:
             raise TypeError(f'Single value expected, got {len(values)}')
         val = values[0]
@@ -487,16 +751,47 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> ScalarNumParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NumericScalarVariable):
             raise TypeError(f'var is expected to be NumericScalarVariable, is {type(var)}')
         v = cls.interval_function(confidence, var.parameters)
@@ -577,6 +872,17 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarNumParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
@@ -585,6 +891,17 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
         var: Variable,
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            interval: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NumericScalarVariable):
             raise TypeError(f'Expected var as NumericScalarVariable, got {type(var)}')
         match var.dsa_bounds_type:
@@ -602,8 +919,20 @@ class NumericScalarValuedDistribution(ScalarValuedDistribution):
                 raise ValueError(f'Unknown dsa_bounds_type {var.dsa_bounds_type}')
 
 class TwoParamNumericScalarValuedDistribution(NumericScalarValuedDistribution):
+    """Two Param Numeric Scalar Valued Distribution.
+
+    TODO: Add a description.
+    """
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if len(parameters) != 2 :
             raise TypeError(f'Two numeric parameters expected, got {len(parameters)}')
         
@@ -618,19 +947,54 @@ class TwoParamNumericScalarValuedDistribution(NumericScalarValuedDistribution):
 
 class VectorValuedDistribution(Distribution):
 
+    """Vector Valued Distribution.
+
+    TODO: Add a description.
+    """
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> VectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> VectorParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[VectorParam, VectorParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
@@ -701,6 +1065,17 @@ class VectorValuedDistribution(Distribution):
 
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> VectorParam:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, VectorVariable):
             raise TypeError(f'Expected VectorVariable, got {type(var)}')
         match bound:
@@ -726,15 +1101,40 @@ class VectorValuedDistribution(Distribution):
     @classmethod
     @abstractmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> VectorParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[VectorParam, VectorParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 class NumericVectorValuedDistribution(VectorValuedDistribution):
 
+    """Numeric Vector Valued Distribution.
+
+    TODO: Add a description.
+    """
     permitted_dsa_bounds = (
         'absolute',
         'relative',
@@ -756,22 +1156,64 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
     @classmethod
     @abstractmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
     @abstractmethod
     def std(cls, var: Variable) -> VectorParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[VectorParam, VectorParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NumericVectorVariable):
             raise TypeError(f'var should be a NumericVectorVariable, is {type(var)}')
         return cls.interval_function(confidence, var)
 
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> NumericVectorParam:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         if var.dsa_bounds_type == 'interval':
             if not isinstance(var, NumericVectorVariable):
                 raise TypeError(f'Expected NumericVectorVariable, got {type(var)}')
@@ -796,6 +1238,17 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
         var: Variable,
         rng: np.random.Generator
     ) -> NumericVectorParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @classmethod
@@ -804,6 +1257,16 @@ class NumericVectorValuedDistribution(VectorValuedDistribution):
         cls, 
         var: Variable
     ) -> tuple[NumericVectorParam, NumericVectorParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 class _ConstantParameterisation(Parameterisation):
@@ -811,6 +1274,17 @@ class _ConstantParameterisation(Parameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
@@ -824,18 +1298,49 @@ class _ConstantParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarParam], tuple[ScalarParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 
 class ConstantParameterisationDefault(
     _ConstantParameterisation
 ):
+    """Constant Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('value', )
     types = ('scalar', )
     defaults = (1., )
     
     @classmethod
     def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            value: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if len(args):
             raise TypeError('Constant variable can only accept single value - use constant_vector')
         if isinstance(value, str):
@@ -872,6 +1377,10 @@ class ConstantParameterisationDefault(
         
 
 class ConstantDistribution(ScalarValuedDistribution):
+    """Constant Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'constant'
     parameterisations = [
         ConstantParameterisationDefault(),
@@ -881,6 +1390,14 @@ class ConstantDistribution(ScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
         if len(parameters) > 1 or len(parameters) < 1:
@@ -902,6 +1419,16 @@ class ConstantDistribution(ScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
         
@@ -918,14 +1445,46 @@ class ConstantDistribution(ScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return 0
     
     @classmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarParam, ScalarParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         return(cls.deterministic_value(var), cls.deterministic_value(var))
 
     @classmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
         
@@ -933,6 +1492,16 @@ class ConstantDistribution(ScalarValuedDistribution):
     
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[ScalarParam, ScalarParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ConstantVariable):
             raise TypeError(f'Expecting var as ConstantVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -951,6 +1520,17 @@ class _NumericConstantParameterisation(Parameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @classmethod
@@ -964,18 +1544,49 @@ class _NumericConstantParameterisation(Parameterisation):
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam], tuple[ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 
 class NumericConstantParameterisationDefault(
     _NumericConstantParameterisation
 ):
+    """Numeric Constant Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('value', )
     types = ('scalar', )
     defaults = (1., )
     
     @classmethod
     def generator(cls, value: Param, *args, **kwargs) -> tuple[ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            value: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if len(args):
             raise TypeError('Constant variable can only accept single value - use constant_vector for %s', args)
         if isinstance(value, str):
@@ -1012,6 +1623,10 @@ class NumericConstantParameterisationDefault(
 
 
 class NumericConstantDistribution(NumericScalarValuedDistribution):
+    """Numeric Constant Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'numeric_constant'
     parameterisations = [
         NumericConstantParameterisationDefault(),
@@ -1021,6 +1636,14 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
         if len(parameters) > 1 or len(parameters) < 1:
@@ -1041,6 +1664,16 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
         
@@ -1057,14 +1690,46 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return 0
     
     @classmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         return(cls.deterministic_value(var), cls.deterministic_value(var))
 
     @classmethod
     def psa_value(cls, var: Variable, rng: np.random.Generator) -> ScalarNumParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
         
@@ -1072,6 +1737,17 @@ class NumericConstantDistribution(NumericScalarValuedDistribution):
     
     @classmethod
     def dsa_auto_values(cls, var: Variable, interval: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            interval: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NumericConstantVariable):
             raise TypeError(f'Expecting var as NumericConstantVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -1091,6 +1767,10 @@ class _BinomialParameterisation(TwoParamParameterisation):
 class BinomialParameterisationDefault(
     _BinomialParameterisation
 ):
+    """Binomial Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('probability', 'trials')
     types = ('scalar', 'scalar')
     defaults = (0.25, 1)
@@ -1102,6 +1782,19 @@ class BinomialParameterisationDefault(
         trials: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            probability: TODO.
+            trials: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return (trials, probability)
     
     @classmethod
@@ -1114,6 +1807,21 @@ class BinomialParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1142,6 +1850,10 @@ class BinomialParameterisationDefault(
 class BinomialParameterisationExpected(
     _BinomialParameterisation
 ):
+    """Binomial Parameterisation Expected.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'trials')
     types = ('scalar', 'scalar')
     defaults = (0.25, 1)
@@ -1153,6 +1865,19 @@ class BinomialParameterisationExpected(
         trials: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            trials: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if trials == 0:
             if mean == 0:
                 return (0, 0)
@@ -1171,6 +1896,21 @@ class BinomialParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1217,6 +1957,10 @@ def _binomial_interval_function(
     return binom.interval(interval, parameters[0], parameters[1])
 
 class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
+    """Binomial Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'binomial'
     parameterisations: Sequence[_BinomialParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         BinomialParameterisationDefault(),
@@ -1228,6 +1972,14 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
         
@@ -1244,6 +1996,14 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         super().value_validation(var, *values)
 
         if not isinstance(var, BinomialVariable):
@@ -1256,6 +2016,16 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
         
@@ -1265,11 +2035,32 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         from scipy.stats import binom
         return float(binom.std(var.parameters[0], var.parameters[1]))
     
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
         
@@ -1283,6 +2074,17 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable,
         rng: np.random.Generator
     ) -> ScalarNumParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, BinomialVariable):
             raise TypeError(f'Expecting var as BinomialVariable, is {type(var)}')
         
@@ -1294,6 +2096,17 @@ class BinomialDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            interval: TODO.
+
+        Returns:
+            TODO.
+        """
         rval = super().dsa_auto_values(var, interval)
         var = cast(TwoParamNumericScalarVariable, var)
 
@@ -1341,6 +2154,10 @@ class _NormalParameterisation(TwoParamParameterisation):
 class NormalParameterisationDefault(
     _NormalParameterisation
 ):
+    """Normal Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
     defaults = (0, 1)
@@ -1352,6 +2169,19 @@ class NormalParameterisationDefault(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            sd: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return (mean, sd)
     
     @classmethod
@@ -1363,6 +2193,21 @@ class NormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1385,11 +2230,25 @@ class NormalParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'identity'
     
 class LogNormalParameterisationDefault(
     _NormalParameterisation
 ):
+    """Log Normal Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('mu', 'sigma')
     types = ('scalar', 'scalar')
     defaults = (0, 1)
@@ -1401,6 +2260,19 @@ class LogNormalParameterisationDefault(
         sigma: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mu: TODO.
+            sigma: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if sigma < 0:
             raise ValueError(f'Sigma parameter must be positive, is {sigma}')
         return (mu, sigma)
@@ -1414,6 +2286,21 @@ class LogNormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1436,11 +2323,25 @@ class LogNormalParameterisationDefault(
         
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'ln'
 
 class LogNormalParameterisationExpected(
     _NormalParameterisation
 ):
+    """Log Normal Parameterisation Expected.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
     defaults = (1, 1)
@@ -1452,6 +2353,19 @@ class LogNormalParameterisationExpected(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            sd: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if sd == 0:
             return (np.log(mean), 0)
         if mean <= 0:
@@ -1469,6 +2383,21 @@ class LogNormalParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1492,6 +2421,16 @@ class LogNormalParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'ln'
     
 def _normal_interval(
@@ -1515,6 +2454,10 @@ def _lognormal_interval(
     return lognorm.interval(interval, parameters[1], scale=np.exp(parameters[0]))
     
 class NormalDistribution(TwoParamNumericScalarValuedDistribution):
+    """Normal Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'normal'
     parameterisations: Sequence[_NormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         NormalParameterisationDefault(),
@@ -1528,6 +2471,14 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
         
@@ -1541,6 +2492,16 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
         if var.transform[0] == 'ln':
@@ -1550,6 +2511,16 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
         if var.transform[0] == 'ln':
@@ -1560,6 +2531,17 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def interval(cls, var: Variable, confidence: float = 0.95) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Interval.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
         if var.transform[0] == 'ln':
@@ -1570,6 +2552,17 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         if var.transform[0] == 'ln' and var.dsa_bounds_type == 'interval':
             if not isinstance(var, NumericScalarVariable):
                 raise TypeError(f'Expected NumericScalarVariable, got {type(var)}')
@@ -1596,6 +2589,17 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> ScalarNumParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, NormalVariable):
             raise TypeError(f'Expecting var as NormalVariable, is {type(var)}')
 
@@ -1612,6 +2616,17 @@ class NormalDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            interval: TODO.
+
+        Returns:
+            TODO.
+        """
         match var.transform[0]:
             case 'identity':
                 return super().dsa_auto_values(var, interval)
@@ -1637,6 +2652,10 @@ class _BetaParameterisation(TwoParamParameterisation):
 class BetaParameterisationDefault(
     _BetaParameterisation
 ):
+    """Beta Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('a', 'b')
     types = ('scalar', 'scalar')
     defaults = (1, 1)
@@ -1648,6 +2667,19 @@ class BetaParameterisationDefault(
         b: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            a: TODO.
+            b: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return (a, b)
     
     @classmethod
@@ -1659,6 +2691,21 @@ class BetaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1681,11 +2728,25 @@ class BetaParameterisationDefault(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'identity'
 
 class BetaParameterisationExpected(
     _BetaParameterisation
 ):
+    """Beta Parameterisation Expected.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
     defaults = (0.5, 0.25)
@@ -1697,6 +2758,19 @@ class BetaParameterisationExpected(
         sd: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            sd: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if mean == 0:
             return (0, 1)
         elif mean == 1:
@@ -1717,6 +2791,21 @@ class BetaParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1763,11 +2852,25 @@ class BetaParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'identity'
 
 class LogBetaParameterisationDefault(
     _BetaParameterisation
 ):
+    """Log Beta Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('a_log', 'b_log')
     types = ('scalar', 'scalar')
     defaults = (1, 1)
@@ -1779,6 +2882,19 @@ class LogBetaParameterisationDefault(
         b_log: ScalarNumParam, 
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            a_log: TODO.
+            b_log: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return (a_log, b_log)
     
     @classmethod
@@ -1790,6 +2906,21 @@ class LogBetaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1812,6 +2943,16 @@ class LogBetaParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'ln'
 
 def _beta_interval(
@@ -1824,6 +2965,10 @@ def _beta_interval(
     return beta.interval(interval, parameters[0], parameters[1])
 
 class BetaDistribution(TwoParamNumericScalarValuedDistribution):
+    """Beta Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'beta'
     parameterisations: Sequence[_BetaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         BetaParameterisationDefault(),
@@ -1837,6 +2982,14 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
         
@@ -1850,6 +3003,14 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         super().value_validation(var, *values)
 
         if not isinstance(var, BetaVariable):
@@ -1862,6 +3023,16 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
         a, b = var.parameters
@@ -1873,6 +3044,16 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
         a, b = var.parameters
@@ -1891,6 +3072,17 @@ class BetaDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> ScalarNumParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, BetaVariable):
             raise TypeError(f'Expecting var as BetaVariable, is {type(var)}')
         
@@ -1911,6 +3103,10 @@ class _GammaParameterisation(TwoParamParameterisation):
 class GammaParameterisationDefault(
     _GammaParameterisation
 ):
+    """Gamma Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('shape', 'scale')
     types = ('scalar', 'scalar')
     defaults = (1, 1)
@@ -1922,6 +3118,19 @@ class GammaParameterisationDefault(
         scale: ScalarNumParam,
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            shape: TODO.
+            scale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return (shape, scale)
     
     @classmethod
@@ -1933,6 +3142,21 @@ class GammaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -1955,11 +3179,25 @@ class GammaParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'identity'
     
 class GammaParameterisationExpected(
     _GammaParameterisation
 ):
+    """Gamma Parameterisation Expected.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'sd')
     types = ('scalar', 'scalar')
     defaults = (1, 1)
@@ -1980,6 +3218,19 @@ class GammaParameterisationExpected(
         # scale = mean/shape
         # sd = sqrt(shape) * mean / shape = mean / sqrt(shape)
         # shape = (mean / sd) **2
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            sd: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if sd < 0:
             raise ValueError(f'sd must be positive, is: {sd}')
         if mean < 0:
@@ -2001,6 +3252,21 @@ class GammaParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -2023,11 +3289,25 @@ class GammaParameterisationExpected(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'identity'
 
 class LogGammaParameterisationDefault(
     _GammaParameterisation
 ):
+    """Log Gamma Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('shape_log', 'scale_log')
     types = ('scalar', 'scalar')
     defaults = (1, 1)
@@ -2039,6 +3319,19 @@ class LogGammaParameterisationDefault(
         scale_log: ScalarNumParam,
         *args, **kwargs
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            shape_log: TODO.
+            scale_log: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return (shape_log, scale_log)
     
     @classmethod
@@ -2050,6 +3343,21 @@ class LogGammaParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[ScalarNumParam, ScalarNumParam], tuple[ScalarNumParam, ScalarNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -2072,6 +3380,16 @@ class LogGammaParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return var.transform[0] == 'ln'
 
 def _gamma_interval(
@@ -2097,6 +3415,10 @@ def _loggamma_interval(
     return (np.exp(interval_values[0]), np.exp(interval_values[1]))
 
 class GammaDistribution(TwoParamNumericScalarValuedDistribution):
+    """Gamma Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'gamma'
     parameterisations: Sequence[_GammaParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         GammaParameterisationDefault(),
@@ -2110,6 +3432,14 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
         
@@ -2123,6 +3453,14 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         super().value_validation(var, *values)
 
         if not isinstance(var, GammaVariable):
@@ -2135,6 +3473,16 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
 
     @classmethod
     def deterministic_value(cls, var: Variable) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
         shape, scale = var.parameters
@@ -2153,6 +3501,16 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> ScalarNumParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
         from scipy.stats import gamma as gamma_dist
@@ -2164,6 +3522,17 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         
     @classmethod
     def dsa_value(cls, var: Variable, bound: DSA_BOUND) -> ScalarNumParam:
+        """Dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            bound: TODO.
+
+        Returns:
+            TODO.
+        """
         if var.dsa_bounds_type == 'interval':
 
 
@@ -2205,6 +3574,17 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> ScalarNumParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, GammaVariable):
             raise TypeError(f'Expecting var as GammaVariable, is {type(var)}')
         
@@ -2226,6 +3606,17 @@ class GammaDistribution(TwoParamNumericScalarValuedDistribution):
         var: Variable, 
         interval: float = 0.95
     ) -> tuple[ScalarNumParam, ScalarNumParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            interval: TODO.
+
+        Returns:
+            TODO.
+        """
         match var.transform[0]:
             case 'identity':
                 return super().dsa_auto_values(var, interval)
@@ -2252,6 +3643,10 @@ class _ConstantVectorParameterisation(VectorParameterisation):
 class ConstantVectorParameterisationDefault(
     _ConstantVectorParameterisation
 ):
+    """Constant Vector Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('values',)
     types = ('vector',)
     defaults = ([1], )
@@ -2262,6 +3657,18 @@ class ConstantVectorParameterisationDefault(
         values: VectorParam,
         *args, **kwargs
     ) -> tuple[VectorParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            values: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if len(args) > 0:
             # Assume that we need to concat
             if not isinstance(values, Sized):
@@ -2296,6 +3703,10 @@ class ConstantVectorParameterisationDefault(
     
 
 class ConstantVectorDistribution(VectorValuedDistribution):
+    """Constant Vector Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'constant_vector'
     parameterisations: Sequence[_ConstantVectorParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         ConstantVectorParameterisationDefault(),
@@ -2306,6 +3717,14 @@ class ConstantVectorDistribution(VectorValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if len(parameters) != 1:
             raise TypeError(f'Single parameter sequence expected, got {len(parameters)} separate parameters')
         
@@ -2313,6 +3732,14 @@ class ConstantVectorDistribution(VectorValuedDistribution):
     
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         if len(values) != 1:
             raise TypeError(f'Single vector or Sequence of values expected, got {len(values)} individual values')
         val = values[0]
@@ -2327,6 +3754,16 @@ class ConstantVectorDistribution(VectorValuedDistribution):
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> VectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ConstantVectorVariable):
             raise TypeError(f'Expecting var as ConstantVectorVariable, is {type(var)}')
         rval = copy.copy(var.parameters[0])
@@ -2358,6 +3795,16 @@ class ConstantVectorDistribution(VectorValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> VectorParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return np.zeros_like(cls.deterministic_value(var))
 
     # dsa_value should inherit from VectorValuedDistribution
@@ -2368,12 +3815,33 @@ class ConstantVectorDistribution(VectorValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> VectorParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ConstantVectorVariable):
             raise TypeError(f'Expecting var as ConstantVectorVariable, is {type(var)}')
         return var.deterministic_value
     
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[VectorParam, VectorParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, ConstantVectorVariable):
             raise TypeError(f'Expecting var as ConstantVectorVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -2391,11 +3859,26 @@ class _MultivariateNormalParameterisation(VectorParameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[NumericVectorParam, MatrixNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 class MultivariateNormalParameterisationDefault(
     _MultivariateNormalParameterisation
 ):
+    """Multivariate Normal Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'vcv')
     types = ('vector', 'matrix')
     defaults = (np.asarray([0.,0.,]), np.asarray([[1., 0.],[0.,1.]]))
@@ -2407,6 +3890,19 @@ class MultivariateNormalParameterisationDefault(
         vcv: MatrixNumParam, 
         *args, **kwargs
     ) -> tuple[NumericVectorParam, MatrixNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            vcv: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
@@ -2425,6 +3921,21 @@ class MultivariateNormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam, MatrixNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -2481,11 +3992,25 @@ class MultivariateNormalParameterisationDefault(
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return all(trans == 'identity' for trans in var.transform)
     
 class MultivariateLogNormalParameterisationDefault(
     _MultivariateNormalParameterisation
 ):
+    """Multivariate Log Normal Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('mu', 'vcv')
     types = ('vector', 'matrix')
     defaults = (np.asarray([0.,0.,]), np.asarray([[1., 0.],[0.,1.]]))
@@ -2497,6 +4022,19 @@ class MultivariateLogNormalParameterisationDefault(
         vcv: MatrixNumParam, 
         *args, **kwargs
     ) -> tuple[NumericVectorParam, MatrixNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mu: TODO.
+            vcv: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(mu, np.ndarray):
             mu = np.asarray(mu, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
@@ -2515,6 +4053,21 @@ class MultivariateLogNormalParameterisationDefault(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam, MatrixNumParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -2571,11 +4124,25 @@ class MultivariateLogNormalParameterisationDefault(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return any(trans == 'ln' for trans in var.transform)
     
 class MultivariateLogNormalParameterisationExpected(
     _MultivariateNormalParameterisation
 ):
+    """Multivariate Log Normal Parameterisation Expected.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'vcv', 'transform')
     types = ('vector', 'matrix', 'vector')
     defaults = (np.asarray([1.,1.,]), np.asarray([[1., 0.],[0.,1.]])) # NB - do not provide transform, so that it is passed from the Variable at parameter set time
@@ -2588,6 +4155,20 @@ class MultivariateLogNormalParameterisationExpected(
         transform: VectorParam,
         *args, **kwargs
     ) -> tuple[NumericVectorParam, MatrixNumParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            vcv: TODO.
+            transform: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
@@ -2614,9 +4195,23 @@ class MultivariateLogNormalParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return any(trans == 'ln' for trans in var.transform)
 
 class MultivariateNormalDistribution(NumericVectorValuedDistribution):
+    """Multivariate Normal Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'mvn'
     parameterisations: Sequence[_MultivariateNormalParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         MultivariateNormalParameterisationDefault(),
@@ -2633,6 +4228,17 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
         interval: float, 
         var: NumericVectorVariable
     ) -> tuple[NumericVectorParam, NumericVectorParam]:
+        """Interval function.
+
+        TODO: Add a description.
+
+        Args:
+            interval: TODO.
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         out_val = super().interval_function(interval, var)
         i = var.dsa_value_index
         if i >= len(out_val[0]):
@@ -2657,6 +4263,14 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if len(parameters) != 2:
             raise TypeError(f'Two parameters expected - vector of means and variance-covariance matrix; got {len(parameters)} separate parameters')
         
@@ -2683,6 +4297,14 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         if len(values) != 1:
             raise TypeError(f'Single vector or Sequence of values expected, got {len(values)} individual values')
         val = values[0]
@@ -2706,6 +4328,16 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
             
     @classmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         var = cast(MultivariateNormalVariable, var)
@@ -2724,6 +4356,16 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> NumericVectorParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         
@@ -2745,6 +4387,17 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> NumericVectorParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         
@@ -2758,6 +4411,16 @@ class MultivariateNormalDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[NumericVectorParam, NumericVectorParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, MultivariateNormalVariable):
             raise TypeError(f'Expecting var as MultivariateNormalVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -2782,11 +4445,26 @@ class _DirichletParameterisation(Parameterisation):
     @classmethod
     @abstractmethod
     def generator(cls, *args, **kwargs) -> tuple[NumericVectorParam]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 class DirichletParameterisationDefault(
     _DirichletParameterisation
 ):
+    """Dirichlet Parameterisation Default.
+
+    TODO: Add a description.
+    """
     names = ('alpha',)
     types = ('vector',)
     defaults = ([0.5, 0.5], )
@@ -2797,6 +4475,18 @@ class DirichletParameterisationDefault(
         alpha: NumericVectorParam,
         *args, **kwargs
     ) -> tuple[NumericVectorParam, ]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            alpha: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         alpha = np.asarray(alpha, dtype = np.float64).flatten()
         return (alpha, )
     
@@ -2811,15 +4501,44 @@ class DirichletParameterisationDefault(
         **kwargs
     ) -> tuple[tuple[NumericVectorParam], tuple[NumericVectorParam]]:
         # As there is only a single parameter, there is no difference between setting a single parameter and all
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         return parameter, cls.generator(parameter[0]) # pyright: ignore[reportReturnType, reportArgumentType]
     
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return all(trans == 'identity' for trans in var.transform)
     
 class DirichletParameterisationExpected(
     _DirichletParameterisation
 ):
+    """Dirichlet Parameterisation Expected.
+
+    TODO: Add a description.
+    """
     names = ('mean', 'vcv')
     types = ('vector', 'matrix')
     # Note that the variance of values with equal concentration parameters must be the same
@@ -2832,6 +4551,19 @@ class DirichletParameterisationExpected(
         vcv: MatrixNumParam,
         *args, **kwargs
     ) -> tuple[NumericVectorParam, ]:
+        """Generator.
+
+        TODO: Add a description.
+
+        Args:
+            mean: TODO.
+            vcv: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(mean, np.ndarray):
             mean = np.asarray(mean, dtype = np.float64)
         if not isinstance(vcv, np.ndarray):
@@ -2863,6 +4595,21 @@ class DirichletParameterisationExpected(
         autoscale: bool = True,
         **kwargs
     ) -> tuple[tuple[NumericVectorParam, MatrixNumParam], tuple[NumericVectorParam]]:
+        """Partial generator.
+
+        TODO: Add a description.
+
+        Args:
+            parameter: TODO.
+            parameter_index: TODO.
+            current_params: TODO.
+            autoscale: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         pargs = _multiparameter_partial_generation_broadcast(
             parameter, parameter_index, current_params
         )
@@ -2920,9 +4667,23 @@ class DirichletParameterisationExpected(
 
     @classmethod
     def eligibility(cls, var: Variable) -> bool:
+        """Eligibility.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         return all(trans == 'identity' for trans in var.transform)
 
 class DirichletDistribution(NumericVectorValuedDistribution):
+    """Dirichlet Distribution.
+
+    TODO: Add a description.
+    """
     distribution = 'dirichlet'
     parameterisations: Sequence[_DirichletParameterisation] = [ # pyright: ignore[reportIncompatibleVariableOverride]
         DirichletParameterisationDefault(),
@@ -2938,6 +4699,17 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         interval: float,
         var: NumericVectorVariable
     ) -> tuple[NumericVectorParam, NumericVectorParam]:
+        """Interval function.
+
+        TODO: Add a description.
+
+        Args:
+            interval: TODO.
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         out_val = super().interval_function(interval, var)
 
         i = var.dsa_value_index
@@ -2976,6 +4748,14 @@ class DirichletDistribution(NumericVectorValuedDistribution):
     
     @classmethod
     def parameter_validation(cls, var: Variable, *parameters: Param) -> None:
+        """Parameter validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *parameters: TODO.
+        """
         if len(parameters) != 1:
             raise TypeError(f'Single numeric vector of concentration parameters expected - got {len(parameters)} individual parameters')
         
@@ -3000,6 +4780,14 @@ class DirichletDistribution(NumericVectorValuedDistribution):
 
     @classmethod
     def value_validation(cls, var: Variable, *values: Value) -> None:
+        """Value validation.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            *values: TODO.
+        """
         if len(values) != 1:
             raise TypeError(f'Single vector or Sequence of values expected, got {len(values)} individual values')
         val = values[0]
@@ -3030,6 +4818,16 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         
     @classmethod
     def deterministic_value(cls, var: Variable) -> NumericVectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         var = cast(DirichletVariable, var)
@@ -3042,6 +4840,16 @@ class DirichletDistribution(NumericVectorValuedDistribution):
     
     @classmethod
     def std(cls, var: Variable) -> NumericVectorParam:
+        """Std.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         
@@ -3059,6 +4867,17 @@ class DirichletDistribution(NumericVectorValuedDistribution):
         var: Variable, 
         rng: Generator
     ) -> NumericVectorParam:
+        """Psa value.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            rng: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         if any(trans == 'ln' for trans in var.transform):
@@ -3076,6 +4895,16 @@ class DirichletDistribution(NumericVectorValuedDistribution):
             
     @classmethod
     def dsa_auto_values(cls, var: Variable) -> tuple[NumericVectorParam, NumericVectorParam]:
+        """Dsa auto values.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         if not isinstance(var, DirichletVariable):
             raise TypeError(f'Expecting var as DirichletVariable, is {type(var)}')
         match var.dsa_bounds_type:
@@ -3117,6 +4946,18 @@ def get_value_from_model(
     model_section: str | SequenceNotStr[str] | None, 
     model_parameter: str | SequenceNotStr[str]
 ) -> Value | Sequence[Value]:
+    """Get value from model.
+
+    TODO: Add a description.
+
+    Args:
+        model: TODO.
+        model_section: TODO.
+        model_parameter: TODO.
+
+    Returns:
+        TODO.
+    """
     if not isinstance(model_parameter, str) and isinstance(model_parameter, Sequence):
         if not isinstance(model_section, str) and isinstance(model_section, Sequence):
             if len(model_parameter) != len(model_section):
@@ -3167,6 +5008,16 @@ def update_model_with_value(
     model_section: str | None,
     model_parameter: str
 ) -> None:
+    """Update model with value.
+
+    TODO: Add a description.
+
+    Args:
+        value: TODO.
+        model: TODO.
+        model_section: TODO.
+        model_parameter: TODO.
+    """
     update_dict = {}
     last_dict = update_dict
     if model_section is not None and model_section != '':
@@ -3182,6 +5033,10 @@ def update_model_with_value(
 class VariableConfig(DataWithRevision):
     # Don't include parameters as well as raw, or update will trigger two revisions
     #parameters: ParamList | None = None
+    """Variable Config.
+
+    TODO: Add a description.
+    """
     raw_parameters: ParamList | None = None
 
     dsa_selected: bool = False
@@ -3476,6 +5331,10 @@ class Variable(
 
     @property
     def label(self) -> str:
+        """Label.
+
+        TODO: Add a description.
+        """
         if self._label is None:
             return self.name
         return self._label
@@ -3486,6 +5345,10 @@ class Variable(
 
     @property
     def parameterisation(self) -> Parameterisation:
+        """Parameterisation.
+
+        TODO: Add a description.
+        """
         if self.parameterisation_index is None:
             raise AttributeError('No parameterisation index set')
         return self.distribution.parameterisations[self.parameterisation_index]
@@ -3506,6 +5369,10 @@ class Variable(
 
     @property
     def parameters(self) -> tuple[ScalarParam | VectorParam | MatrixParam, ...]:
+        """Parameters.
+
+        TODO: Add a description.
+        """
         return self._get_native_parameters()
 
     @parameters.setter
@@ -3513,6 +5380,13 @@ class Variable(
         self._set_native_parameters(parameters)
 
     def set_parameters(self, *parameters: Param):
+        """Set parameters.
+
+        TODO: Add a description.
+
+        Args:
+            *parameters: TODO.
+        """
         raw_parameters = copy.copy(parameters)
         
         native_params = self.distribution.parameterisations[self.parameterisation_index].generator(*parameters)
@@ -3544,42 +5418,98 @@ class Variable(
     @property
     @abstractmethod
     def transform(self) -> tuple[VARIABLE_TRANSFORM, ...]:
+        """Transform.
+
+        TODO: Add a description.
+        """
         ...
 
     @abstractmethod
     def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
+        """Set transform.
+
+        TODO: Add a description.
+
+        Args:
+            transform: TODO.
+            autosize: TODO.
+        """
         ...
     
     def get_deterministic_value(self) -> Value:
+        """Get deterministic value.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         v = self.distribution.deterministic_value(self)
         self.distribution.value_validation(self, v)
         return v
 
     @property
     def deterministic_value(self) -> Value:
+        """Deterministic value.
+
+        TODO: Add a description.
+        """
         return self.get_deterministic_value()
     
     def get_std(self) -> Value:
+        """Get std.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         v = self.distribution.std(self)
         return v
     
     def get_confidence_interval(self, confidence: float = 0.95) -> tuple[Value, Value]:
+        """Get confidence interval.
+
+        TODO: Add a description.
+
+        Args:
+            confidence: TODO.
+
+        Returns:
+            TODO.
+        """
         v = self.distribution.interval(self, confidence)
         return v
 
     def set_distribution(self) -> None:
+        """Set distribution.
+
+        TODO: Add a description.
+        """
         pass
 
     @property
     def dsa_possible(self) -> bool:
+        """Dsa possible.
+
+        TODO: Add a description.
+        """
         return self.distribution.dsa_possible
     
     @property
     def psa_possible(self) -> bool:
+        """Psa possible.
+
+        TODO: Add a description.
+        """
         return self.distribution.psa_possible
     
     @property
     def optim_possible(self) -> bool:
+        """Optim possible.
+
+        TODO: Add a description.
+        """
         return self.distribution.optim_possible
     
     @property
@@ -3625,6 +5555,13 @@ class Variable(
         self._optim_show = show
     
     def get_indexed_parameterisations(self):
+        """Get indexed parameterisations.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return [
             {'index':i, 'parameterisation': x} 
             for i, x in enumerate(self.distribution.parameterisations) 
@@ -3673,6 +5610,13 @@ class Variable(
         self._default_parameters = parameters
 
     def reset_parameters(self, parameter_index: int | None = None):
+        """Reset parameters.
+
+        TODO: Add a description.
+
+        Args:
+            parameter_index: TODO.
+        """
         if parameter_index is None:
             self.set_parameters(*self._default_parameters)
         else:
@@ -3694,10 +5638,18 @@ class Variable(
 
     @property
     def n_values(self) -> int:
+        """N values.
+
+        TODO: Add a description.
+        """
         return self.distribution.n_values(self)
     
     @property
     def dsa_lower(self) -> Value:
+        """Dsa lower.
+
+        TODO: Add a description.
+        """
         return self._dsa_lower
     
     @dsa_lower.setter
@@ -3708,6 +5660,10 @@ class Variable(
     
     @property
     def dsa_upper(self) -> Value:
+        """Dsa upper.
+
+        TODO: Add a description.
+        """
         return self._dsa_upper
     
     @dsa_upper.setter
@@ -3751,6 +5707,17 @@ class Variable(
         rng: np.random.Generator,
         retries: int = 1
         ) -> Value:
+        """Draw psa.
+
+        TODO: Add a description.
+
+        Args:
+            rng: TODO.
+            retries: TODO.
+
+        Returns:
+            TODO.
+        """
         if (
             self.distribution.psa_possible
             and self.psa_selectable
@@ -3775,6 +5742,13 @@ class Variable(
         return self.deterministic_value
         
     def get_psa_value(self) -> Value:
+        """Get psa value.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         if (
             self.distribution.psa_possible
             and self.psa_selectable
@@ -3785,6 +5759,16 @@ class Variable(
         return self.deterministic_value
     
     def is_model_type(self, model: ModelType) -> bool:
+        """Is model type.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+
+        Returns:
+            TODO.
+        """
         match self.configuration_type:
             case 'model':
                 return isinstance(model, NewsegsModelInterface)
@@ -3832,6 +5816,13 @@ class Variable(
 
     
     def update_model(self, model: ModelType) -> None:
+        """Update model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         self.update_model_deterministic(model)
 
     def update_model_deterministic(self, model: ModelType) -> None:
@@ -3843,12 +5834,27 @@ class Variable(
         self._update_model(model, self.deterministic_value)
 
     def update_model_dsa(self, model: ModelType, bound: DSA_BOUND) -> None:
+        """Update model dsa.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+            bound: TODO.
+        """
         if not self.is_model_type(model):
             return
         val = self.get_dsa_value(bound)
         self._update_model(model, val)
 
     def update_model_psa(self, model: ModelType) -> None:
+        """Update model psa.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         val = self.get_psa_value()
@@ -3908,6 +5914,10 @@ def _recover_variable(name, dist):
 
 class ScalarVariable(Variable):
 
+    """Scalar Variable.
+
+    TODO: Add a description.
+    """
     distribution: ScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: ScalarParam
     _dsa_upper: ScalarParam
@@ -3933,6 +5943,10 @@ class ScalarVariable(Variable):
         
     @property
     def dsa_lower(self) -> ScalarParam:
+        """Dsa lower.
+
+        TODO: Add a description.
+        """
         return self._dsa_lower
 
     @dsa_lower.setter
@@ -3944,6 +5958,10 @@ class ScalarVariable(Variable):
     
     @property
     def dsa_upper(self) -> ScalarParam:
+        """Dsa upper.
+
+        TODO: Add a description.
+        """
         return self._dsa_upper
 
     @dsa_upper.setter
@@ -3955,9 +5973,21 @@ class ScalarVariable(Variable):
 
     @property
     def transform(self) -> tuple[VARIABLE_TRANSFORM]:
+        """Transform.
+
+        TODO: Add a description.
+        """
         return self._transform
     
     def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
+        """Set transform.
+
+        TODO: Add a description.
+
+        Args:
+            transform: TODO.
+            autosize: TODO.
+        """
         if isinstance(transform, str):
             if not transform in get_args(VARIABLE_TRANSFORM):
                 raise ValueError(f'Transform not recognised: {transform}')
@@ -3978,13 +6008,32 @@ class ScalarVariable(Variable):
     
     @property
     def deterministic_value(self) -> ScalarParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+        """
         return cast(ScalarParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> ScalarParam:
+        """Get dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            bound: TODO.
+            force: TODO.
+
+        Returns:
+            TODO.
+        """
         return cast(ScalarParam, super().get_dsa_value(bound, force))
 
 
 class NumericScalarVariable(ScalarVariable):
+    """Numeric Scalar Variable.
+
+    TODO: Add a description.
+    """
     distribution: NumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
 
     formatter_dp = 1
@@ -4016,13 +6065,32 @@ class NumericScalarVariable(ScalarVariable):
 
     @property
     def deterministic_value(self) -> ScalarNumParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+        """
         return cast(ScalarNumParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> ScalarNumParam:
+        """Get dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            bound: TODO.
+            force: TODO.
+
+        Returns:
+            TODO.
+        """
         return cast(ScalarNumParam, super().get_dsa_value(bound, force))
 
 
 class TwoParamNumericScalarVariable(NumericScalarVariable):
+    """Two Param Numeric Scalar Variable.
+
+    TODO: Add a description.
+    """
     distribution: TwoParamNumericScalarValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
@@ -4037,6 +6105,10 @@ class TwoParamNumericScalarVariable(NumericScalarVariable):
 
 class VectorVariable(Variable):
 
+    """Vector Variable.
+
+    TODO: Add a description.
+    """
     distribution: VectorValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: VectorParam
     _dsa_upper: VectorParam
@@ -4057,6 +6129,13 @@ class VectorVariable(Variable):
         self, 
         *parameters: Param,
     ):
+        """Set parameters.
+
+        TODO: Add a description.
+
+        Args:
+            *parameters: TODO.
+        """
         super().set_parameters(*parameters)
         if len(self.parameters) == 0:
             return
@@ -4093,6 +6172,10 @@ class VectorVariable(Variable):
     
     @property
     def dsa_lower(self) -> VectorParam:
+        """Dsa lower.
+
+        TODO: Add a description.
+        """
         return self._dsa_lower
     
     @dsa_lower.setter
@@ -4104,6 +6187,10 @@ class VectorVariable(Variable):
     
     @property
     def dsa_upper(self) -> VectorParam:
+        """Dsa upper.
+
+        TODO: Add a description.
+        """
         return self._dsa_upper
     
     @dsa_upper.setter
@@ -4115,9 +6202,21 @@ class VectorVariable(Variable):
     
     @property
     def transform(self) -> tuple[VARIABLE_TRANSFORM, ...]:
+        """Transform.
+
+        TODO: Add a description.
+        """
         return self._transform
     
     def set_transform(self, transform: VARIABLE_TRANSFORM | Sequence[VARIABLE_TRANSFORM], autosize: bool = True) -> None:
+        """Set transform.
+
+        TODO: Add a description.
+
+        Args:
+            transform: TODO.
+            autosize: TODO.
+        """
         if isinstance(transform, str):
             if not transform in get_args(VARIABLE_TRANSFORM):
                 raise ValueError(f'Transform not recognised: {transform}')
@@ -4148,16 +6247,42 @@ class VectorVariable(Variable):
     
     @property
     def deterministic_value(self) -> VectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+        """
         return cast(VectorParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> VectorParam:
+        """Get dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            bound: TODO.
+            force: TODO.
+
+        Returns:
+            TODO.
+        """
         return cast(VectorParam, super().get_dsa_value(bound, force))
     
     def get_psa_value(self) -> VectorParam:
+        """Get psa value.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return cast(VectorParam, super().get_psa_value())
     
     
 class NumericVectorVariable(VectorVariable):
+    """Numeric Vector Variable.
+
+    TODO: Add a description.
+    """
     distribution: NumericVectorValuedDistribution # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_lower: NumericVectorParam # pyright: ignore[reportIncompatibleVariableOverride]
     _dsa_upper: NumericVectorParam # pyright: ignore[reportIncompatibleVariableOverride]
@@ -4204,6 +6329,10 @@ class NumericVectorVariable(VectorVariable):
 
     @property
     def dsa_lower(self) -> NumericVectorParam:
+        """Dsa lower.
+
+        TODO: Add a description.
+        """
         return self._dsa_lower
     
     @dsa_lower.setter
@@ -4220,6 +6349,10 @@ class NumericVectorVariable(VectorVariable):
 
     @property
     def dsa_upper(self) -> NumericVectorParam:
+        """Dsa upper.
+
+        TODO: Add a description.
+        """
         return self._dsa_upper
     
     @dsa_upper.setter
@@ -4236,15 +6369,34 @@ class NumericVectorVariable(VectorVariable):
 
     @property
     def deterministic_value(self) -> NumericVectorParam:
+        """Deterministic value.
+
+        TODO: Add a description.
+        """
         return cast(NumericVectorParam, self.get_deterministic_value())
     
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> NumericVectorParam:
+        """Get dsa value.
+
+        TODO: Add a description.
+
+        Args:
+            bound: TODO.
+            force: TODO.
+
+        Returns:
+            TODO.
+        """
         return cast(NumericVectorParam, super().get_dsa_value(bound, force))
 
     
 
 
 class ConstantVariable(ScalarVariable):
+    """Constant Variable.
+
+    TODO: Add a description.
+    """
     distribution = ConstantDistribution()
 
     @property
@@ -4260,6 +6412,13 @@ class ConstantVariable(ScalarVariable):
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4290,6 +6449,10 @@ class ConstantVariable(ScalarVariable):
 
 
 class NumericConstantVariable(NumericScalarVariable):
+    """Numeric Constant Variable.
+
+    TODO: Add a description.
+    """
     distribution = NumericConstantDistribution()
 
     @property
@@ -4305,6 +6468,13 @@ class NumericConstantVariable(NumericScalarVariable):
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4335,12 +6505,23 @@ class NumericConstantVariable(NumericScalarVariable):
         
 
 class BinomialVariable(TwoParamNumericScalarVariable):
+    """Binomial Variable.
+
+    TODO: Add a description.
+    """
     distribution = BinomialDistribution()
 
     def synchronise_from_model(
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4375,12 +6556,23 @@ class BinomialVariable(TwoParamNumericScalarVariable):
 
 
 class NormalVariable(TwoParamNumericScalarVariable):
+    """Normal Variable.
+
+    TODO: Add a description.
+    """
     distribution = NormalDistribution()
 
     def synchronise_from_model(
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4418,12 +6610,23 @@ class NormalVariable(TwoParamNumericScalarVariable):
 
 
 class BetaVariable(TwoParamNumericScalarVariable):
+    """Beta Variable.
+
+    TODO: Add a description.
+    """
     distribution = BetaDistribution()
 
     def synchronise_from_model(
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4465,12 +6668,23 @@ class BetaVariable(TwoParamNumericScalarVariable):
 
 
 class GammaVariable(TwoParamNumericScalarVariable):
+    """Gamma Variable.
+
+    TODO: Add a description.
+    """
     distribution = GammaDistribution()
 
     def synchronise_from_model(
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4508,10 +6722,18 @@ class GammaVariable(TwoParamNumericScalarVariable):
 
 
 class ConstantVectorVariable(VectorVariable):
+    """Constant Vector Variable.
+
+    TODO: Add a description.
+    """
     distribution = ConstantVectorDistribution()
     
     @property
     def parameters(self) -> tuple[VectorParam]:
+        """Parameters.
+
+        TODO: Add a description.
+        """
         return cast(tuple[VectorParam], self._get_native_parameters())
 
     @parameters.setter
@@ -4522,6 +6744,13 @@ class ConstantVectorVariable(VectorVariable):
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4546,10 +6775,18 @@ class ConstantVectorVariable(VectorVariable):
 
 
 class MultivariateNormalVariable(NumericVectorVariable):
+    """Multivariate Normal Variable.
+
+    TODO: Add a description.
+    """
     distribution = MultivariateNormalDistribution()
 
     @property
     def parameters(self) -> tuple[NumericVectorParam, MatrixNumParam]:
+        """Parameters.
+
+        TODO: Add a description.
+        """
         return cast(
             tuple[NumericVectorParam, MatrixNumParam],
             self._get_native_parameters()
@@ -4561,6 +6798,13 @@ class MultivariateNormalVariable(NumericVectorVariable):
     
     
     def set_parameters(self, *parameters: Param):
+        """Set parameters.
+
+        TODO: Add a description.
+
+        Args:
+            *parameters: TODO.
+        """
         if 'transform' in self.parameterisation.names and len(parameters) < 3:
             super().set_parameters(*parameters, self.transform)
         else:
@@ -4570,6 +6814,13 @@ class MultivariateNormalVariable(NumericVectorVariable):
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4607,10 +6858,18 @@ class MultivariateNormalVariable(NumericVectorVariable):
 
 
 class DirichletVariable(NumericVectorVariable):
+    """Dirichlet Variable.
+
+    TODO: Add a description.
+    """
     distribution = DirichletDistribution()
 
     @property
     def parameters(self) -> tuple[NumericVectorParam]:
+        """Parameters.
+
+        TODO: Add a description.
+        """
         return cast(tuple[NumericVectorParam], self._get_native_parameters())
 
     @parameters.setter
@@ -4621,6 +6880,13 @@ class DirichletVariable(NumericVectorVariable):
         self, 
         model: ModelType
     ) -> None:
+        """Synchronise from model.
+
+        TODO: Add a description.
+
+        Args:
+            model: TODO.
+        """
         if not self.is_model_type(model):
             return
         
@@ -4669,6 +6935,16 @@ VARIABLE_CONSTRUCTORS = {
 }
 
 def variable_from_dict(config: dict[str, Any]) -> Variable:
+    """Variable from dict.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     classname = config.get('class')
     if classname is None:
         raise ValueError(f'`class` not found in configuration dictionary with keys {config.keys()}')
@@ -4686,6 +6962,16 @@ def variable_from_dict(config: dict[str, Any]) -> Variable:
     return var
 
 def variable_uid(variable: Variable) -> str | list[str]:
+    """Variable uid.
+
+    TODO: Add a description.
+
+    Args:
+        variable: TODO.
+
+    Returns:
+        TODO.
+    """
     if not isinstance(variable.interface_key, str) and isinstance(variable.interface_key, Sequence):
         if isinstance(variable.interface_section, str):
             return list([lambda x: str(variable.interface_section) + "." + str(x) + "." + str(variable.interface_subindex) for x in variable.interface_key]) # type: ignore
@@ -4695,6 +6981,16 @@ def variable_uid(variable: Variable) -> str | list[str]:
         return str(variable.interface_section) + "." + str(variable.interface_key) + "." + str(variable.interface_subindex)
 
 def varible_uid_to_dict(varid: str):
+    """Varible uid to dict.
+
+    TODO: Add a description.
+
+    Args:
+        varid: TODO.
+
+    Returns:
+        TODO.
+    """
     ss = varid.split('.')
     if not len(ss) == 3:
         raise ValueError(f'{varid} is not a valid variable id')

@@ -1,3 +1,7 @@
+"""Requesthanderinterface module.
+
+TODO: Describe the purpose of the module.
+"""
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Sequence, overload
 

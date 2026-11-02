@@ -27,6 +27,10 @@ __all__ = [
 
 @runtime_checkable
 class RevisionNotifierProtocol(Protocol):
+    """Revision Notifier Protocol.
+
+    TODO: Add a description.
+    """
     def _add_child(self, child: 'RevisionNotifierProtocol', subscribe: bool = True): ...
     def _remove_child(self, child: 'RevisionNotifierProtocol'): ...
     def _notify_change(self, trigger: Any | None = None, **kwargs): ...
@@ -88,6 +92,10 @@ class RevisionNotifierMixin():
 
     @property
     def revision(self) -> int:
+        """Revision.
+
+        TODO: Add a description.
+        """
         return self._revision
 
     @revision.setter
@@ -114,10 +122,18 @@ class RevisionNotifierMixin():
 
     @property
     def modified(self) -> bool:
+        """Modified.
+
+        TODO: Add a description.
+        """
         return self._last_syncronised != self.revision
 
     @property
     def chain_modified(self) -> bool:
+        """Chain modified.
+
+        TODO: Add a description.
+        """
         return (
             self.modified 
             or any((child.chain_modified for child in self._children))
@@ -281,12 +297,26 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
 
     def subscribe(self, subscriber: 'RevisionNotifierProtocol | ConfigurationMixin'):
         # Addition to subscriber list occurs in _add_child
+        """Subscribe.
+
+        TODO: Add a description.
+
+        Args:
+            subscriber: TODO.
+        """
         if isinstance(subscriber, ConfigurationMixin):
             subscriber._config._add_child(self, subscribe = True)
         else:
             subscriber._add_child(self, subscribe = True)
 
     def unsubscribe(self, subscriber: 'RevisionNotifierProtocol | ConfigurationMixin'):
+        """Unsubscribe.
+
+        TODO: Add a description.
+
+        Args:
+            subscriber: TODO.
+        """
         if isinstance(subscriber, ConfigurationMixin):
             search_subscriber = subscriber._config
         else:
@@ -369,6 +399,10 @@ class DataWithRevision(SubscriptionRevisionNotifierMixin, serialisation.Serialis
 
 
 class ConfigurationMixin:
+    """Configuration Mixin.
+
+    TODO: Add a description.
+    """
     _config: DataWithRevision
 
     _id_prefix: str = COMPONENT_PREFIXES['component']
@@ -382,10 +416,21 @@ class ConfigurationMixin:
     
     @classmethod
     def generate_new_id(cls) -> str:
+        """Generate new id.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return cls._id_prefix + '-' + str(mod_uuid.uuid4())
 
     @property
     def id(self) -> str:
+        """Id.
+
+        TODO: Add a description.
+        """
         return self._id_prefix + '-' + self.uuid
     
     @id.setter
@@ -397,6 +442,10 @@ class ConfigurationMixin:
         self.uuid = uid
 
     def anonymise_ids(self):
+        """Anonymise ids.
+
+        TODO: Add a description.
+        """
         self.id = self.generate_new_id()
 
     def __init__(self, *args, **kwargs):
@@ -458,6 +507,10 @@ class ConfigurationMixin:
 
     @property 
     def revision(self) -> int:
+        """Revision.
+
+        TODO: Add a description.
+        """
         return self._config.revision
 
     @revision.setter
@@ -467,16 +520,32 @@ class ConfigurationMixin:
 
     @property
     def modified(self) -> bool:
+        """Modified.
+
+        TODO: Add a description.
+        """
         return self._config.modified
 
     @property
     def chain_modified(self) -> bool:
+        """Chain modified.
+
+        TODO: Add a description.
+        """
         return self._config.chain_modified
 
     def syncronise(self):
+        """Syncronise.
+
+        TODO: Add a description.
+        """
         self._config._syncronise()
 
     def chain_syncronise(self):
+        """Chain syncronise.
+
+        TODO: Add a description.
+        """
         self._config._chain_syncronise()
     
 
@@ -522,20 +591,52 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
             self._notify_change()
 
     def append(self, item):
+        """Append.
+
+        TODO: Add a description.
+
+        Args:
+            item: TODO.
+        """
         super().append(self._wrap_value(item, [self]))
         self._notify_change()
 
     def extend(self, iterable: Iterable) -> None:
+        """Extend.
+
+        TODO: Add a description.
+
+        Args:
+            iterable: TODO.
+        """
         wrapped = [self._wrap_value(item, [self]) for item in iterable]
         if wrapped:
             super().extend(wrapped)
             self._notify_change()
 
     def insert(self, index, item):
+        """Insert.
+
+        TODO: Add a description.
+
+        Args:
+            index: TODO.
+            item: TODO.
+        """
         super().insert(index, self._wrap_value(item, [self]))
         self._notify_change()
 
     def pop(self, index: SupportsIndex = -1):
+        """Pop.
+
+        TODO: Add a description.
+
+        Args:
+            index: TODO.
+
+        Returns:
+            TODO.
+        """
         item = super().pop(index)
         self._notify_change()
 
@@ -543,6 +644,13 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
         return item
 
     def remove(self, value):
+        """Remove.
+
+        TODO: Add a description.
+
+        Args:
+            value: TODO.
+        """
         try:
             idx = self.index(value)
             item = self[idx]
@@ -556,6 +664,10 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
         self._notify_change()
 
     def clear(self):
+        """Clear.
+
+        TODO: Add a description.
+        """
         if len(self) > 0:
             super().clear()
             self._children = []
@@ -572,6 +684,14 @@ class ObservableList(list, SubscriptionRevisionNotifierMixin):
 
 
 def recursive_remove_children(obj, child_item):
+    """Recursive remove children.
+
+    TODO: Add a description.
+
+    Args:
+        obj: TODO.
+        child_item: TODO.
+    """
     if child_item is None:
         return
     if isinstance(child_item, RevisionNotifierProtocol):
@@ -648,6 +768,14 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
         self._notify_change()
 
     def update(self, *args, **kwargs):
+        """Update.
+
+        TODO: Add a description.
+
+        Args:
+            *args: TODO.
+            **kwargs: TODO.
+        """
         other = dict(*args, **kwargs)
         changed = False
         for k, v in other.items():
@@ -661,6 +789,17 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
             self._notify_change()
     
     def pop(self, key, *args):
+        """Pop.
+
+        TODO: Add a description.
+
+        Args:
+            key: TODO.
+            *args: TODO.
+
+        Returns:
+            TODO.
+        """
         if key in self:
             item = super().pop(key)
             self._notify_change()
@@ -669,6 +808,10 @@ class ObservableDict(dict, SubscriptionRevisionNotifierMixin):
         return super().pop(key, *args)
 
     def clear(self):
+        """Clear.
+
+        TODO: Add a description.
+        """
         if len(self) > 0:
             for item in self.values():
                 self._safe_remove_child_value(item)
@@ -725,6 +868,18 @@ class ObservableOrderedDict(ObservableDict, OrderedDict):
             subscriber._add_child(self, subscribe = False)
 
     def pop(self, key, *args, **kwargs):
+        """Pop.
+
+        TODO: Add a description.
+
+        Args:
+            key: TODO.
+            *args: TODO.
+            **kwargs: TODO.
+
+        Returns:
+            TODO.
+        """
         if key in self:
             item = super().pop(key)
             self._notify_change()
@@ -735,6 +890,10 @@ class ObservableOrderedDict(ObservableDict, OrderedDict):
 
 class TableModifyingObservableOrderedDict(ObservableOrderedDict):
     
+    """Table Modifying Observable Ordered Dict.
+
+    TODO: Add a description.
+    """
     def __init__(
         self, 
         mapping=(), 
@@ -917,6 +1076,10 @@ class ComponentOrderedDictProperty(ComponentSubscriptionRevisionNotifierProperty
         
 
 class TableModifyingComponentSRNProperty(ComponentSubscriptionRevisionNotifierProperty):
+    """Table Modifying Component SRN Property.
+
+    TODO: Add a description.
+    """
     @override
     def __set__(self, instance: ConfigurationMixin, value: Any):
         old_val = getattr(instance, self.name, None)
@@ -955,6 +1118,10 @@ class TableModifyingComponentSRNProperty(ComponentSubscriptionRevisionNotifierPr
 
 class TableModifyingComponentOrderedDictProperty(TableModifyingComponentSRNProperty):
 
+    """Table Modifying Component Ordered Dict Property.
+
+    TODO: Add a description.
+    """
     def __init__(
         self,
         oftype: Type | tuple[Type, ...] | None = None
@@ -1085,6 +1252,10 @@ class TableModifyingObservableList(ObservableList):
 
 class TableModifyingComponentListProperty(TableModifyingComponentSRNProperty):
 
+    """Table Modifying Component List Property.
+
+    TODO: Add a description.
+    """
     def __init__(
         self,
         oftype: Type | tuple[Type, ...] | None = None

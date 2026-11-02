@@ -1,3 +1,7 @@
+"""Config module.
+
+TODO: Describe the purpose of the module.
+"""
 
 from dynaconf import Dynaconf
 

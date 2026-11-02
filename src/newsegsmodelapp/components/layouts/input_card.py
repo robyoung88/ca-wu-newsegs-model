@@ -1,3 +1,7 @@
+"""Input card module.
+
+TODO: Describe the purpose of the module.
+"""
 import dash
 from dash import dcc, html
 
@@ -9,6 +13,19 @@ def create_input_card(
     title: list[dash.development.base_component.Component | str],
     className: str | None = None
 ):
+    """Create input card.
+
+    TODO: Add a description.
+
+    Args:
+        supersection: TODO.
+        section: TODO.
+        title: TODO.
+        className: TODO.
+
+    Returns:
+        TODO.
+    """
     if className is not None:
         container_class_name = 'input-container ' + className
     else:

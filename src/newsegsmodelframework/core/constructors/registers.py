@@ -12,6 +12,10 @@ from typing import Any, Callable, Literal, Type
 from newsegsmodelframework.core.serialisation import T
 
 class NakedConstructor:
+    """Naked Constructor.
+
+    TODO: Add a description.
+    """
     def to_dict(self) -> dict[str, Any]: ...
     def update(self, config: dict[str, Any]): ...
 
@@ -20,6 +24,16 @@ class NakedConstructor:
 
     @classmethod
     def from_dict(cls: Type[T], config: dict[str, Any]) -> T:
+        """From dict.
+
+        TODO: Add a description.
+
+        Args:
+            config: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 def get_subclasses_in_module(
@@ -53,7 +67,7 @@ CONSTRUCTOR_CLASS_REGISTER: dict[str, Callable[[], dict[str, object] | dict[str,
 def register_constructor_class(cc_name: str):
     """Add a constructor class registry function to `CONSTRUCTOR_CLASS_REGISTER`
 
-    Registration is necessary to use [core.find_constructor][] for a new constructor_class
+    Registration is necessary to use [find_constructor][newsegsmodelframework.core.find_constructor] for a new constructor_class
     
     The decorated function should take no arguments, and return a dictionary
     of constructors for classes which implement a `.from_dict` constructor
@@ -171,6 +185,13 @@ def get_newsegsmodule_register():
 
 @register_constructor_class('Generator')
 def get_generator_register():
+    """Get generator register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     from newsegsmodelframework.core import generation
     
     GENERATOR_CONSTRUCTORS = {}
@@ -183,6 +204,13 @@ def get_generator_register():
 
 @register_constructor_class('Environment')
 def get_environment_register():
+    """Get environment register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     from newsegsmodelframework.core import environment
 
     ENVIRONMENT_CONSTRUCTORS = {}
@@ -199,6 +227,13 @@ def get_environment_register():
 
 @register_constructor_class('Location')
 def get_location_register():
+    """Get location register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     from newsegsmodelframework.core import location
 
     LOCATION_CONSTRUCTORS = {}
@@ -209,6 +244,13 @@ def get_location_register():
 
 @register_constructor_class('TimeSpan')
 def get_timespan_register():
+    """Get timespan register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     from newsegsmodelframework.core import timespan
 
     TIMESPAN_CONSTRUCTORS = {}
@@ -219,6 +261,13 @@ def get_timespan_register():
 
 @register_constructor_class('Timestamp')
 def get_timestamp_register():
+    """Get timestamp register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     import pandas as pd
     def timestamp_from_dict(config: dict[str, Any]) -> pd.Timestamp:
         config = config.copy()
@@ -235,6 +284,13 @@ def get_timestamp_register():
 
 @register_constructor_class('Timedelta')
 def get_timedelta_register():
+    """Get timedelta register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     import pandas as pd
 
     def timedelta_from_dict(config: dict[str, Any]) -> pd.Timedelta:
@@ -251,6 +307,13 @@ def get_timedelta_register():
 
 @register_constructor_class('datetime')
 def get_datetime_register():
+    """Get datetime register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     import datetime
 
     def datetime_from_dict(config: dict[str, Any]) -> datetime.datetime:
@@ -267,6 +330,13 @@ def get_datetime_register():
 
 @register_constructor_class('PVLib')
 def get_pvlib_register():
+    """Get pvlib register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     from newsegsmodelframework.core import location
 
     LOCATION_CONSTRUCTORS = {}
@@ -277,6 +347,13 @@ def get_pvlib_register():
 
 @register_constructor_class('Variable')
 def get_variable_register():
+    """Get variable register.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return CONSTRUCTOR_CLASS_REGISTER['NewsegsComponent']()
 
 # Storage for classes dynamically added at runtime

@@ -14,6 +14,16 @@ from newsegsmodelframework.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsvariable.variable import Variable, variable_uid
 
 def flatten(nested: list) -> list:
+    """Flatten.
+
+    TODO: Add a description.
+
+    Args:
+        nested: TODO.
+
+    Returns:
+        TODO.
+    """
     return reduce(iconcat, nested, [])
 
 # -----------------------------------------------------------------------------

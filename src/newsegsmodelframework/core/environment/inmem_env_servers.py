@@ -190,12 +190,31 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
                        location:RaisedLocation,
                        timespan:OffsetRegTimeSpan):
         # Only store a single series for temperature
+        """Set external temperature.
+
+        TODO: Add a description.
+
+        Args:
+            external_temperature: TODO.
+            location: TODO.
+            timespan: TODO.
+        """
         self._external_temperature_series[None] = {
             'timespan': timespan,
             'timeseries': external_temperature
         }
 
     def access_external_temperature_series(self,location:Location):
+        """Access external temperature series.
+
+        TODO: Add a description.
+
+        Args:
+            location: TODO.
+
+        Returns:
+            TODO.
+        """
         return self._external_temperature_series[None]
 
     @override
@@ -225,6 +244,15 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         location: AspectLocation,
         timespan: OffsetRegTimeSpan
     ):
+        """Set solar flux on plane.
+
+        TODO: Add a description.
+
+        Args:
+            solar_flux: TODO.
+            location: TODO.
+            timespan: TODO.
+        """
         az = location.azimuth
         pitch = location.pitch
         if not az in self._solar_flux_on_plane_series.keys():
@@ -236,6 +264,16 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
         }
 
     def access_solar_flux_on_plane_series(self,location:AspectLocation):
+        """Access solar flux on plane series.
+
+        TODO: Add a description.
+
+        Args:
+            location: TODO.
+
+        Returns:
+            TODO.
+        """
         az = location.azimuth
         pitch = location.pitch
         azd = self._solar_flux_on_plane_series.get(az, None)
@@ -337,6 +375,10 @@ class InMemoryLocalEnv(NewsegsLocalEnvironment):
     
 
 class InMemoryWiderEnv(NewsegsWiderEnvironment):
+    """In Memory Wider Env.
+
+    TODO: Add a description.
+    """
     _version = '0.0.1'
     _name = 'Wider environment'
 
@@ -349,6 +391,14 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         effective_temperatures: npt.ArrayLike,
         timespan: OffsetRegTimeSpan
     ):
+        """Set temperature series.
+
+        TODO: Add a description.
+
+        Args:
+            effective_temperatures: TODO.
+            timespan: TODO.
+        """
         self._temperature_series = {
             'timespan': timespan,
             'timeseries': effective_temperatures
@@ -374,6 +424,14 @@ class InMemoryWiderEnv(NewsegsWiderEnvironment):
         horizontal_solar_flux: npt.ArrayLike,
         timespan = OffsetRegTimeSpan
     ):
+        """Set horizontal solar flux series.
+
+        TODO: Add a description.
+
+        Args:
+            horizontal_solar_flux: TODO.
+            timespan: TODO.
+        """
         self._horizontal_solar_flux_series = {
             'timespan': timespan,
             'timeseries': horizontal_solar_flux

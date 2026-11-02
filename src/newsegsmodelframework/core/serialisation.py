@@ -63,6 +63,10 @@ _TimeZoneScalar: TypeAlias = str | tzinfo
 
 @runtime_checkable
 class SerialiseToDictProtocol(Protocol):
+    """Serialise To Dict Protocol.
+
+    TODO: Add a description.
+    """
     def to_dict(self) -> dict[str, Any]: ...
     def update(self, config: dict[str, Any]): ...
 
@@ -99,14 +103,14 @@ class SerialiseToDictMixin:
     - Export of instance configuration to dictionary (`.to_dict()`)
     - Serialisation of dictionary (e.g. `json.dumps`)
     - Unserialisation of dictionary back to instance of original object (using
-        constructor found by [`core.find_constructor`][core.find_constructor])
+        constructor found by [`find_constructor`][newsegsmodelframework.core.find_constructor])
     - Update of instance using another configuration dictionary or another instance
         of the same class.
 
     In order to be unserialised as a SerialiseToDictMixin, the class is required to
     include an attribute `._constructor_class` which must be registered to
     core.constructors.registers.CONSTRUCTOR_CLASS_REGISTER using the decorator function
-    [register_constructor_class][core.register_constructor_class]
+    [register_constructor_class][newsegsmodelframework.core.register_constructor_class]
 
     Examples:
         ```python
@@ -394,6 +398,16 @@ class SerialiseToDictMixin:
         return inst
 
 def timestamp_to_dict(ts: pd.Timestamp) -> dict[str, str]:
+    """Timestamp to dict.
+
+    TODO: Add a description.
+
+    Args:
+        ts: TODO.
+
+    Returns:
+        TODO.
+    """
     return {
         'class': 'Timestamp',
         'constructor_class': 'Timestamp',
@@ -402,6 +416,16 @@ def timestamp_to_dict(ts: pd.Timestamp) -> dict[str, str]:
     }
 
 def datetime_to_dict(ts: datetime) -> dict[str, Any]:
+    """Datetime to dict.
+
+    TODO: Add a description.
+
+    Args:
+        ts: TODO.
+
+    Returns:
+        TODO.
+    """
     return {
         'class': 'datetime',
         'constructor_class': 'datetime',
@@ -409,6 +433,16 @@ def datetime_to_dict(ts: datetime) -> dict[str, Any]:
     }
 
 def timedelta_to_dict(td: pd.Timedelta) -> dict[str, str]:
+    """Timedelta to dict.
+
+    TODO: Add a description.
+
+    Args:
+        td: TODO.
+
+    Returns:
+        TODO.
+    """
     return{
         'class': 'Timedelta',
         'constructor_class': 'Timedelta',

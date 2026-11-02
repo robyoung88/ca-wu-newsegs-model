@@ -21,6 +21,10 @@ class NewsegsFinanceData(NewsegsComponent):
 
 @revision_dataclass
 class NewsegsFinanceConfig(DataWithRevision):
+    """Newsegs Finance Config.
+
+    TODO: Add a description.
+    """
     benefit_discount_rate: float = 0.
     cost_discount_rate: float = 0.
 
@@ -67,6 +71,10 @@ class NewsegsFinance(NewsegsFinanceInterface):
     
     @property
     def finance_version(self) -> str:
+        """Finance version.
+
+        TODO: Add a description.
+        """
         return self.version
 
     def run(self):
@@ -82,6 +90,14 @@ class NewsegsFinance(NewsegsFinanceInterface):
         mdl: newsegsmodelinterface.NewsegsModelInterface,
         dirty: bool = True
     ) -> None:
+        """Set model.
+
+        TODO: Add a description.
+
+        Args:
+            mdl: TODO.
+            dirty: TODO.
+        """
         last_revision = self.revision
         self.model = mdl
         if not dirty:
@@ -375,59 +391,119 @@ class NewsegsFinance(NewsegsFinanceInterface):
     @property
     @abstractmethod
     def capex_costs_distribution_undiscounted(self) -> pd.DataFrame:
+        """Capex costs distribution undiscounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_distribution_discounted(self) -> pd.DataFrame:
+        """Capex costs distribution discounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_metering_undiscounted(self) -> pd.DataFrame:
+        """Capex costs metering undiscounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_metering_discounted(self) -> pd.DataFrame:
+        """Capex costs metering discounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_other_undiscounted(self) -> pd.DataFrame:
+        """Capex costs other undiscounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def capex_costs_other_discounted(self) -> pd.DataFrame:
+        """Capex costs other discounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def all_capex_costs_undiscounted(self) -> pd.DataFrame:
+        """All capex costs undiscounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def all_capex_costs_discounted(self) -> pd.DataFrame:
+        """All capex costs discounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @property
     @abstractmethod
     def all_costs_undiscounted(self) -> pd.DataFrame:
+        """All costs undiscounted.
+
+        TODO: Add a description.
+        """
         ...
     
     @property
     @abstractmethod
     def all_costs_discounted(self) -> pd.DataFrame:
+        """All costs discounted.
+
+        TODO: Add a description.
+        """
         ...
 
     @abstractmethod
     def get_total_present_costs_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get total present costs undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @abstractmethod
     def get_total_present_costs_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get total present costs discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     # Summary vectors
@@ -461,31 +537,92 @@ class NewsegsFinance(NewsegsFinanceInterface):
 
     @abstractmethod
     def get_benefits_costs_undiscounted(self) -> pd.DataFrame:
+        """Get benefits costs undiscounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_benefits_costs_discounted(self) -> pd.DataFrame:
+        """Get benefits costs discounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
 
     # Derived values
     @abstractmethod
     def get_benefit_cost_ratio_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get benefit cost ratio undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @abstractmethod
     def get_benefit_cost_ratio_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get benefit cost ratio discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_simple_payback_time_days(self) -> float:
+        """Get simple payback time days.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @abstractmethod
     def get_net_present_value_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get net present value undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
     
     @abstractmethod
     def get_net_present_value_discounted(self, horizon:pd.Timedelta|None=None) -> float:
+        """Get net present value discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     def __hash__(self):

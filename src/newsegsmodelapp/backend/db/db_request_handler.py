@@ -1,3 +1,7 @@
+"""Db request handler module.
+
+TODO: Describe the purpose of the module.
+"""
 from dataclasses import asdict
 import logging
 logger = logging.getLogger(__name__)
@@ -28,6 +32,10 @@ _REQUEST_CLASSES = {
 
 
 class FromDatabaseRequestHandler(RequestHandlerInterface):
+    """From Database Request Handler.
+
+    TODO: Add a description.
+    """
     def __init__(
         self,
         get_engine: Callable[[], sa.Engine],
@@ -240,6 +248,14 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         request_id: int | Sequence[int],
         status: tbls.REQUEST_STATUS
     ):
+        """Set request status.
+
+        TODO: Add a description.
+
+        Args:
+            request_id: TODO.
+            status: TODO.
+        """
         if isinstance(request_id, int):
             request_id = [request_id,]
 

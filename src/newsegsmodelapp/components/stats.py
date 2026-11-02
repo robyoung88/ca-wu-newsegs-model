@@ -1,3 +1,7 @@
+"""Stats module.
+
+TODO: Describe the purpose of the module.
+"""
 from typing import List
 from collections.abc import Callable, Mapping, Iterable
 
@@ -39,12 +43,34 @@ def format_val_and_proportion(
     val,
     prop
 ):
+    """Format val and proportion.
+
+    TODO: Add a description.
+
+    Args:
+        val: TODO.
+        prop: TODO.
+
+    Returns:
+        TODO.
+    """
     return f'{val:,.0f} ({prop:0.1%})'
 
 def format_twoval(
     val1,
     val2
 ):
+    """Format twoval.
+
+    TODO: Add a description.
+
+    Args:
+        val1: TODO.
+        val2: TODO.
+
+    Returns:
+        TODO.
+    """
     return f'{val1:,.0f} | {val2:,.0f}'
 
 def format_val_and_proportion_with_range(
@@ -55,9 +81,34 @@ def format_val_and_proportion_with_range(
     min_prop,
     max_prop
 ):
+    """Format val and proportion with range.
+
+    TODO: Add a description.
+
+    Args:
+        mean_val: TODO.
+        min_val: TODO.
+        max_val: TODO.
+        mean_prop: TODO.
+        min_prop: TODO.
+        max_prop: TODO.
+
+    Returns:
+        TODO.
+    """
     return f'{mean_val:,.0f} ({min_val:,.0f}, {max_val:,.0f}) - {mean_prop:,.1%} ({min_prop:,.1%}, {max_prop:,.1%})'
 
 def annual_selfconsumption_format(rw):
+    """Annual selfconsumption format.
+
+    TODO: Add a description.
+
+    Args:
+        rw: TODO.
+
+    Returns:
+        TODO.
+    """
     return format_val_and_proportion_with_range(
         rw[('self_consumption', 'mean')],
         rw[('self_consumption', 'min')],
@@ -68,12 +119,33 @@ def annual_selfconsumption_format(rw):
         )
 
 def annual_selfconsumption_format_single(rw, stat='mean'):
+    """Annual selfconsumption format single.
+
+    TODO: Add a description.
+
+    Args:
+        rw: TODO.
+        stat: TODO.
+
+    Returns:
+        TODO.
+    """
     return format_val_and_proportion(
         rw[('self_consumption', stat)].iloc[0],
         rw[('prop_gen_self_consumption', stat)].iloc[0]
         )
 
 def annual_consumption_format_single(rw):
+    """Annual consumption format single.
+
+    TODO: Add a description.
+
+    Args:
+        rw: TODO.
+
+    Returns:
+        TODO.
+    """
     return format_twoval(
         rw['consumption'].iloc[0],
         rw['per_day'].iloc[0]
@@ -308,22 +380,76 @@ DEFAULT_DAYS_IN_RANGE_STATS = [
     ]
 
 def DEFAULT_STAT_FORMATTER(stat_dict):
+    """DEFAULT STAT FORMATTER.
+
+    TODO: Add a description.
+
+    Args:
+        stat_dict: TODO.
+
+    Returns:
+        TODO.
+    """
     return str(stat_dict)
 
 def recursive_get(d, *keys):
+    """Recursive get.
+
+    TODO: Add a description.
+
+    Args:
+        d: TODO.
+        *keys: TODO.
+
+    Returns:
+        TODO.
+    """
     return reduce(lambda c, k: c.get(k, {}), keys, d)
 
 def hours_in_range_formatter(d):
+    """Hours in range formatter.
+
+    TODO: Add a description.
+
+    Args:
+        d: TODO.
+
+    Returns:
+        TODO.
+    """
     if d is None:
         return "( -  kW) - (%)"
     return f"({d.get('min_power'):,.0f} - {d.get('max_power'):,.0f}) {d.get('hours'):,.1f} ({d.get('horizon_fraction'):,.1%})"
 
 def days_in_range_formatter(d):
+    """Days in range formatter.
+
+    TODO: Add a description.
+
+    Args:
+        d: TODO.
+
+    Returns:
+        TODO.
+    """
     if d is None:
         return "( - kWh) - (%)"
     return f"({d.get('min_value'):,.0f} - {d.get('max_value'):,.0f}) {d.get('days'):,.0f} ({d.get('horizon_fraction'):,.1%})"
 
 def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
+    """Val percent formatter factory.
+
+    TODO: Add a description.
+
+    Args:
+        value_id: TODO.
+        fraction_id: TODO.
+        value_dp: TODO.
+        fraction_dp: TODO.
+
+    Returns:
+        TODO.
+    """
     fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
     def val_percent_formatter(d):
         if d is None:
@@ -332,6 +458,19 @@ def val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp
     return val_percent_formatter
 
 def recursive_val_percent_formatter_factory(value_id, fraction_id, value_dp=0, fraction_dp=1):
+    """Recursive val percent formatter factory.
+
+    TODO: Add a description.
+
+    Args:
+        value_id: TODO.
+        fraction_id: TODO.
+        value_dp: TODO.
+        fraction_dp: TODO.
+
+    Returns:
+        TODO.
+    """
     fmt = "{:,." + str(value_dp) + "f} ({:,." + str(fraction_dp) + "%})"
     def val_percent_formatter(d):
         if d is None:
@@ -344,6 +483,18 @@ def as_df(
     orient: str = 'columns',
     index_variables: list = ['variable', 'statistic']
 ) -> pd.DataFrame | None:
+    """As df.
+
+    TODO: Add a description.
+
+    Args:
+        df: TODO.
+        orient: TODO.
+        index_variables: TODO.
+
+    Returns:
+        TODO.
+    """
     if df is None:
         return None
     if isinstance(df, pd.DataFrame):
@@ -377,6 +528,21 @@ def present_single_scalar(
     none_str = '-'
 ) -> pd.DataFrame:
     
+    """Present single scalar.
+
+    TODO: Add a description.
+
+    Args:
+        data_list: TODO.
+        value_name: TODO.
+        variable_label: TODO.
+        statistic_label: TODO.
+        fmt: TODO.
+        none_str: TODO.
+
+    Returns:
+        TODO.
+    """
     src_data = [x.get(value_name) if x is not None else None for x in data_list]
 
     odata = {f'config-{i+1}': [fmt.format(x)] if x is not None else [none_str] for i,x in enumerate(src_data)}
@@ -398,6 +564,22 @@ def present_paired_scalars(
     fmt='{:,.2f} ({:,.1%})',
     none_str = '-'
 ) -> pd.DataFrame:
+    """Present paired scalars.
+
+    TODO: Add a description.
+
+    Args:
+        data_list: TODO.
+        value1_name: TODO.
+        value2_name: TODO.
+        variable_label: TODO.
+        statistic_label: TODO.
+        fmt: TODO.
+        none_str: TODO.
+
+    Returns:
+        TODO.
+    """
     src_data_1 = [x.get(value1_name) if x is not None else None for x in data_list]
     src_data_2 = [x.get(value2_name) if x is not None else None for x in data_list]
     odata = {f'config-{i+1}': [fmt.format(src_data_1[i], src_data_2[i])] if src_data_1[i] is not None else [none_str] for i,_ in enumerate(src_data_1)}
@@ -421,6 +603,23 @@ def present_single_stat_per_row(
     statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER
 ) -> pd.DataFrame:
 
+    """Present single stat per row.
+
+    TODO: Add a description.
+
+    Args:
+        data_list: TODO.
+        table_name: TODO.
+        variable_names: TODO.
+        statistic_names: TODO.
+        fmt: TODO.
+        none_str: TODO.
+        variable_mapper: TODO.
+        statistic_mapper: TODO.
+
+    Returns:
+        TODO.
+    """
     valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
     if len(valid_config_indexes) == 0:
         return pd.DataFrame()
@@ -482,6 +681,26 @@ def present_paired_seasonal_stats(
     statistic_mapper: None|Callable|Mapping = DEFAULT_STATISTIC_MAPPER,
     season_mapper: None|Callable|Mapping = DEFAULT_SEASON_MAPPER,
 ) -> pd.DataFrame:
+    """Present paired seasonal stats.
+
+    TODO: Add a description.
+
+    Args:
+        data_list: TODO.
+        table1_name: TODO.
+        table2_name: TODO.
+        variable_names: TODO.
+        statistic_names: TODO.
+        season_indices: TODO.
+        fmt: TODO.
+        none_str: TODO.
+        variable_mapper: TODO.
+        statistic_mapper: TODO.
+        season_mapper: TODO.
+
+    Returns:
+        TODO.
+    """
     valid_config_indexes = [i for i, x in enumerate(data_list) if x is not None]
     if len(valid_config_indexes) == 0:
         return pd.DataFrame()
@@ -905,6 +1124,18 @@ def tornado_plot(
     label_df,
     statistic = 'net_present_value_undiscounted'
 ):
+    """Tornado plot.
+
+    TODO: Add a description.
+
+    Args:
+        dsa_df: TODO.
+        label_df: TODO.
+        statistic: TODO.
+
+    Returns:
+        TODO.
+    """
     plot_data = (
         dsa_df
         .xs(statistic, axis = 0, level = 'statistic')

@@ -26,6 +26,13 @@ _LOOKUP_DIR = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
 NOMINAL_WT_HEIGHT = 10.0
 
 def get_sprake_gamesa_126():
+    """Get sprake gamesa 126.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     pcurve = (
         pd.read_excel(
             os.path.join(
@@ -54,6 +61,13 @@ def get_sprake_gamesa_126():
     return turbine
 
 def get_sprake_ned100():
+    """Get sprake ned100.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     cpcurve = (
         pd.read_excel(
             os.path.join(
@@ -98,6 +112,13 @@ class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
         self.set_solar(solar_energy)
 
     def get_timespan(self) -> modtimespan.RegTimeSpan:
+        """Get timespan.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._timespan
 
     @property
@@ -119,26 +140,72 @@ class SprakeGenerationResult(newsegsmoduleresult.NewsegsModuleResult):
         return np.empty((0,0))
 
     def get_meter_names(self):
+        """Get meter names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('wind_export', 'solar_export')
 
     def get_meter_types(self):
+        """Get meter types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('export', 'export')
 
     def get_dsm_names(self):
+        """Get dsm names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ()
     
     def get_dsm_types(self):
+        """Get dsm types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ()
     
     def set_wind(self, wind_energy:np.ndarray[tuple[int], np.dtype[np.number]]) -> None:
+        """Set wind.
+
+        TODO: Add a description.
+
+        Args:
+            wind_energy: TODO.
+        """
         self._wind = wind_energy
 
     def set_solar(self, solar_energy:np.ndarray[tuple[int], np.dtype[np.number]]) -> None:
+        """Set solar.
+
+        TODO: Add a description.
+
+        Args:
+            solar_energy: TODO.
+        """
         self._solar = solar_energy
 
 
 @revision_dataclass
 class SprakeGenerationConfig(NewsegsGenerationConfig):
+    """Sprake Generation Config.
+
+    TODO: Add a description.
+    """
     wind_capacity: float = 1.0
     pv_capacity: float = 1.0
 
@@ -224,6 +291,13 @@ class SprakeGeneration(NewsegsGeneration):
 
     @classmethod
     def from_none(cls) -> SprakeGeneration:
+        """From none.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         turbine = get_sprake_ned100()
         return cls(turbine)
 
@@ -254,6 +328,10 @@ class SprakeGeneration(NewsegsGeneration):
         #    return self.generator.location
         #except AttributeError:
         # No need to pass location to the actual generator, as sprake model uses only a single location
+        """Location.
+
+        TODO: Add a description.
+        """
         return super().location # type: ignore
     
     @location.setter
@@ -268,6 +346,17 @@ class SprakeGeneration(NewsegsGeneration):
         timespan: modtimespan.TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> SprakeGenerationResult:
+        """Run.
+
+        TODO: Add a description.
+
+        Args:
+            timespan: TODO.
+            run_start: TODO.
+
+        Returns:
+            TODO.
+        """
         super().run(timespan, run_start)
         energy = self.generator.run(timespan)
 

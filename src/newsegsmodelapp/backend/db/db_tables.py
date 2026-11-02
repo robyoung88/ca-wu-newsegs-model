@@ -549,4 +549,11 @@ process_staleness = sa.Table(
 # -----------------------------------------------------------------------------
 
 def create_all_tables(engine: sa.Engine):
+    """Create all tables.
+
+    TODO: Add a description.
+
+    Args:
+        engine: TODO.
+    """
     metadata.create_all(engine)

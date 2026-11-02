@@ -1,3 +1,7 @@
+"""Sprake module.
+
+TODO: Describe the purpose of the module.
+"""
 import json
 import os
 import pickle
@@ -65,6 +69,13 @@ def _create_default_variables() -> list[variable.Variable]:
 
 @register_project_factory(MODEL_TYPE)
 def sprake_project_factory():
+    """Sprake project factory.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     prevstate = RevisionNotifierMixin._set_notification_state('disabled')
     try:
         mdl = _create_default_model()

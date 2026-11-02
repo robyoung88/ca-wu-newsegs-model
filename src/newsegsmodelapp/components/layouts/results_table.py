@@ -1,3 +1,7 @@
+"""Results table module.
+
+TODO: Describe the purpose of the module.
+"""
 import dash_ag_grid as dag
 
 from newsegsmodelapp.components import icons

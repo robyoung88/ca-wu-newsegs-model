@@ -23,6 +23,19 @@ def generic_create_deterministic_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
     variableprovider: FromDatabaseVariableProvider,
 ) -> list[dash.development.base_component.Component]:
+    """Generic create deterministic input container contents.
+
+    TODO: Add a description.
+
+    Args:
+        section: TODO.
+        lproj: TODO.
+        lmm: TODO.
+        variableprovider: TODO.
+
+    Returns:
+        TODO.
+    """
     contents = []
     var_uids = list(lmm.variables.values())
     lwvars = variableprovider.get_lightweight_variable(var_uids)
@@ -63,6 +76,17 @@ def generic_create_dsa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
     variable_provider: FromDatabaseVariableProvider
 ) -> list[dash.development.base_component.Component]:
+    """Generic create dsa input container contents.
+
+    TODO: Add a description.
+
+    Args:
+        lmm: TODO.
+        variable_provider: TODO.
+
+    Returns:
+        TODO.
+    """
     contents = []
     vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
     for var in vars:
@@ -74,6 +98,17 @@ def generic_create_psa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
     variable_provider: FromDatabaseVariableProvider
 ) -> list[dash.development.base_component.Component]:
+    """Generic create psa input container contents.
+
+    TODO: Add a description.
+
+    Args:
+        lmm: TODO.
+        variable_provider: TODO.
+
+    Returns:
+        TODO.
+    """
     contents = []
     vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
     for var in vars:
@@ -84,6 +119,16 @@ def generic_create_psa_input_container_contents(
 def generic_create_optim_input_container_contents(
     mm: NewsegsMetaModel,
 ) -> list[dash.development.base_component.Component]:
+    """Generic create optim input container contents.
+
+    TODO: Add a description.
+
+    Args:
+        mm: TODO.
+
+    Returns:
+        TODO.
+    """
     contents = []
     for var in mm.variables.values():
         contents.append(create_optim_input(var))

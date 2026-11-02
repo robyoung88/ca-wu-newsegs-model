@@ -1,3 +1,7 @@
+"""Results sections sprake module.
+
+TODO: Describe the purpose of the module.
+"""
 from newsegsmodelapp.components.layouts.results_card import create_results_table_card
 from newsegsmodelapp.components import icons
 

@@ -1,3 +1,7 @@
+"""Db snapshot module.
+
+TODO: Describe the purpose of the module.
+"""
 from typing import Any
 import uuid
 import warnings

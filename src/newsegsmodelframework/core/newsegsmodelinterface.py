@@ -19,10 +19,18 @@ class NewsegsModelInterface(
     newsegsmodeltimeinterface.NewsegsModelTimeInterface,
     TableOwningRunnableNewsegsComponent,
 ):
+    """Newsegs Model Interface.
+
+    TODO: Add a description.
+    """
     ...
 
 
 class NewsegsModelProviderInterface(NewsegsComponentProviderInterface):
+    """Newsegs Model Provider Interface.
+
+    TODO: Add a description.
+    """
     @overload
     @abstractmethod
     def get_component(self, component_id: str) -> NewsegsModelInterface:
@@ -34,16 +42,51 @@ class NewsegsModelProviderInterface(NewsegsComponentProviderInterface):
 
     @abstractmethod
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsModelInterface | SequenceNotStr[NewsegsModelInterface]:
+        """Get component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsModelInterface:
+        """Duplicate component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsModelInterface:
+        """Get default component.
+
+        TODO: Add a description.
+
+        Args:
+            component_type: TODO.
+            index: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
 
 class NewsegsModelPersistenceInterface(NewsegsComponentPersistenceInterface):
+    """Newsegs Model Persistence Interface.
+
+    TODO: Add a description.
+    """
     ...

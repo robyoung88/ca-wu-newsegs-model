@@ -13,6 +13,10 @@ from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_da
 
 @revision_dataclass
 class NewsegsCSConfig(DataWithRevision):
+    """Newsegs CS Config.
+
+    TODO: Add a description.
+    """
     location: modlocation.Location = field(default_factory = modlocation.Location.from_none)
     """
     A generalised location for the module.

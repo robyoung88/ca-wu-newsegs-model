@@ -1,3 +1,7 @@
+"""Serialisedtrackeddata module.
+
+TODO: Describe the purpose of the module.
+"""
 import copy
 from typing import Any, Mapping, Sequence, Type, override
 
@@ -10,6 +14,10 @@ class SerialisedConfigurationMixin(
     ConfigurationMixin,
     StateSerialiseToDictMixin
 ):
+    """Serialised Configuration Mixin.
+
+    TODO: Add a description.
+    """
     @override
     def _preupdate_from_dict(self, config):
         super()._preupdate_from_dict(config)

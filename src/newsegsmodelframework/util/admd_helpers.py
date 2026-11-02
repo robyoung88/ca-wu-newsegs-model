@@ -1,3 +1,7 @@
+"""Admd helpers module.
+
+TODO: Describe the purpose of the module.
+"""
 import os
 from pathlib import Path
 libdir = Path(__file__).parent.parent.absolute()
@@ -20,6 +24,16 @@ def _get_default_admd_model_driver() -> driver.Driver:
     )
 
 def get_admd_model_driver(conf:dict) -> driver.Driver:
+    """Get admd model driver.
+
+    TODO: Add a description.
+
+    Args:
+        conf: TODO.
+
+    Returns:
+        TODO.
+    """
     if conf == default_model_config:
         return _get_default_admd_model_driver()
     else:

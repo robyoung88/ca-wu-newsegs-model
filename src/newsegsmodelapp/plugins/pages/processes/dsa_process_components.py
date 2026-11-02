@@ -1,9 +1,23 @@
+"""Dsa process components module.
+
+TODO: Describe the purpose of the module.
+"""
 from dash import dcc, html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 
 def dsa_process_components(**kwargs):
+    """Dsa process components.
+
+    TODO: Add a description.
+
+    Args:
+        **kwargs: TODO.
+
+    Returns:
+        TODO.
+    """
     return [
         dcc.Store(id = {'type': 'trigger', 'page':kwargs.get('page_type', 'None'), 'key': 'dsa_input_change'}, data = []),
         dbc.Modal(

@@ -13,6 +13,10 @@ from newsegsmodelframework.newsegsvariable.variable import Variable, variable_ui
 
 class VariableProviderInterface(metaclass = ABCMeta):
 
+    """Variable Provider Interface.
+
+    TODO: Add a description.
+    """
     @overload
     @abstractmethod
     def get_variable(self, instance_id: str) -> Variable:
@@ -25,14 +29,45 @@ class VariableProviderInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def get_variable(self, instance_id: str | SequenceNotStr[str]) -> Variable | SequenceNotStr[Variable]:
+        """Get variable.
+
+        TODO: Add a description.
+
+        Args:
+            instance_id: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_default_variable(self, variable_id: str, index: int = -1) -> Variable:
+        """Get default variable.
+
+        TODO: Add a description.
+
+        Args:
+            variable_id: TODO.
+            index: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def duplicate_variable(self, instance_id: str) -> Variable:
+        """Duplicate variable.
+
+        TODO: Add a description.
+
+        Args:
+            instance_id: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
@@ -80,11 +115,19 @@ class VariablePersistenceInterface(metaclass = ABCMeta):
         """
 
 class VariableManagerInterface(VariableProviderInterface, VariablePersistenceInterface):
+    """Variable Manager Interface.
+
+    TODO: Add a description.
+    """
     ...
 
 
 class InMemoryVariableProvider(VariableManagerInterface):
 
+    """In Memory Variable Provider.
+
+    TODO: Add a description.
+    """
     def __init__(self, default_variables):
         super().__init__()
         self._variables_by_varid = OrderedDict()
@@ -107,6 +150,16 @@ class InMemoryVariableProvider(VariableManagerInterface):
         ...
 
     def get_variable(self, instance_id: str | SequenceNotStr[str]) -> Variable | SequenceNotStr[Variable]:
+        """Get variable.
+
+        TODO: Add a description.
+
+        Args:
+            instance_id: TODO.
+
+        Returns:
+            TODO.
+        """
         if isinstance(instance_id, str):
             if instance_id in self._variables_by_uid:
                 return self._variables_by_uid[instance_id]
@@ -115,11 +168,32 @@ class InMemoryVariableProvider(VariableManagerInterface):
         raise KeyError(f'Variable {instance_id} not found - try get_default_variable with the varid')
 
     def get_default_variable(self, variable_id: str, index: int = -1) -> Variable:
+        """Get default variable.
+
+        TODO: Add a description.
+
+        Args:
+            variable_id: TODO.
+            index: TODO.
+
+        Returns:
+            TODO.
+        """
         if variable_id in self._variables_by_varid:
             return list(self._variables_by_varid[variable_id].values())[index]
         raise KeyError(f'Variable type {variable_id} not found - a first application of this variable must be added.')
 
     def duplicate_variable(self, instance_id: str) -> Variable:
+        """Duplicate variable.
+
+        TODO: Add a description.
+
+        Args:
+            instance_id: TODO.
+
+        Returns:
+            TODO.
+        """
         if instance_id in self._variables_by_uid:
             v1 = self._variables_by_uid[instance_id]
             v2 = cast(Variable, copy.deepcopy(v1))
@@ -131,6 +205,16 @@ class InMemoryVariableProvider(VariableManagerInterface):
         raise KeyError(f'Variable {instance_id} not found - try get_default_variable with the varid')
 
     def add_variable(self, var: Variable) -> str:
+        """Add variable.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+
+        Returns:
+            TODO.
+        """
         vid = variable_uid(var)
         if not vid in self._variables_by_varid:
             self._variables_by_varid[vid] = OrderedDict()
@@ -141,6 +225,13 @@ class InMemoryVariableProvider(VariableManagerInterface):
         return var.id
 
     def get_varids(self) -> tuple[str, ...]:
+        """Get varids.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return tuple(self._variables_by_varid.keys())
 
     @override
@@ -191,6 +282,13 @@ class RecoverableInMemoryVariableProvider(InMemoryVariableProvider):
         self._variables_by_uid = dict()
 
     def reattach_variables(self, variable_provider: VariableProviderInterface):
+        """Reattach variables.
+
+        TODO: Add a description.
+
+        Args:
+            variable_provider: TODO.
+        """
         if not hasattr(self, '_variable_recovery_uids'):
             return
         vrus = self._variable_recovery_uids # pyright: ignore[reportAttributeAccessIssue]

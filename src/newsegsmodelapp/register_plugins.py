@@ -23,10 +23,24 @@ def load_plugins_recursive(package):
 # Pages must be loaded before contents
 import newsegsmodelapp.plugins.pages as pages
 def load_pages_plugins():
+    """Load pages plugins.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return load_plugins_recursive(pages)
 
 import newsegsmodelapp.plugins.models as models
 def load_models_plugins():
+    """Load models plugins.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return load_plugins_recursive(models)
 
 load_pages_plugins()
@@ -35,6 +49,13 @@ load_models_plugins()
 
 import newsegsmodelapp.components as components
 def load_components():
+    """Load components.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     d = {}
     for info in pkgutil.iter_modules(
         components.__path__, prefix = 'newsegsmodelapp.components.'

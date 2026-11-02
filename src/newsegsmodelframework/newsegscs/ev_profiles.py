@@ -84,6 +84,18 @@ def characterise_profile_data(
     holiday_subdiv = 'ENG'
 ):
     
+    """Characterise profile data.
+
+    TODO: Add a description.
+
+    Args:
+        profile_data: TODO.
+        holiday_country: TODO.
+        holiday_subdiv: TODO.
+
+    Returns:
+        TODO.
+    """
     return (
         profile_data.pipe(characterise_dates_evprofile, holiday_country, holiday_subdiv)
         .groupby(['start_day_seconds','end_day_seconds','month_n','prof_day'])
@@ -102,6 +114,17 @@ PROFILE_DATA_CHARACTERISED = pd.read_parquet(
 # TODO: This function takes too long
 def ev_profiles_for_time_spans(time_spans,
                                profile_data=PROFILE_DATA_CHARACTERISED):
+    """Ev profiles for time spans.
+
+    TODO: Add a description.
+
+    Args:
+        time_spans: TODO.
+        profile_data: TODO.
+
+    Returns:
+        TODO.
+    """
     import sqlite3
     
     with sqlite3.connect(':memory:') as conn:

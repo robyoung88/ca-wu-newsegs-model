@@ -7,6 +7,16 @@ from typing import List, TypeVar
 
 
 def flatten_mixed_list(mixed_list: Sequence[List[str] | str]) -> List[str]:
+    """Flatten mixed list.
+
+    TODO: Add a description.
+
+    Args:
+        mixed_list: TODO.
+
+    Returns:
+        TODO.
+    """
     flat_list=[]
     for item in mixed_list:
         if isinstance(item, str):
@@ -16,6 +26,16 @@ def flatten_mixed_list(mixed_list: Sequence[List[str] | str]) -> List[str]:
     return flat_list
 
 def len_mixed_list(mixed_list: Sequence[List[str] | str]) -> List[int]:
+    """Len mixed list.
+
+    TODO: Add a description.
+
+    Args:
+        mixed_list: TODO.
+
+    Returns:
+        TODO.
+    """
     lens=[]
     for item in mixed_list:
         if isinstance(item, str):
@@ -30,6 +50,17 @@ def repeat_list_by_index(
     l: Sequence[T], 
     repeats: int | Sequence[int]
 ) -> List[T]:
+    """Repeat list by index.
+
+    TODO: Add a description.
+
+    Args:
+        l: TODO.
+        repeats: TODO.
+
+    Returns:
+        TODO.
+    """
     if not isinstance(repeats, Sequence):
         repeats = [repeats] * len(l)
     assert len(l) == len(repeats), '`repeats` must be a scalar or same length as the list'

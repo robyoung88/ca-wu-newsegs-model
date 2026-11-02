@@ -44,6 +44,17 @@ class NewsegsModule(newsegscomponent.NewsegsComponent):
         timespan:TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> NewsegsModuleResult:
+        """Run.
+
+        TODO: Add a description.
+
+        Args:
+            timespan: TODO.
+            run_start: TODO.
+
+        Returns:
+            TODO.
+        """
         if run_start is None:
             run_start = datetime.datetime.now()
         self.last_run = run_start

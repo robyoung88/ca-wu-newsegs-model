@@ -388,6 +388,10 @@ class RaisedLocation(Location):
     
     @property
     def height_agl(self) -> float:
+        """Height agl.
+
+        TODO: Add a description.
+        """
         return self._height
     
     @height_agl.setter
@@ -579,6 +583,10 @@ class AspectLocation(RaisedLocation):
     
     @property
     def azimuth(self) -> float:
+        """Azimuth.
+
+        TODO: Add a description.
+        """
         return self._azimuth
     
     @azimuth.setter
@@ -587,6 +595,10 @@ class AspectLocation(RaisedLocation):
     
     @property
     def pitch(self) -> float:
+        """Pitch.
+
+        TODO: Add a description.
+        """
         return self._pitch
     
     @pitch.setter
@@ -761,6 +773,21 @@ class PVLibPVSystem(
 
 @lru_cache
 def cached_get_solarposition(t0, periods, freq, lat, lon, method: str = 'nrel_numba'):
+    """Cached get solarposition.
+
+    TODO: Add a description.
+
+    Args:
+        t0: TODO.
+        periods: TODO.
+        freq: TODO.
+        lat: TODO.
+        lon: TODO.
+        method: TODO.
+
+    Returns:
+        TODO.
+    """
     from pvlib.solarposition import get_solarposition
     import pandas as pd
     times = pd.date_range(start = t0, periods = periods, freq = freq)

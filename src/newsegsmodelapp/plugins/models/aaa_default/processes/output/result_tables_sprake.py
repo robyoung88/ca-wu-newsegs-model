@@ -104,6 +104,17 @@ def create_wind_results(wind_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(wind_data), 'table_generation_wind', annual)
 
 def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
+    """Create pv results.
+
+    TODO: Add a description.
+
+    Args:
+        pv_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     pv_data = _as_data_list(pv_data)
 
     if (annual):
@@ -169,6 +180,17 @@ def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(pv_data), 'table_generation_pv', annual)
 
 def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid:
+    """Create combined generation results.
+
+    TODO: Add a description.
+
+    Args:
+        gen_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     gen_data = _as_data_list(gen_data)
 
     if (annual):
@@ -233,6 +255,17 @@ def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid
     return _create_grid(records, len(gen_data), 'table_generation_combined', annual)
 
 def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
+    """Create stor results.
+
+    TODO: Add a description.
+
+    Args:
+        stor_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     stor_data = _as_data_list(stor_data)
 
     if (annual):
@@ -369,6 +402,17 @@ def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(stor_data), 'table_storage', annual)
 
 def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
+    """Create cons results.
+
+    TODO: Add a description.
+
+    Args:
+        cons_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     cons_data = _as_data_list(cons_data)
 
     if annual:
@@ -487,6 +531,17 @@ def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
     return _create_grid(records, len(cons_data), 'table_consumption', annual)
 
 def create_seasonal_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
+    """Create seasonal cons results.
+
+    TODO: Add a description.
+
+    Args:
+        cons_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     cons_data = _as_data_list(cons_data)
 
     if (annual):
@@ -539,6 +594,17 @@ def create_seasonal_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
 
 def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create net results.
+
+    TODO: Add a description.
+
+    Args:
+        net_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     net_data = _as_data_list(net_data)
 
     if (annual):
@@ -579,6 +645,17 @@ def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
 
 def create_seasonal_net_results(net_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create seasonal net results.
+
+    TODO: Add a description.
+
+    Args:
+        net_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     net_data = _as_data_list(net_data)
 
     if (annual):
@@ -639,6 +716,17 @@ def create_seasonal_net_results(net_data=None, annual=True) -> dag.AgGrid:
 
 def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create so benefits results.
+
+    TODO: Add a description.
+
+    Args:
+        econ_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     econ_data = _as_data_list(econ_data)
 
     if (annual):
@@ -696,6 +784,17 @@ def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
 
 def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create so costs results.
+
+    TODO: Add a description.
+
+    Args:
+        econ_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     econ_data = _as_data_list(econ_data)
 
     if (annual):
@@ -770,6 +869,17 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
 
 def create_so_value_results(econ_data=None, annual=True) -> dag.AgGrid:
     # TODO: Load tables as appropriate at this stage to prevent multiple from_dict interprets
+    """Create so value results.
+
+    TODO: Add a description.
+
+    Args:
+        econ_data: TODO.
+        annual: TODO.
+
+    Returns:
+        TODO.
+    """
     econ_data = _as_data_list(econ_data)
 
     simple_stats = newsegsbrowser_stats.present_single_stat_per_row(

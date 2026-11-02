@@ -1,3 +1,7 @@
+"""Lightweightnewsegsproject module.
+
+TODO: Describe the purpose of the module.
+"""
 from dataclasses import field
 
 from newsegsmodelframework.core.lightweightnewsegscomponent import LightweightNewsegsComponent
@@ -6,6 +10,10 @@ from newsegsmodelframework.core.trackeddata import ObservableList, revision_data
 
 @revision_dataclass
 class LightweightNewsegsProject(LightweightNewsegsComponent):
+    """Lightweight Newsegs Project.
+
+    TODO: Add a description.
+    """
     name: str
     table_config: LightweightNewsegsComponent
     dsa_config: LightweightNewsegsComponent

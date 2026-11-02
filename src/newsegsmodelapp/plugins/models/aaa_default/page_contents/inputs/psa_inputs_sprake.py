@@ -79,6 +79,17 @@ def n_samples_input(
         'psa', 'psa-settings',
         'samples', 0
     )):
+    """N samples input.
+
+    TODO: Add a description.
+
+    Args:
+        psa_config: TODO.
+        id: TODO.
+
+    Returns:
+        TODO.
+    """
     overall_id = id
 
     header_id = copy.copy(id)
@@ -115,6 +126,17 @@ def random_seed_input(
         'psa', 'psa-settings',
         'seed', 0
 )):
+    """Random seed input.
+
+    TODO: Add a description.
+
+    Args:
+        psa_config: TODO.
+        id: TODO.
+
+    Returns:
+        TODO.
+    """
     overall_id = id
 
     header_id = copy.copy(id)
@@ -151,6 +173,17 @@ def return_draws_input(
         'psa', 'psa-settings',
         'return_draws', 0
 )):
+    """Return draws input.
+
+    TODO: Add a description.
+
+    Args:
+        psa_config: TODO.
+        id: TODO.
+
+    Returns:
+        TODO.
+    """
     overall_id = id
 
     header_id = copy.copy(id)
@@ -186,6 +219,24 @@ def handle_psa_settings(
     return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ):
+    """Handle psa settings.
+
+    TODO: Add a description.
+
+    Args:
+        triggered_id: TODO.
+        input_ids: TODO.
+        header_ids: TODO.
+        trigger_ids: TODO.
+        calling_dict: TODO.
+        active_project_id: TODO.
+        project_provider: TODO.
+        return_dict: TODO.
+        new_val: TODO.
+
+    Returns:
+        TODO.
+    """
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
         if new_val is None and triggered_id['key'] != 'seed':
@@ -262,6 +313,24 @@ def handle_psa_active(
     return_dict: dict[str, Any],
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ) -> dict[str, Any]:
+    """Handle psa active.
+
+    TODO: Add a description.
+
+    Args:
+        triggered_id: TODO.
+        input_ids: TODO.
+        header_ids: TODO.
+        trigger_ids: TODO.
+        calling_dict: TODO.
+        active_project_id: TODO.
+        project_provider: TODO.
+        return_dict: TODO.
+        new_val: TODO.
+
+    Returns:
+        TODO.
+    """
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
 

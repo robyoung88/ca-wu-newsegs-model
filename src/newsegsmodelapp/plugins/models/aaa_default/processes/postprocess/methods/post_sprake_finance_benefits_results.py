@@ -1,3 +1,7 @@
+"""Post sprake finance benefits results module.
+
+TODO: Describe the purpose of the module.
+"""
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegsfinance.sprakefinance import SprakeFinance
 

@@ -1,3 +1,7 @@
+"""Core package.
+
+TODO: Describe what the package provides and its main public classes.
+"""
 from .constructors.constructors import find_constructor
 from .serialisation import SerialiseToDictMixin, StateSerialiseToDictMixin
 from .serialisedtrackeddata import SerialisedConfigurationMixin

@@ -53,6 +53,13 @@ class SprakeCSResult(NewsegsModuleResult):
         self.set_storage_soc(storage_soc)
 
     def get_timespan(self) -> modtimespan.RegTimeSpan:
+        """Get timespan.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._timespan
 
     @property
@@ -120,40 +127,117 @@ class SprakeCSResult(NewsegsModuleResult):
         return o_arr
 
     def get_meter_names(self):
+        """Get meter names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('appliance_import', 'dhw_import', 'spaceheat_import', 'evcharge_import',
                 'storage_import', 'storage_export', 'storage_loss',
                 'grid_import', 'grid_export')
     
     def get_meter_types(self):
+        """Get meter types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('load', 'load', 'load', 'load',
                 'import_storage', 'export_storage', 'loss',
                 'import', 'export')
 
     def get_dsm_names(self):
+        """Get dsm names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('storage_soc',)
 
     def get_dsm_types(self):
+        """Get dsm types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('system_state',)
 
     def set_domestic_consumption(self, domestic_consumption:np.ndarray[tuple[int,int], np.dtype[np.number]]):
+        """Set domestic consumption.
+
+        TODO: Add a description.
+
+        Args:
+            domestic_consumption: TODO.
+        """
         self._domestic_consumption = domestic_consumption
 
     def set_storage_import(self, storage_import:np.ndarray[tuple[int], np.dtype[np.number]]):
+        """Set storage import.
+
+        TODO: Add a description.
+
+        Args:
+            storage_import: TODO.
+        """
         self._storage_import = storage_import
 
     def set_storage_export(self, storage_export:np.ndarray[tuple[int], np.dtype[np.number]]):
+        """Set storage export.
+
+        TODO: Add a description.
+
+        Args:
+            storage_export: TODO.
+        """
         self._storage_export = storage_export
 
     def set_storage_loss(self, storage_loss:np.ndarray[tuple[int], np.dtype[np.number]]):
+        """Set storage loss.
+
+        TODO: Add a description.
+
+        Args:
+            storage_loss: TODO.
+        """
         self._storage_loss = storage_loss
 
     def set_grid_import(self, grid_import:np.ndarray[tuple[int], np.dtype[np.number]]):
+        """Set grid import.
+
+        TODO: Add a description.
+
+        Args:
+            grid_import: TODO.
+        """
         self._grid_import = grid_import
 
     def set_grid_export(self, grid_export:np.ndarray[tuple[int], np.dtype[np.number]]):
+        """Set grid export.
+
+        TODO: Add a description.
+
+        Args:
+            grid_export: TODO.
+        """
         self._grid_export = grid_export
 
     def set_storage_soc(self, storage_soc:np.ndarray[tuple[int], np.dtype[np.number]]):
+        """Set storage soc.
+
+        TODO: Add a description.
+
+        Args:
+            storage_soc: TODO.
+        """
         self._storage_soc = storage_soc
 
 # Function wrappers for consumption models
@@ -179,6 +263,18 @@ def _get_sprake_appliance_consumption_reference_timeseries(start, periods, freq)
 def sprake_appliance_consumption(datetimes, efficiency_reduction=0.1, n_households=1000):
     #from newsegscs.elexon_profiles import get_elexon_consumption
     #cons = get_elexon_consumption(datetimes)
+    """Sprake appliance consumption.
+
+    TODO: Add a description.
+
+    Args:
+        datetimes: TODO.
+        efficiency_reduction: TODO.
+        n_households: TODO.
+
+    Returns:
+        TODO.
+    """
     start = datetimes[0]
     periods = len(datetimes)
     freq = datetimes[1] - datetimes[0]
@@ -202,6 +298,18 @@ def _get_sprake_ev_consumption_reference_timeseries(start, periods, freq):
     )
 
 def sprake_ev_consumption(datetimes, annual_residential_consumption_per_ev=1760.0, n_evs=1000):
+    """Sprake ev consumption.
+
+    TODO: Add a description.
+
+    Args:
+        datetimes: TODO.
+        annual_residential_consumption_per_ev: TODO.
+        n_evs: TODO.
+
+    Returns:
+        TODO.
+    """
     start = datetimes[0]
     periods = len(datetimes)
     freq = datetimes[1] - datetimes[0]
@@ -220,6 +328,19 @@ def _get_sprake_dhw_energy_consumption_reference_timeseries(start, periods, freq
     return cons
 
 def sprake_dhw_consumption(datetimes, ref_daily_consumption=4.5, seasonal_variance=0.2, n_households=1000):
+    """Sprake dhw consumption.
+
+    TODO: Add a description.
+
+    Args:
+        datetimes: TODO.
+        ref_daily_consumption: TODO.
+        seasonal_variance: TODO.
+        n_households: TODO.
+
+    Returns:
+        TODO.
+    """
     start = datetimes[0]
     periods = len(datetimes)
     freq = datetimes[1] - datetimes[0]
@@ -234,6 +355,19 @@ def _get_sprake_spaceheat_consumption_timeseries(start, periods, freq, hlp=1.1, 
     return cons
 
 def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_households=1000):
+    """Sprake spaceheat consumption.
+
+    TODO: Add a description.
+
+    Args:
+        datetimes: TODO.
+        hlp: TODO.
+        gfa: TODO.
+        n_households: TODO.
+
+    Returns:
+        TODO.
+    """
     start = datetimes[0]
     periods = len(datetimes)
     freq = datetimes[1] - datetimes[0]
@@ -243,6 +377,10 @@ def sprake_spaceheat_consumption(datetimes, hlp:float=1.1, gfa:float=105.0, n_ho
 
 @revision_dataclass
 class SprakeCSConfig(NewsegsCSConfig):
+    """Sprake CS Config.
+
+    TODO: Add a description.
+    """
     n_units: float = 100.0
     ev_per_unit: float = 1.2
     # Appliance parameters
@@ -294,6 +432,13 @@ class SprakeCS(NewsegsCS):
     
     @classmethod
     def from_none(cls):
+        """From none.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
             spaceheat_params = {
                 'hlp': 0.3,
@@ -313,29 +458,72 @@ class SprakeCS(NewsegsCS):
 
     @property
     def n_households(self) -> float:
+        """N households.
+
+        TODO: Add a description.
+        """
         return self.n_units
 
     @property
     def n_evs(self) -> float:
+        """N evs.
+
+        TODO: Add a description.
+        """
         return self.n_units * self.ev_per_unit
 
     def get_appliance_params(self):
+        """Get appliance params.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         atts = ['efficiency_reduction', 'n_households']
         return {k: getattr(self, k) for k in atts}
 
     def get_ev_params(self):
+        """Get ev params.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         atts = ['annual_residential_consumption_per_ev', 'n_evs']
         return {k: getattr(self, k) for k in atts}
 
     def get_dhw_params(self):
+        """Get dhw params.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         atts = ['ref_daily_consumption', 'seasonal_variance', 'n_households']
         return {k: getattr(self, k) for k in atts}
 
     def get_sh_params(self):
+        """Get sh params.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         atts = ['hlp', 'gfa', 'n_households']
         return {k: getattr(self, k) for k in atts}
 
     def get_storage_params(self):
+        """Get storage params.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         atts = ['storage_capacity', 'storage_rte']
         return {k: getattr(self, k) for k in atts}
 
@@ -344,6 +532,17 @@ class SprakeCS(NewsegsCS):
         timespan: modtimespan.TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> SprakeCSResult:
+        """Run.
+
+        TODO: Add a description.
+
+        Args:
+            timespan: TODO.
+            run_start: TODO.
+
+        Returns:
+            TODO.
+        """
         super().run(timespan, run_start)
         if not isinstance(timespan, modtimespan.RegTimeSpan):
             if self.model is None:

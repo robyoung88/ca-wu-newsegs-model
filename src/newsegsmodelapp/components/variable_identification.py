@@ -1,3 +1,7 @@
+"""Variable identification module.
+
+TODO: Describe the purpose of the module.
+"""
 from dataclasses import dataclass
 from typing import override
 
@@ -22,6 +26,18 @@ class VariableComponentID(SerialisableDataclass):
         type: str = 'notype',
         supersection: str = 'deterministic',
     ):
+        """From variable.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            type: TODO.
+            supersection: TODO.
+
+        Returns:
+            TODO.
+        """
         section = var.interface_section
         section = 'None' if section is None else section
         if not isinstance(section, str):
@@ -45,6 +61,18 @@ class VariableComponentID(SerialisableDataclass):
         type: str = 'notype',
         supersection: str = 'deterministic',
     ):
+        """From lightweight variable.
+
+        TODO: Add a description.
+
+        Args:
+            var: TODO.
+            type: TODO.
+            supersection: TODO.
+
+        Returns:
+            TODO.
+        """
         section = var.interface_section
         section = 'None' if section is None else section
         if not isinstance(section, str):
@@ -64,6 +92,10 @@ class VariableComponentID(SerialisableDataclass):
 
 @dataclass
 class VariableInstanceComponentID(VariableComponentID):
+    """Variable Instance Component ID.
+
+    TODO: Add a description.
+    """
     subindex: int|str = 0
 
     @override
@@ -92,6 +124,10 @@ class VariableInstanceComponentID(VariableComponentID):
 
 @dataclass
 class VariableInstanceParameterComponentID(VariableInstanceComponentID):
+    """Variable Instance Parameter Component ID.
+
+    TODO: Add a description.
+    """
     parameter_index: int = 0
     vector_location: int = 0
     purpose: str = 'parameter'

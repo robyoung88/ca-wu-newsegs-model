@@ -36,6 +36,13 @@ class SprakeGridResult(NewsegsModuleResult):
         self.set_export_cost(export_unit_cost)
 
     def get_timespan(self) -> modtimespan.RegTimeSpan:
+        """Get timespan.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._timespan
     @property
     def meters(self) -> np.ndarray[tuple[int,int],  np.dtype[np.number]]:
@@ -56,26 +63,72 @@ class SprakeGridResult(NewsegsModuleResult):
         return o_arr
 
     def get_meter_names(self):
+        """Get meter names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ()
 
     def get_meter_types(self):
+        """Get meter types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ()
 
     def get_dsm_names(self):
+        """Get dsm names.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('per_unit_import', 'per_unit_export')
     
     def get_dsm_types(self):
+        """Get dsm types.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return ('import', 'export')
 
     def set_import_cost(self, import_unit_cost:npt.ArrayLike) -> None:
+        """Set import cost.
+
+        TODO: Add a description.
+
+        Args:
+            import_unit_cost: TODO.
+        """
         self._import = np.asarray(import_unit_cost).flatten()
 
     def set_export_cost(self, export_unit_cost:npt.ArrayLike) -> None:
+        """Set export cost.
+
+        TODO: Add a description.
+
+        Args:
+            export_unit_cost: TODO.
+        """
         self._export = np.asarray(export_unit_cost).flatten()
 
 
 @revision_dataclass
 class SprakeGridConfig(DataWithRevision):
+    """Sprake Grid Config.
+
+    TODO: Add a description.
+    """
     import_per_unit: float = 0.30
     export_per_unit: float = 0.07
 
@@ -112,10 +165,21 @@ class SprakeGrid(NewsegsGrid):
 
     @classmethod
     def from_none(cls):
+        """From none.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return cls(0.20)
 
     @property
     def import_rate(self) -> float:
+        """Import rate.
+
+        TODO: Add a description.
+        """
         return self.import_per_unit
 
     @import_rate.setter
@@ -124,6 +188,10 @@ class SprakeGrid(NewsegsGrid):
         
     @property
     def export_rate(self) -> float:
+        """Export rate.
+
+        TODO: Add a description.
+        """
         return self.export_per_unit
 
     @export_rate.setter
@@ -135,6 +203,17 @@ class SprakeGrid(NewsegsGrid):
         timespan: modtimespan.TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> SprakeGridResult:
+        """Run.
+
+        TODO: Add a description.
+
+        Args:
+            timespan: TODO.
+            run_start: TODO.
+
+        Returns:
+            TODO.
+        """
         super().run(timespan, run_start)
         if not isinstance(timespan, modtimespan.RegTimeSpan):
             if self.model is None:

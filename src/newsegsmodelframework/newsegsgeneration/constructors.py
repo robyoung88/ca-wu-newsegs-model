@@ -1,3 +1,7 @@
+"""Constructors module.
+
+TODO: Describe the purpose of the module.
+"""
 import copy
 from typing import Any
 
@@ -11,6 +15,16 @@ _GENERATION_MODULE_CONSTRUCTORS = {
 def generation_module_from_dict(
     config: dict[str, Any]
 ) -> newsegsgeneration.NewsegsGeneration:
+    """Generation module from dict.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     config = copy.copy(config)
     classname = config.pop('class')
     if classname is None:

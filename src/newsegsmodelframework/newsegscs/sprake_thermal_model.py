@@ -1,3 +1,7 @@
+"""Sprake thermal model module.
+
+TODO: Describe the purpose of the module.
+"""
 import os
 import numpy as np
 import pandas as pd
@@ -35,10 +39,32 @@ def calibrate_hlp(target_specific_heat_loss: float = 52.0, #kWh/m²/yr
                   calibration_degree_days: npt.ArrayLike = np.asarray(CALIBRATION_DEGREE_DAYS['hdd_15_5'].values)
                   ) -> float:
     # degree days to degree hours
+    """Calibrate hlp.
+
+    TODO: Add a description.
+
+    Args:
+        target_specific_heat_loss: TODO.
+        calibration_degree_days: TODO.
+
+    Returns:
+        TODO.
+    """
     dh = 24.0 * np.sum(calibration_degree_days)
     return target_specific_heat_loss / (dh / 1000.0)
 
 def profiles_for_time_spans(time_spans, profile_data):
+    """Profiles for time spans.
+
+    TODO: Add a description.
+
+    Args:
+        time_spans: TODO.
+        profile_data: TODO.
+
+    Returns:
+        TODO.
+    """
     import sqlite3
 
     with sqlite3.connect(':memory:') as conn:
@@ -74,6 +100,20 @@ def get_spaceheat_energy_consumption(datetimes,
                                      hdd:pd.DataFrame=TIMESERIES_DEGREE_DAYS,
                                      profile_data:pd.DataFrame=PROFILE_DATA
                                      ):
+    """Get spaceheat energy consumption.
+
+    TODO: Add a description.
+
+    Args:
+        datetimes: TODO.
+        hlp: TODO.
+        gfa: TODO.
+        hdd: TODO.
+        profile_data: TODO.
+
+    Returns:
+        TODO.
+    """
     oframe = (
         pd.DataFrame(
             {'datetime': pd.to_datetime(datetimes)}

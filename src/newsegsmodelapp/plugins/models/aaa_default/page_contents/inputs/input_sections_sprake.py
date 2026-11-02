@@ -1,3 +1,7 @@
+"""Input sections sprake module.
+
+TODO: Describe the purpose of the module.
+"""
 
 from newsegsmodelapp.components import icons
 from newsegsmodelapp.components.layouts.input_card import create_input_card

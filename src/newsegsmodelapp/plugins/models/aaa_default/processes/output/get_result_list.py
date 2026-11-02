@@ -1,3 +1,7 @@
+"""Get result list module.
+
+TODO: Describe the purpose of the module.
+"""
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
@@ -8,6 +12,19 @@ def get_result_list(
     result_provider: NewsegsResultProviderInterface,
     allow_stale: bool = True
 ) -> tuple[list, bool]:
+    """Get result list.
+
+    TODO: Add a description.
+
+    Args:
+        result_type: TODO.
+        lproject: TODO.
+        result_provider: TODO.
+        allow_stale: TODO.
+
+    Returns:
+        TODO.
+    """
     is_finance = 'finance' in result_type
     results_list = []
     any_stale = False

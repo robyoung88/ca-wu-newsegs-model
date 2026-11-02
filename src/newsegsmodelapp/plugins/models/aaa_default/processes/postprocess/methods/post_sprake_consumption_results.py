@@ -1,3 +1,7 @@
+"""Post sprake consumption results module.
+
+TODO: Describe the purpose of the module.
+"""
 import numpy as np
 import pandas as pd
 
@@ -31,6 +35,17 @@ _ADMD_CONF = default_model_config.copy()
 _ADMD_DR = get_admd_model_driver(_ADMD_CONF)
 
 def calculate_sprake_admd(n_units, n_evs):
+    """Calculate sprake admd.
+
+    TODO: Add a description.
+
+    Args:
+        n_units: TODO.
+        n_evs: TODO.
+
+    Returns:
+        TODO.
+    """
     site_details = {
         'N_customers': int(n_units),
         'N_EV_chargers': np.min([n_evs, n_units]),
@@ -55,6 +70,16 @@ def calculate_sprake_admd(n_units, n_evs):
     return o.get('ADMD_standard')
 
 def seasonal_and_profile_consumption_summary(grp):
+    """Seasonal and profile consumption summary.
+
+    TODO: Add a description.
+
+    Args:
+        grp: TODO.
+
+    Returns:
+        TODO.
+    """
     summary_consumption_year = (
         grp
         .loc[:,['consumption', 'year_index']]

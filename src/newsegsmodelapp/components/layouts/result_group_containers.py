@@ -1,3 +1,7 @@
+"""Result group containers module.
+
+TODO: Describe the purpose of the module.
+"""
 from dash import html
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc

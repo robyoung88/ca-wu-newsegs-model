@@ -1,3 +1,7 @@
+"""Project selector module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,15 @@ def rename_project(
     project_id: str,
     project_name: str,
 ):
+    """Rename project.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        project_id: TODO.
+        project_name: TODO.
+    """
     project_provider.set_component_metadata(
         project_id,
         'label',
@@ -69,6 +82,18 @@ def create_snapshot(
     project_id: str,
     snapshot_name: str,
 ) -> int:
+    """Create snapshot.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        project_id: TODO.
+        snapshot_name: TODO.
+
+    Returns:
+        TODO.
+    """
     return project_provider.create_project_snapshot(
         project_id, snapshot_name
     )
@@ -77,6 +102,17 @@ def verify_project_exists(
     project_provider: NewsegsProjectProviderInterface,
     project_id: str
 ) -> bool:
+    """Verify project exists.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        project_id: TODO.
+
+    Returns:
+        TODO.
+    """
     try:
         label = project_provider.get_component_metadata(
             project_id, 'label'
@@ -91,6 +127,18 @@ def load_snapshot(
     current_project_id: str,
     snapshot_id: str
 ) -> str | None:
+    """Load snapshot.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        current_project_id: TODO.
+        snapshot_id: TODO.
+
+    Returns:
+        TODO.
+    """
     int_snapshot_id = int(snapshot_id)
     all_snapshots = project_provider.list_project_snapshots(current_project_id)
     if not np.any(all_snapshots['snapshot_id'] == int_snapshot_id):
@@ -106,6 +154,17 @@ def new_project(
     project_provider: NewsegsProjectProviderInterface,
     model_type: str
 ) -> str:
+    """New project.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
                     
     factory = PROJECT_FACTORIES.get(model_type, PROJECT_FACTORIES['default'])
@@ -118,6 +177,17 @@ def duplicate_project(
     project_provider: NewsegsProjectProviderInterface,
     current_project_id: str,
 ) -> str:
+    """Duplicate project.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        current_project_id: TODO.
+
+    Returns:
+        TODO.
+    """
     new_proj = cast(
         NewsegsProject, 
         project_provider.duplicate_component(current_project_id)
@@ -135,6 +205,15 @@ def rename_snapshot(
     snapshot_id: str,
     snapshot_name: str,
 ):
+    """Rename snapshot.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        snapshot_id: TODO.
+        snapshot_name: TODO.
+    """
     if not isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         return
     project_provider.rename_snapshot(int(snapshot_id), snapshot_name)
@@ -145,6 +224,19 @@ def delete_project(
     active_project_id: str,
     model_type: str,
 ) -> str | None:
+    """Delete project.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        delete_project_id: TODO.
+        active_project_id: TODO.
+        model_type: TODO.
+
+    Returns:
+        TODO.
+    """
     returned = project_provider.delete_component(delete_project_id)
     if returned:
         raise ValueError('Project could not be deleted')
@@ -162,6 +254,15 @@ def delete_snapshot(
     project_id: str,
     delete_snapshot_id: str
 ):
+    """Delete snapshot.
+
+    TODO: Add a description.
+
+    Args:
+        project_provider: TODO.
+        project_id: TODO.
+        delete_snapshot_id: TODO.
+    """
     int_dsi = int(delete_snapshot_id)
     project_provider.delete_project_snapshot(project_id, int_dsi)
 
@@ -170,6 +271,13 @@ def delete_snapshot(
 # -----------------------------------------------
 def create_project_selector():
     
+    """Create project selector.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     def stores_and_dialogs() -> list[dash.development.base_component.Component]:
         return [
             # Delete project confirmation dialog
@@ -467,6 +575,16 @@ def create_project_selector():
 create_project_selector_block = create_project_selector
 
 def add_project_selector_callbacks(app: NewsegsDash):
+    """Add project selector callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         Output("collapse-controls", "is_open"),
         Input("btn-toggle-controls", "n_clicks"),

@@ -1,3 +1,7 @@
+"""Newsegsmodel package.
+
+TODO: Describe what the package provides and its main public classes.
+"""
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel, NewsegsModelData, NewsegsModelConfig
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel, SprakeModelConfig
 __all__ = [

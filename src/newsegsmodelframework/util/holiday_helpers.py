@@ -1,3 +1,7 @@
+"""Holiday helpers module.
+
+TODO: Describe the purpose of the module.
+"""
 import os
 from functools import lru_cache
 
@@ -9,6 +13,19 @@ _loaded_holidays = {}
 
 @lru_cache
 def get_holiday_df(start_year, end_year, holiday_country = 'GB', holiday_subdiv = 'WLS'):
+    """Get holiday df.
+
+    TODO: Add a description.
+
+    Args:
+        start_year: TODO.
+        end_year: TODO.
+        holiday_country: TODO.
+        holiday_subdiv: TODO.
+
+    Returns:
+        TODO.
+    """
     if holiday_country == 'GB':
         global _loaded_holidays
         hol_fn = 'gb_' + holiday_subdiv.lower() + '.parquet'

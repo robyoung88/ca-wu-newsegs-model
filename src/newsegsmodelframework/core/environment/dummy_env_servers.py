@@ -12,6 +12,10 @@ from newsegsmodelframework.core.timespan.timespan import TimeSpan
 
 
 class DummyLocalEnv(NewsegsLocalEnvironment):
+    """Dummy Local Env.
+
+    TODO: Add a description.
+    """
     _version = '0.0.1'
     _name = 'Dummy local environment'
 
@@ -107,6 +111,10 @@ class DummyLocalEnv(NewsegsLocalEnvironment):
     
 
 class DummyWiderEnv(NewsegsWiderEnvironment):
+    """Dummy Wider Env.
+
+    TODO: Add a description.
+    """
     _version = '0.0.1'
     _name = 'Dummy wider environment'
 

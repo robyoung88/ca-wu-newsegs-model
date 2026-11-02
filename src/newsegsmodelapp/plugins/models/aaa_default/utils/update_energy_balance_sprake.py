@@ -1,3 +1,7 @@
+"""Update energy balance sprake module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,18 @@ def update_estimated_energy_balance(
     variableprovider: FromDatabaseVariableProvider,
     energy_balance: energy_balance_estimation.EstimatedEnergyBalance
 ) -> energy_balance_estimation.EstimatedEnergyBalance:
+    """Update estimated energy balance.
+
+    TODO: Add a description.
+
+    Args:
+        mm: TODO.
+        variableprovider: TODO.
+        energy_balance: TODO.
+
+    Returns:
+        TODO.
+    """
     vars_required = (
         'gen_input.wind_capacity.0',
         'gen_input.pv_capacity.0',

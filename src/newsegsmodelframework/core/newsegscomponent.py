@@ -66,6 +66,13 @@ class NewsegsComponent(
 
     @classmethod
     def set_state_exclusion_policy(cls, excludes: _STATE_EXCLUDES = 'excluded_and_components'):
+        """Set state exclusion policy.
+
+        TODO: Add a description.
+
+        Args:
+            excludes: TODO.
+        """
         cls._serialisation_settings['state_excludes'] = excludes
 
     def __init__(self, *args, name: Optional[str] = None, **kwargs):
@@ -77,6 +84,10 @@ class NewsegsComponent(
             
     @property
     def name(self) -> str:
+        """Name.
+
+        TODO: Add a description.
+        """
         return self._name
     
     @name.setter
@@ -85,10 +96,18 @@ class NewsegsComponent(
 
     @property
     def version(self) -> str:
+        """Version.
+
+        TODO: Add a description.
+        """
         return self._version
 
     @property
     def config(self) -> DataWithRevision:
+        """Config.
+
+        TODO: Add a description.
+        """
         return self._config
 
     @override
@@ -113,6 +132,13 @@ class NewsegsComponent(
         return odict
 
     def json_dumps_repr(self) -> str:
+        """Json dumps repr.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return json.dumps(self.to_dict_repr(), cls = jsonfuncs.NumpyEncoder)
     
     def _repr_represent(self, value):
@@ -280,10 +306,18 @@ class NewsegsComponent(
 
     @property
     def dirty(self):
+        """Dirty.
+
+        TODO: Add a description.
+        """
         return self.chain_modified
     
 
 class RunnableNewsegsComponent(NewsegsComponent):
+    """Runnable Newsegs Component.
+
+    TODO: Add a description.
+    """
     last_run: float = 0.0
 
     def run(self) -> Any:
@@ -318,18 +352,59 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
 
     @abstractmethod
     def get_component(self, component_id: str | SequenceNotStr[str]) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        """Get component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def duplicate_component(self, component_id: str | NewsegsComponent) -> NewsegsComponent:
+        """Duplicate component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def add_component(self, component: NewsegsComponent) -> str:
+        """Add component.
+
+        TODO: Add a description.
+
+        Args:
+            component: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
     def get_default_component(self, component_type: str, index: int = -1) -> NewsegsComponent:
+        """Get default component.
+
+        TODO: Add a description.
+
+        Args:
+            component_type: TODO.
+            index: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
@@ -338,6 +413,17 @@ class NewsegsComponentProviderInterface(metaclass = ABCMeta):
         component_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get component metadata.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+            metadata_ids: TODO.
+
+        Returns:
+            TODO.
+        """
         ...
 
     @abstractmethod
@@ -387,10 +473,18 @@ class NewsegsComponentPersistenceInterface(metaclass = ABCMeta):
         """
 
 class NewsegsComponentManagerInterface(NewsegsComponentProviderInterface, NewsegsComponentPersistenceInterface):
+    """Newsegs Component Manager Interface.
+
+    TODO: Add a description.
+    """
     ...
 
 
 class DictionaryComponentProvider(NewsegsComponentProviderInterface):
+    """Dictionary Component Provider.
+
+    TODO: Add a description.
+    """
     def __init__(
         self,
         comp_dict: dict
@@ -409,6 +503,16 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self, 
         component_id: str | SequenceNotStr[str]
     ) -> NewsegsComponent | SequenceNotStr[NewsegsComponent]:
+        """Get component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         if isinstance(component_id, str):
             return self.comp_dict[component_id]
         else:
@@ -418,6 +522,16 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self, 
         component_id: str | NewsegsComponent
     ) -> NewsegsComponent:
+        """Duplicate component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         if isinstance(component_id, str):
             return copy.deepcopy(self.comp_dict[component_id])
         else:
@@ -427,6 +541,16 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         self,
         component: NewsegsComponent
     ) -> str:
+        """Add component.
+
+        TODO: Add a description.
+
+        Args:
+            component: TODO.
+
+        Returns:
+            TODO.
+        """
         self.comp_dict[component.id] = component
         return component.id
 
@@ -435,6 +559,17 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         component_type: str, 
         index: int = -1
     ) -> NewsegsComponent:
+        """Get default component.
+
+        TODO: Add a description.
+
+        Args:
+            component_type: TODO.
+            index: TODO.
+
+        Returns:
+            TODO.
+        """
         return next(iter(self.comp_dict.values()))
     
     def get_component_metadata(
@@ -442,11 +577,31 @@ class DictionaryComponentProvider(NewsegsComponentProviderInterface):
         component_id: str | SequenceNotStr[str], 
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get component metadata.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+            metadata_ids: TODO.
+
+        Returns:
+            TODO.
+        """
         return {'message': 'No metadata'}
 
     def set_component_metadata(
         self, component_id: str, metadata_id: str, metadata_value: Any
     ):
+        """Set component metadata.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+            metadata_id: TODO.
+            metadata_value: TODO.
+        """
         ...
 
     @override

@@ -1,3 +1,7 @@
+"""Dhw profiles module.
+
+TODO: Describe the purpose of the module.
+"""
 # Helper functions for aligning timeseries with DHW profile data
 
 import os
@@ -20,6 +24,17 @@ PROFILE_DATA = pd.read_excel(os.path.join(lookup_dir,
                         end_day_seconds = lambda df: df['start_day_seconds'].shift(-1, fill_value = df['start_day_seconds'].iloc[-1] + (df['start_day_seconds'].iloc[1] - df['start_day_seconds'].iloc[0])))
 
 def profiles_for_time_spans(time_spans, profile_data):
+    """Profiles for time spans.
+
+    TODO: Add a description.
+
+    Args:
+        time_spans: TODO.
+        profile_data: TODO.
+
+    Returns:
+        TODO.
+    """
     import sqlite3
 
     with sqlite3.connect(':memory:') as conn:
@@ -55,6 +70,19 @@ def get_dhw_energy_consumption(datetimes,
                                profile_data=PROFILE_DATA
                                ):
     
+    """Get dhw energy consumption.
+
+    TODO: Add a description.
+
+    Args:
+        datetimes: TODO.
+        ref_daily_consumption: TODO.
+        seasonal_variance: TODO.
+        profile_data: TODO.
+
+    Returns:
+        TODO.
+    """
     max_daily_consumption = ref_daily_consumption * (1.0+seasonal_variance)
     min_daily_consumption = ref_daily_consumption * (1.0-seasonal_variance)
 

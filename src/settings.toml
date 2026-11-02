@@ -17,6 +17,10 @@ NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1
 NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/"
 
 PROGRESS_POLL_INTERVAL = 1000
+
+# Location of the built documentation (mkdocs build), served at /documentation/. Defaults to ./site
+#DOCS_PATH = '/opt/newsegs-docs'
+
 JOB_DISPATCH_TIMEOUT_MS = 200
 WORKER_RECEIVE_TIMEOUT_MS = 3000
 WORKER_SHUTDOWN_TIMEOUT_S = 5

@@ -15,10 +15,24 @@ from newsegsmodelapp.types import Page
 PAGE_TYPE = 'landing'
 
 def create_landing_header(**kwargs):
+    """Create landing header.
+
+    TODO: Add a description.
+
+    Args:
+        **kwargs: TODO.
+
+    Returns:
+        TODO.
+    """
     return html.H1(kwargs.get('head_text', ''))
 
 @dataclass
 class LandingLayoutConfiguration(registers.LayoutConfiguration):
+    """Landing Layout Configuration.
+
+    TODO: Add a description.
+    """
     page_type: str = PAGE_TYPE
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
     layout_top: Callable[[], Any] = create_landing_header
@@ -32,6 +46,16 @@ class LandingLayoutConfiguration(registers.LayoutConfiguration):
 
 def create_landing_layout(config: LandingLayoutConfiguration):
 
+    """Create landing layout.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     header = dbc.Row([
         dbc.Col(
             config.layout_navigation(config.model_type),

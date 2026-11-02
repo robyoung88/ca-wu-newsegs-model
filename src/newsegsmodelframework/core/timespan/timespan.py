@@ -330,7 +330,7 @@ class TimeSpan(StateSerialiseToDictMixin):
     def from_dict(cls: type[TTimeSpan], config: dict[str, Any]) -> TTimeSpan:
         """Create a TimeSpan from a serialized dictionary.
 
-        Overrides [core.SerialiseToDictMixin.from_dict][]
+        Overrides [SerialiseToDictMixin.from_dict][newsegsmodelframework.core.SerialiseToDictMixin.from_dict]
 
         Args:
             config (dict[str, Any]): Serialized TimeSpan configuration.
@@ -452,7 +452,7 @@ setattr(TimeSpan, '_from_other', TimeSpan_from_other)
 class RegTimeSpan(TimeSpan):
     """A TimeSpan which strides between its start and end in equally-spaced TimeDeltas.
 
-    Extends [TimeSpan][] with a regular timestep within the span.
+    Extends [TimeSpan][newsegsmodelframework.core.timespan.TimeSpan] with a regular timestep within the span.
     """
     _default_timestep = pd.Timedelta(1, 'h')
 
@@ -670,6 +670,14 @@ class RegTimeSpan(TimeSpan):
 # RegTimeSpan copy constructor
 @RegTimeSpan.__init__.register(TimeSpan) # pyright: ignore[reportFunctionMemberAccess]
 def RegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
+    """Reg Time Span from other.
+
+    TODO: Add a description.
+
+    Args:
+        start: TODO.
+        end: TODO.
+    """
     super(RegTimeSpan, self).__init__(start) # pyright: ignore[reportCallIssue]
     if isinstance(start, RegTimeSpan):
         self._timestep = start.timestep
@@ -912,6 +920,14 @@ class OffsetRegTimeSpan(RegTimeSpan):
 # OffsetRegTimeSpan copy constructor
 @OffsetRegTimeSpan.__init__.register(TimeSpan) # pyright: ignore[reportFunctionMemberAccess]
 def OffsetRegTimeSpan_from_other(self, start: TimeSpan, end: None = None):
+    """Offset Reg Time Span from other.
+
+    TODO: Add a description.
+
+    Args:
+        start: TODO.
+        end: TODO.
+    """
     super(OffsetRegTimeSpan, self).__init__(start) # pyright: ignore[reportCallIssue]
     if isinstance(start, OffsetRegTimeSpan):
         self._offset_initialised = start.offset_initialised

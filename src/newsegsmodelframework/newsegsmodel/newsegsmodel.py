@@ -25,6 +25,10 @@ from newsegsmodelframework.newsegscs import NewsegsCS
 from newsegsmodelframework.core import newsegsmodelinterface
 
 class NewsegsModelProperty(ComponentProperty):
+    """Newsegs Model Property.
+
+    TODO: Add a description.
+    """
     @override
     def __set__(self, instance: 'newsegscomponent.NewsegsComponent', value: 'newsegscomponent.NewsegsComponent'): # pyright: ignore[reportIncompatibleMethodOverride]
         if not isinstance(instance, NewsegsModel):
@@ -44,6 +48,10 @@ class NewsegsModelData(newsegscomponent.NewsegsComponent):
 
 @revision_dataclass
 class NewsegsModelConfig(DataWithRevision):
+    """Newsegs Model Config.
+
+    TODO: Add a description.
+    """
     ...
 
 
@@ -107,6 +115,10 @@ class NewsegsModel(
             
     @property
     def model_version(self) -> str:
+        """Model version.
+
+        TODO: Add a description.
+        """
         return self.version
 
     @abstractmethod
@@ -381,6 +393,13 @@ class NewsegsModel(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach grid.
+
+        TODO: Add a description.
+
+        Args:
+            component_provider: TODO.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('grid', '') == '':
             raise AttributeError('This Energy Model has no grid module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('grid', ''))
@@ -392,6 +411,13 @@ class NewsegsModel(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach generation.
+
+        TODO: Add a description.
+
+        Args:
+            component_provider: TODO.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('generation', '') == '':
             raise AttributeError('This Energy Model has no generation module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('generation',''))
@@ -403,6 +429,13 @@ class NewsegsModel(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach consumption storage.
+
+        TODO: Add a description.
+
+        Args:
+            component_provider: TODO.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('consumption_storage', '') == '':
             raise AttributeError('This Energy Model has no consumption_storage module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('consumption_storage', ''))
@@ -414,6 +447,13 @@ class NewsegsModel(
         self,
         component_provider: newsegscomponent.NewsegsComponentProviderInterface
     ):
+        """Reattach table config.
+
+        TODO: Add a description.
+
+        Args:
+            component_provider: TODO.
+        """
         if not hasattr(self, '_component_ids') or self._component_ids.get('table_config', '') == '':
             raise AttributeError('This Energy Model has no table_config module to reattach.')
         comp = component_provider.get_component(self._component_ids.get('table_config', ''))

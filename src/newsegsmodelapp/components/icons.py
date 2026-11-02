@@ -68,6 +68,7 @@ DEFAULT_ICONS = {
     'results-download': 'bi bi-table',
     'show-graph': 'bi bi-graph-up',
     'nav-options': 'bi bi-list',
+    'nav-help': 'bi bi-question-circle',
     'nav-landing': 'bi bi-card-text',
     'nav-system-config': 'bi bi-sliders2-vertical',
     'nav-dsa-config': 'bi bi-tornado',
@@ -225,6 +226,18 @@ def get_icon(icon_name: None | SequenceNotStr[str] | str = None,
              style_name: Literal['default', 'raw', 'unpadded'] = 'default'):
     
     # Icon for missing names:
+    """Get icon.
+
+    TODO: Add a description.
+
+    Args:
+        icon_name: TODO.
+        icon_class: TODO.
+        style_name: TODO.
+
+    Returns:
+        TODO.
+    """
     mi = "bi bi-exclamation-circle"
     # The bootstrap pad and margin classes for default styles
     default_pad_class = 'p-1 m-2'

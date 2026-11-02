@@ -1,3 +1,7 @@
+"""Post sprake net results module.
+
+TODO: Describe the purpose of the module.
+"""
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
 from newsegsmodelframework.newsegsgeneration import newsegsgeneration
 from newsegsmodelframework.newsegscs import newsegscs

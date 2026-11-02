@@ -43,6 +43,13 @@ from .processes.optim_process_components import optim_process_components
 PAGE_TYPE = 'dsa'
 
 def create_dsa_header():
+    """Create dsa header.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return dbc.Container(
         [
             dbc.Row(
@@ -82,6 +89,13 @@ def create_dsa_header():
     )
 
 def create_dsa_configuration_editor():
+    """Create dsa configuration editor.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return dbc.Col([
         html.Div(
             [
@@ -116,6 +130,16 @@ def create_dsa_configuration_editor():
     ])
 
 def create_optim_configuration_editor_header(**kwargs):
+    """Create optim configuration editor header.
+
+    TODO: Add a description.
+
+    Args:
+        **kwargs: TODO.
+
+    Returns:
+        TODO.
+    """
     button_container_children = [
         dbc.Button(
             'Optimise',
@@ -140,6 +164,16 @@ def create_optim_configuration_editor_header(**kwargs):
     )
 
 def create_optim_configuration_editor(**kwargs):
+    """Create optim configuration editor.
+
+    TODO: Add a description.
+
+    Args:
+        **kwargs: TODO.
+
+    Returns:
+        TODO.
+    """
     return dbc.Col([
         *create_staleness_indicator(kwargs.get('page_type', PAGE_TYPE), 'optim'),
         create_optim_configuration_editor_header(**kwargs),
@@ -219,6 +253,10 @@ def create_optim_configuration_editor(**kwargs):
 
 @dataclass
 class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
+    """DSA Configuration Layout Configuration.
+
+    TODO: Add a description.
+    """
     page_type: str = PAGE_TYPE
 
     layout_navigation: Callable[[str], Any] = navigation.create_navigation_component
@@ -228,6 +266,16 @@ class DSAConfigurationLayoutConfiguration(registers.LayoutConfiguration):
 
 def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
 
+    """Create dsa layout.
+
+    TODO: Add a description.
+
+    Args:
+        config: TODO.
+
+    Returns:
+        TODO.
+    """
     a1_contents = [
         dbc.Row([
             dbc.Col(
@@ -357,6 +405,16 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
     )
 
 def add_dsa_run_callbacks(app: NewsegsDash):
+    """Add dsa run callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     if True:
         @app.callback(
             output = {
@@ -668,6 +726,16 @@ def add_dsa_run_callbacks(app: NewsegsDash):
 def add_optim_run_callbacks(app: NewsegsDash):
 
     # Pre-run modal control
+    """Add optim run callbacks.
+
+    TODO: Add a description.
+
+    Args:
+        app: TODO.
+
+    Returns:
+        TODO.
+    """
     @app.callback(
         output = {
             'modal': {

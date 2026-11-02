@@ -25,6 +25,10 @@ HOURS_IN_YEAR = 8760.0
 
 @revision_dataclass
 class SprakeFinanceConfig(newsegsfinance.NewsegsFinanceConfig):
+    """Sprake Finance Config.
+
+    TODO: Add a description.
+    """
     wind_capex_per_kw: float = 1500.0
     wind_om_per_kw_year: float = 46.0
 
@@ -109,6 +113,13 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     
     @classmethod
     def from_none(cls):
+        """From none.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return cls(0.0)
 
     def set_unit_costs_from_dict(self, input_dict: Mapping) -> None:
@@ -180,53 +191,113 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     # Benefits
     @property
     def resident_receipts_undiscounted(self) -> pd.DataFrame:
+        """Resident receipts undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_resident_receipts_undiscounted(self).copy()
 
     @property
     def resident_receipts_discounted(self) -> pd.DataFrame:
+        """Resident receipts discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_resident_receipts_discounted(self).copy()
         
     @property
     def ev_receipts_undiscounted(self) -> pd.DataFrame:
+        """Ev receipts undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_ev_receipts_undiscounted(self).copy()
         
     @property
     def ev_receipts_discounted(self) -> pd.DataFrame:
+        """Ev receipts discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_ev_receipts_discounted(self).copy()
 
     @property
     def export_receipts_undiscounted(self) -> pd.DataFrame:
+        """Export receipts undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_export_receipts_undiscounted(self).copy()
 
     @property
     def export_receipts_discounted(self) -> pd.DataFrame:
+        """Export receipts discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_export_receipts_discounted(self).copy()
 
     @property
     def all_receipts_undiscounted(self) -> pd.DataFrame:
+        """All receipts undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_receipts_undiscounted(self).copy()
         
     @property
     def all_receipts_discounted(self) -> pd.DataFrame:
+        """All receipts discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_receipts_discounted(self).copy()
 
     def get_total_present_benefits_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get total present benefits undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_total_present_benefits_undiscounted(
             self,
             horizon
         )
     
     def get_total_present_benefits_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get total present benefits discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_total_present_benefits_discounted(self, horizon)
         
     # Costs
     
     @property
     def import_costs_undiscounted(self) -> pd.DataFrame:
+        """Import costs undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_import_costs_undiscounted(self).copy()
 
     @property
     def import_costs_discounted(self) -> pd.DataFrame:
+        """Import costs discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_import_costs_discounted(self).copy()
     
     @property
@@ -278,6 +349,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         
     @property
     def om_costs_billing_discounted(self) -> pd.DataFrame:
+        """Om costs billing discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_om_costs_billing_discounted(self).copy()
     
     @property
@@ -289,14 +364,26 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
 
     @property
     def om_costs_other_discounted(self) -> pd.DataFrame:
+        """Om costs other discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_om_costs_other_discounted(self).copy()
 
     @property
     def all_recurrent_costs_undiscounted(self) -> pd.DataFrame:
+        """All recurrent costs undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_recurrent_costs_undiscounted(self).copy()
 
     @property
     def all_recurrent_costs_discounted(self) -> pd.DataFrame:
+        """All recurrent costs discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_recurrent_costs_discounted(self).copy()
 
     @property
@@ -308,14 +395,26 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         
     @property
     def capex_costs_generation_discounted(self) -> pd.DataFrame:
+        """Capex costs generation discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_capex_costs_generation_discounted(self).copy()
 
     @property
     def capex_costs_storage_undiscounted(self) -> pd.DataFrame:
+        """Capex costs storage undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_capex_costs_storage_undiscounted(self).copy()
         
     @property
     def capex_costs_storage_discounted(self) -> pd.DataFrame:
+        """Capex costs storage discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_capex_costs_storage_discounted(self).copy()
 
     @property
@@ -327,6 +426,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         
     @property
     def capex_costs_distribution_discounted(self) -> pd.DataFrame:
+        """Capex costs distribution discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_capex_costs_distribution_discounted(self).copy()
 
     @property
@@ -338,6 +441,10 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
         
     @property
     def capex_costs_metering_discounted(self) -> pd.DataFrame:
+        """Capex costs metering discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_capex_costs_metering_discounted(self).copy()
 
     @property
@@ -349,63 +456,192 @@ class SprakeFinance(newsegsfinance.NewsegsFinance):
     
     @property
     def capex_costs_other_discounted(self) -> pd.DataFrame:
+        """Capex costs other discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_capex_costs_other_discounted(self).copy()
 
     @property
     def all_capex_costs_undiscounted(self) -> pd.DataFrame:
+        """All capex costs undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_capex_costs_undiscounted(self).copy()
 
     @property
     def all_capex_costs_discounted(self) -> pd.DataFrame:
+        """All capex costs discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_capex_costs_discounted(self).copy()
 
     @property
     def all_costs_undiscounted(self) -> pd.DataFrame:
+        """All costs undiscounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_costs_undiscounted(self).copy()
         
     @property
     def all_costs_discounted(self) -> pd.DataFrame:
+        """All costs discounted.
+
+        TODO: Add a description.
+        """
         return _deferred_get_all_costs_discounted(self).copy()
         
     def get_total_present_costs_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get total present costs undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_total_present_costs_undiscounted(self)
         
     def get_total_present_costs_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get total present costs discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_total_present_costs_discounted(self)
         
     # Summary vectors
     def get_benefits_series_undiscounted(self) -> pd.Series:
+        """Get benefits series undiscounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_benefits_series_undiscounted(self).copy()
 
     def get_benefits_series_discounted(self) -> pd.Series:
+        """Get benefits series discounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_benefits_series_discounted(self).copy()
             
     def get_costs_series_undiscounted(self) -> pd.Series:
+        """Get costs series undiscounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_costs_series_undiscounted(self).copy()
 
     def get_costs_series_discounted(self) -> pd.Series:
+        """Get costs series discounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_costs_series_discounted(self).copy()
 
     def get_benefits_costs_undiscounted(self) -> pd.DataFrame:
+        """Get benefits costs undiscounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_benefits_costs_undiscounted(self).copy()
     
     def get_benefits_costs_discounted(self) -> pd.DataFrame:
+        """Get benefits costs discounted.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_benefits_costs_discounted(self).copy()
 
     # Derived values
     def get_benefit_cost_ratio_undiscounted(self,  horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get benefit cost ratio undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_benefit_cost_ratio_undiscounted(self)
         
     def get_benefit_cost_ratio_discounted(self,  horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get benefit cost ratio discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_benefit_cost_ratio_discounted(self)
 
     def get_simple_payback_time_days(self) -> float:
+        """Get simple payback time days.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_simple_payback_time_days(self)
         
     def get_net_present_value_undiscounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get net present value undiscounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_net_present_value_undiscounted(self, horizon)
 
     def get_net_present_value_discounted(self, horizon:pd.Timestamp|pd.Timedelta|None=None) -> float:
+        """Get net present value discounted.
+
+        TODO: Add a description.
+
+        Args:
+            horizon: TODO.
+
+        Returns:
+            TODO.
+        """
         return _deferred_get_net_present_value_discounted(self, horizon)
 
 # SprakeFinance copy constructor

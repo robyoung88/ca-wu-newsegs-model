@@ -1,3 +1,7 @@
+"""Db result provider module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,10 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from cachetools import LRUCache
 
 class FromDatabaseResultProvider(NewsegsResultProviderInterface):
+    """From Database Result Provider.
+
+    TODO: Add a description.
+    """
     def __init__(
         self,
         get_engine: Callable[[], sa.Engine],
@@ -306,6 +314,16 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         self,
         result_id: int
     ) ->  tuple[Any, int] | tuple[None, None]:
+        """Get result by id.
+
+        TODO: Add a description.
+
+        Args:
+            result_id: TODO.
+
+        Returns:
+            TODO.
+        """
         stmt = (
             sa.select(self._table.c.result_file, self._table.c.component_config_revision)
             .where(self._table.c.result_id == result_id)
@@ -331,6 +349,19 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         parent_component: NewsegsComponent | LightweightNewsegsComponent | str,
         revision: Optional[int] = None,
     ) -> int | bool:
+        """Result exists.
+
+        TODO: Add a description.
+
+        Args:
+            result_type: TODO.
+            request_id: TODO.
+            parent_component: TODO.
+            revision: TODO.
+
+        Returns:
+            TODO.
+        """
         stmt = (
             sa.select(
                 self._table.c.result_id,
@@ -380,6 +411,10 @@ class CachedFromDatabaseResultProvider(
     FromDatabaseResultProvider
 ):
     
+    """Cached From Database Result Provider.
+
+    TODO: Add a description.
+    """
     def __init__(self, get_engine: Callable[[], sa.Engine], result_store: Path):
         super().__init__(get_engine, result_store)
         self._result_cache = LRUCache(maxsize = 128)

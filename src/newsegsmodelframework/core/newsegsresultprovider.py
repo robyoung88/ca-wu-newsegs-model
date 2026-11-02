@@ -1,9 +1,17 @@
+"""Newsegsresultprovider module.
+
+TODO: Describe the purpose of the module.
+"""
 from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
 from newsegsmodelframework.core.newsegscomponent import NewsegsComponent
 
 class NewsegsResultProviderInterface(metaclass = ABCMeta):
+    """Newsegs Result Provider Interface.
+
+    TODO: Add a description.
+    """
     @abstractmethod
     def upsert_result(self,
         result_type: str,

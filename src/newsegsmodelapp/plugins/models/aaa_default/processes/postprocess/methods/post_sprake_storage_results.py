@@ -1,3 +1,7 @@
+"""Post sprake storage results module.
+
+TODO: Describe the purpose of the module.
+"""
 import numpy as np
 
 from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel

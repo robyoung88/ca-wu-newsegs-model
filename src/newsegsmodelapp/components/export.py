@@ -1,3 +1,7 @@
+"""Export module.
+
+TODO: Describe the purpose of the module.
+"""
 import io
 import json
 import tempfile
@@ -64,6 +68,23 @@ def export_results(
     format_option: str = 'csv',
     result_level: Optional[str] = None,
 ):
+    """Export results.
+
+    TODO: Add a description.
+
+    Args:
+        result_type: TODO.
+        project_provider: TODO.
+        result_provider: TODO.
+        project_id: TODO.
+        metamodel_id: TODO.
+        contents_option: TODO.
+        format_option: TODO.
+        result_level: TODO.
+
+    Returns:
+        TODO.
+    """
     proj = project_provider.get_project(project_id)
     match result_type:
         case 'dsa':

@@ -12,6 +12,10 @@ from newsegsmodelframework.newsegsvariable.variableprovider import VariableManag
 ON_MISSING_OPTION = Literal['last', 'create', 'none']
 
 class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
+    """Newsegs Project Provider Interface.
+
+    TODO: Add a description.
+    """
     metamodel_provider: NewsegsComponentManagerInterface
     variable_provider: VariableManagerInterface
 
@@ -65,6 +69,16 @@ class NewsegsProjectProviderInterface(NewsegsComponentManagerInterface):
         """Delete a specific snapshot"""
 
     def get_project(self, project_id: str) -> NewsegsProject:
+        """Get project.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+
+        Returns:
+            TODO.
+        """
         return cast(NewsegsProject, self.get_component(project_id))
 
     @abstractmethod

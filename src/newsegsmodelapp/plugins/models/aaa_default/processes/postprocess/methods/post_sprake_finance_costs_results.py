@@ -1,3 +1,7 @@
+"""Post sprake finance costs results module.
+
+TODO: Describe the purpose of the module.
+"""
 import numpy as np
 import pandas as pd
 

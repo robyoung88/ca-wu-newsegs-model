@@ -1,3 +1,7 @@
+"""Sprakemodel module.
+
+TODO: Describe the purpose of the module.
+"""
 from __future__ import annotations
 from dataclasses import asdict, field
 import os
@@ -62,6 +66,13 @@ def _get_sprake_wind_speeds():
 
 @lru_cache
 def get_sprake_environment_server():
+    """Get sprake environment server.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     server = inmem_env_servers.InMemoryLocalEnv()
 
     ### Wind
@@ -142,6 +153,13 @@ def get_sprake_environment_server():
     return server
 
 def get_sprake_wider_env_server():
+    """Get sprake wider env server.
+
+    TODO: Add a description.
+
+    Returns:
+        TODO.
+    """
     return DummyWiderEnv()
 
 def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
@@ -150,6 +168,10 @@ def _timespan_to_horizon_years(timespan: modtimespan.TimeSpan) -> int:
 
 @revision_dataclass
 class SprakeModelConfig(newsegsmodel.NewsegsModelConfig):
+    """Sprake Model Config.
+
+    TODO: Add a description.
+    """
     timestep: pd.Timedelta = pd.Timedelta(_DEFAULT_TS)
     run_period: modtimespan.TimeSpan = field(default_factory = lambda: copy.copy(_DEFAULT_TIMESPAN))
 
@@ -274,14 +296,35 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     # We can do the from_none using the _from_str init
     @classmethod
     def from_none(cls):
+        """From none.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return cls('Sprake Energy Model')
 
     def set_run_period(self, timespan: modtimespan.TimeSpan) -> None:
+        """Set run period.
+
+        TODO: Add a description.
+
+        Args:
+            timespan: TODO.
+        """
         new_timespan = modtimespan.RegTimeSpan(timespan)
         new_timespan.timestep = self.timestep
         self._config.run_period = new_timespan
         
     def get_run_period(self) -> modtimespan.TimeSpan:
+        """Get run period.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self.run_period
     
     @property
@@ -300,6 +343,10 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @property
     def local_env(self) -> environment_servers.NewsegsLocalEnvironment:
+        """Local env.
+
+        TODO: Add a description.
+        """
         try:
             return self._local_environment_server
         except AttributeError:
@@ -316,6 +363,10 @@ class SprakeModel(newsegsmodel.NewsegsModel):
 
     @property
     def wider_env(self) -> environment_servers.NewsegsWiderEnvironment:
+        """Wider env.
+
+        TODO: Add a description.
+        """
         try:
             return self._wider_environment_server
         except AttributeError:
@@ -330,6 +381,13 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self._wider_environment_server = wider_env_server
 
     def get_default_timestep(self) -> pd.Timedelta:
+        """Get default timestep.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self.timestep
 
     @property
@@ -347,15 +405,43 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         self.consumption_storage.location = loc
 
     def get_generation_result(self) -> NewsegsModuleResult:
+        """Get generation result.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._generation_result
 
     def get_grid_result(self) -> NewsegsModuleResult:
+        """Get grid result.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._grid_result
 
     def get_cs_result(self) -> NewsegsModuleResult:
+        """Get cs result.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._cs_result
 
     def get_consumption_storage_result(self) -> NewsegsModuleResult:
+        """Get consumption storage result.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self._cs_result
 
     @override

@@ -257,6 +257,10 @@ def run_psa(
 
 @revision_dataclass
 class PSAConfig(DataWithRevision):
+    """PSA Config.
+
+    TODO: Add a description.
+    """
     samples: int = 1000
     seed: int | None = None
     return_draws: bool = False
@@ -350,6 +354,10 @@ def basic_psa_stats(
 ##### Generic Graph functions #####
 
 class BoundingBox(NamedTuple):
+    """Bounding Box.
+
+    TODO: Add a description.
+    """
     """"""
     xmin: float
     ymin: float

@@ -17,6 +17,10 @@ from newsegsmodelframework.core.trackeddata import ConfigurationMixin, DataWithR
 
 @revision_dataclass
 class NewsegsGenerationConfig(DataWithRevision):
+    """Newsegs Generation Config.
+
+    TODO: Add a description.
+    """
     location: modlocation.Location | list[modlocation.Location] = field(default_factory = modlocation.Location.from_none)
     """The location of the generators / power plants.
     

@@ -1,3 +1,7 @@
+"""Db component provider module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,10 @@ from newsegsmodelframework.newsegsvariable.variableprovider import VariableProvi
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentManagerInterface
 ):
+    """From Database Newsegs Component Provider.
+
+    TODO: Add a description.
+    """
     _table = tbls.component_configs
 
     _lightweight_component_columns = tuple(
@@ -156,6 +164,16 @@ class FromDatabaseNewsegsComponentProvider(
     def get_lightweight_component(
         self, component_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsComponent | SequenceNotStr[LightweightNewsegsComponent]:
+        """Get lightweight component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+
+        Returns:
+            TODO.
+        """
         prevstate = RevisionNotifierMixin._set_notification_state('disabled')
         try:
             is_sequence = False
@@ -277,6 +295,14 @@ class FromDatabaseNewsegsComponentProvider(
     def upsert_children(self, component: NewsegsComponent, force: bool = False):
         # Expect to override this for different types of component
         # to deal with different tables
+        """Upsert children.
+
+        TODO: Add a description.
+
+        Args:
+            component: TODO.
+            force: TODO.
+        """
         component_children = component.get_components(component_group= 'component_configs')
         if component_children:
             self.upsert_component(component_children, force = force)
@@ -545,6 +571,17 @@ class FromDatabaseNewsegsComponentProvider(
         component_id: str | SequenceNotStr[str],
         metadata_ids: str | SequenceNotStr[str]
     ) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get component metadata.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+            metadata_ids: TODO.
+
+        Returns:
+            TODO.
+        """
         is_single_id = isinstance(component_id, (str, bytes))
         component_id = [component_id] if is_single_id else list(component_id)
 
@@ -648,6 +685,10 @@ class FromDatabaseNewsegsComponentProvider(
         return
 
 class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
+    """From Database Newsegs EM Provider.
+
+    TODO: Add a description.
+    """
     _table = tbls.em_configs
 
     _lightweight_component_columns = tuple(
@@ -732,6 +773,16 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
     def get_lightweight_em(
             self, model_id: str | SequenceNotStr[str]
         ) -> LightweightNewsegsModel | SequenceNotStr[LightweightNewsegsModel]:
+        """Get lightweight em.
+
+        TODO: Add a description.
+
+        Args:
+            model_id: TODO.
+
+        Returns:
+            TODO.
+        """
         return self.get_lightweight_component(model_id)
     
     @override
@@ -818,6 +869,10 @@ class FromDatabaseNewsegsEMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
+    """From Database Newsegs FM Provider.
+
+    TODO: Add a description.
+    """
     _table = tbls.fm_configs
 
     _lightweight_component_columns = tuple(
@@ -884,6 +939,16 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
     def get_lightweight_fm(
         self, finance_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsFinance | SequenceNotStr[LightweightNewsegsFinance]:
+        """Get lightweight fm.
+
+        TODO: Add a description.
+
+        Args:
+            finance_id: TODO.
+
+        Returns:
+            TODO.
+        """
         return self.get_lightweight_component(finance_id)
  
     @override
@@ -967,6 +1032,10 @@ class FromDatabaseNewsegsFMProvider(FromDatabaseNewsegsComponentProvider):
 
 
 class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider):
+    """From Database Newsegs Metamodel Provider.
+
+    TODO: Add a description.
+    """
     _table = tbls.metamodels
     _metamodel_variable_jct = tbls.metamodel_variables
 
@@ -1184,6 +1253,16 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
     def get_lightweight_metamodel(
         self, metamodel_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsMetaModel | SequenceNotStr[LightweightNewsegsMetaModel]:
+        """Get lightweight metamodel.
+
+        TODO: Add a description.
+
+        Args:
+            metamodel_id: TODO.
+
+        Returns:
+            TODO.
+        """
         return self.get_lightweight_component(metamodel_id)
 
     @override
@@ -1221,6 +1300,14 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         metamodel: NewsegsMetaModel | LightweightNewsegsMetaModel,
         variables: Sequence[Variable | LightweightVariable]
     ):
+        """Refresh metamodel variable junction.
+
+        TODO: Add a description.
+
+        Args:
+            metamodel: TODO.
+            variables: TODO.
+        """
         varids = [x.varid if isinstance(x, LightweightVariable) else variable_uid(x) for x in variables]
         if not varids:
             return
@@ -1419,6 +1506,10 @@ class FromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsComponentProvider,
     NewsegsProjectProviderInterface,
 ):
+    """From Database Newsegs Project Provider.
+
+    TODO: Add a description.
+    """
     _table = tbls.projects
     _project_metamodel_jct = tbls.project_metamodels
     _project_variable_jct = tbls.project_variables
@@ -1591,6 +1682,16 @@ class FromDatabaseNewsegsProjectProvider(
     def get_lightweight_project(
         self, project_id: str | SequenceNotStr[str]
     ) -> LightweightNewsegsProject | SequenceNotStr[LightweightNewsegsProject]:
+        """Get lightweight project.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+
+        Returns:
+            TODO.
+        """
         return self.get_lightweight_component(project_id)
 
     def add_variables_to_project(
@@ -1598,6 +1699,14 @@ class FromDatabaseNewsegsProjectProvider(
         project_id: str,
         variables: Sequence[Variable | LightweightVariable]
     ):
+        """Add variables to project.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+            variables: TODO.
+        """
         new_entries = [
             {
                 'project_id': project_id,
@@ -1617,6 +1726,14 @@ class FromDatabaseNewsegsProjectProvider(
         project_id: str,
         variables: Sequence[Variable | LightweightVariable | str]
     ):
+        """Remove variables from project.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+            variables: TODO.
+        """
         var_uids = [x.id if not isinstance(x, str) else x for x in variables]
         clear_statement = (
             self._project_variable_jct.delete()
@@ -1968,6 +2085,14 @@ class FromDatabaseNewsegsProjectProvider(
         snapshot_id: int,
         snapshot_name: str
     ):
+        """Rename snapshot.
+
+        TODO: Add a description.
+
+        Args:
+            snapshot_id: TODO.
+            snapshot_name: TODO.
+        """
         stmt = (
             sa.update(tbls.snapshots)
             .where(tbls.snapshots.c.snapshot_id == snapshot_id)
@@ -2054,6 +2179,13 @@ class FromDatabaseNewsegsProjectProvider(
 
     def delete_orphan_variables(self) -> int:
 
+        """Delete orphan variables.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         referenced_variable_ids = sa.union(
             sa.select(tbls.project_variables.c.variable_config_id),
             sa.select(tbls.metamodel_variables.c.variable_config_id)
@@ -2069,6 +2201,17 @@ class FromDatabaseNewsegsProjectProvider(
             return result.rowcount
 
     def create_project_snapshot(self, project_id: str, snapshot_label: str) -> int:
+        """Create project snapshot.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+            snapshot_label: TODO.
+
+        Returns:
+            TODO.
+        """
         snapshot_id = db_snapshot.generic_snapshot_entity(
             self._get_engine(writer = True),
             tbls.metadata,
@@ -2080,6 +2223,17 @@ class FromDatabaseNewsegsProjectProvider(
         return snapshot_id
 
     def load_project_snapshot(self, project_id: str, snapshot_id: int) -> NewsegsProject:
+        """Load project snapshot.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+            snapshot_id: TODO.
+
+        Returns:
+            TODO.
+        """
         id_remap = db_snapshot.generic_restore_snapshot(
             self._get_engine(writer = True),
             tbls.metadata,
@@ -2089,6 +2243,14 @@ class FromDatabaseNewsegsProjectProvider(
         return self.get_project(new_project_id)
 
     def delete_project_snapshot(self, project_id: str, snapshot_id: int):
+        """Delete project snapshot.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+            snapshot_id: TODO.
+        """
         db_snapshot.delete_snapshot(self._get_engine(writer = True), tbls.metadata, snapshot_id)
 
     @override
@@ -2115,6 +2277,13 @@ class FromDatabaseNewsegsProjectProvider(
         return res
 
     def touch_project(self, project_id: str):
+        """Touch project.
+
+        TODO: Add a description.
+
+        Args:
+            project_id: TODO.
+        """
         stmt = (
             sa.update(self._table)
             .where(self._table.c.id == project_id)
@@ -2133,6 +2302,10 @@ class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
 ):
 
+    """Cached From Database Newsegs Project Provider.
+
+    TODO: Add a description.
+    """
     def _create_variable_provider(self) -> VariableProviderInterface:
         return CachedFromDatabaseVariableProvider(self._get_engine)
     
@@ -2296,6 +2469,13 @@ class CachedFromDatabaseNewsegsProjectProvider(
         return olist
 
     def invalidate_cache_for_component(self, component_id):
+        """Invalidate cache for component.
+
+        TODO: Add a description.
+
+        Args:
+            component_id: TODO.
+        """
         if isinstance(component_id, str):
             component_id = [component_id]
         for id_ in component_id:
@@ -2305,6 +2485,16 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 del self._lightweight_project_cache[id_]        
 
 def get_component_critical_state(component):
+    """Get component critical state.
+
+    TODO: Add a description.
+
+    Args:
+        component: TODO.
+
+    Returns:
+        TODO.
+    """
     return {
         'id': component.id,
         'revision': component.revision,
@@ -2312,12 +2502,32 @@ def get_component_critical_state(component):
     }
 
 def get_observable_critical_state(observable):
+    """Get observable critical state.
+
+    TODO: Add a description.
+
+    Args:
+        observable: TODO.
+
+    Returns:
+        TODO.
+    """
     return {
         'revision': observable.revision,
         'modified': observable.modified
     }
 
 def get_project_critical_state(project):
+    """Get project critical state.
+
+    TODO: Add a description.
+
+    Args:
+        project: TODO.
+
+    Returns:
+        TODO.
+    """
     odict = {}
     odict.update(
         {

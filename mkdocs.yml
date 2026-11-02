@@ -1,19 +1,45 @@
 site_name: NewSEGS Energy Modelling Software
 site_description: Documentation supporting NewSEGS Energy Modelling software.
+repo_url: https://github.com/robyoung88/ca-wu-newsegs-model
+repo_name: robyoung88/ca-wu-newsegs-model
+
+# The same HTML is served from GitHub Pages and from inside the app (under /documentation/),
+# so all links must be relative and must not rely on the server resolving directory indexes.
+use_directory_urls: false
 
 theme:
   name: material
+  # Do not fetch Google Fonts - the documentation must also work for an app without internet access
+  font: false
   palette:
-    scheme: light
+    scheme: default
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - search.highlight
+
+extra_javascript:
+  - javascripts/app-link.js
 
 markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 plugins:
   - search
@@ -25,6 +51,10 @@ plugins:
             show_root_heading: true
             show_source: true
             docstring_style: google
+            docstring_options:
+              # Template docstrings and older docstrings do not always give types
+              warn_missing_types: false
+              returns_named_value: false
             members_order: __all__
             summary:
               attributes: true
@@ -34,14 +64,25 @@ plugins:
 
 nav:
   - Home: index.md
-  - Core components: core.md
-  - Metamodel: newsegsmetamodel.md
-  - Model: newsegsmodel.md
-  - Modules: newsegsmodules.md
-  - Finance: newsegsfinance.md
-  - Variable: newsegsvariable.md
-  - Statistics and Sensitivity: newsegsstats.md
-  - App: newsegsbrowser.md
-  - NEWA: newa.md
-  - ADMD: admd.md
-  - Utilities: util.md
+  - Architecture: architecture.md
+  - Docstring conventions: docstrings.md
+  - Framework:
+    - framework/index.md
+    - Plugins: framework/plugins.md
+    - Core components: framework/core.md
+    - Modules: framework/modules.md
+    - Model: framework/model.md
+    - Finance: framework/finance.md
+    - Variable: framework/variable.md
+    - Metamodel and Project: framework/metamodel.md
+    - Statistics and Sensitivity: framework/stats-sensitivity.md
+    - Utilities: framework/util.md
+  - Application:
+    - app/index.md
+    - Plugins: app/plugins.md
+    - Backend: app/backend.md
+    - Components: app/components.md
+    - Database: app/database.md
+  - Supporting packages:
+    - NEWA: support/newa.md
+    - ADMD: support/admd.md

@@ -35,6 +35,10 @@ import os
 POISON_PILL = b"__STOP__"
 
 class RunAlreadyExistsError(BaseException):
+    """Run Already Exists Error.
+
+    TODO: Add a description.
+    """
     pass
 
 def worker_process(
@@ -44,6 +48,20 @@ def worker_process(
     db_path: str | None = None, 
     stop_event = None
 ):
+    """Worker process.
+
+    TODO: Add a description.
+
+    Args:
+        worker_id: TODO.
+        server: TODO.
+        port: TODO.
+        db_path: TODO.
+        stop_event: TODO.
+
+    Returns:
+        TODO.
+    """
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.setsockopt(zmq.RCVTIMEO, settings.get('WORKER_RECEIVE_TIMEOUT_MS', -1))

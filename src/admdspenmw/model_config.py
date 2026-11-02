@@ -1,3 +1,11 @@
+"""Default configuration for running the ADMD calculation (`admd`) with a Hamilton driver.
+
+Attributes:
+    default_model_config: Hamilton configuration (empty - no configuration is needed).
+    default_model_inputs: Default values of the inputs of the calculation: 50 customers with no
+        EV chargers, heat pumps or storage heating, and smart charging.
+    default_model_outputs: The values requested from the calculation.
+"""
 default_model_config = {}
 
 default_model_inputs = {

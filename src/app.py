@@ -17,13 +17,16 @@ import uuid
 from dash import ALL, Dash, Input, Output, State, DiskcacheManager, CeleryManager
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
-from flask import jsonify
+from flask import jsonify, send_from_directory
 import sqlalchemy as sa
 import sqlite3
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings
+
+from newsegsmodelapp.components.navigation import DOCS_URL
+DEFAULT_DOCS_PATH = APP_ROOT.parent / 'site' # Where `mkdocs build` puts the documentation
 
 # PLUGINS
 import newsegsmodelframework.register_plugins
@@ -296,6 +299,24 @@ def create_app(external_stylesheets = None) -> Dash:
             return jsonify({'status': 'healthy', 'message': 'Service is operational'}), 200
         except sqlite3.Error as e:
             return jsonify({'status': 'unhealthy', 'message': f'Database error: {e}'}), 500
+
+    # ---------------------------------
+    # Documentation
+    # ---------------------------------
+    # The HTML built by `mkdocs build` is served from DOCS_PATH, so that the app can link to it.
+    # The documentation is not part of the Dash app: pages are plain HTML files with relative
+    # links (use_directory_urls is false in mkdocs.yml), served below DOCS_URL.
+    @server.route(DOCS_URL, defaults = {'filename': 'index.html'})
+    @server.route(DOCS_URL + '<path:filename>')
+    def documentation(filename):
+        docs_path = Path(str(settings.get('DOCS_PATH', DEFAULT_DOCS_PATH)))
+        if not (docs_path / 'index.html').exists():
+            return (
+                'The documentation has not been built. Run "mkdocs build" in the root of the '
+                f'repository, or set DOCS_PATH (currently {docs_path}).',
+                404
+            )
+        return send_from_directory(docs_path, filename)
 
     # Bind callbacks
     add_display_callbacks(app)

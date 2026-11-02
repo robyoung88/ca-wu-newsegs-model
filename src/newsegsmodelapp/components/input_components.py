@@ -1,3 +1,7 @@
+"""Input components module.
+
+TODO: Describe the purpose of the module.
+"""
 import logging
 logger = logging.getLogger(__name__)
 
@@ -37,6 +41,21 @@ def create_numeric_variable_parameter_input(
     max: int | float | None = None,
     step: int | float  = 1
 ):
+    """Create numeric variable parameter input.
+
+    TODO: Add a description.
+
+    Args:
+        param_id: TODO.
+        placeholder: TODO.
+        value: TODO.
+        min: TODO.
+        max: TODO.
+        step: TODO.
+
+    Returns:
+        TODO.
+    """
     input_id = param_id.as_dict()
 
     if float(int(step)) == float(step):
@@ -70,6 +89,26 @@ def create_numeric_card_variable_parameter_input(
     status_text: str = "Shared with all",
     status_colour: str = "success",
 ):
+    """Create numeric card variable parameter input.
+
+    TODO: Add a description.
+
+    Args:
+        icon_name: TODO.
+        label: TODO.
+        param_id: TODO.
+        placeholder: TODO.
+        value: TODO.
+        min: TODO.
+        max: TODO.
+        step: TODO.
+        reset_button: TODO.
+        status_text: TODO.
+        status_colour: TODO.
+
+    Returns:
+        TODO.
+    """
     button_elements = []
     if reset_button:
 
@@ -120,6 +159,24 @@ def update_single_parameter(
     new_val: Optional[Any] = None, # Include this so we can call from other parameter setting functions, not just dash callbacks
 ) -> dict[str, Any]:
 
+    """Update single parameter.
+
+    TODO: Add a description.
+
+    Args:
+        triggered_id: TODO.
+        input_ids: TODO.
+        header_ids: TODO.
+        trigger_ids: TODO.
+        calling_dict: TODO.
+        active_project_id: TODO.
+        project_provider: TODO.
+        return_dict: TODO.
+        new_val: TODO.
+
+    Returns:
+        TODO.
+    """
     if new_val is None:
         new_val = callback_utils.get_triggered_value()
         if new_val is None:
@@ -208,6 +265,16 @@ def update_single_parameter(
 def create_value_reset_button(
     param_id: VariableInstanceParameterComponentID
 ):
+    """Create value reset button.
+
+    TODO: Add a description.
+
+    Args:
+        param_id: TODO.
+
+    Returns:
+        TODO.
+    """
     button_id = copy.copy(param_id)
     button_id.type = 'input-action-button'
     button_id.purpose = 'value-reset'
@@ -271,6 +338,16 @@ def _reset_value(
 def create_value_set_default_button(
     param_id: VariableInstanceParameterComponentID
 ):
+    """Create value set default button.
+
+    TODO: Add a description.
+
+    Args:
+        param_id: TODO.
+
+    Returns:
+        TODO.
+    """
     button_id = copy.copy(param_id)
     button_id.type = 'input-action-button'
     button_id.purpose = 'value-set-default'
@@ -325,6 +402,16 @@ def _set_default_value(
 def create_blank_single_input_header_element(
     param_id: VariableInstanceParameterComponentID
 ):
+    """Create blank single input header element.
+
+    TODO: Add a description.
+
+    Args:
+        param_id: TODO.
+
+    Returns:
+        TODO.
+    """
     header_id = copy.copy(param_id)
     header_id.type = 'single-input-header'
     header_id.purpose = 'header'
@@ -334,6 +421,17 @@ def create_input_group_config_update_trigger(
     param_id: VariableInstanceParameterComponentID,
     purpose: str = 'trigger',
 ):
+    """Create input group config update trigger.
+
+    TODO: Add a description.
+
+    Args:
+        param_id: TODO.
+        purpose: TODO.
+
+    Returns:
+        TODO.
+    """
     trigger_id = copy.copy(param_id)
     trigger_id.type = 'input-group-config-update-trigger'
     trigger_id.purpose = purpose
@@ -397,6 +495,18 @@ def create_variable_status_badge(
     status_text: str = "Shared with all", 
     colour: str = "success"
 ):
+    """Create variable status badge.
+
+    TODO: Add a description.
+
+    Args:
+        param_id: TODO.
+        status_text: TODO.
+        colour: TODO.
+
+    Returns:
+        TODO.
+    """
     badge_id = copy.copy(param_id)
     badge_id.type = 'input-action-button'
     badge_id.purpose = 'variable-status-toggle'

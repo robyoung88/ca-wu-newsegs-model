@@ -1,8 +1,16 @@
+"""Lightweightnewsegscomponent module.
+
+TODO: Describe the purpose of the module.
+"""
 from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_dataclass
 
 
 @revision_dataclass
 class LightweightNewsegsComponent(DataWithRevision):
+    """Lightweight Newsegs Component.
+
+    TODO: Add a description.
+    """
     id: str
 
 

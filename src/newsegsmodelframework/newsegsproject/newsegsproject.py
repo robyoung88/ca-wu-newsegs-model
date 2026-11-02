@@ -29,12 +29,20 @@ from newsegsmodelframework.newsegsvariable.variableprovider import InMemoryVaria
 
 @revision_dataclass
 class NewsegsProjectConfig(DataWithRevision):
+    """Newsegs Project Config.
+
+    TODO: Add a description.
+    """
     model_type: str = ''
     model_version: str = ''
 
 
 class ProjVarWatcher(RevisionNotifierProtocol):
     
+    """Proj Var Watcher.
+
+    TODO: Add a description.
+    """
     def __init__(self, project: 'NewsegsProject'):
         self._project = project
 
@@ -127,10 +135,18 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
 
     @property
     def metamodel_ids(self) -> tuple[str, ...]:
+        """Metamodel ids.
+
+        TODO: Add a description.
+        """
         return tuple(mm.id for mm in self.metamodels)
 
     @property
     def watcher(self) -> RevisionNotifierProtocol:
+        """Watcher.
+
+        TODO: Add a description.
+        """
         if self._watcher is None:
             self._watcher = ProjVarWatcher(self)
         return self._watcher
@@ -140,6 +156,13 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         self._watcher = watcher
 
     def get_focussed_metamodel_index(self) -> int:
+        """Get focussed metamodel index.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         if self._focussed_metamodel >= len(self.metamodels):
             if len(self.metamodels) == 0:
                 raise ValueError('No metamodels within project')
@@ -148,12 +171,34 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         return self._focussed_metamodel
 
     def set_focussed_metamodel_index(self, metamodel_index: int = 0):
+        """Set focussed metamodel index.
+
+        TODO: Add a description.
+
+        Args:
+            metamodel_index: TODO.
+        """
         self.set_focussed_metamodel(metamodel_index = metamodel_index)
 
     def get_focussed_metamodel(self):
+        """Get focussed metamodel.
+
+        TODO: Add a description.
+
+        Returns:
+            TODO.
+        """
         return self.metamodels[self.get_focussed_metamodel_index()]
 
     def set_focussed_metamodel(self, metamodel_id: Optional[str] = None, metamodel_index: int = 0):
+        """Set focussed metamodel.
+
+        TODO: Add a description.
+
+        Args:
+            metamodel_id: TODO.
+            metamodel_index: TODO.
+        """
         if metamodel_id:
             for i, mm in enumerate(self.metamodels):
                 if mm.id == metamodel_id:
@@ -162,6 +207,16 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         self._focussed_metamodel = max(0, min(len(self.metamodels)-1, metamodel_index))
 
     def duplicate_metamodel(self, metamodel_id: str) -> newsegsmetamodel.NewsegsMetaModel:
+        """Duplicate metamodel.
+
+        TODO: Add a description.
+
+        Args:
+            metamodel_id: TODO.
+
+        Returns:
+            TODO.
+        """
         try:
             wch = self.metamodel_ids.index(metamodel_id)
         except ValueError:
@@ -218,6 +273,13 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         return result
 
     def reattach_metamodels(self, provider: NewsegsComponentProviderInterface):
+        """Reattach metamodels.
+
+        TODO: Add a description.
+
+        Args:
+            provider: TODO.
+        """
         if not hasattr(self, '_metamodel_ids') or not self._metamodel_ids:
             return
         r0 = self.revision
@@ -232,6 +294,16 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         self.table_config.revision = tr0
 
     def get_metamodel_by_id(self, metamodel_id: str):
+        """Get metamodel by id.
+
+        TODO: Add a description.
+
+        Args:
+            metamodel_id: TODO.
+
+        Returns:
+            TODO.
+        """
         for mm in self.metamodels:
             if mm.id == metamodel_id:
                 break
@@ -253,6 +325,15 @@ class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariablePro
         variable_id: Optional['str | SequenceNotStr[str]'] = None,
         force: bool = False,
     ):
+        """Variable to store.
+
+        TODO: Add a description.
+
+        Args:
+            store_interface: TODO.
+            variable_id: TODO.
+            force: TODO.
+        """
         if isinstance(variable_id, str):
             variable_id = [variable_id, ]
         elif variable_id is None:
