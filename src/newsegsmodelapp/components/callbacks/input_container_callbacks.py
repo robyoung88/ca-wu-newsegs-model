@@ -188,7 +188,13 @@ def add_input_container_callbacks(app: NewsegsDash):
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
 
-        for trig in ctx.triggered:
+        # Intervals are reset to 0 by update_input_header_contents and then tick to 1;
+        # only hydrate on the tick, or each container is built twice
+        triggers = [x for x in ctx.triggered if x['value'] == 1]
+        if not triggers:
+            raise PreventUpdate
+
+        for trig in triggers:
             trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
             supersection = trig.get('supersection')
             section = trig.get('section')

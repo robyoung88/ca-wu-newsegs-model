@@ -7,7 +7,6 @@ from typing import Any, cast
 
 from dash import ALL, MATCH, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
-from dash_extensions import Purify
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components import callback_utils
@@ -325,7 +324,8 @@ def add_result_container_callbacks(app: NewsegsDash):
             raise PreventUpdate
 
         trig_id = ctx.triggered_id
-        if isinstance(trig_id, str) and trig_id == 'result-container-refill-interval':
+        # The interval is reset to 0 on project change and then ticks to 1; only act on the tick
+        if isinstance(trig_id, str) and trig_id == 'delayed-result-container-refill-interval':
             if callback_utils.get_triggered_value() != 1:
                 raise PreventUpdate
 
@@ -356,14 +356,20 @@ def add_result_container_callbacks(app: NewsegsDash):
         model_type = app_state.get('model_type', 'default')
         
         contents_by_section_subindex = {}
-        """Local store for contents to prevent redrawing within single call"""
+        """
+        Local store for contents to prevent redrawing within single call, keyed
+        by (section, key, subindex): containers share a section ('tabledraw'),
+        so the key is needed to tell their tables apart
+        """
         
         # Do not update if the toggle status has not changed, the project is the same,
         # and the table revision number is the same.
         logger.debug('Getting lightweight project - Updating Result Table Containers')
         lproj = app.project_provider.get_lightweight_project(active_project_id)
         table_rev = lproj.table_config.revision
-        ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
+        # The toggle's value is None until first used; normalise so that the
+        # rendered state recorded below can match on the next call
+        ann_hori_toggle = bool(ann_hori_toggle[0]) if len(ann_hori_toggle) else False
 
         rendered_project = {
             (k['section'], k['key']) : v for k, v in zip(container_ids, rendered_project_ids)
@@ -390,7 +396,7 @@ def add_result_container_callbacks(app: NewsegsDash):
                         continue
 
             subindex = int(container_id.get('subindex'))
-            ss = (section, subindex)
+            ss = (section, key, subindex)
             if ss in contents_by_section_subindex:
                 callback_utils.update_property_by_id(
                     container_id,

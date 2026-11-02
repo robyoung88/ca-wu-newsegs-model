@@ -125,6 +125,10 @@ def create_results_header(page_type, **kwargs):
                         'supersection': 'global', 'section': 'tabledraw',
                         'key': 'timeseriesupdate', 'subindex': 0
                     }, data = 0),
+                    # Id of the model whose results are drawn in graph-timeseries
+                    dcc.Store(id = 'timeseries-rendered-model-id'),
+                    # x-axis range requested by clicking a date in a result grid
+                    dcc.Store(id = 'timeseries-zoom-request'),
                 ]), 
             className = 'drawer-title'
             ),

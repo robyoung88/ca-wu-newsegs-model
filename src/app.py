@@ -326,4 +326,10 @@ server = app.server
 if __name__ == '__main__':
 #    init_db()
 #    app = create_app()
-    app.run(host = '0.0.0.0', port = 8050, debug = True, use_reloader = False, threaded = True)
+    app.run(
+        host = '0.0.0.0', port = 8050, debug = True, use_reloader = False, threaded = True,
+        # Circular-callback validation expands every pattern-matching id over all
+        # wildcard values in the browser, which blocks the initial page load for
+        # about a minute. Set DASH_VALIDATE_CALLBACKS=true to check for cycles.
+        dev_tools_validate_callbacks = os.environ.get('DASH_VALIDATE_CALLBACKS', 'false').lower() == 'true',
+    )
