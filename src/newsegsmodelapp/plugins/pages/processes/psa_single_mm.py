@@ -7,6 +7,7 @@ import time
 import json
 from typing import Callable
 
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -40,6 +41,7 @@ def execute_psa_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
         
     run_config = json.loads(request.payload)
@@ -89,6 +91,7 @@ def execute_psa_single_mm_run(
     mm = deterministic_run_metamodel(
         mm, proj, request, project_provider, result_provider, run_id,
         deterministic_progress_callback, check_cancel_status,
+        run_started_ns = started_ns,
     )
     logger.debug(
         'PSA run: - Post-Deterministic. Metamodel modified: %s',
@@ -108,5 +111,6 @@ def execute_psa_single_mm_run(
     # Connect this result to the metamodel table config, rather than the project dsa config
     #project_provider.upsert_component(proj)
     result_provider.upsert_result('psa_single_metamodel', mm.table_config, psa_results, request = request)
+    db_staleness.record_process_run(mm.id, 'psa', started_ns)
 
     return 'ok'

@@ -529,6 +529,22 @@ sessions = sa.Table(
 )
 
 # -----------------------------------------------------------------------------
+# Process staleness
+# -----------------------------------------------------------------------------
+
+process_staleness = sa.Table(
+    'process_staleness',
+    metadata,
+    # No FK, so that removing a metamodel is not blocked by its staleness rows
+    sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
+    sa.Column('process', sa.String(16), primary_key = True), # One of db_staleness.PROCESSES
+    # time.time_ns() of the latest input change meaningful to the process
+    sa.Column('inputs_changed_ns', sa.BigInteger, nullable = True),
+    # time.time_ns() at which the latest completed run of the process started
+    sa.Column('last_run_ns', sa.BigInteger, nullable = True),
+)
+
+# -----------------------------------------------------------------------------
 # Table creation
 # -----------------------------------------------------------------------------
 

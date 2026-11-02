@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import datetime
+import time
 from typing import Callable, cast
 
 import sqlalchemy as sa
@@ -32,6 +33,7 @@ def execute_deterministic_run_project(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    started_ns = time.time_ns()
     proj = cast(NewsegsProject, project_provider.get_component(request.project_id))
 
     metamodels = proj.metamodels
@@ -56,7 +58,8 @@ def execute_deterministic_run_project(
             check_cancel_status,
             start_step = i*3,
             total_steps = n_steps,
-            sequence_number = i + 1
+            sequence_number = i + 1,
+            run_started_ns = started_ns,
         )
 
     return 'ok'

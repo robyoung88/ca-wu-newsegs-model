@@ -3,13 +3,16 @@ logger = logging.getLogger(__name__)
 
 import copy
 import json
+import time
 from typing import cast
 from pyproj import Transformer
 from dash import Dash, html, dcc, Input, Output, State, ALL, no_update
 from dash.exceptions import PreventUpdate
 import dash_leaflet as dl
 
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsEMProvider, FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.components import staleness
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.core import location as modlocation
@@ -17,6 +20,13 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
+
+def _site_metamodel_id(site_location: str | None) -> str | None:
+    """Id of the configuration a 'site-location' store value belongs to, if recorded"""
+    try:
+        return json.loads(site_location).get('metamodel_id')
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 def create_map_layout(map_id='sitemap',
                       center=(53.165716, -3.728402)):
@@ -149,7 +159,11 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
             return no_update
         easting,northing = _trans_togb.transform(lat, lon)
-        new_site = json.dumps({'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing, 'name': site_name})
+        new_site = {'lat': lat, 'lon': lon, 'easting': easting, 'northing': northing, 'name': site_name}
+        metamodel_id = _site_metamodel_id(current_site)
+        if metamodel_id:
+            new_site['metamodel_id'] = metamodel_id
+        new_site = json.dumps(new_site)
         logger.debug(
             'Site location inputs syncronised to store: lat/lon: (%s, %s); OSGB: (%s, %s)',
             lat, lon, easting, northing
@@ -162,6 +176,7 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         Output('site-lat-input', 'value'),
         Output('site-lon-input', 'value'),
         Output('site-name-input', 'value'),
+        Output('staleness-update-trigger', 'data', allow_duplicate = True),
 
         Input('site-location', 'data'),
         State('active-project-id', 'data'),
@@ -185,7 +200,17 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
         lproj = provider.get_lightweight_project(active_project_id)
         lmm = lproj.metamodels[lproj.focussed_metamodel_index]
 
+        # A location still queued from the previously focussed configuration
+        # must not be written to the newly focussed one
+        if coords.get('metamodel_id', lmm.id) != lmm.id:
+            logger.debug(
+                'Ignoring site location for Metamodel ID %s; focussed Metamodel ID is %s',
+                coords.get('metamodel_id'), lmm.id
+            )
+            raise PreventUpdate
+
         modified = False
+        staleness_update = no_update
         oldloc = copy.copy(lmm.location)
         if not(newloc == lmm.location):
             lmm.location = newloc
@@ -229,7 +254,12 @@ def add_latlon_sync_callbacks(app: NewsegsDash):
                 lmm.id, oldloc, lmm.location
             )
 
-        return f"{lat:.6f}", f"{lon:.6f}", name
+            # Renaming the site alone has no effect on results
+            if (oldloc.lat, oldloc.lon) != (lmm.location.lat, lmm.location.lon):
+                db_staleness.mark_inputs_changed(lmm.id, staleness.processes_affected(deterministic = True))
+                staleness_update = time.time_ns()
+
+        return f"{lat:.6f}", f"{lon:.6f}", name, staleness_update
 
 def add_map_click_callback(app: NewsegsDash):
     @app.callback(
@@ -298,11 +328,15 @@ def add_confirm_site_change_btn_callback(app: NewsegsDash):
 
         Input({'type': 'confirm-site-popup-btn', 'index': ALL}, 'n_clicks'),
         State('potential-site-location', 'data'),
+        State('site-location', 'data'),
         prevent_initial_call=True
     )
-    def change_site(click_data, json_latlon):
+    def change_site(click_data, json_latlon, current_site):
         if click_data[0] is None:
             return no_update
+        metamodel_id = _site_metamodel_id(current_site)
+        if metamodel_id and json_latlon:
+            json_latlon = json.dumps({**json.loads(json_latlon), 'metamodel_id': metamodel_id})
         return json_latlon
     return app
 

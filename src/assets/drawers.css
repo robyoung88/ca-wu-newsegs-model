@@ -46,25 +46,23 @@
     justify-content: space-between;
 }
 
-.resize-handle {
-    /* position: absolute;
-    top: 0; */
+/* Full-width strip giving feedback: process staleness or progress */
+.feedback-strip {
     display: flex;
     width: 100%;
-    height: 8px; 
-    /* cursor: ns-resize; */
-    /* background: transparent; */
-} 
+    height: 8px;
+}
 
-.resize-handle-ok {
+/* Staleness indicators, see components/staleness.py */
+.staleness-indicator-ok {
     background-color: rgb(130, 253, 69);
 }
 
-.resize-handle-warning {
+.staleness-indicator-warning {
     background-color: rgb(243, 178, 72);
 }
 
-.resize-handle-error {
+.staleness-indicator-error {
     background-color: rgb(230, 2, 51);
 }
 

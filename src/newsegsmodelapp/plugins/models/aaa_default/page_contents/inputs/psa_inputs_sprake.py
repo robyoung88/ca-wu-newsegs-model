@@ -25,6 +25,8 @@ from newsegsmodelframework.newsegsvariable import variable
 
 from newsegsmodelapp.components.composite_input_components import generic_create_psa_input_container_contents
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_metamodel
+from newsegsmodelapp.backend.db import db_staleness
+from newsegsmodelapp.components import staleness
 from newsegsmodelapp.registers import register_input_container_content_creator, register_input_handler, register_single_input_header_content_creator
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
@@ -243,6 +245,9 @@ def handle_psa_settings(
     
     provider.increment_revision(lproj.id)
 
+    # PSA settings are held for the project, so apply to every configuration
+    db_staleness.mark_inputs_changed([x.id for x in lproj.metamodels], 'psa')
+
     return return_dict
 
 @register_input_handler('psa-active')
@@ -296,5 +301,7 @@ def handle_psa_active(
     provider._component_provider.increment_revision(lproj.table_config.id)
     
     provider.increment_revision(lproj.id)
+
+    db_staleness.mark_inputs_changed(staleness.metamodels_using_variable(lproj, var_uid), 'psa')
     
     return return_dict

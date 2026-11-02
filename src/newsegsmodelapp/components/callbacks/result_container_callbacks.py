@@ -7,9 +7,13 @@ from typing import Any, cast
 
 from dash import ALL, MATCH, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
+# Cached results are unpickled inside callbacks, and Dash refuses component
+# libraries first imported there. Tables cached before the move to AG Grid hold
+# dash_extensions.Purify components, so register the library at startup.
+import dash_extensions # noqa: F401
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.components import callback_utils
+from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp import registers
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_result_container_content_creator, get_result_section_header_content_creator
@@ -636,207 +640,84 @@ def add_result_container_callbacks(app: NewsegsDash):
 
         return return_contents 
         
-    # @app.callback(
-    #     output = dict(
-    #         indicator_class = Output(
-    #             {'type': 'resize-handle', 'page': ALL},
-    #             'className',
-    #         ),
-    #         tooltip_children = Output(
-    #             {'type': 'result-tooltip', 'page': ALL}, 
-    #             'children',
-    #         ),
-    #         trigger_check_stale_data = Output(
-    #             'trigger-check-stale', 'data'
-    #         ),
-    #     ),
-    #     inputs = dict(
-    #         data_stale = Input(
-    #             {
-    #                 'type': 'result-table', 'purpose': 'container',
-    #                 'supersection': ALL, 'section': ALL,
-    #                 'key': ALL, 'subindex': ALL
-    #             }, 
-    #             'data-is-stale',
-    #         ),
-    #         config_update = Input(
-    #             {
-    #                 'type': 'input-group-config-update-trigger', 
-    #                 'supersection': ALL, 'purpose': 'trigger',
-    #                 'section': ALL, 'key': ALL, 'subindex': ALL,
-    #                 'parameter_index': ALL, 'vector_location': ALL,
-    #             }, 
-    #             'data'
-    #         ),
-    #     ),
-    #     state = dict(
-    #         active_project_id = State('active-project-id', 'data'),
-    #         rendered_project_ids = State(
-    #             {
-    #                 'type': 'result-table', 'purpose': 'container',
-    #                 'supersection': ALL, 'section': ALL,
-    #                 'key': ALL, 'subindex': ALL
-    #             }, 
-    #             'data-rendered-project-id'
-    #         ),
-    #         rendered_project_table_revisions = State(
-    #             {
-    #                 'type': 'result-table', 'purpose': 'container',
-    #                 'supersection': ALL, 'section': ALL,
-    #                 'key': ALL, 'subindex': ALL
-    #             },
-    #             'data-rendered-project-table-revision'
-    #         ),
-    #         trigger_ids = State(
-    #             {
-    #                 'type': 'postaction-trigger', 'purpose': 'trigger',
-    #                 'supersection': ALL, 'section': ALL,
-    #                 'key': ALL, 'subindex': ALL
-    #             },
-    #             'id'
-    #         ),
-    #         #indicator_class = State({'type': 'resize-handle', 'page': ALL}, 'className'),
-    #         #tooltip_children = State({'type': 'result-tooltip', 'page': ALL}, 'children'),
-    #     ),
-    # )
-    # def update_stale_indicators(
-    #     data_stale,
-    #     config_update,
-    #     active_project_id,
-    #     rendered_project_ids,
-    #     rendered_project_table_revisions,
-    #     #indicator_class,
-    #     #tooltip_children,
-    #     **kwargs
-    # ):
-    #     triggered_id = ctx.triggered_id
-    #     t0 = time.perf_counter()
-    #     logger.debug('Checking staleness - triggered by %s', triggered_id)
-    #     if triggered_id is None:
-    #         raise PreventUpdate
-    #     elif isinstance(triggered_id, dict) and triggered_id['type'] == 'input-group-config-update-trigger':
-    #         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
-    #         logger.debug('Getting lightweight project - Checking Staleness')
-    #         lproj = provider.get_lightweight_project(active_project_id)
-            
-    #         results_stale = False
-    #         # Because have retrieved the proj from database, will never be modified.
-    #         #results_stale = proj.table_config.chain_modified or any(x.modified for x in proj._variables_by_uid.values())
-    #         if not results_stale:
-    #             results_stale = not all(x is not None and x == active_project_id for x in rendered_project_ids)
-    #         if not results_stale:
-    #             table_revision = lproj.table_config.revision
-    #             logger.debug(
-    #                 'Checking against project table revision: %s', table_revision
-    #             )
-    #             logger.debug(
-    #                 'Rendered table revisions are: %s', rendered_project_table_revisions
-    #             )
-    #             results_stale = not all(x is not None and x == table_revision for x in rendered_project_table_revisions)
-                
-    #     else:
-    #         if data_stale is None:
-    #             raise PreventUpdate
-    #         logger.debug(
-    #             'Checking against data-is-stale: %s', data_stale
-    #         )
-    #         results_stale = any(x for x in data_stale)
+    @app.callback(
+        output = dict(
+            indicator_class = Output(
+                {'type': staleness.INDICATOR_TYPE, 'page': ALL, 'process': ALL},
+                'className',
+            ),
+            tooltip_children = Output(
+                {'type': staleness.TOOLTIP_TYPE, 'page': ALL, 'process': ALL},
+                'children',
+            ),
+            header_class = Output(
+                {'type': 'result-header-single-config', 'table': ALL, 'metamodel': ALL},
+                'className',
+            ),
+        ),
+        inputs = dict(
+            config_update = Input(
+                {
+                    'type': 'input-group-config-update-trigger', 
+                    'supersection': ALL, 'purpose': 'trigger',
+                    'section': ALL, 'key': ALL, 'subindex': ALL,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                }, 
+                'data'
+            ),
+            postaction_triggers = Input(
+                {
+                    'type': 'postaction-trigger', 'purpose': 'trigger',
+                    'supersection': ALL, 'section': ALL,
+                    'key': ALL, 'subindex': ALL
+                },
+                'data'
+            ),
+            staleness_update = Input('staleness-update-trigger', 'data'),
+            active_project_id = Input('active-project-id', 'data'),
+        ),
+        prevent_initial_call = False, # Want to trigger as we change page
+    )
+    def update_staleness_feedback(
+        active_project_id,
+        **kwargs
+    ):
+        """
+        Show whether results are up to date with their inputs: per page section
+        in the staleness indicators, and per configuration in the section headers.
+        """
+        groups = ctx.outputs_grouping
+        indicator_ids = [x['id'] for x in groups['indicator_class']]
+        header_ids = [x['id'] for x in groups['header_class']]
+        if not active_project_id or not (indicator_ids or header_ids):
+            raise PreventUpdate
+        t0 = time.perf_counter()
 
-    #     rval = callback_utils.create_noupdate_return()
+        logger.debug('Getting lightweight project - Updating staleness feedback')
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
 
-    #     if results_stale:
-    #         handle_class = 'resize-handle resize-handle-warning'
-    #         tooltip_text = 'Results require refreshing.'
-    #     else:
-    #         handle_class = 'resize-handle resize-handle-ok'
-    #         tooltip_text = 'Results up to date.'
+        indicator_class, tooltip_children = [], []
+        for indicator_id in indicator_ids:
+            class_name, text = staleness.indicator_feedback(lproj, indicator_id['process'])
+            indicator_class.append(class_name)
+            tooltip_children.append(text)
 
-    #     rval['indicator_class'] = [handle_class] * len(rval['indicator_class'])
-    #     rval['tooltip_children'] = [tooltip_text] * len(rval['tooltip_children'])
-    #     rval['trigger_check_stale_data'] = time.time_ns()
+        header_class = []
+        if header_ids:
+            states = staleness.get_process_states(lproj.metamodels, 'deterministic')
+            for header_id in header_ids:
+                header_class.append(
+                    staleness.result_header_class_name(
+                        states.get(header_id['metamodel']),
+                        header_id['metamodel'] == lproj.focussed_metamodel_id,
+                    )
+                )
 
-    #     t1 = time.perf_counter()
-    #     logger.info(f'Staleness checked in {t1 - t0:.3f}s')
+        t1 = time.perf_counter()
+        logger.info(f'Staleness feedback updated in {t1 - t0:.3f}s')
 
-    #     return rval
-
-    # @app.callback(
-    #     output = dict(
-    #         header_classnames = Output(
-    #             {
-    #                 'type': 'result-header-single-config',
-    #                 'table': ALL,
-    #                 'metamodel': ALL,
-    #             },
-    #             'className'
-    #         )
-    #     ),
-    #     inputs = dict(
-    #         trigger_check_stale = Input(
-    #             'trigger-check-stale', 'data'
-    #         )
-    #     ),
-    #     state = dict(
-    #         headers = dict(
-    #             parent_component = State(
-    #                 {
-    #                     'type': 'result-header-single-config',
-    #                     'table': ALL,
-    #                     'metamodel': ALL,
-    #                 },
-    #                 'data-parent-component'
-    #             ),
-    #             parent_component_revision = State(
-    #                 {
-    #                     'type': 'result-header-single-config',
-    #                     'table': ALL,
-    #                     'metamodel': ALL,
-    #                 },
-    #                 'data-parent-component-revision'
-    #             ),
-    #             class_name = State(
-    #                 {
-    #                     'type': 'result-header-single-config',
-    #                     'table': ALL,
-    #                     'metamodel': ALL,
-    #                 },
-    #                 'className'
-    #             ),
-    #             id = State(
-    #                 {
-    #                     'type': 'result-header-single-config',
-    #                     'table': ALL,
-    #                     'metamodel': ALL,
-    #                 },
-    #                 'id'
-    #             )
-    #         )
-    #     ),
-    #     prevent_initial_call = True
-    # )
-    # def update_result_header_staleness(
-    #     headers, **kwargs
-    # ):
-    #     component_ids = list(set(headers['parent_component']))
-    #     current_revisions = app.project_provider._component_provider.get_component_metadata(
-    #         component_ids,
-    #         'revision'
-    #     )
-
-    #     rval = []
-    #     for parent_component, parent_revision, cn, id in zip(headers['parent_component'], headers['parent_component_revision'], headers['class_name'], headers['id']):
-    #         r0 = -1 if parent_revision is None else int(parent_revision)
-    #         r1 = int(current_revisions[parent_component]['revision'])
-    #         logger.debug(
-    #             'Checking staleness for Result Header ID: %s; Drawn: %d; Live: %d; Component ID: %s',
-    #             id, r0, r1, parent_component
-    #         )
-    #         if r0 != r1:
-    #             if not 'stale' in cn:
-    #                 cn = (cn + ' stale').strip()
-    #         else:
-    #             if 'stale' in cn:
-    #                 cn = cn.replace(' stale', '').strip()
-    #         rval.append(cn)
-        
-    #     return dict(header_classnames = rval)
+        return dict(
+            indicator_class = indicator_class,
+            tooltip_children = tooltip_children,
+            header_class = header_class,
+        )

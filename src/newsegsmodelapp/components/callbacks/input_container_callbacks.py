@@ -15,7 +15,8 @@ from dash.exceptions import PreventUpdate
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider
-from newsegsmodelapp.components import callback_utils
+from newsegsmodelapp.backend.db import db_staleness
+from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp.components.constants import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.input_components import get_variable_sharing_status
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
@@ -445,6 +446,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                             provider._component_provider.increment_revision(
                                 lproj.table_config.id
                             )
+                            db_staleness.mark_inputs_changed(
+                                staleness.metamodels_using_variable(lproj, varuid), 'dsa'
+                            )
 
                     case 'optim':
                         logger.debug('Input change being handled as optim bounds value or plot resolution change.')
@@ -454,6 +458,8 @@ def add_input_container_callbacks(app: NewsegsDash):
                         logger.debug('Getting lightweight project - Handling optim bounds value change')
                         lproj = provider.get_lightweight_project(active_project_id)
 
+                        varid = make_varid(**trigger_id)
+
                         dsa_config = provider._component_provider.get_component(lproj.table_config.id)
                         if not hasattr(dsa_config, 'optim_config'):
                             dsa_config.optim_config = {}
@@ -462,14 +468,24 @@ def add_input_container_callbacks(app: NewsegsDash):
                         bound = variable_bounds.setdefault(varid, {})
                         match trigger_id['purpose']:
                             case 'plot-intervals':
-                                bound['intervals'] = new_val
+                                bound_key = 'intervals'
                             case 'bound-lower':
-                                bound['lower'] = new_val
+                                bound_key = 'lower'
                             case _:
-                                bound['upper'] = new_val
+                                bound_key = 'upper'
+                        bound_changed = bound.get(bound_key) != new_val
+                        bound[bound_key] = new_val
 
                         provider._component_provider.upsert_component(dsa_config, project_id = active_project_id)
                         provider.invalidate_cache_for_component(lproj.id)
+
+                        # Plot intervals only set the resolution of the marginal plot
+                        if bound_changed and bound_key != 'intervals':
+                            # Bounds are held for the project, so apply to every configuration
+                            db_staleness.mark_inputs_changed([x.id for x in lproj.metamodels], 'optim')
+                            for idx, id in enumerate(trigger_ids):
+                                if id['supersection'] == 'optim':
+                                    rval['trigger_data'][idx] = now
                         
             case 'dsaboundtype':
                 logger.debug('Input change being handled as dsa bounds type change.')
@@ -528,6 +544,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 provider._component_provider.increment_revision(
                     lproj.table_config.id
                 )
+                db_staleness.mark_inputs_changed(
+                    staleness.metamodels_using_variable(lproj, varuid), 'dsa'
+                )
 
             case 'dsa-active':
                 logger.debug('Input change being handled as dsa active toggle change.')
@@ -562,6 +581,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 provider.increment_revision(lproj.id)
                 provider._component_provider.increment_revision(
                     lproj.table_config.id
+                )
+                db_staleness.mark_inputs_changed(
+                    staleness.metamodels_using_variable(lproj, varuid), 'dsa'
                 )
 
             case _:
@@ -761,7 +783,9 @@ def add_input_container_callbacks(app: NewsegsDash):
         loc_input = {
             'lat': lmm.location.lat,
             'lon': lmm.location.lon,
-            'name': lmm.location.name
+            'name': lmm.location.name,
+            # Lets the map apply this location only to the configuration it came from
+            'metamodel_id': lmm.id,
         }
         logger.debug('Setting site location in response to a trigger by "active-project-id".')
         t1 = time.perf_counter()

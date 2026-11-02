@@ -256,7 +256,7 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
         ),
         html.Progress(
             id={'type': 'progress-bar', 'page': kwargs.get('page_type', 'None')},
-            className='resize-handle resize-handle-progress',
+            className='feedback-strip feedback-strip-progress',
             style = {'display': 'none'}
         ),
         dbc.Tooltip(

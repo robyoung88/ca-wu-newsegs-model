@@ -3,6 +3,7 @@ import dash_daq as daq
 
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components import icons
+from newsegsmodelapp.components.staleness import create_staleness_indicator
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_results_header(page_type, **kwargs):
@@ -12,15 +13,7 @@ def create_results_header(page_type, **kwargs):
     """
     return html.Div(
         [
-            html.Div(
-                id={'type': 'resize-handle', 'page': page_type}, 
-                className='resize-handle resize-handle-ok'
-            ),
-            dbc.Tooltip(
-                'Results up-to-date',
-                id = {'type': 'result-tooltip', 'page': page_type},
-                target = {'type': 'resize-handle', 'page': page_type}
-            ), 
+            *create_staleness_indicator(page_type, 'deterministic'),
 
             html.Div(
                 dbc.Container([
@@ -176,15 +169,7 @@ def create_results_header_dsa(**kwargs):
 
     return html.Div(
         [
-            html.Div(
-                id={'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}, 
-                className='resize-handle resize-handle-ok'
-            ),
-            dbc.Tooltip(
-                'Results up-to-date',
-                id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
-                target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
-            ),
+            *create_staleness_indicator(kwargs.get('page_type', 'None'), 'dsa'),
 
             html.Div(
                 dbc.Container([
@@ -250,17 +235,8 @@ def create_results_header_psa(**kwargs):
 
     return html.Div(
         [
-            html.Div(
-                id={'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}, 
-                className='resize-handle resize-handle-ok'
-            ),
-            
-            dbc.Tooltip(
-                'Results up-to-date',
-                id = {'type': 'result-tooltip', 'page': kwargs.get('page_type', 'None')},
-                target = {'type': 'resize-handle', 'page': kwargs.get('page_type', 'None')}
-            ),
-            
+            *create_staleness_indicator(kwargs.get('page_type', 'None'), 'psa'),
+
             html.Div([
                 dbc.Container([
                     dbc.Row([

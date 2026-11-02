@@ -11,10 +11,11 @@ import numpy as np
 
 from useful_types import SequenceNotStr
 
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
 from newsegsmodelapp.components.constants import VARIABLE_PARAMETER_KEYS
-from newsegsmodelapp.components import callback_utils
+from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
 from newsegsmodelapp.components.icons import get_icon
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
@@ -196,6 +197,11 @@ def update_single_parameter(
         provider._component_provider.increment_revision(table_components_to_revise)
         provider.metamodel_provider.increment_revision(metamodels_to_revise)
         provider.increment_revision(lproj.id)
+
+        db_staleness.mark_inputs_changed(
+            metamodels_to_revise,
+            staleness.processes_affected(deterministic_changed, dsa_changed, psa_changed),
+        )
     
     return return_dict
 
@@ -429,6 +435,7 @@ def _toggle_variable_sharing(
         return return_dict
     
     current_mm_idx = lproj.metamodels.index(lmm) + 1
+    old_var = project_provider.variable_provider.get_variable(lmm.variables[varid])
     
     # Locate current group index
     current_group_idx = next(i for i, g in enumerate(groups) if current_mm_idx in g)
@@ -474,6 +481,13 @@ def _toggle_variable_sharing(
     )
     project_provider.metamodel_provider.increment_revision(lmm.id)
     project_provider.increment_revision(lproj.id)
+
+    db_staleness.mark_inputs_changed(
+        lmm.id,
+        staleness.processes_affected_by_variable_swap(
+            old_var, project_provider.variable_provider.get_variable(lmm.variables[varid])
+        ),
+    )
 
     if isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         project_provider.delete_orphan_variables()
@@ -550,6 +564,7 @@ def _set_variable_optim_active(
     varprovider.set_variable_metadata(var.id, 'optim_selected', var.optim_selected)
 
     provider.invalidate_cache_for_component(lproj.id)
+    db_staleness.mark_inputs_changed(staleness.metamodels_using_variable(lproj, varuid), 'optim')
     
     now = time.time_ns()
     # Update triggers in case there is any formatting that needs to be done.

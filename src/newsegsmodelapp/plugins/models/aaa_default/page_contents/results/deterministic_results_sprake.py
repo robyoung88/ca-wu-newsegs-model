@@ -8,7 +8,7 @@ import dash
 from dash import html
 import pandas as pd
 
-from newsegsmodelapp.components import icons
+from newsegsmodelapp.components import icons, staleness
 from newsegsmodelapp.registers import register_result_container_content_creator, register_result_section_header_content_creator, register_table_subindex_map
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
@@ -217,8 +217,6 @@ def _(
 # Header content
 # -----------------------------------------------
 
-RESULT_HEADER_SINGLE_CONFIG_CLASS = 'result-header-single-config'
-
 def _make_headers_for_multiple_configs(
     lproj: LightweightNewsegsProject,
     result_provider: NewsegsResultProviderInterface,
@@ -228,6 +226,7 @@ def _make_headers_for_multiple_configs(
     ann_hori_toggle: bool = True,
 ):
     rval = []
+    states = staleness.get_process_states(lproj.metamodels, 'deterministic')
     for idx, lmm in enumerate(lproj.metamodels):
         match table_identifier:
             case 'model':
@@ -254,11 +253,7 @@ def _make_headers_for_multiple_configs(
         else:
             cntnt = [mm_icon] + ['- No data']
         
-        cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
-        if rev != mod.revision:
-            cn += ' stale'
-        if lmm.id != lproj.focussed_metamodel_id:
-            cn += ' unfocussed'
+        cn = staleness.result_header_class_name(states[lmm.id], lmm.id == lproj.focussed_metamodel_id)
         
         rval.append(html.Div(
             cntnt, 
@@ -587,6 +582,7 @@ def _(
 
     # This one needs to be bespoke, as header is constructed from multiple postprocess keys
     rval = []
+    states = staleness.get_process_states(lproj.metamodels, 'deterministic')
     for idx, lmm in enumerate(lproj.metamodels):
         mod = lmm.finance.table_config
         
@@ -613,11 +609,7 @@ def _(
 
         cntnt = [mm_icon] + _make_finance_result_header(res_benefits, res_costs, res_value, ann_hori_toggle)
 
-        cn = RESULT_HEADER_SINGLE_CONFIG_CLASS
-        if rev_benefits != mod.revision or rev_costs != mod.revision or rev_value != mod.revision:
-            cn += ' stale'
-        if lmm.id != lproj.focussed_metamodel_id:
-            cn += ' unfocussed'
+        cn = staleness.result_header_class_name(states[lmm.id], lmm.id == lproj.focussed_metamodel_id)
 
         rval.append(html.Div(
             cntnt, 

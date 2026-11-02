@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import datetime
 import json
+import time
 from typing import Callable
 
 from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
@@ -34,6 +35,7 @@ def execute_deterministic_single_mm_run(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
 ) -> str:
+    started_ns = time.time_ns()
     proj = project_provider.get_project(request.project_id)
 
     run_config = json.loads(request.payload)
@@ -58,7 +60,8 @@ def execute_deterministic_single_mm_run(
         check_cancel_status,
         start_step = 0,
         total_steps = 2,
-        sequence_number = 1
+        sequence_number = 1,
+        run_started_ns = started_ns,
     )
 
     return 'ok'

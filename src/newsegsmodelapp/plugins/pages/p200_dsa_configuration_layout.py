@@ -27,6 +27,7 @@ from newsegsmodelapp.components import callback_utils, export, navigation
 
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import icons
+from newsegsmodelapp.components.staleness import create_staleness_indicator
 from newsegsmodelapp.types import Page
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -140,6 +141,7 @@ def create_optim_configuration_editor_header(**kwargs):
 
 def create_optim_configuration_editor(**kwargs):
     return dbc.Col([
+        *create_staleness_indicator(kwargs.get('page_type', PAGE_TYPE), 'optim'),
         create_optim_configuration_editor_header(**kwargs),
         dcc.Loading(
             [
@@ -335,7 +337,7 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
             ), 
             html.Progress(
                 id={'type': 'progress-bar', 'page': config.page_type},
-                className='resize-handle resize-handle-progress',
+                className='feedback-strip feedback-strip-progress',
                 style = {'display': 'none'}
             ),
             dbc.Tooltip(

@@ -1,8 +1,10 @@
 import logging
 logger = logging.getLogger(__name__)
 
-from typing import Callable
+import time
+from typing import Callable, Optional
 
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -20,8 +22,14 @@ def deterministic_run_metamodel(
     check_cancel_status: Callable[[], bool],
     start_step: int = 0,
     total_steps: int = 3,
-    sequence_number: int = 1
+    sequence_number: int = 1,
+    run_started_ns: Optional[int] = None,
 ):
+    """
+    run_started_ns is when the calling procedure read its inputs, recorded
+    as the start of the deterministic run; defaults to now.
+    """
+    run_started_ns = run_started_ns or time.time_ns()
     step = start_step
     progress_callback(step, total_steps, f'Setting model variables - config {sequence_number}')
 
@@ -189,5 +197,7 @@ def deterministic_run_metamodel(
         result_provider.duplicate_result(
             'deterministic_consumption_storage', mm.model.consumption_storage, request
         )
+
+    db_staleness.record_process_run(mm.id, 'deterministic', run_started_ns)
 
     return mm
