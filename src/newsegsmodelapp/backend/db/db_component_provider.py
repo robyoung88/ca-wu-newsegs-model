@@ -42,6 +42,17 @@ from newsegsmodelframework.newsegsvariable.lightweight_variable import Lightweig
 from newsegsmodelframework.newsegsvariable.variable import Variable, variable_uid
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
 
+def _variable_key(varid: str) -> str:
+    """The key of a varid, `{section}.{key}`, without its subindex."""
+    return varid.rsplit('.', 1)[0]
+
+def _variable_key_orders(varids: Sequence[str]) -> dict[str, int]:
+    """The position of each key among the varids, in order of first appearance."""
+    key_orders: dict[str, int] = {}
+    for varid in varids:
+        key_orders.setdefault(_variable_key(varid), len(key_orders))
+    return key_orders
+
 class FromDatabaseNewsegsComponentProvider(
     NewsegsComponentManagerInterface
 ):
@@ -1094,42 +1105,35 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             obj._finance_id = row.fm_config_id
             obj._component_ids['table_config'] = row.table_config_id
 
-            var_stmt = (
-                sa.select(
-                    tbls.variable_configs.c.varid,
-                    tbls.variable_configs.c.id,
-                )
-                .select_from(self._metamodel_variable_jct)
-                .join(
-                    tbls.variable_configs,
-                    self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
-                )
-                .where(self._metamodel_variable_jct.c.metamodel_id == obj.id)
-            )
+            var_stmt = self._metamodel_variable_select(obj.id)
             with read_transaction(self._get_engine()) as conn:
-                result = conn.execute(var_stmt)
-                var_mapping = {
-                    row[0]: row[1] for row in result
-                }
-            # To keep order, try to use the existing order
-            used_keys = []
-            var_ids = []
-            for x in obj.variable_ids:
-                k = x['varid']
-                uid = var_mapping.get(k)
-                if uid:
-                    var_ids.append({
-                        'varid': k,
-                        'uid': uid
-                    })
-                    used_keys.append(k)
-            used_keys = set(used_keys)
-            for k in var_mapping.keys():
-                if not k in used_keys:
-                    var_ids.append({
-                        'varid': k,
-                        'uid': var_mapping[k]
-                    })
+                var_rows = conn.execute(var_stmt).fetchall()
+            var_mapping = {
+                var_row.varid: var_row.id for var_row in var_rows
+            }
+            if var_rows and all(var_row.key_order is not None for var_row in var_rows):
+                # The order is recorded in the junction table
+                var_ids = [{'varid': k, 'uid': uid} for k, uid in var_mapping.items()]
+            else:
+                # Saved before the order was recorded: to keep order, try to use the existing order
+                used_keys = []
+                var_ids = []
+                for x in obj.variable_ids:
+                    k = x['varid']
+                    uid = var_mapping.get(k)
+                    if uid:
+                        var_ids.append({
+                            'varid': k,
+                            'uid': uid
+                        })
+                        used_keys.append(k)
+                used_keys = set(used_keys)
+                for k in var_mapping.keys():
+                    if not k in used_keys:
+                        var_ids.append({
+                            'varid': k,
+                            'uid': var_mapping[k]
+                        })
             
             obj._variable_ids = tuple(var_ids)
 
@@ -1217,18 +1221,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
         prevstate = RevisionNotifierMixin._set_notification_state('disabled')
         try:
             for idx, comp_id in enumerate(component_id):
-                var_stmt = (
-                    sa.select(
-                        tbls.variable_configs.c.varid,
-                        tbls.variable_configs.c.id,
-                    )
-                    .select_from(self._metamodel_variable_jct)
-                    .join(
-                        tbls.variable_configs,
-                        self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
-                    )
-                    .where(self._metamodel_variable_jct.c.metamodel_id == comp_id)
-                )
+                var_stmt = self._metamodel_variable_select(comp_id)
                 with read_transaction(self._get_engine()) as conn:
                     result = conn.execute(var_stmt)
                     var_mapping = {
@@ -1268,6 +1261,30 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             raise ValueError(f'{component.id} is being upserted in a modified state')
         return metamodel_to_raw_table_data(component)
 
+    def _metamodel_variable_select(self, metamodel_id: str):
+        """Select the varid, id and key order of the variables of a metamodel, in order of key then subindex.
+
+        Variables without a key order (from metamodels saved before the order was recorded) come last.
+        """
+        return (
+            sa.select(
+                tbls.variable_configs.c.varid,
+                tbls.variable_configs.c.id,
+                self._metamodel_variable_jct.c.key_order,
+            )
+            .select_from(self._metamodel_variable_jct)
+            .join(
+                tbls.variable_configs,
+                self._metamodel_variable_jct.c.variable_config_id == tbls.variable_configs.c.id,
+            )
+            .where(self._metamodel_variable_jct.c.metamodel_id == metamodel_id)
+            .order_by(
+                self._metamodel_variable_jct.c.key_order.is_(None),
+                self._metamodel_variable_jct.c.key_order,
+                tbls.variable_configs.c.interface_subindex,
+            )
+        )
+
     def _set_metamodel_variable_junction(self, metamodel: NewsegsMetaModel):
         clear_statement = (
             self._metamodel_variable_jct.delete()
@@ -1275,10 +1292,12 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
                 self._metamodel_variable_jct.c.metamodel_id == metamodel.id
             )
         )
+        key_orders = _variable_key_orders([var['varid'] for var in metamodel.variable_ids])
         new_variable_entries = [
             {
                 'metamodel_id': metamodel.id,
-                'variable_config_id': var['uid']
+                'variable_config_id': var['uid'],
+                'key_order': key_orders[_variable_key(var['varid'])],
             } for var in metamodel.variable_ids
         ]
         with write_transaction(self._get_engine(writer = True)) as conn:
@@ -1321,13 +1340,26 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             )
         )
 
-        new_entries = [
-            {
+        # Keep the position of each key; a new key goes last. Metamodels saved before the order was
+        # recorded have no key order, and are left without.
+        with read_transaction(self._get_engine()) as conn:
+            existing = conn.execute(self._metamodel_variable_select(metamodel.id)).fetchall()
+        key_orders = {
+            _variable_key(row.varid): row.key_order for row in existing if row.key_order is not None
+        }
+        ordered = bool(key_orders) or not existing
+        next_order = max(key_orders.values(), default = -1) + 1
+        new_entries = []
+        for varid, var in zip(varids, variables):
+            key = _variable_key(varid)
+            if ordered and key not in key_orders:
+                key_orders[key] = next_order
+                next_order += 1
+            new_entries.append({
                 'metamodel_id': metamodel.id,
-                'variable_config_id': var.id
-            }
-            for var in variables
-        ]
+                'variable_config_id': var.id,
+                'key_order': key_orders.get(key),
+            })
         with write_transaction(self._get_engine(writer = True)) as conn:
             conn.execute(clear_statement)
 

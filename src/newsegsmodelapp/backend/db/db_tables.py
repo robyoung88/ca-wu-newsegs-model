@@ -429,6 +429,9 @@ metamodel_variables = sa.Table(
     metadata,
     sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('metamodels.id'), primary_key = True),
     sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), sa.ForeignKey('variable_configs.id'), primary_key = True),
+    # Position of the variable's key ({section}.{key}) in the metamodel; variables are recovered in order of key, then subindex.
+    # Null for metamodels saved before the order was recorded.
+    sa.Column('key_order', sa.Integer, nullable = True),
 )
 
 snapshot_metamodel_variables = sa.Table(
@@ -437,6 +440,7 @@ snapshot_metamodel_variables = sa.Table(
     sa.Column('snapshot_id', sa.Integer, sa.ForeignKey('snapshots.snapshot_id'), primary_key = True),
     sa.Column('metamodel_id', sa.String(L_COMPONENT_UID), primary_key = True),
     sa.Column('variable_config_id', sa.String(L_VARIABLE_UID), primary_key = True),
+    sa.Column('key_order', sa.Integer, nullable = True),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'metamodel_id'],
         ['snapshot_metamodels.snapshot_id', 'snapshot_metamodels.id']
