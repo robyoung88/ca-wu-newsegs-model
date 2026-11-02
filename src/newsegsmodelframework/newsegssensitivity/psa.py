@@ -17,6 +17,7 @@ from newsegsmodelframework.core.trackeddata import DataWithRevision, revision_da
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel import NewsegsModel
 from newsegsmodelframework.newsegsfinance import NewsegsFinance
+from newsegsmodelframework.newsegssensitivity.common import COST_FRAME_STATISTICS, total_of_cost_frame
 from newsegsmodelframework.newsegsvariable import variable
 
 PSA_FLOAT_STATISTIC = Literal[
@@ -25,7 +26,11 @@ PSA_FLOAT_STATISTIC = Literal[
     'total_present_benefits_undiscounted',
     'total_present_benefits_discounted',
     'net_present_value_undiscounted',
-    'net_present_value_discounted'
+    'net_present_value_discounted',
+    'all_capex_costs_undiscounted',
+    'all_capex_costs_discounted',
+    'all_recurrent_costs_undiscounted',
+    'all_recurrent_costs_discounted',
 ]
 """The statistics of a run of the NewSEGS Energy Model and finance model that a PSA can calculate."""
 
@@ -42,7 +47,11 @@ PSA_STATISTIC_LABELS = {
     'total_present_benefits_undiscounted': 'Total benefits (undisc.)',
     'total_present_benefits_discounted': 'Total benefits (disc.)',
     'net_present_value_undiscounted': 'NPV (undisc.)',
-    'net_present_value_discounted': 'NPV (disc.)'
+    'net_present_value_discounted': 'NPV (disc.)',
+    'all_capex_costs_undiscounted': 'Total capex (undisc.)',
+    'all_capex_costs_discounted': 'Total capex (disc.)',
+    'all_recurrent_costs_undiscounted': 'Total opex (undisc.)',
+    'all_recurrent_costs_discounted': 'Total opex (disc.)',
 }
 """Short labels of the statistics of a PSA, for plots."""
 
@@ -95,6 +104,9 @@ def _psa_float_statistic_mapper(
     mdl: NewsegsModel,
     fnc: NewsegsFinance
 ) -> float:
+    if stat in COST_FRAME_STATISTICS:
+        return total_of_cost_frame(getattr(fnc, stat))
+
     fnc_attrname = 'get_' + stat
     if hasattr(fnc, fnc_attrname):
         return getattr(fnc, fnc_attrname)()
@@ -317,7 +329,9 @@ def basic_psa_stats(
     Returns:
         A dataframe with a row for each statistic and columns of the deterministic value, the count, mean, median and standard deviation
         of the samples, and the quantiles; and a dataframe of the probability that each net present value is positive.
+        Statistics missing from the results (e.g. results from before the statistic was added) are left out.
     """
+    statistics = [s for s in statistics if s in psa_results.columns]
     res_det = (
         psa_results
         .query('deterministic == True')
@@ -383,12 +397,13 @@ def get_null_psa_data(statistics: Sequence[str]) -> pd.DataFrame:
         statistics: The statistics for which to make data.
 
     Returns:
-        A dataframe of two rows - one deterministic and one not - with every statistic equal to 1.
+        A dataframe of two rows - one deterministic and one not (draws 0 and 1) - with every statistic equal to 1.
     """
     stat_dict = {
         x: [1, 1] for x in statistics
     }
     stat_dict['deterministic'] = [True, False]
+    stat_dict['draw'] = [0, 1]
     return pd.DataFrame.from_dict(
             stat_dict
         )

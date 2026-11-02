@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from newsegsmodelframework.newsegsmodel import SprakeModel
-from newsegsmodelframework.newsegsfinance import SprakeFinance
+from newsegsmodelframework.newsegsfinance.sprakefinance import SprakeFinance
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegssensitivity import dsa
@@ -74,6 +74,40 @@ class TestDSA(unittest.TestCase):
         self.assertGreater(
             float(dsa_results.loc[('Storage capacity','upper'),'total_present_costs_undiscounted']), # pyright: ignore[reportArgumentType]
             det_cost
+        )
+
+    def test_cost_breakdown_dsa(self):
+        mm = self.make_sprake_metamodel()
+        for v in mm.variables.values():
+            v.dsa_selected = v.model_parameter == 'storage_capacity'
+
+        dsa_results = dsa.run_dsa(
+            mm,
+            [
+                'total_present_costs_undiscounted',
+                'total_present_costs_discounted',
+                'all_capex_costs_undiscounted',
+                'all_capex_costs_discounted',
+                'all_recurrent_costs_undiscounted',
+                'all_recurrent_costs_discounted',
+            ]
+        )
+        dsa_results = dsa_results.set_index(['variable', 'bound'])
+
+        # Capex and opex together make up the total costs
+        for scale in ['undiscounted', 'discounted']:
+            for idx in dsa_results.index:
+                self.assertAlmostEqual(
+                    float(dsa_results.loc[idx, f'all_capex_costs_{scale}']) # pyright: ignore[reportArgumentType]
+                    + float(dsa_results.loc[idx, f'all_recurrent_costs_{scale}']), # pyright: ignore[reportArgumentType]
+                    float(dsa_results.loc[idx, f'total_present_costs_{scale}']), # pyright: ignore[reportArgumentType]
+                    places = 4
+                )
+
+        # More storage costs more capital
+        self.assertLess(
+            float(dsa_results.loc[('Storage capacity', 'lower'), 'all_capex_costs_undiscounted']), # pyright: ignore[reportArgumentType]
+            float(dsa_results.loc[('Storage capacity', 'upper'), 'all_capex_costs_undiscounted']), # pyright: ignore[reportArgumentType]
         )
 
     def test_long_dsa(self):

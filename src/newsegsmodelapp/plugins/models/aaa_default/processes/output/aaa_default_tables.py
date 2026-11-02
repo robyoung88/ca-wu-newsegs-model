@@ -597,7 +597,9 @@ def _make_dsa_tables_sprake(
         return 'missing'
     stale = mm.table_config.revision != rev
 
-    dsa_statistics = list(sensitivity.DSA_STATISTIC_LABELS.keys())
+    # Results from before a statistic was added do not include it
+    available_statistics = set(raw_table.index.get_level_values('statistic'))
+    dsa_statistics = [s for s in sensitivity.DSA_STATISTIC_LABELS.keys() if s in available_statistics]
 
     component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
     table_component = component_provider.get_lightweight_dataholding_component(mm.table_config.id)
@@ -668,6 +670,8 @@ def _get_dsa_metamodel_table(
             )
 
             stat = 'net_present_value_undiscounted' if not stat else stat
+            if stat not in dsa_df.index.get_level_values('statistic'):
+                return None, None
             plot = tornado_plot(dsa_df, label_df, stat)
             return plot, rev
         case _:
