@@ -23,7 +23,8 @@ import sqlite3
 
 APP_ROOT = Path(__file__).parent.parent.resolve() / 'src'
 os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
-from config import settings
+from config import settings, environment
+logger.info('Environment: %s', environment.get_environment())
 
 from newsegsmodelapp.components.navigation import DOCS_URL
 DEFAULT_DOCS_PATH = APP_ROOT.parent / 'site' # Where `mkdocs build` puts the documentation
@@ -347,12 +348,19 @@ app = create_app()
 server = app.server
 
 if __name__ == '__main__':
-#    init_db()
-#    app = create_app()
+    # The Flask development server. In production the app is served by gunicorn
+    # (`gunicorn --config gunicorn.conf.py app:server`) and this block is not run.
+    if environment.is_production():
+        logger.warning(
+            'Running the development server with NEWSEGS_ENV=production; '
+            'use gunicorn instead. Debug tools are disabled.'
+        )
+    # Debug tools (error pop-ups, the callback graph, hot reload of assets) only in development
+    debug = environment.is_development()
     app.run(
-        host = '0.0.0.0', port = 8050, debug = True, use_reloader = False, threaded = True,
+        host = '0.0.0.0', port = 8050, debug = debug, use_reloader = False, threaded = True,
         # Circular-callback validation expands every pattern-matching id over all
         # wildcard values in the browser, which blocks the initial page load for
         # about a minute. Set DASH_VALIDATE_CALLBACKS=true to check for cycles.
-        dev_tools_validate_callbacks = os.environ.get('DASH_VALIDATE_CALLBACKS', 'false').lower() == 'true',
+        dev_tools_validate_callbacks = debug and os.environ.get('DASH_VALIDATE_CALLBACKS', 'false').lower() == 'true',
     )

@@ -86,7 +86,7 @@ def retrieve_latest_backup(
 
     # Find all backup files and sort by modification time (newest last)
     backup_files = sorted(
-        backup_dir.glob(f"{settings.get('DB_FILENAME_ROOT')}_*.db"),
+        backup_dir.glob(f"{settings['DB_FILENAME_ROOT']}_*.db"),
         key = os.path.getmtime
     )
 
@@ -125,6 +125,8 @@ def create_db(
     db_path: str
 ) -> bool:
     """Perform the basic database creation."""
+    # SQLite creates the file but not its directory
+    Path(db_path).parent.mkdir(parents = True, exist_ok = True)
     try:
         run_migrations()
     except sqlite3.Error as e:
