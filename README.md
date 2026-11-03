@@ -7,6 +7,10 @@ The NewSEGS-modelling project builds on the work of Dr David Sprake to produce e
 
 ## Getting Started
 
+## Contributing
+
+Pull requests go to the `development` branch, with a Conventional Commit title (`feat: ...`, `fix: ...`); releases are made by promoting `development` to `canary` (prereleases) and `canary` to `main` (releases). See `docs/development.md`.
+
 ## Supported platforms
 This program has been tested on the following platforms:
 
