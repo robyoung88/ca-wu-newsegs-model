@@ -7,6 +7,10 @@ The NewSEGS-modelling project builds on the work of Dr David Sprake to produce e
 
 ## Getting Started
 
+## Contributing
+
+Pull requests go to the `development` branch, with a Conventional Commit title (`feat: ...`, `fix: ...`); releases are made by promoting `development` to `canary` (prereleases) and `canary` to `main` (releases). See `docs/development.md`.
+
 ## Supported platforms
 This program has been tested on the following platforms:
 
@@ -1459,6 +1463,27 @@ mkdocs build   # writes static HTML to site/
 
 - On pushes to `main` the `publish documentation` workflow deploys the site to the `gh-pages` branch (GitHub Pages must be set to deploy from that branch).
 - The running app serves the built HTML from `site/` (or `DOCS_PATH`) at `/documentation/`; the Docker image builds it automatically.
+
+<!-- BEGIN TEMPORARY CI SECTION: Revisit or remove during the README refactor. -->
+## CI checks and generated model artifacts
+
+Pull requests targeting `development`, `canary` or `main` run the unit-test workflow. The
+workflow first regenerates the default model artifacts and checks them against
+the files in `data/`; it does not modify the pull request. PSA/DSA tests run
+separately on pushes to `main`. Excel-based validation tests are excluded from
+these automated test runs.
+
+If generated artifacts differ from the checked-in files, the prerequisite
+check fails and uploads the generated files as the
+`generated-default-model-artifacts` workflow artifact. To retrieve them, open
+the failed workflow run from the pull request's **Checks** tab, then download
+the artifact from the run summary's **Artifacts** section. Update the
+corresponding files in `data/` and push the changes to the pull request; the
+check must pass before the pull request can merge.
+
+The artifact is available when generation reaches the comparison step. If
+generation fails earlier, generated files may not be available to download.
+<!-- END TEMPORARY CI SECTION -->
 
 ## Licence
 This software is available under the [MIT License](LICENCE).

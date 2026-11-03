@@ -27,3 +27,30 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# -----------------------------------------------------------------------------
+# Releases (python-semantic-release), run by .github/workflows/release.yml
+# -----------------------------------------------------------------------------
+# The version is taken from the Conventional Commits since the last tag. Releases are tags and GitHub
+# Releases only: nothing is committed back, so `project.version` above is not updated.
+
+[tool.semantic_release]
+tag_format = "v{version}"
+commit_parser = "conventional"
+allow_zero_version = true
+major_on_zero = false
+no_git_verify = false
+
+[tool.semantic_release.commit_parser_options]
+# Pick up each Conventional Commit listed in the body of a squash merge
+parse_squash_commits = true
+ignore_merge_commits = true
+
+[tool.semantic_release.branches.main]
+match = "^main$"
+prerelease = false
+
+[tool.semantic_release.branches.canary]
+match = "^canary$"
+prerelease = true
+prerelease_token = "canary"
