@@ -86,7 +86,7 @@ def retrieve_latest_backup(
 
     # Find all backup files and sort by modification time (newest last)
     backup_files = sorted(
-        backup_dir.glob(f"{settings.get('DB_FILENAME_ROOT')}_*.db"),
+        backup_dir.glob(f"{settings['DB_FILENAME_ROOT']}_*.db"),
         key = os.path.getmtime
     )
 

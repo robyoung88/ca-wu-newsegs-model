@@ -7,6 +7,9 @@ FRONTENDPORT = 8555
 BACKENDPORT = 8556
 HEARTBEAT_FILE = '/tmp/dispatcher_heartbeat.txt'
 
+# Database backups are named <DB_FILENAME_ROOT>_<timestamp>.db
+DB_FILENAME_ROOT = 'newsegs_db'
+
 SprakeStartDatetime = "2005-01-01T00:00:00"
 SprakeEndDatetime = "2015-01-01T00:00:00"
 SprakeValidationLat = 53.25535
