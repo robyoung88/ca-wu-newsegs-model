@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 import schedule
 
-from newsegsmodelapp.backend.pruning import prune_old_jobs
+from newsegsmodelapp.backend.pruning import prune_all
 from config import settings
 DB_PATH = Path(str(settings['DB_PATH']))
 DB_BACKUP_PATH = Path(str(settings['DB_BACKUP_PATH']))
@@ -23,7 +23,7 @@ def run_pruning():
     """Perform pruning tasks"""
     cleanup_old_backups(DB_BACKUP_PATH, BACKUP_RETENTION_DAYS)
 
-    prune_old_jobs(DB_PATH, RESULTS_STORE)
+    prune_all(RESULTS_STORE)
 
     # For a practical app, we would also have some pruning of the 
     # configurations here.
