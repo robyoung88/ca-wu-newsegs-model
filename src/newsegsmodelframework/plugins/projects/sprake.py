@@ -53,7 +53,6 @@ def _create_default_finance() -> newsegsfinance.NewsegsFinance:
         fnc_conf.anonymise_ids()
         _reset_revision(fnc_conf)
     return fnc_conf
-    #return sprakefinance.SprakeFinance.from_dict(fnc_conf)
 
 def _create_default_variables() -> list[variable.Variable]:
     with open(os.path.join(STATICDATA, 'sprake-variable-config.json')) as f:
