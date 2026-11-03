@@ -1819,7 +1819,7 @@ class TestVariableSerialisation(unittest.TestCase):
     # NB - using from_dict form here, not direct construction.
     # This allows us to hold onto e.g. raw_parameters
     def load_sprake_variables(self):
-        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-validation-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
     
@@ -2535,7 +2535,7 @@ from dataclasses import dataclass, field
 
 class TestVariableListManagement(unittest.TestCase):
     def load_sprake_variables(self):
-        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-validation-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
 
