@@ -7,7 +7,7 @@ import pandas as pd
 
 from newsegsmodelframework.util.holiday_helpers import get_holiday_df
 
-from config import settings
+from config import settings, environment
 # Where to find elexon profile data
 from newsegsmodelframework import STATICDATA
 lookup_dir = settings.get('SprakeDataLoc', STATICDATA / 'sprake_data')
@@ -182,7 +182,7 @@ def characterise_dates_elexon(
         )
     )
 
-    if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
+    if environment.is_spraketest():
         # Original Sprake model does not consider holidays
         oframe = oframe \
             .assign(

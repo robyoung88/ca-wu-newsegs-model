@@ -10,6 +10,8 @@
                 "-f",
                 "docker-compose.yml",
                 "-f",
+                "docker-compose.dev.yml",
+                "-f",
                 "docker-compose.debug.yml",
                 "up",
                 "--build",

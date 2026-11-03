@@ -1,0 +1,53 @@
+# Development overrides, layered on top of the production docker-compose.yml.
+#
+# Run:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Tip: put COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml in your local
+# .env to make plain `docker compose up` use the development stack.
+#
+# Compared with production this:
+#   - sets NEWSEGS_ENV=development (dynaconf [development] settings, Dash debug tools)
+#   - mounts the working copy over /app for live code changes
+#   - runs the Dash app with the Flask development server instead of gunicorn
+#   - adds the dozzle log viewer (:9090) and the sqlite-web database browser (:9080)
+#
+# To attach a debugger, also add docker-compose.debug.yml (see .vscode/tasks.json).
+services:
+  dash-app:
+    command: python src/app.py
+    environment:
+      NEWSEGS_ENV: development
+    volumes:
+      # The Code Mount (for Live Reloading)
+      - .:/app
+
+  zmq-dispatcher:
+    environment:
+      NEWSEGS_ENV: development
+    volumes:
+      - .:/app
+
+  maintenance-cron:
+    environment:
+      NEWSEGS_ENV: development
+    volumes:
+      - .:/app
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    ports:
+      - "9090:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  sqlite-web:
+    image: coleifer/sqlite-web:latest
+    ports:
+      - "9080:8080"
+    volumes:
+      - local_db_data:/var/lib/sqlite_data
+    command: ["python", "-m", "sqlite_web", "/var/lib/sqlite_data/newsegs_db.db", "--port", "8080", "--host", "0.0.0.0"]
+    restart: unless-stopped

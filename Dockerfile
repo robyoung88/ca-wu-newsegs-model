@@ -23,10 +23,14 @@ RUN conda run -n ca-wu-newsegs-mod mkdocs build --site-dir /opt/newsegs-docs
 # Create SQLite database directory for named volume target
 RUN mkdir -p /var/lib/sqlite_data
 
+# Production by default; docker-compose.dev.yml switches to development.
+ENV NEWSEGS_ENV=production
+ENV PYTHONPATH=src
+
 EXPOSE 8050
 
 # Ensure subsequent CMD runs within the Conda environment
 ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "ca-wu-newsegs-mod"]
 
-# Default command (overridden by docker-compose for other services)
-CMD ["python", "src/app.py"]
+# Default command: serve the Dash app with gunicorn (overridden by docker-compose for other services)
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:server"]

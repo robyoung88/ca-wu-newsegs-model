@@ -125,6 +125,8 @@ def create_db(
     db_path: str
 ) -> bool:
     """Perform the basic database creation."""
+    # SQLite creates the file but not its directory
+    Path(db_path).parent.mkdir(parents = True, exist_ok = True)
     try:
         run_migrations()
     except sqlite3.Error as e:
