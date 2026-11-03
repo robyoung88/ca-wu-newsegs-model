@@ -10,8 +10,8 @@ jobs:
   generate-and-validate:
     runs-on: ubuntu-latest
     env:
-      GENERATION_ROOT: ${{ runner.temp }}/default-model-generation
-      GENERATED_ARTIFACTS: ${{ runner.temp }}/generated-default-model-artifacts
+      GENERATION_ROOT: ${{ github.workspace }}/.default-model-generation
+      GENERATED_ARTIFACTS: ${{ github.workspace }}/.generated-default-model-artifacts
     steps:
       - uses: actions/checkout@v4
 
@@ -31,15 +31,15 @@ jobs:
           git archive HEAD | tar -x -C "$GENERATION_ROOT"
 
       - name: Generate default-model artifacts
-        working-directory: ${{ runner.temp }}/default-model-generation
+        working-directory: ${{ github.workspace }}/.default-model-generation
         env:
-          PYTHONPATH: ${{ runner.temp }}/default-model-generation/src
+          PYTHONPATH: ${{ github.workspace }}/.default-model-generation/src
         run: python scripts/200_create_default_models.py
 
       - name: Compare generated artifacts with repository data
-        working-directory: ${{ runner.temp }}/default-model-generation
+        working-directory: ${{ github.workspace }}/.default-model-generation
         env:
-          PYTHONPATH: ${{ runner.temp }}/default-model-generation/src
+          PYTHONPATH: ${{ github.workspace }}/.default-model-generation/src
         run: >-
           python scripts/201_validate_default_model_artifacts.py
           "$GITHUB_WORKSPACE/data"
@@ -50,6 +50,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: generated-default-model-artifacts
-          path: ${{ runner.temp }}/generated-default-model-artifacts/
+          path: ${{ github.workspace }}/.generated-default-model-artifacts/
           if-no-files-found: warn
           retention-days: 7
