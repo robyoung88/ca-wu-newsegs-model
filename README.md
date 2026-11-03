@@ -1467,7 +1467,7 @@ mkdocs build   # writes static HTML to site/
 <!-- BEGIN TEMPORARY CI SECTION: Revisit or remove during the README refactor. -->
 ## CI checks and generated model artifacts
 
-Pull requests targeting `development` or `main` run the unit-test workflow. The
+Pull requests targeting `development`, `canary` or `main` run the unit-test workflow. The
 workflow first regenerates the default model artifacts and checks them against
 the files in `data/`; it does not modify the pull request. PSA/DSA tests run
 separately on pushes to `main`. Excel-based validation tests are excluded from

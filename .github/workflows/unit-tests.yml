@@ -1,10 +1,13 @@
 name: unit tests
 
+# The job `unit-tests` is the status check required on pull requests into main.
 on:
   pull_request:
     branches:
       - development
+      - canary
       - main
+  workflow_call:  # by release.yml, before a canary prerelease
 
 permissions:
   contents: read

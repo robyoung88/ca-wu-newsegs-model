@@ -1,6 +1,7 @@
 name: release
 
-# Merges into canary make a prerelease (vX.Y.Z-canary.N); merges into main make a release (vX.Y.Z).
+# Merges into canary make a prerelease (vX.Y.Z-canary.N), after the unit tests; merges into main make a
+# release (vX.Y.Z), after the PSA and DSA tests.
 # python-semantic-release works out the version from the Conventional Commits since the last tag,
 # then creates the tag and the GitHub Release. Nothing is committed back to the branch.
 #
@@ -24,12 +25,21 @@ permissions:
   contents: read
 
 jobs:
-  tests:
-    uses: ./.github/workflows/tests.yml
+  # Canary: the unit tests. Main and release tags: the PSA and DSA tests (the unit tests ran on the PR into main).
+  unit-tests:
+    if: github.ref_name == 'canary'
+    uses: ./.github/workflows/unit-tests.yml
+
+  enhanced-unit-tests:
+    if: github.ref_name != 'canary'
+    uses: ./.github/workflows/enhanced-unit-tests.yml
 
   semantic-release:
-    if: github.ref_type == 'branch'
-    needs: tests
+    # Runs when whichever test job applies has passed, and the other was skipped
+    if: >-
+      !cancelled() && github.ref_type == 'branch'
+      && !contains(needs.*.result, 'failure') && contains(needs.*.result, 'success')
+    needs: [unit-tests, enhanced-unit-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -94,7 +104,7 @@ jobs:
 
   manual-tag-release:
     if: github.ref_type == 'tag'
-    needs: tests
+    needs: enhanced-unit-tests
     runs-on: ubuntu-latest
     permissions:
       contents: write
