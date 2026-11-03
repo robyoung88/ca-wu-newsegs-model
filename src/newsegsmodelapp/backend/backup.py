@@ -26,10 +26,10 @@ def cleanup_old_backups(
     if not isinstance(backup_path, Path):
         backup_path = Path(backup_path)
 
-    if not backup_path.exists:
+    if not backup_path.exists():
         return
 
-    pattern = re.compile(str(settings.get('DB_FILENAME_ROOT') + r'_.*\.db'))
+    pattern = re.compile(re.escape(str(settings['DB_FILENAME_ROOT'])) + r'_.*\.db')
     for file in backup_path.iterdir():
         match = pattern.match(file.name)
         if match:
@@ -51,7 +51,7 @@ def backup_now(
     backup_path.mkdir(parents = True, exist_ok = True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_fn = f'{settings.get('DB_FILENAME_ROOT') }_{timestamp}.db'
+    backup_fn = f'{settings['DB_FILENAME_ROOT']}_{timestamp}.db'
     backup_file_path = backup_path / backup_fn
 
     try:

@@ -1,9 +1,9 @@
 name: enhanced unit tests
 
+# Run by release.yml on pushes to main, before the release is made.
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read

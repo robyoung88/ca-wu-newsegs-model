@@ -16,6 +16,7 @@ from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.newsegscs import NewsegsCS, NewsegsCSConfig
 
 from newsegsmodelframework import STATICDATA
+from config import environment
 from newsegsmodelframework.newsegscs.sprake_thermal_model import TIMESERIES_DEGREE_DAYS
 from newsegsmodelframework.newsegsvariable.variable import ScalarNumParam
 AnyNumber = Union[ScalarNumParam]#, Number]
@@ -423,7 +424,7 @@ class SprakeCS(NewsegsCS):
         Returns:
             The module.
         """
-        if (os.environ.get('ENV_FOR_DYNACONF',None) == 'spraketest'):
+        if environment.is_spraketest():
             spaceheat_params = {
                 'hlp': 0.3,
                 'gfa': 105.0,

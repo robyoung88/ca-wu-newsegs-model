@@ -66,6 +66,7 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Docstring conventions: docstrings.md
+  - Development and releases: development.md
   - Framework:
     - framework/index.md
     - Plugins: framework/plugins.md

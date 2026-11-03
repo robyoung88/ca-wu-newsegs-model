@@ -52,4 +52,6 @@ jobs:
           name: generated-default-model-artifacts
           path: ${{ github.workspace }}/.generated-default-model-artifacts/
           if-no-files-found: warn
+          # The directory name starts with a dot, which upload-artifact otherwise skips
+          include-hidden-files: true
           retention-days: 7

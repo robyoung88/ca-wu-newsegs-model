@@ -46,3 +46,4 @@ dependencies:
   - uuid6
   - openpyxl
   - fasteners
+  - gunicorn=23.0.0

@@ -14,7 +14,7 @@
                 50.0
             ]
         },
-        "uuid": "dad70482-0fca-4dd1-a123-5d36c03148a4",
+        "uuid": "e3260dba-2400-4ab5-a2e4-d25d866b47c3",
         "_component_ids": {},
         "_name": "Wind capacity",
         "unit": "kW",
@@ -67,7 +67,7 @@
                 15.0
             ]
         },
-        "uuid": "92b07011-5cdd-417d-9be5-7ad24edb8d71",
+        "uuid": "b38bd45b-2286-45b4-bdc4-92e0c8f1d2fb",
         "_component_ids": {},
         "_name": "Solar PV capacity",
         "unit": "kWp",
@@ -120,7 +120,7 @@
                 1200.0
             ]
         },
-        "uuid": "eede9150-ed3f-475e-9cf0-dcad1abd373b",
+        "uuid": "e6bc2bfe-ea54-4643-ac70-9850106b4d58",
         "_component_ids": {},
         "_name": "Storage capacity",
         "unit": "kWh",
@@ -172,7 +172,7 @@
                 0.02
             ]
         },
-        "uuid": "a615e72b-7250-46b6-93ad-474ea9c6ba2d",
+        "uuid": "4c173cc1-2e9e-4d13-a0e9-ee2738fdc2a3",
         "_component_ids": {},
         "_name": "Storage round trip efficiency",
         "unit": "",
@@ -225,7 +225,7 @@
                 50.0
             ]
         },
-        "uuid": "803eb466-64ab-40a7-b162-0dff45b7e80f",
+        "uuid": "cfa5b2bb-c7bf-4551-be4a-af0376fede54",
         "_component_ids": {},
         "_name": "No. of households",
         "unit": "N",
@@ -279,7 +279,7 @@
                 0.18000000000000002
             ]
         },
-        "uuid": "fd9ed28f-ad69-4725-9707-63a3d2e9ec8b",
+        "uuid": "48bc26c1-52ad-4616-8599-d8a81709c0bc",
         "_component_ids": {},
         "_name": "HLP",
         "unit": "W/m\u00b2/K",
@@ -335,7 +335,7 @@
                 16.2
             ]
         },
-        "uuid": "add63acc-f078-4e71-91e5-8dec000cad29",
+        "uuid": "0435b8ab-59e6-4894-b001-0b97587e7351",
         "_component_ids": {},
         "_name": "Mean GFA",
         "unit": "m\u00b2/household",
@@ -391,7 +391,7 @@
                 0.9
             ]
         },
-        "uuid": "e6b09e79-5da1-421e-ad4e-3cd9bf897f90",
+        "uuid": "c2ce9c1e-752a-4ebb-98d5-e01507d4d2f7",
         "_component_ids": {},
         "_name": "Reference hot water demand",
         "unit": "kWh/day",
@@ -448,7 +448,7 @@
                 0.04000000000000001
             ]
         },
-        "uuid": "7c33b13d-564e-42e5-8dfa-bac06b3319af",
+        "uuid": "1d89c68e-dbf5-46c2-be00-26dbbdf0ac07",
         "_component_ids": {},
         "_name": "Seasonal variation",
         "unit": "factor",
@@ -505,7 +505,7 @@
                 0.02
             ]
         },
-        "uuid": "2a31d684-8522-4c7f-8cf1-2b24e7f12488",
+        "uuid": "2ed71e36-bb85-4708-a949-a20293a756bd",
         "_component_ids": {},
         "_name": "High-efficiency appliances consumption reduction",
         "unit": "factor",
@@ -562,7 +562,7 @@
                 262.944
             ]
         },
-        "uuid": "8623d025-cc3f-4a3f-912f-e75ca623da69",
+        "uuid": "a075cf05-726a-4785-b372-aa22c2461f83",
         "_component_ids": {},
         "_name": "Residential charging per EV",
         "unit": "kWh/yr",
@@ -619,7 +619,7 @@
                 0.04000000000000001
             ]
         },
-        "uuid": "3a419222-175c-49fa-b451-ca1e76f32a3b",
+        "uuid": "9da236b4-604b-4ade-ac90-9f26c3a08487",
         "_component_ids": {},
         "_name": "EVs per household",
         "unit": "N",
@@ -672,7 +672,7 @@
                 10
             ]
         },
-        "uuid": "f1281820-00f6-438f-9e5e-dfde7102ac44",
+        "uuid": "9fa4ae0a-041b-4b37-bdac-429861a7e43d",
         "_component_ids": {},
         "_name": "Model time horizon",
         "unit": "years",
@@ -727,7 +727,7 @@
                 1080.0
             ]
         },
-        "uuid": "4b8f31f9-6757-42cb-a40f-63eb0a78b67a",
+        "uuid": "4a36091a-edc6-4911-9134-16b0e2d314f7",
         "_component_ids": {},
         "_name": "Wind Capex",
         "unit": "\u00a3/kW",
@@ -787,7 +787,7 @@
                 43.2
             ]
         },
-        "uuid": "636e8f03-3f46-4f42-af23-4c5f2da2af3a",
+        "uuid": "ce5082fa-3392-4022-b3de-5181f8dd6418",
         "_component_ids": {},
         "_name": "Wind Ongoing",
         "unit": "\u00a3/kW/yr",
@@ -846,7 +846,7 @@
                 273.0
             ]
         },
-        "uuid": "d40ece41-b6fb-4c65-9590-2878c1a4de10",
+        "uuid": "cd3b338a-126d-4448-9056-f023d5651951",
         "_component_ids": {},
         "_name": "Solar PV Capex",
         "unit": "\u00a3/kWp",
@@ -906,7 +906,7 @@
                 2.73
             ]
         },
-        "uuid": "12680b03-77c1-449c-b74a-adc2f496e4ea",
+        "uuid": "e4bf1ccb-8cda-4665-aab0-9ba772568b4c",
         "_component_ids": {},
         "_name": "Solar PV Ongoing",
         "unit": "\u00a3/kWp/yr",
@@ -965,7 +965,7 @@
                 30.0
             ]
         },
-        "uuid": "ed7eee27-8061-4cf0-ad81-6b2a803c83f4",
+        "uuid": "eae15eff-1168-4dae-baf7-403d3faacdbf",
         "_component_ids": {},
         "_name": "BESS Capex",
         "unit": "\u00a3/kWh",
@@ -1024,7 +1024,7 @@
                 0.30000000000000004
             ]
         },
-        "uuid": "0a26177d-41a3-4944-8f9d-d3236eea096d",
+        "uuid": "5528f849-5080-42c4-a5ec-45254ca39daa",
         "_component_ids": {},
         "_name": "BESS Ongoing",
         "unit": "\u00a3/kWh",
@@ -1082,7 +1082,7 @@
                 0.0
             ]
         },
-        "uuid": "523fbc02-30b0-4dab-915e-acea5da54dfa",
+        "uuid": "1fb72ac1-8bea-4a0d-8a2f-b323cd8bc387",
         "_component_ids": {},
         "_name": "Resident standing charge",
         "unit": "\u00a3/household/day",
@@ -1138,7 +1138,7 @@
                 0.04772000000000001
             ]
         },
-        "uuid": "281f9b0c-e892-4461-a2f7-cf4ae2ac969d",
+        "uuid": "0c6d9979-6ffa-4e9c-99bd-c680c2c32bca",
         "_component_ids": {},
         "_name": "Resident per unit charge",
         "unit": "\u00a3/kWh",
@@ -1194,7 +1194,7 @@
                 0.020000000000000004
             ]
         },
-        "uuid": "e72c0c5b-3ff4-4061-ab55-1e27a42c553a",
+        "uuid": "41775a7d-1ee1-4a90-a2c2-b52e9a111e00",
         "_component_ids": {},
         "_name": "Grid export - mean per unit",
         "unit": "\u00a3/kWh",
@@ -1250,7 +1250,7 @@
                 0.0
             ]
         },
-        "uuid": "f75e4b4c-7610-4de4-96ba-abe3bd3f8145",
+        "uuid": "275cbe7f-9337-4df5-bf0e-5ce89ea43ce2",
         "_component_ids": {},
         "_name": "Fixed costs for backup",
         "unit": "\u00a3/site/day",
@@ -1307,7 +1307,7 @@
                 0.06362
             ]
         },
-        "uuid": "e2f6e4b2-0c1d-4b7e-8d81-07dcf295dc1e",
+        "uuid": "b74df99d-6e04-4658-83b1-cc332359fc68",
         "_component_ids": {},
         "_name": "Per-unit costs for backup",
         "unit": "\u00a3/kWh",
@@ -1361,7 +1361,7 @@
                 0.17434878835254347
             ]
         },
-        "uuid": "85544a0b-4708-4855-b98a-71af08a94e06",
+        "uuid": "3f6f201b-060a-423b-9d87-82b5f200e055",
         "_component_ids": {},
         "_name": "Benefit discount rate",
         "unit": "factor",
@@ -1415,7 +1415,7 @@
                 0.17434878835254347
             ]
         },
-        "uuid": "e67deb01-72b5-407f-94a8-b975c431f514",
+        "uuid": "0bcc2b34-df22-4b9b-ba02-e755694bf9c3",
         "_component_ids": {},
         "_name": "Cost discount rate",
         "unit": "factor",
