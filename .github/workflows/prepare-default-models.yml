@@ -1,0 +1,55 @@
+name: prepare default models
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-and-validate:
+    runs-on: ubuntu-latest
+    env:
+      GENERATION_ROOT: ${{ runner.temp }}/default-model-generation
+      GENERATED_ARTIFACTS: ${{ runner.temp }}/generated-default-model-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.12'
+          cache: pip
+          cache-dependency-path: requirements-generation.txt
+
+      - name: Install generation dependencies
+        run: python -m pip install -r requirements-generation.txt
+
+      - name: Create isolated checkout
+        run: |
+          mkdir -p "$GENERATION_ROOT"
+          git archive HEAD | tar -x -C "$GENERATION_ROOT"
+
+      - name: Generate default-model artifacts
+        working-directory: ${{ runner.temp }}/default-model-generation
+        env:
+          PYTHONPATH: ${{ runner.temp }}/default-model-generation/src
+        run: python scripts/200_create_default_models.py
+
+      - name: Compare generated artifacts with repository data
+        working-directory: ${{ runner.temp }}/default-model-generation
+        env:
+          PYTHONPATH: ${{ runner.temp }}/default-model-generation/src
+        run: >-
+          python scripts/201_validate_default_model_artifacts.py
+          "$GITHUB_WORKSPACE/data"
+          "$GENERATED_ARTIFACTS"
+
+      - name: Upload generated artifacts for updating the PR
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-default-model-artifacts
+          path: ${{ runner.temp }}/generated-default-model-artifacts/
+          if-no-files-found: warn
+          retention-days: 7

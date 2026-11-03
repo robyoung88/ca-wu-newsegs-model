@@ -239,28 +239,6 @@ class SprakeModel(newsegsmodel.NewsegsModel):
     ) -> None:
         super().__init__(*args, **kwargs)
 
-        # if local_environment_server:
-        #     if isinstance(local_environment_server, str):
-        #         testenv = get_sprake_environment_server()
-        #         if str(testenv) != local_environment_server:
-        #             raise ValueError('Mismatched local environments')
-        #         self.local_env = testenv
-        #     else:
-        #         self.local_env = local_environment_server
-        # else:
-        #     self.local_env = get_sprake_environment_server()
-        
-        # if wider_environment_server:
-        #     if isinstance(wider_environment_server, str):
-        #         testenv = get_sprake_wider_env_server()
-        #         if str(testenv) != wider_environment_server:
-        #             raise ValueError('Mismatched wider environments')
-        #         self.wider_env = testenv
-        #     else:
-        #         self.wider_env = wider_environment_server
-        # else:
-        #     self.wider_env = get_sprake_wider_env_server()
-
         if not isinstance(generation, sprakegeneration.SprakeGeneration):
             raise TypeError(f'"generation" must be of type SprakeGeneration, is {type(generation)}')
         self.generation = generation # pyright: ignore[reportIncompatibleMethodOverride]
@@ -456,10 +434,7 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         
         self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
-
-    @override
-    def _prepare_object_state(self):
-        super()._prepare_object_state()
+    
 
 # SprakeModel copy constructor
 @SprakeModel.__init__.register(SprakeModel) # pyright: ignore[reportFunctionMemberAccess]
