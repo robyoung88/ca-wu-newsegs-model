@@ -1,0 +1,1459 @@
+[
+    {
+        "class": "NumericConstantVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "relative",
+            "optim_selected": true,
+            "raw_parameters": [
+                200.0
+            ]
+        },
+        "uuid": "2bfc901f-0a29-4ac2-b44a-9a7bc7c28516",
+        "_component_ids": {},
+        "_name": "Wind capacity",
+        "unit": "kW",
+        "icon_name": "gen-wind",
+        "configuration_type": "model",
+        "model_section": "generation",
+        "model_parameter": "wind_capacity",
+        "interface_section": "gen_input",
+        "interface_key": "wind_capacity",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            200.0
+        ],
+        "_default_parameters": [
+            200.0
+        ],
+        "_dsa_lower": 0.9,
+        "_dsa_upper": 1.1,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": true,
+        "_optim_show": true,
+        "configuration_show": true,
+        "interface_min": 0,
+        "interface_max": 10000,
+        "interface_step": 5.0
+    },
+    {
+        "class": "NumericConstantVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "relative",
+            "optim_selected": true,
+            "raw_parameters": [
+                200.0
+            ]
+        },
+        "uuid": "e3781c54-f4a9-457f-ac91-006d0eba8f45",
+        "_component_ids": {},
+        "_name": "Solar PV capacity",
+        "unit": "kWp",
+        "icon_name": "gen-pv",
+        "configuration_type": "model",
+        "model_section": "generation",
+        "model_parameter": "pv_capacity",
+        "interface_section": "gen_input",
+        "interface_key": "pv_capacity",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            200.0
+        ],
+        "_default_parameters": [
+            200.0
+        ],
+        "_dsa_lower": 0.9,
+        "_dsa_upper": 1.1,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": true,
+        "_optim_show": true,
+        "configuration_show": true,
+        "interface_min": 0,
+        "interface_max": 10000,
+        "interface_step": 5.0
+    },
+    {
+        "class": "NumericConstantVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "relative",
+            "optim_selected": true,
+            "raw_parameters": [
+                4000.0
+            ]
+        },
+        "uuid": "3d081d9d-1ece-42fd-b4b8-4b3a1650d4f0",
+        "_component_ids": {},
+        "_name": "Storage capacity",
+        "unit": "kWh",
+        "icon_name": "storage",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "storage_capacity",
+        "interface_section": "stor_input",
+        "interface_key": "storage_capacity",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            4000.0
+        ],
+        "_default_parameters": [
+            4000.0
+        ],
+        "_dsa_lower": 0.9,
+        "_dsa_upper": 1.1,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": true,
+        "_optim_show": true,
+        "configuration_show": true,
+        "interface_min": 0,
+        "interface_max": 10000,
+        "interface_step": 5.0
+    },
+    {
+        "class": "BetaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_bounds_type": "interval",
+            "raw_parameters": [
+                0.8799999999999999,
+                0.02
+            ]
+        },
+        "uuid": "b5010fdd-96f3-4eba-ad23-31b1bc60fcfe",
+        "_component_ids": {},
+        "_name": "Storage round trip efficiency",
+        "unit": "",
+        "icon_name": "storage-rte",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "storage_rte",
+        "interface_section": "stor_input",
+        "interface_key": "storage_rte",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            231.4400000000001,
+            31.56000000000005
+        ],
+        "_default_parameters": [
+            0.88,
+            0.25
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": false,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.01,
+        "formatter_dp": 3
+    },
+    {
+        "class": "NumericConstantVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "raw_parameters": [
+                100.0
+            ]
+        },
+        "uuid": "28e06333-f023-49a8-b530-7c268e7397f2",
+        "_component_ids": {},
+        "_name": "No. of households",
+        "unit": "N",
+        "icon_name": "consumption-building-nunits",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "n_units",
+        "interface_section": "bc_input",
+        "interface_key": "n_units",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            100.0
+        ],
+        "_default_parameters": [
+            100.0
+        ],
+        "_dsa_lower": 90,
+        "_dsa_upper": 110,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": 1,
+        "interface_max": 1000,
+        "interface_step": 1
+    },
+    {
+        "class": "NormalVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                0.3,
+                0.06
+            ]
+        },
+        "uuid": "27ef559d-94f7-4ec0-9d66-932668e5762f",
+        "_component_ids": {},
+        "_name": "HLP",
+        "unit": "W/m\u00b2/K",
+        "icon_name": "consumption-building-hlp",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "hlp",
+        "interface_section": "bc_input",
+        "interface_key": "hlp",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            0.3,
+            0.06
+        ],
+        "_default_parameters": [
+            0.3,
+            1
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 3.0,
+        "interface_step": 0.1,
+        "formatter_dp": 3
+    },
+    {
+        "class": "NormalVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "raw_parameters": [
+                105.0,
+                21.0
+            ]
+        },
+        "uuid": "b55c2c1a-9ab0-4c04-9a2d-a0ef9aa18de3",
+        "_component_ids": {},
+        "_name": "Mean GFA",
+        "unit": "m\u00b2/household",
+        "icon_name": "consumption-building-gfa",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "gfa",
+        "interface_section": "bc_input",
+        "interface_key": "gfa",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            105.0,
+            21.0
+        ],
+        "_default_parameters": [
+            105.0,
+            1
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 300,
+        "interface_step": 1
+    },
+    {
+        "class": "NormalVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                4.5,
+                0.9
+            ]
+        },
+        "uuid": "f066f57d-d35f-4b07-adb0-ab547179f9e8",
+        "_component_ids": {},
+        "_name": "Reference hot water demand",
+        "unit": "kWh/day",
+        "icon_name": "consumption-building-dhw-ref",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "ref_daily_consumption",
+        "interface_section": "bc_input",
+        "interface_key": "ref_daily_consumption",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            4.5,
+            0.9
+        ],
+        "_default_parameters": [
+            4.5,
+            1
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10.0,
+        "interface_step": 0.1,
+        "formatter_dp": 2
+    },
+    {
+        "class": "BetaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                0.2,
+                0.04000000000000001
+            ]
+        },
+        "uuid": "56ec19e0-3ae4-4720-80b8-fb59a283bad9",
+        "_component_ids": {},
+        "_name": "Seasonal variation",
+        "unit": "factor",
+        "icon_name": "consumption-building-dhw-var",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "seasonal_variance",
+        "interface_section": "bc_input",
+        "interface_key": "seasonal_variance",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            19.799999999999997,
+            79.19999999999999
+        ],
+        "_default_parameters": [
+            0.2,
+            0.25
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.05,
+        "formatter_dp": 2
+    },
+    {
+        "class": "BetaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                0.09999999999999999,
+                0.02
+            ]
+        },
+        "uuid": "50b7397b-c113-4872-a2f5-1c1723cdb463",
+        "_component_ids": {},
+        "_name": "High-efficiency appliances consumption reduction",
+        "unit": "factor",
+        "icon_name": "consumption-direct-appliance-reduction",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "efficiency_reduction",
+        "interface_section": "dc_input",
+        "interface_key": "efficiency_reduction",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            22.399999999999995,
+            201.59999999999997
+        ],
+        "_default_parameters": [
+            0.1,
+            0.25
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.05,
+        "formatter_dp": 2
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                1314.72,
+                262.944
+            ]
+        },
+        "uuid": "34480f52-86e0-4e8f-aa86-36d68d91188a",
+        "_component_ids": {},
+        "_name": "Residential charging per EV",
+        "unit": "kWh/yr",
+        "icon_name": "consumption-direct-ev-anncharge",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "annual_residential_consumption_per_ev",
+        "interface_section": "dc_input",
+        "interface_key": "annual_residential_consumption_per_ev",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            52.5888
+        ],
+        "_default_parameters": [
+            1314.72,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.05,
+        "formatter_dp": 0
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                0.2,
+                0.04000000000000001
+            ]
+        },
+        "uuid": "43b8e244-50aa-4869-b518-dc1c7e382489",
+        "_component_ids": {},
+        "_name": "EVs per household",
+        "unit": "N",
+        "icon_name": "consumption-direct-ev-nperunit",
+        "configuration_type": "model",
+        "model_section": "consumption_storage",
+        "model_parameter": "ev_per_unit",
+        "interface_section": "dc_input",
+        "interface_key": "n_evs_per_household",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            24.999999999999993,
+            0.008000000000000002
+        ],
+        "_default_parameters": [
+            0.2,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 3.0,
+        "interface_step": 0.05,
+        "formatter_dp": 2
+    },
+    {
+        "class": "NumericConstantVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "raw_parameters": [
+                10
+            ]
+        },
+        "uuid": "7356b408-da79-4ef3-9076-6a33d5362376",
+        "_component_ids": {},
+        "_name": "Model time horizon",
+        "unit": "years",
+        "icon_name": "model-settings-time-horizon",
+        "configuration_type": "model",
+        "model_section": "",
+        "model_parameter": "horizon",
+        "interface_section": "mc_input",
+        "interface_key": "horizon",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 0,
+        "_parameters": [
+            10
+        ],
+        "_default_parameters": [
+            10
+        ],
+        "_dsa_lower": 5,
+        "_dsa_upper": 10,
+        "dsa_selectable": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": false,
+        "value_name": "Value",
+        "psa_selectable": false,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": 1,
+        "interface_max": 10,
+        "interface_step": 1,
+        "formatter_dp": 0
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                1500.0,
+                300.0
+            ]
+        },
+        "uuid": "7f17d67f-7441-40a6-9c3e-cb3b4f74fc77",
+        "_component_ids": {},
+        "_name": "Wind Capex",
+        "unit": "\u00a3/kW",
+        "icon_name": [
+            "gen-wind",
+            "finance-settings"
+        ],
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "wind_capex_per_kw",
+        "interface_section": "gen_costs",
+        "interface_key": "wind_capex_per_kw",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            60.0
+        ],
+        "_default_parameters": [
+            1500.0,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 50,
+        "formatter_dp": 0
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                46.0,
+                9.200000000000001
+            ]
+        },
+        "uuid": "9f87a39f-a617-49f2-882d-0a228180e09b",
+        "_component_ids": {},
+        "_name": "Wind Ongoing",
+        "unit": "\u00a3/kW/yr",
+        "icon_name": [
+            "gen-wind",
+            "cost-recurrent"
+        ],
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "wind_om_per_kw_year",
+        "interface_section": "gen_costs",
+        "interface_key": "wind_om_per_kw_year",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            24.999999999999993,
+            1.8400000000000005
+        ],
+        "_default_parameters": [
+            46.0,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 5000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                1000.0,
+                200.0
+            ]
+        },
+        "uuid": "51500469-53e4-4549-955a-899fa6a0f6a4",
+        "_component_ids": {},
+        "_name": "Solar PV Capex",
+        "unit": "\u00a3/kWp",
+        "icon_name": [
+            "gen-pv",
+            "finance-settings"
+        ],
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "pv_capex_per_kw",
+        "interface_section": "gen_costs",
+        "interface_key": "pv_capex_per_kw",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            40.0
+        ],
+        "_default_parameters": [
+            1000.0,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 50,
+        "formatter_dp": 0
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                10.5,
+                2.1
+            ]
+        },
+        "uuid": "f73064d1-5d2a-4568-8918-b6926462225e",
+        "_component_ids": {},
+        "_name": "Solar PV Ongoing",
+        "unit": "\u00a3/kWp/yr",
+        "icon_name": [
+            "gen-pv",
+            "cost-recurrent"
+        ],
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "pv_om_per_kw_year",
+        "interface_section": "gen_costs",
+        "interface_key": "pv_om_per_kw_year",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            0.42
+        ],
+        "_default_parameters": [
+            10.5,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 5000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                191.772,
+                38.3544
+            ]
+        },
+        "uuid": "362db066-893c-4803-b2c5-5969209f91ba",
+        "_component_ids": {},
+        "_name": "BESS Capex",
+        "unit": "\u00a3/kWh",
+        "icon_name": [
+            "storage",
+            "finance-settings"
+        ],
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "bess_capex_per_kwh",
+        "interface_section": "stor_costs",
+        "interface_key": "bess_capex_per_kwh",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            7.6708799999999995
+        ],
+        "_default_parameters": [
+            191.772,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 50
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                16.719,
+                3.3438000000000003
+            ]
+        },
+        "uuid": "69aee0a4-0d63-498f-a39d-8fe44d2540e1",
+        "_component_ids": {},
+        "_name": "BESS Ongoing",
+        "unit": "\u00a3/kWh",
+        "icon_name": [
+            "storage",
+            "cost-recurrent"
+        ],
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "bess_om_per_kwh_year",
+        "interface_section": "stor_costs",
+        "interface_key": "bess_om_per_kwh_year",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            0.66876
+        ],
+        "_default_parameters": [
+            16.719,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 5000,
+        "interface_step": 10
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "raw_parameters": [
+                0.0,
+                0.0
+            ]
+        },
+        "uuid": "182c9adf-6c8a-42ae-a95d-4630e7038f7a",
+        "_component_ids": {},
+        "_name": "Resident standing charge",
+        "unit": "\u00a3/household/day",
+        "icon_name": "cost-residents-standing",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "resident_sc_per_unit_day",
+        "interface_section": "sales_costs",
+        "interface_key": "resident_sc_per_unit_day",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            0.0,
+            0.0
+        ],
+        "_default_parameters": [
+            0.0,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01,
+        "formatter_dp": 5
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "raw_parameters": [
+                0.2975,
+                0.0595
+            ]
+        },
+        "uuid": "310fa0f0-49a9-4773-aa88-ed245d32c603",
+        "_component_ids": {},
+        "_name": "Resident per unit charge",
+        "unit": "\u00a3/kWh",
+        "icon_name": "cost-residents-perunit",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "resident_var_per_unit",
+        "interface_section": "sales_costs",
+        "interface_key": "resident_var_per_unit",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            0.011899999999999999
+        ],
+        "_default_parameters": [
+            0.2975,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01,
+        "formatter_dp": 5
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "raw_parameters": [
+                0.1,
+                0.020000000000000004
+            ]
+        },
+        "uuid": "e0ac1a98-14df-4470-abc3-3987cf903682",
+        "_component_ids": {},
+        "_name": "Grid export - mean per unit",
+        "unit": "\u00a3/kWh",
+        "icon_name": "cost-export",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "grid_export_var_per_unit",
+        "interface_section": "sales_costs",
+        "interface_key": "grid_export_var_per_unit",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            24.999999999999993,
+            0.004000000000000001
+        ],
+        "_default_parameters": [
+            0.1,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01,
+        "formatter_dp": 5
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "raw_parameters": [
+                0.0,
+                0.0
+            ]
+        },
+        "uuid": "449c7c6c-9b58-4b80-93d9-30c3ced5bee6",
+        "_component_ids": {},
+        "_name": "Fixed costs for backup",
+        "unit": "\u00a3/site/day",
+        "icon_name": "cost-import-fixed",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "grid_import_sc_per_day",
+        "interface_section": "import_costs",
+        "interface_key": "grid_import_sc_per_day",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            0.0,
+            0.0
+        ],
+        "_default_parameters": [
+            0.0,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10000,
+        "interface_step": 10,
+        "formatter_dp": 2
+    },
+    {
+        "class": "GammaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "dsa_selected": true,
+            "dsa_bounds_type": "interval",
+            "psa_selected": true,
+            "raw_parameters": [
+                0.35,
+                0.06999999999999999
+            ]
+        },
+        "uuid": "313f11ca-cfaf-4812-90be-992798d51c09",
+        "_component_ids": {},
+        "_name": "Per-unit costs for backup",
+        "unit": "\u00a3/kWh",
+        "icon_name": "cost-import-perunit",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "grid_import_var_per_unit",
+        "interface_section": "import_costs",
+        "interface_key": "grid_import_var_per_unit",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            25.0,
+            0.013999999999999999
+        ],
+        "_default_parameters": [
+            0.35,
+            1.0
+        ],
+        "_dsa_lower": 0.95,
+        "_dsa_upper": 0.95,
+        "dsa_selectable": true,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": true,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 10,
+        "interface_step": 0.01,
+        "formatter_dp": 5
+    },
+    {
+        "class": "BetaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "raw_parameters": [
+                0.035,
+                0.17434878835254347
+            ]
+        },
+        "uuid": "ce074050-bb72-4169-833e-6c3b073885e5",
+        "_component_ids": {},
+        "_name": "Benefit discount rate",
+        "unit": "factor",
+        "icon_name": "finance-settings-benefit-discount",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "benefit_discount_rate",
+        "interface_section": "finance_settings",
+        "interface_key": "benefit_discount_rate",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            0.003888888888888891,
+            0.10722222222222226
+        ],
+        "_default_parameters": [
+            0.035,
+            0.17434878835254347
+        ],
+        "_dsa_lower": 0.0,
+        "_dsa_upper": 0.06,
+        "dsa_selectable": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.01,
+        "formatter_dp": 3
+    },
+    {
+        "class": "BetaVariable",
+        "constructor_class": "Variable",
+        "_config": {
+            "class": "VariableConfig",
+            "constructor_class": "DataWithRevision",
+            "_last_syncronised": 0,
+            "_revision": 1,
+            "raw_parameters": [
+                0.035,
+                0.17434878835254347
+            ]
+        },
+        "uuid": "5a0397e5-861f-4ba7-ba48-2f5bc46f92ae",
+        "_component_ids": {},
+        "_name": "Cost discount rate",
+        "unit": "factor",
+        "icon_name": "finance-settings-cost-discount",
+        "configuration_type": "finance",
+        "model_section": "",
+        "model_parameter": "cost_discount_rate",
+        "interface_section": "finance_settings",
+        "interface_key": "cost_discount_rate",
+        "interface_subindex": 0,
+        "_transform": [
+            "identity"
+        ],
+        "parameterisation_index": 1,
+        "_parameters": [
+            0.003888888888888891,
+            0.10722222222222226
+        ],
+        "_default_parameters": [
+            0.035,
+            0.17434878835254347
+        ],
+        "_dsa_lower": 0.0,
+        "_dsa_upper": 0.06,
+        "dsa_selectable": false,
+        "dsa_active": false,
+        "dsa_focussed": false,
+        "_dsa_show": true,
+        "value_name": "Value",
+        "psa_selectable": true,
+        "psa_active": false,
+        "_psa_show": false,
+        "optim_selectable": false,
+        "_optim_show": false,
+        "configuration_show": true,
+        "interface_min": null,
+        "interface_max": 1.0,
+        "interface_step": 0.01,
+        "formatter_dp": 3
+    }
+]

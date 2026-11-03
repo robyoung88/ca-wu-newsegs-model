@@ -2,6 +2,7 @@
 Unit tests for newsegsmodel/sprakemodel.
 """
 import os
+import pickle
 import unittest
 import json
 from pathlib import Path
@@ -179,10 +180,9 @@ class TestSprakeModelRun(unittest.TestCase):
             .set_index('datetime')
         )
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprakemodel-validation-config.json', 'r') as f:
-            d1 = json.load(f)
+        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-model-config.pickle', 'rb') as f:
+            mdl = pickle.load(f)
         
-        mdl = sprakemodel.SprakeModel.from_dict(d1)
         mdl.run()
 
         gen_meters = newsegsgeneration.get_generation_meters(
@@ -238,16 +238,14 @@ class TestSprakeFinanceRun(unittest.TestCase):
             )
         )
 
-        with open(PROJECT_ROOT / f'data/sprakemodel-validation-config.json', 'r') as f:
-            d1 = json.load(f)
+        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-model-config.pickle', 'rb') as f:
+            mdl = pickle.load(f)
 
-        with open(PROJECT_ROOT / f'data/sprakemodel-validation-finance-config.json', 'r') as f:
-            fd1 = json.load(f)
-        
-        mdl = sprakemodel.SprakeModel.from_dict(d1)
+        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-finance-config.pickle', 'rb') as f:
+            fnc = pickle.load(f)
+
         mdl.run()
 
-        fnc = sprakefinance.SprakeFinance.from_dict(fd1)
         fnc.model = mdl
 
         numpy.testing.assert_allclose(
