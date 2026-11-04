@@ -5,7 +5,7 @@ appversion = 'dev'
 dispatchservers = ['0.0.0.0','zmq-dispatcher']
 FRONTENDPORT = 8555
 BACKENDPORT = 8556
-HEARTBEAT_FILE = '/tmp/dispatcher_heartbeat.txt'
+# HEARTBEAT_FILE defaults to the system temporary directory (see config/default_paths.py)
 
 # Database backups are named <DB_FILENAME_ROOT>_<timestamp>.db
 DB_FILENAME_ROOT = 'newsegs_db'
@@ -29,7 +29,6 @@ WORKER_RECEIVE_TIMEOUT_MS = 3000
 WORKER_SHUTDOWN_TIMEOUT_S = 5
 
 [testing]
-HEARTBEAT_FILE = 'C:/Scratch/dispatcher_heartbeat.txt'
 #SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\Sprake"
 SprakeExcelValidationLoc = "@format {env[OneDrive]}\\Model\\Validation"
 
@@ -39,3 +38,5 @@ SprakeDataLoc = "@format {env[OneDrive]}\\Model\\Data\\SprakeTest"
 [production]
 appversion = '0.1.1'
 dispatchservers = ['0.0.0.0','zmq-dispatcher']
+# Watched by the zmq-dispatcher health check in docker-compose.yml
+HEARTBEAT_FILE = '/tmp/dispatcher_heartbeat.txt'

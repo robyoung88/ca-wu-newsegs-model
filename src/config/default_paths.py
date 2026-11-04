@@ -16,9 +16,14 @@ its configuration should fail rather than quietly write data to the home directo
 
 The database backups live beside the database, rather than on a separate drive, which
 offers little protection against disk failure; hence "safe, if suboptimal".
+
+HEARTBEAT_FILE, which holds no data, falls back to the system temporary directory in
+every environment; production pins it in `settings.toml` to the path that the
+docker-compose health check watches.
 """
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -33,6 +38,8 @@ def user_data_dir() -> Path:
     base = os.environ.get('XDG_DATA_HOME')
     return (Path(base) if base else home / '.local' / 'share') / 'newsegs'
 
+
+HEARTBEAT_FILE = str(Path(tempfile.gettempdir()) / 'dispatcher_heartbeat.txt')
 
 # NEWSEGS_ENV is read directly: dynaconf has already loaded .env into the
 # environment, but has not yet resolved the current environment.
