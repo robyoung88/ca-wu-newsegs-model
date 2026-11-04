@@ -52,7 +52,6 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         self._pvgis_cache = {}
 
     @override
-    @lru_cache 
     def get_wind_speeds(
         self,
         location: RaisedLocation | Sequence[RaisedLocation],
@@ -110,7 +109,6 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         return pd.Timedelta(1, 'hour')
 
     @override
-    @lru_cache
     def get_horizontal_solar_flux(
         self,
         location: Location | Sequence[Location],
@@ -176,7 +174,7 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         return np.append(pv_data['poa_direct'].at[0], pv_data['poa_direct'].to_numpy())
 
     @override
-    def solar_flux_on_plane_timestep(self):
+    def get_solar_flux_on_plane_timestep(self):
         return pd.Timedelta(1, 'hour')
 
     @override

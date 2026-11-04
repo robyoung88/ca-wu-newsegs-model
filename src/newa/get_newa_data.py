@@ -55,7 +55,7 @@ def get_newa_micro_point(lat, lon, height=50.0,
     if response.status_code == 200:
         hd = response.headers
         if hd.get('Content-Type') == 'application/x-netcdf':
-            tmp = tempfile.TemporaryFile(suffix='.nc', delete=False)
+            tmp = tempfile.NamedTemporaryFile(suffix='.nc', delete=False)
             tmp.write(response.content)
             tmp.flush()
             tmp.close()
@@ -150,7 +150,7 @@ def get_newa_meso_point(lat, lon, height=50.0,
     if response.status_code == 200:
         hd = response.headers
         if hd.get('Content-Type') == 'application/x-netcdf':
-            tmp = tempfile.TemporaryFile(suffix='.nc', delete=False)
+            tmp = tempfile.NamedTemporaryFile(suffix='.nc', delete=False)
             tmp.write(response.content)
             tmp.flush()
             tmp.close()
@@ -319,7 +319,7 @@ def get_newa_meso_ts_point(lat, lon, height=50.0,
     if response.status_code == 200:
         hd = response.headers
         if hd.get('Content-Type') == 'application/x-netcdf':
-            tmp = tempfile.TemporaryFile(suffix='.nc', delete=False)
+            tmp = tempfile.NamedTemporaryFile(suffix='.nc', delete=False)
             tmp.write(response.content)
             tmp.flush()
             tmp.close()
