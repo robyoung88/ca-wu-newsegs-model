@@ -18,12 +18,16 @@ from newsegsmodelframework.core.environment import environment_cache
 from newsegsmodelframework.core.environment.inmem_env_servers import InMemoryLocalEnv
 from newsegsmodelframework.core.timespan.timespan import RegTimeSpan, TimeSpan
 from newsegsmodelframework.newsegscs import sprake_thermal_model, sprakecs, sprakeloccs
+from newsegsmodelframework.newsegsgeneration import sprakegeneration
 from newsegsmodelframework.newsegsmodel import sprakemodel, sprakelocmodel
 
 def _create_model() -> sprakelocmodel.SprakeLocModel:
     mdl = sprakelocmodel.SprakeLocModel.from_none()
     mdl.local_env = sprakemodel.get_sprake_environment_server()
     mdl.wider_env = sprakemodel.get_sprake_wider_env_server()
+    # The Sprake wind speeds are at the height of the Sprake turbine only
+    mdl.generation.generator.generators[0].turbine.hub_height = sprakegeneration.NOMINAL_WT_HEIGHT # pyright: ignore[reportAttributeAccessIssue]
+    mdl.generation.generator.chain_syncronise()
     return mdl
 
 def _year_timespan() -> RegTimeSpan:

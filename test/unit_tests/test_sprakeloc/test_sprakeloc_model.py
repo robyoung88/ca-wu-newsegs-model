@@ -32,6 +32,9 @@ def _create_model() -> sprakelocmodel.SprakeLocModel:
 def _use_offline_environment(mdl: sprakelocmodel.SprakeLocModel) -> None:
     mdl.local_env = sprakemodel.get_sprake_environment_server()
     mdl.wider_env = sprakemodel.get_sprake_wider_env_server()
+    # The Sprake wind speeds are at the height of the Sprake turbine only
+    mdl.generation.generator.generators[0].turbine.hub_height = sprakegeneration.NOMINAL_WT_HEIGHT # pyright: ignore[reportAttributeAccessIssue]
+    mdl.generation.generator.chain_syncronise()
 
 class TestSprakeLocModelConfigEqualities(unittest.TestCase):
     """

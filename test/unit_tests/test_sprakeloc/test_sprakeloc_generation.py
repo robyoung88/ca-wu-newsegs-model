@@ -78,6 +78,30 @@ class TestSprakeLocGenerationConfigEqualities(unittest.TestCase):
             self.assertEqual(gen1.location, gen2.location)
             self.assertEqual(gen1.nameplate_capacity, gen2.nameplate_capacity)
 
+class TestSprakeLocGenerationTurbineHeight(unittest.TestCase):
+    """
+    The default turbine of the location-aware model is at 15 m; the Sprake model's stays at 10 m.
+    """
+
+    def test_default_turbine_height(self):
+        inst = sprakelocgeneration.SprakeLocGeneration.from_none()
+        self.assertIsInstance(inst, sprakelocgeneration.SprakeLocGeneration)
+        turbine_location = cast(location.RaisedLocation, inst.generator.generators[0].location)
+        self.assertEqual(turbine_location.height_agl, 15.)
+
+    def test_model_default_turbine_height(self):
+        from newsegsmodelframework.newsegsmodel.sprakelocmodel import SprakeLocModel
+        from newsegsmodelframework.newsegsmodel.sprakemodel import SprakeModel
+
+        heights = {
+            model_class: cast(
+                location.RaisedLocation,
+                model_class('Test').generation.generator.generators[0].location
+            ).height_agl
+            for model_class in (SprakeLocModel, SprakeModel)
+        }
+        self.assertEqual(heights, {SprakeLocModel: 15., SprakeModel: 10.})
+
 class TestSprakeLocGenerationLocation(unittest.TestCase):
     """
     The location of the module is a point location, which the generators share.
