@@ -2,6 +2,7 @@
     {
         "class": "NumericConstantVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -55,6 +56,7 @@
     {
         "class": "NumericConstantVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -108,6 +110,7 @@
     {
         "class": "NumericConstantVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -161,6 +164,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -216,6 +220,7 @@
     {
         "class": "NumericConstantVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -266,6 +271,7 @@
     {
         "class": "NormalVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -323,6 +329,7 @@
     {
         "class": "NormalVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -378,6 +385,7 @@
     {
         "class": "NormalVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -435,6 +443,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -492,6 +501,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -549,6 +559,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -606,6 +617,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -663,6 +675,7 @@
     {
         "class": "NumericConstantVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -714,6 +727,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -774,6 +788,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -833,6 +848,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -893,6 +909,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -952,6 +969,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1011,6 +1029,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1070,6 +1089,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1126,6 +1146,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1182,6 +1203,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1238,6 +1260,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1294,6 +1317,7 @@
     {
         "class": "GammaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1351,6 +1375,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
@@ -1405,6 +1430,7 @@
     {
         "class": "BetaVariable",
         "constructor_class": "Variable",
+        "version": "0.1.0",
         "_config": {
             "class": "VariableConfig",
             "constructor_class": "DataWithRevision",
