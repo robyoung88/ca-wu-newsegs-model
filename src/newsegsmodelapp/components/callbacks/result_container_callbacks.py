@@ -198,20 +198,21 @@ def add_result_container_callbacks(app: NewsegsDash):
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
 
-        contents_by_section = {}
+        # Headers of the same section and key (e.g. on different pages) share their contents
+        contents_by_section_key = {}
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
 
         for container_id in headers_for_update:
             section = container_id['section']
-            if section in contents_by_section:
+            key = container_id['key']
+            if (section, key) in contents_by_section_key:
                 callback_utils.update_property_by_id(
                     container_id,
                     'children',
-                    contents_by_section[section],
+                    contents_by_section_key[(section, key)],
                     rval
                 )
                 continue
-            key = container_id['key']
             content_creator = get_result_section_header_content_creator(
                 key, section, model_type
             )
@@ -224,7 +225,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             contents = content_creator(
                 active_project_id, app.project_provider, app.results_provider, ann_hori_toggle
             )
-            contents_by_section[section] = contents
+            contents_by_section_key[(section, key)] = contents
             callback_utils.update_property_by_id(
                 container_id,
                 'children',
