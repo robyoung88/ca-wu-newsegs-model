@@ -110,6 +110,8 @@ def serve_layout():
         # Set when process staleness may have changed outside the input-group update triggers
         dcc.Store(id = 'staleness-update-trigger', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
+        # Messages of the runs abandoned since the last batch of jobs started, shown as failures
+        dcc.Store(id = 'failed-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
         dcc.Interval(id = 'feedback-graph-interval', interval = 100, n_intervals = 1, max_intervals = 1, disabled = False),
         dcc.Interval(id = 'delayed-result-container-refill-interval', interval = 1000, n_intervals = 1, max_intervals = 1, disabled = False),

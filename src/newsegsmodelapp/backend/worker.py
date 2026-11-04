@@ -22,7 +22,7 @@ BACKENDPORT = str(settings['BACKENDPORT'])
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_component_provider import CachedFromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, set_cancel_request_status, update_calculation_progress, get_cancel_status, set_status_success, set_status_failed
+from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket, is_retryable, prevent_request_retry, set_cancel_request_status, update_calculation_progress, get_cancel_status, set_status_success, set_status_failed
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported  # noqa: F401
@@ -186,6 +186,8 @@ def worker_process(
                     )
 
                 except Exception as e:
+                    if not is_retryable(e):
+                        prevent_request_retry(write_engine, request.request_id)
                     set_status_failed(write_engine, job_id, str(e))
                     logger.warning(
                         'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d; Triggering Request ID = %d;',
