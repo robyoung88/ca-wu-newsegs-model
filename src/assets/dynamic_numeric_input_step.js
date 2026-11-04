@@ -4,16 +4,29 @@
 
 const MAX_PRECISION = 5;
 
+// The number of decimal places in a number string. Trailing zeros, as in 'step-val-0.100000', do
+// not count.
+function countDecimals(numStr) {
+    const [mantissa, exponent] = numStr.toLowerCase().split('e');
+    const fraction = (mantissa.split('.')[1] || '').replace(/0+$/, '');
+    return Math.max(0, fraction.length - (parseInt(exponent) || 0));
+}
+
 function getStep(input) {
     const stepClass = Array.from(input.classList).find(c => c.startsWith('step-val-'));
     if (!stepClass) return null;
     const stepStr = stepClass.replace('step-val-', '');
-    // Trailing zeros, as in 'step-val-0.100000', do not add precision
-    const decimals = stepStr.includes('.') ? stepStr.split('.')[1].replace(/0+$/, '').length : 0;
     return {
         amount: parseFloat(stepStr) || 1,
-        precision: Math.min(decimals, MAX_PRECISION),
+        precision: Math.min(countDecimals(stepStr), MAX_PRECISION),
     };
+}
+
+// Step from a value string. The result keeps the value's decimals, so a whole-number step moves
+// 12.5 to 112.5 rather than rounding it, and is only rounded to remove floating point error.
+function stepFrom(valueStr, direction, step) {
+    const newValue = (parseFloat(valueStr) || 0) + direction * step.amount;
+    return newValue.toFixed(Math.max(step.precision, countDecimals(valueStr || '')));
 }
 
 // Set the value so that React (and so Dash) sees the change: assigning `input.value` directly
@@ -48,8 +61,7 @@ document.addEventListener('input', function(e) {
     // The browser steps by 1 from the last value
     const diff = currentValue - lastValue;
     if (Math.abs(diff) === 1) {
-        const newValue = lastValue + Math.sign(diff) * step.amount;
-        setValue(input, newValue.toFixed(step.precision));
+        setValue(input, stepFrom(input.dataset.lastVal, Math.sign(diff), step));
     } else {
         input.dataset.lastVal = input.value;
     }
@@ -68,10 +80,7 @@ document.addEventListener('keydown', function(e) {
         // Halt default step="any" keyboard increments
         e.preventDefault();
 
-        let currentValue = parseFloat(input.value) || 0;
-        currentValue += (e.key === 'ArrowUp' ? 1 : -1) * step.amount;
-
-        setValue(input, currentValue.toFixed(step.precision));
+        setValue(input, stepFrom(input.value, e.key === 'ArrowUp' ? 1 : -1, step));
     }
 });
 
