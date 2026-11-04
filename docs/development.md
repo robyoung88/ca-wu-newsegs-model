@@ -28,6 +28,84 @@ Work moves through three branches:
 
 Every push to `development` builds the Docker image.
 
+## Tests
+
+The unit tests are in `test/unit_tests`. Run them from the repository root with `src` on the path, as the `unit tests`
+workflow does:
+
+```bash
+PYTHONPATH=src python -m pytest test/unit_tests \
+    --ignore=test/unit_tests/test_dsa --ignore=test/unit_tests/test_psa \
+    --ignore=test/unit_tests/test_dsa_multiple.py --ignore=test/unit_tests/test_psa_multiple.py
+```
+
+The excluded PSA and DSA tests are slow; they run in the `enhanced unit tests` workflow on a release. The tests are
+`unittest` test cases, so the VS Code test explorer (configured for `unittest`) runs them too.
+
+### Callback tests
+
+`test/unit_tests/test_app_callbacks` tests the Dash callbacks without a browser. Each test builds a minimal
+`NewsegsDash` holding the input container callbacks, with a temporary database and a sprake project, and posts
+requests to `/_dash-update-component` with the Flask test client. Dash itself then dispatches the request, so the
+tests cover the callback's registration, pattern matching, `ctx` and grouped outputs. They don't show that a browser
+emits a given event.
+
+```bash
+PYTHONPATH=src python -m pytest test/unit_tests/test_app_callbacks
+```
+
+The tests depend on the format of Dash's requests, so `requirements-test.txt` pins the Dash packages to the versions
+in `conda-environment.yml`. Change them together.
+
+- `dash_dispatch.py` holds the helpers. `dispatch_input_change` posts a change of an input to
+  `react_to_input_change` and returns a `CallbackResponse`: `response.updated` is false when Dash made no update, and
+  `response.get(id, prop)` gives the value returned for a component, or `NOT_UPDATED`. The callback's inputs, outputs
+  and state are read from `/_dash-dependencies`. The components sent with each wildcard are those of the "page": a
+  list of components, usually rendered by the app's own input container content creators with
+  `render_input_containers`, so the tests follow the layout.
+- `base.py` holds `InputChangeTestCase`. It sets up each test afresh, and has helpers to set up the project as the
+  app does (`add_configuration`, `make_independent`, `set_focus`, `remove_configuration`) and to read what is stored:
+  `stored_variable` and `loaded_variable`, `revised` (rows whose revision changed), `stale_marks` (configurations
+  and processes marked stale) and `assertNothingChanged`. It reads through an uncached provider, so the assertions
+  see the database rather than a cache.
+- Each test case runs with the uncached project provider, and again with the cached provider the app uses, through
+  `cached_variant`.
+
+### Adding a test of an input handler
+
+Add a test case to `test_registered_handlers.py`, or to a new `test_*.py` module in the package. Render the page
+that holds the input, dispatch a change, and assert on both the response and the database:
+
+```python
+from .base import InputChangeTestCase, cached_variant
+from .dash_dispatch import NOT_UPDATED, variable_id
+
+class TestMyHandler(InputChangeTestCase):
+    """`my-purpose` of an `input-toggle`"""
+    n_metamodels = 2  # the configurations share every variable until made independent
+
+    def test_saved(self):
+        components = self.page(('dsa', None))  # (supersection, section) of each input container
+        trigger = variable_id('input-toggle', 'my-purpose', 'gen_input', 'wind_capacity', supersection = 'dsa')
+        t0 = self.now()
+
+        response = self.dispatch(trigger, True, components)
+
+        self.assertIsNot(
+            response.get(variable_id('input-group-config-update-trigger', 'trigger', 'gen_input', 'wind_capacity', supersection = 'dsa'), 'data'),
+            NOT_UPDATED,
+        )
+        self.assertTrue(self.loaded_variable('gen_input.wind_capacity.0', 1).my_setting)
+        self.assertEqual(self.stale_marks(t0), {(x, 'dsa') for x in self.metamodel_ids})
+
+TestMyHandlerCached = cached_variant(TestMyHandler)
+```
+
+If the input isn't rendered by a content creator, add a component for it to the page, such as
+`dcc.Input(id = trigger)`. Change data through the app's own paths, or through the `base.py` helpers that copy them,
+so that caches see the change as they would in the app. A handler that should make no change must also leave the
+database as it was: check with `database_state` and `assertNothingChanged`.
+
 ## Releasing
 
 - **Prerelease.** Open a pull request from `development` to `canary`, and merge it with a merge commit (not squash or

@@ -2334,6 +2334,16 @@ class FromDatabaseNewsegsProjectProvider(
         with read_transaction(self._get_engine(writer=True)) as conn:
             conn.execute(stmt)
 
+    def invalidate_cache_for_component(self, component_id):
+        """Remove projects from the cache; this provider keeps none, so does nothing.
+
+        Lets callers invalidate whichever provider they hold; `CachedFromDatabaseNewsegsProjectProvider` overrides it.
+
+        Args:
+            component_id: Id(s) of the component(s).
+        """
+        return
+
 USE_DATAVERSION = True
 """Enable use of the database dataversion pragma to determine data staleness.
 
@@ -2511,6 +2521,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
         return olist
 
+    @override
     def invalidate_cache_for_component(self, component_id):
         """Remove projects from the cache.
 

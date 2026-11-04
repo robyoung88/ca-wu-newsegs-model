@@ -5744,7 +5744,7 @@ class Variable(
         The raw parameters are converted by the current parameterisation into native parameters, which are validated by the distribution. The raw parameters are stored in the configuration.
 
         Args:
-            *parameters: The parameters, in native form.
+            *parameters: The raw parameters.
         """
         raw_parameters = copy.copy(parameters)
         
@@ -6004,20 +6004,31 @@ class Variable(
     def dsa_lower(self, value: Value):
         if self.dsa_bounds_type == 'absolute':
             self.distribution.value_validation(self, value)
-        self._dsa_lower = value
-    
+        self._set_dsa_bound('_dsa_lower', value)
+
     @property
     def dsa_upper(self) -> Value:
         """The upper DSA bound, interpreted according to `dsa_bounds_type`.
         """
         return self._dsa_upper
-    
+
     @dsa_upper.setter
     def dsa_upper(self, value: Value):
         if self.dsa_bounds_type == 'absolute':
             self.distribution.value_validation(self, value)
-        self._dsa_upper = value
-    
+        self._set_dsa_bound('_dsa_upper', value)
+
+    def _set_dsa_bound(self, attribute: str, value: Value):
+        """Set a DSA bound, revising the variable if a bound already set changes.
+
+        The bounds are not fields of the revision-tracked configuration, so without the revision a change would be
+        neither stored (`upsert_variable` writes revised variables) nor seen by caches of the variable.
+        """
+        changed = hasattr(self, attribute) and not np.array_equal(getattr(self, attribute), value)
+        setattr(self, attribute, value)
+        if changed:
+            self._config._notify_change()
+
     def get_dsa_value(self, bound: DSA_BOUND, force: bool = False) -> Value:
         """
         Get the deterministic sensitivity analysis value at the specified bound.
@@ -6310,7 +6321,7 @@ class ScalarVariable(Variable):
         if self.dsa_bounds_type == 'absolute':
             self.distribution.value_validation(self, value)
         value = self._validate_bound(value)
-        self._dsa_lower = value
+        self._set_dsa_bound('_dsa_lower', value)
     
     @property
     def dsa_upper(self) -> ScalarParam:
@@ -6323,7 +6334,7 @@ class ScalarVariable(Variable):
         if self.dsa_bounds_type == 'absolute':
             self.distribution.value_validation(self, value)
         value = self._validate_bound(value)
-        self._dsa_upper = value
+        self._set_dsa_bound('_dsa_upper', value)
 
     @property
     def transform(self) -> tuple[VARIABLE_TRANSFORM]:
@@ -6527,7 +6538,7 @@ class VectorVariable(Variable):
         if self.dsa_bounds_type == 'absolute':
             self.distribution.value_validation(self, value)
         value = self._validate_bound(value)
-        self._dsa_lower = value
+        self._set_dsa_bound('_dsa_lower', value)
     
     @property
     def dsa_upper(self) -> VectorParam:
@@ -6540,7 +6551,7 @@ class VectorVariable(Variable):
         if self.dsa_bounds_type == 'absolute':
             self.distribution.value_validation(self, value)
         value = self._validate_bound(value)
-        self._dsa_upper = value
+        self._set_dsa_bound('_dsa_upper', value)
     
     @property
     def transform(self) -> tuple[VARIABLE_TRANSFORM, ...]:
@@ -6683,7 +6694,7 @@ class NumericVectorVariable(VectorVariable):
             or isinstance(value, np.ndarray)
         ):
             raise TypeError(f'Expected a vector or sequence, got: {type(value)}')
-        self._dsa_lower = cast(NumericVectorParam, value) # pyright: ignore[reportIncompatibleVariableOverride]
+        self._set_dsa_bound('_dsa_lower', cast(NumericVectorParam, value))
 
     @property
     def dsa_upper(self) -> NumericVectorParam:
@@ -6700,7 +6711,7 @@ class NumericVectorVariable(VectorVariable):
             or isinstance(value, np.ndarray)
         ):
             raise TypeError(f'Expected a vector or sequence, got: {type(value)}')
-        self._dsa_upper = cast(NumericVectorParam, value) # pyright: ignore[reportIncompatibleVariableOverride]
+        self._set_dsa_bound('_dsa_upper', cast(NumericVectorParam, value))
 
     @property
     def deterministic_value(self) -> NumericVectorParam:
