@@ -168,6 +168,13 @@ Reopening the row builds the editor again, so it shows the current values. Closi
 
 * Redraw only the children of the editor container, never the `Details` or `Summary`, or the count of clicks and the
   open state will disagree. Rebuilding the whole input container is safe.
+
+The deterministic inputs use this for their group editor (`components/group_editor.py`). Opening an input's sharing
+summary shows every group's value, and buttons that move configurations between groups. Selecting a configuration and
+choosing where to move it happens in the browser (`assets/group_editor.js`), which writes the move to the row's
+`group-move-request` store. `react_to_input_change` passes moves, and edits of other groups' values (`group-value-input`),
+to the handlers in that module. Code that moves configurations between Variables should use `move_metamodels_to_group`,
+which keeps the junctions, revisions, staleness and orphaned Variables right.
 * Don't put interactive components in the `Summary`, since clicks on them are counted too.
 
 ### Processes

@@ -139,7 +139,7 @@ class InputChangeTestCase(unittest.TestCase):
         self.reader.metamodel_provider.refresh_metamodel_variable_junction(
             lmm, [self.reader.variable_provider.get_lightweight_variable(var.id)]
         )
-        # As the handler of `variable-status-toggle` does, which tells caches of the project that it has changed
+        # As moving a configuration between groups does, which tells caches of the project that it has changed
         self.reader.metamodel_provider.increment_revision(lmm.id)
         self.reader.increment_revision(self.project_id)
         return var.id
