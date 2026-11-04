@@ -2648,3 +2648,43 @@ class TestVariableListManagement(unittest.TestCase):
             consumer1.variables[vname].deterministic_value,
             consumer2.variables[vname].deterministic_value,
         )
+
+
+class TestVariableChangeTracking(unittest.TestCase):
+    """Changes made through the interface are recorded, so that they are stored, and failed changes leave no trace"""
+
+    def setUp(self):
+        from newsegsmodelframework import register_plugins # noqa: F401 - registers the project factories
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        self.variables = PROJECT_FACTORIES['sprake']().metamodels[0].variables
+
+    def test_rejected_update_restores_raw_parameters(self):
+        from newsegsmodelframework.newsegsvariable.update_variable import update_variable
+
+        # A Gamma distribution rejects a negative mean
+        var = self.variables['gen_costs.wind_capex_per_kw.0']
+        raw, native = var.raw_parameters, var.parameters
+        self.assertNotEqual(raw, native)
+
+        is_ok, *_, params = update_variable(var, 0, 0, -5.)
+
+        self.assertFalse(is_ok)
+        self.assertEqual(params, raw)
+        self.assertEqual(var.raw_parameters, raw)
+        self.assertEqual(var.parameters, native)
+
+    def test_dsa_bound_change_revises_variable(self):
+        var = self.variables['gen_costs.wind_capex_per_kw.0']
+        var.syncronise()
+        r0 = var.revision
+
+        var.dsa_lower = var.dsa_lower
+        self.assertFalse(var.modified)
+
+        var.dsa_lower = var.dsa_lower * 0.5
+        self.assertTrue(var.modified)
+        self.assertEqual(var.revision, r0 + 1)
+
+        var.syncronise()
+        var.dsa_upper = 1.
+        self.assertEqual(var.revision, r0 + 2)

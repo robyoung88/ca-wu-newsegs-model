@@ -126,6 +126,25 @@ def create_dsa_inputs(...): ...         # builds the Dash components for the inp
 def create_results(...): ...            # builds the Dash components for a result
 ```
 
+### Input handlers
+
+`react_to_input_change` (in `components/callbacks/input_container_callbacks.py`) receives almost every change to an
+input. An input's id gives its `type`, `purpose`, `supersection`, and the `section`, `key` and `subindex` of its
+variable. The callback handles the DSA bounds, bound type and selection, and the optimisation bounds and plot
+resolution itself. It passes every other purpose to the handler registered for it:
+
+```python
+@register_input_handler('my-purpose', 'input-toggle')        # purpose, component type (None for any)
+def handle_my_purpose(triggered_id, input_ids, header_ids, trigger_ids, calling_dict,
+                      active_project_id, project_provider, return_dict):
+    ...                                  # save the change, mark what it makes stale
+    return return_dict                   # with any input_values, header_children and trigger_data set
+```
+
+The handler is looked up for the purpose, the component type and the model type in the `app-state` store. It falls
+back to the `default` model type, then to any component type. A purpose with no handler makes no update. Each handler
+should have a [callback test](../development.md#adding-a-test-of-an-input-handler).
+
 ### Processes
 
 A *process* is work done in the background by a worker. Processes are chained by naming the
