@@ -3,7 +3,7 @@ Functions and classes for finding optimal system configurations
 """
 import copy
 from dataclasses import dataclass
-from typing import Callable, Literal, Sequence, get_args
+from typing import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -12,35 +12,19 @@ from scipy import optimize as scipy_opt
 
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.optim_component import ( # noqa: F401 - re-exported for the pages
+    OPTIM_TARGET_STATISTIC as _OPTIM_TARGET_STATISTIC,
+    OPTIM_TARGET_STATISTICS,
+    OPTIM_TARGET_STATISTIC_LABELS,
+    OPTIMISATION_METHODS,
+)
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
-
-_OPTIM_TARGET_STATISTIC = Literal[
-    'net_present_value_discounted',
-    'net_present_value_undiscounted',
-]
-
-OPTIM_TARGET_STATISTICS = get_args(_OPTIM_TARGET_STATISTIC)
+from newsegsmodelframework.newsegsvariable.variable import Variable
 
 _MAXIMISE_OPTIM_TARGET_STATISTICS = [
     'net_present_value_discounted',
     'net_present_value_undiscounted',
 ]
-
-OPTIM_TARGET_STATISTIC_LABELS = {
-    'net_present_value_undiscounted': 'NPV (undiscounted)',
-    'net_present_value_discounted': 'NPV (discounted)'
-}
-
-_OPTIMISATION_METHODS = Literal[
-    'Nelder-Mead',
-    'L-BFGS-B',
-    'TNC',
-    'SLSQP',
-    'Powell'
-]
-
-OPTIMISATION_METHODS = get_args(_OPTIMISATION_METHODS)
-
 """
 Statistics in this list will be inverted for minimization
 """
@@ -85,6 +69,50 @@ class OptimVariable:
     lower: float = -np.inf
     upper: float = np.inf
     param_index: int = 0
+
+class InvalidOptimBoundsError(ValueError):
+    """Raised when variables to be optimised have bounds that cannot be used.
+
+    The message is intended for the user, and names the variables and their problems.
+    """
+    retryable = False
+    """Running again gives the same result until the bounds are changed, so the app does not retry."""
+
+def optim_bounds_problem(var: Variable) -> str | None:
+    """Why the optimisation bounds of a variable cannot be used, if they cannot.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        A description of the problem, or `None` if the bounds are valid.
+    """
+    lower, upper = var.get_optim_bounds()
+    if lower is None and upper is None:
+        return 'no lower or upper bound'
+    if lower is None:
+        return 'no lower bound'
+    if upper is None:
+        return 'no upper bound'
+    if not lower < upper: # pyright: ignore[reportOperatorIssue]
+        return f'lower bound {lower} is not below upper bound {upper}'
+    return None
+
+def check_optim_bounds(variables: Sequence[Variable]) -> None:
+    """Check that the optimisation bounds of the variables can be used.
+
+    Args:
+        variables: The variables.
+
+    Raises:
+        InvalidOptimBoundsError: Naming every variable whose bounds cannot be used.
+    """
+    problems = [
+        f'{var.label} ({problem})' for var in variables
+        if (problem := optim_bounds_problem(var)) is not None
+    ]
+    if problems:
+        raise InvalidOptimBoundsError('Invalid optimisation bounds: ' + '; '.join(problems))
 
 def run_optimisation(
     mm: NewsegsMetaModel,

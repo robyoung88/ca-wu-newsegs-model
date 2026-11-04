@@ -877,31 +877,17 @@ def _trigger_plot_marginal_optim(
     if varid is None or varid not in mm.variables:
         return 'variable missing'
 
-    # TODO: This needs replacing with a dedicated configuration one day.
-    if hasattr(proj.dsa_config, 'optim_config'):
-        raw_config = proj.dsa_config.optim_config
-    else:
-        raw_config = {}
+    var = mm.variables[varid]
+    optim.check_optim_bounds([var])
+    lower, upper = var.get_optim_bounds()
 
-    bounds_config = raw_config.get('bounds', {})
-    var_bounds = bounds_config.get(varid, {})
-
-    lower = var_bounds.get('lower', 0)
-    upper = var_bounds.get('upper', 10000)
-    res = var_bounds.get('intervals', 10)
-
-    if lower > upper:
-        temp = lower
-        lower = upper
-        upper = temp
-
-    res = int(res)
+    res = int(var.optim_plot_intervals)
     if res <= 0:
         res = 2
     if res > 20:
         res = 20
 
-    stat = run_config.get('statistic', 'net_present_value_discounted')
+    stat = mm.optim_config.statistic
 
     # TODO: Add progress
     plot_df = optim.evaluate_statistic_across_margin(

@@ -39,6 +39,7 @@ erDiagram
         string em_config_id FK
         string fm_config_id FK
         string table_config_id FK
+        string optim_config_id FK
         string payload
         int revision
         string label
@@ -96,6 +97,7 @@ erDiagram
         string interface_key
         int interface_subindex
         int revision
+        string component_version
         string component_type
         string variable_type
         string distribution
@@ -188,7 +190,7 @@ erDiagram
     METAMODELS }o--|| FM_CONFIGS : "uses"
 
     PROJECTS }o--o| COMPONENT_CONFIGS : "DSA, PSA and table configs"
-    METAMODELS }o--o| COMPONENT_CONFIGS : "table config"
+    METAMODELS }o--o| COMPONENT_CONFIGS : "table and optimisation configs"
     EM_CONFIGS }o--o| COMPONENT_CONFIGS : "grid, generation, cs, modeldata, table configs"
     FM_CONFIGS }o--o| COMPONENT_CONFIGS : "financedata and table configs"
 
@@ -206,6 +208,13 @@ erDiagram
   staleness rows. It records, per metamodel and per process (see `db_staleness.PROCESSES`), when
   the inputs relevant to the process last changed and when the last completed run began. A
   process is stale when its inputs changed after its last run started.
+* `metamodels.optim_config_id` is the `OptimComponent` holding the method and statistic of
+  optimisation. It is null for metamodels saved before it existed; they are given the default
+  component when loaded. The bounds of optimisation are held by each variable, in the
+  `optim_min`, `optim_max` and `optim_plot_intervals` columns of `variable_configs`.
+* `variable_configs.component_version` is the version of the `Variable` class that saved the
+  row, null if it was saved before versions were recorded. As with the other components, the
+  payload records the version too, and a payload newer than the app supports is rejected.
 * `requests` are created by the front end (from the actions in the app) and picked up by the
   dispatcher; each request is executed as one or more `runs` by a worker. The run carries the
   progress and cancellation flag that the front end polls.
@@ -245,6 +254,7 @@ erDiagram
         string em_config_id FK
         string fm_config_id FK
         string table_config_id FK
+        string optim_config_id FK
     }
 
     SNAPSHOT_EM_CONFIGS {

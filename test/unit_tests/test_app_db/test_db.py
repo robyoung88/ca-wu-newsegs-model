@@ -194,7 +194,7 @@ class TestDatabaseStart(unittest.TestCase):
                 .select_from(tbls.component_configs)
             ).scalar()
 
-        self.assertEqual(nrow_components_post - nrow_components_pre, 19)
+        self.assertEqual(nrow_components_post - nrow_components_pre, 21)
         
         project_id = proj.id
 
@@ -242,7 +242,7 @@ class TestDatabaseStart(unittest.TestCase):
             mm1 = proj.metamodels[0]
             mm2 = proj.metamodels[1]
             self.assertEqual(len(mm1.get_component_attributes()), len(mm2.get_component_attributes()))
-            self.assertEqual(len(mm1.get_component_attributes()), 4) # table_config + model + finance + variable OrderedDict
+            self.assertEqual(len(mm1.get_component_attributes()), 5) # table_config + optim_config + model + finance + variable OrderedDict
 
             self.assertEqual(len(mm1.model.get_component_attributes()), len(mm2.model.get_component_attributes()))
             self.assertEqual(len(mm1.model.get_component_attributes()), 5) # model_data + table_config + grid + generation + consumption_storage
@@ -255,15 +255,15 @@ class TestDatabaseStart(unittest.TestCase):
             n_components = (
                 5 * 2 # Modules in model
                 + 2 * 2 # finance_data and table_config in finance
-                + 1 * 2 # table_config in metamodel
+                + 2 * 2 # table_config and optim_config in metamodel
                 + 3 # dsa_config, psa_config and table_config in finance
             )
-            # Based on this, we expect 19 components
+            # Based on this, we expect 21 components
             result = conn.execute(
                 tbls.snapshot_component_configs.select()
                 .where(tbls.snapshot_component_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 19)
+            self.assertEqual(len(result.fetchall()), 21)
 
             result = conn.execute(
                 tbls.snapshot_variable_configs.select()

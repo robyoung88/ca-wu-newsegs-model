@@ -45,7 +45,10 @@ def execute_optim_single_mm_run(
 ) -> str:
     """Run the optimisation of one metamodel, in a worker.
 
-    Varies the variables selected for optimisation within their bounds. Raises `ValueError` if no metamodel is named in the request and `KeyError` if it is not in the project.
+    Varies the variables selected for optimisation within their bounds, using the method and statistic of the
+    metamodel's `optim_config`. Raises `InvalidOptimBoundsError`, naming the variables, if any selected variable
+    has bounds that cannot be used, so that nothing is run. Raises `ValueError` if no metamodel is named in the
+    request and `KeyError` if it is not in the project.
 
     Args:
         request: The request being executed.
@@ -71,33 +74,26 @@ def execute_optim_single_mm_run(
     else:
         raise KeyError(f'Metamodel {mm_id} not found for project {proj.id} - available values are {[x.id for x in proj.metamodels]}.')
 
-    # TODO: This needs replacing with a dedicated configuration one day.
-    if hasattr(proj.dsa_config, 'optim_config'):
-        raw_config = proj.dsa_config.optim_config
-    else:
-        raw_config = {}
-    bounds_config = raw_config.get('bounds', {})
+    selected = {
+        varid: var for varid, var in mm.variables.items()
+        if var.optim_possible and var.optim_selectable and var.optim_selected
+    }
+    if len(selected) == 0:
+        return 'Optimisation not run - no variables selected'
+
+    # Run with every selected variable or none, so that the optimisation is of the selection the user made
+    optim.check_optim_bounds(list(selected.values()))
 
     optim_vars = {}
-    for varid, var in mm.variables.items():
-        if var.optim_possible and var.optim_selectable and var.optim_selected:
-            var_bounds = bounds_config.get(varid, {})
-            lower = var_bounds.get('lower', 0)
-            upper = var_bounds.get('upper', 10000)
-            if lower is None or upper is None:
-                continue
-            if not lower < upper:
-                continue
-            optim_vars[varid] = optim.OptimVariable(varid, lower = lower, upper = upper) # pyright: ignore[reportArgumentType]
-
-    if len(optim_vars) == 0:
-        return 'Optimisation not run - no variables selected with valid bounds'
+    for varid, var in selected.items():
+        lower, upper = var.get_optim_bounds()
+        optim_vars[varid] = optim.OptimVariable(varid, lower = lower, upper = upper) # pyright: ignore[reportArgumentType]
 
     if check_cancel_status():
         raise InterruptedError(f'Optimisation process {run_id} has been cancelled.')
 
-    stat = run_config.get('statistic', 'net_present_value_discounted')
-    method = run_config.get('optim-method')
+    stat = mm.optim_config.statistic
+    method = mm.optim_config.method
 
     vars = [x for x in optim_vars.values()]
 

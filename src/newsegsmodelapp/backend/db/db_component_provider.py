@@ -34,6 +34,7 @@ from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsfinance.lightweightnewsegsfinance import LightweightNewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.optim_component import OptimComponent
 from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import LightweightNewsegsModel
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
@@ -499,7 +500,8 @@ class FromDatabaseNewsegsComponentProvider(
                 sa.and_(
                     tbls.metamodels.c.id.not_in(ignore_ids),
                     (
-                        (tbls.metamodels.c.table_config_id == component_id)
+                        (tbls.metamodels.c.table_config_id == component_id) |
+                        (tbls.metamodels.c.optim_config_id == component_id)
                     )
                 )
             )
@@ -1053,6 +1055,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             'label',
 
             'table_config_id',
+            'optim_config_id',
             'em_config_id',
             'fm_config_id',
             'location',
@@ -1104,6 +1107,12 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             obj._model_id = row.em_config_id
             obj._finance_id = row.fm_config_id
             obj._component_ids['table_config'] = row.table_config_id
+            if row.optim_config_id is not None:
+                obj._component_ids['optim_config'] = row.optim_config_id
+            else:
+                # Saved before metamodels held optimisation settings: the default is used,
+                # and stored with the next upsert of the metamodel
+                obj._component_ids.pop('optim_config', None)
 
             var_stmt = self._metamodel_variable_select(obj.id)
             with read_transaction(self._get_engine()) as conn:
@@ -1168,6 +1177,11 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             )
         }
         metadata.update(child_components)
+        optim_config_id = metadata.pop('optim_config_id')
+        metadata['optim_config'] = (
+            self._component_provider.get_lightweight_component(optim_config_id)
+            if optim_config_id is not None else None
+        )
         em_child_ids = [
             metadata.pop(x) for x in (
                 'em_config_id',
@@ -1239,6 +1253,34 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             RevisionNotifierMixin._set_notification_state(prevstate)
 
         return rval
+
+    def get_optim_config(self, metamodel_id: str, project_id: Optional[str] = None) -> OptimComponent:
+        """Get the optimisation settings of a metamodel, without constructing the metamodel.
+
+        A metamodel saved before it held optimisation settings is given the default
+        `OptimComponent`, which is stored and referenced from the metamodel.
+
+        Args:
+            metamodel_id: Id of the metamodel.
+            project_id: Id of the project of the metamodel, whose cache is invalidated if the default is stored.
+
+        Returns:
+            The optimisation settings.
+        """
+        with read_transaction(self._get_engine()) as conn:
+            optim_config_id = conn.execute(
+                sa.select(self._table.c.optim_config_id).where(self._table.c.id == metamodel_id)
+            ).scalar()
+        if optim_config_id is not None:
+            return cast(OptimComponent, self._component_provider.get_component(optim_config_id))
+
+        optim_config = OptimComponent()
+        self._component_provider.upsert_component(optim_config)
+        self.set_component_metadata(
+            metamodel_id, 'optim_config_id', optim_config.id,
+            increment_revision = False, project_id = project_id,
+        )
+        return optim_config
 
     def get_lightweight_metamodel(
         self, metamodel_id: str | SequenceNotStr[str]
@@ -1476,7 +1518,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
 
         get_child_component_id_stmt = (
             sa.select(
-                self._table.c.table_config_id
+                self._table.c.table_config_id,
+                self._table.c.optim_config_id,
             )
             .where(self._table.c.id == component_id)
         )
@@ -2536,6 +2579,7 @@ def get_project_critical_state(project):
         mm_dict = {
             f'metamodel_{idx}': get_component_critical_state(mm),
             f'metamodel_{idx}.table_config': get_component_critical_state(mm.table_config),
+            f'metamodel_{idx}.optim_config': get_component_critical_state(mm.optim_config),
             f'model_{idx}': get_component_critical_state(mdl),
             f'model_{idx}.table_config': get_component_critical_state(mdl.table_config),
             f'model_{idx}.grid': get_component_critical_state(mdl.grid),

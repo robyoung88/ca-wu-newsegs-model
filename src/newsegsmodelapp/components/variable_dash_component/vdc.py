@@ -1234,7 +1234,9 @@ def create_bounded_toggle(var):
     )
 
 def create_optim_bound_inputs(var: variable.ScalarVariable):
-    """Create the inputs of the lower and upper bounds of the optimisation of a variable.
+    """Create the inputs of the lower and upper bounds of the optimisation of a variable, and the resolution of its marginal plot.
+
+    Show the saved values; a bound that has not been set shows the limit of the input field, which is what is used.
 
     Args:
         var: The variable.
@@ -1260,27 +1262,28 @@ def create_optim_bound_inputs(var: variable.ScalarVariable):
         supersection = 'optim',
         purpose = 'plot-intervals',
     )
-    
+    lower, upper = var.get_optim_bounds()
+
     return [
         dbc.InputGroup([
             dbc.InputGroupText('Lower bound:'), # pyright: ignore[reportCallIssue]
             create_numeric_variable_parameter_input(
                 variable_id_lower,
-                value = var.interface_min,
+                value = lower,
             ),
         ]),
         dbc.InputGroup([
             dbc.InputGroupText('Upper bound:'), # pyright: ignore[reportCallIssue]
             create_numeric_variable_parameter_input(
                 variable_id_upper,
-                value = var.interface_max,
+                value = upper,
             ),
         ]),
         dbc.InputGroup([
             dbc.InputGroupText('N plot:'), # pyright: ignore[reportCallIssue]
             create_numeric_variable_parameter_input(
                 variable_id_plotintervals,
-                value = 10,
+                value = var.optim_plot_intervals,
                 step = 1,
             ),
         ])

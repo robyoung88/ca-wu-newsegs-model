@@ -113,6 +113,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 'supersection': trig['supersection'],
                 'section': trig['section'],
             }
+            # Not every section has a header (e.g. those of optimisation), so only update one on the page
+            if not any(x['id'] == container_id for x in ctx.outputs_grouping['headers']):
+                raise PreventUpdate
             id_roots = [container_id]
 
         for container_id in id_roots:
@@ -456,32 +459,38 @@ def add_input_container_callbacks(app: NewsegsDash):
                         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
                         logger.debug('Getting lightweight project - Handling optim bounds value change')
                         lproj = provider.get_lightweight_project(active_project_id)
-
+                        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
                         varid = make_varid(**trigger_id)
+                        varuid = lmm.variables.get(varid)
+                        if not varuid:
+                            raise PreventUpdate
+                        var = provider.variable_provider.get_variable(varuid)
 
-                        dsa_config = provider._component_provider.get_component(lproj.table_config.id)
-                        if not hasattr(dsa_config, 'optim_config'):
-                            dsa_config.optim_config = {}
-                        variable_bounds = dsa_config.optim_config.setdefault('bounds', {})
-                        
-                        bound = variable_bounds.setdefault(varid, {})
                         match trigger_id['purpose']:
                             case 'plot-intervals':
-                                bound_key = 'intervals'
+                                # An emptied input leaves the resolution as it was
+                                if new_val is None or int(new_val) == var.optim_plot_intervals:
+                                    raise PreventUpdate
+                                var.optim_plot_intervals = int(new_val)
                             case 'bound-lower':
-                                bound_key = 'lower'
+                                # An emptied input unsets the bound, which falls back to the input limit
+                                if new_val == var.optim_min:
+                                    raise PreventUpdate
+                                var.optim_min = new_val
                             case _:
-                                bound_key = 'upper'
-                        bound_changed = bound.get(bound_key) != new_val
-                        bound[bound_key] = new_val
+                                if new_val == var.optim_max:
+                                    raise PreventUpdate
+                                var.optim_max = new_val
 
-                        provider._component_provider.upsert_component(dsa_config, project_id = active_project_id)
+                        provider.variable_provider.upsert_variable(var)
                         provider.invalidate_cache_for_component(lproj.id)
 
                         # Plot intervals only set the resolution of the marginal plot
-                        if bound_changed and bound_key != 'intervals':
-                            # Bounds are held for the project, so apply to every configuration
-                            db_staleness.mark_inputs_changed([x.id for x in lproj.metamodels], 'optim')
+                        if trigger_id['purpose'] != 'plot-intervals':
+                            # Configurations sharing the variable share its bounds
+                            db_staleness.mark_inputs_changed(
+                                staleness.metamodels_using_variable(lproj, varuid), 'optim'
+                            )
                             for idx, id in enumerate(trigger_ids):
                                 if id['supersection'] == 'optim':
                                     rval['trigger_data'][idx] = now

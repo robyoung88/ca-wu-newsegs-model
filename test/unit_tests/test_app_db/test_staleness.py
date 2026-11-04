@@ -172,3 +172,41 @@ class TestStalenessUpdates(unittest.TestCase):
         
         proj_provider.add_component(proj)
 
+
+
+class TestVariableSwapStaleness(unittest.TestCase):
+    """Which processes are made stale when a configuration switches to another instance of a variable"""
+
+    def setUp(self):
+        from newsegsmodelframework import register_plugins # noqa: F401 - registers the project factories
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        proj = PROJECT_FACTORIES['sprake']()
+        self.old_var = [x for x in proj.metamodels[0].variables.values() if x.optim_selectable][0]
+        self.old_var.optim_selected = True
+        self.new_var = copy.deepcopy(self.old_var)
+
+    def _affected(self):
+        from newsegsmodelapp.components import staleness
+        return staleness.processes_affected_by_variable_swap(self.old_var, self.new_var)
+
+    def test_identical(self):
+        self.assertNotIn('optim', self._affected())
+
+    def test_optim_bounds_differ(self):
+        self.new_var.optim_max = 123.
+        self.assertEqual(self._affected(), {'optim'})
+
+    def test_resolved_bounds_equal(self):
+        # An unset bound and one set to the input limit are the same bound
+        self.new_var.optim_min = self.old_var.interface_min
+        self.assertNotIn('optim', self._affected())
+
+    def test_plot_intervals_do_not_matter(self):
+        self.new_var.optim_plot_intervals = 3
+        self.assertNotIn('optim', self._affected())
+
+    def test_bounds_of_unselected_variable_do_not_matter(self):
+        self.old_var.optim_selected = False
+        self.new_var.optim_selected = False
+        self.new_var.optim_max = 123.
+        self.assertNotIn('optim', self._affected())
