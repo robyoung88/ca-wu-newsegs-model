@@ -113,6 +113,9 @@ def add_input_container_callbacks(app: NewsegsDash):
                 'supersection': trig['supersection'],
                 'section': trig['section'],
             }
+            # Not every section has a header (e.g. those of optimisation), so only update one on the page
+            if not any(x['id'] == container_id for x in ctx.outputs_grouping['headers']):
+                raise PreventUpdate
             id_roots = [container_id]
 
         for container_id in id_roots:
