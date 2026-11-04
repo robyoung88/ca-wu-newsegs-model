@@ -89,7 +89,34 @@ div.numeric-card-input details {
 }
 
 div.numeric-card-input details summary {
-    color: #cccccc;    
+    color: #cccccc;
+}
+
+/* How the configurations share an input: a link icon, or each group's configurations and value */
+div.variable-sharing-summary {
+    font-size: 0.8rem;
+    color: #6c757d;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+div.variable-sharing-summary .variable-sharing-group.focussed {
+    color: #212529;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+
+/* The number of inputs of a card whose configurations differ */
+span.input-card-label:not(:empty) {
+    margin-left: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    vertical-align: middle;
+    color: #055160;
+    background-color: #cff4fc;
 }
 
 button.btn.set-default {

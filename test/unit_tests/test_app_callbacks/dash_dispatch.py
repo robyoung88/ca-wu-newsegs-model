@@ -188,6 +188,10 @@ def get_callback_spec(client, output_type: str, output_property: str) -> Callbac
 def _is_wildcard(pattern: str | dict) -> bool:
     return isinstance(pattern, dict) and any(isinstance(v, list) for v in pattern.values())
 
+def _is_multi_valued(pattern: str | dict) -> bool:
+    """Whether a wildcard matches a list of components; with only `MATCH`, it matches one, sent on its own"""
+    return isinstance(pattern, dict) and any(v in (['ALL'], ['ALLSMALLER']) for v in pattern.values())
+
 def _matches(pattern: dict, id_: dict, trigger: dict) -> bool:
     """Whether the id matches the pattern, resolving `MATCH` from the trigger"""
     if set(pattern) != set(id_):
@@ -289,6 +293,10 @@ def dispatch_callback(
                     if with_values:
                         entry['value'] = changed.get((stringify_id(c.id), prop), _component_value(c, prop))
                     entries.append(entry)
+            if not _is_multi_valued(pattern):
+                if len(entries) != 1:
+                    raise ValueError(f'{len(entries)} components match {pattern}, which needs one')
+                return entries[0]
             return entries
         entry = {'id': pattern, 'property': prop}
         if with_values:

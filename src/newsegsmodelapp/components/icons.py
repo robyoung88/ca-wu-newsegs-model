@@ -60,6 +60,7 @@ DEFAULT_ICONS = {
     'config-6': 'bi bi-6-circle-fill',
     'config-7': 'bi bi-7-circle-fill',
     'config-8': 'bi bi-8-circle-fill',
+    'config-shared': 'bi bi-link-45deg',
     'config-duplicate': 'bi bi-copy',
     'config-remove': 'bi bi-dash-circle',
     'config-focus': 'bi bi-crosshair',

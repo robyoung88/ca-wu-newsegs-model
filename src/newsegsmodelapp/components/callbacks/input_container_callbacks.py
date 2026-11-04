@@ -17,7 +17,11 @@ from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegs
 from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.components import callback_utils, staleness
-from newsegsmodelapp.components.input_components import get_variable_sharing_status
+from newsegsmodelapp.components.input_components import (
+    count_differing_variables,
+    create_variable_sharing_summary_contents,
+    get_variable_groups,
+)
 from newsegsmodelapp.components.variable_dash_component.vdc import create_dsa_bounds_inputs_scalar
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_feedback_graph_artist, get_input_container_content_creator, get_input_section_header_content_creator, get_single_input_header_content_creator
@@ -305,6 +309,16 @@ def add_input_container_callbacks(app: NewsegsDash):
                     'parameter_index': ALL, 'vector_location': ALL,
                 },
                 'children',
+            ),
+            # Written whenever a value is saved or the sharing changes, so that the sharing summary is redrawn
+            summary_refresh = Output(
+                {
+                    'type': 'variable-summary-refresh-trigger',
+                    'supersection': ALL, 'purpose': 'trigger',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'data',
             ),
         ),
 
@@ -911,53 +925,70 @@ def add_input_container_callbacks(app: NewsegsDash):
 
     @app.callback(
         Output({
-            'type': 'input-action-button', 
+            'type': 'input-action-button',
             'supersection': MATCH, 'purpose': 'variable-status-toggle',
-            'section': MATCH, 'key': MATCH, 'subindex': ALL,
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL
         }, 'children'),
-        Output({
-            'type': 'input-action-button', 
-            'supersection': MATCH, 'purpose': 'variable-status-toggle',
-            'section': MATCH, 'key': MATCH, 'subindex': ALL,
-            'parameter_index': ALL, 'vector_location': ALL
-        }, 'color'),
 
         Input({
-            'type': 'input-group-config-update-trigger', 
+            'type': 'variable-summary-refresh-trigger',
             'supersection': MATCH, 'purpose': 'trigger',
-            'section': MATCH, 'key': MATCH, 'subindex': ALL,
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL
         }, 'data'),
-
-        State({
-            'type': 'input-action-button', 
-            'supersection': MATCH, 'purpose': 'variable-status-toggle',
-            'section': MATCH, 'key': MATCH, 'subindex': ALL,
-            'parameter_index': ALL, 'vector_location': ALL
-        }, 'id'),
 
         State('active-project-id', 'data'),
         prevent_initial_call = True,
     )
-    def update_variable_status_badge(
+    def update_variable_sharing_summary(
         trigger_data,
-        button_ids,
         active_project_id
     ):
-        trigger_id = ctx.triggered_id
-        if trigger_id is None or active_project_id is None:
+        triggered_id = ctx.triggered_id
+        if triggered_id is None or active_project_id is None:
             raise PreventUpdate
         t0 = time.perf_counter()
 
-        triggered_id = ctx.triggered_id
-        logger.debug('Getting lightweight project - Updating variable status badge')
+        logger.debug('Getting lightweight project - Updating variable sharing summary')
         lproj = app.project_provider.get_lightweight_project(active_project_id)
-        lmm = lproj.metamodels[lproj.focussed_metamodel_index]
         varid = make_varid(**triggered_id) # pyright: ignore[reportCallIssue]
-        contents, colour = get_variable_sharing_status(lproj, lmm, varid)
+        var_uids = [x.var_uid for x in get_variable_groups(lproj, varid) if x.var_uid is not None]
+        lvars = app.project_provider.variable_provider.get_lightweight_variable(var_uids)
+        contents = create_variable_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
 
-        logger.debug('Updated the variable status badge for variable %s, triggered by %s', varid, triggered_id)
         t1 = time.perf_counter()
-        logger.info(f'Variable Status badge for {varid} updated in {t1 - t0:.3f}s')
-        return [contents] * len(button_ids), [colour] * len(button_ids)
+        logger.info(f'Variable sharing summary for {varid} updated in {t1 - t0:.3f}s')
+        return [contents] * len(ctx.outputs_list)
+
+    @app.callback(
+        Output({'type': 'input-card-label', 'supersection': MATCH, 'section': MATCH}, 'children'),
+
+        # Every row of the card: called when the rows are drawn, and when any of them signals a change
+        Input({
+            'type': 'variable-summary-refresh-trigger',
+            'supersection': MATCH, 'purpose': 'trigger',
+            'section': MATCH, 'key': ALL, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'data'),
+        State({
+            'type': 'variable-summary-refresh-trigger',
+            'supersection': MATCH, 'purpose': 'trigger',
+            'section': MATCH, 'key': ALL, 'subindex': ALL,
+            'parameter_index': ALL, 'vector_location': ALL
+        }, 'id'),
+
+        State('active-project-id', 'data'),
+    )
+    def update_input_card_label(
+        trigger_data,
+        trigger_ids,
+        active_project_id
+    ):
+        if not trigger_ids or active_project_id is None:
+            return None
+
+        logger.debug('Getting lightweight project - Updating input card label')
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        n_differ = count_differing_variables(lproj, (make_varid(**x) for x in trigger_ids))
+        return f'{n_differ} differ' if n_differ else None

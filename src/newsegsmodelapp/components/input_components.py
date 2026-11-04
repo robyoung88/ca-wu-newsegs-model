@@ -3,7 +3,9 @@
 import logging
 logger = logging.getLogger(__name__)
 
+from collections.abc import Iterable, Mapping, Sequence
 import copy
+from dataclasses import dataclass
 import json
 import time
 from typing import Any, Optional, cast
@@ -20,9 +22,10 @@ from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariable
 from newsegsmodelapp.components.constants import VARIABLE_PARAMETER_KEYS
 from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
-from newsegsmodelapp.components.icons import get_icon
+from newsegsmodelapp.components.icons import ICON_COLOUR_CLASSES, get_icon
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
+from newsegsmodelframework.newsegsvariable.lightweight_variable import LightweightVariable
 from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
@@ -83,12 +86,11 @@ def create_numeric_card_variable_parameter_input(
     max: int | float | None = None,
     step: int | float  = 1,
     reset_button = True,
-    status_text: str = "Shared with all",
-    status_colour: str = "success",
+    sharing_summary: Any = None,
 ):
     """Create a card with a labelled numeric field for a parameter of a variable.
 
-    The card has an icon, the field, optionally buttons to reset the value and set the default, and a badge showing whether the variable is shared.
+    The card has an icon, the field, optionally buttons to reset the value and set the default, and optionally a summary of how the configurations share the variable (see `create_variable_sharing_summary`), below the field.
 
     Args:
         icon_name: Name(s) of the icon(s), from `components.icons`.
@@ -100,8 +102,7 @@ def create_numeric_card_variable_parameter_input(
         max: Maximum value of the field.
         step: Step of the field.
         reset_button: Whether to include the button which resets the value.
-        status_text: Text of the badge which shows whether the variable is shared.
-        status_colour: Bootstrap colour of the badge.
+        sharing_summary: The summary of how the configurations share the variable.
 
     Returns:
         The card.
@@ -127,7 +128,6 @@ def create_numeric_card_variable_parameter_input(
             [
                 get_icon(icon_name, None, 'default'),
                 html.Span(label+":", className='me-2'),
-                create_variable_status_badge(param_id, status_text = status_text, colour = status_colour),
             ],
             style={'display':'inline'}
         ),
@@ -139,7 +139,7 @@ def create_numeric_card_variable_parameter_input(
             max,
             step
         ),
-        ],
+        ] + ([sharing_summary] if sharing_summary is not None else []),
         className = 'numeric-card-input'
     )
 
@@ -256,7 +256,8 @@ def update_single_parameter(
             metamodels_to_revise,
             staleness.processes_affected(deterministic_changed, dsa_changed, psa_changed),
         )
-    
+        _signal_summary_refresh(return_dict, now)
+
     return return_dict
 
 def create_value_reset_button(
@@ -533,81 +534,173 @@ def _build_opened_editor(
 # Variable group cycling
 # -----------------------------------------------
 
-def _variables_by_varid(
-    proj: LightweightNewsegsProject,
-    varid: str
-) -> list[str]:
-    var_uids = []
-    for lmm in proj.metamodels:
-        var_uid = lmm.variables.get(varid, None)
-        if var_uid is not None and var_uid not in var_uids:
-            var_uids.append(var_uid)
-    return var_uids
+@dataclass(frozen = True)
+class VariableGroup:
+    """Configurations of a project which hold the same instance of a variable.
 
-def get_metamodel_groups_for_var(proj: LightweightNewsegsProject, varid: str) -> list[set[int]]:
+    Attributes:
+        var_uid: Id of the variable instance, or None for the configurations without the variable.
+        metamodel_indices: Indices (from 0) of the configurations, in order.
     """
-    Finds groups of metamodels (1-indexed) sharing the variable with `varid`.
-    Returns a list of sets containing metamodel 1-based indices.
-    """
-    var_to_mm_indices: dict[str, set[int]] = {}
-    for idx, lmm in enumerate(proj.metamodels, start = 1):
-        if varid in lmm.variables:
-            var_to_mm_indices.setdefault(lmm.variables[varid], set()).add(idx)
-            
-    return list(var_to_mm_indices.values())
+    var_uid: str | None
+    metamodel_indices: tuple[int, ...]
 
-def get_variable_sharing_status(
-    proj: LightweightNewsegsProject,
-    current_mm: LightweightNewsegsMetaModel, 
-    varid: str
-) -> tuple[str, str]:
-    """
-    Determines status label and badge color scheme for a given variable.
-    """
-    total_mms = len(proj.metamodels)
-    if total_mms <= 1:
-        return "Independent", "secondary"
-
-    groups = get_metamodel_groups_for_var(proj, varid)
-    current_mm_idx = proj.metamodels.index(current_mm) + 1
-
-    # Find group containing the current metamodel
-    current_group = next((g for g in groups if current_mm_idx in g), {current_mm_idx})
-
-    if len(current_group) == total_mms:
-        return "Shared with all", "success"
-    elif len(current_group) == 1:
-        return "Independent", "secondary"
-    else:
-        indices_str = ", ".join(str(i) for i in sorted(current_group))
-        return f"Shared with MM: {indices_str}", "info"
-
-def create_variable_status_badge(
-    param_id: VariableInstanceParameterComponentID, 
-    status_text: str = "Shared with all", 
-    colour: str = "success"
-):
-    """Create the badge which shows, and toggles, whether a variable is shared by all configurations.
+def get_variable_groups(proj: LightweightNewsegsProject, varid: str) -> list[VariableGroup]:
+    """Group the configurations of a project by the instance of a variable that they hold.
 
     Args:
-        param_id: Identification of the variable parameter that the component edits.
-        status_text: Text of the badge which shows whether the variable is shared.
-        colour: Bootstrap colour of the badge.
+        proj: The lightweight project.
+        varid: Id of the variable.
 
     Returns:
-        The badge.
+        The groups, ordered by their lowest configuration index, so that they keep their order when the focus changes.
+        The configurations without the variable form a group with no `var_uid`.
     """
-    badge_id = copy.copy(param_id)
-    badge_id.type = 'input-action-button'
-    badge_id.purpose = 'variable-status-toggle'
+    indices_by_uid: dict[str | None, list[int]] = {}
+    for idx, lmm in enumerate(proj.metamodels):
+        indices_by_uid.setdefault(lmm.variables.get(varid), []).append(idx)
+    groups = [VariableGroup(uid, tuple(indices)) for uid, indices in indices_by_uid.items()]
+    return sorted(groups, key = lambda x: x.metamodel_indices[0])
 
-    return dbc.Badge(
-        status_text,
-        id = badge_id.as_dict(),
-        color = colour,
-        className = "me-2 variable-status-badge",
-        style = {"cursor": "pointer"}
+def count_differing_variables(proj: LightweightNewsegsProject, varids: Iterable[str]) -> int:
+    """The number of variables whose configurations don't all hold the same instance.
+
+    Args:
+        proj: The lightweight project.
+        varids: Ids of the variables.
+
+    Returns:
+        The number of variables with more than one group.
+    """
+    return sum(len(get_variable_groups(proj, x)) > 1 for x in set(varids))
+
+def format_variable_value(var: LightweightVariable | None) -> str:
+    """The value of a variable, as its sharing summary shows it.
+
+    Args:
+        var: The variable, or None for a configuration without it.
+
+    Returns:
+        The value shown in its input (the first raw parameter), the number of values of an array, or `–`.
+    """
+    if var is None:
+        return '–'
+    value = var.raw_parameter_0
+    # Arrays are lists when read from the database
+    if isinstance(value, (list, tuple, np.ndarray)):
+        value = np.asarray(value)
+        if value.size != 1:
+            return f'{value.size} values'
+        value = value.item()
+    if isinstance(value, (int, float, np.number)):
+        return f'{value:,.6g}'
+    return str(value)
+
+def _config_icons(indices: Sequence[int]) -> list:
+    """Configuration icons, with runs of three or more consecutive configurations shortened to the first and last."""
+    def icon(idx):
+        return html.I(className = ' '.join([
+            get_icon(f'config-{idx+1}', style_name = 'raw'),
+            ICON_COLOUR_CLASSES[idx % len(ICON_COLOUR_CLASSES)],
+        ]))
+
+    runs: list[list[int]] = []
+    for idx in indices:
+        if runs and idx == runs[-1][-1] + 1:
+            runs[-1].append(idx)
+        else:
+            runs.append([idx])
+
+    children = []
+    for run in runs:
+        if len(run) >= 3:
+            children.extend([icon(run[0]), '–', icon(run[-1])])
+        else:
+            children.extend(icon(x) for x in run)
+    return children
+
+def create_variable_sharing_summary_contents(
+    proj: LightweightNewsegsProject,
+    varid: str,
+    variables: Mapping[str, LightweightVariable],
+) -> list:
+    """Create what the sharing summary of an input shows.
+
+    Nothing for a project with one configuration; a link icon when every configuration shares the variable; otherwise a
+    line with each group's configurations and value, emphasising the group of the focussed configuration.
+
+    Args:
+        proj: The lightweight project.
+        varid: Id of the variable.
+        variables: The variables of the project, by id; it needs only those of the groups.
+
+    Returns:
+        The children of the summary.
+    """
+    if len(proj.metamodels) <= 1:
+        return []
+    groups = get_variable_groups(proj, varid)
+    if len(groups) == 1:
+        return [html.I(className = get_icon('config-shared', style_name = 'raw'), title = 'Shared by every configuration')]
+
+    focussed_index = proj.focussed_metamodel_index
+    line = []
+    for group in groups:
+        if line:
+            line.append(' · ')
+        class_name = 'variable-sharing-group'
+        if focussed_index in group.metamodel_indices:
+            class_name += ' focussed'
+        value = format_variable_value(variables.get(group.var_uid) if group.var_uid else None)
+        line.append(html.Span([*_config_icons(group.metamodel_indices), ' ', value], className = class_name))
+    return line
+
+def create_variable_sharing_summary(
+    param_id: VariableInstanceParameterComponentID,
+    contents: list,
+):
+    """Create the summary which shows how the configurations share a variable, and cycles the sharing when clicked.
+
+    Its id is that of the `variable-status-toggle` action, which the input handler of that purpose acts on.
+
+    Args:
+        param_id: Identification of the variable parameter that the input edits.
+        contents: Its children (see `create_variable_sharing_summary_contents`).
+
+    Returns:
+        The summary.
+    """
+    summary_id = copy.copy(param_id)
+    summary_id.type = 'input-action-button'
+    summary_id.purpose = 'variable-status-toggle'
+
+    return html.Div(
+        contents,
+        id = summary_id.as_dict(),
+        className = 'variable-sharing-summary',
+        title = 'Change which configurations share this input',
     )
+
+def create_variable_summary_refresh_trigger(param_id: VariableInstanceParameterComponentID):
+    """Create the store which signals that the sharing summary of an input should be redrawn.
+
+    `react_to_input_change` writes to it whenever a value is saved or the sharing changes.
+
+    Args:
+        param_id: Identification of the variable parameter that the input edits.
+
+    Returns:
+        The store.
+    """
+    trigger_id = copy.copy(param_id)
+    trigger_id.type = 'variable-summary-refresh-trigger'
+    trigger_id.purpose = 'trigger'
+    return dcc.Store(id = trigger_id.as_dict())
+
+def _signal_summary_refresh(return_dict: dict[str, Any], now: int):
+    """Set every sharing summary refresh trigger of the row"""
+    if 'summary_refresh' in return_dict:
+        return_dict['summary_refresh'] = [now] * len(return_dict['summary_refresh'])
 
 @register_input_handler('variable-status-toggle', 'input-action-button')
 def _toggle_variable_sharing(
@@ -630,37 +723,35 @@ def _toggle_variable_sharing(
 
     varid = make_varid(**triggered_id)
 
-    groups = get_metamodel_groups_for_var(lproj, varid)
-    if not groups or len(groups) < 1 or (len(groups) == 1 and len(groups[0]) <= 1):
+    # Configurations without the variable take no part in the cycling
+    groups = [x for x in get_variable_groups(lproj, varid) if x.var_uid is not None]
+    if not groups or (len(groups) == 1 and len(groups[0].metamodel_indices) <= 1):
         return return_dict
-    
-    current_mm_idx = lproj.metamodels.index(lmm) + 1
+
+    current_mm_idx = lproj.metamodels.index(lmm)
     old_var = project_provider.variable_provider.get_variable(lmm.variables[varid])
-    
+
     # Locate current group index
-    current_group_idx = next(i for i, g in enumerate(groups) if current_mm_idx in g)
+    current_group_idx = next(i for i, g in enumerate(groups) if current_mm_idx in g.metamodel_indices)
 
     vars_to_delete = []
-    if len(groups[current_group_idx]) == 1:
+    if len(groups[current_group_idx].metamodel_indices) == 1:
         # MM is alone in the group - will need to delete the variable as we exit.
         vars_to_delete.append(lmm.variables[varid])
 
     # Cycle to the next group index
     next_group_idx = (current_group_idx + 1)# % len(groups)
     if next_group_idx >= len(groups):
-        if len(groups[-1]) == 1:
+        if len(groups[-1].metamodel_indices) == 1:
             # Was independent and so should cycle to joining the first variable group
-            next_group_idx = 0
-            var_uid = _variables_by_varid(lproj, varid)[next_group_idx]
-            lmm.variables[varid] = var_uid
+            lmm.variables[varid] = cast(str, groups[0].var_uid)
         else:
             # Should spawn a new variable
             var = project_provider.variable_provider.duplicate_variable(lmm.variables[varid])
             lmm.variables[varid] = var.id
             project_provider.add_variables_to_project(lproj.id, [var])
     else:
-        var_uid = _variables_by_varid(lproj, varid)[next_group_idx]
-        lmm.variables[varid] = var_uid
+        lmm.variables[varid] = cast(str, groups[next_group_idx].var_uid)
 
     if vars_to_delete:
         project_provider.remove_variables_from_project(lproj.id, vars_to_delete)
@@ -724,7 +815,8 @@ def _toggle_variable_sharing(
     # Update triggers
     for idx, id in enumerate(trigger_ids):
         return_dict['trigger_data'][idx] = now
-        
+    _signal_summary_refresh(return_dict, now)
+
     return return_dict
 
 @register_input_handler('toggle-optim-active', 'input-toggle')

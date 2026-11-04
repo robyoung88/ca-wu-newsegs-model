@@ -6,6 +6,7 @@ from collections import OrderedDict
 import copy
 from dataclasses import dataclass
 import re
+import threading
 from typing import Any, Callable, Collection, Iterable, Literal, Optional, Protocol, SupportsIndex, Type, TypeVar, dataclass_transform, override, runtime_checkable
 import uuid as mod_uuid
 
@@ -40,9 +41,15 @@ NOTIFY_STATE = Literal[
     'disabled',
 ]
 
+# The notification state set by `_set_notification_state`, for each thread. Loading components disables notifications
+# while they are built; a process-wide state would also disable them in other threads (e.g. the requests of a Dash
+# server), and overlapping loads could leave them disabled.
+_notification_state = threading.local()
+
 class RevisionNotifierMixin():
     """Handles part-child notifications and revision counts"""
 
+    # The notification state of a thread which has not set one
     _rn_config = {
         'notify': 'broadcast'
     }
@@ -83,9 +90,22 @@ class RevisionNotifierMixin():
                 return
 
     @classmethod
-    def _set_notification_state(cls, state: NOTIFY_STATE = 'broadcast'):
-        prevstate = cls._rn_config['notify']
-        cls._rn_config['notify'] = state
+    def _get_notification_state(cls) -> NOTIFY_STATE:
+        """The notification state of the current thread."""
+        return getattr(_notification_state, 'notify', cls._rn_config['notify'])
+
+    @classmethod
+    def _set_notification_state(cls, state: NOTIFY_STATE = 'broadcast') -> NOTIFY_STATE:
+        """Set the notification state of the current thread.
+
+        Args:
+            state: The state.
+
+        Returns:
+            The previous state, to restore.
+        """
+        prevstate = cls._get_notification_state()
+        _notification_state.notify = state
         return prevstate
 
     @property
@@ -99,7 +119,7 @@ class RevisionNotifierMixin():
         self._revision = revision
 
     def _notify_change(self, trigger: Any | None = None, **kwargs):
-        if self._rn_config['notify'] == 'disabled':
+        if self._get_notification_state() == 'disabled':
             return
         
         if not hasattr(self, '_revision'):
@@ -283,7 +303,7 @@ class SubscriptionRevisionNotifierMixin(RevisionNotifierMixin):
         trigger = self if trigger is None else trigger
         super()._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
 
-        if self._rn_config['notify'] == 'broadcast' and broadcast:
+        if self._get_notification_state() == 'broadcast' and broadcast:
             for subscriber in self._subscribers:
                 subscriber._notify_change(trigger = trigger, broadcast = broadcast, **kwargs)
 

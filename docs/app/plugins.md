@@ -145,6 +145,10 @@ The handler is looked up for the purpose, the component type and the model type 
 back to the `default` model type, then to any component type. A purpose with no handler makes no update. Each handler
 should have a [callback test](../development.md#adding-a-test-of-an-input-handler).
 
+A handler that saves a value shown on the site configuration page, or changes which configurations share a Variable,
+should set `return_dict['summary_refresh']`. That redraws the input's sharing summary and its card's label, which
+counts the inputs whose configurations differ.
+
 ### Lazily built editors
 
 A row can build its editor only when it is opened, so that expensive content isn't built for every row of a page.

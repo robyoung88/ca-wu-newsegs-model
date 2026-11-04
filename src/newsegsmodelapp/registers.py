@@ -186,6 +186,7 @@ It should return (modified) return_dict including:
     header_children
     trigger_data
     editor_children
+    summary_refresh - set when a value is saved or the sharing changes, to redraw the sharing summary
 and any other elements that are included in the call.
 """
 
