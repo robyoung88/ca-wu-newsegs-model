@@ -11,7 +11,7 @@
             "dsa_bounds_type": "relative",
             "optim_selected": true,
             "raw_parameters": [
-                200.0
+                50.0
             ]
         },
         "uuid": "6a53cca7-6324-4b1c-abd6-d9bddcb06b13",
@@ -30,10 +30,10 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            200.0
+            50.0
         ],
         "_default_parameters": [
-            200.0
+            50.0
         ],
         "_dsa_lower": 0.9,
         "_dsa_upper": 1.1,
@@ -64,7 +64,7 @@
             "dsa_bounds_type": "relative",
             "optim_selected": true,
             "raw_parameters": [
-                200.0
+                15.0
             ]
         },
         "uuid": "2caf2527-9981-466d-b9bf-07cb40810b4e",
@@ -83,10 +83,10 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            200.0
+            15.0
         ],
         "_default_parameters": [
-            200.0
+            15.0
         ],
         "_dsa_lower": 0.9,
         "_dsa_upper": 1.1,
@@ -117,7 +117,7 @@
             "dsa_bounds_type": "relative",
             "optim_selected": true,
             "raw_parameters": [
-                4000.0
+                1200.0
             ]
         },
         "uuid": "73107ca6-464c-4b23-9aeb-d5ef34f8d140",
@@ -136,10 +136,10 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            4000.0
+            1200.0
         ],
         "_default_parameters": [
-            4000.0
+            1200.0
         ],
         "_dsa_lower": 0.9,
         "_dsa_upper": 1.1,
@@ -222,7 +222,7 @@
             "_last_syncronised": 0,
             "_revision": 1,
             "raw_parameters": [
-                100.0
+                50.0
             ]
         },
         "uuid": "8958c3ba-9ee3-484f-8e03-a37c32840ced",
@@ -241,13 +241,13 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            100.0
+            50.0
         ],
         "_default_parameters": [
-            100.0
+            50.0
         ],
-        "_dsa_lower": 90,
-        "_dsa_upper": 110,
+        "_dsa_lower": 45,
+        "_dsa_upper": 55,
         "dsa_selectable": true,
         "dsa_active": false,
         "dsa_focussed": false,
@@ -275,8 +275,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                0.3,
-                0.06
+                0.9,
+                0.18000000000000002
             ]
         },
         "uuid": "52eca75a-29ab-4992-875d-d013b586b0d0",
@@ -295,11 +295,11 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            0.3,
-            0.06
+            0.9,
+            0.18000000000000002
         ],
         "_default_parameters": [
-            0.3,
+            0.9,
             1
         ],
         "_dsa_lower": 0.95,
@@ -331,8 +331,8 @@
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
-                105.0,
-                21.0
+                81,
+                16.2
             ]
         },
         "uuid": "ca46ef1c-cdad-4339-9856-24f215270245",
@@ -351,11 +351,11 @@
         ],
         "parameterisation_index": 0,
         "_parameters": [
-            105.0,
-            21.0
+            81,
+            16.2
         ],
         "_default_parameters": [
-            105.0,
+            81,
             1
         ],
         "_dsa_lower": 0.95,
@@ -723,8 +723,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                1500.0,
-                300.0
+                5400.0,
+                1080.0
             ]
         },
         "uuid": "74d3d024-a9d5-4843-a172-35df5a5b6e48",
@@ -747,10 +747,10 @@
         "parameterisation_index": 1,
         "_parameters": [
             25.0,
-            60.0
+            216.0
         ],
         "_default_parameters": [
-            1500.0,
+            5400,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -783,8 +783,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                46.0,
-                9.200000000000001
+                216.0,
+                43.2
             ]
         },
         "uuid": "fde8c4d6-5099-4b95-a9ea-cd04d0037d80",
@@ -806,11 +806,11 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            24.999999999999993,
-            1.8400000000000005
+            25.0,
+            8.64
         ],
         "_default_parameters": [
-            46.0,
+            216,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -842,8 +842,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                1000.0,
-                200.0
+                1365.0,
+                273.0
             ]
         },
         "uuid": "2c502dde-66d0-459c-92e7-4a9ac2847a44",
@@ -866,10 +866,10 @@
         "parameterisation_index": 1,
         "_parameters": [
             25.0,
-            40.0
+            54.6
         ],
         "_default_parameters": [
-            1000.0,
+            1365,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -902,8 +902,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                10.5,
-                2.1
+                13.649999999999999,
+                2.73
             ]
         },
         "uuid": "f122edcc-5de0-4ac5-b3c0-48c3b070f87d",
@@ -925,11 +925,11 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            25.0,
-            0.42
+            24.999999999999993,
+            0.5460000000000002
         ],
         "_default_parameters": [
-            10.5,
+            13.65,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -961,8 +961,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                191.772,
-                38.3544
+                150.0,
+                30.0
             ]
         },
         "uuid": "2a2f6177-c6cc-45d7-90a4-c29f5dc6fb0e",
@@ -985,10 +985,10 @@
         "parameterisation_index": 1,
         "_parameters": [
             25.0,
-            7.6708799999999995
+            6.0
         ],
         "_default_parameters": [
-            191.772,
+            150,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -1020,8 +1020,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                16.719,
-                3.3438000000000003
+                1.5,
+                0.30000000000000004
             ]
         },
         "uuid": "b50e02ed-3752-468f-9c60-c08398f3f91d",
@@ -1043,11 +1043,11 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            25.0,
-            0.66876
+            24.999999999999993,
+            0.06000000000000002
         ],
         "_default_parameters": [
-            16.719,
+            1.5,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -1134,8 +1134,8 @@
             "dsa_selected": true,
             "dsa_bounds_type": "interval",
             "raw_parameters": [
-                0.2975,
-                0.0595
+                0.23860000000000003,
+                0.04772000000000001
             ]
         },
         "uuid": "66c465d8-02bd-4955-bc35-e727435ca50f",
@@ -1154,11 +1154,11 @@
         ],
         "parameterisation_index": 1,
         "_parameters": [
-            25.0,
-            0.011899999999999999
+            24.999999999999993,
+            0.009544000000000004
         ],
         "_default_parameters": [
-            0.2975,
+            0.2386,
             1.0
         ],
         "_dsa_lower": 0.95,
@@ -1303,8 +1303,8 @@
             "dsa_bounds_type": "interval",
             "psa_selected": true,
             "raw_parameters": [
-                0.35,
-                0.06999999999999999
+                0.3181,
+                0.06362
             ]
         },
         "uuid": "d336446d-76bb-4552-be4a-3f2c1a39b828",
@@ -1324,10 +1324,10 @@
         "parameterisation_index": 1,
         "_parameters": [
             25.0,
-            0.013999999999999999
+            0.012724
         ],
         "_default_parameters": [
-            0.35,
+            0.3181,
             1.0
         ],
         "_dsa_lower": 0.95,

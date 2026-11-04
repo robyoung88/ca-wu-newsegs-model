@@ -20,10 +20,14 @@ _DEFAULT_LOCATION = Location(
 
 def create_energy_model():
     mdl = SprakeLocModel.from_none()
-    mdl.generation.wind_capacity = 200.
-    mdl.generation.pv_capacity = 200.
-    mdl.consumption_storage.storage_capacity = 4000.
-    mdl.consumption_storage.hlp = 0.3
+    mdl.generation.wind_capacity = 50.
+    mdl.generation.pv_capacity = 15.
+
+    mdl.consumption_storage.storage_capacity = 1200.
+
+    mdl.consumption_storage.n_units = 50.
+    mdl.consumption_storage.hlp = 0.9
+    mdl.consumption_storage.gfa = 81
     mdl.consumption_storage.ev_per_unit = 0.2
 
     # Set the location of the generators appropriately
@@ -43,12 +47,27 @@ def create_energy_model():
 def create_finance_model():
     fnc = SprakeFinance.from_none()
 
+    fnc.wind_capex_per_kw = 5400
+    fnc.wind_om_per_kw_year = 216
+    fnc.pv_capex_per_kw = 1365
+    fnc.pv_om_per_kw_year = 13.65
+
+    fnc.bess_capex_per_kwh = 150
+    fnc.bess_om_per_kwh_year = 1.5
+
+    fnc.resident_sc_per_unit_day = 0.0
+    
     # Apply resident discount
-    fnc.resident_var_per_unit = 0.35 * (1 - 0.15)
+    fnc.resident_var_per_unit = 0.2386
+
+    fnc.grid_export_var_per_unit = 0.1
+    fnc.grid_import_sc_per_day = 0
+    fnc.grid_import_var_per_unit = 0.3181
 
     # Apply discount factors
     fnc.benefit_discount_rate = 0.035
     fnc.cost_discount_rate = 0.035
+
 
     return fnc
 
