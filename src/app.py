@@ -55,7 +55,7 @@ RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
 
-AVAILABLE_MODELS = ['sprake', 'sprake-localised']
+AVAILABLE_MODELS = ['sprake', 'sprakeloc']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
