@@ -2344,11 +2344,6 @@ class FromDatabaseNewsegsProjectProvider(
         """
         return
 
-USE_DATAVERSION = True
-"""Enable use of the database dataversion pragma to determine data staleness.
-
-Has been known to allow for the return of stale results.
-"""
 
 class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
@@ -2356,8 +2351,11 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
     """A `FromDatabaseNewsegsProjectProvider` which caches the projects it loads.
 
-    A cached project is returned if the database has not been written to since (SQLite `data_version`) or if the project's modification key is unchanged. Otherwise it is loaded
-    again. A lock prevents several threads loading the same project at once.
+    A cached project is returned if the project's modification key (`modified_order`, changed by every update of its
+    row) is unchanged. Otherwise it is loaded again. A lock prevents several threads loading the same project at once.
+
+    SQLite's `data_version` is not used: it is a count kept by each connection, so values from the pooled connections
+    can't be compared, and a match could return a stale project.
     """
     def _create_variable_provider(self) -> VariableProviderInterface:
         return CachedFromDatabaseVariableProvider(self._get_engine)
@@ -2366,11 +2364,9 @@ class CachedFromDatabaseNewsegsProjectProvider(
         super().__init__(get_engine)
         self._project_cache = LRUCache(maxsize = 5)
         self._project_last_accessed = {}
-        self._project_dataversions = LRUCache(maxsize = 30)
 
         self._lightweight_project_cache = LRUCache(maxsize = 10)
         self._lightweight_project_last_accessed = {}
-        self._lightweight_project_dataversions = LRUCache(maxsize = 30)
         
         # Create a lock to prevent a cache stampede at initial load
         self._lock = threading.Lock()
@@ -2390,21 +2386,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
     def get_project(self, project_id: str) -> NewsegsProject:
         logger.debug('Finding Full Project: %s', project_id)
         with self._lock:
-            if USE_DATAVERSION:
-                # Check if any writes to db have occurred; if not and project in cache, return immediately
-                existing_dv = self._project_dataversions.get(project_id)
-                with read_transaction(self._get_engine()) as conn:
-                    current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
-                
-                if existing_dv is not None and current_dv == existing_dv:
-                    proj = self._project_cache.get(project_id)
-                    if proj is not None:
-                        logger.debug(
-                            'Returning Full Project %s from cache due to unmodified dataversion - revision is %d, table revision is %d',
-                            project_id, proj.revision, proj.table_config.revision
-                        )
-                        return proj
-
             # Check the modification status of the project; if equal and project in cache, return from cache.
             new_modkey = self._get_project_modification_key(project_id)
             
@@ -2427,8 +2408,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 project_id, get_project_critical_state(proj)
             )
             self._project_last_accessed[project_id] = new_modkey
-            if USE_DATAVERSION:
-                self._project_dataversions[project_id] = current_dv
             self._project_cache[project_id] = proj
         
         return proj
@@ -2442,19 +2421,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
             is_sequence = True
 
         with self._lock:
-
-            if USE_DATAVERSION:
-                existing_dvs = [self._lightweight_project_dataversions.get(x) for x in project_id]
-                with read_transaction(self._get_engine()) as conn:
-                    current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
-
-                if all(x is not None and x == current_dv for x in existing_dvs):
-                    rlist = [self._lightweight_project_cache.get(x) for x in project_id]
-                    if all(x is not None for x in rlist):
-                        if is_sequence:
-                            return rlist
-                        return rlist[0]
-
             new_modkeys = [self._get_project_modification_key(x) for x in project_id]
             
             rlist = []
@@ -2483,8 +2449,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 components_from_db = super().get_lightweight_component(get_list)
                 jdx = 0
                 for idx, id_ in enumerate(rlist):
-                    if USE_DATAVERSION:
-                        self._lightweight_project_dataversions[project_id[idx]] = current_dv
                     if id_ is None:
                         cmpx = components_from_db[jdx]
                         rlist[idx] = cmpx
@@ -2495,10 +2459,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
                             cmpx.id, get_project_critical_state(cmpx)
                         )
                         jdx += 1
-            else:
-                if USE_DATAVERSION:
-                    for pid in project_id:
-                        self._lightweight_project_dataversions[pid] = current_dv
 
         if is_sequence:
             return rlist

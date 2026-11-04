@@ -723,35 +723,34 @@ def _toggle_variable_sharing(
 
     varid = make_varid(**triggered_id)
 
-    # Configurations without the variable take no part in the cycling
-    groups = [x for x in get_variable_groups(lproj, varid) if x.var_uid is not None]
-    if not groups or (len(groups) == 1 and len(groups[0].metamodel_indices) <= 1):
-        return return_dict
-
     current_mm_idx = lproj.metamodels.index(lmm)
-    old_var = project_provider.variable_provider.get_variable(lmm.variables[varid])
+    current_uid = lmm.variables[varid]
 
-    # Locate current group index
-    current_group_idx = next(i for i, g in enumerate(groups) if current_mm_idx in g.metamodel_indices)
+    # The configuration cycles through sharing each instance held by other configurations, in the order of the
+    # configurations, then having an instance of its own (None). Configurations without the variable take no part.
+    shareable = [
+        cast(str, x.var_uid) for x in get_variable_groups(lproj, varid)
+        if x.var_uid is not None and set(x.metamodel_indices) - {current_mm_idx}
+    ]
+    targets: list[str | None] = [*shareable, None]
+    if len(targets) < 2:
+        return return_dict
+    current_target = current_uid if current_uid in shareable else None
+    next_target = targets[(targets.index(current_target) + 1) % len(targets)]
+
+    old_var = project_provider.variable_provider.get_variable(current_uid)
 
     vars_to_delete = []
-    if len(groups[current_group_idx].metamodel_indices) == 1:
-        # MM is alone in the group - will need to delete the variable as we exit.
-        vars_to_delete.append(lmm.variables[varid])
+    if current_target is None:
+        # The configuration's own instance is left without a configuration
+        vars_to_delete.append(current_uid)
 
-    # Cycle to the next group index
-    next_group_idx = (current_group_idx + 1)# % len(groups)
-    if next_group_idx >= len(groups):
-        if len(groups[-1].metamodel_indices) == 1:
-            # Was independent and so should cycle to joining the first variable group
-            lmm.variables[varid] = cast(str, groups[0].var_uid)
-        else:
-            # Should spawn a new variable
-            var = project_provider.variable_provider.duplicate_variable(lmm.variables[varid])
-            lmm.variables[varid] = var.id
-            project_provider.add_variables_to_project(lproj.id, [var])
+    if next_target is None:
+        var = project_provider.variable_provider.duplicate_variable(current_uid)
+        lmm.variables[varid] = var.id
+        project_provider.add_variables_to_project(lproj.id, [var])
     else:
-        lmm.variables[varid] = cast(str, groups[next_group_idx].var_uid)
+        lmm.variables[varid] = next_target
 
     if vars_to_delete:
         project_provider.remove_variables_from_project(lproj.id, vars_to_delete)
