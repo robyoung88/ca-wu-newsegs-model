@@ -157,6 +157,31 @@ class TestOptimConfigStorage(unittest.TestCase):
             ).scalar()
         self.assertEqual(stored_id, default_id)
 
+    def test_get_optim_config(self):
+        mm_provider = self.provider.metamodel_provider
+        optim_config = mm_provider.get_optim_config(self.mm.id)
+        self.assertEqual(optim_config.id, self.mm.optim_config.id)
+        self.assertEqual(optim_config.method, 'Powell')
+
+    def test_get_optim_config_stores_default(self):
+        with write_transaction(self.engine) as conn:
+            conn.execute(
+                tbls.metamodels.update()
+                .where(tbls.metamodels.c.id == self.mm.id)
+                .values(optim_config_id = None)
+            )
+        mm_provider = self.provider.metamodel_provider
+        optim_config = mm_provider.get_optim_config(self.mm.id, project_id = self.proj.id)
+        self.assertEqual(optim_config.method, 'Nelder-Mead')
+
+        # A change to it is a change to the metamodel's settings
+        optim_config.method = 'TNC'
+        self.provider._component_provider.upsert_component(optim_config)
+        self.assertEqual(mm_provider.get_optim_config(self.mm.id).id, optim_config.id)
+        proj = self.provider.get_project(self.proj.id)
+        self.assertEqual(proj.metamodels[0].optim_config.method, 'TNC')
+        self.assertEqual(len(proj.metamodels[0].variables), len(self.mm.variables))
+
     def test_not_pruned(self):
         from newsegsmodelapp.backend.pruning import prune_orphan_configurations
         prune_orphan_configurations(self.engine)

@@ -34,6 +34,7 @@ from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsfinance.lightweightnewsegsfinance import LightweightNewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.optim_component import OptimComponent
 from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import LightweightNewsegsModel
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
@@ -1252,6 +1253,34 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             RevisionNotifierMixin._set_notification_state(prevstate)
 
         return rval
+
+    def get_optim_config(self, metamodel_id: str, project_id: Optional[str] = None) -> OptimComponent:
+        """Get the optimisation settings of a metamodel, without constructing the metamodel.
+
+        A metamodel saved before it held optimisation settings is given the default
+        `OptimComponent`, which is stored and referenced from the metamodel.
+
+        Args:
+            metamodel_id: Id of the metamodel.
+            project_id: Id of the project of the metamodel, whose cache is invalidated if the default is stored.
+
+        Returns:
+            The optimisation settings.
+        """
+        with read_transaction(self._get_engine()) as conn:
+            optim_config_id = conn.execute(
+                sa.select(self._table.c.optim_config_id).where(self._table.c.id == metamodel_id)
+            ).scalar()
+        if optim_config_id is not None:
+            return cast(OptimComponent, self._component_provider.get_component(optim_config_id))
+
+        optim_config = OptimComponent()
+        self._component_provider.upsert_component(optim_config)
+        self.set_component_metadata(
+            metamodel_id, 'optim_config_id', optim_config.id,
+            increment_revision = False, project_id = project_id,
+        )
+        return optim_config
 
     def get_lightweight_metamodel(
         self, metamodel_id: str | SequenceNotStr[str]

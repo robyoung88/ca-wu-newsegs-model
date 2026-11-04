@@ -117,11 +117,14 @@ def processes_affected_by_variable_swap(old_var, new_var) -> set[str]:
     psa = _differs(old_var.psa_selected, new_var.psa_selected) or (
         new_var.psa_show and _differs(_try_get(old_var.get_std), _try_get(new_var.get_std))
     )
+    optim = _differs(old_var.optim_selected, new_var.optim_selected) or (
+        new_var.optim_selected and _differs(old_var.get_optim_bounds(), new_var.get_optim_bounds())
+    )
     return processes_affected(
         deterministic = _differs(old_var.deterministic_value, new_var.deterministic_value),
         dsa = dsa,
         psa = psa,
-        optim = _differs(old_var.optim_selected, new_var.optim_selected),
+        optim = optim,
     )
 
 def result_header_class_name(state: ProcessState | None, focussed: bool) -> str:
