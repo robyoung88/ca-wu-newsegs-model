@@ -31,6 +31,17 @@ WIDER_ENVIRONMENT_MEASURE = Literal[
     'horizontal_solar_flux'
 ]
 
+class EnvironmentDataUnavailableError(RuntimeError):
+    """Raised when an environment server cannot obtain its data, such as when a remote service
+    does not respond or refuses the request.
+
+    The message is intended for the user, so should say which data could not be obtained and why.
+    """
+    retryable = False
+    """Whether running again immediately may succeed. Remote services that have not responded
+    within their timeout are unlikely to have recovered, so runs failing with this error are not
+    retried by the app."""
+
 class NewsegsLocalEnvironment(
     serialisation.StateSerialiseToDictMixin,
     metaclass = ABCMeta
@@ -60,6 +71,16 @@ class NewsegsLocalEnvironment(
             name: New name for this environment data provider.
         """
         self._name = name
+
+    @property
+    def cache_identity(self) -> tuple[str, str] | None:
+        """Class name and version of the provider, identifying its data in the persistent
+        environment cache (see `environment_cache`).
+
+        None, the default, when its data must not be cached persistently, such as data held in
+        memory that may be changed without changing the version of the provider.
+        """
+        return None
 
     @abstractmethod
     def get_wind_speeds(

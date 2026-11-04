@@ -1,38 +1,85 @@
-"""An implementation of NewsegsLocalEnvironment using PVGIS and NEWA environmental data."""
+"""An implementation of NewsegsLocalEnvironment using PVGIS and NEWA environmental data.
 
-from functools import lru_cache
-from typing import Sequence, overload, override
+The data fetched are kept in the persistent environment cache (see `environment_cache`), keyed by
+the location (to 3 dp), the time span, the height (to the nearest metre) or plane orientation (to
+the nearest degree), and the class name and version of the server. Data are fetched at the
+rounded location, height and orientation, so that they do not depend on the order of requests.
 
+If PVGIS or NEWA does not respond within its timeout (the `PVGIS_TIMEOUT_S` and `NEWA_TIMEOUT_S`
+settings), cannot be reached, or refuses the request, an `EnvironmentDataUnavailableError` is
+raised; nothing is cached, so the data are fetched again on the next request.
+"""
+
+from typing import Callable, Sequence, TypeVar, overload, override
+
+import diskcache
 import numpy as np
 import pandas as pd
 import pvlib
+import requests
 
-from newsegsmodelframework.core.environment.environment_servers import LOCAL_ENVIRONMENT_MEASURE, NewsegsLocalEnvironment, RealArrayLike
+from config import settings
+from newsegsmodelframework.core.environment import environment_cache
+from newsegsmodelframework.core.environment.environment_servers import LOCAL_ENVIRONMENT_MEASURE, EnvironmentDataUnavailableError, NewsegsLocalEnvironment, RealArrayLike
 from newsegsmodelframework.core.location.location import AspectLocation, Location, RaisedLocation
 from newsegsmodelframework.core.timespan.timespan import RegTimeSpan, TimeSpan
 from newsegsmodelframework.util import wind_resource_helpers
 
-def _fetch_pvgis_data(pvgis_key):
-    if len(pvgis_key) == 4:
-        pvg_data, pvg_meta = pvlib.iotools.get_pvgis_hourly(
-            pvgis_key[0], pvgis_key[1],
-            start = pvgis_key[2], end = pvgis_key[3],
+T = TypeVar('T')
+
+# The columns of the PVGIS data that are served
+_PVGIS_COLUMNS = ['timestamp', 'poa_global', 'poa_direct', 'temp_air']
+
+def _fetch_or_raise(service: str, description: str, fetch: Callable[[], T]) -> T:
+    """Fetch data from a remote service, raising `EnvironmentDataUnavailableError` if it fails."""
+    def unavailable(reason: str) -> EnvironmentDataUnavailableError:
+        return EnvironmentDataUnavailableError(f'Unable to obtain {description} from {service}: {reason}')
+
+    try:
+        return fetch()
+    except requests.Timeout as e:
+        raise unavailable('the service did not respond in time') from e
+    except requests.ConnectionError as e:
+        raise unavailable('the service could not be reached') from e
+    except (requests.RequestException, ConnectionError) as e:
+        # Includes the errors returned by the services, e.g. for a location they do not cover
+        raise unavailable(str(e)) from e
+
+def _pvgis_timeout() -> tuple[float, float]:
+    connect, read = settings.get('PVGIS_TIMEOUT_S', [10, 120])
+    return float(connect), float(read)
+
+def _fetch_pvgis_data(
+    lat: float,
+    lon: float,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    surface_tilt: float | None = None,
+    surface_azimuth: float | None = None,
+) -> pd.DataFrame:
+    if surface_tilt is None or surface_azimuth is None:
+        description = f'solar data for ({lat}, {lon})'
+        fetch = lambda: pvlib.iotools.get_pvgis_hourly(
+            lat, lon,
+            start = start, end = end,
             components = False,
-            raddatabase = 'PVGIS-ERA5' 
+            raddatabase = 'PVGIS-ERA5',
+            timeout = _pvgis_timeout()
         )
     else:
-        pvg_data, pvg_meta = pvlib.iotools.get_pvgis_hourly(
-            pvgis_key[0], pvgis_key[1],
-            start = pvgis_key[2], end = pvgis_key[3],
-            surface_tilt = pvgis_key[4], surface_azimuth = pvgis_key[5],
+        description = f'solar data for ({lat}, {lon}) at pitch {surface_tilt}, azimuth {surface_azimuth}'
+        fetch = lambda: pvlib.iotools.get_pvgis_hourly(
+            lat, lon,
+            start = start, end = end,
+            surface_tilt = surface_tilt, surface_azimuth = surface_azimuth,
             components = False,
-            raddatabase = 'PVGIS-ERA5' 
+            raddatabase = 'PVGIS-ERA5',
+            timeout = _pvgis_timeout()
         )
-    location = pvlib.location.Location(pvgis_key[0], pvgis_key[1])
-    solarpos = location.get_solarposition(pvg_data.index, method = 'nrel_numba')
-    
+    pvg_data, pvg_meta = _fetch_or_raise('PVGIS', description, fetch)
+
     odata = (
-        pvg_data.join(solarpos)
+        pvg_data
         .reset_index()
         .rename(
             columns = {
@@ -40,16 +87,40 @@ def _fetch_pvgis_data(pvgis_key):
             }
         )
     )
-    return odata
+    # Only the served columns are kept, to limit the size of the cache
+    return odata.loc[:, [col for col in _PVGIS_COLUMNS if col in odata.columns]]
 
 class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
     _version = '0.0.1'
     _name = 'Hourly PVGIS-NEWA Local Environment'
 
-    def __init__(self):
-        # TODO: manage these to prevent bloat
-        self._ws_cache = {}
-        self._pvgis_cache = {}
+    def __init__(self, cache: diskcache.Cache | None = None):
+        """
+        Args:
+            cache: The cache of the data fetched; defaults to the persistent environment cache.
+        """
+        self._cache = cache
+
+    @property
+    def cache(self) -> diskcache.Cache:
+        """The cache of the data fetched."""
+        if self._cache is None:
+            return environment_cache.get_environment_cache()
+        return self._cache
+
+    @property
+    @override
+    def cache_identity(self) -> tuple[str, str]:
+        return (type(self).__name__, self._version)
+
+    def _get_pvgis_data(self, location: Location, timespan: TimeSpan) -> pd.DataFrame:
+        key = environment_cache.environment_cache_key(self.cache_identity, 'pvgis_hourly', location, timespan)
+        lat, lon = environment_cache.round_location(location)
+        return environment_cache.get_or_set(
+            key,
+            lambda: _fetch_pvgis_data(lat, lon, timespan.start, timespan.end - pd.Timedelta(0.5, 'h')),
+            cache = self.cache
+        )
 
     @override
     def get_wind_speeds(
@@ -62,47 +133,47 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
 
-        ws_key = (location.lat, location.lon, timespan.start, timespan.end, location.height_agl)
-
         # If height is 2m or less, we should probably return the pvgis wind speed
-        
-        if not ws_key in self._ws_cache:
+
+        key = environment_cache.environment_cache_key(
+            self.cache_identity, 'wind_speeds', location, timespan, height = location.height_agl
+        )
+        lat, lon = environment_cache.round_location(location)
+        height = environment_cache.round_height(location.height_agl)
+
+        def fetch_hourly_wind_speeds():
             # use random number generator to resolve tiebreaks when extrapolating
             # wind speeds
             rng = np.random.default_rng(260423)
 
-            self._ws_cache[ws_key] = wind_resource_helpers.get_wind_at_site(
-                location.lat, location.lon,
-                rng,
-                dt_start = timespan.start,
-                dt_stop = timespan.end,
-                site_heights = [location.height_agl]
+            wind_resource = _fetch_or_raise(
+                'NEWA',
+                f'wind speeds for ({lat}, {lon}) at {height} m',
+                lambda: wind_resource_helpers.get_wind_at_site(
+                    lat, lon,
+                    rng,
+                    dt_start = timespan.start,
+                    dt_stop = timespan.end,
+                    site_heights = [height]
+                )
             )
 
-        wind_resource = self._ws_cache[ws_key]
-
-        # Convert to hourly mean
-        wind_out = (
-            wind_resource
-            .assign(
-                # Shift the times to the mid of their averaging interval
-                time = lambda df: df['time'] - pd.Timedelta(15, 'm'),
-                # 
-                datetime = lambda df: df['time'].dt.ceil('h')
+            # Convert to hourly mean
+            wind_out = (
+                wind_resource
+                .assign(
+                    # Shift the times to the mid of their averaging interval
+                    time = lambda df: df['time'] - pd.Timedelta(15, 'm'),
+                    #
+                    datetime = lambda df: df['time'].dt.ceil('h')
+                )
+                .loc[:, ['datetime', 'hub_height', 'ws_hub']]
+                .groupby(['datetime', 'hub_height'])
+                .mean()
             )
-            .loc[:, ['datetime', 'hub_height', 'ws_hub']]
-            .groupby(['datetime', 'hub_height'])
-            .mean()
-            # .reset_index()
-            # .rename(
-            #     columns={
-            #         'datetime': 'timestamp',
-            #         'ws_hub': 'wind_speed'
-            #     }
-            # )
-            # .loc[:,['timestamp','wind_speed']]
-        )
-        return wind_out['ws_hub'].values
+            return wind_out['ws_hub'].values
+
+        return environment_cache.get_or_set(key, fetch_hourly_wind_speeds, cache = self.cache)
 
     @override
     def get_wind_timestep(self) -> pd.Timedelta:
@@ -118,13 +189,8 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
             olist = [self.get_horizontal_solar_flux(x, timespan=timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
-        
-        pvgis_key = (location.lat, location.lon, timespan.start, timespan.end - pd.Timedelta(0.5, 'h'))
 
-        if not pvgis_key in self._pvgis_cache:
-            self._pvgis_cache[pvgis_key] = _fetch_pvgis_data(pvgis_key)
-
-        pv_data = self._pvgis_cache[pvgis_key]
+        pv_data = self._get_pvgis_data(location, timespan)
         return np.append(pv_data['poa_global'].at[0], pv_data['poa_global'].to_numpy())
 
     @override
@@ -134,16 +200,11 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
     @override
     def get_external_temperature(self, location, timespan):
         if isinstance(location, Sequence):
-            olist = [self.get_horizontal_solar_flux(x, timespan=timespan) for x in location]
+            olist = [self.get_external_temperature(x, timespan=timespan) for x in location]
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
-        
-        pvgis_key = (location.lat, location.lon, timespan.start, timespan.end - pd.Timedelta(0.5, 'h'))
 
-        if not pvgis_key in self._pvgis_cache:
-            self._pvgis_cache[pvgis_key] = _fetch_pvgis_data(pvgis_key)
-
-        pv_data = self._pvgis_cache[pvgis_key]
+        pv_data = self._get_pvgis_data(location, timespan)
         return np.append(pv_data['temp_air'].at[0], pv_data['temp_air'].to_numpy())
 
     @override
@@ -152,7 +213,7 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
 
     @override
     def get_solar_flux_on_plane(
-        self, 
+        self,
         location: AspectLocation | Sequence[AspectLocation],
         timespan: TimeSpan):
         if (isinstance(location, Sequence)):
@@ -161,16 +222,18 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
             return np.asarray(olist).reshape((nrow,-1))
 
         # For Sprake model, this is not necessary
-        pvgis_key = (
-            location.lat, location.lon,
-            timespan.start, timespan.end,
-            location.pitch, location.azimuth,
+        pitch = int(round(location.pitch))
+        azimuth = int(round(location.azimuth))
+        key = environment_cache.environment_cache_key(
+            self.cache_identity, 'pvgis_hourly_on_plane', location, timespan,
+            pitch = pitch, azimuth = azimuth
         )
-
-        if not pvgis_key in self._pvgis_cache:
-            self._pvgis_cache[pvgis_key] = _fetch_pvgis_data(pvgis_key)
-            
-        pv_data = self._pvgis_cache[pvgis_key]
+        lat, lon = environment_cache.round_location(location)
+        pv_data = environment_cache.get_or_set(
+            key,
+            lambda: _fetch_pvgis_data(lat, lon, timespan.start, timespan.end, pitch, azimuth),
+            cache = self.cache
+        )
         return np.append(pv_data['poa_direct'].at[0], pv_data['poa_direct'].to_numpy())
 
     @override
@@ -193,7 +256,7 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         timespan: TimeSpan
     ) -> pd.DatetimeIndex:
         ...
-    
+
     @overload
     def get_true_datetimes(
         self,
@@ -217,12 +280,12 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
             ]
             return olist
 
-        # All data are at the requested times - 
+        # All data are at the requested times -
         # offsets need to be applied by the consumer
         timestep = self.get_wind_timestep()
         ts2 = RegTimeSpan(timespan)
         ts2.timestep = timestep
         return ts2.to_pandas()
-        
+
     def __str__(self) -> str:
         return super().__str__() + "; name: " + self._name

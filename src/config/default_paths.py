@@ -20,6 +20,11 @@ offers little protection against disk failure; hence "safe, if suboptimal".
 HEARTBEAT_FILE, which holds no data, falls back to the system temporary directory in
 every environment; production pins it in `settings.toml` to the path that the
 docker-compose health check watches.
+
+ENV_CACHE_PATH, the persistent cache of environmental data (see
+`newsegsmodelframework.core.environment.environment_cache`), falls back to the user data
+directory, or to the system temporary directory in production, where docker-compose.yml
+keeps it on the database volume.
 """
 import os
 import sys
@@ -48,3 +53,8 @@ if os.environ.get('NEWSEGS_ENV', '').strip().lower() != 'production':
     DB_PATH = str(_DATA_DIR / 'db' / 'newsegs_db.db')
     RESULTS_STORE = str(_DATA_DIR / 'results_store')
     DB_BACKUP_PATH = str(_DATA_DIR / 'db_backups')
+    ENV_CACHE_PATH = str(_DATA_DIR / 'env_cache')
+else:
+    # The environment cache holds no data that cannot be fetched again, so may fall back
+    # to the system temporary directory; docker-compose.yml keeps it on a volume.
+    ENV_CACHE_PATH = str(Path(tempfile.gettempdir()) / 'newsegs_env_cache')

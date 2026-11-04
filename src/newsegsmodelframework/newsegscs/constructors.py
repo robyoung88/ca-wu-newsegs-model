@@ -2,10 +2,11 @@
 """
 
 from newsegsmodelframework.newsegscs import newsegscs
-from newsegsmodelframework.newsegscs import sprakecs
+from newsegsmodelframework.newsegscs import sprakecs, sprakeloccs
 
 _CS_MODULE_CONSTRUCTORS = {
     'SprakeCS': sprakecs.SprakeCS,
+    'SprakeLocCS': sprakeloccs.SprakeLocCS,
 }
 
 # REVIEW (redundant?): nothing calls `cs_module_from_dict`; the constructor registries in `core.constructors.registers` do this job.

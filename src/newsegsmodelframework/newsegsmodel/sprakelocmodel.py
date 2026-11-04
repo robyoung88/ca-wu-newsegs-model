@@ -18,6 +18,7 @@ from newsegsmodelframework.core.trackeddata import revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from newsegsmodelframework.newsegsgeneration.sprakegeneration import get_sprake_ned100
 from newsegsmodelframework.newsegsgeneration.sprakelocgeneration import SprakeLocGeneration
+from newsegsmodelframework.newsegscs.sprakeloccs import SprakeLocCS
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModelProperty
 from newsegsmodelframework.newsegsmodel.sprakemodel import _DEFAULT_LOCATION, SprakeModel, SprakeModelConfig
 
@@ -50,8 +51,13 @@ class SprakeLocModel(SprakeModel):
 
     # Overridden descriptors
     generation = NewsegsModelProperty(
-        default = SprakeLocGeneration.from_none, 
+        default = SprakeLocGeneration.from_none,
         oftype = SprakeLocGeneration
+    )
+
+    consumption_storage = NewsegsModelProperty(
+        default = SprakeLocCS.from_none,
+        oftype = SprakeLocCS
     )
 
     @singledispatchmethod
@@ -77,9 +83,13 @@ class SprakeLocModel(SprakeModel):
         generation: NewsegsGeneration,
         *args,
         loc: Location | None = None,
+        consumption_storage: SprakeLocCS | None = None,
         **kwargs
     ) -> None:
-        super().__init__(generation, *args, **kwargs)
+        # The Sprake model defaults to a SprakeCS
+        if consumption_storage is None:
+            consumption_storage = SprakeLocCS.from_none()
+        super().__init__(generation, *args, consumption_storage = consumption_storage, **kwargs)
         # The Sprake model gives `loc` to the consumption-storage module only
         if loc:
             self.location = loc

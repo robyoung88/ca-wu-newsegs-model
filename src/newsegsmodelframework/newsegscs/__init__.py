@@ -6,6 +6,7 @@ base class is exposed here; the implementation used by the Sprake model is in `s
 Modules:
     newsegscs: `NewsegsCS`, the base class, and `NewsegsCSConfig`.
     sprakecs: `SprakeCS`, the Sprake consumption and storage module.
+    sprakeloccs: `SprakeLocCS`, the location-aware Sprake consumption and storage module.
     elexon_profiles: Elexon profile class demand profiles of domestic customers.
     ev_profiles: Electric vehicle charging profiles.
     dhw_profiles: Domestic hot water demand profiles.

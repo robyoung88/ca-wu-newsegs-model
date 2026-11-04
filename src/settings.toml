@@ -18,6 +18,9 @@ SprakeValidationLon = -3.47697
 NEWAEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/microscale-atlas/v1/"
 NEWAMesoEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-atlas/v1/"
 NEWAMesoTSEntryPoint = "https://wps.neweuropeanwindatlas.eu/api/mesoscale-ts/v1/"
+# (connect, read) timeouts (s) of requests for environmental data
+NEWA_TIMEOUT_S = [10, 300]
+PVGIS_TIMEOUT_S = [10, 120]
 
 PROGRESS_POLL_INTERVAL = 1000
 

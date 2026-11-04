@@ -6,6 +6,12 @@ import netCDF4
 import xarray as xr
 from typing import Literal, get_args
 
+
+def _request_timeout() -> tuple[float, float]:
+    """The (connect, read) timeout (s) of requests to the NEWA API, from the NEWA_TIMEOUT_S setting."""
+    connect, read = settings.get('NEWA_TIMEOUT_S', [10, 300])
+    return float(connect), float(read)
+
 _MICRO_VARS = Literal['power_dens',
                       'wind_speed',
                       'weib_A_combined',
@@ -50,7 +56,7 @@ def get_newa_micro_point(lat, lon, height=50.0,
         + '&' + '&'.join(["variable=" + var for var in variables])
     )
 
-    response = requests.get(query)
+    response = requests.get(query, timeout = _request_timeout())
 
     if response.status_code == 200:
         hd = response.headers
@@ -145,7 +151,7 @@ def get_newa_meso_point(lat, lon, height=50.0,
         + '&' + '&'.join(["variable=" + var for var in translated_vars])
     )
 
-    response = requests.get(query)
+    response = requests.get(query, timeout = _request_timeout())
 
     if response.status_code == 200:
         hd = response.headers
@@ -314,7 +320,7 @@ def get_newa_meso_ts_point(lat, lon, height=50.0,
         + '&' + '&'.join(["variable=" + var for var in translated_vars])
     )   
 
-    response = requests.get(query)
+    response = requests.get(query, timeout = _request_timeout())
 
     if response.status_code == 200:
         hd = response.headers

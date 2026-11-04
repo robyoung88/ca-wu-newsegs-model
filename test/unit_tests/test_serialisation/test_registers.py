@@ -46,8 +46,9 @@ class TestRegisters(unittest.TestCase):
 
         self.assertEqual(
             len(modreg),
-            4
+            5
         )
+        self.assertIn('SprakeLocCS', modreg)
 
     def test_timespan_register(self):
         tsreg = registers.get_timespan_register()
