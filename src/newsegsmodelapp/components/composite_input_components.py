@@ -4,7 +4,14 @@ import dash
 from dash_bootstrap_components._components.Row import Row as dbc_Row
 
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
-from newsegsmodelapp.components.input_components import create_blank_single_input_header_element, create_input_group_config_update_trigger, create_numeric_card_variable_parameter_input, get_variable_sharing_status
+from newsegsmodelapp.components.input_components import (
+    create_blank_single_input_header_element,
+    create_input_group_config_update_trigger,
+    create_numeric_card_variable_parameter_input,
+    create_variable_sharing_summary,
+    create_variable_sharing_summary_contents,
+    create_variable_summary_refresh_trigger,
+)
 from newsegsmodelapp.components.variable_dash_component.vdc_dsa import create_dsa_input
 from newsegsmodelapp.components.variable_dash_component.vdc_psa import create_psa_input
 from newsegsmodelapp.components.variable_dash_component.vdc_optim import create_optim_input
@@ -22,7 +29,8 @@ def generic_create_deterministic_input_container_contents(
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs of a section for the deterministic run of a metamodel.
 
-    One input for each variable of the metamodel whose interface section is `section`.
+    One input for each variable of the metamodel whose interface section is `section`, with a summary of how the
+    configurations of the project share it. The variables of every configuration are fetched in one call.
 
     Args:
         section: The section.
@@ -34,9 +42,10 @@ def generic_create_deterministic_input_container_contents(
         List of components.
     """
     contents = []
-    var_uids = list(lmm.variables.values())
-    lwvars = variableprovider.get_lightweight_variable(var_uids)
-    for varid, lvar in zip(lmm.variables.keys(), lwvars):
+    var_uids = list(dict.fromkeys(uid for x in lproj.metamodels for uid in x.variables.values()))
+    lwvars = {x.id: x for x in variableprovider.get_lightweight_variable(var_uids)}
+    for varid, var_uid in lmm.variables.items():
+        lvar = lwvars[var_uid]
         if lvar.interface_section == section: # and lvar.configuration_show: # TODO: Add configuration_show into lighweight variable
             #if not isinstance(var, variable.ScalarVariable):
             #    raise TypeError(f'Cannot handle variables of type {type(var)}')
@@ -46,7 +55,9 @@ def generic_create_deterministic_input_container_contents(
                 type = 'single-input-config',
                 supersection = 'deterministic',
             )
-            var_sharing_status = get_variable_sharing_status(lproj, lmm, varid) # pyright: ignore[reportArgumentType]
+            sharing_summary = create_variable_sharing_summary(
+                paramid, create_variable_sharing_summary_contents(lproj, varid, lwvars)
+            )
             contents.append(
                 dbc_Row([
                     create_blank_single_input_header_element(paramid),
@@ -59,10 +70,10 @@ def generic_create_deterministic_input_container_contents(
                         min = lvar.interface_min,
                         max = lvar.interface_max,
                         step = lvar.interface_step if lvar.interface_step else 1,
-                        status_text= var_sharing_status[0], 
-                        status_colour = var_sharing_status[1],
+                        sharing_summary = sharing_summary,
                     ),
                     create_input_group_config_update_trigger(paramid), # pyright: ignore[reportCallIssue]
+                    create_variable_summary_refresh_trigger(paramid),
                 ]
                 ) # type: ignore
             )

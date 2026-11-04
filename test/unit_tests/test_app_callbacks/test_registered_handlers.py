@@ -6,6 +6,7 @@ import json
 from newsegsmodelapp.backend.db import db_tables as tbls
 from newsegsmodelapp.backend.db.db_staleness import PROCESSES
 from newsegsmodelapp.components import staleness
+from newsegsmodelapp.components.input_components import get_variable_groups
 
 from .base import InputChangeTestCase, cached_variant
 from .dash_dispatch import NOT_UPDATED, variable_id
@@ -209,6 +210,45 @@ class TestVariableStatusToggle(InputChangeTestCase):
         self.assertFalse(response.updated)
         self.assertNothingChanged(before)
 
+class TestVariableStatusCycle(InputChangeTestCase):
+    """`variable-status-toggle` with three configurations: the order of the cycle"""
+    n_metamodels = 3
+
+    def setUp(self):
+        super().setUp()
+        self.badge = row_id('input-action-button', 'variable-status-toggle', WIND)
+
+    def sharing(self) -> list[tuple[int, ...]]:
+        """The configurations sharing each instance of the wind capacity, from 1"""
+        lproj = self.reader.get_lightweight_project(self.project_id)
+        return [tuple(i + 1 for i in x.metamodel_indices) for x in get_variable_groups(lproj, WIND_VARID)]
+
+    def cycle(self, n: int) -> list[list[tuple[int, ...]]]:
+        states = []
+        for _ in range(n):
+            self.dispatch(self.badge, 1, self.page(('deterministic', 'gen_input')))
+            states.append(self.sharing())
+        return states
+
+    def test_middle_configuration_reaches_every_group(self):
+        # The first and third configurations hold separate instances; the second shares the first's
+        self.make_independent(2, WIND_VARID)
+        self.set_focus(1)
+        self.assertEqual(self.sharing(), [(1, 2), (3,)])
+
+        self.assertEqual(self.cycle(3), [
+            [(1,), (2, 3)],     # shares the third's
+            [(1,), (2,), (3,)], # its own
+            [(1, 2), (3,)],     # back to the first's
+        ])
+
+    def test_all_shared_alternates_with_independent(self):
+        self.set_focus(1)
+        self.assertEqual(self.cycle(2), [
+            [(1, 3), (2,)],
+            [(1, 2, 3)],
+        ])
+
 class TestToggleOptimActive(InputChangeTestCase):
     """`toggle-optim-active` of an `input-toggle`: selecting a variable for the optimisation"""
     n_metamodels = 3
@@ -332,6 +372,7 @@ TestParameterCached = cached_variant(TestParameter)
 TestValueResetCached = cached_variant(TestValueReset)
 TestValueSetDefaultCached = cached_variant(TestValueSetDefault)
 TestVariableStatusToggleCached = cached_variant(TestVariableStatusToggle)
+TestVariableStatusCycleCached = cached_variant(TestVariableStatusCycle)
 TestToggleOptimActiveCached = cached_variant(TestToggleOptimActive)
 TestPsaActiveCached = cached_variant(TestPsaActive)
 TestPsaSettingsCached = cached_variant(TestPsaSettings)
