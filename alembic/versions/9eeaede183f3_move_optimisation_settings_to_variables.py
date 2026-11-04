@@ -1,10 +1,10 @@
 """Move optimisation settings onto variables and a metamodel component
 
 The bounds and marginal plot resolution of optimisation were held in a dictionary,
-`optim_config['bounds'][varid]`, in the payload of a component of the project (the table
-config, where the interface saved them; the dsa config, where the run looked for them).
-They are now held by each variable, in the `optim_min`, `optim_max` and `optim_plot_intervals`
-columns, which override the variable payload when a variable is loaded.
+`optim_config['bounds'][varid]`, in the payload of the project's table config, where the
+interface saved them; no optimisation settings are held by the dsa config. They are now
+held by each variable, in the `optim_min`, `optim_max` and `optim_plot_intervals` columns,
+which override the variable payload when a variable is loaded.
 
 Variables record their `component_version`; it is left null for existing rows, which were
 saved before versions were recorded (0.0.1).
@@ -35,11 +35,11 @@ DEFAULT_PLOT_INTERVALS = 10
 
 _projects = sa.table(
     'projects',
-    sa.column('id'), sa.column('table_config_id'), sa.column('dsa_component_config_id'),
+    sa.column('id'), sa.column('table_config_id'),
 )
 _snapshot_projects = sa.table(
     'snapshot_projects',
-    sa.column('snapshot_id'), sa.column('id'), sa.column('table_config_id'), sa.column('dsa_component_config_id'),
+    sa.column('snapshot_id'), sa.column('id'), sa.column('table_config_id'),
 )
 _component_configs = sa.table(
     'component_configs',
@@ -69,29 +69,22 @@ _snapshot_variable_configs = sa.table(
 )
 
 
-def _pop_bounds(conn, components, component_ids, snapshot_id = None) -> dict[str, dict]:
-    """Remove `optim_config` from the payloads of the components, returning the bounds by varid.
-
-    The table config is given last, so that what the interface saved takes precedence.
-    """
-    bounds = {}
-    for component_id in component_ids:
-        if component_id is None:
-            continue
-        where = components.c.id == component_id
-        if snapshot_id is not None:
-            where = sa.and_(where, components.c.snapshot_id == snapshot_id)
-        payload = conn.execute(sa.select(components.c.payload).where(where)).scalar()
-        if not payload:
-            continue
-        payload_dict = json.loads(payload)
-        if 'optim_config' not in payload_dict:
-            continue
-        optim_config = payload_dict.pop('optim_config') or {}
-        for varid, var_bounds in (optim_config.get('bounds') or {}).items():
-            bounds.setdefault(varid, {}).update(var_bounds or {})
-        conn.execute(components.update().where(where).values(payload = json.dumps(payload_dict)))
-    return bounds
+def _pop_bounds(conn, components, component_id, snapshot_id = None) -> dict[str, dict]:
+    """Remove `optim_config` from the payload of a component, returning the bounds by varid."""
+    if component_id is None:
+        return {}
+    where = components.c.id == component_id
+    if snapshot_id is not None:
+        where = sa.and_(where, components.c.snapshot_id == snapshot_id)
+    payload = conn.execute(sa.select(components.c.payload).where(where)).scalar()
+    if not payload:
+        return {}
+    payload_dict = json.loads(payload)
+    if 'optim_config' not in payload_dict:
+        return {}
+    optim_config = payload_dict.pop('optim_config') or {}
+    conn.execute(components.update().where(where).values(payload = json.dumps(payload_dict)))
+    return {varid: var_bounds or {} for varid, var_bounds in (optim_config.get('bounds') or {}).items()}
 
 
 def _bound_values(var_bounds: dict) -> dict:
@@ -110,15 +103,13 @@ def _bound_values(var_bounds: dict) -> dict:
 
 
 def _move_bounds(conn, projects, components, project_variables, variables, snapshot = False):
-    """Write the bounds saved for each project to the variables of the project, and remove them from its components."""
-    project_columns = [projects.c.id, projects.c.table_config_id, projects.c.dsa_component_config_id]
+    """Write the bounds saved for each project to the variables of the project, and remove them from its table config."""
+    project_columns = [projects.c.id, projects.c.table_config_id]
     if snapshot:
         project_columns.append(projects.c.snapshot_id)
     for row in conn.execute(sa.select(*project_columns)).fetchall():
         snapshot_id = row.snapshot_id if snapshot else None
-        bounds = _pop_bounds(
-            conn, components, (row.dsa_component_config_id, row.table_config_id), snapshot_id
-        )
+        bounds = _pop_bounds(conn, components, row.table_config_id, snapshot_id)
         for varid, var_bounds in bounds.items():
             values = _bound_values(var_bounds)
             if not values:
