@@ -46,7 +46,7 @@ class TestRegisters(unittest.TestCase):
 
         self.assertEqual(
             len(modreg),
-            3
+            4
         )
 
     def test_timespan_register(self):
