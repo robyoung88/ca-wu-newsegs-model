@@ -297,8 +297,17 @@ def add_input_container_callbacks(app: NewsegsDash):
                 },
                 'data',
             ),
+            editor_children = Output(
+                {
+                    'type': 'input-group-editor',
+                    'supersection': ALL, 'purpose': 'editor',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'children',
+            ),
         ),
-        
+
         inputs = dict(
             changed_input_values = Input(
                 {
@@ -335,7 +344,17 @@ def add_input_container_callbacks(app: NewsegsDash):
                     'parameter_index': ALL, 'vector_location': ALL,
                 }, 
                 'n_clicks',
-            )
+            ),
+            # Opening a row: html.Details does not report `open`, so the clicks on its summary are counted
+            changed_summary_n_clicks = Input(
+                {
+                    'type': 'input-summary',
+                    'supersection': ALL, 'purpose': 'group-editor-toggle',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'n_clicks',
+            ),
         ),
 
         state = dict(
@@ -364,6 +383,16 @@ def add_input_container_callbacks(app: NewsegsDash):
                     'section': MATCH, 'key': MATCH, 'subindex': MATCH,
                     'parameter_index': ALL, 'vector_location': ALL,
                 }, 
+                'id'
+            ),
+            # Not a named argument, so passed to the input handlers in their calling_dict
+            editor_ids = State(
+                {
+                    'type': 'input-group-editor',
+                    'supersection': ALL, 'purpose': 'editor',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
                 'id'
             ),
             active_project_id = State('active-project-id', 'data'),
@@ -628,7 +657,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                         input_ids,
                         header_ids,
                         trigger_ids,
-                        kwargs,
+                        {**kwargs, 'app_state': app_state},
                         active_project_id,
                         app.project_provider,
                         return_dict = rval

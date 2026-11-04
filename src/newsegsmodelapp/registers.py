@@ -175,7 +175,8 @@ Handler functions take:
     input_ids [list[dict]] - a list of the ids of the associated Input html elements
     header_ids [list[dict]] - a list of the ids of the associated header container html elements
     trigger_ids [list[dict]] - a list of the ids of the associated trigger dcc.Store elements
-    calling_dict [dict[str, Any]] - a dict of other keyword arguments to the calling function
+    calling_dict [dict[str, Any]] - a dict of other keyword arguments to the calling function: the values of the
+        other inputs, `editor_ids` (the ids of the associated `input-group-editor` containers) and `app_state`
     active_project_id [str]
     project_provider [NewsegsProjectProviderInterface]
     return_dict [dict[str, Any]] - A dict of updates to output components of input_container_callbacks.react_to_input_change
@@ -184,6 +185,7 @@ It should return (modified) return_dict including:
     input_values
     header_children
     trigger_data
+    editor_children
 and any other elements that are included in the call.
 """
 
@@ -914,6 +916,79 @@ def get_input_container_content_creator(
     )
     return cast(
         Callable[[str, NewsegsProjectProviderInterface], list[DashComponent]],
+        getter(supersection, section, model_type)
+    )
+
+
+INPUT_EDITOR_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        str,
+        NewsegsProjectProviderInterface
+    ], list[DashComponent]]] = {}
+"""Register of functions to create the content of an input's editor, built when its row is opened.
+
+Keyed by a tuple of:
+    supersection [str] - e.g. dsa, deterministic
+    section [str | None] - e.g. gen_input
+    model_type [str]
+
+Functions take the variable id, the active project id and the project provider, and return the children of the
+`input-group-editor` container (see `components.input_components.create_lazy_input_details`).
+"""
+
+def register_input_editor_content_creator(supersection: str, section: str | None, model_type: str):
+    """Decorator which registers a function which creates the content of an input's editor.
+
+    Keyed by the supersection, the section (`None` for all) and the model type. See `INPUT_EDITOR_CONTENT_CREATORS` for the arguments and return of the function.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
+
+    Args:
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+
+    Returns:
+        The decorator.
+    """
+    section = section if section else 'ALL'
+    key = (supersection, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in INPUT_EDITOR_CONTENT_CREATORS:
+                raise KeyError(f'Input editor content creation function already exists for {key}')
+        INPUT_EDITOR_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in INPUT_EDITOR_CONTENT_CREATORS:
+            INPUT_EDITOR_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def get_input_editor_content_creator(
+    supersection: str,
+    section: str | None,
+    model_type: str = 'default'
+) -> Callable[[str, str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    """Get the function which creates the content of an input's editor.
+
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
+
+    Args:
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+
+    Returns:
+        The function.
+    """
+    getter = _three_param_key_getter_with_fallback(
+        INPUT_EDITOR_CONTENT_CREATORS,
+        return_type_description = 'input editor content creation function'
+    )
+    return cast(
+        Callable[[str, str, NewsegsProjectProviderInterface], list[DashComponent]],
         getter(supersection, section, model_type)
     )
 

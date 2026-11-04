@@ -1,9 +1,10 @@
-"""Components for the inputs of variable parameters: numeric fields and cards, reset and default buttons, and the handler of changes.
+"""Components for the inputs of variable parameters: numeric fields and cards, reset and default buttons, rows with lazily built editors, and the handlers of changes.
 """
 import logging
 logger = logging.getLogger(__name__)
 
 import copy
+import json
 import time
 from typing import Any, Optional, cast
 
@@ -26,7 +27,7 @@ from newsegsmodelframework.newsegsvariable.update_variable import update_variabl
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelapp.registers import register_input_handler
-from newsegsmodelapp.registers import get_single_input_header_content_creator
+from newsegsmodelapp.registers import get_input_editor_content_creator, get_single_input_header_content_creator
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def create_numeric_variable_parameter_input(
@@ -426,6 +427,107 @@ def create_input_group_config_update_trigger(
     trigger_id.type = 'input-group-config-update-trigger'
     trigger_id.purpose = purpose
     return dcc.Store(id = trigger_id.as_dict())
+
+# -----------------------------------------------
+# Lazily built editors
+# -----------------------------------------------
+
+def create_lazy_input_details(
+    summary_children: Any,
+    param_id: VariableInstanceParameterComponentID,
+    className: str | None = None,
+) -> html.Details:
+    """Create a row which builds its editor only when it is opened.
+
+    The row is a `Details` holding a `Summary`, whose clicks are counted by `react_to_input_change`, and an empty
+    `input-group-editor` container. An odd count opens the row, and the editor content creator registered for the
+    supersection and section of `param_id` (see `registers.register_input_editor_content_creator`) fills the container.
+    Reopening the row builds the editor again, so that it shows the current values.
+
+    The row also holds a hidden `single-input-config` with the purpose `editor-anchor`. The Dash renderer only calls
+    `react_to_input_change` for a row with a component matching its first output, and the editor's inputs don't exist
+    until it is built. No handler writes to the anchor, and its value never changes.
+
+    Redraw only the children of the editor container, never the `Details` or the `Summary`: a new `Summary` restarts the
+    count while the `Details` stays as it was, and the count and the open state then disagree. Rebuilding the whole input
+    container is safe, since it resets both.
+
+    Don't put interactive components in the `Summary`: clicks on them are counted too.
+
+    Args:
+        summary_children: The children of the summary, shown whether the row is open or closed.
+        param_id: Identification of the variable parameter that the row edits.
+        className: Class of the `Details`.
+
+    Returns:
+        The row.
+    """
+    summary_id = copy.copy(param_id)
+    summary_id.type = 'input-summary'
+    summary_id.purpose = 'group-editor-toggle'
+
+    editor_id = copy.copy(param_id)
+    editor_id.type = 'input-group-editor'
+    editor_id.purpose = 'editor'
+
+    anchor_id = copy.copy(param_id)
+    anchor_id.type = 'single-input-config'
+    anchor_id.purpose = 'editor-anchor'
+
+    return html.Details(
+        [
+            html.Summary(summary_children, id = summary_id.as_dict()),
+            html.Div([], id = editor_id.as_dict()),
+            dcc.Input(id = anchor_id.as_dict(), type = 'hidden'),
+        ],
+        className = className,
+    )
+
+@register_input_handler('group-editor-toggle', 'input-summary')
+def _build_opened_editor(
+    triggered_id: dict,
+    input_ids: list[dict[str, str]],
+    header_ids: list[dict[str, str]],
+    trigger_ids: list[dict[str, str]],
+    calling_dict: dict,
+    active_project_id: str,
+    project_provider: NewsegsProjectProviderInterface,
+    return_dict: dict[str, Any],
+):
+    # An odd count of clicks opens the row; nothing is built when it closes
+    n_clicks = callback_utils.get_triggered_value()
+    if not n_clicks or n_clicks % 2 == 0:
+        raise PreventUpdate
+
+    # The editor of the same parameter as the summary
+    editor_index = next(
+        (
+            idx for idx, id in enumerate(calling_dict.get('editor_ids', []))
+            if all(id.get(k) == v for k, v in triggered_id.items() if k not in ('type', 'purpose'))
+        ),
+        None,
+    )
+    if editor_index is None:
+        logger.warning('No editor container for opened row %s', triggered_id)
+        raise PreventUpdate
+
+    app_state = calling_dict.get('app_state')
+    model_type = json.loads(app_state).get('model_type', 'default') if app_state else 'default'
+    try:
+        content_creator = get_input_editor_content_creator(
+            triggered_id['supersection'], triggered_id['section'], model_type
+        )
+    except KeyError:
+        logger.warning(
+            'No input editor content creator for supersection %s, section %s and model type %s',
+            triggered_id['supersection'], triggered_id['section'], model_type
+        )
+        raise PreventUpdate
+
+    return_dict['editor_children'][editor_index] = content_creator(
+        make_varid(**triggered_id), active_project_id, project_provider
+    )
+    return return_dict
 
 # -----------------------------------------------
 # Variable group cycling
