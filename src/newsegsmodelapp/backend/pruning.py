@@ -316,7 +316,7 @@ def prune_orphan_configurations(engine: Optional[sa.Engine] = None) -> dict[str,
             em.c.grid_config_id, em.c.generation_config_id, em.c.cs_config_id,
             em.c.modeldata_config_id, em.c.table_config_id,
             fm.c.financedata_config_id, fm.c.table_config_id,
-            mm.c.table_config_id,
+            mm.c.table_config_id, mm.c.optim_config_id,
             p.c.dsa_component_config_id, p.c.psa_component_config_id, p.c.table_config_id,
         ])
         # Their results reference them; the rows go here, and the files go as orphans in prune_old_results.

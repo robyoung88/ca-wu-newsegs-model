@@ -499,7 +499,8 @@ class FromDatabaseNewsegsComponentProvider(
                 sa.and_(
                     tbls.metamodels.c.id.not_in(ignore_ids),
                     (
-                        (tbls.metamodels.c.table_config_id == component_id)
+                        (tbls.metamodels.c.table_config_id == component_id) |
+                        (tbls.metamodels.c.optim_config_id == component_id)
                     )
                 )
             )
@@ -1053,6 +1054,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             'label',
 
             'table_config_id',
+            'optim_config_id',
             'em_config_id',
             'fm_config_id',
             'location',
@@ -1104,6 +1106,12 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             obj._model_id = row.em_config_id
             obj._finance_id = row.fm_config_id
             obj._component_ids['table_config'] = row.table_config_id
+            if row.optim_config_id is not None:
+                obj._component_ids['optim_config'] = row.optim_config_id
+            else:
+                # Saved before metamodels held optimisation settings: the default is used,
+                # and stored with the next upsert of the metamodel
+                obj._component_ids.pop('optim_config', None)
 
             var_stmt = self._metamodel_variable_select(obj.id)
             with read_transaction(self._get_engine()) as conn:
@@ -1168,6 +1176,11 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             )
         }
         metadata.update(child_components)
+        optim_config_id = metadata.pop('optim_config_id')
+        metadata['optim_config'] = (
+            self._component_provider.get_lightweight_component(optim_config_id)
+            if optim_config_id is not None else None
+        )
         em_child_ids = [
             metadata.pop(x) for x in (
                 'em_config_id',
@@ -1476,7 +1489,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
 
         get_child_component_id_stmt = (
             sa.select(
-                self._table.c.table_config_id
+                self._table.c.table_config_id,
+                self._table.c.optim_config_id,
             )
             .where(self._table.c.id == component_id)
         )
@@ -2536,6 +2550,7 @@ def get_project_critical_state(project):
         mm_dict = {
             f'metamodel_{idx}': get_component_critical_state(mm),
             f'metamodel_{idx}.table_config': get_component_critical_state(mm.table_config),
+            f'metamodel_{idx}.optim_config': get_component_critical_state(mm.optim_config),
             f'model_{idx}': get_component_critical_state(mdl),
             f'model_{idx}.table_config': get_component_critical_state(mdl.table_config),
             f'model_{idx}.grid': get_component_critical_state(mdl.grid),

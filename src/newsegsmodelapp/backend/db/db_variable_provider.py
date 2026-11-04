@@ -116,6 +116,7 @@ def variable_to_raw_table_data(
         interface_key = variable.interface_key,
         interface_subindex = variable.interface_subindex,
         revision = variable.revision,
+        component_version = variable.version,
         component_type = model_sec,
         variable_type = variable.variable_type,
         distribution = variable.distribution.distribution,
@@ -146,6 +147,7 @@ def variable_to_raw_table_data(
         optim_selected = variable.optim_selected,
         optim_min = json.dumps(variable.optim_min, cls = jsonfuncs.NumpyEncoder) if variable.optim_min is not None else None,
         optim_max = json.dumps(variable.optim_max, cls = jsonfuncs.NumpyEncoder) if variable.optim_max is not None else None,
+        optim_plot_intervals = variable.optim_plot_intervals,
 
         payload = variable.json_dumps(),
 
@@ -256,6 +258,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
             'optim_selected',
             'optim_min',
             'optim_max',
+            'optim_plot_intervals',
         )
     )
 

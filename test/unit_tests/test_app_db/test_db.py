@@ -194,7 +194,7 @@ class TestDatabaseStart(unittest.TestCase):
                 .select_from(tbls.component_configs)
             ).scalar()
 
-        self.assertEqual(nrow_components_post - nrow_components_pre, 19)
+        self.assertEqual(nrow_components_post - nrow_components_pre, 21)
         
         project_id = proj.id
 
@@ -255,15 +255,15 @@ class TestDatabaseStart(unittest.TestCase):
             n_components = (
                 5 * 2 # Modules in model
                 + 2 * 2 # finance_data and table_config in finance
-                + 1 * 2 # table_config in metamodel
+                + 2 * 2 # table_config and optim_config in metamodel
                 + 3 # dsa_config, psa_config and table_config in finance
             )
-            # Based on this, we expect 19 components
+            # Based on this, we expect 21 components
             result = conn.execute(
                 tbls.snapshot_component_configs.select()
                 .where(tbls.snapshot_component_configs.c.snapshot_id == snapshot_id)
             )
-            self.assertEqual(len(result.fetchall()), 19)
+            self.assertEqual(len(result.fetchall()), 21)
 
             result = conn.execute(
                 tbls.snapshot_variable_configs.select()
