@@ -242,7 +242,7 @@ class TestDatabaseStart(unittest.TestCase):
             mm1 = proj.metamodels[0]
             mm2 = proj.metamodels[1]
             self.assertEqual(len(mm1.get_component_attributes()), len(mm2.get_component_attributes()))
-            self.assertEqual(len(mm1.get_component_attributes()), 4) # table_config + model + finance + variable OrderedDict
+            self.assertEqual(len(mm1.get_component_attributes()), 5) # table_config + optim_config + model + finance + variable OrderedDict
 
             self.assertEqual(len(mm1.model.get_component_attributes()), len(mm2.model.get_component_attributes()))
             self.assertEqual(len(mm1.model.get_component_attributes()), 5) # model_data + table_config + grid + generation + consumption_storage

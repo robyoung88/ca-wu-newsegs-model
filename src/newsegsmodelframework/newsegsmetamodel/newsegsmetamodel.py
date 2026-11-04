@@ -15,6 +15,7 @@ from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterfa
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
+from newsegsmodelframework.newsegsmetamodel.optim_component import OptimComponent
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
@@ -117,6 +118,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     - A reference to a NewsegsFinance which itself references the NewsegsModel
     - A series of Variables which locate the values in the NewsegsModel and
       NewsegsFinance
+    - An OptimComponent holding the method and statistic of optimisation
 
     The metamodel can be set into a state:
 
@@ -142,7 +144,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     checked_out: bool = False
 
     _name = 'NewSEGS MetaModel'
-    _version = '0.0.1'
+    _version = '0.1.0'
     _id_prefix = COMPONENT_PREFIXES['metamodel']
     _last_modified: datetime.datetime = datetime.datetime.now()
 
@@ -154,6 +156,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     model = ComponentProperty(default = None, oftype = NewsegsModelInterface)
     finance = ComponentProperty(default = None, oftype = NewsegsFinanceInterface)
+    optim_config = ComponentProperty(default = OptimComponent, oftype = OptimComponent)
+    """The optimisation settings; a metamodel saved without them is given the defaults."""
 
     variables = TableModifyingComponentOrderedDictProperty(oftype = variable.Variable)
     _variables_last_model_sync: dict
@@ -170,11 +174,13 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         finance: NewsegsFinanceInterface,
         variables: MutableSequence[variable.Variable] = [],
         table_config: Optional[TableConfigNewsegsComponent] = None,
+        optim_config: Optional[OptimComponent] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
         
         self.table_config = table_config or TableConfigNewsegsComponent()
+        self.optim_config = optim_config or OptimComponent()
         self.watcher = MMVarWatcher(self)
 
         self.model = model

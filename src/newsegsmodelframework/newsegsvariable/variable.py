@@ -5301,6 +5301,9 @@ class VariableConfig(DataWithRevision):
         dsa_bounds_type: How the DSA bounds are specified: `absolute`, `offset`, `relative` or `interval`.
         psa_selected: If PSA is possible and the variable is selectable, whether it is selected.
         optim_selected: Whether the variable is varied in optimisation.
+        optim_min: Lower bound for optimisation; `None` uses `interface_min`.
+        optim_max: Upper bound for optimisation; `None` uses `interface_max`.
+        optim_plot_intervals: Number of intervals of the marginal plot of the optimisation statistic.
     """
     raw_parameters: ParamList | None = None
 
@@ -5316,6 +5319,18 @@ class VariableConfig(DataWithRevision):
     optim_selected: bool = False
     """
     Is the variable selected for variation in optimisation?
+    """
+    optim_min: ScalarParam | None = None
+    """
+    Lower bound for optimisation; if `None`, the minimum of the input field is used.
+    """
+    optim_max: ScalarParam | None = None
+    """
+    Upper bound for optimisation; if `None`, the maximum of the input field is used.
+    """
+    optim_plot_intervals: int = 10
+    """
+    Number of intervals of the marginal plot of the optimisation statistic.
     """
 
 
@@ -5369,8 +5384,6 @@ class Variable(
         psa_selectable: Whether the variable can be selected for PSA.
         psa_active: Whether the system is running a PSA.
         optim_selectable: Whether the variable can be varied in optimisation.
-        optim_min: Lower limit for optimisation.
-        optim_max: Upper limit for optimisation.
         variable_type: `scalar` or `vector`.
         soft_dirty: Flags the variable for storage without dirtying the components that depend upon it.
     """
@@ -5448,13 +5461,12 @@ class Variable(
     """
     Is the variable to be shown in the opimisation configuration container?
     """
-    optim_min = 0
-    optim_max = None
 
     variable_type: VARIABLE_TYPE = 'scalar'
     _label: str | None = None
 
     # NewsegsComponent constants
+    _version = '0.1.0'
     _id_prefix = COMPONENT_PREFIXES['variable']
     # SerialiseToDictMixin constants
     _constructor_class = 'Variable'
@@ -5882,7 +5894,20 @@ class Variable(
     @optim_show.setter
     def optim_show(self, show: bool) -> None:
         self._optim_show = show
-    
+
+    def get_optim_bounds(self) -> tuple[ScalarParam | None, ScalarParam | None]:
+        """The lower and upper bounds for optimisation.
+
+        A bound which has not been set falls back to the limit of the input field
+        (`interface_min` or `interface_max`), which may itself be `None`.
+
+        Returns:
+            The lower and upper bounds.
+        """
+        lower = self.optim_min if self.optim_min is not None else self.interface_min
+        upper = self.optim_max if self.optim_max is not None else self.interface_max
+        return lower, upper
+
     def get_indexed_parameterisations(self):
         """The parameterisations that can be used with the transform of the variable.
 

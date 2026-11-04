@@ -3,7 +3,7 @@ Functions and classes for finding optimal system configurations
 """
 import copy
 from dataclasses import dataclass
-from typing import Callable, Literal, Sequence, get_args
+from typing import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -12,35 +12,18 @@ from scipy import optimize as scipy_opt
 
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.optim_component import ( # noqa: F401 - re-exported for the pages
+    OPTIM_TARGET_STATISTIC as _OPTIM_TARGET_STATISTIC,
+    OPTIM_TARGET_STATISTICS,
+    OPTIM_TARGET_STATISTIC_LABELS,
+    OPTIMISATION_METHODS,
+)
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
-
-_OPTIM_TARGET_STATISTIC = Literal[
-    'net_present_value_discounted',
-    'net_present_value_undiscounted',
-]
-
-OPTIM_TARGET_STATISTICS = get_args(_OPTIM_TARGET_STATISTIC)
 
 _MAXIMISE_OPTIM_TARGET_STATISTICS = [
     'net_present_value_discounted',
     'net_present_value_undiscounted',
 ]
-
-OPTIM_TARGET_STATISTIC_LABELS = {
-    'net_present_value_undiscounted': 'NPV (undiscounted)',
-    'net_present_value_discounted': 'NPV (discounted)'
-}
-
-_OPTIMISATION_METHODS = Literal[
-    'Nelder-Mead',
-    'L-BFGS-B',
-    'TNC',
-    'SLSQP',
-    'Powell'
-]
-
-OPTIMISATION_METHODS = get_args(_OPTIMISATION_METHODS)
-
 """
 Statistics in this list will be inverted for minimization
 """
