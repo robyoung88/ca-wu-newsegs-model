@@ -13,6 +13,7 @@ import numpy.testing
 
 from config import settings
 
+from newsegsmodelframework import STATICDATA
 from newsegsmodelframework.util import jsonfuncs
 from newsegsmodelframework.core import location
 from newsegsmodelframework.newsegsmodel import sprakemodel
@@ -180,7 +181,7 @@ class TestSprakeModelRun(unittest.TestCase):
             .set_index('datetime')
         )
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-model-config.pickle', 'rb') as f:
+        with open(STATICDATA / 'sprake-validation-model-config.pickle', 'rb') as f:
             mdl = pickle.load(f)
         
         mdl.run()
@@ -238,10 +239,10 @@ class TestSprakeFinanceRun(unittest.TestCase):
             )
         )
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-model-config.pickle', 'rb') as f:
+        with open(STATICDATA / 'sprake-validation-model-config.pickle', 'rb') as f:
             mdl = pickle.load(f)
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-finance-config.pickle', 'rb') as f:
+        with open(STATICDATA / 'sprake-validation-finance-config.pickle', 'rb') as f:
             fnc = pickle.load(f)
 
         mdl.run()
