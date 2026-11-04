@@ -1472,8 +1472,11 @@ mkdocs build   # writes static HTML to site/
 Pull requests targeting `development`, `canary` or `main` run the unit-test workflow. The
 workflow first regenerates the default model artifacts and checks them against
 the files in `data/`; it does not modify the pull request. PSA/DSA tests run
-separately on pushes to `main`. Excel-based validation tests are excluded from
-these automated test runs.
+separately on pushes to `main`. The Excel-based validation tests compare against
+results extracted from the validation workbook into `data/sprake_validation/`, so
+they run in CI without it. After the workbook changes, rerun
+`scripts/210_extract_sprake_validation_results.py` on a computer with access to it
+and commit the updated files.
 
 If generated artifacts differ from the checked-in files, the prerequisite
 check fails and uploads the generated files as the
