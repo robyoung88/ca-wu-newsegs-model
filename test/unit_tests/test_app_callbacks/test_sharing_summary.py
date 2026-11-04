@@ -165,7 +165,7 @@ class TestVariableGroups(InputChangeTestCase):
         )
 
 def summary_id(section: str = SECTION, key: str = KEY) -> dict:
-    return variable_id('input-action-button', 'variable-status-toggle', section, key)
+    return variable_id('variable-sharing-summary', 'summary', section, key)
 
 def refresh_id(section: str = SECTION, key: str = KEY) -> dict:
     return variable_id('variable-summary-refresh-trigger', 'trigger', section, key)
@@ -188,7 +188,7 @@ class TestSharingCallbacks(InputChangeTestCase):
         return render(next(x for x in components if x.id == summary_id(section, key)).children)
 
     def redraw_summary(self, components, section: str = SECTION, key: str = KEY) -> str:
-        spec = get_callback_spec(self.client, 'input-action-button', 'children')
+        spec = get_callback_spec(self.client, 'variable-sharing-summary', 'children')
         response = dispatch_callback(
             self.client, spec, refresh_id(section, key), 1, components, stores = {'active-project-id': self.project_id}
         )
@@ -235,9 +235,11 @@ class TestSharingCallbacks(InputChangeTestCase):
         )
         self.assertIs(response.get(refresh_id(CAPEX_SECTION, CAPEX_KEY), 'data'), NOT_UPDATED)
 
-    def test_cycling_sharing_signals_refresh_and_redraws(self):
+    def test_move_signals_refresh_and_redraws(self):
+        # The focussed first configuration is given a new value of its own
         components = self.page_of()
-        response = self.dispatch(summary_id(), 1, components)
+        move = variable_id('group-move-request', 'move', SECTION, KEY)
+        response = self.dispatch(move, {'mm_index': 0, 'target': 'new'}, components)
         self.assertIsNot(response.get(refresh_id(), 'data'), NOT_UPDATED)
 
         value = f'{self.stored_value():,.6g}'

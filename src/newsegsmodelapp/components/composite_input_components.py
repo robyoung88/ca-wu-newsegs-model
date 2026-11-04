@@ -1,12 +1,15 @@
 """Components which require both input_compoents and variable_dash_component"""
 
 import dash
+from dash import html
 from dash_bootstrap_components._components.Row import Row as dbc_Row
 
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
+from newsegsmodelapp.components.group_editor import create_group_move_request_store
 from newsegsmodelapp.components.input_components import (
     create_blank_single_input_header_element,
     create_input_group_config_update_trigger,
+    create_lazy_input_details,
     create_numeric_card_variable_parameter_input,
     create_variable_sharing_summary,
     create_variable_sharing_summary_contents,
@@ -58,6 +61,15 @@ def generic_create_deterministic_input_container_contents(
             sharing_summary = create_variable_sharing_summary(
                 paramid, create_variable_sharing_summary_contents(lproj, varid, lwvars)
             )
+            if len(lproj.metamodels) > 1:
+                # Opening the summary builds the group editor, which edits and moves between the groups
+                sharing_summary = html.Div([
+                    create_lazy_input_details(
+                        [sharing_summary, html.Span('Hide groups', className = 'group-editor-close-label')],
+                        paramid, className = 'group-editor-details',
+                    ),
+                    create_group_move_request_store(paramid),
+                ])
             contents.append(
                 dbc_Row([
                     create_blank_single_input_header_element(paramid),

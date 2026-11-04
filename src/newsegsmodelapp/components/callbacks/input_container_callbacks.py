@@ -369,6 +369,25 @@ def add_input_container_callbacks(app: NewsegsDash):
                 },
                 'n_clicks',
             ),
+            # The group editor: values of the groups other than the focussed one, and moves between groups
+            changed_group_values = Input(
+                {
+                    'type': 'group-value-input',
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL, 'var_uid': ALL,
+                },
+                'value',
+            ),
+            group_move_requests = Input(
+                {
+                    'type': 'group-move-request',
+                    'supersection': ALL, 'purpose': 'move',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'data',
+            ),
         ),
 
         state = dict(
@@ -925,8 +944,8 @@ def add_input_container_callbacks(app: NewsegsDash):
 
     @app.callback(
         Output({
-            'type': 'input-action-button',
-            'supersection': MATCH, 'purpose': 'variable-status-toggle',
+            'type': 'variable-sharing-summary',
+            'supersection': MATCH, 'purpose': 'summary',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL
         }, 'children'),
