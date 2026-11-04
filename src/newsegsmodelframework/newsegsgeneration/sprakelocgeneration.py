@@ -20,5 +20,7 @@ class SprakeLocGeneration(SprakeGeneration):
         # provided with a raw Location, so we must make sure that the object is downcasted.
         pure_loc = Location(loc)
         self._config.location = pure_loc
-        # Pass this point location on to the generators
-        self.generator.location = pure_loc
+        # Pass this point location on to the generators. The copy constructor sets the location
+        # before the generator, which it then copies with the same locations.
+        if self.generator is not None:
+            self.generator.location = pure_loc

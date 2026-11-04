@@ -3,6 +3,7 @@
 Extends the model of Dr David Sprake by making the environmental conditions
 adaptable to the latitude/longitude of the selected site.
 """
+from __future__ import annotations
 
 import copy
 from functools import lru_cache, singledispatchmethod
@@ -11,7 +12,7 @@ from typing import cast, override
 from newsegsmodelframework.core.environment import pvgis_newa_env_servers
 from newsegsmodelframework.core.environment.dummy_env_servers import DummyWiderEnv
 from newsegsmodelframework.core.environment.environment_servers import NewsegsLocalEnvironment, NewsegsWiderEnvironment
-from newsegsmodelframework.core.location.location import RaisedLocation
+from newsegsmodelframework.core.location.location import Location, RaisedLocation
 from newsegsmodelframework.core.timespan.timespan import SECONDS_TO_DAYS, RegTimeSpan, TimeSpan
 from newsegsmodelframework.core.trackeddata import revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
@@ -56,19 +57,55 @@ class SprakeLocModel(SprakeModel):
     @singledispatchmethod
     def __init__(
         self,
-        dispatch_arg: str | SprakeModel | NewsegsGeneration,
+        dispatch_arg: str | SprakeLocModel | NewsegsGeneration,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(dispatch_arg, *args, **kwargs)
 
+    @__init__.register(SprakeModel)
+    def _from_SprakeModel(self, other: SprakeModel, *args, **kwargs) -> None:
+        # Only a SprakeLocModel may be copied (see _SprakeLocModel_from_other): the generation
+        # module of a SprakeModel is not location-aware.
+        raise TypeError(
+            f'A {type(self).__name__} can only be copied from a SprakeLocModel, not a {type(other).__name__}'
+        )
+
+    @__init__.register(NewsegsGeneration)
+    def _from_NewsegsGeneration(
+        self,
+        generation: NewsegsGeneration,
+        *args,
+        loc: Location | None = None,
+        **kwargs
+    ) -> None:
+        super().__init__(generation, *args, **kwargs)
+        # The Sprake model gives `loc` to the consumption-storage module only
+        if loc:
+            self.location = loc
+
     @__init__.register(str)
     def _from_str(self, name: str, *args, **kwargs) -> None:
         mod_gen = SprakeLocGeneration(get_sprake_ned100())
-        mod_gen.location = copy.copy(_DEFAULT_LOCATION)
         cast(RaisedLocation, mod_gen.generator.generators[1].location).height_agl = 2.
 
+        kwargs.setdefault('loc', copy.copy(_DEFAULT_LOCATION))
         self.__init__(mod_gen, name=name, *args, **kwargs)
+
+    @property
+    @override
+    def location(self) -> Location:
+        return self.consumption_storage.location
+
+    @location.setter
+    @override
+    def location(self, loc: Location):
+        """
+        Unlike the Sprake model, the location determines the environment of the generators,
+        so is passed to the generation module as well as the consumption-storage module.
+        """
+        self.consumption_storage.location = loc
+        self.generation.location = loc
 
     def _generate_config(self, *args, **kwargs) -> SprakeLocModelConfig:
         return SprakeLocModelConfig(*args, **kwargs)
@@ -95,3 +132,14 @@ class SprakeLocModel(SprakeModel):
         except AttributeError:
             self._wider_environment_server = get_sprakeloc_wider_env_server()
             return self._wider_environment_server    
+
+# SprakeLocModel copy constructor
+@SprakeLocModel.__init__.register(SprakeLocModel) # pyright: ignore[reportFunctionMemberAccess]
+def _SprakeLocModel_from_other(
+    self,
+    other: SprakeLocModel,
+    *args,
+    **kwargs
+) -> None:
+    # The SprakeModel copy constructor
+    super(SprakeLocModel, self).__init__(other, *args, **kwargs)
