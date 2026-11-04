@@ -70,6 +70,9 @@ in `conda-environment.yml`. Change them together.
   see the database rather than a cache.
 - Each test case runs with the uncached project provider, and again with the cached provider the app uses, through
   `cached_variant`.
+- `test_row_anchors.py` renders every registered input container for each model type, and fails if a row has an input
+  of `react_to_input_change` but no component matching its first output. The Dash renderer never calls the callback
+  for such a row, and a request-level test can't show that.
 
 ### Adding a test of an input handler
 

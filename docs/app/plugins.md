@@ -145,6 +145,27 @@ The handler is looked up for the purpose, the component type and the model type 
 back to the `default` model type, then to any component type. A purpose with no handler makes no update. Each handler
 should have a [callback test](../development.md#adding-a-test-of-an-input-handler).
 
+### Lazily built editors
+
+A row can build its editor only when it is opened, so that expensive content isn't built for every row of a page.
+`html.Details` doesn't report `open` to callbacks, so the row counts the clicks on its summary instead.
+`input_components.create_lazy_input_details` makes the row: a `Details` holding a `Summary`, an empty
+`input-group-editor` container, and a hidden `single-input-config` anchor. Dash only calls the callback for a row with a
+component matching its first output, and the editor's own inputs don't exist until it's built. When a click opens the row, `react_to_input_change` calls the editor content creator
+registered for its supersection and section, and puts what it returns in the container:
+
+```python
+@register_input_editor_content_creator('dsa', None, 'sprake')    # supersection, section (None for all), model type
+def create_dsa_editor(varid, active_project_id, project_provider) -> list[Component]:
+    ...                                  # the children of the editor container
+```
+
+Reopening the row builds the editor again, so it shows the current values. Closing it builds nothing.
+
+* Redraw only the children of the editor container, never the `Details` or `Summary`, or the count of clicks and the
+  open state will disagree. Rebuilding the whole input container is safe.
+* Don't put interactive components in the `Summary`, since clicks on them are counted too.
+
 ### Processes
 
 A *process* is work done in the background by a worker. Processes are chained by naming the
@@ -182,6 +203,7 @@ success.
 | `PAGE_LAYOUT_CONFIGURATION_REGISTER` | `add_page_layout_configuration` | page id, model type |
 | `INPUT_HANDLERS` | `register_input_handler` | purpose, component type, model type |
 | `INPUT_CONTAINER_CONTENT_CREATORS` | `register_input_container_content_creator` | supersection, section, model type |
+| `INPUT_EDITOR_CONTENT_CREATORS` | `register_input_editor_content_creator` | supersection, section, model type |
 | `INPUT_SECTION_HEADER_CONTENT_CREATORS` | `register_input_section_header_content_creator` | supersection, section, model type |
 | `SINGLE_INPUT_HEADER_CONTENT_CREATORS` | `register_single_input_header_content_creator` | supersection, section, model type |
 | `RESULT_CONTAINER_CONTENT_CREATORS` | `register_result_container_content_creator` | key, section, model type |
