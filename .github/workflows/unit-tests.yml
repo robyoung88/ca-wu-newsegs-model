@@ -37,7 +37,6 @@ jobs:
       - name: Run unit tests
         run: >-
           python -m pytest test/unit_tests
-          -k "not test_excel_validation"
           --ignore=test/unit_tests/test_dsa
           --ignore=test/unit_tests/test_psa
           --ignore=test/unit_tests/test_dsa_multiple.py

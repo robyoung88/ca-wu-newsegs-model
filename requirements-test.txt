@@ -6,6 +6,7 @@ pyproj
 pvlib
 openpyxl
 dynaconf
+diskcache
 sqlalchemy
 pyzmq
 dash

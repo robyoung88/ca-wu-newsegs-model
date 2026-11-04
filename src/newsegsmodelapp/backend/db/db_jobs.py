@@ -175,3 +175,37 @@ def set_status_failed(engine: sa.Engine, job_id: int, message: str | None):
     )
 
     write_with_retries(engine, stmt)
+
+def prevent_request_retry(engine: sa.Engine, request_id: int):
+    """Stop a request being retried when its run fails, such as when the failure is not one
+    that running again may cure (see `is_retryable`).
+
+    The request is given no retries beyond its current attempt, so that the action manager
+    abandons it when it next handles the failed run.
+
+    Args:
+        engine: The SQLAlchemy engine.
+        request_id: Id of the request.
+    """
+    logger.debug('Preventing retry of Request ID = %d;', request_id)
+    stmt = (
+        sa.update(tbls.requests)
+        .values(max_retries = tbls.requests.c.retry_number + 1)
+        .where(tbls.requests.c.request_id == request_id)
+    )
+
+    write_with_retries(engine, stmt)
+
+def is_retryable(exception: BaseException) -> bool:
+    """Whether a run failing with an exception may succeed if run again.
+
+    True unless the exception has a false `retryable` attribute, as has
+    `EnvironmentDataUnavailableError`.
+
+    Args:
+        exception: The exception.
+
+    Returns:
+        Whether to retry.
+    """
+    return bool(getattr(exception, 'retryable', True))

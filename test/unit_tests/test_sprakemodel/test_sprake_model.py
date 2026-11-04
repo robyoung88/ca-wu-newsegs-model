@@ -1,7 +1,6 @@
 """
 Unit tests for newsegsmodel/sprakemodel.
 """
-import os
 import pickle
 import unittest
 import json
@@ -11,8 +10,7 @@ import pandas as pd
 import numpy as np
 import numpy.testing
 
-from config import settings
-
+from newsegsmodelframework import STATICDATA
 from newsegsmodelframework.util import jsonfuncs
 from newsegsmodelframework.core import location
 from newsegsmodelframework.newsegsmodel import sprakemodel
@@ -167,20 +165,12 @@ class TestSprakeModelRun(unittest.TestCase):
         """
         Internal validation using an independently coded excel model.
 
-        Considers only the meters, not the financial estimates.
+        Considers only the meters, not the financial estimates. The workbook's results are extracted to
+        `data/sprake_validation` by `scripts/210_extract_sprake_validation_results.py`.
         """
-        external_meter_data = (
-            pd.read_excel(
-                os.path.join(settings.get('SprakeExcelValidationLoc'), 'Sprake_model_validation.xlsx'),
-                sheet_name = 'Raw',
-                header = 0,
-                parse_dates = ['datetime']
-            )
-            .assign(datetime = lambda df: df['datetime'].dt.tz_localize('utc'))
-            .set_index('datetime')
-        )
+        external_meter_data = pd.read_parquet(STATICDATA / 'sprake_validation' / 'meters.parquet')
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-model-config.pickle', 'rb') as f:
+        with open(STATICDATA / 'sprake-validation-model-config.pickle', 'rb') as f:
             mdl = pickle.load(f)
         
         mdl.run()
@@ -224,24 +214,23 @@ class TestSprakeFinanceRun(unittest.TestCase):
     """
 
     def test_excel_validation(self):
+        """
+        Internal validation of the finance figures using an independently coded excel model.
 
+        The workbook's totals are extracted to `data/sprake_validation` by
+        `scripts/210_extract_sprake_validation_results.py`.
+        """
         # Acceptable relative tolerance for validation
         # Mostly thrown off by the slightly different PV model
         RTOL = 1e-5
 
-        external_finance_data = (
-            pd.read_excel(
-                os.path.join(settings.get('SprakeExcelValidationLoc'), 'Sprake_model_validation.xlsx'),
-                sheet_name = 'Totals',
-                header = 0,
-                index_col = 'name'
-            )
-        )
+        with open(STATICDATA / 'sprake_validation' / 'totals.json', encoding = 'utf-8') as f:
+            external_totals = json.load(f)
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-model-config.pickle', 'rb') as f:
+        with open(STATICDATA / 'sprake-validation-model-config.pickle', 'rb') as f:
             mdl = pickle.load(f)
 
-        with open(f'{os.getenv("PROJECT_ROOT_PATH")}/data/sprake-validation-finance-config.pickle', 'rb') as f:
+        with open(STATICDATA / 'sprake-validation-finance-config.pickle', 'rb') as f:
             fnc = pickle.load(f)
 
         mdl.run()
@@ -250,36 +239,36 @@ class TestSprakeFinanceRun(unittest.TestCase):
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_costs_undiscounted(),
-            float(external_finance_data.loc['total_cost_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
+            external_totals['total_cost_undiscounted'],
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_costs_discounted(),
-            float(external_finance_data.loc['total_cost_discounted', 'value']), # pyright: ignore[reportArgumentType]
+            external_totals['total_cost_discounted'],
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_benefits_undiscounted(),
-            float(external_finance_data.loc['total_benefits_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
+            external_totals['total_benefits_undiscounted'],
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_total_present_benefits_discounted(),
-            float(external_finance_data.loc['total_benefits_discounted', 'value']), # pyright: ignore[reportArgumentType]
+            external_totals['total_benefits_discounted'],
             rtol = RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_net_present_value_undiscounted(),
-            float(external_finance_data.loc['npv_undiscounted', 'value']), # pyright: ignore[reportArgumentType]
+            external_totals['npv_undiscounted'],
             rtol = 10*RTOL
         )
 
         numpy.testing.assert_allclose(
             fnc.get_net_present_value_discounted(),
-            float(external_finance_data.loc['npv_discounted', 'value']), # pyright: ignore[reportArgumentType]
+            external_totals['npv_discounted'],
             rtol = 10*RTOL
         )

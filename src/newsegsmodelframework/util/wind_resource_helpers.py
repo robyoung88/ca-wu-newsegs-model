@@ -1,7 +1,10 @@
 """Helpers for wind resource assessment from the New European Wind Atlas: wind speeds at a site and heights,
 compass point categories, and wind rose, energy rose and wind speed profile plots.
 """
+import datetime
 import itertools
+from typing import Any, Literal, Sequence, overload
+
 import numpy as np
 import pandas as pd
 
@@ -160,17 +163,65 @@ def get_alphas(wd_10, ws_10, alpha_dist):
 
     return (idf.set_index(['wd_10_cat','ws_10_cat']).join(alpha_dist)['alpha'].values)
 
-def get_wind_at_site(lat, lon,
-                     rng,
-                     meso_reference_height=50,
-                     micro_reference_height=50,
-                     dt_start='2005-01-01T00:00:00',
-                     dt_stop='2022-12-31T23:30:00',
-                     site_heights = EVAL_HEIGHTS,
-                     #site_cps = CPS,
-                     return_working = False
-                     ):
-    
+NewaDatetime = str | datetime.datetime | pd.Timestamp
+"""A datetime accepted by `get_wind_at_site`: a string, `datetime.datetime` or `pd.Timestamp`."""
+
+_NEWA_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+
+def to_newa_datetime_string(dt: NewaDatetime) -> str:
+    """Format a datetime as the New European Wind Atlas API requires, e.g. `'2005-01-01T00:00:00'`.
+
+    The API takes UTC times without a timezone, to the second, so a timezone-aware datetime is converted to UTC
+    and a naive one is taken to be UTC already.
+
+    Args:
+        dt: The datetime; a string is parsed by `pd.Timestamp`.
+
+    Returns:
+        The formatted datetime.
+    """
+    ts = pd.Timestamp(dt)
+    if ts.tz is not None:
+        ts = ts.tz_convert('UTC').tz_localize(None)
+    return ts.strftime(_NEWA_DATETIME_FORMAT)
+
+@overload
+def get_wind_at_site(
+    lat: float, lon: float,
+    rng: np.random.Generator,
+    meso_reference_height: float = ...,
+    micro_reference_height: float = ...,
+    dt_start: NewaDatetime = ...,
+    dt_stop: NewaDatetime = ...,
+    site_heights: Sequence[float] = ...,
+    return_working: Literal[False] = ...
+) -> pd.DataFrame: ...
+
+@overload
+def get_wind_at_site(
+    lat: float, lon: float,
+    rng: np.random.Generator,
+    meso_reference_height: float = ...,
+    micro_reference_height: float = ...,
+    dt_start: NewaDatetime = ...,
+    dt_stop: NewaDatetime = ...,
+    site_heights: Sequence[float] = ...,
+    *,
+    return_working: Literal[True]
+) -> dict[str, Any]: ...
+
+def get_wind_at_site(
+    lat: float, lon: float,
+    rng: np.random.Generator,
+    meso_reference_height: float = 50,
+    micro_reference_height: float = 50,
+    dt_start: NewaDatetime = '2005-01-01T00:00:00',
+    dt_stop: NewaDatetime = '2022-12-31T23:30:00',
+    site_heights: Sequence[float] = EVAL_HEIGHTS,
+    #site_cps = CPS,
+    return_working: bool = False
+) -> pd.DataFrame | dict[str, Any]:
+
     """Wind speeds at a site, at heights, from the New European Wind Atlas.
 
     Takes the mesoscale wind speed series at the reference height and maps its Weibull distribution onto the microscale Weibull distribution of the site, then scales the result to each site height by the power law with a shear exponent which depends upon the wind direction and speed.
@@ -178,11 +229,11 @@ def get_wind_at_site(lat, lon,
     Args:
         lat: Latitude (degrees).
         lon: Longitude (degrees).
-        rng: Random number generator.
+        rng: Random number generator, which resolves ties when the wind speeds are sorted.
         meso_reference_height: Height (m) of the mesoscale data used as reference.
         micro_reference_height: Height (m) of the microscale data used as reference.
-        dt_start: Start of the period.
-        dt_stop: End of the period.
+        dt_start: Start of the period; see `to_newa_datetime_string`.
+        dt_stop: End of the period; see `to_newa_datetime_string`.
         site_heights: Heights (m) at which to give the wind speeds.
         return_working: Return the intermediate data as well.
 
@@ -190,9 +241,9 @@ def get_wind_at_site(lat, lon,
         The wind speed series at each height; with `return_working`, a dictionary which also holds the intermediate data.
     """
     meso_data = get_newa_meso_ts_point(lat, lon,
-                                       height=meso_reference_height, 
-                                       dt_start=dt_start, 
-                                       dt_stop=dt_stop,
+                                       height=meso_reference_height,
+                                       dt_start=to_newa_datetime_string(dt_start),
+                                       dt_stop=to_newa_datetime_string(dt_stop),
                                        variables=['wind_speed',
                                                   'wind_from_direction_10m',
                                                   'wind_speed_10m',

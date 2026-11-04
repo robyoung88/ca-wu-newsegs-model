@@ -50,6 +50,8 @@ A single variable, `NEWSEGS_ENV`, selects the environment: `development` (the de
 
 It selects the matching section of `src/settings.toml` (it is dynaconf's environment switcher, replacing `ENV_FOR_DYNACONF`), and it controls behaviour outside dynaconf: the Dash debug tools are only enabled in `development`. Code can query it through `config.environment` (e.g. `environment.is_production()`).
 
+The tests select `testing` themselves (see `test/__init__.py`), whatever `NEWSEGS_ENV` is set to, unless it is `spraketest`.
+
 ### Storage locations
 
 `DB_PATH`, `RESULTS_STORE` and `DB_BACKUP_PATH` can be set in `src/.secrets.toml`, in `src/settings.toml`, or with `DYNACONF_DB_PATH` etc. When they are not set, and the environment is not `production`, they default to a per-user data directory (see `src/config/default_paths.py`):
@@ -1470,8 +1472,11 @@ mkdocs build   # writes static HTML to site/
 Pull requests targeting `development`, `canary` or `main` run the unit-test workflow. The
 workflow first regenerates the default model artifacts and checks them against
 the files in `data/`; it does not modify the pull request. PSA/DSA tests run
-separately on pushes to `main`. Excel-based validation tests are excluded from
-these automated test runs.
+separately on pushes to `main`. The Excel-based validation tests compare against
+results extracted from the validation workbook into `data/sprake_validation/`, so
+they run in CI without it. After the workbook changes, rerun
+`scripts/210_extract_sprake_validation_results.py` on a computer with access to it
+and commit the updated files.
 
 If generated artifacts differ from the checked-in files, the prerequisite
 check fails and uploads the generated files as the

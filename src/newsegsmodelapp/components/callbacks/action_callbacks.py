@@ -24,7 +24,7 @@ from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
 from newsegsmodelapp.backend.db.db import read_transaction
 from newsegsmodelapp.backend.db import db_tables as tbls
-from newsegsmodelapp.backend.db.db_jobs import set_status_completed
+from newsegsmodelapp.backend.db.db_jobs import is_retryable, prevent_request_retry, set_status_completed
 from newsegsmodelapp.backend.worker import set_status_failed
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
@@ -105,6 +105,8 @@ def _local_run_any(
         return job_id
     except Exception as e:
         logger.exception('Local run Run ID: %d; has failed with exception', job_id, exc_info = True)
+        if not is_retryable(e):
+            prevent_request_retry(engine, request.request_id)
         set_status_failed(engine, job_id, str(e))
         return job_id
 
@@ -371,6 +373,34 @@ def _get_run_statuses(
         return {}
     return {x[0]: dict(x._mapping) for x in result}
 
+def results_status(
+    ongoing_run_ids: Sequence[int],
+    failure_messages: Sequence[str],
+    new_jobs: bool,
+    progress_message: str | NoUpdate,
+) -> tuple[str, str | NoUpdate, str | NoUpdate]:
+    """The status of the results containers, and the title and subtitle of their overlay.
+
+    While runs are underway the containers are `CALCULATING`. Once none are, they are `FAILED` if
+    any run of the batch was abandoned, showing why, or else `IDLE`.
+
+    Args:
+        ongoing_run_ids: Ids of the runs underway.
+        failure_messages: Messages of the runs abandoned since the batch started.
+        new_jobs: Whether new runs have been spawned.
+        progress_message: Message of the progress of the runs underway.
+
+    Returns:
+        The status, title and subtitle.
+    """
+    if len(ongoing_run_ids) > 0:
+        return 'CALCULATING', 'Computing...' if new_jobs else no_update, progress_message
+    if failure_messages:
+        title = 'A job failed' if len(failure_messages) == 1 else f'{len(failure_messages)} jobs failed'
+        # Retries of the same request may fail in the same way
+        return 'FAILED', title, ' | '.join(dict.fromkeys(failure_messages))
+    return 'IDLE', no_update, progress_message
+
 def add_action_callbacks(app: NewsegsDash):
 
     """Bind the callbacks which turn user actions into requests, start them, monitor their progress and trigger their post-actions.
@@ -410,6 +440,7 @@ def add_action_callbacks(app: NewsegsDash):
             'key': ALL, 'subindex': 0
         }, 'data', allow_duplicate = True),
         Output('ongoing-actions', 'data'),
+        Output('failed-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
         Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
         Output({'type': 'results-overlay-text', 'section': ALL, 'supersection': ALL}, 'children', allow_duplicate = True),
@@ -420,6 +451,7 @@ def add_action_callbacks(app: NewsegsDash):
         Input('progress-poll-interval', 'n_intervals'),
 
         State('ongoing-actions', 'data'),
+        State('failed-actions', 'data'),
         State({
             'type': 'postaction-trigger', 'purpose': 'trigger',
             'supersection': 'global', 'section': ALL,
@@ -433,6 +465,7 @@ def add_action_callbacks(app: NewsegsDash):
         poll_intervals,
 
         ongoing_actions: list[int],
+        failure_messages: list[str],
         postaction_trigger_ids,
         container_ids,
     ):
@@ -448,7 +481,11 @@ def add_action_callbacks(app: NewsegsDash):
             logger.debug('Ongoing actions at start of manager are: %s', ongoing_actions)
 
             postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)
+            # A new batch of jobs, started with none underway, clears the failures of the last
+            batch_starting = len(ongoing_actions) == 0
             ongoing_actions = set(ongoing_actions)
+            failures_before = list(failure_messages or [])
+            failure_messages = list(failures_before)
             failed_actions = []
             completed_actions = []
             spawned_actions = []
@@ -543,8 +580,9 @@ def add_action_callbacks(app: NewsegsDash):
                         
                         else:
                             # Return of a negative indicates no more retries available;
-                            # Request should already be marked as CANCELLED so for now do nothing
-                            pass
+                            # Request should already be marked as CANCELLED, so report the failure
+                            message = run_statuses.get(request.run_id, {}).get('progress_message')
+                            failure_messages.append(message or f'{request.request_type} failed without a message')
 
                     for run_id in failed_run_ids:
                         logger.debug('Removing Failed Run from list of ongoing actions: Run ID = %d;', run_id)
@@ -644,20 +682,24 @@ def add_action_callbacks(app: NewsegsDash):
                         prog_ = 0.
 
             new_jobs = new_jobs or len(spawned_actions)
+            if batch_starting and new_jobs:
+                failure_messages = [m for m in failure_messages if m not in failures_before]
 
             logger.debug('Ongoing actions at end of manager are: %s', ongoing_run_ids)
 
         finally:
             action_manager_lock.release()
 
+        status, title, subtitle = results_status(ongoing_run_ids, failure_messages, new_jobs, mess_)
         return (
             postaction_trigger_returns,
             ongoing_run_ids,
+            failure_messages,
             not(retry_spawns) and len(ongoing_run_ids) == 0,
-            (['CALCULATING'] if len(ongoing_run_ids) > 0 else ['IDLE']) * len(container_ids),
-            (['Computing...'] if new_jobs else [no_update]) * len(container_ids),
+            [status] * len(container_ids),
+            [title] * len(container_ids),
             [prog_] * len(container_ids),
-            [mess_] * len(container_ids),
+            [subtitle] * len(container_ids),
         )
 
     @app.callback(

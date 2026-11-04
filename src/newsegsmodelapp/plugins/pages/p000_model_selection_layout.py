@@ -63,7 +63,7 @@ model_selection_layout = dbc.Container([
                             style = {'display':'block'}),
                         html.H3('Localised Model')
                     ],
-                    id = {'type': 'btn-model-type-selector', 'label': 'sprake-loc'},
+                    id = {'type': 'btn-model-type-selector', 'label': 'sprakeloc'},
                     class_name = 'text-center'
                 ), 
                 width = 6,
@@ -122,8 +122,8 @@ def assign_callbacks(app: NewsegsDash):
         match pid['label']:
             case 'sprake':
                 model_type = 'sprake'
-            case 'sprake-loc':
-                model_type = 'sprake-loc'
+            case 'sprakeloc':
+                model_type = 'sprakeloc'
             case _:
                 raise ValueError(f'Unknown prop has called update_model_type: {pid}')
 

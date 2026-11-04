@@ -49,6 +49,36 @@ def calibrate_hlp(target_specific_heat_loss: float = 52.0, #kWh/m²/yr
     dh = 24.0 * np.sum(calibration_degree_days)
     return target_specific_heat_loss / (dh / 1000.0)
 
+HDD_BASE_TEMPERATURE = 15.5
+"""Base temperature (degrees C) of the heating degree days."""
+
+def heating_degree_days_from_temperature(
+    datetimes: pd.DatetimeIndex,
+    temperatures: npt.ArrayLike,
+) -> pd.DataFrame:
+    """Heating degree days (to 15.5 degrees C) of each day, from a series of air temperatures.
+
+    The degree days of a day are the amount by which its mean temperature is below the base
+    temperature, or zero. Each temperature is taken as the mean over the timestep ending at its
+    datetime, as for the consumption of `get_spaceheat_energy_consumption`, so a temperature at
+    midnight belongs to the day before.
+
+    Args:
+        datetimes: Datetimes at the end of the timestep of each temperature.
+        temperatures: Air temperatures (degrees C).
+
+    Returns:
+        Dataframe of the `timestamp` (midnight) of each day and its degree days, `hdd_15_5`,
+        in the format of `TIMESERIES_DEGREE_DAYS`.
+    """
+    srs = pd.Series(np.asarray(temperatures, dtype=np.float64), index = pd.DatetimeIndex(datetimes))
+    days = (srs.index - pd.Timedelta(1, 'm')).floor('D')
+    daily_mean = srs.groupby(days).mean()
+    return pd.DataFrame({
+        'timestamp': daily_mean.index,
+        'hdd_15_5': np.clip(HDD_BASE_TEMPERATURE - daily_mean.to_numpy(), a_min = 0., a_max = None),
+    })
+
 def profiles_for_time_spans(time_spans, profile_data):
     """Fraction of the daily space heating demand in each of the time spans, from the profile.
 
