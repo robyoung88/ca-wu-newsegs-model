@@ -1,5 +1,5 @@
 """
-Unit tests of the migration of the optimisation bounds from the project's components to its variables (9eeaede183f3)
+Unit tests of the migration that moves optimisation settings onto variables and a metamodel component (9eeaede183f3)
 """
 import datetime
 import json
@@ -108,20 +108,16 @@ class TestOptimConfigMigration(unittest.TestCase):
         with self.engine.connect() as conn:
             return [json.loads(x) for x in conn.execute(sa.text(f'SELECT payload FROM {table_name}')).scalars()]
 
-    def test_upgrade_moves_bounds(self):
+    def test_upgrade_discards_old_settings(self):
         command.upgrade(self.alembic_cfg, _REVISION)
 
+        # Every variable starts with unset bounds, which fall back to the input limits
+        unset = (None, None, 10)
         self.assertEqual(self._variables('variable_configs'), {
-            # Every variable of the project with the varid is given its bounds
-            'v-wind-a': ('5', '500', 15),
-            'v-wind-b': ('5', '500', 15),
-            # A bound that was not saved is unset, falling back to the input limits
-            'v-solar': (None, '50', 10),
-            'v-other': (None, None, 10),
+            x: unset for x in ('v-wind-a', 'v-wind-b', 'v-solar', 'v-other')
         })
         self.assertEqual(self._variables('snapshot_variable_configs'), {
-            'v-wind-a': ('5', '500', 15),
-            'v-other': (None, None, 10),
+            x: unset for x in ('v-wind-a', 'v-other')
         })
         for table_name in ('component_configs', 'snapshot_component_configs'):
             for payload in self._payloads(table_name):

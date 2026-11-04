@@ -1,17 +1,18 @@
 """Move optimisation settings onto variables and a metamodel component
 
-The bounds and marginal plot resolution of optimisation were held in a dictionary,
-`optim_config['bounds'][varid]`, in the payload of the project's table config, where the
-interface saved them; no optimisation settings are held by the dsa config. They are now
-held by each variable, in the `optim_min`, `optim_max` and `optim_plot_intervals` columns,
-which override the variable payload when a variable is loaded.
+The bounds and marginal plot resolution of optimisation are now held by each variable, in the
+`optim_min`, `optim_max` and `optim_plot_intervals` columns, which override the variable payload
+when a variable is loaded. The method and statistic are held by an `OptimComponent` of each
+metamodel, referenced by `optim_config_id`.
+
+This is a breaking change: settings saved before it are discarded. Every variable starts with
+unset bounds, which fall back to the limits of its input field, and the `optim_config` dictionary
+that the interface saved in the project's table config is removed. `optim_config_id` is left null:
+a metamodel without one is given the default component when it is loaded, which is stored with
+its next upsert.
 
 Variables record their `component_version`; it is left null for existing rows, which were
 saved before versions were recorded (0.0.1).
-
-The method and statistic of optimisation are now held by an `OptimComponent` of each
-metamodel, referenced by `optim_config_id`. That is left null here: a metamodel without one is
-given the default component when it is loaded, which is stored with its next upsert.
 
 Revision ID: 9eeaede183f3
 Revises: c7e2a9d41f05
@@ -33,98 +34,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 DEFAULT_PLOT_INTERVALS = 10
 
-_projects = sa.table(
-    'projects',
-    sa.column('id'), sa.column('table_config_id'),
-)
-_snapshot_projects = sa.table(
-    'snapshot_projects',
-    sa.column('snapshot_id'), sa.column('id'), sa.column('table_config_id'),
-)
-_component_configs = sa.table(
-    'component_configs',
-    sa.column('id'), sa.column('payload'),
-)
-_snapshot_component_configs = sa.table(
-    'snapshot_component_configs',
-    sa.column('snapshot_id'), sa.column('id'), sa.column('payload'),
-)
-_project_variables = sa.table(
-    'project_variables',
-    sa.column('project_id'), sa.column('variable_config_id'),
-)
-_snapshot_project_variables = sa.table(
-    'snapshot_project_variables',
-    sa.column('snapshot_id'), sa.column('project_id'), sa.column('variable_config_id'),
-)
-_variable_configs = sa.table(
-    'variable_configs',
-    sa.column('id'), sa.column('varid'),
-    sa.column('optim_min'), sa.column('optim_max'), sa.column('optim_plot_intervals'),
-)
-_snapshot_variable_configs = sa.table(
-    'snapshot_variable_configs',
-    sa.column('snapshot_id'), sa.column('id'), sa.column('varid'),
-    sa.column('optim_min'), sa.column('optim_max'), sa.column('optim_plot_intervals'),
-)
 
-
-def _pop_bounds(conn, components, component_id, snapshot_id = None) -> dict[str, dict]:
-    """Remove `optim_config` from the payload of a component, returning the bounds by varid."""
-    if component_id is None:
-        return {}
-    where = components.c.id == component_id
-    if snapshot_id is not None:
-        where = sa.and_(where, components.c.snapshot_id == snapshot_id)
-    payload = conn.execute(sa.select(components.c.payload).where(where)).scalar()
-    if not payload:
-        return {}
-    payload_dict = json.loads(payload)
-    if 'optim_config' not in payload_dict:
-        return {}
-    optim_config = payload_dict.pop('optim_config') or {}
-    conn.execute(components.update().where(where).values(payload = json.dumps(payload_dict)))
-    return {varid: var_bounds or {} for varid, var_bounds in (optim_config.get('bounds') or {}).items()}
-
-
-def _bound_values(var_bounds: dict) -> dict:
-    """Column values for the saved bounds of a variable."""
-    values = {}
-    for key, column in (('lower', 'optim_min'), ('upper', 'optim_max')):
-        if var_bounds.get(key) is not None:
-            values[column] = json.dumps(var_bounds[key])
-    intervals = var_bounds.get('intervals')
-    if intervals is not None:
-        try:
-            values['optim_plot_intervals'] = int(intervals)
-        except (TypeError, ValueError):
-            pass
-    return values
-
-
-def _move_bounds(conn, projects, components, project_variables, variables, snapshot = False):
-    """Write the bounds saved for each project to the variables of the project, and remove them from its table config."""
-    project_columns = [projects.c.id, projects.c.table_config_id]
-    if snapshot:
-        project_columns.append(projects.c.snapshot_id)
-    for row in conn.execute(sa.select(*project_columns)).fetchall():
-        snapshot_id = row.snapshot_id if snapshot else None
-        bounds = _pop_bounds(conn, components, row.table_config_id, snapshot_id)
-        for varid, var_bounds in bounds.items():
-            values = _bound_values(var_bounds)
-            if not values:
-                continue
-            # Bounds were held for the project, so apply to every variable of the project with the varid
-            var_ids = sa.select(project_variables.c.variable_config_id).where(project_variables.c.project_id == row.id)
-            where = sa.and_(variables.c.varid == varid, variables.c.id.in_(var_ids))
-            if snapshot:
-                var_ids = var_ids.where(project_variables.c.snapshot_id == snapshot_id)
-                where = sa.and_(
-                    variables.c.varid == varid,
-                    variables.c.snapshot_id == snapshot_id,
-                    variables.c.id.in_(var_ids),
-                )
-            conn.execute(variables.update().where(where).values(**values))
+def _remove_optim_config(conn, table_name: str):
+    """Remove the old `optim_config` dictionary from the payloads of the components that hold it."""
+    components = sa.table(table_name, sa.column('payload'))
+    for payload in conn.execute(
+        sa.select(components.c.payload).where(components.c.payload.like('%"optim_config"%'))
+    ).scalars().all():
+        payload_dict = json.loads(payload)
+        if payload_dict.pop('optim_config', None) is not None:
+            conn.execute(
+                components.update().where(components.c.payload == payload).values(payload = json.dumps(payload_dict))
+            )
 
 
 def upgrade() -> None:
@@ -146,25 +67,20 @@ def upgrade() -> None:
         )
 
     conn = op.get_bind()
-    for variables in (_variable_configs, _snapshot_variable_configs):
-        conn.execute(variables.update().values(optim_plot_intervals = DEFAULT_PLOT_INTERVALS))
-        # The lower bound was written from a class default of 0 that nothing used; unset, it uses the
-        # minimum of the input field. Bounds that were saved are written below.
-        conn.execute(variables.update().where(variables.c.optim_min == '0').values(optim_min = None))
-
-    _move_bounds(conn, _projects, _component_configs, _project_variables, _variable_configs)
-    _move_bounds(
-        conn, _snapshot_projects, _snapshot_component_configs, _snapshot_project_variables,
-        _snapshot_variable_configs, snapshot = True,
-    )
+    for table_name in ('variable_configs', 'snapshot_variable_configs'):
+        variables = sa.table(table_name, sa.column('optim_min'), sa.column('optim_max'), sa.column('optim_plot_intervals'))
+        # The old columns were written from class defaults that nothing used
+        conn.execute(variables.update().values(
+            optim_min = None, optim_max = None, optim_plot_intervals = DEFAULT_PLOT_INTERVALS,
+        ))
+    for table_name in ('component_configs', 'snapshot_component_configs'):
+        _remove_optim_config(conn, table_name)
 
 
 def downgrade() -> None:
     """Downgrade schema.
 
-    The bounds are left on the variables: they are not written back to the `optim_config`
-    dictionary of the project, which is no longer read, so a downgraded app falls back to its
-    default bounds.
+    The settings are not restored: a downgraded app falls back to its default bounds.
     """
     with op.batch_alter_table('snapshot_metamodels') as batch_op:
         batch_op.drop_constraint('fk_snapshot_metamodels_optim_config_id', type_='foreignkey')
