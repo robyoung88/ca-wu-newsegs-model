@@ -22,6 +22,9 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 _trans_togb = Transformer.from_crs("EPSG:4326", "EPSG:27700")
 
+SITE_NAME_HINT = 'Site name'
+"""The hint in the name box of a site with no name."""
+
 def _site_metamodel_id(site_location: str | None) -> str | None:
     """Id of the configuration a 'site-location' store value belongs to, if recorded"""
     try:
@@ -69,9 +72,9 @@ def create_latlon_input():
     return [
         html.Span(get_icon('latlon'), style={'fontSize':'1.5rem'}),
         html.Span("(", style={'marginRight': '0.2rem'}),
-        dcc.Input(id="site-lat-input", type="text", debounce=True, placeholder="Lat", style={'width': "7rem", 'margin-right': '0.2rem'}),
+        dcc.Input(id="site-lat-input", type="text", debounce=True, placeholder="Latitude", style={'width': "7rem", 'margin-right': '0.2rem'}),
         html.Span(", "),
-        dcc.Input(id="site-lon-input", type="text", debounce=True, placeholder="Lon", style={'width': "7rem", 'margin-left': '0.2rem'}),
+        dcc.Input(id="site-lon-input", type="text", debounce=True, placeholder="Longitude", style={'width': "7rem", 'margin-left': '0.2rem'}),
         html.Span(")", style={'marginLeft': '0.2rem'})
     ]
 
@@ -116,14 +119,14 @@ def create_site_selector_map(
                 dbc.Col(
                     html.H1(
                         dcc.Input(
-                            placeholder = 'Site Name',
+                            placeholder = SITE_NAME_HINT,
                             debounce = True,
                             type = 'text',
                             id = 'site-name-input',
                             style = {
                                 'border': 'none',
                                 'outline': 'none',
-                                'width': '25',
+                                'width': '100%',
                                 'height': 'auto',
                                 'lineHeight': '1.5',
                                 'padding': '5px 0',
@@ -444,7 +447,7 @@ def add_site_change_callback(app) -> Dash:
             dl.Marker(
                 id='site-marker',
                 position=pos,
-                children=[dl.Tooltip("Site Location")]
+                children=[dl.Tooltip("Site location")]
             )
         ]
 
@@ -468,7 +471,7 @@ def add_site_change_callback(app) -> Dash:
                                     position=[lat, lon],
                                     opacity=0.4,
                                     children=[
-                                        dl.Tooltip(loc.name)
+                                        dl.Tooltip(loc.display_name)
                                     ]
                                 )
                             )

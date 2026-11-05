@@ -1,0 +1,68 @@
+/* ==========================================================================
+   Inputs
+   The containers and cards of inputs (components/input_components.py), and how the configurations share an input.
+   ========================================================================== */
+
+.input-container {
+    content-visibility: auto;
+    /* content-visibility clips painting to the container; let the focus glow of an input at its edge (Bootstrap's
+       0.25rem ring) extend beyond it */
+    overflow-clip-margin: 0.5rem;
+}
+
+input.dynamic-step-field {
+    float: right;
+    width: 100px !important;
+}
+
+input.numeric-input {
+    width: 100px !important;
+    flex: 0 0 100px !important;
+}
+
+div.numeric-card-input details {
+    display: inline-flex;
+}
+
+div.numeric-card-input details summary {
+    color: var(--ns-brand-soft);
+}
+
+/* How the configurations share an input: a link icon, or each group's configurations and value */
+div.variable-sharing-summary {
+    font-size: 0.8rem;
+    color: var(--ns-muted);
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+div.variable-sharing-summary .variable-sharing-group.focussed {
+    color: var(--ns-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+
+/* The number of inputs of a card whose configurations differ */
+span.input-card-label:not(:empty) {
+    margin-left: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    vertical-align: middle;
+    color: var(--ns-brand);
+    background-color: var(--ns-brand-subtle);
+}
+
+/* Setting the default flashes the button, then fades back */
+button.btn.set-default {
+    transition: background-color 3.0s ease, color 3.0s ease;
+}
+
+button.btn.set-default:active {
+    background-color: var(--ns-brand-mid) !important;
+    color: var(--ns-surface) !important;
+    border-color: var(--ns-brand-mid) !important;
+    transition: none;
+}

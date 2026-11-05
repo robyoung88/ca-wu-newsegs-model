@@ -7,6 +7,7 @@ from dash_iconify import DashIconify
 import plotly.express as px
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
+from newsegsmodelapp.components import colours
 
 def create_indicative_net_energy_card():
     """
@@ -36,7 +37,7 @@ def create_indicative_net_energy_card():
                             config={'displayModeBar': False},
                             style={
                                 'height': '120px',
-                                'border': '1px solid #dee2e6',
+                                'border': '1px solid var(--bs-border-color)',
                                 'borderRadius': '0.5rem',
                                 'backgroundColor': 'transparent'
                             }
@@ -48,7 +49,7 @@ def create_indicative_net_energy_card():
                             config={'displayModeBar': False},
                             style={
                                 'height': '120px',
-                                'border': '1px solid #dee2e6',
+                                'border': '1px solid var(--bs-border-color)',
                                 'borderRadius': '0.5rem',
                                 'backgroundColor': 'transparent'
                             }
@@ -67,6 +68,7 @@ _feedback_graph_bar = partial(
     px.bar,
     x = 'value',
     color = 'label',
+    template = colours.PLOT_TEMPLATES,
     orientation = 'h'
 )
 
@@ -77,9 +79,10 @@ _feedback_graph_layout = dict(
         'x': 0.5,
         'xanchor': 'center',
         'yanchor': 'top',
-        'font': {'size': 12, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
+        'font': {'size': 12, 'family': 'Arial', 'color': colours.TEXT, 'weight': 'bold'}
     },
     showlegend=False,
+    template=colours.PLOT_TEMPLATES,
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)',
     bargap=0.75

@@ -34,7 +34,7 @@ def request_deterministic_single_mm_run(project_id: str, project_provider: Newse
     mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return DeterministicRunMetamodelRunRequest(
         project_id = project_id,
-        request_label = 'Deterministic run for single metamodel - ' + str(datetime.datetime.now()),
+        request_label = 'Deterministic run for one configuration - ' + str(datetime.datetime.now()),
         payload = json.dumps({
             'metamodel_id': mm_id
         })

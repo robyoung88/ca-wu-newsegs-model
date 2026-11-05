@@ -235,7 +235,7 @@ def create_dsa_project_results():
                         },
                         style = {
                             'minHeight': '590px',
-                            'border': '1px solid #dee2e6',
+                            'border': '1px solid var(--bs-border-color)',
                             'borderRadius': '0.5rem',
                             'backgroundColor': 'transparent'
                         }
@@ -322,7 +322,7 @@ def create_optim_configuration_editor(**kwargs):
                                 },
                                 style= {
                                     'height': '590px',
-                                    'border': '1px solid #dee2e6',
+                                    'border': '1px solid var(--bs-border-color)',
                                     'borderRadius': '0.5rem',
                                     'backgroundColor': 'transparent'
                                 }
@@ -486,7 +486,7 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
                                     },
                                     style= {
                                         'height': '590px',
-                                        'border': '1px solid #dee2e6',
+                                        'border': '1px solid var(--bs-border-color)',
                                         'borderRadius': '0.5rem',
                                         'backgroundColor': 'transparent'
                                     }

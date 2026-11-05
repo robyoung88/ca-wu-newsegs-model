@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 from newsegsmodelframework.core.timespan import SEASON_NAMES
 from newsegsmodelframework.newsegssensitivity import common as sensitivity
 
+from newsegsmodelapp.components import colours
+
 DEFAULT_SEASON_MAPPER = {k: v for k,v in enumerate(SEASON_NAMES)}
 
 DEFAULT_STATISTIC_MAPPER = {
@@ -1105,7 +1107,7 @@ DSA_ALL_STATISTIC_LABELS = {**sensitivity.DSA_STATISTIC_LABELS, **sensitivity.DS
 DSA_BOUND_COLUMNS = ['central', 'lower', 'upper', 'interval']
 """Columns of the absolute values of a DSA table, in the order that they are shown."""
 
-COMPARATOR_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948']
+COMPARATOR_COLORS = colours.CONFIG_COLOURS
 """Colors of the comparators (configurations) of a plot, in fixed order: a comparator keeps its color whatever is selected."""
 
 def filter_dsa_variables(dsa_df: pd.DataFrame, variables: Iterable[str] | None = None) -> pd.DataFrame:
@@ -1190,7 +1192,7 @@ def dsa_comparison_table(
 def _empty_dsa_figure(message: str = 'No DSA results to show'):
     fig = go.Figure()
     fig.add_annotation(text = message, showarrow = False, xref = 'paper', yref = 'paper', x = 0.5, y = 0.5)
-    fig.update_layout(template = 'plotly_white', xaxis_visible = False, yaxis_visible = False)
+    fig.update_layout(template = colours.PLOT_TEMPLATES, xaxis_visible = False, yaxis_visible = False)
     return fig
 
 def _dsa_plot_data(dsa_df, statistic, variables = None):
@@ -1237,8 +1239,8 @@ def tornado_plot(
         .loc[plot_data.index, :]
     )
 
-    color_low = '#e1ceff'
-    color_high = '#ff6262'
+    color_low = colours.SERIES_COLOURS[2]
+    color_high = colours.SERIES_COLOURS[0]
     labels = plot_data.index.tolist()
     central_values = plot_data[('absolute', 'central')].to_numpy()
     lower_values = plot_data[('absolute', 'lower')].to_numpy()
@@ -1305,7 +1307,7 @@ def tornado_plot(
 
     fig.add_vline(
         x=central_values[0],
-        line_color='black',
+        line_color=colours.PLOT_EMPHASIS,
         line_width=1,
         annotation_text='Deterministic',
         annotation_position='bottom left'
@@ -1316,7 +1318,7 @@ def tornado_plot(
         xaxis_title = DSA_ALL_STATISTIC_LABELS.get(statistic, statistic),
         yaxis_title='Variable',
         barmode='overlay',
-        template='plotly_white',
+        template=colours.PLOT_TEMPLATES,
         height=800,
         margin=dict(l=20, r=20, t=60, b=20)
     )
@@ -1416,7 +1418,7 @@ def multi_tornado_plot(
         xaxis_title = DSA_ALL_STATISTIC_LABELS.get(statistic, statistic),
         yaxis_title = 'Variable',
         barmode = 'group',
-        template = 'plotly_white',
+        template = colours.PLOT_TEMPLATES,
         height = max(400, 120 + 40 * len(order) * max(1, len(frames)) // 2),
         margin = dict(l = 20, r = 20, t = 60, b = 20),
         legend = dict(orientation = 'h', yanchor = 'bottom', y = 1.0, xanchor = 'left', x = 0),
@@ -1462,8 +1464,8 @@ PSA_PROJECT_PLOTS = {
 }
 """The plots of each comparator view of a whole-project PSA, by key."""
 
-_PSA_FRONTIER_COLOR = '#3d3d3d'
-_PSA_REFERENCE_LINE_COLOR = '#8c8c8c'
+_PSA_FRONTIER_COLOR = colours.PLOT_EMPHASIS
+_PSA_REFERENCE_LINE_COLOR = colours.PLOT_NEUTRAL
 
 def _comparator_color(color_indexes: Mapping[str, int], comparator: str, default: int = 0) -> str:
     return COMPARATOR_COLORS[color_indexes.get(comparator, default) % len(COMPARATOR_COLORS)]
@@ -1476,7 +1478,7 @@ def _psa_layout(fig, title: str, xaxis_title: str, yaxis_title: str, **kwargs):
         title = title,
         xaxis_title = xaxis_title,
         yaxis_title = yaxis_title,
-        template = 'plotly_white',
+        template = colours.PLOT_TEMPLATES,
         height = 560,
         margin = dict(l = 20, r = 20, t = 80, b = 20),
         legend = dict(orientation = 'h', yanchor = 'bottom', y = 1.0, xanchor = 'left', x = 0),

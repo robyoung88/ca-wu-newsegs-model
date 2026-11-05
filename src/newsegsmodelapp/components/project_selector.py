@@ -18,6 +18,7 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
+from newsegsmodelframework.util import naming
 
 # -----------------------------------------------
 # Helper functions
@@ -182,7 +183,7 @@ def duplicate_project(
     rename_project(
         project_provider,
         new_proj.id,
-        new_proj.name + ' - Copy'
+        naming.copy_name(new_proj.name, project_provider.list_projects()['label'])
     )
     return new_proj.id
 
@@ -340,7 +341,7 @@ def create_project_selector():
                 [
                     dbc.Input(
                         id="input-project-name",
-                        placeholder="Project Name",
+                        placeholder="Project name",
                         type="text",
                         size="sm",
                     ),
@@ -366,7 +367,7 @@ def create_project_selector():
                 [
                     dbc.Input(
                         id="input-snapshot-name",
-                        placeholder="Snapshot Name",
+                        placeholder="Snapshot name, e.g. Before tariff change",
                         type="text",
                         size="sm",
                     ),
@@ -390,7 +391,7 @@ def create_project_selector():
                 [
                     dbc.Select(
                         id="select-load-project",
-                        placeholder="Select existing project...",
+                        placeholder="Select a project",
                         size="sm",
                     ),
                     dbc.Button(
@@ -411,7 +412,7 @@ def create_project_selector():
                 [
                     dbc.Select(
                         id="select-load-snapshot",
-                        placeholder="Select snapshot...",
+                        placeholder="Select a snapshot",
                         size="sm",
                     ),
                     dbc.Button(

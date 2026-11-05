@@ -20,7 +20,7 @@ from newsegsmodelapp.components import icons
 from newsegsmodelframework.core.constructors.constructors import find_constructor
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
-from newsegsmodelframework.util import jsonfuncs
+from newsegsmodelframework.util import jsonfuncs, naming
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 # -----------------------------------------------
@@ -91,7 +91,11 @@ def create_header_metamodel_input_container(supersection: str) -> html.Div:
         className = 'configuration-selector-hdrcontainer'
     )
 
-_PLACEHOLDER_NAMES = set('Configuration Name')
+CONFIGURATION_NAME_HINT = 'Configuration name, e.g. Heat pumps and PV'
+"""The hint in the name box of a configuration with no name."""
+
+CONFIGURATION_NAME_FOCUS_ID = 'configuration-name-focus'
+"""Store of the index of the configuration whose name box takes the focus, after a duplicate, or `None`."""
 
 def create_single_configuration_selector_row(
     config_index: int = 0,
@@ -125,36 +129,22 @@ def create_single_configuration_selector_row(
         icon_class = icons.ICON_COLOUR_CLASSES[config_index % len(icons.ICON_COLOUR_CLASSES)]
     ),]
     
-    if metamodel is None:
-        config_name = 'Configuration Name'
-    else:
-        config_name = metamodel.name
+    config_name = metamodel.name if metamodel is not None else ''
 
     is_focussed = True if is_focussed is None else is_focussed
     
-    if config_name in _PLACEHOLDER_NAMES:
-        # Assume this is a placeholder and do not populated the Input Value
-        contents.append(
-            dcc.Input(
-                placeholder = config_name,
-                debounce = True,
-                type = 'text',
-                id = {'type': 'config-name-input', 'index': config_index},
-                size = str(reference_size),
-                className = ' configuration-selector-row-name-input'
-            )
+    # An unnamed configuration shows the hint, at a size to fit it
+    contents.append(
+        dcc.Input(
+            value = config_name,
+            placeholder = CONFIGURATION_NAME_HINT,
+            debounce = True,
+            type = 'text',
+            id = {'type': 'config-name-input', 'index': config_index},
+            size = str(reference_size * 1.3 if config_name else len(CONFIGURATION_NAME_HINT)),
+            className = 'configuration-selector-row-name-input'
         )
-    else:
-        contents.append(
-            dcc.Input(
-                value = config_name,
-                debounce = True,
-                type = 'text',
-                id = {'type': 'config-name-input', 'index': config_index},
-                size = str(reference_size * 1.3),
-                className = 'configuration-selector-row-name-input'
-            )
-        )
+    )
 
     button_container_children = []
     
@@ -268,6 +258,7 @@ def create_configuration_selector():
             id = {'type': 'metamodel-input-container', 'supersection': 'configurations', 'section': 'configuration-selector'}
         ),
         dcc.Download(id='download-config-json'),
+        dcc.Store(id = CONFIGURATION_NAME_FOCUS_ID, data = None, storage_type = 'memory'),
     ])
 
 # -----------------------------------------------
@@ -374,6 +365,9 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         mm = lproj.metamodels[mm_index]
         if not mm or mm.name == new_name:
             raise PreventUpdate
+        if not (new_name or '').strip():
+            # A configuration keeps its name: redraw the selector to show it again
+            return active_project_id
 
         old_name = mm.name
 
@@ -396,6 +390,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
     # Duplicate
     @app.callback(
         Output('active-project-id', 'data', allow_duplicate = True),
+        Output(CONFIGURATION_NAME_FOCUS_ID, 'data', allow_duplicate = True),
 
         Input({'type': 'config-dup-btn', 'index': ALL}, 'n_clicks'),
 
@@ -419,7 +414,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             NewsegsMetaModel,
             app.project_provider.metamodel_provider.duplicate_component(ref_mm.id) # pyright: ignore[reportAttributeAccessIssue]
         )
-        new_mm.name = new_mm.name + ' - Copy'
+        new_mm.name = naming.copy_name(ref_mm.name, (x.name for x in proj.metamodels))
 
         # Ensure that the variables can be obtained from the project,
         # though they will be identical to the sourced metamodel
@@ -441,8 +436,57 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             new_mm.id, 'label', new_mm.name
         )
 
-        # Trigger interface update
-        return active_project_id
+        # Trigger interface update, and put the cursor in the copy's name box, so that the user names it
+        return active_project_id, len(proj.metamodels) - 1
+
+    # Focus the name box of a copy, with its name selected, as soon as the selector shows it. Waits for the box
+    # itself, not for the selector's callback, which Dash may run seconds after the box appears. Redraws soon after
+    # can replace the box, so it is focussed again for a few seconds, unless the user has moved on.
+    app.clientside_callback(
+        """
+        function(index) {
+            if (index === null || index === undefined) {
+                return window.dash_clientside.no_update;
+            }
+            const id = JSON.stringify({index: index, type: 'config-name-input'});
+            const started = Date.now();
+            let focussed = null;
+            let focussedAt = null;
+            const observer = new MutationObserver(() => attempt());
+            const stop = () => observer.disconnect();
+            function attempt() {
+                const input = document.getElementById(id);
+                const now = Date.now();
+                if (focussed === null && now - started > 20000) {
+                    return stop();
+                }
+                if (focussedAt !== null && now - focussedAt > 3000) {
+                    return stop();
+                }
+                if (!input || input === document.activeElement) {
+                    return;
+                }
+                const active = document.activeElement;
+                if (focussed !== null && active && active !== document.body) {
+                    return stop(); // The user is elsewhere
+                }
+                input.focus();
+                input.select();
+                focussed = input;
+                if (focussedAt === null) {
+                    focussedAt = now;
+                }
+            }
+            observer.observe(document.body, {childList: true, subtree: true});
+            attempt();
+            setTimeout(stop, 25000);
+            return window.dash_clientside.no_update;
+        }
+        """,
+        Output(CONFIGURATION_NAME_FOCUS_ID, 'data', allow_duplicate = True),
+        Input(CONFIGURATION_NAME_FOCUS_ID, 'data'),
+        prevent_initial_call = True,
+    )
 
     # Remove
     @app.callback(
@@ -551,7 +595,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         odict = metamodel_to_config_file(mm)
 
-        fn = odict.get('config_name','metamodel_configuration') + ".json"
+        fn = (odict.get('config_name') or 'configuration') + ".json"
         fn = pathvalidate.sanitize_filename(fn)
 
         logger.info(
@@ -604,6 +648,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         mm_new.anonymise_ids()
 
         proj = app.project_provider.get_project(active_project_id)
+        mm_new.name = naming.unique_name(mm_new.name, (x.name for x in proj.metamodels))
         proj.metamodels.append(mm_new) # pyright: ignore[reportAttributeAccessIssue]
         proj.set_focussed_metamodel(mm_new.id)
         # Project revision increment should occur on the metamodels.append
@@ -773,7 +818,7 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
                 mm = configurations[config_index]
 
                 if mm is None:
-                    rval['toast']['children'] = ['Could not retrieve metamodel'] * n_toast
+                    rval['toast']['children'] = ['Could not retrieve the configuration'] * n_toast
                     rval['toast']['is_opens'] = [True] * n_toast
                     return rval
 
