@@ -13,6 +13,12 @@ from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaM
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
+DETERMINISTIC_STEPS = 4
+"""Number of tasks of `deterministic_run_metamodel`: setting the variables, running the model,
+running the finance, and saving the results. Progress is a count of tasks completed: from
+`start_step`, it reports `start_step` to `start_step + 3` as each task starts, and the next
+metamodel of a run starts at `start_step + DETERMINISTIC_STEPS`, when the last is complete."""
+
 def deterministic_run_metamodel(
     mm: NewsegsMetaModel,
     proj: NewsegsProject,
@@ -23,13 +29,16 @@ def deterministic_run_metamodel(
     progress_callback: Callable[[float, float, str], None],
     check_cancel_status: Callable[[], bool],
     start_step: int = 0,
-    total_steps: int = 3,
+    total_steps: int = DETERMINISTIC_STEPS,
     sequence_number: int = 1,
     run_started_ns: Optional[int] = None,
 ):
     """
     run_started_ns is when the calling procedure read its inputs, recorded
     as the start of the deterministic run; defaults to now.
+
+    Progress is reported as each of the `DETERMINISTIC_STEPS` tasks starts, from `start_step` out of
+    `total_steps`; the model run reports its own progress within its task.
     """
     run_started_ns = run_started_ns or time.time_ns()
     step = start_step

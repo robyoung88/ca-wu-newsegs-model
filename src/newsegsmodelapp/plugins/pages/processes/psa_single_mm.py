@@ -11,6 +11,7 @@ from typing import Callable
 
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
+from newsegsmodelapp.plugins.pages.processes.progress_messages import runs_progress_message
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
@@ -84,22 +85,14 @@ def execute_psa_single_mm_run(
         if check_cancel_status():
             raise InterruptedError(f'PSA process {run_id} has been cancelled.')
 
-        t1 = time.time_ns()
-        tot_secs = (t1 - t0) * 1e-9
-        if step > 0:
-            per_iter = tot_secs / step
-            msg = f'PSA: Run {step} of {total}, {per_iter:.1f} sec/run. Elapsed time: {tot_secs:.0f} seconds.'
-        else:
-            msg = f'PSA: Run {step} of {total}. Elapsed time: {tot_secs:.0f} seconds.'
-
-        progress_callback(step, total, msg)
+        tot_secs = (time.time_ns() - t0) * 1e-9
+        progress_callback(step, total, runs_progress_message('PSA', step, total, tot_secs))
 
     seed = proj.psa_config.seed
     seed = int(seed) if seed is not None and seed != '' else seed
 
     def deterministic_progress_callback(step, total, message):
-        msg = 'PSA: Reference run'
-        progress_callback(0, 1, msg)
+        progress_callback(step, total, 'PSA: Reference run - ' + message)
 
     # By running the deterministic through this process, the module revisions will
     # be correctly modified

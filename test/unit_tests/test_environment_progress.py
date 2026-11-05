@@ -20,9 +20,11 @@ import newsegsmodelframework.register_plugins  # noqa: F401
 import newsegsmodelapp.register_plugins  # noqa: F401
 
 from newsegsmodelapp.plugins.pages.processes import common_deterministic
+from newsegsmodelapp.plugins.pages.processes.progress_messages import runs_progress_message
 from newsegsmodelframework.core import location
 from newsegsmodelframework.core.environment import environment_cache, environment_progress, pvgis_newa_env_servers
 from newsegsmodelframework.core.timespan.timespan import TimeSpan
+from newsegsmodelframework.newsegssensitivity import dsa
 from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
 
 _TIMESPAN = TimeSpan('2010-01-01', '2010-01-02', tz = 'utc')
@@ -263,10 +265,11 @@ class TestModelRunProgress(FakeServicesTestCase):
 
 class TestDeterministicRunProgress(unittest.TestCase):
     """
-    The progress of the model run is merged into the step of the deterministic run.
+    The deterministic run reports progress as a count of its tasks completed, and the progress of
+    the model run within its task.
     """
 
-    def test_model_progress_merged(self):
+    def run_metamodel(self, **kwargs):
         mm = mock.MagicMock()
         def run(run_from, progress_callback):
             progress_callback(0., 'Running the grid module')
@@ -283,13 +286,64 @@ class TestDeterministicRunProgress(unittest.TestCase):
                 mm, mock.Mock(), request, mock.Mock(), result_provider, 2,
                 lambda step, total, message: progress.append((step, total, message)),
                 lambda: False,
-                sequence_number = 2,
+                **kwargs,
             )
-        self.assertEqual(progress, [
-            (0, 3, 'Setting model variables - config 2'),
-            (1, 3, 'Running model - config 2'),
-            (1., 3, 'Running model - config 2: Running the grid module'),
-            (1.5, 3, 'Running model - config 2: Running the generation module - Awaiting environmental data: wind speeds'),
-            (2, 3, 'Running finance - config 2'),
-            (3, 3, 'Saving results - config 2'),
+        return progress
+
+    def test_model_progress_merged(self):
+        self.assertEqual(self.run_metamodel(sequence_number = 2), [
+            (0, 4, 'Setting model variables - config 2'),
+            (1, 4, 'Running model - config 2'),
+            (1., 4, 'Running model - config 2: Running the grid module'),
+            (1.5, 4, 'Running model - config 2: Running the generation module - Awaiting environmental data: wind speeds'),
+            (2, 4, 'Running finance - config 2'),
+            (3, 4, 'Saving results - config 2'),
         ])
+
+    def test_single_configuration_counts_tasks_completed(self):
+        # 0% to 75% as the tasks start; 100% is set by the worker when the run is complete
+        fractions = [step / total for step, total, _ in self.run_metamodel(total_steps = common_deterministic.DETERMINISTIC_STEPS)]
+        self.assertEqual(fractions[0], 0.)
+        self.assertEqual(max(fractions), 0.75)
+        self.assertEqual(sorted(fractions), fractions)
+
+    def test_configurations_follow_each_other(self):
+        # The second of two configurations runs from 50% to 87.5%, after the first's 0% to 37.5%
+        n = common_deterministic.DETERMINISTIC_STEPS
+        first = [step / total for step, total, _ in self.run_metamodel(start_step = 0, total_steps = 2 * n)]
+        second = [step / total for step, total, _ in self.run_metamodel(start_step = n, total_steps = 2 * n)]
+        self.assertEqual((first[0], max(first)), (0., 0.375))
+        self.assertEqual((second[0], max(second)), (0.5, 0.875))
+
+class TestRunsProgressMessage(unittest.TestCase):
+
+    def test_names_the_run_underway(self):
+        self.assertEqual(runs_progress_message('DSA', 0, 9, 0.), 'DSA: Run 1 of 9. Elapsed time: 0 seconds.')
+        self.assertEqual(runs_progress_message('DSA', 2, 9, 3.), 'DSA: Run 3 of 9, 1.5 sec/run. Elapsed time: 3 seconds.')
+
+    def test_complete(self):
+        self.assertEqual(
+            runs_progress_message('PSA (all configurations)', 9, 9, 12.),
+            'PSA (all configurations): 9 of 9 runs complete. Elapsed time: 12 seconds.'
+        )
+
+class TestSingleDSAProgress(unittest.TestCase):
+    """
+    The DSA of one metamodel counts its model runs: the central run, and one at each bound of each
+    selected variable.
+    """
+
+    def test_counts_model_runs(self):
+        variables = []
+        for name, selected in (('a', True), ('b', True), ('c', False)):
+            v = mock.Mock(dsa_possible = True, dsa_selected = selected)
+            v.name = name
+            variables.append(v)
+        mm = mock.MagicMock()
+        mm.variables.values.return_value = variables
+        calls = []
+        with mock.patch.object(dsa, 'make_dsa_result', return_value = {}):
+            dsa.run_dsa(mm, progress = lambda i, n: calls.append((i, n)))
+        self.assertEqual(calls, [(i, 5) for i in range(6)])
+        # One report for each model run, after the first
+        self.assertEqual(mm.model.run.call_count, 5)
