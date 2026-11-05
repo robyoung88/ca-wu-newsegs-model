@@ -473,11 +473,11 @@ def add_action_callbacks(app: NewsegsDash):
         if not haslock:
             raise PreventUpdate
         try:
-            trigger_id = ctx.triggered_id
-            # Do not run if triggered by creation of page elements
-            if trigger_id is None or len(ctx.triggered) > 1:
+            # Either trigger (a request, or the poll) asks for the same check, so it is run once whichever fire
+            triggers = callback_utils.get_triggers()
+            if not triggers:
                 raise PreventUpdate
-            logger.debug('Action manager triggered by %s', trigger_id)
+            logger.debug('Action manager triggered by %s', [x.id for x in triggers])
             logger.debug('Ongoing actions at start of manager are: %s', ongoing_actions)
 
             postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)

@@ -588,16 +588,12 @@ def add_dsa_run_callbacks(app: NewsegsDash):
             modal_close_button,
             dsa_prerun_button,
         ):
-            clicks = callback_utils.get_triggered_value()
-            if not clicks:
-                raise PreventUpdate
-            
-            trig_id = ctx.triggered_id
-            if trig_id is None:
+            clicked = callback_utils.get_clicked_trigger()
+            if clicked is None:
                 raise PreventUpdate
 
             rval = callback_utils.create_noupdate_return()
-            if trig_id == 'btn-dsa-prerun':
+            if clicked.id == 'btn-dsa-prerun':
                 rval['modal']['is_opens'] = True
             else:
                 rval['modal']['is_opens'] = False
@@ -646,12 +642,10 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         options,
         active_project_id,
     ):
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
-        click = callback_utils.get_triggered_value()
-        if not click:
-            raise PreventUpdate
+        trig_id = clicked.id
 
         rval = callback_utils.create_noupdate_return()
 
@@ -969,7 +963,7 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         if reference not in mm_ids:
             rval['reference']['value'] = mm_ids[0] if mm_ids else None
 
-        if ctx.triggered_id == 'btn-dsa-filter-selected':
+        if callback_utils.has_trigger(callback_utils.get_triggers(), 'btn-dsa-filter-selected'):
             # Filter to the variables still selected for DSA in any configuration
             provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
             selected_names = set()
@@ -1016,11 +1010,11 @@ def add_optim_run_callbacks(app: NewsegsDash):
         optim_prerun_button,
     ):
         
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
-        
-        if trig_id == 'btn-optim-prerun':
+
+        if clicked.id == 'btn-optim-prerun':
             return dict(modal = dict(is_open = True))
         else:
             return dict(modal = dict(is_open = False))

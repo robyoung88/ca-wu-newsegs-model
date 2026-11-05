@@ -13,6 +13,24 @@ Reusable Dash components, layouts and callbacks used by the pages.
 | `staleness`, `feedback` | Showing whether results are out of date, indicative energy balances, and the environmental conditions of a site |
 | `requesthandler` | Interface for creating and monitoring requests |
 
+## Callbacks with several inputs
+
+Several inputs of a callback can fire in the same call, such as a post-action trigger and the refill interval after a
+run, or the active project and the app state on a change of page. Dash lists them all in `ctx.triggered`, but
+`ctx.triggered_id` and `callback_utils.get_triggered_value()` give only the first, which may differ in kind (a string
+id or a pattern-matching one), in shape, or in what it asks for. A callback with several inputs therefore considers
+every trigger, with the helpers of `callback_utils`:
+
+* `get_triggers()` gives each trigger with its id parsed (`Trigger.id` is a string or a dictionary), and none on the
+  initial call;
+* `get_clicked_trigger()` gives the one button clicked, for a callback with several buttons as inputs: buttons fire
+  together, with no clicks, when they are drawn;
+* `ids_to_update()` gives the containers to redraw for the triggers: all of them for a string id, otherwise those
+  matching a trigger.
+
+Where a callback's decision is more than that, it is a function of its triggers beside the callback (e.g.
+`input_headers_to_update`, `timeseries_triggers`), so it can be tested with the triggers which fire together.
+
 ## Names
 
 Users name projects, configurations and sites; the app encourages them to:

@@ -24,6 +24,9 @@ from newsegsmodelapp.registers import get_result_container_content_creator, get_
 _UPDATE_ALL_TRIGGER_TYPES = {'annual-horizon-toggle'}
 """Types of the triggers which change every result, so that all are redrawn."""
 
+REFILL_INTERVAL_ID = 'delayed-result-container-refill-interval'
+"""The interval which refills the result tables after a change of project: reset to 0, then ticks to 1."""
+
 def ids_to_update(
     triggered: list[dict],
     target_ids: list[dict],
@@ -33,10 +36,8 @@ def ids_to_update(
     """The ids of the result containers or headers to redraw for the triggers of a callback.
 
     Every trigger is considered, as several may fire together, such as a post-action trigger and the
-    refill interval after a run; `ctx.triggered_id` is only the first. A trigger without a dictionary
-    id (such as the refill interval, or the initial call), or with a type in
-    `_UPDATE_ALL_TRIGGER_TYPES`, or without a section, redraws every target. Otherwise the targets
-    redrawn are those whose section and key match the trigger.
+    refill interval after a run (see `callback_utils.ids_to_update`). The annual/horizon toggle
+    redraws every target.
 
     Args:
         triggered: `ctx.triggered`.
@@ -47,27 +48,56 @@ def ids_to_update(
     Returns:
         The ids to redraw, and the (section, key) of each table whose options were changed.
     """
-    update_all = False
-    option_changed = set()
-    matches = []
-    for trig in triggered:
-        try:
-            trig_id = json.loads(trig['prop_id'].rsplit('.', 1)[0])
-        except ValueError:
-            trig_id = None
-        if not isinstance(trig_id, dict) or trig_id.get('type') in _UPDATE_ALL_TRIGGER_TYPES or 'section' not in trig_id:
-            update_all = True
-            continue
-        if trig_id.get('type') == 'result-table-option':
-            option_changed.add((trig_id['section'], trig_id['key']))
-        match = {k: v for k, v in trig_id.items() if k not in ('subindex', 'supersection')}
-        match.update(type = target_type, purpose = target_purpose)
-        matches.append(match)
-
-    if update_all:
-        return list(target_ids), option_changed
-    ids = [x for x in target_ids if any(callback_utils.intersection_values_match(m, x) for m in matches)]
+    triggers = callback_utils.get_triggers(triggered)
+    option_changed = {
+        (x.id['section'], x.id['key']) for x in triggers # pyright: ignore[reportIndexIssue, reportCallIssue, reportArgumentType]
+        if x.type == 'result-table-option' and 'section' in x.id and 'key' in x.id
+    }
+    ids = callback_utils.ids_to_update(
+        triggers, target_ids, target_type, target_purpose, update_all_types = _UPDATE_ALL_TRIGGER_TYPES
+    )
     return ids, option_changed
+
+def result_table_triggers(triggered: list[dict]) -> list[dict] | None:
+    """The triggers of the result tables callback to act on: all but the refill interval, unless it ticks to 1.
+
+    The interval is reset to 0 on a change of project and ticks to 1 after, so only the tick redraws. Other
+    triggers which fire with the reset (such as post-action triggers) are still acted on.
+
+    Args:
+        triggered: `ctx.triggered`.
+
+    Returns:
+        The entries of `ctx.triggered` to act on (an empty list on the initial call, which redraws every table), or
+        None if there is nothing to act on.
+    """
+    kept = []
+    initial_call = True
+    for entry in triggered:
+        id_, _ = callback_utils.parse_prop_id(entry.get('prop_id', '.'))
+        if id_ is None:
+            continue
+        initial_call = False
+        if id_ == REFILL_INTERVAL_ID and entry.get('value') != 1:
+            continue
+        kept.append(entry)
+    if initial_call:
+        return []
+    return kept or None
+
+def only_project_changed(triggers: list[callback_utils.Trigger]) -> bool:
+    """Whether the active project is the only trigger of the result containers callback.
+
+    Then only the containers drawn for another project are redrawn. A change of page or layout, alone or with the
+    project, redraws every container.
+
+    Args:
+        triggers: The triggers of the callback.
+
+    Returns:
+        Whether only the active project triggered the callback.
+    """
+    return bool(triggers) and all(x.id == 'active-project-id' for x in triggers)
 
 def add_result_container_callbacks(app: NewsegsDash):
     """
@@ -126,8 +156,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         t0 = time.perf_counter()
 
         # Do not update layout if only redrawing the existing project
-        triggered_id = ctx.triggered_id
-        is_project_trigger = (triggered_id == 'active-project-id')
+        is_project_trigger = only_project_changed(callback_utils.get_triggers())
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
@@ -365,18 +394,17 @@ def add_result_container_callbacks(app: NewsegsDash):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
-        trig_id = ctx.triggered_id
         # The interval is reset to 0 on project change and then ticks to 1; only act on the tick
-        if isinstance(trig_id, str) and trig_id == 'delayed-result-container-refill-interval':
-            if callback_utils.get_triggered_value() != 1:
-                raise PreventUpdate
+        triggered = result_table_triggers(ctx.triggered)
+        if triggered is None:
+            raise PreventUpdate
 
         t0 = time.perf_counter()
         rval = callback_utils.create_noupdate_return()
 
         # Tables whose options were changed must be redrawn even if the revision is unchanged
         tables_for_update, option_changed_tables = ids_to_update(
-            ctx.triggered,
+            triggered,
             [x['id'] for x in ctx.outputs_grouping['table']],
             target_type = 'result-table',
             target_purpose = 'container',
