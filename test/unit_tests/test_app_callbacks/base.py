@@ -159,11 +159,11 @@ class InputChangeTestCase(unittest.TestCase):
     def page(self, *containers: tuple[str, str | None], open_editors: bool | None = None) -> list:
         """The components of input containers, rendered by the app for the active project.
 
-        The rows' editors are built, as if each row were opened, if `open_editors`; by default, for the DSA page, whose
-        inputs are in its rows' editors.
+        The rows' editors are built, as if each row were opened, if `open_editors`; by default, for the DSA and PSA
+        pages, whose inputs are in their rows' editors.
         """
         if open_editors is None:
-            open_editors = any(supersection == 'dsa' for supersection, _ in containers)
+            open_editors = any(supersection in ('dsa', 'psa') for supersection, _ in containers)
         return render_input_containers(self.provider, self.project_id, containers, MODEL_TYPE, open_editors = open_editors)
 
     def dispatch(self, trigger: dict, value: Any, components: list, **kwargs) -> CallbackResponse:

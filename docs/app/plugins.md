@@ -183,6 +183,10 @@ act on them; the other groups' inputs are `group-value-input`s carrying their Va
 `group-value`, `group-dsaboundtype`, `group-dsa-bound-lower` and `group-dsa-bound-upper`. A change of a Variable's DSA
 settings should go through `set_dsa_bound` or `set_dsa_bound_type`, which save it and mark the DSA stale for the
 configurations using it.
+
+The PSA rows follow the same pattern (`components/psa_group_editor.py`): the editor shows the distribution, and each
+group's Mean and SD (or Value, for a constant) and confidence interval. The other groups' parameters are edited through
+the `group-value` handler. The PSA's selection and its project settings (samples, seed, draws) aren't grouped.
 * Don't put interactive components in the `Summary`, since clicks on them are counted too.
 
 ### Processes

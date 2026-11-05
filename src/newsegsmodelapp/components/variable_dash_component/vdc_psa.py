@@ -1,48 +1,28 @@
 """Creation of the PSA input of a variable.
 """
 
-
-
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 def create_psa_input(
-    var: FullLightweightVariable
+    var: FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
     """Create the PSA input of a variable.
 
-    Dispatches on the distribution of the variable. Nothing is created if the variable is not to be shown.
+    Nothing is created if the variable is not to be shown.
 
     Args:
         var: The variable.
+        summary_contents: The summary of how the configurations' Variables differ (see
+            `psa_group_editor.create_psa_sharing_summary_contents`).
+        n_configurations: The number of configurations of the project.
 
     Returns:
         The input, or nothing.
     """
     if not var.psa_show:
         return None
-    match var.distribution:
-        case 'constant':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_constant
-        case 'numeric_constant':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_constant
-        case 'normal':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_normal
-        case 'beta':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_beta
-        case 'gamma':
-            is_scalar = True
-            creation_func = var_dc.create_psa_input_scalar_gamma
-        case _:
-            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
-        
-    if is_scalar:
-        #var = cast(variable.NumericScalarVariable, var)
-        return creation_func(var)
-    else:
-        raise ValueError(f'Distribution {var.distribution} not currently supported')
-    
+    var_dc.psa_parameter_labels(var.distribution)  # Raises for an unsupported distribution
+    return var_dc.create_psa_input_scalar(var, summary_contents, n_configurations)

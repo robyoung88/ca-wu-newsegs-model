@@ -763,172 +763,131 @@ def create_psa_distribution_component(
     ]
 
 
+_PSA_PARAMETERS = {
+    # distribution: (label, parameter index, step scale, limited to the input's range)
+    'constant': [('Value', 0, 1., True)],
+    'numeric_constant': [('Value', 0, 1., True)],
+    'normal': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+    'beta': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+    'gamma': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+}
+
+def psa_parameter_labels(distribution: str) -> list[str]:
+    """The labels of the parameters of a distribution on the PSA page: `Value`, or `Mean` and `SD`."""
+    if distribution not in _PSA_PARAMETERS:
+        raise ValueError(f'Distribution {distribution} not currently supported')
+    return [x[0] for x in _PSA_PARAMETERS[distribution]]
+
+def create_psa_input_parameters(
+    var: FullLightweightVariable,
+    id_for: Callable[..., VariableInstanceParameterComponentID] | None = None,
+) -> list:
+    """Create the inputs of a Variable's distribution parameters on the PSA page: Value, or Mean and SD.
+
+    Args:
+        var: The Variable.
+        id_for: Makes the identification of an input from its purpose (`group-value`) and parameter index, for a group
+            other than the focussed configuration's. By default, the inputs are the focussed configuration's, with
+            their usual ids.
+
+    Returns:
+        The inputs, one for each parameter.
+    """
+    distribution = var.distribution if isinstance(var, FullLightweightVariable) else var.distribution.distribution
+    psa_parameter_labels(distribution)
+    return [
+        _create_numeric_inputgroup_from_var(
+            var, label, index, stepscale = stepscale,
+            min = var.interface_min if limited else 0, max = var.interface_max if limited else None,
+            supersection = 'psa',
+            variable_id = id_for('group-value', index) if id_for else None,
+        )
+        for label, index, stepscale, limited in _PSA_PARAMETERS[distribution]
+    ]
+
 def compose_psa_input(
     header_component,
-    distribution_component,
-    parameter_component,
-    var: variable.Variable,
+    var: variable.Variable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
-    """Compose the PSA input of a variable from its parts.
+    """Compose the PSA input of a variable: its toggle, and a row which opens to its group editor.
+
+    As the DSA input (see `compose_dsa_input`): the row's summary holds the header and a summary of the groups (see
+    `psa_group_editor.create_psa_sharing_summary_contents`), and opening it builds the editor
+    (`psa_group_editor.create_psa_group_editor_contents`), with the distribution and the focussed configuration's inputs.
 
     Args:
         header_component: The header.
-        distribution_component: The component showing the distribution.
-        parameter_component: The component for the parameters of the distribution.
         var: The variable.
+        summary_contents: The summary of the groups.
+        n_configurations: The number of configurations of the project; with several, the row can move them.
 
     Returns:
         The input.
     """
-    overall_input_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-component',
-        supersection = 'psa',
-        purpose = 'input-group-container',
-    )
-
-    toggle_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-toggle',
-        supersection = 'psa',
-        purpose = 'psa-active',
-    )
-
-    header_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'single-input-header',
-        supersection = 'psa',
-        purpose = 'header'
-    )
-
-    trigger_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-group-config-update-trigger',
-        supersection = 'psa',
-        purpose = 'trigger',
-    )
+    def row_id(type_: str, purpose: str):
+        return VariableInstanceParameterComponentID.from_variable(var, type = type_, supersection = 'psa', purpose = purpose) # pyright: ignore[reportArgumentType]
 
     if var.psa_selected:
         cn = 'psa-input-single-value-block'
     else:
         cn = 'psa-input-single-value-block deselected'
 
+    stores = [
+        dcc.Store(id = row_id('input-group-config-update-trigger', 'trigger').as_dict()),
+        dcc.Store(id = row_id('variable-summary-refresh-trigger', 'trigger').as_dict()),
+    ]
+    if n_configurations > 1:
+        stores.append(dcc.Store(id = row_id('group-move-request', 'move').as_dict()))
+
     return html.Div([
         daq.ToggleSwitch(
             className = 'psa-toggle',
             size = 30,
             value = var.psa_selected,
-            id = toggle_id.as_dict(),
+            id = row_id('input-toggle', 'psa-active').as_dict(),
         ),
         html.Details([
             html.Summary(
-                header_component,
+                [
+                    html.Div(header_component, id = row_id('single-input-header', 'header').as_dict(), className = 'psa-configuration-header'),
+                    html.Div(
+                        summary_contents or [],
+                        id = row_id('variable-sharing-summary', 'summary').as_dict(),
+                        className = 'variable-sharing-summary psa-sharing-summary',
+                    ),
+                ],
                 className = 'psa-configuration-summary',
-                id = header_id.as_dict()
+                id = row_id('input-summary', 'group-editor-toggle').as_dict(),
             ),
-            html.Div((
-                [html.Div(
-                    distribution_component,
-                    className = 'distribution-label',
-                )]
-                +parameter_component
-            ))
-        ]),
-        dcc.Store(id = trigger_id.as_dict())
+            html.Div([], id = row_id('input-group-editor', 'editor').as_dict()),
+            dcc.Input(id = row_id('single-input-config', 'editor-anchor').as_dict(), type = 'hidden'),
+        ],
+        className = 'group-editor-details psa-group-editor-details',
+        ),
+        *stores,
     ],
     className = cn,
-    id = overall_input_id.as_dict(),
+    id = row_id('input-component', 'input-group-container').as_dict(),
     )
 
-def create_psa_input_scalar_constant(
-    var: variable.ScalarVariable,
+def create_psa_input_scalar(
+    var: variable.ScalarVariable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
-    """Create the PSA input of a constant scalar variable.
+    """Create the PSA input of a scalar variable, of any of the supported distributions.
 
     Args:
         var: The variable.
+        summary_contents: The summary of the groups (see `compose_psa_input`).
+        n_configurations: The number of configurations of the project.
 
     Returns:
         The input.
     """
-    return compose_psa_input(
-        create_psa_header(var),
-        create_psa_distribution_component(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Value', 0, # pyright: ignore[reportArgumentType]
-                min = var.interface_min, max = var.interface_max,
-                supersection = 'psa'
-            ),
-        ],
-        var
-    )
-
-def create_psa_input_twoparam(
-    var: variable.NumericScalarVariable,    
-):
-    """Create the PSA input of a numeric scalar variable described by two parameters.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return compose_psa_input(
-        create_psa_header(var),
-        create_psa_distribution_component(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
-                supersection = 'psa'
-            ),
-            _create_numeric_inputgroup_from_var(
-                var, 'SD', 1, stepscale = 0.1,
-                supersection = 'psa'
-            ),
-        ],
-        var
-    )
-
-def create_psa_input_scalar_normal(
-    var: variable.NumericScalarVariable,
-):
-    """Create the PSA input of a normally distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return create_psa_input_twoparam(var)
-
-def create_psa_input_scalar_beta(
-    var: variable.NumericScalarVariable,
-):
-    """Create the PSA input of a beta distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return create_psa_input_twoparam(var)
-
-def create_psa_input_scalar_gamma(
-    var: variable.NumericScalarVariable,
-):
-    """Create the PSA input of a gamma distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return create_psa_input_twoparam(var)
+    return compose_psa_input(create_psa_header(var), var, summary_contents, n_configurations)
 
 def compose_optim_input(
     header,

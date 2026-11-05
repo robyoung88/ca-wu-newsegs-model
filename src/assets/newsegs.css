@@ -442,6 +442,8 @@ div.dsa-input-single-value-block > .dsa-toggle {
 /* The header, as the summary was before it held the line of the groups; beside the marker, however long */
 div.dsa-configuration-header {
     display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
     max-width: calc(100% - 1.25rem);
     vertical-align: top;
 }
@@ -529,36 +531,88 @@ div.group-editor-dsa div.group-editor-head > span:nth-child(2) {
 
 /* PSA Configuration */
 
+/* As the DSA rows: the toggle, then the row, which opens to the group editor (components/psa_group_editor.py) */
 div.psa-input-single-value-block {
-    display: block;
-    width: fit-content;
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
     margin: 4px 2px 4px 2px;
 }
 
 div.psa-input-single-value-block > details {
-    display: inline-block;
-    width: auto;
-}
-
-div.psa-input-single-value-block > details > div div {
-    display: inline-flex;
-    width: fit-content;
-    margin: 5px 2px 5px 2px;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 div.psa-input-single-value-block > .psa-toggle {
-    display: inline-flex;
-    width: fit-content;
-    vertical-align: top;
+    flex: 0 0 auto;
     margin-right: 10px;
 }
 
 .psa-configuration-summary {
-    display: inline-flex;
+    display: list-item;
 }
 
-.psa-configuration-summary > h4 {
+div.psa-configuration-header {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    max-width: calc(100% - 1.25rem);
+    vertical-align: top;
+}
+
+/* The values stay on one line, below a long label if they don't fit beside it */
+div.psa-configuration-header > .psa-configuration-summaryinfo,
+div.dsa-configuration-header > .dsa-configuration-summaryinfo {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+div.psa-configuration-header > h4 {
     display: inline;
+}
+
+div.psa-sharing-summary {
+    margin-left: 0.25rem;
+}
+
+span.psa-distribution-differs {
+    margin-left: 0.75rem;
+    padding: 0 0.4rem;
+    border-radius: 0.75rem;
+    color: #664d03;
+    background-color: #fff3cd;
+}
+
+/* The editor's cells: the distribution, each parameter and the confidence interval */
+div.group-editor-psa div.psa-group-row > div.psa-group-parameter {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+}
+
+div.group-editor-psa div.psa-group-row > div.psa-group-distribution,
+div.group-editor-psa div.psa-group-row > div.psa-group-ci {
+    flex: 0 0 6.5rem;
+}
+
+div.group-editor-psa div.psa-group-row .input-group {
+    width: auto;
+    flex-wrap: nowrap;
+}
+
+div.group-editor-psa div.psa-group-row input.dynamic-step-field {
+    float: none;
+    width: 4.5rem !important;
+}
+
+div.group-editor-psa div.group-editor-head > span:not(:last-child) {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+    margin-right: 0;
+}
+
+div.group-editor-psa > div.distribution-label {
+    margin-bottom: 0.25rem;
 }
 
 .psa-configuration-summaryinfo {

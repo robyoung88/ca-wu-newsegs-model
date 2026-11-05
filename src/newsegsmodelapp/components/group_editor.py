@@ -406,7 +406,8 @@ def _focussed_input_value(id: dict, var: FullLightweightVariable) -> Any:
 
 def _feed_back_focussed(triggered_id, input_ids, header_ids, trigger_ids, lproj, provider, return_dict, now):
     """Show the focussed configuration's new Variable in every part of its row: on the DSA page, the DSA and the
-    optimisation inputs, toggles and styling, as well as the headers and triggers"""
+    optimisation inputs, toggles and styling; on the PSA page, its toggle; and the headers and triggers, which redraw
+    the DSA bounds and the DSA and PSA styling"""
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     varid = make_varid(**triggered_id)
     var = cast(FullLightweightVariable, provider.variable_provider.get_full_lightweight_variable(lmm.variables[varid]))
@@ -415,7 +416,7 @@ def _feed_back_focussed(triggered_id, input_ids, header_ids, trigger_ids, lproj,
 
     # The toggles and the optimisation row's styling, which a Variable of other selections changes
     grouping = ctx.outputs_grouping if ctx.using_outputs_grouping else {}
-    selected = {'dsa-active': var.dsa_selected, 'toggle-optim-active': var.optim_selected}
+    selected = {'dsa-active': var.dsa_selected, 'psa-active': var.psa_selected, 'toggle-optim-active': var.optim_selected}
     for idx, output in enumerate(grouping.get('toggle_values', [])):
         if output['id']['purpose'] in selected:
             return_dict['toggle_values'][idx] = selected[output['id']['purpose']]
