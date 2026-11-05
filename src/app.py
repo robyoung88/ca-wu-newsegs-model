@@ -370,6 +370,8 @@ if __name__ == '__main__':
     debug = environment.is_development()
     app.run(
         host = '0.0.0.0', port = 8050, debug = debug, use_reloader = False, threaded = True,
+        # dynaconf loads .env (see config/config.py), so Flask need not load it again
+        load_dotenv = False,
         # Circular-callback validation expands every pattern-matching id over all
         # wildcard values in the browser, which blocks the initial page load for
         # about a minute. Set DASH_VALIDATE_CALLBACKS=true to check for cycles.
