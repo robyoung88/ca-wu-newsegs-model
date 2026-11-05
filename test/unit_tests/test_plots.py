@@ -16,6 +16,7 @@ import plotly.graph_objects as go
 import plotly.utils
 
 from newsegsmodelapp.components import psa_plots as app_psa_plots
+from newsegsmodelframework.newsegssensitivity.psa import CONVERGENCE_STATISTICS, quantile_stderr_cum
 from newsegsmodelutils.plots import apply_values, optim as optim_plots, psa as psa_plots, wind_resource
 
 def _psa_data(seed: int, n: int = 100) -> pd.DataFrame:
@@ -92,6 +93,19 @@ class TestPSAPlots(unittest.TestCase):
                         _json([v for _, v in expected]),
                     )
 
+    def test_convergence_of_every_statistic_without_spread(self):
+        # The standard error of a quantile needs the density at the quantile, which cannot be estimated from one
+        # sample (an empty plot) or from equal samples; the plot is drawn without the band of the standard error
+        n = 20
+        constant = pd.DataFrame({'draw': np.arange(n + 1), 'deterministic': [True] + [False] * n, 'net_present_value_discounted': np.full(n + 1, 7.)})
+        for statistic in CONVERGENCE_STATISTICS:
+            for name, data in (('empty', None), ('constant', constant)):
+                with self.subTest(statistic = statistic, data = name):
+                    fig = psa_plots.psa_convergence(data, 'net_present_value_discounted', statistic)
+                    self.assertTrue(len(fig.data[0].y))
+                    values = psa_plots.psa_convergence_values(constant, 'net_present_value_discounted', statistic)
+                    self.assertTrue(values)
+
     def test_scatter_without_proportion(self):
         values = psa_plots.psa_scatter_values(_psa_data(1), show_proportion_ce = False)
         self.assertFalse([p for p, _ in values if p[:2] == ('layout', 'annotations')])
@@ -101,6 +115,20 @@ class TestPSAPlots(unittest.TestCase):
         self.assertEqual(set(app_psa_plots.psa_plots), {'Scatter plot', 'Cumulative probability', 'Convergence'})
         for funcs in app_psa_plots.psa_plots.values():
             self.assertEqual(set(funcs), {'draw', 'update', 'controls', 'arguments'})
+
+class TestQuantileStandardError(unittest.TestCase):
+
+    def test_without_spread(self):
+        for x in ([5.], [5., 5., 5.], [5., np.nan]):
+            with self.subTest(x = x):
+                stderr = quantile_stderr_cum(pd.Series(x), 0.1)
+                self.assertEqual(len(stderr), len(x))
+                self.assertTrue(np.isnan(stderr).all())
+
+    def test_falls_with_more_draws(self):
+        stderr = quantile_stderr_cum(pd.Series(np.random.default_rng(1).normal(0., 1., 200)), 0.25)
+        self.assertTrue(np.isfinite(stderr).all())
+        self.assertGreater(stderr[0], stderr[-1])
 
 class TestOptimPlot(unittest.TestCase):
 

@@ -82,10 +82,15 @@ def quantile_stderr_cum(
         bw: Bandwidth of the kernel density estimate; by default chosen by scipy.
 
     Returns:
-        Array of the standard error after each draw.
+        Array of the standard error after each draw; NaN throughout if the density cannot be estimated, as when there
+        are fewer than two values or they are all equal (such as the placeholder data of an empty plot).
     """
     # https://github.com/kbroman/broman/blob/main/R/quantileSE.R
     from scipy.stats import gaussian_kde
+    values = np.asarray(x, dtype = float)
+    finite = values[np.isfinite(values)]
+    if len(finite) < 2 or np.ptp(finite) == 0.:
+        return np.full(len(values), np.nan)
     quant = np.quantile(x, p)
     R = np.sqrt(p * (1. - p) / (np.arange(len(x))+1))
     if bw is None:
