@@ -114,12 +114,16 @@ class TestOptimRun(unittest.TestCase):
     def test_panel_saved_against_the_table_configuration(self):
         # The panel shown after an optimisation is saved where the results container reads it:
         # against the project's table configuration
+        from newsegsmodelapp.backend import db
+        from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
         from newsegsmodelapp.plugins.models.aaa_default.processes.output import aaa_default_tables
         from newsegsmodelapp.registers import TableDrawRequest
 
-        result_provider = mock.MagicMock()
-        result_provider.get_result.return_value = (
-            {'success': True, 'opt': SimpleNamespace(success = True, message = 'Optimization terminated successfully.')}, 1
+        # A real result provider, which checks the component results are saved against
+        result_provider = FromDatabaseResultProvider(db.get_engine, Path(self.db_dir.name) / 'results')
+        result_provider.upsert_result(
+            'optimisation_result', self.proj.table_config,
+            {'success': True, 'opt': SimpleNamespace(success = True, message = 'Optimization terminated successfully.')},
         )
         request = TableDrawRequest(project_id = self.proj.id, payload = json.dumps({'metamodel_id': self.mm.id}))
         self.assertEqual(
@@ -128,10 +132,10 @@ class TestOptimRun(unittest.TestCase):
             ),
             'ok'
         )
-        result_type, component, _ = result_provider.upsert_result.call_args.args
-        self.assertEqual(result_type, 'table_postopt_metamodel')
-        self.assertEqual(component.id, self.proj.table_config.id)
-        self.assertTrue(hasattr(component, 'revision'))
+        # Read as the results container reads it
+        lproj = self.provider.get_lightweight_project(self.proj.id)
+        panel, _ = result_provider.get_result('table_postopt_metamodel', lproj.table_config)
+        self.assertTrue(panel)
 
     def test_invalid_bounds_are_reported(self):
         proj = self.provider.get_project(self.proj.id)
