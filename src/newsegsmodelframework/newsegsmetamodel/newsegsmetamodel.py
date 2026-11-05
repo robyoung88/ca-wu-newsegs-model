@@ -513,6 +513,15 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     @override
     def _post_update_from_dict(self):
+        # A representation of the metamodel (`to_dict_repr`, as in a configuration file) holds its variables, which
+        # the update sets directly, leaving them a plain dict. They are set again through the `variables` property, so
+        # that they are held in an observable dictionary to which the table configuration and the watcher subscribe,
+        # as when they are reattached from the database. (Only `update` reaches here: `__setstate__`, used to copy and
+        # unpickle, restores the observable dictionary itself.)
+        variables = self.__dict__.get('_variables')
+        if variables is not None and not isinstance(variables, TableModifyingObservableOrderedDict):
+            del self.__dict__['_variables']
+            self.variables = dict(variables)
         try:
             if self.finance.model is None or self.finance.model is not self.model:
                 self.finance.set_model(self.model, dirty = False)
