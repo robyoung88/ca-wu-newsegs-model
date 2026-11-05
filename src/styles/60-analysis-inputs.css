@@ -1,0 +1,311 @@
+/* ==========================================================================
+   Analysis inputs
+   The rows of inputs of the DSA, PSA and optimisation pages (components/variable_dash_component/vdc.py): a toggle,
+   then a row which opens to the group editor of the analysis (components/dsa_group_editor.py, psa_group_editor.py).
+   ========================================================================== */
+
+/* The header of a configuration page: its title, then its buttons at the right */
+div.configuration-header-title-container {
+    float: left;
+    width: 75%;
+}
+
+.configuration-header-title-container div,
+.configuration-header-title-container h4 {
+    display: inline-flex;
+}
+
+div.configuration-header-button-container {
+    width: 25%;
+    float: right;
+    text-align: right;
+}
+
+/* --------------------------------------------------------------------------
+   DSA and PSA
+   -------------------------------------------------------------------------- */
+
+/* The toggle, then the row, which takes the rest of the pane's width */
+div.dsa-input-single-value-block,
+div.psa-input-single-value-block {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    margin: 4px 2px;
+}
+
+div.dsa-input-single-value-block > details,
+div.psa-input-single-value-block > details {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+div.dsa-input-single-value-block > .dsa-toggle,
+div.psa-input-single-value-block > .psa-toggle {
+    flex: 0 0 auto;
+    margin-right: 10px;
+}
+
+.dsa-configuration-summary,
+.psa-configuration-summary {
+    display: list-item;
+}
+
+.deselected .dsa-configuration-summary,
+.deselected .psa-configuration-summary {
+    filter: brightness(5);
+}
+
+/* The header, beside the marker of the summary however long, and the line of the groups */
+div.dsa-configuration-header,
+div.psa-configuration-header {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    max-width: calc(100% - 1.25rem);
+    vertical-align: top;
+}
+
+div.dsa-configuration-header > h4,
+div.psa-configuration-header > h4 {
+    display: inline;
+}
+
+/* The values stay on one line, below a long label if they don't fit beside it */
+div.dsa-configuration-header > .dsa-configuration-summaryinfo,
+div.psa-configuration-header > .psa-configuration-summaryinfo {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+div.dsa-sharing-summary,
+div.psa-sharing-summary {
+    margin-left: 0.25rem;
+}
+
+/* The groups of an input differ in more than their values */
+span.dsa-bounds-differ,
+span.psa-distribution-differs {
+    margin-left: 0.75rem;
+    padding: 0 0.4rem;
+    border-radius: 0.75rem;
+    color: var(--bs-warning-text-emphasis);
+    background-color: var(--bs-warning-bg-subtle);
+}
+
+/* The current values of an input, beside its label */
+.dsa-configuration-summaryinfo,
+.psa-configuration-summaryinfo,
+div.optim-configuration-summaryinfo {
+    display: inline-flex;
+    text-align: center;
+    align-items: baseline;
+    vertical-align: baseline;
+    margin-left: 10px;
+    font-size: 1.5rem;
+}
+
+.dsa-configuration-summaryinfo > span,
+.psa-configuration-summaryinfo > span,
+div.optim-configuration-summaryinfo > span {
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.dsa-configuration-summaryinfo-dsa-live-values,
+.psa-configuration-summaryinfo-psa-live-values {
+    font-size: 0.8em;
+}
+
+/* The cells of the DSA group editor: the parameters, the bound type and the bounds, which wrap within a narrow pane */
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-parameters,
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-bounds {
+    display: flex;
+    flex: 1 1 8rem;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-width: 7rem;
+}
+
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-bound-type {
+    flex: 0 0 7.5rem;
+}
+
+/* The focussed row's bounds are in the container that update_dsa_input_contents redraws: laid out as the others' */
+div.group-editor-dsa div.dsa-group-bounds > span {
+    display: contents;
+}
+
+/* The headings above the cells */
+div.group-editor-dsa div.group-editor-head > span:nth-child(1),
+div.group-editor-dsa div.group-editor-head > span:nth-child(3) {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+}
+
+div.group-editor-dsa div.group-editor-head > span:nth-child(2) {
+    flex: 0 0 7.5rem;
+}
+
+/* The cells of the PSA group editor: the distribution, each parameter and the confidence interval */
+div.group-editor-psa div.psa-group-row > div.psa-group-parameter {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+}
+
+div.group-editor-psa div.psa-group-row > div.psa-group-distribution,
+div.group-editor-psa div.psa-group-row > div.psa-group-ci {
+    flex: 0 0 6.5rem;
+}
+
+div.group-editor-psa div.group-editor-head > span:not(:last-child) {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+    margin-right: 0;
+}
+
+div.group-editor-psa > div.distribution-label {
+    margin-bottom: 0.25rem;
+}
+
+/* The fields of both editors: narrow, in line, and not floated as elsewhere */
+div.group-editor-dsa div.dsa-group-row .input-group,
+div.group-editor-psa div.psa-group-row .input-group {
+    width: auto;
+    flex-wrap: nowrap;
+}
+
+div.group-editor-dsa div.dsa-group-row input.dynamic-step-field,
+div.group-editor-psa div.psa-group-row input.dynamic-step-field {
+    float: none;
+    width: 4.5rem !important;
+}
+
+/* The distribution of a PSA input */
+.distribution-label {
+    display: inline-table !important;
+    margin-top: 1px;
+    margin-bottom: 1px;
+    margin-right: 15px !important;
+    vertical-align: middle;
+}
+
+.distribution-label p {
+    margin-bottom: 0;
+    margin-top: 0;
+}
+
+.distribution-label-title {
+    font-size: 0.7em;
+    font-weight: bold;
+}
+
+/* The settings of a PSA (plugins/models/aaa_default/page_contents/inputs/psa_inputs_sprake.py) */
+.input-settings {
+    display: block;
+}
+
+.input-toggle {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.input-settings h4 {
+    display: inline-block;
+    margin: 0 12px 4px 0;
+}
+
+.input-settings .input-group {
+    display: inline-flex;
+    margin: 0 12px 4px 0;
+    width: fit-content;
+}
+
+.input-settings .input-group input {
+    display: inline-block;
+}
+
+/* Cancels a running DSA or PSA, over its progress */
+.background-callback-cancel-button {
+    position: absolute;
+    top: 33%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1100;
+    pointer-events: auto;
+}
+
+.background-callback-cancel-button-hidden {
+    display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Optimisation
+   -------------------------------------------------------------------------- */
+
+div.optim-input-single-value-block {
+    display: flex;
+    flex-grow: 1;
+    margin: 4px 2px;
+    padding: 2px 24px 2px 2px;
+}
+
+div.optim-input-single-value-block > .optim-toggle {
+    display: inline-flex;
+    width: fit-content;
+    vertical-align: top;
+    margin-right: 10px;
+}
+
+div.optim-input-single-value-block > details {
+    display: inline-block;
+    align-content: center;
+    flex-grow: 1;
+}
+
+div.optim-input-single-value-block > details > div {
+    align-content: center;
+}
+
+div.optim-input-single-value-block > details > div div {
+    display: inline-flex;
+    align-content: center;
+    margin: 5px 2px;
+}
+
+div.optim-input-single-value-block > details .input-group {
+    width: fit-content;
+}
+
+div.optim-input-single-value-block span {
+    display: inline-flex;
+}
+
+summary.optim-configuration-summary {
+    display: inline-flex;
+    width: 100%;
+}
+
+summary.optim-configuration-summary > h4 {
+    display: inline;
+}
+
+.deselected summary.optim-configuration-summary {
+    filter: brightness(5);
+}
+
+/* The toggles of whether an input is positive or bounded */
+.optim-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+
+.optim-toggle-row .optim-opt-toggle {
+    display: inline-block;
+    margin-top: 0;
+    margin-right: 12px;
+    margin-bottom: 15px;
+    padding-top: 0;
+}

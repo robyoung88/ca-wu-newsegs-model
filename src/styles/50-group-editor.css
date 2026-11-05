@@ -1,0 +1,197 @@
+/* ==========================================================================
+   Group editor
+   The editor of how the configurations share an input (components/group_editor.py, assets/group_editor.js): a row
+   for each group of configurations with the same value, with the group's configuration icons.
+   ========================================================================== */
+
+/* Not inline-flex, as the card's reset and default details are: the editor takes the card's width, below the summary */
+div.numeric-card-input details.group-editor-details {
+    display: block;
+    width: 100%;
+}
+
+/* Open, the editor shows the groups, so the summary line gives way to a label which closes it */
+details.group-editor-details > summary .group-editor-close-label,
+details.group-editor-details[open] > summary .variable-sharing-summary {
+    display: none;
+}
+
+/* Beside the marker of the summary, not below it */
+details.group-editor-details > summary div.variable-sharing-summary {
+    display: inline;
+}
+
+details.group-editor-details[open] > summary .group-editor-close-label {
+    display: inline;
+    font-size: 0.8rem;
+    color: var(--ns-muted);
+}
+
+div.group-editor {
+    margin: 0.25rem 0 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* A row's icons and actions wrap below its value, together, only when they don't fit beside it. They end at the
+   right, and the actions have a fixed width, so the icons line up in every row. */
+div.group-editor-head,
+div.group-editor-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    padding: 0.15rem 0;
+}
+
+div.group-editor-head {
+    color: var(--ns-muted);
+    font-size: 0.75rem;
+}
+
+div.group-editor-head > span:first-child,
+div.group-editor-value {
+    flex: 1 1 7rem;
+    min-width: 7rem;
+}
+
+/* Above the icons, which end beside the actions */
+div.group-editor-head > span:last-child {
+    margin-right: calc(4rem + 0.5rem);
+}
+
+input.group-editor-value-input {
+    max-width: 8rem;
+}
+
+div.group-editor-row.pending {
+    opacity: 0.6;
+}
+
+div.group-editor-side {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+div.group-editor-icons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.15rem;
+}
+
+div.group-editor-actions {
+    display: flex;
+    flex: 0 0 4rem;
+    gap: 0.25rem;
+    justify-content: flex-end;
+}
+
+button.group-editor-icon,
+button.group-editor-insert,
+button.group-editor-all {
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    background: none;
+    padding: 0.05rem 0.3rem;
+    line-height: 1.2;
+}
+
+/* Positioned for the underline of the focussed configuration */
+button.group-editor-icon {
+    position: relative;
+}
+
+button.group-editor-icon:hover,
+button.group-editor-icon:focus-visible {
+    border-color: var(--ns-brand-mid);
+}
+
+/* The focussed configuration: underlined, as its group is in the sharing summary, and drawn to look like that
+   underline (1px, about 3px below the icon). A bar under the button, centred on the icon by the button's even padding,
+   so it neither moves the icon nor changes the height of the row. */
+button.group-editor-icon.focussed::after {
+    content: '';
+    position: absolute;
+    left: 0.3rem;
+    right: 0.3rem;
+    bottom: -2.25px;
+    height: 1px;
+    background-color: var(--ns-text);
+}
+
+button.group-editor-icon.selected {
+    background-color: var(--ns-brand-subtle);
+    border-color: var(--ns-brand);
+}
+
+button.group-editor-icon.ghost {
+    opacity: 0.4;
+}
+
+button.group-editor-insert,
+button.group-editor-all {
+    border-color: var(--bs-border-color);
+    color: var(--ns-muted);
+}
+
+/* Insert buttons only while an icon is selected, on the rows it can move to */
+button.group-editor-insert {
+    display: none;
+}
+
+div.group-editor[data-selected] div.group-editor-row:not(.source) button.group-editor-insert {
+    display: inline-block;
+}
+
+/* The new Variable row only while an icon is selected or dragged, and not for a configuration already alone in its
+   group */
+div.group-editor div.group-editor-row.new-value,
+div.group-editor[data-selected].source-alone div.group-editor-row.new-value,
+div.group-editor[data-dragging].source-alone div.group-editor-row.new-value {
+    display: none;
+}
+
+div.group-editor[data-selected] div.group-editor-row.new-value,
+div.group-editor[data-dragging] div.group-editor-row.new-value {
+    display: flex;
+}
+
+/* Dragging an icon: the rows it can be dropped on, and the one under the pointer */
+button.group-editor-icon[draggable="true"] {
+    cursor: grab;
+}
+
+span.group-editor-drop-label {
+    display: none;
+    color: var(--ns-muted);
+    font-style: italic;
+}
+
+div.group-editor[data-dragging] span.group-editor-drop-label {
+    display: inline;
+}
+
+div.group-editor-row.drop-candidate {
+    outline: 1px dashed var(--ns-brand-mid);
+    outline-offset: -1px;
+    border-radius: 0.375rem;
+}
+
+div.group-editor-row.drop-over {
+    outline: 2px solid var(--ns-brand);
+    background-color: var(--ns-brand-subtle);
+}
+
+div.group-editor-confirm:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.375rem;
+    background-color: var(--bs-warning-bg-subtle);
+}

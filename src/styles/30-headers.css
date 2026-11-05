@@ -1,0 +1,55 @@
+/* ==========================================================================
+   Headers
+   The project selector (components/project_selector.py), the headers of results (components/layouts/results_header.py)
+   and their feedback strip.
+   ========================================================================== */
+
+.newsegs-project-selector .action-button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+}
+
+.newsegs-project-selector .toggle-controls {
+    align-self: end;
+}
+
+.newsegs-project-selector .header {
+    width: 100%;
+}
+
+.drawer-header {
+    background: var(--ns-surface);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.drawer-title {
+    margin-top: 8px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Full-width strip giving feedback: process staleness or progress */
+.feedback-strip {
+    display: flex;
+    width: 100%;
+    height: 8px;
+}
+
+/* Staleness indicators (components/staleness.py) */
+.staleness-indicator-ok {
+    background-color: var(--ns-status-ok);
+}
+
+.staleness-indicator-warning {
+    background-color: var(--ns-status-warning);
+}
+
+.staleness-indicator-error {
+    background-color: var(--ns-status-error);
+}

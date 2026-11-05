@@ -27,6 +27,7 @@ import plotly.graph_objects as go
 import pvlib
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.components import colours
 from newsegsmodelapp.components.feedback.environmental_conditions import EnvironmentFeedbackItem
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelframework.core import generation
@@ -63,8 +64,9 @@ _LAYOUT = dict(
         'x': 0.5,
         'xanchor': 'center',
         'yanchor': 'top',
-        'font': {'size': 13, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
+        'font': {'size': 13, 'family': 'Arial', 'color': colours.TEXT, 'weight': 'bold'}
     },
+    template = colours.PLOT_TEMPLATES,
     paper_bgcolor = 'rgba(0,0,0,0)',
     plot_bgcolor = 'rgba(0,0,0,0)',
     legend = {'font': {'size': 10}},
@@ -74,7 +76,7 @@ _LAYOUT = dict(
 _LEGEND_BELOW = dict(orientation = 'h', x = 0.5, xanchor = 'center', y = -0.2, yanchor = 'top', font = {'size': 10})
 
 _GRAPH_STYLE = {
-    'border': '1px solid #dee2e6',
+    'border': '1px solid var(--bs-border-color)',
     'borderRadius': '0.5rem',
     'backgroundColor': 'transparent',
 }
@@ -187,7 +189,7 @@ def _note(text: str, right: bool = False) -> dict:
         text = text, xref = 'paper', yref = 'paper', x = 1. if right else 0., y = 1.,
         xanchor = 'right' if right else 'left', yanchor = 'top',
         showarrow = False, align = 'left', font = {'size': 11},
-        bgcolor = 'rgba(255,255,255,0.85)', bordercolor = '#adb5bd', borderwidth = 1, borderpad = 4,
+        bgcolor = 'rgba(255,255,255,0.85)', bordercolor = colours.BRAND_SOFT, borderwidth = 1, borderpad = 4,
     )
 
 def _wind(location: Location, config: SiteConfiguration) -> tuple[pd.Series, pd.Series]:
@@ -232,8 +234,7 @@ def draw_wind_rose(location: Location, sites: Sequence[tuple[str, Location]], me
     proportions = 100. * counts / len(speeds)
 
     fig = go.Figure()
-    colours = ['#d0e1f2', '#a6cbe3', '#6caed6', '#3a8ac2', '#1764ab', '#08468b', '#08306b']
-    for colour, interval in zip(colours, speed_bin.cat.categories):
+    for colour, interval in zip(colours.SEQUENTIAL_COLOURS, speed_bin.cat.categories):
         if interval not in proportions.columns:
             continue
         fig.add_trace(go.Barpolar(
@@ -271,15 +272,15 @@ def draw_wind_speed_distribution(location: Location, sites: Sequence[tuple[str, 
         x = speeds.to_numpy(),
         xbins = dict(start = 0., end = float(np.ceil(speeds.max())) + 0.5, size = 0.5),
         histnorm = 'percent',
-        marker_color = '#6caed6',
+        marker_color = colours.SEQUENTIAL_COLOURS[2],
         name = 'Hours',
         hovertemplate = '%{x} m/s: %{y:.1f}% of hours<extra></extra>',
     ))
-    lines = [('Mean', speeds.mean(), '#212529', 'solid')]
+    lines = [('Mean', speeds.mean(), colours.PLOT_EMPHASIS, 'solid')]
     if len(yearly):
         lines += [
-            (f'Lowest year ({yearly.idxmin()})', yearly.min(), '#d6604d', 'dash'),
-            (f'Highest year ({yearly.idxmax()})', yearly.max(), '#4393c3', 'dash'),
+            (f'Lowest year ({yearly.idxmin()})', yearly.min(), colours.SERIES_COLOURS[1], 'dash'),
+            (f'Highest year ({yearly.idxmax()})', yearly.max(), colours.SERIES_COLOURS[0], 'dash'),
         ]
     for name, value, colour, dash in lines:
         fig.add_trace(go.Scatter(
@@ -308,12 +309,16 @@ def draw_sun_path(location: Location, sites: Sequence[tuple[str, Location]], met
     horizon = _server().get_horizon(_point(location)).sort_index()
     fig = go.Figure(go.Scatter(
         x = horizon.index.to_numpy(), y = horizon.to_numpy(),
-        fill = 'tozeroy', mode = 'lines', line = {'color': '#6c757d', 'width': 1},
-        fillcolor = 'rgba(108,117,125,0.35)', name = 'Horizon',
+        fill = 'tozeroy', mode = 'lines', line = {'color': colours.PLOT_NEUTRAL, 'width': 1},
+        fillcolor = colours.rgba(colours.PLOT_NEUTRAL, 0.35), name = 'Horizon',
         hovertemplate = 'Azimuth %{x:.0f}°: %{y:.1f}°<extra>Horizon</extra>',
     ))
     year = pd.Timestamp.now().year
-    days = [('21 June', f'{year}-06-21', '#f4a582'), ('20 March', f'{year}-03-20', '#92c5de'), ('21 December', f'{year}-12-21', '#4393c3')]
+    days = [
+        ('21 June', f'{year}-06-21', colours.SERIES_COLOURS[0]),
+        ('20 March', f'{year}-03-20', colours.SERIES_COLOURS[2]),
+        ('21 December', f'{year}-12-21', colours.SERIES_COLOURS[1]),
+    ]
     for name, day, colour in days:
         times = pd.date_range(f'{day} 00:00', f'{day} 23:59', freq = '5min', tz = 'Europe/London')
         position = pvlib.solarposition.get_solarposition(times, location.lat, location.lon)
@@ -355,19 +360,21 @@ def draw_external_temperature(location: Location, sites: Sequence[tuple[str, Loc
     server = _server()
     timespan = SiteConfiguration.from_metamodel(metamodel).timespan
     fig = go.Figure()
-    for name, loc in sites:
+    # The other sites in the colours of series other than the first, which is this site's
+    others = colours.SERIES_COLOURS[1:]
+    for i, (name, loc) in enumerate(sites):
         if not server.is_cached('external_temperature', _point(loc), timespan):
             continue
         monthly = _monthly_temperature(loc, timespan)
         fig.add_trace(go.Scatter(
             x = [_MONTHS[m - 1] for m in monthly.index], y = monthly.to_numpy(), mode = 'lines',
-            line = {'width': 1.5, 'dash': 'dot'}, opacity = 0.7, name = name,
+            line = {'width': 1.5, 'dash': 'dot', 'color': others[i % len(others)]}, opacity = 0.7, name = name,
             hovertemplate = '%{x}: %{y:.1f} °C<extra>' + name + '</extra>',
         ))
     monthly = _monthly_temperature(location, timespan)
     fig.add_trace(go.Scatter(
         x = [_MONTHS[m - 1] for m in monthly.index], y = monthly.to_numpy(), mode = 'lines+markers',
-        line = {'width': 3, 'color': '#d6604d'}, name = 'This site',
+        line = {'width': 3, 'color': colours.SERIES_COLOURS[0]}, name = 'This site',
         hovertemplate = '%{x}: %{y:.1f} °C<extra>This site</extra>',
     ))
     timespan_years = f'{timespan.start.year}–{(timespan.end - pd.Timedelta(1, "s")).year}'

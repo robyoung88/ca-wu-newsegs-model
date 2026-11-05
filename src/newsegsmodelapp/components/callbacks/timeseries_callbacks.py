@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from plotly_resampler import FigureResampler
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.components import callback_utils
+from newsegsmodelapp.components import callback_utils, colours
 from newsegsmodelapp.dash_extension import NewsegsDash
 
 
@@ -139,6 +139,7 @@ def _build_figure(mdl) -> FigureResampler | None:
         )
 
     fig.update_layout(
+        template = colours.PLOT_TEMPLATES,
         height = 250,
         margin = {'l': 5, 'r': 5, 't': 5, 'b': 0},
         legend_y = 0,
