@@ -169,7 +169,8 @@ def run_optimisation(
         variables: The variables to vary.
         target: The statistic to maximise.
         progress: Function reporting progress, called with the iteration and a count one or two larger; the total is not known in advance.
-        cancel_status: Function returning whether cancellation has been requested; checked after each iteration.
+        cancel_status: Function returning whether cancellation has been requested; checked before each run of the
+            models, so that the optimisation stops within one run whatever the method.
         method: The scipy optimisation method.
 
     Returns:
@@ -217,6 +218,11 @@ def run_optimisation(
             mm.update_model_from_variable_deterministic(var.varid)
 
     def optfunc(x, *args) -> float:
+        # Cancellation is checked here rather than in the callback: scipy ignores a callback returning True, and
+        # some methods (e.g. Powell) run the models many times in each iteration. Raising from the objective stops
+        # every method, and propagates out of `minimize`.
+        if cancel_status():
+            raise InterruptedError('Optimisation cancelled')
         setpars(x, mm)
         mm.model.run()
         mm.finance.run()
@@ -225,13 +231,10 @@ def run_optimisation(
     cback_count = 0
     def cback(intermediate_result: scipy_opt.OptimizeResult):
         nonlocal cback_count
-        
+
         cback_count += 1
         progress(cback_count, cback_count + 2)
-        if cancel_status():
-            return True
-            #raise StopIteration(f'Optimisation process has been cancelled.')
-    
+
     if do_bound:
         bounds = []
         for var, trans in zip(variables, transforms):
