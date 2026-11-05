@@ -4,10 +4,11 @@ An implementation of the model of Dr David Sprake as a `NewsegsModel`, using `Sp
 modules, an in-memory local environment holding the default Sprake weather data and no wider environment.
 """
 from __future__ import annotations
+from contextlib import contextmanager
 from dataclasses import asdict, field
 import os
 import copy
-from typing import cast, override
+from typing import Callable, Iterator, cast, override
 from functools import singledispatchmethod, lru_cache
 
 import numpy as np
@@ -18,7 +19,7 @@ from newsegsmodelframework.core.location.location import RaisedLocation
 from newsegsmodelframework.core.newsegsmoduleresult import NewsegsModuleResult
 from newsegsmodelframework.core import timespan as modtimespan
 from newsegsmodelframework.core import location as modlocation
-from newsegsmodelframework.core.environment import environment_servers
+from newsegsmodelframework.core.environment import environment_progress, environment_servers
 from newsegsmodelframework.core.environment import inmem_env_servers
 from newsegsmodelframework.core.timespan.timespan import SECONDS_TO_DAYS
 from newsegsmodelframework.core.trackeddata import revision_dataclass
@@ -411,29 +412,76 @@ class SprakeModel(newsegsmodel.NewsegsModel):
         return self._cs_result
 
     @override
-    def run(self, run_from = 'start'):
+    def run(
+        self,
+        run_from = 'start',
+        progress_callback: Callable[[float, str], None] | None = None,
+    ):
+        """Run the modules of the model in order: the grid, the generation, and the consumption
+        and storage.
+
+        Args:
+            run_from: The last module whose result is current. 'start' runs every module, 'grid'
+                runs from the generation module, and 'generation' runs only the consumption and
+                storage module.
+            progress_callback: Told the progress of the run as each module starts: the fraction
+                of the modules run (from 0 to 1), and a message. While a module waits for
+                environmental data, such as from a remote service, the message says so (see
+                `environment_progress`).
+
+        Returns:
+            Hash of the run.
+        """
         super().run()
 
+        stages: list[tuple[str, Callable[[], object]]] = []
         if run_from == 'start':
-            self._grid_result = cast(
-                sprakegrid.SprakeGridResult,
-                self.grid.run(self.run_period)
-            )
-
-        if run_from in ('start', 'grid'):        
-            self._generation_result = cast(
-                sprakegeneration.SprakeGenerationResult,
-                self.generation.run(self.run_period)
-            )
-
+            stages.append(('Running the grid module', self._run_grid))
+        if run_from in ('start', 'grid'):
+            stages.append(('Running the generation module', self._run_generation))
         if run_from in ('start', 'grid', 'generation'):
-            self._cs_result = cast(
-                sprakecs.SprakeCSResult,
-                self.consumption_storage.run(self.run_period)
-            )
-        
+            stages.append(('Running the consumption and storage module', self._run_consumption_storage))
+
+        for i, (message, run_module) in enumerate(stages):
+            with _module_progress(progress_callback, i / len(stages), message):
+                run_module()
+
         self._last_hash = hash((self.id, str(self.last_run)))
         return self._last_hash
+
+    def _run_grid(self) -> None:
+        self._grid_result = cast(
+            sprakegrid.SprakeGridResult,
+            self.grid.run(self.run_period)
+        )
+
+    def _run_generation(self) -> None:
+        self._generation_result = cast(
+            sprakegeneration.SprakeGenerationResult,
+            self.generation.run(self.run_period)
+        )
+
+    def _run_consumption_storage(self) -> None:
+        self._cs_result = cast(
+            sprakecs.SprakeCSResult,
+            self.consumption_storage.run(self.run_period)
+        )
+
+@contextmanager
+def _module_progress(
+    progress_callback: Callable[[float, str], None] | None,
+    fraction: float,
+    message: str,
+) -> Iterator[None]:
+    """Report the start of a module of a run, and the waits for environmental data within it."""
+    if progress_callback is None:
+        yield
+        return
+    progress_callback(fraction, message)
+    def on_wait(wait_message: str | None) -> None:
+        progress_callback(fraction, message if wait_message is None else f'{message} - {wait_message}')
+    with environment_progress.reporting_waits(on_wait):
+        yield
     
 
 # SprakeModel copy constructor

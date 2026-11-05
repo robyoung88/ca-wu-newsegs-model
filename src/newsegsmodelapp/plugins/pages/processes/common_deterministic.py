@@ -91,7 +91,12 @@ def deterministic_run_metamodel(
         progress_callback(step, total_steps, f'Model already run - config {sequence_number}')
     else:
         progress_callback(step, total_steps, f'Running model - config {sequence_number}')
-        mm.model.run(run_from = model_run_from)
+
+        # The progress of the model run within this step, such as waits for environmental data
+        def model_progress(fraction: float, message: str, step = step):
+            progress_callback(step + fraction, total_steps, f'Running model - config {sequence_number}: {message}')
+
+        mm.model.run(run_from = model_run_from, progress_callback = model_progress) # pyright: ignore[reportCallIssue]
         # There should be no need to increment the table config;
         # If it was necessary this should have happened in the sync_model_with_changed_variables_deterministic
         # However, if there are simply no results and the model is unchanged, then rightly nothing should be
