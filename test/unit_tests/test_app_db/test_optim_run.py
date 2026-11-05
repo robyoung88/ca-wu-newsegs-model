@@ -53,6 +53,11 @@ class TestOptimRun(unittest.TestCase):
         self.provider.add_component(self.proj)
         self.original_parameters = self.var.parameters
 
+        # The statistic before optimisation, without running the model
+        self.evaluate = mock.patch.object(optim, 'evaluate_statistic', return_value = 1000.).start()
+        self.addCleanup(mock.patch.stopall)
+        self.result_provider = mock.MagicMock()
+
     def _cleanup(self):
         from newsegsmodelapp.backend import db
         for writer in (False, True):
@@ -67,7 +72,7 @@ class TestOptimRun(unittest.TestCase):
         return optim_single_mm.execute_optim_single_mm_run(
             request,
             self.provider,
-            mock.MagicMock(),
+            self.result_provider,
             1,
             lambda *args: None,
             lambda: False,
@@ -75,10 +80,60 @@ class TestOptimRun(unittest.TestCase):
 
     @staticmethod
     def _fake_optimisation(mm, variables, target, method, progress, cancel_status):
-        # Move each variable to its upper bound, as the optimiser would move it to its optimum
+        # Move each variable to its upper bound, as the optimiser would move it to its optimum. The
+        # NPV is maximised, so the optimiser minimises its negative.
         for x in variables:
             mm.variables[x.varid].set_parameters(x.upper)
-        return SimpleNamespace(success = True)
+        return SimpleNamespace(success = True, fun = -1500., message = 'Optimization terminated successfully.')
+
+    def _saved_result(self) -> dict:
+        calls = [c for c in self.result_provider.upsert_result.call_args_list if c.args[0] == 'optimisation_result']
+        self.assertEqual(len(calls), 1)
+        return calls[0].args[2]
+
+    def test_result_saved(self):
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation):
+            self._run()
+        result = self._saved_result()
+        self.assertEqual(result['status'], 'success')
+        self.assertEqual(result['statistic'], 'net_present_value_undiscounted')
+        self.assertTrue(result['maximised'])
+        # Evaluated on the copy, before optimising
+        self.assertEqual(result['start_value'], 1000.)
+        self.assertNotEqual(self.evaluate.call_args.args[0].id, self.mm.id)
+        # The sign of the objective is undone
+        self.assertEqual(result['final_value'], 1500.)
+        self.assertEqual(result['variables'], [{
+            'varid': self.varid, 'label': self.var.label,
+            'before': float(self.original_parameters[0]), 'after': 20., 'lower': 10., 'upper': 20.,
+        }])
+        self.assertEqual(result['metamodel_name'], self.mm.name)
+        self.assertEqual(result['new_metamodel_name'], self.mm.name + ' - Opt')
+        proj = self.provider.get_project(self.proj.id)
+        self.assertEqual(result['new_metamodel_id'], proj.metamodels[1].id)
+
+    def test_failure_saved(self):
+        def fail(mm, variables, target, method, progress, cancel_status):
+            return SimpleNamespace(success = False, fun = -1200., message = 'Maximum number of iterations has been exceeded.')
+        with mock.patch.object(optim, 'run_optimisation', side_effect = fail):
+            self.assertEqual(self._run(), 'ok')
+        result = self._saved_result()
+        self.assertEqual((result['status'], result['success']), ('failure', False))
+        self.assertEqual(result['final_value'], 1200.)
+        self.assertEqual(result['message'], 'Maximum number of iterations has been exceeded.')
+        self.assertIsNone(result['new_metamodel_id'])
+        # No configuration is added
+        self.assertEqual(len(self.provider.get_project(self.proj.id).metamodels), 1)
+
+    def test_no_variables_selected(self):
+        proj = self.provider.get_project(self.proj.id)
+        var = proj.metamodels[0].variables[self.varid]
+        var.optim_selected = False
+        self.provider.variable_provider.upsert_variable([var], force = True)
+        with mock.patch.object(optim, 'run_optimisation') as run:
+            self.assertEqual(self._run(), optim_single_mm.NO_VARIABLES_MESSAGE)
+        run.assert_not_called()
+        self.assertEqual(self._saved_result()['status'], 'not_run')
 
     def test_settings_are_passed_to_the_optimiser(self):
         with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation) as run:
