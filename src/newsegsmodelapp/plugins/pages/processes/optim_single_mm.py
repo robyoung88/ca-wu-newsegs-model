@@ -13,6 +13,7 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegssensitivity import optim
+from newsegsmodelframework.util import naming
 
 
 REQUEST_TYPE = 'optim_run_metamodel'
@@ -54,7 +55,7 @@ def execute_optim_single_mm_run(
 
     Saves an `optimisation_result` (see `optimisation_result`) for the feedback shown afterwards: whether the
     optimisation ran and succeeded, the statistic before and after, and how each variable changed. On success, the
-    optimised copy of the metamodel is added to the project.
+    optimised copy of the metamodel is added to the project, named "<name> - Opt" (made unique), and focussed.
 
     Args:
         request: The request being executed.
@@ -137,11 +138,14 @@ def execute_optim_single_mm_run(
         cancel_status = check_cancel_status,
     )
     if opt.success:
-        mm_copy.name = mm.name + ' - Opt'
+        mm_copy.name = naming.unique_name(mm.name + ' - Opt', (x.name for x in proj.metamodels))
         proj.metamodels.append(mm_copy) # pyright: ignore[reportAttributeAccessIssue]
         for k in vars:
             varid = k.varid
             proj.add_variable(mm_copy.variables[varid])
+        # The optimised configuration is focussed, so that the user sees it; the page reloads the
+        # project when the optimisation completes
+        proj.set_focussed_metamodel(mm_copy.id)
         project_provider.upsert_component(proj)
 
     new_parameters = {k.varid: mm_copy.variables[k.varid].parameters for k in vars}

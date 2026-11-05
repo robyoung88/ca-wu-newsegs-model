@@ -166,20 +166,34 @@ class TestOptimRun(unittest.TestCase):
         self.assertNotEqual(optimised.optim_config.id, original.optim_config.id)
         self.assertEqual(optimised.optim_config.method, 'Powell')
 
+    def test_optimised_configuration_focussed(self):
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation):
+            self._run()
+            self._run()
+        proj = self.provider.get_project(self.proj.id)
+        self.assertEqual(len(proj.metamodels), 3)
+        # The latest optimised configuration is focussed, and each has its own name
+        self.assertEqual(proj.get_focussed_metamodel().id, proj.metamodels[2].id)
+        names = [x.name for x in proj.metamodels]
+        self.assertEqual(len(set(names)), 3)
+        self.assertEqual(names[1], self.mm.name + ' - Opt')
+
     def test_panel_saved_against_the_table_configuration(self):
-        # The panel shown after an optimisation is saved where the results container reads it:
-        # against the project's table configuration
+        # The panel shown after an optimisation is saved where the results container reads it,
+        # against the project's table configuration, and is read back as components
+        from dash import html
+        from dash.development.base_component import Component
         from newsegsmodelapp.backend import db
         from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
         from newsegsmodelapp.plugins.models.aaa_default.processes.output import aaa_default_tables
         from newsegsmodelapp.registers import TableDrawRequest
 
-        # A real result provider, which checks the component results are saved against
+        # A real result provider, which checks the component results are saved against, and saves
+        # them to files as the app does
         result_provider = FromDatabaseResultProvider(db.get_engine, Path(self.db_dir.name) / 'results')
-        result_provider.upsert_result(
-            'optimisation_result', self.proj.table_config,
-            {'success': True, 'opt': SimpleNamespace(success = True, message = 'Optimization terminated successfully.')},
-        )
+        self.result_provider = result_provider
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation):
+            self._run()
         request = TableDrawRequest(project_id = self.proj.id, payload = json.dumps({'metamodel_id': self.mm.id}))
         self.assertEqual(
             aaa_default_tables._make_postopt_tables_sprake(
@@ -190,7 +204,10 @@ class TestOptimRun(unittest.TestCase):
         # Read as the results container reads it
         lproj = self.provider.get_lightweight_project(self.proj.id)
         panel, _ = result_provider.get_result('table_postopt_metamodel', lproj.table_config)
-        self.assertTrue(panel)
+        self.assertIsInstance(panel, html.Div)
+        self.assertTrue(panel.children)
+        self.assertTrue(all(isinstance(x, Component) for x in panel.children))
+        self.assertEqual(panel.children[0].children, 'Optimisation complete')
 
     def test_invalid_bounds_are_reported(self):
         proj = self.provider.get_project(self.proj.id)

@@ -942,7 +942,8 @@ def _make_postopt_tables_sprake(
     if optdict is None:
         return 'missing'
 
-    table_data = optim_feedback.create_optimisation_feedback(optdict)
+    # A component, not a list: a list is saved as JSON, which would turn the components into text
+    table_data = html.Div(optim_feedback.create_optimisation_feedback(optdict))
 
     # Saved against the table configuration, from which the results container reads it; the result
     # provider needs its data-holding description, as do the other tables

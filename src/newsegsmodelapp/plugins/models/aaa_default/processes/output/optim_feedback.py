@@ -131,7 +131,7 @@ def create_optimisation_feedback(result: dict) -> list:
             children.append(html.P([
                 'The optimised values are in the new configuration ',
                 html.B(result['new_metamodel_name']),
-                ', added to the project.',
+                ', added to the project and now focussed.',
             ]))
         children.append(_diagnostics(result))
         return children
