@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Optional
+from typing import Callable, Hashable, Optional, TypeVar
 
 import pandas as pd
 
@@ -12,6 +12,8 @@ from newsegsmodelframework.core.newsegscomponent import TableConfigNewsegsCompon
 from newsegsmodelframework.core.newsegsfinanceinterface import NewsegsFinanceInterface
 from newsegsmodelframework.core import newsegsmodelinterface
 from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, revision_dataclass
+
+T = TypeVar('T')
 
 class NewsegsFinanceData(NewsegsComponent):
     """
@@ -43,7 +45,8 @@ class NewsegsFinance(NewsegsFinanceInterface):
     _finance_version = '0.0.1'
     _id_prefix = COMPONENT_PREFIXES['fm']
 
-    _excluded_attributes = NewsegsFinanceInterface._excluded_attributes.union({'_model'})
+    # The cache of results is for the current run only, so is not saved or copied
+    _excluded_attributes = NewsegsFinanceInterface._excluded_attributes.union({'_model', '_result_cache'})
 
     finance_data = ComponentProperty(default = NewsegsFinanceData)
 
@@ -81,9 +84,42 @@ class NewsegsFinance(NewsegsFinanceInterface):
     def run(self):
         """
         Perform any expensive computation required to "un-dirty" the finance
+
+        Empties the cache of results (see `cached_result`), so must be called before results are read
+        after a run of the model or a change to the configuration.
         """
         super().run()
+        self.clear_result_cache()
         return hash(self)
+
+    def clear_result_cache(self) -> None:
+        """Empty the cache of results (see `cached_result`)."""
+        self._result_cache = (None, {})
+
+    def cached_result(self, key: Hashable, compute: Callable[[], T]) -> T:
+        """A result of the finance model, computed once for the current run.
+
+        Results derived from the same run are often needed several times, such as the costs, which
+        both the NPV and the benefit-cost ratio use. They are cached on the instance, and the cache
+        is emptied by `run`. It is also emptied if the configuration or the run of the model has
+        changed since it was filled (that is, if the hash of the instance has changed), so that
+        a result is never that of an earlier run, and the cache holds the results of one run only.
+
+        Args:
+            key: Key of the result, unique to the function computing it and its arguments.
+            compute: Function computing the result when it is not cached.
+
+        Returns:
+            The result.
+        """
+        state = hash(self)
+        cached_state, cache = self.__dict__.get('_result_cache', (None, {}))
+        if cached_state != state:
+            cache = {}
+            self._result_cache = (state, cache)
+        if key not in cache:
+            cache[key] = compute()
+        return cache[key]
 
     # The model is assumed run, and used to extract results for providing the derived financial properties
     def set_model(
