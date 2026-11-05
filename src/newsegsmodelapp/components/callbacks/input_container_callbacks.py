@@ -66,6 +66,32 @@ def _redraw_headers(rval: dict, header_ids: list[dict], varid: str, var, model_t
         if content_creator:
             rval['header_children'][idx] = content_creator(varid, var)
 
+def input_headers_to_update(
+    triggers: list[callback_utils.Trigger],
+    header_ids: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], bool]:
+    """The input section headers to redraw for the triggers of their callback, and whether to rebuild the inputs.
+
+    A change of layout or of the active project (a string id) redraws every header and rebuilds every input
+    container. Otherwise, each configuration update trigger redraws the header of its section, if the page has one
+    (not every section has, e.g. those of optimisation). These triggers fire with no value after the containers are
+    hydrated, which is ignored. Every trigger is considered, as several may fire together.
+
+    Args:
+        triggers: The triggers of the callback.
+        header_ids: The ids of the headers on the page.
+
+    Returns:
+        The ids of the headers to redraw, in the order of `header_ids`, and whether to rebuild the input containers.
+    """
+    if any(not x.is_pattern() for x in triggers):
+        return list(header_ids), True
+    sections = {
+        (x.id.get('supersection'), x.id.get('section')) for x in triggers # pyright: ignore[reportAttributeAccessIssue]
+        if x.value is not None
+    }
+    return [x for x in header_ids if (x.get('supersection'), x.get('section')) in sections], False
+
 def add_input_container_callbacks(app: NewsegsDash):
     """
     Callbacks to populate input containers.
@@ -108,36 +134,17 @@ def add_input_container_callbacks(app: NewsegsDash):
         if active_project_id is None:
             raise PreventUpdate
         t0 = time.perf_counter()
-        trig = ctx.triggered_id
 
-        if not isinstance(trig, str):
-            if callback_utils.get_triggered_value() is None:
-                # input-group-config-update-trigger are fired after initial hydration with None
-                raise PreventUpdate
-        
+        id_roots, update_contents = input_headers_to_update(
+            callback_utils.get_triggers(), [x['id'] for x in ctx.outputs_grouping['headers']]
+        )
+        if not id_roots:
+            raise PreventUpdate
+
         rval = callback_utils.create_noupdate_return()
-
-        update_all_headers = isinstance(trig, str) # i.e. 'layout-update-trigger' or 'active-project-id'
-        # If trigger is not a layout change (or project change) then no need to redraw the inputs
-        update_contents = update_all_headers                 
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
-
-        id_roots = []
-        if update_all_headers:
-            for container_id in ctx.outputs_grouping['headers']:
-                id_roots.append(container_id['id'])
-        else:
-            container_id = {
-                'type': 'input-section-header',
-                'supersection': trig['supersection'],
-                'section': trig['section'],
-            }
-            # Not every section has a header (e.g. those of optimisation), so only update one on the page
-            if not any(x['id'] == container_id for x in ctx.outputs_grouping['headers']):
-                raise PreventUpdate
-            id_roots = [container_id]
 
         for container_id in id_roots:
             supersection = container_id.get('supersection')

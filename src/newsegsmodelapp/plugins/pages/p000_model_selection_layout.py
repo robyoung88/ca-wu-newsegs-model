@@ -3,13 +3,14 @@
 import logging
 logger = logging.getLogger(__name__)
 
-import json
 
-from dash import ALL, Input, Output, ctx, html
+from typing import cast
+
+from dash import ALL, Input, Output, html
 from dash.exceptions import PreventUpdate
 
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
-from newsegsmodelapp.components import navigation
+from newsegsmodelapp.components import callback_utils, navigation
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.types import ComponentType, LayoutConfiguration, Page
 from newsegsmodelapp import registers
@@ -109,16 +110,12 @@ def assign_callbacks(app: NewsegsDash):
         prevent_initial_call = True,
     )
     def update_model_type(btn_click):
-        trig = ctx.triggered
-        if len(trig) > 1:
-            # Can only set one model at a time
+        # The buttons fire together, with no clicks, when they are drawn: act on the one clicked
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None or not clicked.is_pattern():
             raise PreventUpdate
-        trig = trig[0]
 
-        if trig['value'] is None:
-            raise PreventUpdate
-        
-        pid = json.loads(trig['prop_id'].rstrip('.n_clicks'))
+        pid = cast(dict, clicked.id)
         match pid['label']:
             case 'sprake':
                 model_type = 'sprake'

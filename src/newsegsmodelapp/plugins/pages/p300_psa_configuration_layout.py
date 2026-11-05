@@ -439,6 +439,23 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
         b2_contents,
     )
 
+def psa_plot_triggers(triggers: list[callback_utils.Trigger]) -> tuple[bool, str | None]:
+    """What the triggers of the PSA plot callback ask for: every trigger is considered, as several may fire together.
+
+    A change of the active project or of the plot type redraws the plot and its controls. New results and changes of
+    the plot's controls update the plot drawn (which the callback redraws if the plot type isn't drawn yet).
+
+    Args:
+        triggers: The triggers of the callback.
+
+    Returns:
+        Whether to redraw the plot and its controls, and the plot type chosen, if it changed.
+    """
+    plot_type_changes = [x for x in triggers if x.is_pattern() and x.id.get('purpose') == 'plot-type'] # pyright: ignore[reportAttributeAccessIssue]
+    full_draw = bool(plot_type_changes) or any(not x.is_pattern() for x in triggers)
+    graph_type = next((x.value for x in plot_type_changes if x.value), None)
+    return full_draw, graph_type
+
 def add_psa_run_callbacks(app: NewsegsDash):
     """Bind the callbacks which run, cancel, download and upload the PSA.
 
@@ -487,16 +504,12 @@ def add_psa_run_callbacks(app: NewsegsDash):
         modal_close_button,
         psa_prerun_button,
     ):
-        clicks = callback_utils.get_triggered_value()
-        if not clicks:
-            raise PreventUpdate
-        
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
 
         rval = callback_utils.create_noupdate_return()
-        if trig_id == 'btn-psa-prerun':
+        if clicked.id == 'btn-psa-prerun':
             rval['modal']['is_opens'] = True
         else:
             rval['modal']['is_opens'] = False
@@ -546,12 +559,10 @@ def add_psa_run_callbacks(app: NewsegsDash):
         options,
         active_project_id,
     ):
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
-        click = callback_utils.get_triggered_value()
-        if not click:
-            raise PreventUpdate
+        trig_id = clicked.id
 
         rval = callback_utils.create_noupdate_return()
         
@@ -840,8 +851,8 @@ def add_psa_run_callbacks(app: NewsegsDash):
         if len(plot_container['ids']) == 0 or len(graph_selection_dropdown['values']) == 0:
             raise PreventUpdate
         
-        trig = ctx.triggered_id
-        if trig is None:
+        triggers = callback_utils.get_triggers()
+        if not triggers:
             raise PreventUpdate
         
         proj = app.project_provider.get_project(active_project_id)
@@ -858,13 +869,7 @@ def add_psa_run_callbacks(app: NewsegsDash):
                 rval['plot']['figures'] = plot_funcs['draw'](None)
             return rval
         
-        graph_type = None
-        full_draw = False
-        if isinstance(trig, str) or trig.get('purpose') == 'plot-type':
-            # Need to do a full graph refresh
-            full_draw = True
-            if not isinstance(trig, str):
-                graph_type = callback_utils.get_triggered_value()
+        full_draw, graph_type = psa_plot_triggers(triggers)
         
         if graph_type is None:
             graph_type = graph_selection_dropdown['values'][0]

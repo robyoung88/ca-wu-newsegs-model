@@ -544,11 +544,12 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
         n_clicks_hdr,
         active_project_id
     ):
-        trig = ctx.triggered_id
-        if trig is None or len(ctx.triggered) > 1 or not callback_utils.get_triggered_value() or not active_project_id:
+        # The buttons fire together, with no clicks, when they are drawn: act on the one clicked
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None or not active_project_id:
             raise PreventUpdate
 
-        mm_index = trig['index']
+        mm_index = clicked.id['index'] # pyright: ignore[reportIndexIssue, reportCallIssue, reportArgumentType]
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Setting focussed metamodel')
         lproj = provider.get_lightweight_project(active_project_id)
@@ -780,14 +781,11 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
             )
         )
 
-        trig_id = ctx.triggered_id
-        
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None or not clicked.is_pattern():
             return rval
-        trig_val = ctx.triggered
-        if len(trig_val) > 1 or trig_val[0].get('value') is None:
-            return rval
-        
+        trig_id = cast(dict, clicked.id)
+
         match trig_id.get('type'):
             case 'results-predownload-btn':
                 config_index_str = trig_id.get('key')
