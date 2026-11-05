@@ -1,7 +1,11 @@
-/* Navigation bar: a toggle button and a collapsible drawer of navigation buttons (see
-   components/navigation.py). The drawer opens as a column while the four-pane layout is stacked,
-   and as a row once the panes sit side by side (the breakpoint of panes.css). It opens to fit all
-   of its buttons: --nav-button-count is set on the drawer by create_navigation_component. */
+/* ==========================================================================
+   Navigation
+   The navigation bar (components/navigation.py): a toggle button and a collapsible drawer of navigation buttons. The
+   drawer opens as a column while the panes are stacked, and as a row once they sit side by side (the breakpoint of the
+   layout). It opens to fit all of its buttons: --nav-button-count is set on the drawer by
+   create_navigation_component.
+   ========================================================================== */
+
 div.newsegs-navbar {
     --nav-drawer-duration: 0.3s;
     --nav-button-width: 58px;   /* .newsegs-nav-button width plus horizontal margins */
@@ -10,10 +14,20 @@ div.newsegs-navbar {
     flex-direction: column;
     align-items: flex-start;
     width: auto;
-    border-color: #ccc;
+    border: 1px solid var(--bs-border-color);
     border-radius: 10px;
-    border-style: solid;
-    border-width: 1px;
+}
+
+.newsegs-nav-button {
+    width: 48px;
+    margin: 2px 5px;
+}
+
+.newsegs-options-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin: 2px 5px;
 }
 
 .newsegs-nav-drawer {
@@ -69,17 +83,4 @@ div.newsegs-navbar.expanded .newsegs-nav-toggle {
     div.newsegs-navbar {
         --nav-drawer-duration: 0s;
     }
-}
-
-.newsegs-project-selector .action-button {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-}
-.newsegs-project-selector .toggle-controls {
-    align-self: end;
-}
-
-.newsegs-project-selector .header {
-    width: 100%;
 }

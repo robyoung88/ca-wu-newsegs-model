@@ -9,6 +9,7 @@ import json
 import plotly.express as px
 
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
+from newsegsmodelapp.components import colours
 from newsegsmodelapp.components import energy_balance_estimation
 from newsegsmodelapp.components.get_focussed_metamodel import get_focussed_lightweight_metamodel
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
@@ -100,6 +101,7 @@ _feedback_graph_bar = partial(
     px.bar,
     x = 'value',
     color = 'label',
+    template = colours.PLOT_TEMPLATES,
     orientation = 'h'
 )
 
@@ -110,9 +112,10 @@ _feedback_graph_layout = dict(
         'x': 0.5,
         'xanchor': 'center',
         'yanchor': 'top',
-        'font': {'size': 12, 'family': 'Arial', 'color': '#212529', 'weight': 'bold'}
+        'font': {'size': 12, 'family': 'Arial', 'color': colours.TEXT, 'weight': 'bold'}
     },
     showlegend=False,
+    template=colours.PLOT_TEMPLATES,
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)',
     bargap=0.75
