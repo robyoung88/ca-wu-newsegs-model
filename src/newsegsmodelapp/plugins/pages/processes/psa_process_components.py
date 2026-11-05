@@ -29,6 +29,8 @@ def psa_process_components(**kwargs):
                         'metamodel',
                         id = 'psa-run-scope',
                     ),
+                    # For all configurations: how many variables have different distributions or SDs across them
+                    html.P(id = 'psa-run-differences-note', className = 'psa-run-differences-note'),
                 ]),
                 dbc.ModalFooter([
                     dbc.Button(

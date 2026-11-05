@@ -190,11 +190,11 @@ def update_single_parameter(
 
     var_instance_id = lmm.variables[varid]
     var = provider.variable_provider.get_variable(var_instance_id)
-    
+
     now = time.time_ns()
-    
-    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = update_variable(
-        var, value = new_val, **update_variable_keys # pyright: ignore[reportArgumentType]
+
+    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = apply_parameter_change(
+        provider, lproj, var, new_val, **update_variable_keys
     )
 
     # Feed back current parameters
@@ -234,6 +234,39 @@ def update_single_parameter(
                     return_dict['trigger_data'][idx] = now
 
     if update_ok:
+        _signal_summary_refresh(return_dict, now)
+
+    return return_dict
+
+def apply_parameter_change(
+    provider: FromDatabaseNewsegsProjectProvider,
+    lproj: LightweightNewsegsProject,
+    var,
+    new_val: Any,
+    parameter_index: int = 0,
+    vector_location: int = 0,
+) -> tuple[bool, bool, bool, bool, Any]:
+    """Change a parameter of a variable of a project, and save it if the value is accepted.
+
+    The configurations using the variable, their tables and the project are revised, and the processes the change
+    affects are marked stale for those configurations. The variable need not be that of the focussed configuration.
+
+    Args:
+        provider: Provider of the project.
+        lproj: The lightweight project.
+        var: The variable.
+        new_val: The new value.
+        parameter_index: Index of the parameter.
+        vector_location: Position within an array parameter.
+
+    Returns:
+        As `update_variable`: whether the value was accepted, whether the deterministic value, the DSA bounds and the
+        PSA statistics changed, and the raw parameters, which are those saved if the value was rejected.
+    """
+    update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params = update_variable(
+        var, value = new_val, parameter_index = parameter_index, vector_location = vector_location
+    )
+    if update_ok:
         # Sync the variable
         provider.variable_provider.upsert_variable(var)
 
@@ -247,7 +280,7 @@ def update_single_parameter(
                 table_components_to_revise.append(mm.finance.table_config.id)
                 metamodels_to_revise.append(mm.id)
         table_components_to_revise.append(lproj.table_config.id)
-        
+
         provider._component_provider.increment_revision(table_components_to_revise)
         provider.metamodel_provider.increment_revision(metamodels_to_revise)
         provider.increment_revision(lproj.id)
@@ -256,9 +289,7 @@ def update_single_parameter(
             metamodels_to_revise,
             staleness.processes_affected(deterministic_changed, dsa_changed, psa_changed),
         )
-        _signal_summary_refresh(return_dict, now)
-
-    return return_dict
+    return update_ok, deterministic_changed, dsa_changed, psa_changed, raw_params
 
 def create_value_reset_button(
     param_id: VariableInstanceParameterComponentID
@@ -531,7 +562,7 @@ def _build_opened_editor(
     return return_dict
 
 # -----------------------------------------------
-# Variable group cycling
+# Variable groups
 # -----------------------------------------------
 
 @dataclass(frozen = True)
@@ -659,9 +690,10 @@ def create_variable_sharing_summary(
     param_id: VariableInstanceParameterComponentID,
     contents: list,
 ):
-    """Create the summary which shows how the configurations share a variable, and cycles the sharing when clicked.
+    """Create the summary which shows how the configurations share a variable.
 
-    Its id is that of the `variable-status-toggle` action, which the input handler of that purpose acts on.
+    It is redrawn by its row's refresh trigger (see `create_variable_summary_refresh_trigger`). In a project with
+    several configurations it is the summary of the row's group editor (see `components.group_editor`).
 
     Args:
         param_id: Identification of the variable parameter that the input edits.
@@ -671,14 +703,13 @@ def create_variable_sharing_summary(
         The summary.
     """
     summary_id = copy.copy(param_id)
-    summary_id.type = 'input-action-button'
-    summary_id.purpose = 'variable-status-toggle'
+    summary_id.type = 'variable-sharing-summary'
+    summary_id.purpose = 'summary'
 
     return html.Div(
         contents,
         id = summary_id.as_dict(),
         className = 'variable-sharing-summary',
-        title = 'Change which configurations share this input',
     )
 
 def create_variable_summary_refresh_trigger(param_id: VariableInstanceParameterComponentID):
@@ -701,122 +732,6 @@ def _signal_summary_refresh(return_dict: dict[str, Any], now: int):
     """Set every sharing summary refresh trigger of the row"""
     if 'summary_refresh' in return_dict:
         return_dict['summary_refresh'] = [now] * len(return_dict['summary_refresh'])
-
-@register_input_handler('variable-status-toggle', 'input-action-button')
-def _toggle_variable_sharing(
-    triggered_id: dict,
-    input_ids: list[dict[str, str]],
-    header_ids: list[dict[str, str]],
-    trigger_ids: list[dict[str, str]],
-    calling_dict: dict,
-    active_project_id: str,
-    project_provider: NewsegsProjectProviderInterface,
-    return_dict: dict[str, Any],
-) -> dict:
-    val = callback_utils.get_triggered_value()
-    if val is None:
-        return return_dict
-
-    provider = cast(FromDatabaseNewsegsProjectProvider, project_provider)
-    lproj = provider.get_lightweight_project(active_project_id)
-    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
-
-    varid = make_varid(**triggered_id)
-
-    current_mm_idx = lproj.metamodels.index(lmm)
-    current_uid = lmm.variables[varid]
-
-    # The configuration cycles through sharing each instance held by other configurations, in the order of the
-    # configurations, then having an instance of its own (None). Configurations without the variable take no part.
-    shareable = [
-        cast(str, x.var_uid) for x in get_variable_groups(lproj, varid)
-        if x.var_uid is not None and set(x.metamodel_indices) - {current_mm_idx}
-    ]
-    targets: list[str | None] = [*shareable, None]
-    if len(targets) < 2:
-        return return_dict
-    current_target = current_uid if current_uid in shareable else None
-    next_target = targets[(targets.index(current_target) + 1) % len(targets)]
-
-    old_var = project_provider.variable_provider.get_variable(current_uid)
-
-    vars_to_delete = []
-    if current_target is None:
-        # The configuration's own instance is left without a configuration
-        vars_to_delete.append(current_uid)
-
-    if next_target is None:
-        var = project_provider.variable_provider.duplicate_variable(current_uid)
-        lmm.variables[varid] = var.id
-        project_provider.add_variables_to_project(lproj.id, [var])
-    else:
-        lmm.variables[varid] = next_target
-
-    if vars_to_delete:
-        project_provider.remove_variables_from_project(lproj.id, vars_to_delete)
-
-    # Update the variable junction table for the metamodel
-    var = project_provider.variable_provider.get_lightweight_variable(lmm.variables[varid])
-    project_provider.metamodel_provider.refresh_metamodel_variable_junction(
-        lmm,
-        [var]
-    )
-
-    # Invalidate tables
-    project_provider._component_provider.increment_revision(
-        [
-            lmm.table_config.id,
-            lproj.table_config.id
-        ]
-    )
-    project_provider.metamodel_provider.increment_revision(lmm.id)
-    project_provider.increment_revision(lproj.id)
-
-    db_staleness.mark_inputs_changed(
-        lmm.id,
-        staleness.processes_affected_by_variable_swap(
-            old_var, project_provider.variable_provider.get_variable(lmm.variables[varid])
-        ),
-    )
-
-    if isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
-        project_provider.delete_orphan_variables()
-
-    # Return update signals to refresh input card headers and values
-
-    # Feed back current parameters
-    rps = (var.raw_parameter_0, var.raw_parameter_1)
-    for idx, id in enumerate(input_ids):
-        if id['purpose'] == 'parameter':
-            pi = id['parameter_index']
-            new_param = rps[pi] # pyright: ignore[reportCallIssue, reportArgumentType]
-            if not isinstance(new_param, np.ndarray):
-                return_dict['input_values'][idx] = new_param
-            else:
-                vi = id['vector_location']
-                new_val = new_param.flat[vi] # pyright: ignore[reportArgumentType, reportCallIssue]
-                return_dict['input_values'][idx] = new_val
-
-    # Update headers
-    for idx, id in enumerate(header_ids):
-        try:
-            content_creator = get_single_input_header_content_creator(
-                id['supersection'], id['section'], lmm.model.model_type
-            )
-        except KeyError:
-            content_creator = None
-        if content_creator:
-            varid =  make_varid(**triggered_id)
-            return_dict['header_children'][idx] = content_creator(varid, lmm)
-
-    now = time.time_ns()
-
-    # Update triggers
-    for idx, id in enumerate(trigger_ids):
-        return_dict['trigger_data'][idx] = now
-    _signal_summary_refresh(return_dict, now)
-
-    return return_dict
 
 @register_input_handler('toggle-optim-active', 'input-toggle')
 def _set_variable_optim_active(

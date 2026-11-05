@@ -3,7 +3,7 @@
 The deterministic, DSA, PSA and optimisation pages each show every variable in the form suited to the page: for DSA, its value and bounds; for PSA, its
 distribution and the parameters of that distribution; for optimisation, its bounds. The `create_...` functions build these inputs, and the `compose_...` functions assemble them from their parts.
 """
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 from collections import OrderedDict
 
 from dash import dcc, html
@@ -223,27 +223,33 @@ def _create_numeric_inputgroup_from_var(
     type_id: str | None = None,
     supersection: str = 'deterministic',
     purpose: str = 'parameter',
+    variable_id: VariableInstanceParameterComponentID | None = None,
 ):
     if type_id is None:
         type_id = f'single-input-config'
-    
-    variable_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = type_id,
-        supersection = supersection,
-        purpose = purpose,
-        parameter_index = parameter_index
-    )
+
+    if variable_id is None:
+        variable_id = VariableInstanceParameterComponentID.from_variable(
+            var,
+            type = type_id,
+            supersection = supersection,
+            purpose = purpose,
+            parameter_index = parameter_index
+        )
 
     pars = [var.raw_parameter_0, var.raw_parameter_1]
-    
+    value = pars[parameter_index]
+    # Arrays are lists when read from the database; one of a single value is edited as a number
+    if isinstance(value, (list, tuple)) and len(value) == 1:
+        value = value[0]
+
     return dbc.InputGroup(
         [
             dbc.InputGroupText(parameter_name + ":"), # pyright: ignore[reportCallIssue]
             
             create_numeric_variable_parameter_input(
                 variable_id,
-                value = pars[parameter_index], # pyright: ignore[reportArgumentType]
+                value = value, # pyright: ignore[reportArgumentType]
                 placeholder = parameter_name,
                 min = min,
                 max = max,
@@ -255,6 +261,8 @@ def _create_numeric_inputgroup_from_var(
 def create_dsa_bounds_inputs_scalar(
     bounds_type: variable.DSA_BOUNDS_TYPE,
     var: FullLightweightVariable,
+    id_lower: VariableInstanceParameterComponentID | None = None,
+    id_upper: VariableInstanceParameterComponentID | None = None,
 ):
     """Create the inputs of the lower and upper DSA bounds of a scalar variable.
 
@@ -263,21 +271,20 @@ def create_dsa_bounds_inputs_scalar(
     Args:
         bounds_type: How the DSA bounds are specified.
         var: The variable.
+        id_lower: Identification of the lower bound's input; by default the focussed configuration's.
+        id_upper: Identification of the upper bound's input; by default the focussed configuration's.
 
     Returns:
         The inputs.
     """
-    type_id_lower = f'input-dsabound-lower'
-    type_id_upper = f'input-dsabound-upper'
-
-    variable_id_lower = VariableInstanceParameterComponentID.from_lightweight_variable(
+    variable_id_lower = id_lower if id_lower is not None else VariableInstanceParameterComponentID.from_lightweight_variable(
         var,
         type = 'single-input-config',
         supersection = 'dsa',
         purpose = 'bound-lower',
     )
 
-    variable_id_upper = VariableInstanceParameterComponentID.from_lightweight_variable(
+    variable_id_upper = id_upper if id_upper is not None else VariableInstanceParameterComponentID.from_lightweight_variable(
         var,
         type = 'single-input-config',
         supersection = 'dsa',
@@ -392,6 +399,7 @@ def create_dsa_bound_type_selector(
     permitted_dsa_bounds,
     selected_bound,
     var: variable.Variable,
+    id_: VariableInstanceParameterComponentID | None = None,
 ):
     """Create the selector of the type of DSA bound.
 
@@ -401,16 +409,18 @@ def create_dsa_bound_type_selector(
         permitted_dsa_bounds: The kinds of DSA bound that the distribution permits.
         selected_bound: The kind of bound currently selected.
         var: The variable.
+        id_: Identification of the selector; by default the focussed configuration's.
 
     Returns:
         The selector.
     """
-    id_ = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-dropdown',
-        supersection = 'dsa',
-        purpose = 'dsaboundtype'
-    )
+    if id_ is None:
+        id_ = VariableInstanceParameterComponentID.from_variable(
+            var,
+            type = 'input-dropdown',
+            supersection = 'dsa',
+            purpose = 'dsaboundtype'
+        )
     return [
         dcc.Dropdown(
             permitted_dsa_bounds,
@@ -421,64 +431,98 @@ def create_dsa_bound_type_selector(
         )
     ]
 
+_DSA_PARAMETERS = {
+    # distribution: (label, parameter index, step scale, limited to the input's range)
+    'constant': [('Value', 0, 1., True)],
+    'numeric_constant': [('Value', 0, 1., True)],
+    'normal': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+    'beta': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+    'gamma': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+}
+
+def create_dsa_input_parts(
+    var: FullLightweightVariable,
+    id_for: Callable[..., VariableInstanceParameterComponentID] | None = None,
+) -> dict[str, list]:
+    """Create the inputs of a Variable's DSA settings: its distribution's parameters, its bound type and its bounds.
+
+    Args:
+        var: The Variable.
+        id_for: Makes the identification of an input from its purpose (`group-value`, `group-dsaboundtype`,
+            `group-dsa-bound-lower` or `group-dsa-bound-upper`) and parameter index, for a group other than the
+            focussed configuration's. By default, the inputs are the focussed configuration's, with their usual ids,
+            and the bounds are held in the `bounds-container` which `update_dsa_input_contents` redraws.
+
+    Returns:
+        `parameters`, `bound_type_selector` and `bounds`, each a list of components.
+    """
+    distribution = var.distribution if isinstance(var, FullLightweightVariable) else var.distribution.distribution
+    if distribution not in _DSA_PARAMETERS:
+        raise ValueError(f'Distribution {distribution} not currently supported')
+    permitted = ['absolute', 'relative', 'offset'] + ([] if 'constant' in distribution else ['interval'])
+
+    parameters = [
+        _create_numeric_inputgroup_from_var(
+            var, label, index, stepscale = stepscale,
+            min = var.interface_min if limited else 0, max = var.interface_max if limited else None,
+            supersection = 'dsa',
+            variable_id = id_for('group-value', index) if id_for else None,
+        )
+        for label, index, stepscale, limited in _DSA_PARAMETERS[distribution]
+    ]
+    selector = create_dsa_bound_type_selector(
+        permitted, var.dsa_bounds_type, var, # pyright: ignore[reportArgumentType]
+        id_ = id_for('group-dsaboundtype') if id_for else None,
+    )
+    if id_for:
+        bounds = create_dsa_bounds_inputs_scalar(
+            var.dsa_bounds_type, var, # pyright: ignore[reportArgumentType]
+            id_lower = id_for('group-dsa-bound-lower'), id_upper = id_for('group-dsa-bound-upper'),
+        )
+    else:
+        bounds_container_id = VariableInstanceParameterComponentID.from_variable(
+            var, type = 'input-component', supersection = 'dsa', purpose = 'bounds-container'
+        )
+        bounds = [html.Span(create_dsa_bounds_inputs_scalar(var.dsa_bounds_type, var), id = bounds_container_id.as_dict())] # pyright: ignore[reportArgumentType]
+    return {'parameters': parameters, 'bound_type_selector': selector, 'bounds': bounds}
+
 def compose_dsa_input(
     header_component,
-    parameter_component,
-    dsa_bound_type_selector,
-    dsa_bound_component,
-    var: variable.Variable,
+    var: variable.Variable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
-    """Compose the DSA input of a variable from its parts.
+    """Compose the DSA input of a variable: its toggle, and a row which opens to its group editor.
+
+    The row's summary holds the header, and below it a summary of the groups (see
+    `dsa_group_editor.create_dsa_sharing_summary_contents`), which its refresh trigger redraws. Opening the row builds
+    the editor (`dsa_group_editor.create_dsa_group_editor_contents`), which holds the focussed configuration's inputs
+    and, with several configurations, the other groups'. The row has a hidden anchor, so that the toggle reaches
+    `react_to_input_change` while the editor's inputs aren't built (see `input_components.create_lazy_input_details`).
 
     Args:
         header_component: The header.
-        parameter_component: The component for the parameters of the distribution.
-        dsa_bound_type_selector: The selector of the type of bound.
-        dsa_bound_component: The component for the bounds.
         var: The variable.
+        summary_contents: The summary of the groups.
+        n_configurations: The number of configurations of the project; with several, the row can move them.
 
     Returns:
         The input.
     """
-    overall_input_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-component',
-        supersection = 'dsa',
-        purpose = 'input-group-container',
-    )
-
-    toggle_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-toggle',
-        supersection = 'dsa',
-        purpose = 'dsa-active'
-    )
-
-    header_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'single-input-header',
-        supersection = 'dsa',
-        purpose = 'header',
-    )
-
-    bounds_container_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-component',
-        supersection = 'dsa',
-        purpose = 'bounds-container'
-    )
-
-    trigger_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-group-config-update-trigger',
-        supersection = 'dsa',
-        purpose = 'trigger',
-    )
+    def row_id(type_: str, purpose: str):
+        return VariableInstanceParameterComponentID.from_variable(var, type = type_, supersection = 'dsa', purpose = purpose) # pyright: ignore[reportArgumentType]
 
     if var.dsa_selected:
         cn = 'dsa-input-single-value-block'
     else:
         cn = 'dsa-input-single-value-block deselected'
+
+    stores = [
+        dcc.Store(id = row_id('input-group-config-update-trigger', 'trigger').as_dict()),
+        dcc.Store(id = row_id('variable-summary-refresh-trigger', 'trigger').as_dict()),
+    ]
+    if n_configurations > 1:
+        stores.append(dcc.Store(id = row_id('group-move-request', 'move').as_dict()))
 
     return html.Div([
         daq.ToggleSwitch(
@@ -486,34 +530,34 @@ def compose_dsa_input(
             className = 'dsa-toggle',
             size = 30,
             value = var.dsa_selected,
-            id = toggle_id.as_dict(),
+            id = row_id('input-toggle', 'dsa-active').as_dict(),
         ),
         html.Details([
             html.Summary(
-                header_component,
+                [
+                    html.Div(header_component, id = row_id('single-input-header', 'header').as_dict(), className = 'dsa-configuration-header'),
+                    html.Div(
+                        summary_contents or [],
+                        id = row_id('variable-sharing-summary', 'summary').as_dict(),
+                        className = 'variable-sharing-summary dsa-sharing-summary',
+                    ),
+                ],
                 className='dsa-configuration-summary',
-                id = header_id.as_dict()
+                id = row_id('input-summary', 'group-editor-toggle').as_dict(),
             ),
-            html.Div((
-                parameter_component
-                + dsa_bound_type_selector
-                + [
-                    html.Span(
-                        dsa_bound_component,
-                        id = bounds_container_id.as_dict()
-                    )
-                ]
-            ))
+            html.Div([], id = row_id('input-group-editor', 'editor').as_dict()),
+            dcc.Input(id = row_id('single-input-config', 'editor-anchor').as_dict(), type = 'hidden'),
         ],
+        className = 'group-editor-details dsa-group-editor-details',
         ),
-        dcc.Store(id = trigger_id.as_dict())
+        *stores,
     ],
     className=cn,
-    id = overall_input_id.as_dict(),
+    id = row_id('input-component', 'input-group-container').as_dict(),
     )
 
 def _default_formatter_scalar(dp: int):
-    fstring = '{:,.' + f'{dp:d}'+'f}'   
+    fstring = '{:,.' + f'{dp:d}'+'f}'
     return fstring.format
 
 # REVIEW (unreferenced): no references to `_default_formatter_vector` found in src/, scripts/ or data/.
@@ -522,6 +566,24 @@ def _default_formatter_vector(dp: int):
     def formatter(seq: variable.NumericVectorParam) -> Sequence[str]:
         return [fstring.format(x) for x in seq]
     return formatter
+
+def dsa_value_formatter(var: variable.Variable | FullLightweightVariable) -> Callable[[Any], str]:
+    """The formatter of a variable's values in its DSA header and summary.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        The formatter.
+    """
+    is_lvar = isinstance(var, FullLightweightVariable)
+    dist = var.distribution if is_lvar else var.distribution.distribution
+    if dist == 'constant':
+        return _autoformat
+    if is_lvar:
+        dp = var.formatter_dp
+        return _default_formatter_scalar(dp) if dp is not None else _autoformat
+    return var.value_formatter
 
 def create_dsa_header(
     var: variable.Variable | FullLightweightVariable,
@@ -535,20 +597,8 @@ def create_dsa_header(
         The header.
     """
     is_lvar = isinstance(var, FullLightweightVariable)
+    fmt = dsa_value_formatter(var)
 
-    dist = var.distribution if is_lvar else var.distribution.distribution
-    if dist == 'constant':
-        fmt = _autoformat
-    else:
-        if is_lvar:
-            dp = var.formatter_dp
-            if dp is not None:
-                fmt = _default_formatter_scalar(dp)
-            else:
-                fmt = _autoformat
-        else:
-            fmt = var.value_formatter
-    
     if var.unit == '':
         label = var.label
     else:
@@ -559,155 +609,30 @@ def create_dsa_header(
     uboundval = var.dsa_value_upper if is_lvar else var.get_dsa_value('upper', True)
 
     hdr = create_dsa_input_scalar_numeric_header(
-        label, 
+        label,
         fmt(det_val),
         fmt(lboundval),
         fmt(uboundval),
     )
-    
+
     return hdr
 
-def create_dsa_input_scalar_constant(
-    var: variable.ScalarVariable,
+def create_dsa_input_scalar(
+    var: variable.ScalarVariable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
-    """Create the DSA input of a constant scalar variable.
+    """Create the DSA input of a scalar variable, of any of the supported distributions.
 
     Args:
         var: The variable.
+        summary_contents: The summary of the groups (see `compose_dsa_input`).
+        n_configurations: The number of configurations of the project.
 
     Returns:
         The input.
     """
-    return compose_dsa_input(
-        create_dsa_header(var),
-        [
-             _create_numeric_inputgroup_from_var(
-                var, 'Value', 0,  # pyright: ignore[reportArgumentType]
-                min = var.interface_min, max = var.interface_max, 
-                supersection = 'dsa' # pyright: ignore[reportArgumentType]
-            ),
-        ],
-        create_dsa_bound_type_selector(
-            ['absolute', 'relative', 'offset'],
-            var.dsa_bounds_type,
-            var,
-        ),
-        create_dsa_bounds_inputs_scalar(
-            var.dsa_bounds_type,
-            var, # pyright: ignore[reportArgumentType]
-        ),
-        var
-    )
-
-
-# A form element for a normally distributed variable
-# e.g. a scaling factor for expected annual insolation
-def create_dsa_input_scalar_normal(
-    var: variable.NumericScalarVariable,
-):
-    """Create the DSA input of a normally distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return compose_dsa_input(
-        create_dsa_header(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, 
-                min = var.interface_min, max = var.interface_max,
-                supersection = 'dsa'
-            ),
-            _create_numeric_inputgroup_from_var(
-                var, 'SD', 1, stepscale = 0.1,
-                supersection = 'dsa'
-            ),
-        ],
-        create_dsa_bound_type_selector(
-            ['absolute', 'relative', 'offset', 'interval'],
-            var.dsa_bounds_type,
-            var,
-        ),
-        create_dsa_bounds_inputs_scalar(
-            var.dsa_bounds_type,
-            var,
-        ),
-        var
-    )
-
-def create_dsa_input_scalar_beta(
-    var: variable.NumericScalarVariable,
-):
-    """Create the DSA input of a beta distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return compose_dsa_input(
-        create_dsa_header(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
-                supersection = 'dsa'
-            ),
-            _create_numeric_inputgroup_from_var(
-                var, 'SD', 1, stepscale = 0.1,
-                supersection = 'dsa'
-            ),
-        ],
-        create_dsa_bound_type_selector(
-            ['absolute', 'relative', 'offset', 'interval'],
-            var.dsa_bounds_type,
-            var,
-        ),
-        create_dsa_bounds_inputs_scalar(
-            var.dsa_bounds_type,
-            var,
-        ),
-        var
-    )
-
-def create_dsa_input_scalar_gamma(
-    var: variable.NumericScalarVariable,
-):
-    """Create the DSA input of a gamma distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    type_id = f'input-{var.configuration_type}-config'
-    return compose_dsa_input(
-        create_dsa_header(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
-                supersection = 'dsa'
-            ),
-            _create_numeric_inputgroup_from_var(
-                var, 'SD', 1, stepscale = 0.1,
-                supersection = 'dsa'
-            ),
-        ],
-        create_dsa_bound_type_selector(
-            ['absolute', 'relative', 'offset', 'interval'],
-            var.dsa_bounds_type,
-            var,
-        ),
-        create_dsa_bounds_inputs_scalar(
-            var.dsa_bounds_type,
-            var,
-        ),
-        var
-    )
+    return compose_dsa_input(create_dsa_header(var), var, summary_contents, n_configurations)
 
 def create_psa_input_scalar_numeric_header(
     label: str,
@@ -838,172 +763,131 @@ def create_psa_distribution_component(
     ]
 
 
+_PSA_PARAMETERS = {
+    # distribution: (label, parameter index, step scale, limited to the input's range)
+    'constant': [('Value', 0, 1., True)],
+    'numeric_constant': [('Value', 0, 1., True)],
+    'normal': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+    'beta': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+    'gamma': [('Mean', 0, 1., True), ('SD', 1, 0.1, False)],
+}
+
+def psa_parameter_labels(distribution: str) -> list[str]:
+    """The labels of the parameters of a distribution on the PSA page: `Value`, or `Mean` and `SD`."""
+    if distribution not in _PSA_PARAMETERS:
+        raise ValueError(f'Distribution {distribution} not currently supported')
+    return [x[0] for x in _PSA_PARAMETERS[distribution]]
+
+def create_psa_input_parameters(
+    var: FullLightweightVariable,
+    id_for: Callable[..., VariableInstanceParameterComponentID] | None = None,
+) -> list:
+    """Create the inputs of a Variable's distribution parameters on the PSA page: Value, or Mean and SD.
+
+    Args:
+        var: The Variable.
+        id_for: Makes the identification of an input from its purpose (`group-value`) and parameter index, for a group
+            other than the focussed configuration's. By default, the inputs are the focussed configuration's, with
+            their usual ids.
+
+    Returns:
+        The inputs, one for each parameter.
+    """
+    distribution = var.distribution if isinstance(var, FullLightweightVariable) else var.distribution.distribution
+    psa_parameter_labels(distribution)
+    return [
+        _create_numeric_inputgroup_from_var(
+            var, label, index, stepscale = stepscale,
+            min = var.interface_min if limited else 0, max = var.interface_max if limited else None,
+            supersection = 'psa',
+            variable_id = id_for('group-value', index) if id_for else None,
+        )
+        for label, index, stepscale, limited in _PSA_PARAMETERS[distribution]
+    ]
+
 def compose_psa_input(
     header_component,
-    distribution_component,
-    parameter_component,
-    var: variable.Variable,
+    var: variable.Variable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
-    """Compose the PSA input of a variable from its parts.
+    """Compose the PSA input of a variable: its toggle, and a row which opens to its group editor.
+
+    As the DSA input (see `compose_dsa_input`): the row's summary holds the header and a summary of the groups (see
+    `psa_group_editor.create_psa_sharing_summary_contents`), and opening it builds the editor
+    (`psa_group_editor.create_psa_group_editor_contents`), with the distribution and the focussed configuration's inputs.
 
     Args:
         header_component: The header.
-        distribution_component: The component showing the distribution.
-        parameter_component: The component for the parameters of the distribution.
         var: The variable.
+        summary_contents: The summary of the groups.
+        n_configurations: The number of configurations of the project; with several, the row can move them.
 
     Returns:
         The input.
     """
-    overall_input_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-component',
-        supersection = 'psa',
-        purpose = 'input-group-container',
-    )
-
-    toggle_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-toggle',
-        supersection = 'psa',
-        purpose = 'psa-active',
-    )
-
-    header_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'single-input-header',
-        supersection = 'psa',
-        purpose = 'header'
-    )
-
-    trigger_id = VariableInstanceParameterComponentID.from_variable(
-        var,
-        type = 'input-group-config-update-trigger',
-        supersection = 'psa',
-        purpose = 'trigger',
-    )
+    def row_id(type_: str, purpose: str):
+        return VariableInstanceParameterComponentID.from_variable(var, type = type_, supersection = 'psa', purpose = purpose) # pyright: ignore[reportArgumentType]
 
     if var.psa_selected:
         cn = 'psa-input-single-value-block'
     else:
         cn = 'psa-input-single-value-block deselected'
 
+    stores = [
+        dcc.Store(id = row_id('input-group-config-update-trigger', 'trigger').as_dict()),
+        dcc.Store(id = row_id('variable-summary-refresh-trigger', 'trigger').as_dict()),
+    ]
+    if n_configurations > 1:
+        stores.append(dcc.Store(id = row_id('group-move-request', 'move').as_dict()))
+
     return html.Div([
         daq.ToggleSwitch(
             className = 'psa-toggle',
             size = 30,
             value = var.psa_selected,
-            id = toggle_id.as_dict(),
+            id = row_id('input-toggle', 'psa-active').as_dict(),
         ),
         html.Details([
             html.Summary(
-                header_component,
+                [
+                    html.Div(header_component, id = row_id('single-input-header', 'header').as_dict(), className = 'psa-configuration-header'),
+                    html.Div(
+                        summary_contents or [],
+                        id = row_id('variable-sharing-summary', 'summary').as_dict(),
+                        className = 'variable-sharing-summary psa-sharing-summary',
+                    ),
+                ],
                 className = 'psa-configuration-summary',
-                id = header_id.as_dict()
+                id = row_id('input-summary', 'group-editor-toggle').as_dict(),
             ),
-            html.Div((
-                [html.Div(
-                    distribution_component,
-                    className = 'distribution-label',
-                )]
-                +parameter_component
-            ))
-        ]),
-        dcc.Store(id = trigger_id.as_dict())
+            html.Div([], id = row_id('input-group-editor', 'editor').as_dict()),
+            dcc.Input(id = row_id('single-input-config', 'editor-anchor').as_dict(), type = 'hidden'),
+        ],
+        className = 'group-editor-details psa-group-editor-details',
+        ),
+        *stores,
     ],
     className = cn,
-    id = overall_input_id.as_dict(),
+    id = row_id('input-component', 'input-group-container').as_dict(),
     )
 
-def create_psa_input_scalar_constant(
-    var: variable.ScalarVariable,
+def create_psa_input_scalar(
+    var: variable.ScalarVariable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
-    """Create the PSA input of a constant scalar variable.
+    """Create the PSA input of a scalar variable, of any of the supported distributions.
 
     Args:
         var: The variable.
+        summary_contents: The summary of the groups (see `compose_psa_input`).
+        n_configurations: The number of configurations of the project.
 
     Returns:
         The input.
     """
-    return compose_psa_input(
-        create_psa_header(var),
-        create_psa_distribution_component(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Value', 0, # pyright: ignore[reportArgumentType]
-                min = var.interface_min, max = var.interface_max,
-                supersection = 'psa'
-            ),
-        ],
-        var
-    )
-
-def create_psa_input_twoparam(
-    var: variable.NumericScalarVariable,    
-):
-    """Create the PSA input of a numeric scalar variable described by two parameters.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return compose_psa_input(
-        create_psa_header(var),
-        create_psa_distribution_component(var),
-        [
-            _create_numeric_inputgroup_from_var(
-                var, 'Mean', 0, min = var.interface_min, max = var.interface_max,
-                supersection = 'psa'
-            ),
-            _create_numeric_inputgroup_from_var(
-                var, 'SD', 1, stepscale = 0.1,
-                supersection = 'psa'
-            ),
-        ],
-        var
-    )
-
-def create_psa_input_scalar_normal(
-    var: variable.NumericScalarVariable,
-):
-    """Create the PSA input of a normally distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return create_psa_input_twoparam(var)
-
-def create_psa_input_scalar_beta(
-    var: variable.NumericScalarVariable,
-):
-    """Create the PSA input of a beta distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return create_psa_input_twoparam(var)
-
-def create_psa_input_scalar_gamma(
-    var: variable.NumericScalarVariable,
-):
-    """Create the PSA input of a gamma distributed scalar variable.
-
-    Args:
-        var: The variable.
-
-    Returns:
-        The input.
-    """
-    return create_psa_input_twoparam(var)
+    return compose_psa_input(create_psa_header(var), var, summary_contents, n_configurations)
 
 def compose_optim_input(
     header,

@@ -6,7 +6,6 @@ import json
 from newsegsmodelapp.backend.db import db_tables as tbls
 from newsegsmodelapp.backend.db.db_staleness import PROCESSES
 from newsegsmodelapp.components import staleness
-from newsegsmodelapp.components.input_components import get_variable_groups
 
 from .base import InputChangeTestCase, cached_variant
 from .dash_dispatch import NOT_UPDATED, variable_id
@@ -143,112 +142,6 @@ class TestValueSetDefault(InputChangeTestCase):
         self.dispatch(row_id('input-action-button', 'value-reset', WIND), 2, components)
         self.assertEqual(self.stored_variable(WIND_VARID).raw_parameters[0], 12.5)
 
-class TestVariableStatusToggle(InputChangeTestCase):
-    """`variable-status-toggle` of an `input-action-button`: cycling the sharing of a variable between configurations"""
-    n_metamodels = 2
-
-    def setUp(self):
-        super().setUp()
-        self.components = self.page(('deterministic', 'gen_input'))
-        self.badge = row_id('input-action-button', 'variable-status-toggle', WIND)
-
-    def _junction_uids(self, mm_index: int) -> set[str]:
-        """Ids of the instances of the wind capacity in the configuration's junction rows"""
-        mm_id = self.metamodel_ids[mm_index]
-        rows = self._rows(tbls.metamodel_variables, 'variable_config_id')
-        wind_uids = {k[0] for k, v in self._rows(tbls.variable_configs, 'varid').items() if v == (WIND_VARID,)}
-        return {v[0] for k, v in rows.items() if k[0] == mm_id and v[0] in wind_uids}
-
-
-    def test_shared_becomes_independent(self):
-        shared_uid = self.variable_uid(WIND_VARID, 0)
-        t0 = self.now()
-
-        response = self.dispatch(self.badge, 1, self.components)
-
-        new_uid = self.variable_uid(WIND_VARID, 0)
-        self.assertNotEqual(new_uid, shared_uid)
-        self.assertEqual(self.variable_uid(WIND_VARID, 1), shared_uid)
-        self.assertEqual(self._junction_uids(0), {new_uid})
-        self.assertEqual(self._junction_uids(1), {shared_uid})
-        self.assertEqual(self.loaded_variable(WIND_VARID, 0).id, new_uid)
-
-        # The copy has the same values, so nothing is stale
-        self.assertEqual(self.stale_marks(t0), set())
-
-        value = self.stored_variable(WIND_VARID, 1).raw_parameters[0]
-        self.assertEqual(response.get(row_id('single-input-config', 'parameter', WIND), 'value'), value)
-        self.assertIsNot(response.get(row_id('input-group-config-update-trigger', 'trigger', WIND), 'data'), NOT_UPDATED)
-
-    def test_independent_joins_group(self):
-        own_uid = self.make_independent(0, WIND_VARID)
-        self.dispatch(row_id('single-input-config', 'parameter', WIND), 12.5, self.components)
-        group_uid = self.variable_uid(WIND_VARID, 1)
-        group_value = self.stored_variable(WIND_VARID, 1).raw_parameters[0]
-        t0 = self.now()
-
-        response = self.dispatch(self.badge, 1, self.components)
-
-        self.assertEqual(self.variable_uid(WIND_VARID, 0), group_uid)
-        self.assertEqual(self._junction_uids(0), {group_uid})
-        self.assertEqual(self.loaded_variable(WIND_VARID, 0).raw_parameters[0], group_value)
-
-        # The configuration's own instance is an orphan, and is removed
-        self.assertNotIn((own_uid,), self._rows(tbls.variable_configs))
-        self.assertFalse(any(k[1] == own_uid for k in self._rows(tbls.project_variables)))
-
-        # Only the configuration which moved has changed its value
-        self.assertEqual(self.stale_marks(t0), {(self.metamodel_ids[0], p) for p in PROCESSES})
-        self.assertEqual(response.get(row_id('single-input-config', 'parameter', WIND), 'value'), group_value)
-
-    def test_single_configuration_makes_no_change(self):
-        self.remove_configuration(1)
-        before = self.database_state()
-
-        response = self.dispatch(self.badge, 1, self.page(('deterministic', 'gen_input')))
-
-        self.assertFalse(response.updated)
-        self.assertNothingChanged(before)
-
-class TestVariableStatusCycle(InputChangeTestCase):
-    """`variable-status-toggle` with three configurations: the order of the cycle"""
-    n_metamodels = 3
-
-    def setUp(self):
-        super().setUp()
-        self.badge = row_id('input-action-button', 'variable-status-toggle', WIND)
-
-    def sharing(self) -> list[tuple[int, ...]]:
-        """The configurations sharing each instance of the wind capacity, from 1"""
-        lproj = self.reader.get_lightweight_project(self.project_id)
-        return [tuple(i + 1 for i in x.metamodel_indices) for x in get_variable_groups(lproj, WIND_VARID)]
-
-    def cycle(self, n: int) -> list[list[tuple[int, ...]]]:
-        states = []
-        for _ in range(n):
-            self.dispatch(self.badge, 1, self.page(('deterministic', 'gen_input')))
-            states.append(self.sharing())
-        return states
-
-    def test_middle_configuration_reaches_every_group(self):
-        # The first and third configurations hold separate instances; the second shares the first's
-        self.make_independent(2, WIND_VARID)
-        self.set_focus(1)
-        self.assertEqual(self.sharing(), [(1, 2), (3,)])
-
-        self.assertEqual(self.cycle(3), [
-            [(1,), (2, 3)],     # shares the third's
-            [(1,), (2,), (3,)], # its own
-            [(1, 2), (3,)],     # back to the first's
-        ])
-
-    def test_all_shared_alternates_with_independent(self):
-        self.set_focus(1)
-        self.assertEqual(self.cycle(2), [
-            [(1, 3), (2,)],
-            [(1, 2, 3)],
-        ])
-
 class TestToggleOptimActive(InputChangeTestCase):
     """`toggle-optim-active` of an `input-toggle`: selecting a variable for the optimisation"""
     n_metamodels = 3
@@ -371,8 +264,6 @@ class TestPsaSettings(InputChangeTestCase):
 TestParameterCached = cached_variant(TestParameter)
 TestValueResetCached = cached_variant(TestValueReset)
 TestValueSetDefaultCached = cached_variant(TestValueSetDefault)
-TestVariableStatusToggleCached = cached_variant(TestVariableStatusToggle)
-TestVariableStatusCycleCached = cached_variant(TestVariableStatusCycle)
 TestToggleOptimActiveCached = cached_variant(TestToggleOptimActive)
 TestPsaActiveCached = cached_variant(TestPsaActive)
 TestPsaSettingsCached = cached_variant(TestPsaSettings)

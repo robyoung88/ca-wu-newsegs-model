@@ -17,7 +17,14 @@ from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegs
 from newsegsmodelapp.backend.db.db_variable_provider import CachedFromDatabaseVariableProvider
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.components import callback_utils, staleness
+from newsegsmodelapp.components.dsa_group_editor import (
+    create_dsa_sharing_summary_contents,
+    set_dsa_bound,
+    set_dsa_bound_type,
+)
+from newsegsmodelapp.components.psa_group_editor import create_psa_sharing_summary_contents
 from newsegsmodelapp.components.input_components import (
+    _signal_summary_refresh,
     count_differing_variables,
     create_variable_sharing_summary_contents,
     get_variable_groups,
@@ -48,6 +55,16 @@ def _create_text_field_values(
             case _:
                 text_values.append(no_update)
     return text_values
+
+def _redraw_headers(rval: dict, header_ids: list[dict], varid: str, var, model_type: str):
+    """Redraw the row's single input headers from its (saved) Variable"""
+    for idx, id in enumerate(header_ids):
+        try:
+            content_creator = get_single_input_header_content_creator(id['supersection'], id['section'], model_type)
+        except KeyError:
+            content_creator = None
+        if content_creator:
+            rval['header_children'][idx] = content_creator(varid, var)
 
 def add_input_container_callbacks(app: NewsegsDash):
     """
@@ -320,6 +337,25 @@ def add_input_container_callbacks(app: NewsegsDash):
                 },
                 'data',
             ),
+            # When the focussed configuration moves to another Variable, its row shows the new Variable's selections
+            toggle_values = Output(
+                {
+                    'type': 'input-toggle',
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'value',
+            ),
+            optim_container_class = Output(
+                {
+                    'type': 'input-component',
+                    'supersection': 'optim', 'purpose': 'container',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'className',
+            ),
         ),
 
         inputs = dict(
@@ -368,6 +404,25 @@ def add_input_container_callbacks(app: NewsegsDash):
                     'parameter_index': ALL, 'vector_location': ALL,
                 },
                 'n_clicks',
+            ),
+            # The group editor: values of the groups other than the focussed one, and moves between groups
+            changed_group_values = Input(
+                {
+                    'type': 'group-value-input',
+                    'supersection': ALL, 'purpose': ALL,
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL, 'var_uid': ALL,
+                },
+                'value',
+            ),
+            group_move_requests = Input(
+                {
+                    'type': 'group-move-request',
+                    'supersection': ALL, 'purpose': 'move',
+                    'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+                    'parameter_index': ALL, 'vector_location': ALL,
+                },
+                'data',
             ),
         ),
 
@@ -456,44 +511,15 @@ def add_input_container_callbacks(app: NewsegsDash):
                             raise PreventUpdate
                         var = provider.variable_provider.get_variable(varuid)
 
-                        dsa_changed = False
-                        if trigger_id['purpose'] == 'bound-lower':
-                            if not new_val == var.dsa_lower:
-                                var.dsa_lower = new_val
-                                dsa_changed = True
-                        else:
-                            if not new_val == var.dsa_upper:
-                                var.dsa_upper = new_val
-                                dsa_changed = True
-
-                        if dsa_changed:
-                            # Update headers
-                            for idx, id in enumerate(header_ids):
-                                try:
-                                    content_creator = get_single_input_header_content_creator(
-                                        id['supersection'], id['section'], lmm.model.model_type
-                                    )
-                                except KeyError:
-                                    content_creator = None
-                                if content_creator:
-                                    varid =  make_varid(**trigger_id)
-                                    rval['header_children'][idx] = content_creator(varid, lmm)
+                        if set_dsa_bound(provider, lproj, var, trigger_id['purpose'], new_val):
+                            _redraw_headers(rval, header_ids, varid, var, lmm.model.model_type)
 
                             # Update triggers
                             for idx, id in enumerate(trigger_ids):
                                 match id['supersection']:
                                     case 'dsa':
                                         rval['trigger_data'][idx] = now
-
-                            provider.variable_provider.upsert_variable(var)
-
-                            provider.increment_revision(lproj.id)
-                            provider._component_provider.increment_revision(
-                                lproj.table_config.id
-                            )
-                            db_staleness.mark_inputs_changed(
-                                staleness.metamodels_using_variable(lproj, varuid), 'dsa'
-                            )
+                            _signal_summary_refresh(rval, now)
 
                     case 'optim':
                         logger.debug('Input change being handled as optim bounds value or plot resolution change.')
@@ -551,33 +577,20 @@ def add_input_container_callbacks(app: NewsegsDash):
                 if not varuid:
                     raise PreventUpdate
                 var = provider.variable_provider.get_variable(varuid)
-                if not var or new_val == var.dsa_bounds_type:
+                if not var or not set_dsa_bound_type(provider, lproj, var, new_val):
                     raise PreventUpdate
-
-                var.dsa_bounds_type = new_val
-                dsa_lower, dsa_upper = var.distribution.dsa_auto_values(var)
-                var.dsa_lower = dsa_lower
-                var.dsa_upper = dsa_upper
 
                 # Update inputs
                 for idx, id in enumerate(input_ids):
+                    if id['supersection'] != 'dsa':
+                        continue
                     if id['purpose'] == 'bound-lower':
-                        rval['input_values'][idx] = dsa_lower
+                        rval['input_values'][idx] = var.dsa_lower
                     if id['purpose'] == 'bound-upper':
-                        rval['input_values'][idx] = dsa_upper
+                        rval['input_values'][idx] = var.dsa_upper
 
-                # Update headers
-                for idx, id in enumerate(header_ids):
-                    try:
-                        content_creator = get_single_input_header_content_creator(
-                            id['supersection'], id['section'], lmm.model.model_type
-                        )
-                    except KeyError:
-                        content_creator = None
-                    if content_creator:
-                        varid =  make_varid(**trigger_id)
-                        rval['header_children'][idx] = content_creator(varid, lmm)
-                
+                _redraw_headers(rval, header_ids, varid, var, lmm.model.model_type)
+
                 # Update triggers with a dictionary, not an integer
                 trig_val = json.dumps({
                     'message': 'dsa_bounds_modified',
@@ -587,17 +600,7 @@ def add_input_container_callbacks(app: NewsegsDash):
                     match id['supersection']:
                         case 'dsa':
                             rval['trigger_data'][idx] = trig_val
-
-                # Sync variable and invalidate tables
-                provider.variable_provider.upsert_variable(var)
-
-                provider.increment_revision(lproj.id)
-                provider._component_provider.increment_revision(
-                    lproj.table_config.id
-                )
-                db_staleness.mark_inputs_changed(
-                    staleness.metamodels_using_variable(lproj, varuid), 'dsa'
-                )
+                _signal_summary_refresh(rval, now)
 
             case 'dsa-active':
                 logger.debug('Input change being handled as dsa active toggle change.')
@@ -925,8 +928,8 @@ def add_input_container_callbacks(app: NewsegsDash):
 
     @app.callback(
         Output({
-            'type': 'input-action-button',
-            'supersection': MATCH, 'purpose': 'variable-status-toggle',
+            'type': 'variable-sharing-summary',
+            'supersection': MATCH, 'purpose': 'summary',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL
         }, 'children'),
@@ -954,8 +957,17 @@ def add_input_container_callbacks(app: NewsegsDash):
         lproj = app.project_provider.get_lightweight_project(active_project_id)
         varid = make_varid(**triggered_id) # pyright: ignore[reportCallIssue]
         var_uids = [x.var_uid for x in get_variable_groups(lproj, varid) if x.var_uid is not None]
-        lvars = app.project_provider.variable_provider.get_lightweight_variable(var_uids)
-        contents = create_variable_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
+        if triggered_id['supersection'] == 'dsa':
+            # With each group's bounds
+            lvars = app.project_provider.variable_provider.get_full_lightweight_variable(var_uids)
+            contents = create_dsa_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
+        elif triggered_id['supersection'] == 'psa':
+            # With each group's SD
+            lvars = app.project_provider.variable_provider.get_full_lightweight_variable(var_uids)
+            contents = create_psa_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
+        else:
+            lvars = app.project_provider.variable_provider.get_lightweight_variable(var_uids)
+            contents = create_variable_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
 
         t1 = time.perf_counter()
         logger.info(f'Variable sharing summary for {varid} updated in {t1 - t0:.3f}s')

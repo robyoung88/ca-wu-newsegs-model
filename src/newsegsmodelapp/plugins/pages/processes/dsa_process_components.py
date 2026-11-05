@@ -34,6 +34,8 @@ def dsa_process_components(**kwargs):
                         'metamodel',
                         id = 'dsa-run-scope',
                     ),
+                    # For all configurations: how many variables have different bounds across them
+                    html.P(id = 'dsa-run-bounds-note', className = 'dsa-run-bounds-note'),
                 ]),
                 dbc.ModalFooter([
                     dbc.Button(

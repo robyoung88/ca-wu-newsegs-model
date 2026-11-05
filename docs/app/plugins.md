@@ -168,6 +168,25 @@ Reopening the row builds the editor again, so it shows the current values. Closi
 
 * Redraw only the children of the editor container, never the `Details` or `Summary`, or the count of clicks and the
   open state will disagree. Rebuilding the whole input container is safe.
+
+The deterministic inputs use this for their group editor (`components/group_editor.py`). Opening an input's sharing
+summary shows every group's value, and buttons that move configurations between groups. Selecting a configuration and
+choosing where to move it, or dragging its icon to a row, happens in the browser (`assets/group_editor.js`), which
+writes the move to the row's `group-move-request` store. A drop moves nothing in the page: the server redraws the
+editor, so the script never conflicts with the DOM that React owns. `react_to_input_change` passes moves, and edits of other groups' values (`group-value-input`),
+to the handlers in that module. Code that moves configurations between Variables should use `move_metamodels_to_group`,
+which keeps the junctions, revisions, staleness and orphaned Variables right.
+
+The DSA rows have a group editor too (`components/dsa_group_editor.py`), in which every group's parameters, bound type
+and bounds can be edited. Its focussed row holds the focussed configuration's usual inputs, so the existing handlers
+act on them; the other groups' inputs are `group-value-input`s carrying their Variable's id, with the purposes
+`group-value`, `group-dsaboundtype`, `group-dsa-bound-lower` and `group-dsa-bound-upper`. A change of a Variable's DSA
+settings should go through `set_dsa_bound` or `set_dsa_bound_type`, which save it and mark the DSA stale for the
+configurations using it.
+
+The PSA rows follow the same pattern (`components/psa_group_editor.py`): the editor shows the distribution, and each
+group's Mean and SD (or Value, for a constant) and confidence interval. The other groups' parameters are edited through
+the `group-value` handler. The PSA's selection and its project settings (samples, seed, draws) aren't grouped.
 * Don't put interactive components in the `Summary`, since clicks on them are counted too.
 
 ### Environmental feedback

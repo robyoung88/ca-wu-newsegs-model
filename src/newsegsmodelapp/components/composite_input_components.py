@@ -1,12 +1,15 @@
 """Components which require both input_compoents and variable_dash_component"""
 
 import dash
+from dash import html
 from dash_bootstrap_components._components.Row import Row as dbc_Row
 
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
+from newsegsmodelapp.components.group_editor import create_group_move_request_store
 from newsegsmodelapp.components.input_components import (
     create_blank_single_input_header_element,
     create_input_group_config_update_trigger,
+    create_lazy_input_details,
     create_numeric_card_variable_parameter_input,
     create_variable_sharing_summary,
     create_variable_sharing_summary_contents,
@@ -58,6 +61,15 @@ def generic_create_deterministic_input_container_contents(
             sharing_summary = create_variable_sharing_summary(
                 paramid, create_variable_sharing_summary_contents(lproj, varid, lwvars)
             )
+            if len(lproj.metamodels) > 1:
+                # Opening the summary builds the group editor, which edits and moves between the groups
+                sharing_summary = html.Div([
+                    create_lazy_input_details(
+                        [sharing_summary, html.Span('Hide groups', className = 'group-editor-close-label')],
+                        paramid, className = 'group-editor-details',
+                    ),
+                    create_group_move_request_store(paramid),
+                ])
             contents.append(
                 dbc_Row([
                     create_blank_single_input_header_element(paramid),
@@ -82,45 +94,63 @@ def generic_create_deterministic_input_container_contents(
 
 def generic_create_dsa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
-    variable_provider: FromDatabaseVariableProvider
+    variable_provider: FromDatabaseVariableProvider,
+    lproj: LightweightNewsegsProject | None = None,
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs for the deterministic sensitivity analysis of a metamodel.
 
-    One DSA input for each variable of the metamodel.
+    One DSA input for each variable of the metamodel. Given the project, each input summarises how the configurations'
+    Variables of it differ, and can be opened to edit and move between them; the Variables of every configuration are
+    fetched in one call.
 
     Args:
-        lmm: The lightweight metamodel.
+        lmm: The lightweight metamodel (the focussed configuration).
         variable_provider: Provider of variables.
+        lproj: The lightweight project.
 
     Returns:
         List of components.
     """
+    from newsegsmodelapp.components.dsa_group_editor import create_dsa_sharing_summary_contents
+
+    metamodels = lproj.metamodels if lproj is not None else [lmm]
+    var_uids = list(dict.fromkeys(uid for x in metamodels for uid in x.variables.values()))
+    variables = {x.id: x for x in variable_provider.get_full_lightweight_variable(var_uids)}
     contents = []
-    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
-    for var in vars:
-        contents.append(create_dsa_input(var))
+    for varid, var_uid in lmm.variables.items():
+        summary = create_dsa_sharing_summary_contents(lproj, varid, variables) if lproj is not None else []
+        contents.append(create_dsa_input(variables[var_uid], summary, len(metamodels)))
 
     return contents
 
 def generic_create_psa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
-    variable_provider: FromDatabaseVariableProvider
+    variable_provider: FromDatabaseVariableProvider,
+    lproj: LightweightNewsegsProject | None = None,
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs for the probabilistic sensitivity analysis of a metamodel.
 
-    One PSA input for each variable of the metamodel.
+    One PSA input for each variable of the metamodel. Given the project, each input summarises how the configurations'
+    Variables of it differ, and can be opened to edit and move between them; the Variables of every configuration are
+    fetched in one call.
 
     Args:
-        lmm: The lightweight metamodel.
+        lmm: The lightweight metamodel (the focussed configuration).
         variable_provider: Provider of variables.
+        lproj: The lightweight project.
 
     Returns:
         List of components.
     """
+    from newsegsmodelapp.components.psa_group_editor import create_psa_sharing_summary_contents
+
+    metamodels = lproj.metamodels if lproj is not None else [lmm]
+    var_uids = list(dict.fromkeys(uid for x in metamodels for uid in x.variables.values()))
+    variables = {x.id: x for x in variable_provider.get_full_lightweight_variable(var_uids)}
     contents = []
-    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
-    for var in vars:
-        contents.append(create_psa_input(var))
+    for varid, var_uid in lmm.variables.items():
+        summary = create_psa_sharing_summary_contents(lproj, varid, variables) if lproj is not None else []
+        contents.append(create_psa_input(variables[var_uid], summary, len(metamodels)))
 
     return contents
 
