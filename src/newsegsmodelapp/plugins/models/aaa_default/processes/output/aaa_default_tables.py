@@ -23,7 +23,7 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 from newsegsmodelframework.newsegssensitivity import common as sensitivity, dsa, optim, psa
 
 from ..postprocess.methods import post_dsa_results
-from . import result_tables_sprake
+from . import optim_feedback, result_tables_sprake
 from .get_result_list import get_result_list
 
 def _get_metamodel_from_proj_by_id(mm_id, lproj):
@@ -942,19 +942,8 @@ def _make_postopt_tables_sprake(
     if optdict is None:
         return 'missing'
 
-    if optdict['success']:
-        table_data = [
-            html.H4('Success'),
-            str(optdict['opt'])
-        ]
-    else:
-        opt = optdict['opt']
-        table_data = [
-            html.H4('Failure'),
-            f'Optimisation was not a success: {opt.message}' + \
-            '\n Try again with a different method, variables or bounds.' + \
-            str(opt),
-        ]
+    # A component, not a list: a list is saved as JSON, which would turn the components into text
+    table_data = html.Div(optim_feedback.create_optimisation_feedback(optdict))
 
     # Saved against the table configuration, from which the results container reads it; the result
     # provider needs its data-holding description, as do the other tables

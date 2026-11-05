@@ -51,6 +51,42 @@ def _optim_float_statistic_mapper(
     
     raise ValueError(f'stat {stat} is not known as an optimisation statistic')
 
+def evaluate_statistic(mm: NewsegsMetaModel, stat: _OPTIM_TARGET_STATISTIC) -> float:
+    """The value of an optimisation statistic of a metamodel at its current parameters.
+
+    Runs the NewSEGS Energy Model and the finance model, after bringing the models up to date with
+    the variables.
+
+    Args:
+        mm: The metamodel.
+        stat: The statistic.
+
+    Returns:
+        The value of the statistic, e.g. the NPV (£).
+    """
+    mm.sync_model_with_changed_variables_deterministic()
+    mm.model.run()
+    mm.finance.run()
+    return _optim_float_statistic_mapper(stat, mm.model, mm.finance, do_optim = False)
+
+def statistic_from_objective(stat: _OPTIM_TARGET_STATISTIC, objective: float) -> float:
+    """The value of an optimisation statistic from the value of the objective minimised for it.
+
+    Statistics which are maximised, such as the NPV, are minimised as their negative.
+
+    Args:
+        stat: The statistic.
+        objective: The value of the objective, such as `fun` of the result of `run_optimisation`.
+
+    Returns:
+        The value of the statistic.
+    """
+    return -objective if stat in _MAXIMISE_OPTIM_TARGET_STATISTICS else objective
+
+def statistic_is_maximised(stat: _OPTIM_TARGET_STATISTIC) -> bool:
+    """Whether an optimisation statistic is maximised, rather than minimised."""
+    return stat in _MAXIMISE_OPTIM_TARGET_STATISTICS
+
 @dataclass
 class OptimVariable:
     """Specification of a variable to vary in an optimisation.

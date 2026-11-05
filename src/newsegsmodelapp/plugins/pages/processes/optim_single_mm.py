@@ -13,9 +13,12 @@ from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProvid
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegssensitivity import optim
+from newsegsmodelframework.util import naming
 
 
 REQUEST_TYPE = 'optim_run_metamodel'
+
+NO_VARIABLES_MESSAGE = 'Optimisation not run - no variables selected'
 
 @dataclass
 class OptimRunMetamodelRunRequest(RunRequest):
@@ -50,6 +53,10 @@ def execute_optim_single_mm_run(
     has bounds that cannot be used, so that nothing is run. Raises `ValueError` if no metamodel is named in the
     request and `KeyError` if it is not in the project.
 
+    Saves an `optimisation_result` (see `optimisation_result`) for the feedback shown afterwards: whether the
+    optimisation ran and succeeded, the statistic before and after, and how each variable changed. On success, the
+    optimised copy of the metamodel is added to the project, named "<name> - Opt" (made unique), and focussed.
+
     Args:
         request: The request being executed.
         project_provider: Provider of projects, metamodels and variables.
@@ -79,7 +86,12 @@ def execute_optim_single_mm_run(
         if var.optim_possible and var.optim_selectable and var.optim_selected
     }
     if len(selected) == 0:
-        return 'Optimisation not run - no variables selected'
+        result_provider.upsert_result(
+            'optimisation_result', proj.table_config,
+            {'status': 'not_run', 'success': False, 'message': NO_VARIABLES_MESSAGE},
+            request = request,
+        )
+        return NO_VARIABLES_MESSAGE
 
     # Run with every selected variable or none, so that the optimisation is of the selection the user made
     optim.check_optim_bounds(list(selected.values()))
@@ -112,7 +124,11 @@ def execute_optim_single_mm_run(
 
     if check_cancel_status():
         raise InterruptedError(f'Optimisation process {run_id} has been cancelled.')
-    
+
+    # The statistic before optimisation, at the parameters of the configuration
+    progress_callback(0, 1, 'Optimisation: evaluating the configuration')
+    start_value = optim.evaluate_statistic(mm_copy, stat)
+
     opt = optim.run_optimisation(
         mm_copy,
         vars,
@@ -122,27 +138,92 @@ def execute_optim_single_mm_run(
         cancel_status = check_cancel_status,
     )
     if opt.success:
-        mm_copy.name = mm.name + ' - Opt'
+        mm_copy.name = naming.unique_name(mm.name + ' - Opt', (x.name for x in proj.metamodels))
         proj.metamodels.append(mm_copy) # pyright: ignore[reportAttributeAccessIssue]
         for k in vars:
             varid = k.varid
             proj.add_variable(mm_copy.variables[varid])
+        # The optimised configuration is focussed, so that the user sees it; the page reloads the
+        # project when the optimisation completes
+        proj.set_focussed_metamodel(mm_copy.id)
         project_provider.upsert_component(proj)
 
     new_parameters = {k.varid: mm_copy.variables[k.varid].parameters for k in vars}
 
-    rval = {
-        'success': opt.success,
-        'opt': opt,
-        'original_parameters': original_parameters,
-        'new_parameters': new_parameters,
-        'varids': [k.varid for k in vars]
-    }
-    
+    rval = optimisation_result(
+        mm, mm_copy, vars, stat, start_value, opt, original_parameters, new_parameters
+    )
+
     result_provider.upsert_result('optimisation_result', proj.table_config, rval, request = request)
     db_staleness.record_process_run(mm_id, 'optim', started_ns)
     if isinstance(project_provider, FromDatabaseNewsegsProjectProvider):
         project_provider.delete_orphan_variables()
 
     return 'ok'
+
+def optimisation_result(
+    mm: NewsegsMetaModel,
+    mm_copy: NewsegsMetaModel,
+    variables: list[optim.OptimVariable],
+    stat: str,
+    start_value: float,
+    opt,
+    original_parameters: dict,
+    new_parameters: dict,
+) -> dict:
+    """The result of an optimisation, saved as `optimisation_result` for the feedback shown after it.
+
+    Args:
+        mm: The metamodel optimised.
+        mm_copy: The copy of the metamodel which was varied; on success, it holds the optimal values.
+        variables: The variables varied.
+        stat: The statistic optimised.
+        start_value: The statistic before optimisation.
+        opt: The scipy result of the optimisation.
+        original_parameters: The parameters of each variable before optimisation, by varid.
+        new_parameters: The parameters of each variable after optimisation, by varid.
+
+    Returns:
+        A dictionary of:
+            status: `success` or `failure` (`not_run` is saved when no variables are selected).
+            success: Whether the optimisation succeeded.
+            statistic: The statistic optimised.
+            maximised: Whether the statistic is maximised, rather than minimised.
+            start_value: The statistic before optimisation.
+            final_value: The best value of the statistic found, with its natural sign.
+            variables: For each variable, its `varid`, `label`, value `before` and `after` (of the parameter
+                varied), and its `lower` and `upper` bounds.
+            metamodel_name: Name of the metamodel optimised.
+            new_metamodel_id, new_metamodel_name: The optimised copy added to the project; None on failure.
+            message: The message of the optimiser.
+            opt, original_parameters, new_parameters, varids: The details, for diagnostics.
+    """
+    success = bool(opt.success)
+    return {
+        'status': 'success' if success else 'failure',
+        'success': success,
+        'statistic': stat,
+        'maximised': optim.statistic_is_maximised(stat), # pyright: ignore[reportArgumentType]
+        'start_value': float(start_value),
+        'final_value': float(optim.statistic_from_objective(stat, float(opt.fun))), # pyright: ignore[reportArgumentType]
+        'variables': [
+            {
+                'varid': v.varid,
+                'label': mm.variables[v.varid].label,
+                'before': float(original_parameters[v.varid][v.param_index]),
+                'after': float(new_parameters[v.varid][v.param_index]),
+                'lower': float(v.lower),
+                'upper': float(v.upper),
+            }
+            for v in variables
+        ],
+        'metamodel_name': mm.name,
+        'new_metamodel_id': mm_copy.id if success else None,
+        'new_metamodel_name': mm_copy.name if success else None,
+        'message': str(opt.message),
+        'opt': opt,
+        'original_parameters': original_parameters,
+        'new_parameters': new_parameters,
+        'varids': [v.varid for v in variables],
+    }
     

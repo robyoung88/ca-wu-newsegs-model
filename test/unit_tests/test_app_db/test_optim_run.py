@@ -53,6 +53,11 @@ class TestOptimRun(unittest.TestCase):
         self.provider.add_component(self.proj)
         self.original_parameters = self.var.parameters
 
+        # The statistic before optimisation, without running the model
+        self.evaluate = mock.patch.object(optim, 'evaluate_statistic', return_value = 1000.).start()
+        self.addCleanup(mock.patch.stopall)
+        self.result_provider = mock.MagicMock()
+
     def _cleanup(self):
         from newsegsmodelapp.backend import db
         for writer in (False, True):
@@ -67,7 +72,7 @@ class TestOptimRun(unittest.TestCase):
         return optim_single_mm.execute_optim_single_mm_run(
             request,
             self.provider,
-            mock.MagicMock(),
+            self.result_provider,
             1,
             lambda *args: None,
             lambda: False,
@@ -75,10 +80,60 @@ class TestOptimRun(unittest.TestCase):
 
     @staticmethod
     def _fake_optimisation(mm, variables, target, method, progress, cancel_status):
-        # Move each variable to its upper bound, as the optimiser would move it to its optimum
+        # Move each variable to its upper bound, as the optimiser would move it to its optimum. The
+        # NPV is maximised, so the optimiser minimises its negative.
         for x in variables:
             mm.variables[x.varid].set_parameters(x.upper)
-        return SimpleNamespace(success = True)
+        return SimpleNamespace(success = True, fun = -1500., message = 'Optimization terminated successfully.')
+
+    def _saved_result(self) -> dict:
+        calls = [c for c in self.result_provider.upsert_result.call_args_list if c.args[0] == 'optimisation_result']
+        self.assertEqual(len(calls), 1)
+        return calls[0].args[2]
+
+    def test_result_saved(self):
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation):
+            self._run()
+        result = self._saved_result()
+        self.assertEqual(result['status'], 'success')
+        self.assertEqual(result['statistic'], 'net_present_value_undiscounted')
+        self.assertTrue(result['maximised'])
+        # Evaluated on the copy, before optimising
+        self.assertEqual(result['start_value'], 1000.)
+        self.assertNotEqual(self.evaluate.call_args.args[0].id, self.mm.id)
+        # The sign of the objective is undone
+        self.assertEqual(result['final_value'], 1500.)
+        self.assertEqual(result['variables'], [{
+            'varid': self.varid, 'label': self.var.label,
+            'before': float(self.original_parameters[0]), 'after': 20., 'lower': 10., 'upper': 20.,
+        }])
+        self.assertEqual(result['metamodel_name'], self.mm.name)
+        self.assertEqual(result['new_metamodel_name'], self.mm.name + ' - Opt')
+        proj = self.provider.get_project(self.proj.id)
+        self.assertEqual(result['new_metamodel_id'], proj.metamodels[1].id)
+
+    def test_failure_saved(self):
+        def fail(mm, variables, target, method, progress, cancel_status):
+            return SimpleNamespace(success = False, fun = -1200., message = 'Maximum number of iterations has been exceeded.')
+        with mock.patch.object(optim, 'run_optimisation', side_effect = fail):
+            self.assertEqual(self._run(), 'ok')
+        result = self._saved_result()
+        self.assertEqual((result['status'], result['success']), ('failure', False))
+        self.assertEqual(result['final_value'], 1200.)
+        self.assertEqual(result['message'], 'Maximum number of iterations has been exceeded.')
+        self.assertIsNone(result['new_metamodel_id'])
+        # No configuration is added
+        self.assertEqual(len(self.provider.get_project(self.proj.id).metamodels), 1)
+
+    def test_no_variables_selected(self):
+        proj = self.provider.get_project(self.proj.id)
+        var = proj.metamodels[0].variables[self.varid]
+        var.optim_selected = False
+        self.provider.variable_provider.upsert_variable([var], force = True)
+        with mock.patch.object(optim, 'run_optimisation') as run:
+            self.assertEqual(self._run(), optim_single_mm.NO_VARIABLES_MESSAGE)
+        run.assert_not_called()
+        self.assertEqual(self._saved_result()['status'], 'not_run')
 
     def test_settings_are_passed_to_the_optimiser(self):
         with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation) as run:
@@ -111,20 +166,34 @@ class TestOptimRun(unittest.TestCase):
         self.assertNotEqual(optimised.optim_config.id, original.optim_config.id)
         self.assertEqual(optimised.optim_config.method, 'Powell')
 
+    def test_optimised_configuration_focussed(self):
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation):
+            self._run()
+            self._run()
+        proj = self.provider.get_project(self.proj.id)
+        self.assertEqual(len(proj.metamodels), 3)
+        # The latest optimised configuration is focussed, and each has its own name
+        self.assertEqual(proj.get_focussed_metamodel().id, proj.metamodels[2].id)
+        names = [x.name for x in proj.metamodels]
+        self.assertEqual(len(set(names)), 3)
+        self.assertEqual(names[1], self.mm.name + ' - Opt')
+
     def test_panel_saved_against_the_table_configuration(self):
-        # The panel shown after an optimisation is saved where the results container reads it:
-        # against the project's table configuration
+        # The panel shown after an optimisation is saved where the results container reads it,
+        # against the project's table configuration, and is read back as components
+        from dash import html
+        from dash.development.base_component import Component
         from newsegsmodelapp.backend import db
         from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
         from newsegsmodelapp.plugins.models.aaa_default.processes.output import aaa_default_tables
         from newsegsmodelapp.registers import TableDrawRequest
 
-        # A real result provider, which checks the component results are saved against
+        # A real result provider, which checks the component results are saved against, and saves
+        # them to files as the app does
         result_provider = FromDatabaseResultProvider(db.get_engine, Path(self.db_dir.name) / 'results')
-        result_provider.upsert_result(
-            'optimisation_result', self.proj.table_config,
-            {'success': True, 'opt': SimpleNamespace(success = True, message = 'Optimization terminated successfully.')},
-        )
+        self.result_provider = result_provider
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation):
+            self._run()
         request = TableDrawRequest(project_id = self.proj.id, payload = json.dumps({'metamodel_id': self.mm.id}))
         self.assertEqual(
             aaa_default_tables._make_postopt_tables_sprake(
@@ -135,7 +204,10 @@ class TestOptimRun(unittest.TestCase):
         # Read as the results container reads it
         lproj = self.provider.get_lightweight_project(self.proj.id)
         panel, _ = result_provider.get_result('table_postopt_metamodel', lproj.table_config)
-        self.assertTrue(panel)
+        self.assertIsInstance(panel, html.Div)
+        self.assertTrue(panel.children)
+        self.assertTrue(all(isinstance(x, Component) for x in panel.children))
+        self.assertEqual(panel.children[0].children, 'Optimisation complete')
 
     def test_invalid_bounds_are_reported(self):
         proj = self.provider.get_project(self.proj.id)
