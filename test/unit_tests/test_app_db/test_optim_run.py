@@ -125,6 +125,44 @@ class TestOptimRun(unittest.TestCase):
         # No configuration is added
         self.assertEqual(len(self.provider.get_project(self.proj.id).metamodels), 1)
 
+    def _assert_configuration_kept(self, result: dict):
+        # A success, but the project and its focus are as they were, and no configuration is named
+        self.assertEqual((result['status'], result['success']), ('success', True))
+        self.assertIsNone(result['new_metamodel_id'])
+        self.assertIsNone(result['new_metamodel_name'])
+        proj = self.provider.get_project(self.proj.id)
+        self.assertEqual([x.id for x in proj.metamodels], [self.mm.id])
+        self.assertEqual(proj.get_focussed_metamodel().id, self.mm.id)
+        self.assertEqual(proj.metamodels[0].variables[self.varid].id, self.var.id)
+
+    def test_no_improvement_keeps_the_configuration(self):
+        def unchanged(mm, variables, target, method, progress, cancel_status):
+            return SimpleNamespace(success = True, fun = -1000., message = 'Optimization terminated successfully.')
+        with mock.patch.object(optim, 'run_optimisation', side_effect = unchanged):
+            self.assertEqual(self._run(), 'ok')
+        self._assert_configuration_kept(self._saved_result())
+
+    def test_worse_than_a_start_outside_the_bounds_keeps_the_configuration(self):
+        proj = self.provider.get_project(self.proj.id)
+        var = proj.metamodels[0].variables[self.varid]
+        var.set_parameters(5.) # Below the lower bound of 10
+        self.provider.variable_provider.upsert_variable([var], force = True)
+        with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation_to(-800.)):
+            self.assertEqual(self._run(), 'ok')
+        result = self._saved_result()
+        self._assert_configuration_kept(result)
+        self.assertEqual((result['start_value'], result['final_value']), (1000., 800.))
+        self.assertEqual(result['variables'][0]['before'], 5.)
+        self.assertEqual(self.provider.get_project(self.proj.id).metamodels[0].variables[self.varid].parameters[0], 5.)
+
+    @staticmethod
+    def _fake_optimisation_to(fun: float):
+        def run(mm, variables, target, method, progress, cancel_status):
+            for x in variables:
+                mm.variables[x.varid].set_parameters(x.lower)
+            return SimpleNamespace(success = True, fun = fun, message = 'Optimization terminated successfully.')
+        return run
+
     def test_no_variables_selected(self):
         proj = self.provider.get_project(self.proj.id)
         var = proj.metamodels[0].variables[self.varid]
@@ -266,6 +304,8 @@ class TestMarginalPlot(TestOptimRun):
     # The run tests are not repeated
     test_settings_are_passed_to_the_optimiser = None # pyright: ignore[reportAssignmentType]
     test_acts_on_a_copy = None # pyright: ignore[reportAssignmentType]
+    test_no_improvement_keeps_the_configuration = None # pyright: ignore[reportAssignmentType]
+    test_worse_than_a_start_outside_the_bounds_keeps_the_configuration = None # pyright: ignore[reportAssignmentType]
 
 
 class TestOptimBoundsCheck(unittest.TestCase):

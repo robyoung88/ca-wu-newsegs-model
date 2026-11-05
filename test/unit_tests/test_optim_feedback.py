@@ -98,6 +98,18 @@ class TestImprovementSummary(unittest.TestCase):
             'NPV (discounted) did not improve: the configuration is already at or near its best within the bounds (£150,000).'
         )
 
+    def test_worse_than_a_start_outside_the_bounds(self):
+        # The configuration's wind capacity, 30, is below the lower bound of 50
+        variables = [{'varid': 'gen_input.wind_capacity.0', 'label': 'Wind capacity', 'before': 30., 'after': 50., 'lower': 50., 'upper': 200.}]
+        self.assertEqual(
+            of.improvement_summary(_result(final = 140000., variables = variables)),
+            'NPV (discounted) did not improve: the best value within the bounds (£140,000) is worse than the '
+            'current configuration\'s (£150,000), which lies outside them.'
+        )
+        # Not when the start is within the bounds, nor when the best value is no worse
+        self.assertIn('already at or near its best', of.improvement_summary(_result(final = 140000.)))
+        self.assertIn('already at or near its best', of.improvement_summary(_result(final = 150000., variables = variables)))
+
 class TestFeedback(unittest.TestCase):
 
     def test_success(self):

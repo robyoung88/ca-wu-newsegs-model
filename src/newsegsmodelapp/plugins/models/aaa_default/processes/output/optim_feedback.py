@@ -67,6 +67,13 @@ def improvement_summary(result: dict) -> str:
     label = optim.OPTIM_TARGET_STATISTIC_LABELS.get(result['statistic'], result['statistic'])
     start, final = result['start_value'], result['final_value']
     if not is_improvement(start, final, result['maximised']):
+        start_outside_bounds = any(not v['lower'] <= v['before'] <= v['upper'] for v in result['variables'])
+        if start_outside_bounds and is_improvement(final, start, result['maximised']):
+            # The optimiser searched only within the bounds, so could not return to the start
+            return (
+                f'{label} did not improve: the best value within the bounds ({format_money(final)}) is worse than '
+                f'the current configuration\'s ({format_money(start)}), which lies outside them.'
+            )
         return (
             f'{label} did not improve: the configuration is already at or near its best within the bounds '
             f'({format_money(start)}).'
