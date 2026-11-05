@@ -4,7 +4,7 @@ from dataclasses import asdict
 import time
 from typing import Any, override, Mapping
 from functools import singledispatchmethod
-from functools import lru_cache
+import functools
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,19 @@ from newsegsmodelframework.newsegsmodel import SprakeModel
 
 from newsegsmodelframework.newsegsfinance import apply_discount_factor, sum_all_to_horizon
 from newsegsmodelframework.newsegsstats import core as stats_core
+
+def _cached_for_run(func):
+    """Cache the result of a function of a finance model on the instance, for the current run (see
+    `NewsegsFinance.cached_result`). The function takes the instance as its first argument.
+
+    A module-level `lru_cache` keyed on the instance kept the results of every run, as each run of
+    the model changes the hash of the instance, so holding up to 128 sets of time series.
+    """
+    @functools.wraps(func)
+    def wrapper(fnc, *args, **kwargs):
+        key = (func.__name__, args, tuple(sorted(kwargs.items())))
+        return fnc.cached_result(key, lambda: func(fnc, *args, **kwargs))
+    return wrapper
 
 # Not strictly true, but good enough for finance.
 HOURS_IN_YEAR = 8760.0
@@ -619,7 +632,7 @@ def _SprakeFinance_from_other(
     except AttributeError:
         pass
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_empty_df(fnc: SprakeFinance):
     if fnc._model is None:
         return pd.DataFrame()
@@ -632,7 +645,7 @@ def _deferred_get_empty_df(fnc: SprakeFinance):
         'datetime': csr.get_timespan().to_pandas(),
     }).set_index('datetime')
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_consumption(fnc: SprakeFinance, meter_names) -> pd.DataFrame:
     """
     Summarise consumption meters to a simple dataframe
@@ -651,7 +664,7 @@ def _deferred_get_consumption(fnc: SprakeFinance, meter_names) -> pd.DataFrame:
         'consumption': csr.meters[meter_indices,:].sum(axis=0),
     })
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_resident_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     consumption = fnc._get_resident_consumption()
     if len(consumption) == 0:
@@ -675,7 +688,7 @@ def _deferred_get_resident_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataF
 
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_resident_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.resident_receipts_undiscounted,
@@ -683,7 +696,7 @@ def _deferred_get_resident_receipts_discounted(fnc: SprakeFinance) -> pd.DataFra
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_ev_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     consumption = fnc._get_ev_consumption()
     if len(consumption) == 0:
@@ -702,7 +715,7 @@ def _deferred_get_ev_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
 
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_ev_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.ev_receipts_undiscounted, 
@@ -710,7 +723,7 @@ def _deferred_get_ev_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
         shift=1
     )
 
-#@lru_cache
+#@_cached_for_run
 def _deferred_get_export_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     consumption = fnc._get_grid_export()
     if len(consumption) == 0:
@@ -728,7 +741,7 @@ def _deferred_get_export_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFra
     )
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_export_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.export_receipts_undiscounted,
@@ -736,7 +749,7 @@ def _deferred_get_export_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     mi_names = ['customer', 'receipt']
     resident = fnc.resident_receipts_undiscounted
@@ -758,7 +771,7 @@ def _deferred_get_all_receipts_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
         .join(export)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     ar = fnc.all_receipts_undiscounted
     if len(ar) == 0:
@@ -769,7 +782,7 @@ def _deferred_get_all_receipts_discounted(fnc: SprakeFinance) -> pd.DataFrame:
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_total_present_benefits_undiscounted(
     fnc: SprakeFinance,
     horizon: pd.Timestamp|pd.Timedelta|None = None,
@@ -780,7 +793,7 @@ def _deferred_get_total_present_benefits_undiscounted(
         .pipe(sum_all_to_horizon, horizon=horizon)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_total_present_benefits_discounted(
     fnc: SprakeFinance,
     horizon: pd.Timestamp|pd.Timedelta|None = None,
@@ -791,7 +804,7 @@ def _deferred_get_total_present_benefits_discounted(
         .pipe(sum_all_to_horizon, horizon=horizon)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_import_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     consumption = fnc._get_grid_import()
     if len(consumption) == 0:
@@ -811,7 +824,7 @@ def _deferred_get_import_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
 
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_import_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.import_costs_undiscounted,
@@ -819,7 +832,7 @@ def _deferred_get_import_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     Frame of timeseries of o&m costs of generators.
@@ -853,7 +866,7 @@ def _deferred_get_om_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.Dat
     
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_generation_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     Frame of timeseries of o&m costs of generators (cost discount applied).
@@ -867,7 +880,7 @@ def _deferred_get_om_costs_generation_discounted(fnc: SprakeFinance) -> pd.DataF
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     Frame of timeseries of o&m costs of storage technologies.
@@ -898,7 +911,7 @@ def _deferred_get_om_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.DataFr
 
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_storage_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     Frame of timeseries of o&m costs of storage technologies (cost discount applied).
@@ -912,7 +925,7 @@ def _deferred_get_om_costs_storage_discounted(fnc: SprakeFinance) -> pd.DataFram
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_billing_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     This is uncosted in Sprake model - return zeros
@@ -923,7 +936,7 @@ def _deferred_get_om_costs_billing_undiscounted(fnc: SprakeFinance) -> pd.DataFr
     odf = odf.assign(costs = 0.0)
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_billing_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.om_costs_billing_undiscounted,
@@ -931,7 +944,7 @@ def _deferred_get_om_costs_billing_discounted(fnc: SprakeFinance) -> pd.DataFram
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_other_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     There are no other costs in Sprake model - return zeros
@@ -942,7 +955,7 @@ def _deferred_get_om_costs_other_undiscounted(fnc: SprakeFinance) -> pd.DataFram
     odf = odf.assign(costs = 0.0)
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_om_costs_other_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.om_costs_other_undiscounted,
@@ -950,7 +963,7 @@ def _deferred_get_om_costs_other_discounted(fnc: SprakeFinance) -> pd.DataFrame:
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_recurrent_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     mi_names = ['system','cost']
 
@@ -979,7 +992,7 @@ def _deferred_get_all_recurrent_costs_undiscounted(fnc: SprakeFinance) -> pd.Dat
         .join(grid_import)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_recurrent_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.all_recurrent_costs_undiscounted,
@@ -987,7 +1000,7 @@ def _deferred_get_all_recurrent_costs_discounted(fnc: SprakeFinance) -> pd.DataF
         shift=1
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     In Sprake model, all capex is incurred at start of first timestep
@@ -1005,7 +1018,7 @@ def _deferred_get_capex_costs_generation_undiscounted(fnc: SprakeFinance) -> pd.
     odf['costs'] = odf['wind_costs'] + odf['pv_costs']
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_generation_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.capex_costs_generation_undiscounted,
@@ -1013,7 +1026,7 @@ def _deferred_get_capex_costs_generation_discounted(fnc: SprakeFinance) -> pd.Da
         shift=0
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     odf = fnc._get_empty_df()
     if len(odf) == 0:
@@ -1025,7 +1038,7 @@ def _deferred_get_capex_costs_storage_undiscounted(fnc: SprakeFinance) -> pd.Dat
     odf['costs'] = odf['bess_costs']
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_storage_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.capex_costs_storage_undiscounted,
@@ -1033,7 +1046,7 @@ def _deferred_get_capex_costs_storage_discounted(fnc: SprakeFinance) -> pd.DataF
         shift=0
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_distribution_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     In Sprake model, no distribution costs are accounted for
@@ -1044,7 +1057,7 @@ def _deferred_get_capex_costs_distribution_undiscounted(fnc: SprakeFinance) -> p
     odf['costs'] = 0.0
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_distribution_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.capex_costs_distribution_undiscounted,
@@ -1052,7 +1065,7 @@ def _deferred_get_capex_costs_distribution_discounted(fnc: SprakeFinance) -> pd.
         shift=0
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_metering_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     In Sprake model, no metering costs are accounted for
@@ -1063,7 +1076,7 @@ def _deferred_get_capex_costs_metering_undiscounted(fnc: SprakeFinance) -> pd.Da
     odf['costs'] = 0.0
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_metering_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.capex_costs_metering_undiscounted,
@@ -1071,7 +1084,7 @@ def _deferred_get_capex_costs_metering_discounted(fnc: SprakeFinance) -> pd.Data
         shift=0
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_other_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     """
     In Sprake model, no other costs are accounted for
@@ -1082,7 +1095,7 @@ def _deferred_get_capex_costs_other_undiscounted(fnc: SprakeFinance) -> pd.DataF
     odf['costs'] = 0.0
     return odf
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_capex_costs_other_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.capex_costs_other_undiscounted,
@@ -1090,7 +1103,7 @@ def _deferred_get_capex_costs_other_discounted(fnc: SprakeFinance) -> pd.DataFra
         shift=0
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_capex_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     mi_names = ['system','cost']
 
@@ -1119,7 +1132,7 @@ def _deferred_get_all_capex_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFra
         .join(other)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_capex_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return apply_discount_factor(
         fnc.all_capex_costs_undiscounted,
@@ -1127,7 +1140,7 @@ def _deferred_get_all_capex_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame
         shift=0
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     recur = fnc.all_recurrent_costs_undiscounted
     if len(recur) == 0:
@@ -1146,7 +1159,7 @@ def _deferred_get_all_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
 
     return recur.join(capex)
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_all_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     recur = fnc.all_recurrent_costs_discounted
     if len(recur) == 0:
@@ -1165,7 +1178,7 @@ def _deferred_get_all_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     
     return recur.join(capex)
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_total_present_costs_undiscounted(
     fnc: SprakeFinance, 
     horizon: pd.Timestamp|pd.Timedelta|None = None
@@ -1176,7 +1189,7 @@ def _deferred_get_total_present_costs_undiscounted(
         .pipe(sum_all_to_horizon, horizon=horizon)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_total_present_costs_discounted(
     fnc: SprakeFinance, 
     horizon: pd.Timestamp|pd.Timedelta|None = None
@@ -1187,35 +1200,35 @@ def _deferred_get_total_present_costs_discounted(
         .pipe(sum_all_to_horizon, horizon=horizon)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_benefits_series_undiscounted(fnc: SprakeFinance) -> pd.Series:
     benefits = fnc.all_receipts_undiscounted.loc[:,(slice(None), 'receipts')]
     srs = benefits.sum(axis=1)
     srs.name = 'benefits'
     return srs
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_benefits_series_discounted(fnc: SprakeFinance) -> pd.Series:
     benefits = fnc.all_receipts_discounted.loc[:,(slice(None), 'receipts')]
     srs = benefits.sum(axis=1)
     srs.name = 'benefits'
     return srs
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_costs_series_undiscounted(fnc: SprakeFinance) -> pd.Series:
     benefits = fnc.all_costs_undiscounted.loc[:,(slice(None), 'costs')]
     srs = benefits.sum(axis=1)
     srs.name = 'costs'
     return srs
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_costs_series_discounted(fnc: SprakeFinance) -> pd.Series:
     benefits = fnc.all_costs_discounted.loc[:,(slice(None), 'costs')]
     srs = benefits.sum(axis=1)
     srs.name = 'costs'
     return srs
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_benefits_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFrame:
     return pd.merge(
         fnc.get_benefits_series_undiscounted(),
@@ -1224,7 +1237,7 @@ def _deferred_get_benefits_costs_undiscounted(fnc: SprakeFinance) -> pd.DataFram
         right_index=True
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_benefits_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
     return pd.merge(
         fnc.get_benefits_series_discounted(),
@@ -1233,7 +1246,7 @@ def _deferred_get_benefits_costs_discounted(fnc: SprakeFinance) -> pd.DataFrame:
         right_index=True
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_benefit_cost_ratio_undiscounted(
     fnc: SprakeFinance,
     horizon: pd.Timestamp|pd.Timedelta|None = None
@@ -1245,7 +1258,7 @@ def _deferred_get_benefit_cost_ratio_undiscounted(
         return np.sign(total_benefits) * np.inf
     return total_benefits / total_costs
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_benefit_cost_ratio_discounted(
     fnc: SprakeFinance,
     horizon: pd.Timestamp|pd.Timedelta|None = None
@@ -1257,7 +1270,7 @@ def _deferred_get_benefit_cost_ratio_discounted(
         return np.sign(total_benefits) * np.inf
     return total_benefits / total_costs
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_simple_payback_time_days(fnc: SprakeFinance) -> float:
     capex = fnc.all_capex_costs_undiscounted.sum(axis=1)
     net_revenue = fnc.all_receipts_undiscounted.sum(axis=1) - fnc.all_recurrent_costs_undiscounted.sum(axis=1)
@@ -1290,7 +1303,7 @@ def _deferred_get_simple_payback_time_days(fnc: SprakeFinance) -> float:
 
     return max_debt_days - max_debt / grad
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_net_present_value_undiscounted(
     fnc: SprakeFinance,
     horizon: pd.Timestamp|pd.Timedelta|None = None
@@ -1301,7 +1314,7 @@ def _deferred_get_net_present_value_undiscounted(
         .pipe(sum_all_to_horizon, horizon=horizon)
     )
 
-@lru_cache
+@_cached_for_run
 def _deferred_get_net_present_value_discounted(
     fnc: SprakeFinance,
     horizon: pd.Timestamp|pd.Timedelta|None = None

@@ -956,8 +956,12 @@ def _make_postopt_tables_sprake(
             str(opt),
         ]
 
+    # Saved against the table configuration, from which the results container reads it; the result
+    # provider needs its data-holding description, as do the other tables
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
     result_provider.upsert_result(
-        'table_postopt_metamodel', lproj.table_config.id, 
+        'table_postopt_metamodel', table_component,
         table_data, request=request
     )
 
