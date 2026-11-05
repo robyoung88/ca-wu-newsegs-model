@@ -4,7 +4,7 @@
  * Selecting an icon never contacts the server. Choosing a row writes {mm_index, target} to the row's
  * group-move-request store, which react_to_input_change passes to the move handler; it redraws the editor. A move or
  * "Use for all" that would remove a Variable asks for confirmation first. Esc, selecting the icon again or clicking
- * outside the editor cancels a selection.
+ * outside the editor cancels a selection. An icon can also be dragged to a row, which sends the same request.
  */
 (function () {
     function editorOf(el) {
@@ -157,4 +157,84 @@
             clearAll(null);
         }
     });
+
+    /*
+     * Drag and drop: dragging an icon to a row does what choosing that row's insert button does. Only rows of the
+     * icon's own editor, other than its own row, take a drop. Nothing in the page is moved: the drop sends the request,
+     * and the server redraws the editor. The browser cancels a drag on Esc, and dragend then clears it.
+     */
+    let drag = null;  // {editor, icon, source} while an icon is dragged
+
+    function rowAt(target) {
+        return target && target.closest ? target.closest('.group-editor-row') : null;
+    }
+
+    function takesDrop(row) {
+        if (!drag || !row || editorOf(row) !== drag.editor || row === drag.source) { return false; }
+        // A configuration alone in its group already has a value of its own
+        return !(row.classList.contains('new-value') && drag.source.dataset.size === '1');
+    }
+
+    function endDrag() {
+        if (!drag) { return; }
+        const editor = drag.editor;
+        delete editor.dataset.dragging;
+        editor.querySelectorAll('.drop-candidate, .drop-over').forEach(function (x) {
+            x.classList.remove('drop-candidate', 'drop-over');
+        });
+        drag.source.classList.remove('source');
+        drag = null;
+    }
+
+    document.addEventListener('dragstart', function (event) {
+        const icon = event.target.closest ? event.target.closest('.group-editor-icon') : null;
+        if (!icon || icon.disabled) { return; }
+        const editor = editorOf(icon);
+        clearAll(null);
+        endDrag();
+        const source = icon.closest('.group-editor-row');
+        drag = {editor: editor, icon: icon, source: source};
+        event.dataTransfer.effectAllowed = 'move';
+        // Some browsers start a drag only with data
+        event.dataTransfer.setData('text/plain', 'Config ' + (Number(icon.dataset.mmIndex) + 1));
+        source.classList.add('source');
+        editor.classList.toggle('source-alone', source.dataset.size === '1');
+        editor.dataset.dragging = icon.dataset.mmIndex;
+        editor.querySelectorAll('.group-editor-row').forEach(function (x) {
+            if (takesDrop(x)) { x.classList.add('drop-candidate'); }
+        });
+    });
+
+    document.addEventListener('dragover', function (event) {
+        const row = rowAt(event.target);
+        if (!takesDrop(row)) { return; }
+        event.preventDefault();  // Allows the drop
+        event.dataTransfer.dropEffect = 'move';
+        drag.editor.querySelectorAll('.drop-over').forEach(function (x) {
+            if (x !== row) { x.classList.remove('drop-over'); }
+        });
+        row.classList.add('drop-over');
+    });
+
+    document.addEventListener('dragleave', function (event) {
+        const row = rowAt(event.target);
+        if (row && !row.contains(event.relatedTarget)) { row.classList.remove('drop-over'); }
+    });
+
+    document.addEventListener('drop', function (event) {
+        const row = rowAt(event.target);
+        if (!takesDrop(row)) { return; }
+        event.preventDefault();
+        const editor = drag.editor;
+        const source = drag.source;
+        const request = {mm_index: Number(drag.icon.dataset.mmIndex), target: row.dataset.varUid};
+        endDrag();
+        if (source.dataset.size === '1' && request.target !== 'new') {
+            askConfirm(editor, removalText([groupOf(source)]), request);
+        } else {
+            send(editor, request, row);
+        }
+    });
+
+    document.addEventListener('dragend', endDrag);
 })();

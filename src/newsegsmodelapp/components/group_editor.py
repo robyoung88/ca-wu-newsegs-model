@@ -196,6 +196,8 @@ def _icon_button(idx: int, is_focussed: bool) -> html.Button:
         type = 'button',
         className = 'group-editor-icon' + (' focussed' if is_focussed else ''),
         title = f'Config {idx+1}' + (' (focussed)' if is_focussed else ''),
+        # Dragged to a row as well as clicked to move (assets/group_editor.js)
+        draggable = 'true',
         **{
             'data-mm-index': str(idx),
             'aria-label': f'Select Config {idx+1} to move',
@@ -283,12 +285,12 @@ def create_group_editor_contents(varid: str, active_project_id: str, project_pro
             **{'data-var-uid': var_uid, 'data-label': label, 'data-size': str(len(group.metamodel_indices))},
         ))
 
-    # Shown only while a configuration is selected to be moved (assets/group_editor.js)
+    # Shown only while a configuration is selected to be moved, or dragged (assets/group_editor.js)
     rows.append(html.Div(
         [
             html.Div(html.Span('New Variable', className = 'group-editor-value-text'), className = 'group-editor-value'),
             html.Div([
-                html.Div(className = 'group-editor-icons'),
+                html.Div(html.Span('Drop here', className = 'group-editor-drop-label'), className = 'group-editor-icons'),
                 html.Div([_insert_button(NEW_VARIABLE, 'a new Variable')], className = 'group-editor-actions'),
             ], className = 'group-editor-side'),
         ],
