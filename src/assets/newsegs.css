@@ -493,3 +493,9 @@ div.optim-configuration-summaryinfo-optim-live-values {
 table.dataframe tr {
     text-align: left !important;
 }
+
+/* Environmental feedback of a site other than the one selected */
+.environment-feedback-stale {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+}

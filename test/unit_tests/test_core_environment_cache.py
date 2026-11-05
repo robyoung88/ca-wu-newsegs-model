@@ -254,7 +254,7 @@ class TestHourlyPVGISNEWALocalEnvCache(TemporaryCacheTestCase):
         loc = location.RaisedLocation(53.25535, -3.47697, 15)
         server = pvgis_newa_env_servers.HourlyPVGISNEWALocalEnv(self.cache)
         speeds = server.get_wind_speeds(loc, _TIMESPAN)
-        _, directions_key = server._wind_keys(loc, _TIMESPAN)
+        directions_key, _ = server._cache_key('wind_directions', loc, _TIMESPAN)
         self.cache.delete(directions_key)
         server.get_wind_directions(loc, _TIMESPAN)
         self.assertEqual(self.wind.call_count, 2)

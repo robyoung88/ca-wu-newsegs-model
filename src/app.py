@@ -14,10 +14,11 @@ import os
 from pathlib import Path
 import uuid
 
-from dash import Dash, Input, Output, State
+from dash import Dash, DiskcacheManager, Input, Output, State
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
 from flask import jsonify, send_from_directory
+import diskcache
 import sqlalchemy as sa
 import sqlite3
 
@@ -49,7 +50,9 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.callbacks.input_container_callbacks import add_input_container_callbacks
+from newsegsmodelapp.components.callbacks.environment_feedback_callbacks import add_environment_feedback_callbacks
 from newsegsmodelapp.components import map
+from newsegsmodelapp.components.feedback import environmental_conditions
 
 RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
@@ -272,13 +275,18 @@ def create_app(external_stylesheets = None) -> Dash:
         project_provider = project_provider,
         results_provider = results_provider,
         request_handler = request_handler,
-        #background_callback_manager = background_callback_manager,
+        background_callback_manager = DiskcacheManager(
+            diskcache.Cache(str(settings.get('BACKGROUND_CALLBACK_CACHE_PATH')))
+        ),
     )
 
     app.layout = serve_layout
     default_app_state = {'model_selection': 'default'} 
     app.validation_layout = html.Div(
-        [serve_layout()] + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
+        [serve_layout()]
+        + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
+        # Shown only for model types with environmental feedback, which the defaults have not
+        + [environmental_conditions.create_placeholder_layout()]
     )
 
     server = app.server
@@ -327,6 +335,7 @@ def create_app(external_stylesheets = None) -> Dash:
     add_input_container_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
     map.add_site_selector_callbacks(app)
+    add_environment_feedback_callbacks(app)
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
     add_result_container_callbacks(app)

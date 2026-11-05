@@ -13,7 +13,7 @@ settings), cannot be reached, or refuses the request, an `EnvironmentDataUnavail
 raised; nothing is cached, so the data are fetched again on the next request.
 """
 
-from typing import Callable, Sequence, TypeVar, overload, override
+from typing import Callable, Sequence, TypeVar, cast, overload, override
 
 import diskcache
 import numpy as np
@@ -116,8 +116,69 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
     def cache_identity(self) -> tuple[str, str]:
         return (type(self).__name__, self._version)
 
+    def _cache_key(self, measure: str, location: Location, timespan: TimeSpan | None):
+        """Key of the cache entry holding a measure, and the key locked while it is fetched.
+
+        Args:
+            measure: A local environment measure, `wind_directions` or `horizon`.
+            location: The location; a `RaisedLocation` for the wind, and an `AspectLocation`
+                for the solar flux on a plane.
+            timespan: The time span; ignored for the horizon.
+        """
+        if measure in ('wind_speeds', 'wind_directions'):
+            loc = cast(RaisedLocation, location)
+            speeds_key, directions_key = (
+                environment_cache.environment_cache_key(
+                    self.cache_identity, x, loc, timespan, height = loc.height_agl
+                )
+                for x in ('wind_speeds', 'wind_directions')
+            )
+            # Locked on the speeds, as the speeds and directions are fetched together
+            return (speeds_key if measure == 'wind_speeds' else directions_key), speeds_key
+        if measure in ('horizontal_solar_flux', 'external_temperature'):
+            key = environment_cache.environment_cache_key(self.cache_identity, 'pvgis_hourly', location, timespan)
+        elif measure == 'solar_flux_on_plane':
+            loc = cast(AspectLocation, location)
+            key = environment_cache.environment_cache_key(
+                self.cache_identity, 'pvgis_hourly_on_plane', loc, timespan,
+                pitch = int(round(loc.pitch)), azimuth = int(round(loc.azimuth))
+            )
+        elif measure == 'horizon':
+            key = environment_cache.environment_cache_key(self.cache_identity, 'pvgis_horizon', location, None)
+        else:
+            raise ValueError(f'{type(self).__name__} does not serve {measure}')
+        return key, key
+
+    def is_cached(self, measure: str, location: Location, timespan: TimeSpan | None = None) -> bool:
+        """Whether a measure at a location is cached, so that serving it fetches nothing.
+
+        Args:
+            measure: A local environment measure, `wind_directions` or `horizon`.
+            location: The location, as given to the method serving the measure.
+            timespan: The time span; ignored for the horizon.
+
+        Returns:
+            True if cached.
+        """
+        key, _ = self._cache_key(measure, location, timespan)
+        return key in self.cache
+
+    def is_pending(self, measure: str, location: Location, timespan: TimeSpan | None = None) -> bool:
+        """Whether a measure at a location is being fetched, by this or another process.
+
+        Args:
+            measure: A local environment measure, `wind_directions` or `horizon`.
+            location: The location, as given to the method serving the measure.
+            timespan: The time span; ignored for the horizon.
+
+        Returns:
+            True if being fetched.
+        """
+        _, lock_key = self._cache_key(measure, location, timespan)
+        return environment_cache.is_pending(lock_key, self.cache)
+
     def _get_pvgis_data(self, location: Location, timespan: TimeSpan) -> pd.DataFrame:
-        key = environment_cache.environment_cache_key(self.cache_identity, 'pvgis_hourly', location, timespan)
+        key, _ = self._cache_key('external_temperature', location, timespan)
         lat, lon = environment_cache.round_location(location)
         return environment_cache.get_or_set(
             key,
@@ -138,7 +199,7 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
 
         # If height is 2m or less, we should probably return the pvgis wind speed
 
-        speeds_key, _ = self._wind_keys(location, timespan)
+        speeds_key, _ = self._cache_key('wind_speeds', location, timespan)
         return environment_cache.get_or_set(
             speeds_key, lambda: self._fetch_hourly_wind(location, timespan)[0], cache = self.cache
         )
@@ -154,21 +215,10 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
             nrow = len(olist)
             return np.asarray(olist).reshape((nrow,-1))
 
-        speeds_key, directions_key = self._wind_keys(location, timespan)
-        # Locked on the speeds, as the speeds and directions are fetched together
+        directions_key, speeds_key = self._cache_key('wind_directions', location, timespan)
         return environment_cache.get_or_set(
             directions_key, lambda: self._fetch_hourly_wind(location, timespan)[1],
             cache = self.cache, lock_key = speeds_key
-        )
-
-    def _wind_keys(self, location: RaisedLocation, timespan: TimeSpan):
-        """Keys of the wind speeds and directions, which are fetched together; both are locked
-        on the key of the speeds while fetched."""
-        return tuple(
-            environment_cache.environment_cache_key(
-                self.cache_identity, measure, location, timespan, height = location.height_agl
-            )
-            for measure in ('wind_speeds', 'wind_directions')
         )
 
     def _fetch_hourly_wind(self, location: RaisedLocation, timespan: TimeSpan) -> tuple[np.ndarray, np.ndarray]:
@@ -214,14 +264,14 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         speeds = wind_out['ws_hub'].values
         directions = np.rad2deg(np.arctan2(wind_out['wd_sin'].values, wind_out['wd_cos'].values)) % 360.
 
-        speeds_key, directions_key = self._wind_keys(location, timespan)
+        directions_key, speeds_key = self._cache_key('wind_directions', location, timespan)
         self.cache.set(speeds_key, speeds)
         self.cache.set(directions_key, directions)
         return speeds, directions
 
     @override
     def get_horizon(self, location: Location) -> pd.Series:
-        key = environment_cache.environment_cache_key(self.cache_identity, 'pvgis_horizon', location, None)
+        key, _ = self._cache_key('horizon', location, None)
         lat, lon = environment_cache.round_location(location)
 
         def fetch_horizon():
@@ -283,17 +333,15 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         # For Sprake model, this is not necessary
         pitch = int(round(location.pitch))
         azimuth = int(round(location.azimuth))
-        key = environment_cache.environment_cache_key(
-            self.cache_identity, 'pvgis_hourly_on_plane', location, timespan,
-            pitch = pitch, azimuth = azimuth
-        )
+        key, _ = self._cache_key('solar_flux_on_plane', location, timespan)
         lat, lon = environment_cache.round_location(location)
         pv_data = environment_cache.get_or_set(
             key,
             lambda: _fetch_pvgis_data(lat, lon, timespan.start, timespan.end, pitch, azimuth),
             cache = self.cache
         )
-        return np.append(pv_data['poa_direct'].at[0], pv_data['poa_direct'].to_numpy())
+        # The global flux on the plane: direct, diffuse and reflected
+        return np.append(pv_data['poa_global'].at[0], pv_data['poa_global'].to_numpy())
 
     @override
     def get_solar_flux_on_plane_timestep(self):

@@ -170,6 +170,46 @@ Reopening the row builds the editor again, so it shows the current values. Closi
   open state will disagree. Rebuilding the whole input container is safe.
 * Don't put interactive components in the `Summary`, since clicks on them are counted too.
 
+### Environmental feedback
+
+The site configuration page can show plots and tables of the environmental conditions at the site, to help compare
+sites. It is shown for a model type when its layout configuration sets `layout_environment_feedback`, usually to
+`create_environmental_conditions_card` with a list of `EnvironmentFeedbackItem`s (see
+`plugins/models/sprakeloc/page_contents/configurations.py`). A "Get environmental data" button then appears under the
+map. Other model types have the components hidden.
+
+Fetching the data is slow, so it happens only when the user clicks the button. A model type registers a data source,
+which says whether the data of a site are cached or being fetched, and fetches them. It also registers an artist for
+each item, which draws from the cache only:
+
+```python
+class MyEnvironmentData:
+    def is_available(self, location) -> bool: ...   # all the data are cached
+    def is_pending(self, location) -> bool: ...     # another process is fetching them
+    def fetch(self, location) -> None: ...          # fetches and caches them
+
+register_environment_data_source(MyEnvironmentData(), 'sprakeloc')
+
+@register_environment_feedback_artist('wind-rose', 'sprakeloc')     # item key, model type
+def draw_wind_rose(location, sites) -> Component:   # sites: names and locations of the project's other sites
+    ...                                  # the children of the item
+```
+
+The callbacks are in `components/callbacks/environment_feedback_callbacks.py`:
+
+* **Status.** Runs when the site location changes. If the data aren't cached, the feedback of the previous site stays,
+  greyed out, with a badge saying why. It checks only that a location is set; validating the location is left to the
+  map.
+* **Fetch.** A background callback, using the `DiskcacheManager` set up in `app.py`, with its jobs under
+  `BACKGROUND_CALLBACK_CACHE_PATH`. Its result holds only the error, if any; the data go to the environment cache.
+* **Draw.** Runs once the data are ready and the panel is open, and doesn't draw again for the same site.
+
+The environment cache locks data while they're fetched (see `environment_cache.get_or_set`). If a model run needs data
+that the feedback is fetching, or the other way round, it waits for that fetch and doesn't start another.
+
+For `sprakeloc`, the data are those of the default configuration (the default run period, and the turbine at 15 m), so
+a run of a configuration at the site uses the same cache entries.
+
 ### Processes
 
 A *process* is work done in the background by a worker. Processes are chained by naming the
@@ -213,6 +253,8 @@ success.
 | `RESULT_CONTAINER_CONTENT_CREATORS` | `register_result_container_content_creator` | key, section, model type |
 | `RESULT_SECTION_HEADER_CONTENT_CREATORS` | `register_result_section_header_content_creator` | key, section, model type |
 | `FEEDBACK_GRAPH_ARTISTS` | `register_feedback_graph_artist` | figure key, model type |
+| `ENVIRONMENT_DATA_SOURCES` | `register_environment_data_source` | model type |
+| `ENVIRONMENT_FEEDBACK_ARTISTS` | `register_environment_feedback_artist` | item key, model type |
 | `RUN_REQUEST_REGISTER` | `register_run_request` | request type |
 | `RUN_PROCEDURE_REGISTER` | `register_run_procedure` | request type |
 | `POSTPROCESS_REQUEST_REGISTER` | `register_postprocess_request` | postprocess type |
