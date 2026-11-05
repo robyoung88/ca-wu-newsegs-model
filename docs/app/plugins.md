@@ -184,16 +184,20 @@ each item, which draws from the cache only:
 
 ```python
 class MyEnvironmentData:
-    def is_available(self, location) -> bool: ...   # all the data are cached
-    def is_pending(self, location) -> bool: ...     # another process is fetching them
-    def fetch(self, location) -> None: ...          # fetches and caches them
+    def is_available(self, location, metamodel) -> bool: ...   # all the data are cached
+    def is_pending(self, location, metamodel) -> bool: ...     # another process is fetching them
+    def fetch(self, location, metamodel) -> None: ...          # fetches and caches them
 
 register_environment_data_source(MyEnvironmentData(), 'sprakeloc')
 
 @register_environment_feedback_artist('wind-rose', 'sprakeloc')     # item key, model type
-def draw_wind_rose(location, sites) -> Component:   # sites: names and locations of the project's other sites
+def draw_wind_rose(location, sites, metamodel) -> Component:   # sites: names and locations of the project's other sites
     ...                                  # the children of the item
 ```
+
+`metamodel` is the focussed configuration, loaded in full. The data should be what a run of it at the site requests,
+such as at the heights of its generators and over its run period, so that the feedback and runs share the cached
+data.
 
 The callbacks are in `components/callbacks/environment_feedback_callbacks.py`:
 
@@ -207,8 +211,9 @@ The callbacks are in `components/callbacks/environment_feedback_callbacks.py`:
 The environment cache locks data while they're fetched (see `environment_cache.get_or_set`). If a model run needs data
 that the feedback is fetching, or the other way round, it waits for that fetch and doesn't start another.
 
-For `sprakeloc`, the data are those of the default configuration (the default run period, and the turbine at 15 m), so
-a run of a configuration at the site uses the same cache entries.
+For `sprakeloc`, the data are taken from the focussed configuration: its run period, the wind at the height of its
+turbine, and the wind at the height of its PV array (which runs also request). A run after the feedback then fetches
+nothing.
 
 ### Processes
 

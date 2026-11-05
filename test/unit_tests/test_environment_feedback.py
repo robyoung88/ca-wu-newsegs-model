@@ -27,6 +27,7 @@ from newsegsmodelapp.plugins.pages.p100_model_configuration_layout import create
 from newsegsmodelframework.core.environment import environment_cache, pvgis_newa_env_servers
 from newsegsmodelframework.core.environment.environment_servers import EnvironmentDataUnavailableError
 from newsegsmodelframework.core.location.location import Location
+from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
 
 _SITE = Location(53.255, -3.477)
 _OTHER_SITE = Location(51.5, -0.1)
@@ -76,6 +77,9 @@ class FakeSourceTestCase(unittest.TestCase):
         ).start()
         self.addCleanup(mock.patch.stopall)
         self.source = sle.SprakeLocEnvironmentData()
+        # The default configuration of a new project in the app
+        self.metamodel = PROJECT_FACTORIES['sprakeloc']().get_focussed_metamodel()
+        self.config = sle.SiteConfiguration.from_metamodel(self.metamodel)
 
     def tearDown(self):
         self.cache.close()
@@ -87,51 +91,67 @@ class TestSprakeLocEnvironmentData(FakeSourceTestCase):
         self.assertIsInstance(registers.get_environment_data_source('sprakeloc'), sle.SprakeLocEnvironmentData)
         self.assertIsNone(registers.get_environment_data_source('sprake'))
 
+    def test_configuration(self):
+        # The heights of the generators of the configuration, which are those runs use
+        plants = self.metamodel.model.generation.generator.generators
+        self.assertEqual(self.config.turbine_height, plants[0].location.height_agl)
+        self.assertEqual(self.config.pv_height, plants[1].location.height_agl)
+        self.assertEqual(self.config.timespan, self.metamodel.model.run_period)
+
     def test_fetch_makes_available(self):
-        self.assertFalse(self.source.is_available(_SITE))
-        self.source.fetch(_SITE)
-        self.assertTrue(self.source.is_available(_SITE))
-        self.assertFalse(self.source.is_available(_OTHER_SITE))
-        # Wind once, the horizontal data once and each plane once, and the horizon once
-        self.wind.assert_called_once()
+        self.assertFalse(self.source.is_available(_SITE, self.metamodel))
+        self.source.fetch(_SITE, self.metamodel)
+        self.assertTrue(self.source.is_available(_SITE, self.metamodel))
+        self.assertFalse(self.source.is_available(_OTHER_SITE, self.metamodel))
+        # Wind at the turbine and the PV heights, the horizontal data once and each plane once,
+        # and the horizon once
+        self.assertEqual(
+            sorted(c.kwargs['site_heights'][0] for c in self.wind.call_args_list),
+            sorted([round(self.config.turbine_height), round(self.config.pv_height)])
+        )
         self.assertEqual(self.pvgis.call_count, 1 + len(sle.PV_AZIMUTHS))
         self.horizon.assert_called_once()
-        # At the turbine height
-        self.assertEqual(self.wind.call_args.kwargs['site_heights'], [15])
 
         # Nothing is fetched again
-        self.source.fetch(_SITE)
-        self.wind.assert_called_once()
+        self.source.fetch(_SITE, self.metamodel)
+        self.assertEqual(self.wind.call_count, 2)
 
-    def test_data_shared_with_runs(self):
-        # The wind and temperature fetched are those a run of the default configuration uses
-        from newsegsmodelframework.newsegsmodel.sprakelocmodel import SprakeLocModel
-        self.source.fetch(_SITE)
-        mdl = SprakeLocModel('Test')
-        mdl.local_env = self.server
-        mdl.location = Location(_SITE.lat, _SITE.lon)
-        turbine_location = mdl.generation.generator.generators[0].location
-        self.assertTrue(self.server.is_cached('wind_speeds', turbine_location, mdl.run_period))
-        self.assertTrue(self.server.is_cached('external_temperature', mdl.location, mdl.run_period))
+    def test_depends_on_turbine_height(self):
+        self.source.fetch(_SITE, self.metamodel)
+        self.metamodel.model.generation.generator.generators[0].turbine.hub_height = self.config.turbine_height + 5.
+        self.assertFalse(self.source.is_available(_SITE, self.metamodel))
+
+    def test_run_after_fetch_fetches_nothing(self):
+        # A run of the configuration at the site uses only the data the feedback fetched
+        self.source.fetch(_SITE, self.metamodel)
+        for fetch in (self.wind, self.pvgis, self.horizon):
+            fetch.reset_mock()
+        model = self.metamodel.model
+        model.local_env = self.server
+        model.location = Location(_SITE.lat, _SITE.lon)
+        model.run()
+        self.wind.assert_not_called()
+        self.pvgis.assert_not_called()
 
     def test_pending_while_another_process_fetches(self):
-        self.assertFalse(self.source.is_pending(_SITE))
-        timespan = sle._timespan()
-        _, lock_key = self.server._cache_key('wind_speeds', sle._wind_location(_SITE), timespan)
+        self.assertFalse(self.source.is_pending(_SITE, self.metamodel))
+        _, lock_key = self.server._cache_key(
+            'wind_speeds', sle._raised(_SITE, self.config.turbine_height), self.config.timespan
+        )
         lock = environment_cache._lock(lock_key, self.cache)
         lock.acquire()
         try:
-            self.assertTrue(self.source.is_pending(_SITE))
-            self.assertFalse(self.source.is_pending(_OTHER_SITE))
+            self.assertTrue(self.source.is_pending(_SITE, self.metamodel))
+            self.assertFalse(self.source.is_pending(_OTHER_SITE, self.metamodel))
         finally:
             lock.release()
-        self.assertFalse(self.source.is_pending(_SITE))
+        self.assertFalse(self.source.is_pending(_SITE, self.metamodel))
 
 class TestSprakeLocArtists(FakeSourceTestCase):
 
     def setUp(self):
         super().setUp()
-        self.source.fetch(_SITE)
+        self.source.fetch(_SITE, self.metamodel)
         self.wind.reset_mock()
         self.pvgis.reset_mock()
         self.horizon.reset_mock()
@@ -142,7 +162,7 @@ class TestSprakeLocArtists(FakeSourceTestCase):
         self.horizon.assert_not_called()
 
     def draw(self, key, sites = ()):
-        return registers.get_environment_feedback_artist(key, 'sprakeloc')(_SITE, list(sites))
+        return registers.get_environment_feedback_artist(key, 'sprakeloc')(_SITE, list(sites), self.metamodel)
 
     def test_wind_rose(self):
         graph = self.draw('wind-rose')
@@ -152,6 +172,7 @@ class TestSprakeLocArtists(FakeSourceTestCase):
         self.assertAlmostEqual(sum(float(np.sum(t.r)) for t in traces), 100., places = 6)
         self.assertTrue(all(len(t.r) == sle.WIND_ROSE_SECTORS for t in traces))
         self.assertIn('Mean wind speed', graph.figure.layout.annotations[0].text)
+        self.assertEqual(graph.figure.layout.title.text, f'Wind rose at {self.config.turbine_height:g} m')
         self.assert_nothing_fetched()
 
     def test_wind_speed_distribution(self):
@@ -175,7 +196,7 @@ class TestSprakeLocArtists(FakeSourceTestCase):
 
     def test_external_temperature_of_cached_sites_only(self):
         uncached = Location(52., -1.)
-        self.source.fetch(_OTHER_SITE)
+        self.source.fetch(_OTHER_SITE, self.metamodel)
         for fetch in (self.wind, self.pvgis, self.horizon):
             fetch.reset_mock()
         graph = self.draw('external-temperature', [('Other site', _OTHER_SITE), ('Uncached site', uncached)])
@@ -185,8 +206,9 @@ class TestSprakeLocArtists(FakeSourceTestCase):
         self.assert_nothing_fetched()
 
     def test_generation_potential(self):
-        table = sle.generation_potential(_SITE)
+        table = sle.generation_potential(_SITE, self.metamodel)
         self.assertEqual(list(table['Technology']), ['Wind'] + ['PV'] * len(sle.PV_AZIMUTHS))
+        self.assertEqual(table['Position'].iloc[0], f'{self.config.turbine_height:g} m hub height')
         self.assertTrue((table['Annual production'] > 0).all())
         pv = table[table['Technology'] == 'PV'].set_index('Position')['Annual production']
         self.assertEqual(pv.idxmax(), 'South, 35° pitch')
@@ -196,20 +218,24 @@ class TestSprakeLocArtists(FakeSourceTestCase):
     def test_annual_specific_wind_energy(self):
         # A constant wind gives the turbine's power at that speed for every hour of the year
         speeds = pd.Series(np.full(8766, 8.), index = pd.date_range('2005-01-01', periods = 8766, freq = 'h'))
-        expected = 0.5 * 1.225 * float(sle._turbine().cp(np.asarray([8.]))[0]) * 8.**3 / 1000. * 8766.
-        self.assertAlmostEqual(sle.annual_specific_wind_energy(speeds, 1.225), expected, places = 6)
+        cp = self.config.cp
+        expected = 0.5 * 1.225 * float(cp(np.asarray([8.]))[0]) * 8.**3 / 1000. * 8766.
+        self.assertAlmostEqual(sle.annual_specific_wind_energy(speeds, 1.225, cp), expected, places = 6)
 
 class _Source:
     """A data source whose state is set by the test."""
     def __init__(self, available = False, pending = False):
         self.available = available
         self.pending = pending
-    def is_available(self, location):
+    def is_available(self, location, metamodel):
         return self.available
-    def is_pending(self, location):
+    def is_pending(self, location, metamodel):
         return self.pending
-    def fetch(self, location):
+    def fetch(self, location, metamodel):
         pass
+
+_METAMODEL = mock.Mock(id = 'metam-test')
+_READY = json.dumps({'site': '53.255,-3.477', 'metamodel_id': 'metam-test'})
 
 class TestStatus(unittest.TestCase):
 
@@ -223,39 +249,56 @@ class TestStatus(unittest.TestCase):
         self.assertEqual(efc.location_from_key('53.255,-3.477'), Location(53.255, -3.477))
 
     def test_unset(self):
-        status = efc.get_status(_Source(available = True), None)
-        self.assertEqual(status.status, 'unset')
-        self.assertFalse(status.can_fetch)
-        self.assertIsNone(status.ready)
+        for location, metamodel in ((None, _METAMODEL), (_SITE, None)):
+            status = efc.get_status(_Source(available = True), location, metamodel)
+            self.assertEqual(status.status, 'unset')
+            self.assertFalse(status.can_fetch)
+            self.assertIsNone(status.ready)
 
     def test_available(self):
-        status = efc.get_status(_Source(available = True), _SITE)
-        self.assertEqual((status.status, status.can_fetch, status.ready, status.stale), ('available', False, '53.255,-3.477', False))
+        status = efc.get_status(_Source(available = True), _SITE, _METAMODEL)
+        self.assertEqual((status.status, status.can_fetch, status.ready, status.stale), ('available', False, _READY, False))
         self.assertEqual(status.message, '')
 
     def test_missing(self):
-        status = efc.get_status(_Source(), _SITE)
+        status = efc.get_status(_Source(), _SITE, _METAMODEL)
         self.assertEqual((status.status, status.can_fetch, status.ready, status.stale), ('missing', True, None, True))
 
     def test_pending(self):
-        for status in (efc.get_status(_Source(pending = True), _SITE), efc.get_status(_Source(), _SITE, fetch_requested = True)):
+        for status in (
+            efc.get_status(_Source(pending = True), _SITE, _METAMODEL),
+            efc.get_status(_Source(), _SITE, _METAMODEL, fetch_requested = True),
+        ):
             self.assertEqual((status.status, status.can_fetch, status.stale), ('pending', False, True))
 
     def test_failed(self):
         result = {'key': '53.255,-3.477', 'error': 'Unable to obtain wind speeds'}
-        status = efc.get_status(_Source(), _SITE, result)
+        status = efc.get_status(_Source(), _SITE, _METAMODEL, result)
         self.assertEqual((status.status, status.message, status.can_fetch), ('failed', 'Unable to obtain wind speeds', True))
         # The error of another site is not shown
-        self.assertEqual(efc.get_status(_Source(), _OTHER_SITE, result).status, 'missing')
+        self.assertEqual(efc.get_status(_Source(), _OTHER_SITE, _METAMODEL, result).status, 'missing')
 
     def test_fetch_errors_reported(self):
         source = _Source()
-        self.assertEqual(efc.fetch_environment_data(source, _SITE), {'key': '53.255,-3.477', 'error': None})
+        self.assertEqual(efc.fetch_environment_data(source, _SITE, _METAMODEL), {'key': '53.255,-3.477', 'error': None})
         source.fetch = mock.Mock(side_effect = EnvironmentDataUnavailableError('Unable to obtain the horizon'))
-        self.assertEqual(efc.fetch_environment_data(source, _SITE)['error'], 'Unable to obtain the horizon')
+        self.assertEqual(efc.fetch_environment_data(source, _SITE, _METAMODEL)['error'], 'Unable to obtain the horizon')
         source.fetch = mock.Mock(side_effect = RuntimeError('internal'))
         with self.assertLogs(efc.logger, 'ERROR'):
-            self.assertEqual(efc.fetch_environment_data(source, _SITE)['error'], 'The environmental data could not be fetched')
+            self.assertEqual(
+                efc.fetch_environment_data(source, _SITE, _METAMODEL)['error'], 'The environmental data could not be fetched'
+            )
+
+    def test_focussed_metamodel(self):
+        provider = mock.Mock()
+        lmm = mock.Mock(id = 'metam-2')
+        provider.get_lightweight_project.return_value = mock.Mock(metamodels = [mock.Mock(), lmm], focussed_metamodel_index = 1)
+        provider.metamodel_provider.get_component.return_value = _METAMODEL
+        self.assertIs(efc.focussed_metamodel(provider, 'proj-1'), _METAMODEL)
+        provider.metamodel_provider.get_component.assert_called_once_with('metam-2')
+        self.assertIsNone(efc.focussed_metamodel(provider, ''))
+        provider.get_lightweight_project.side_effect = KeyError('Project not found')
+        self.assertIsNone(efc.focussed_metamodel(provider, 'proj-missing'))
 
     def test_other_sites(self):
         lmms = []
@@ -279,14 +322,14 @@ class TestDrawItems(unittest.TestCase):
         self.addCleanup(mock.patch.stopall)
 
     def test_draws_with_artists(self):
-        registers.ENVIRONMENT_FEEDBACK_ARTISTS[('test-ok', 'test-model')] = lambda loc, sites: html.Span(f'{loc.lat}:{len(sites)}')
+        registers.ENVIRONMENT_FEEDBACK_ARTISTS[('test-ok', 'test-model')] = lambda loc, sites, mm: html.Span(f'{loc.lat}:{len(sites)}:{mm.id}')
         registers.ENVIRONMENT_FEEDBACK_ARTISTS[('test-fails', 'default')] = mock.Mock(side_effect = ValueError)
         with self.assertLogs(efc.logger, 'ERROR'):
             children = efc.draw_items(
                 [{'key': 'test-ok'}, {'key': 'test-fails'}, {'key': 'test-missing'}],
-                'test-model', _SITE, [('Other', _OTHER_SITE)]
+                'test-model', _SITE, [('Other', _OTHER_SITE)], _METAMODEL
             )
-        self.assertEqual(children[0].children, '53.255:1')
+        self.assertEqual(children[0].children, '53.255:1:metam-test')
         self.assertEqual(children[1].children, 'This feedback could not be drawn')
         self.assertIsNone(children[2])
 
@@ -298,12 +341,12 @@ class TestRegisters(unittest.TestCase):
         self.addCleanup(mock.patch.stopall)
 
     def test_artist_fallback(self):
-        first = registers.register_environment_feedback_artist('test-item', 'model-a')(lambda loc, sites: 'a')
-        registers.register_environment_feedback_artist('test-item', 'model-b')(lambda loc, sites: 'b')
+        first = registers.register_environment_feedback_artist('test-item', 'model-a')(lambda loc, sites, mm: 'a')
+        registers.register_environment_feedback_artist('test-item', 'model-b')(lambda loc, sites, mm: 'b')
         self.assertIs(registers.get_environment_feedback_artist('test-item', 'model-c'), first)
-        self.assertEqual(registers.get_environment_feedback_artist('test-item', 'model-b')(None, []), 'b')
+        self.assertEqual(registers.get_environment_feedback_artist('test-item', 'model-b')(None, [], None), 'b')
         with self.assertRaises(KeyError):
-            registers.register_environment_feedback_artist('test-item', 'model-a')(lambda loc, sites: 'again')
+            registers.register_environment_feedback_artist('test-item', 'model-a')(lambda loc, sites, mm: 'again')
         with self.assertRaises(KeyError):
             registers.get_environment_feedback_artist('test-no-item')
 

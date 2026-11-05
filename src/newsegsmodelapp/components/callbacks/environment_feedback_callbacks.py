@@ -28,6 +28,8 @@ from newsegsmodelapp.components.feedback import environmental_conditions as ec
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelframework.core.environment.environment_servers import EnvironmentDataUnavailableError
 from newsegsmodelframework.core.location.location import Location
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 
 def _model_type(app_state: str | None) -> str:
@@ -64,6 +66,34 @@ def location_from_key(key: str) -> Location:
     lat, lon = key.split(',')
     return Location(float(lat), float(lon))
 
+def ready_key(location: Location, metamodel: NewsegsMetaModel) -> str:
+    """Value of the ready store: the site and the metamodel whose feedback can be drawn. The data
+    of a site depend on the metamodel, such as on the heights of its generators."""
+    return json.dumps({'site': location_key(location), 'metamodel_id': metamodel.id})
+
+def focussed_metamodel(
+    project_provider: NewsegsProjectProviderInterface,
+    active_project_id: str | None,
+) -> NewsegsMetaModel | None:
+    """The focussed metamodel of a project, constructed so that a data source can find what a
+    run of it uses; None if there is no project.
+
+    Args:
+        project_provider: Provider of projects.
+        active_project_id: Id of the project.
+
+    Returns:
+        The metamodel.
+    """
+    if not active_project_id:
+        return None
+    try:
+        lproj = project_provider.get_lightweight_project(active_project_id)
+    except KeyError:
+        return None
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+    return project_provider.metamodel_provider.get_component(lmm.id) # pyright: ignore[reportAttributeAccessIssue]
+
 @dataclass
 class EnvironmentFeedbackStatus:
     """The state of the environmental data of a site, and how the feedback shows it.
@@ -74,7 +104,8 @@ class EnvironmentFeedbackStatus:
         message: Text of the status badge; empty to hide it.
         colour: Colour of the status badge.
         can_fetch: Whether the button fetching the data is enabled.
-        ready: Key of the site if its data are available to draw, otherwise None.
+        ready: Value of the ready store (see `ready_key`) if the data are available to draw,
+            otherwise None.
     """
     status: str
     message: str
@@ -90,6 +121,7 @@ class EnvironmentFeedbackStatus:
 def get_status(
     source: registers.EnvironmentDataSource,
     location: Location | None,
+    metamodel: NewsegsMetaModel | None,
     fetch_result: dict | None = None,
     fetch_requested: bool = False,
 ) -> EnvironmentFeedbackStatus:
@@ -98,29 +130,35 @@ def get_status(
     Args:
         source: The data source of the model type.
         location: Location of the site; None if it is not set.
+        metamodel: The focussed metamodel; None if there is no project.
         fetch_result: Result of the last fetch: the `key` of its site and its `error`, if any.
         fetch_requested: Whether the fetch requested by the user is running.
 
     Returns:
         The status.
     """
-    if location is None:
+    if location is None or metamodel is None:
         return EnvironmentFeedbackStatus('unset', 'Set a site location', 'secondary', False)
     key = location_key(location)
-    if source.is_available(location):
-        return EnvironmentFeedbackStatus('available', '', 'success', False, key)
-    if fetch_requested or source.is_pending(location):
+    if source.is_available(location, metamodel):
+        return EnvironmentFeedbackStatus('available', '', 'success', False, ready_key(location, metamodel))
+    if fetch_requested or source.is_pending(location, metamodel):
         return EnvironmentFeedbackStatus('pending', 'Fetching environmental data…', 'info', False)
     if fetch_result and fetch_result.get('key') == key and fetch_result.get('error'):
         return EnvironmentFeedbackStatus('failed', fetch_result['error'], 'danger', True)
     return EnvironmentFeedbackStatus('missing', 'Environmental data not yet fetched for this site', 'warning', True)
 
-def fetch_environment_data(source: registers.EnvironmentDataSource, location: Location) -> dict:
+def fetch_environment_data(
+    source: registers.EnvironmentDataSource,
+    location: Location,
+    metamodel: NewsegsMetaModel,
+) -> dict:
     """Fetch the environmental data of a site, returning the result for the fetch result store.
 
     Args:
         source: The data source of the model type.
         location: Location of the site.
+        metamodel: The focussed metamodel.
 
     Returns:
         The `key` of the site, and the `error` if the data could not be obtained.
@@ -128,7 +166,7 @@ def fetch_environment_data(source: registers.EnvironmentDataSource, location: Lo
     t0 = time.perf_counter()
     result: dict[str, Any] = {'key': location_key(location), 'error': None}
     try:
-        source.fetch(location)
+        source.fetch(location, metamodel)
     except EnvironmentDataUnavailableError as e:
         logger.warning('Environmental data unavailable for %s: %s', location, e)
         result['error'] = str(e)
@@ -171,6 +209,7 @@ def draw_items(
     model_type: str,
     location: Location,
     sites: Sequence[tuple[str, Location]],
+    metamodel: NewsegsMetaModel,
 ) -> list:
     """Draw the items of environmental feedback.
 
@@ -181,6 +220,7 @@ def draw_items(
         model_type: The model type.
         location: Location of the site.
         sites: Names and locations of the other sites of the project.
+        metamodel: The focussed metamodel.
 
     Returns:
         The children of each item.
@@ -194,7 +234,7 @@ def draw_items(
             children.append(None)
             continue
         try:
-            children.append(artist(location, sites))
+            children.append(artist(location, sites, metamodel))
         except Exception: # pylint: disable=broad-except
             logger.exception('Failed to draw environment feedback %s', id_['key'])
             children.append(html.Div('This feedback could not be drawn', className = 'text-danger small'))
@@ -221,15 +261,18 @@ def add_environment_feedback_callbacks(app: NewsegsDash):
         Input(ec.FETCH_RESULT_ID, 'data'),
         Input(ec.PENDING_INTERVAL_ID, 'n_intervals'),
         Input(ec.FETCH_RUNNING_ID, 'data'),
+        Input('active-project-id', 'data'),
         State('app-state', 'data'),
     )
-    def update_environment_feedback_status(site_loc, fetch_result, n_intervals, fetch_running, app_state):
+    def update_environment_feedback_status(site_loc, fetch_result, n_intervals, fetch_running, active_project_id, app_state):
         source = registers.get_environment_data_source(_model_type(app_state))
         if source is None:
             raise PreventUpdate
+        logger.debug('Getting metamodel - Updating environmental feedback status')
         status = get_status(
             source,
             site_location(site_loc),
+            focussed_metamodel(app.project_provider, active_project_id),
             json.loads(fetch_result) if fetch_result else None,
             fetch_requested = bool(fetch_running),
         )
@@ -249,6 +292,7 @@ def add_environment_feedback_callbacks(app: NewsegsDash):
 
         Input(ec.FETCH_BUTTON_ID, 'n_clicks'),
         State('site-location', 'data'),
+        State('active-project-id', 'data'),
         State('app-state', 'data'),
 
         background = True,
@@ -258,12 +302,15 @@ def add_environment_feedback_callbacks(app: NewsegsDash):
         ],
         prevent_initial_call = True,
     )
-    def fetch_site_environment_data(n_clicks, site_loc, app_state):
+    def fetch_site_environment_data(n_clicks, site_loc, active_project_id, app_state):
         source = registers.get_environment_data_source(_model_type(app_state))
         location = site_location(site_loc)
         if not n_clicks or source is None or location is None:
             raise PreventUpdate
-        return json.dumps(fetch_environment_data(source, location))
+        metamodel = focussed_metamodel(app.project_provider, active_project_id)
+        if metamodel is None:
+            raise PreventUpdate
+        return json.dumps(fetch_environment_data(source, location, metamodel))
 
     @app.callback(
         Output({'type': ec.ITEM_TYPE, 'key': ALL}, 'children'),
@@ -285,12 +332,13 @@ def add_environment_feedback_callbacks(app: NewsegsDash):
         if not details_open or not ready or ready == drawn or not item_ids:
             raise PreventUpdate
         t0 = time.perf_counter()
-        location = location_from_key(ready)
-        sites: list[tuple[str, Location]] = []
-        if active_project_id:
-            logger.debug('Getting lightweight project - Drawing environmental feedback')
-            lproj = app.project_provider.get_lightweight_project(active_project_id)
-            sites = other_sites(lproj, location)
-        children = draw_items(item_ids, _model_type(app_state), location, sites)
+        location = location_from_key(json.loads(ready)['site'])
+        logger.debug('Getting metamodel - Drawing environmental feedback')
+        metamodel = focussed_metamodel(app.project_provider, active_project_id)
+        if metamodel is None:
+            raise PreventUpdate
+        lproj = app.project_provider.get_lightweight_project(active_project_id)
+        sites = other_sites(lproj, location)
+        children = draw_items(item_ids, _model_type(app_state), location, sites, metamodel)
         logger.info('Environmental feedback drawn in %.3fs', time.perf_counter() - t0)
         return children, ready

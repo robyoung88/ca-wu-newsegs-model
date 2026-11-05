@@ -1350,17 +1350,22 @@ class EnvironmentDataSource(Protocol):
 
     The data are fetched on request (by the user), not when a site is chosen, as fetching is
     slow; once fetched they are cached, so that the artists can draw them.
+
+    Each method takes the location of the site and the focussed metamodel (a `NewsegsMetaModel`).
+    The location is that of the site selector, which the metamodel may not yet hold. The data
+    should be those that a run of the metamodel at the site uses (such as at the heights of its
+    generators, and over its run period), so that they are fetched once for both.
     """
-    def is_available(self, location: Location) -> bool:
-        """Whether all the data for a location are cached, so that the feedback can be drawn."""
+    def is_available(self, location: Location, metamodel: Any) -> bool:
+        """Whether all the data for a site are cached, so that the feedback can be drawn."""
         ...
 
-    def is_pending(self, location: Location) -> bool:
-        """Whether the data for a location are being fetched, by this or another process."""
+    def is_pending(self, location: Location, metamodel: Any) -> bool:
+        """Whether the data for a site are being fetched, by this or another process."""
         ...
 
-    def fetch(self, location: Location) -> None:
-        """Fetch and cache the data for a location.
+    def fetch(self, location: Location, metamodel: Any) -> None:
+        """Fetch and cache the data for a site.
 
         Raises:
             EnvironmentDataUnavailableError: if the data cannot be obtained.
@@ -1397,9 +1402,10 @@ def get_environment_data_source(model_type: str) -> EnvironmentDataSource | None
     """
     return ENVIRONMENT_DATA_SOURCES.get(model_type)
 
-EnvironmentFeedbackArtist = Callable[[Location, Sequence[tuple[str, Location]]], Any]
-"""Draws an item of environmental feedback from cached data. Takes the location of the site and
-the names and locations of the other sites of the project, and returns the children of the item.
+EnvironmentFeedbackArtist = Callable[[Location, Sequence[tuple[str, Location]], Any], Any]
+"""Draws an item of environmental feedback from cached data. Takes the location of the site, the
+names and locations of the other sites of the project, and the focussed metamodel, and returns the
+children of the item.
 """
 
 ENVIRONMENT_FEEDBACK_ARTISTS: dict[tuple[str, str], EnvironmentFeedbackArtist] = {}
