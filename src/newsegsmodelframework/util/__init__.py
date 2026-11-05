@@ -9,4 +9,5 @@ Modules:
     holiday_helpers: Public holidays.
     admd_helpers: Running the ADMD calculation (`admdspenmw`).
     wind_resource_helpers: Wind resource assessment from the New European Wind Atlas.
+    naming: Default names of copies.
 """

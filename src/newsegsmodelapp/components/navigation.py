@@ -147,8 +147,8 @@ def create_navigation_component(
     """Create the navigation bar: a toggle button and a collapsible drawer of navigation buttons.
 
     The drawer is collapsed until the toggle is clicked. It opens as a row when the four-pane
-    layout is side by side and as a column when the panes are stacked (see `navigation.css`),
-    sized to fit all of its buttons.
+    layout is side by side and as a column when the panes are stacked (see
+    `src/styles/20-navigation.css`), sized to fit all of its buttons.
 
     Args:
         model_type: The model type (e.g. `sprake`); `default` for the fallback.

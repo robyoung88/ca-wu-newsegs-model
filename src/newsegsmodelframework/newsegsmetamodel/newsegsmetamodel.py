@@ -100,6 +100,9 @@ class MMVarWatcher(RevisionNotifierProtocol):
         # Otherwise, do nothing
 
 
+FIRST_CONFIGURATION_NAME = 'Baseline'
+"""The name of the first configuration of a new project, which can't be moved or removed."""
+
 @revision_dataclass
 class NewsegsMetaModelConfig(DataWithRevision):
     """Configuration of a `NewsegsMetaModel`.
@@ -143,7 +146,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     finance_id: str
     checked_out: bool = False
 
-    _name = 'NewSEGS MetaModel'
+    _name = 'Configuration'
     _version = '0.1.0'
     _id_prefix = COMPONENT_PREFIXES['metamodel']
     _last_modified: datetime.datetime = datetime.datetime.now()

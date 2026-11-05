@@ -28,6 +28,8 @@ from config import settings, environment
 logger.info('Environment: %s', environment.get_environment())
 
 from newsegsmodelapp.components.navigation import DOCS_URL, add_navigation_callbacks
+from newsegsmodelapp.components import colours
+colours.set_default_plot_template() # Before any figure is made, as those of plugins may be on import
 DEFAULT_DOCS_PATH = APP_ROOT.parent / 'site' # Where `mkdocs build` puts the documentation
 
 # PLUGINS

@@ -31,7 +31,7 @@ def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config
     mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return PSARunMetamodelRunRequest(
         project_id = project_id,
-        request_label = 'PSA run for single metamodel - ' + str(datetime.datetime.now()),
+        request_label = 'PSA run for one configuration - ' + str(datetime.datetime.now()),
         payload = json.dumps({
             'metamodel_id': mm_id
         })

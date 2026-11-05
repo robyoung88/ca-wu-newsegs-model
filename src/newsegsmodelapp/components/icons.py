@@ -11,6 +11,8 @@ from useful_types import SequenceNotStr
 
 from newsegsmodelframework.util import flatten_string_lists
 
+from newsegsmodelapp.components import colours
+
 DEFAULT_ICONS = {
     'latlon': 'bi bi-geo-alt',
     'osgb': 'bi bi-map',
@@ -85,15 +87,8 @@ DEFAULT_ICONS = {
 
 }
 
-ICON_COLOUR_CLASSES = [
-    'text-primary',
-    'text-success',
-    'text-danger',
-    'text-warning',
-    'text-info',
-    'text-dark',
-    'text-secondary'
-]
+ICON_COLOUR_CLASSES = colours.CONFIG_COLOUR_CLASSES
+"""Classes colouring the icon of each configuration, in order (see `colours.CONFIG_COLOURS`)."""
 
 @overload
 def get_icon(
