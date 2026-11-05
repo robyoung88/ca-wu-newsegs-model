@@ -6,7 +6,7 @@ import json
 import time
 from typing import Callable
 
-from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
+from newsegsmodelapp.plugins.pages.processes.common_deterministic import DETERMINISTIC_STEPS, deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
@@ -86,7 +86,7 @@ def execute_deterministic_single_mm_run(
         progress_callback,
         check_cancel_status,
         start_step = 0,
-        total_steps = 2,
+        total_steps = DETERMINISTIC_STEPS,
         sequence_number = 1,
         run_started_ns = started_ns,
     )

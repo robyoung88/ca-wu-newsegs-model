@@ -6,7 +6,7 @@ import time
 from typing import Callable, cast
 
 
-from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
+from newsegsmodelapp.plugins.pages.processes.common_deterministic import DETERMINISTIC_STEPS, deterministic_run_metamodel
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProject
@@ -68,8 +68,7 @@ def execute_deterministic_run_project(
 
     n_mm = len(metamodels)
 
-    n_steps = n_mm * 4 - 1
-    step = 0
+    n_steps = n_mm * DETERMINISTIC_STEPS
 
     # Ensure that the output tables get updated
     # proj.table_config.revision += 1
@@ -84,7 +83,7 @@ def execute_deterministic_run_project(
             run_id,
             progress_callback,
             check_cancel_status,
-            start_step = i*3,
+            start_step = i * DETERMINISTIC_STEPS,
             total_steps = n_steps,
             sequence_number = i + 1,
             run_started_ns = started_ns,

@@ -265,6 +265,19 @@ are in `plugins/models/<model>/processes`.
 Every procedure receives the progress and cancellation callbacks from the worker. Return `'ok'` on
 success.
 
+The model run reports its own progress through an optional `progress_callback(fraction, message)` argument of
+`run`: the module it is running, and any wait for environmental data. The deterministic run (`common_deterministic`)
+adds these to its "Running model" step. A first run at a new site may say, for example:
+
+```
+Running model - config 1: Running the generation module - Awaiting environmental data: wind speeds for
+(53.255, -3.477) at 10 m from NEWA (requests usually take 1 to 8 minutes)
+```
+
+The environment server reports each wait (see `environment_progress`), including a wait for data that another request,
+such as the site's environmental feedback, is already fetching. The typical durations in the messages are constants
+in `pvgis_newa_env_servers`.
+
 ### Registers
 
 | Register | Added to with | Keyed by |
