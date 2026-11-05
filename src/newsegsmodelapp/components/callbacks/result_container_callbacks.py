@@ -21,6 +21,54 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_result_container_content_creator, get_result_section_header_content_creator
 
 
+_UPDATE_ALL_TRIGGER_TYPES = {'annual-horizon-toggle'}
+"""Types of the triggers which change every result, so that all are redrawn."""
+
+def ids_to_update(
+    triggered: list[dict],
+    target_ids: list[dict],
+    target_type: str,
+    target_purpose: str,
+) -> tuple[list[dict], set[tuple[str, str]]]:
+    """The ids of the result containers or headers to redraw for the triggers of a callback.
+
+    Every trigger is considered, as several may fire together, such as a post-action trigger and the
+    refill interval after a run; `ctx.triggered_id` is only the first. A trigger without a dictionary
+    id (such as the refill interval, or the initial call), or with a type in
+    `_UPDATE_ALL_TRIGGER_TYPES`, or without a section, redraws every target. Otherwise the targets
+    redrawn are those whose section and key match the trigger.
+
+    Args:
+        triggered: `ctx.triggered`.
+        target_ids: The ids of the containers or headers of the callback.
+        target_type: Type of the ids of the targets, e.g. 'result-table'.
+        target_purpose: Purpose of the ids of the targets, e.g. 'container'.
+
+    Returns:
+        The ids to redraw, and the (section, key) of each table whose options were changed.
+    """
+    update_all = False
+    option_changed = set()
+    matches = []
+    for trig in triggered:
+        try:
+            trig_id = json.loads(trig['prop_id'].rsplit('.', 1)[0])
+        except ValueError:
+            trig_id = None
+        if not isinstance(trig_id, dict) or trig_id.get('type') in _UPDATE_ALL_TRIGGER_TYPES or 'section' not in trig_id:
+            update_all = True
+            continue
+        if trig_id.get('type') == 'result-table-option':
+            option_changed.add((trig_id['section'], trig_id['key']))
+        match = {k: v for k, v in trig_id.items() if k not in ('subindex', 'supersection')}
+        match.update(type = target_type, purpose = target_purpose)
+        matches.append(match)
+
+    if update_all:
+        return list(target_ids), option_changed
+    ids = [x for x in target_ids if any(callback_utils.intersection_values_match(m, x) for m in matches)]
+    return ids, option_changed
+
 def add_result_container_callbacks(app: NewsegsDash):
     """
     Callbacks to populate output containers.
@@ -172,25 +220,12 @@ def add_result_container_callbacks(app: NewsegsDash):
         if len(rval) == 0:
             raise PreventUpdate
 
-        trig_id = ctx.triggered_id
-        update_all_headers = isinstance(trig_id, str) or trig_id is None or trig_id['type'] == 'annual-horizon-toggle'
-
-        if update_all_headers:
-            headers_for_update = [x['id'] for x in ctx.outputs_grouping['containers']]
-        else:
-            headers_for_update = []
-            for trig in ctx.triggered:
-                trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
-                trig['purpose'] = 'header'
-                trig['type'] = 'result-section-header'
-                del trig['subindex']
-                del trig['supersection']
-                headers_for_update.extend(
-                    [
-                        x['id'] for x in ctx.outputs_grouping['containers']
-                        if callback_utils.intersection_values_match(trig, x['id'])
-                    ]
-                )
+        headers_for_update, _ = ids_to_update(
+            ctx.triggered,
+            [x['id'] for x in ctx.outputs_grouping['containers']],
+            target_type = 'result-section-header',
+            target_purpose = 'header',
+        )
 
         if not headers_for_update:
             return rval
@@ -339,27 +374,13 @@ def add_result_container_callbacks(app: NewsegsDash):
         t0 = time.perf_counter()
         rval = callback_utils.create_noupdate_return()
 
-        update_all_tables = isinstance(trig_id, str) or trig_id == None
         # Tables whose options were changed must be redrawn even if the revision is unchanged
-        option_changed_tables = set()
-        if update_all_tables:
-            tables_for_update = [x['id'] for x in ctx.outputs_grouping['table']]
-        else:
-            tables_for_update = []
-            for trig in ctx.triggered:
-                trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
-                if trig.get('type') == 'result-table-option':
-                    option_changed_tables.add((trig['section'], trig['key']))
-                trig['purpose'] = 'container'
-                trig['type'] = 'result-table'
-                del trig['subindex']
-                del trig['supersection']
-                tables_for_update.extend(
-                    [
-                        x['id'] for x in ctx.outputs_grouping['table'] 
-                        if callback_utils.intersection_values_match(trig, x['id'])
-                    ]
-                )
+        tables_for_update, option_changed_tables = ids_to_update(
+            ctx.triggered,
+            [x['id'] for x in ctx.outputs_grouping['table']],
+            target_type = 'result-table',
+            target_purpose = 'container',
+        )
         if not tables_for_update:
             return rval
 
