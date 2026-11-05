@@ -106,7 +106,9 @@ registers.add_page(my_page)
 * `attach_callbacks` is called once from `create_app` to bind the page's Dash callbacks.
 * Navigation buttons are created from the pages in `PAGE_REGISTER`. A model type chooses which
   appear, and in what order, with the `pages` argument of
-  `navigation.create_navigation_component`.
+  `navigation.create_navigation_component`. The buttons sit in a drawer, collapsed until the
+  navigation toggle is clicked; it opens as a row when the panes are side by side and as a
+  column when they are stacked.
 * The `pNNN_` prefix of the page modules is only a convention to set the import order.
 
 ## Models

@@ -69,6 +69,7 @@ DEFAULT_ICONS = {
     'results-download': 'bi bi-table',
     'show-graph': 'bi bi-graph-up',
     'nav-options': 'bi bi-list',
+    'nav-toggle': 'bi bi-segmented-nav',
     'nav-help': 'bi bi-question-circle',
     'nav-landing': 'bi bi-card-text',
     'nav-system-config': 'bi bi-sliders2-vertical',
