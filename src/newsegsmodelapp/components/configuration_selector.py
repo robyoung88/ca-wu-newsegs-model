@@ -645,8 +645,10 @@ def add_configuration_selector_callbacks(app: NewsegsDash):
 
         mm_new = cast(NewsegsMetaModel, constr(mm_config))
         # Caution: We cannot safely add this new metamodel to the project until we have generated new ids
-        # for each component.
-        mm_new.anonymise_ids()
+        # for each component. The variables are given new ids too: with the ids in the file, they would be the
+        # variables the file was exported from, so the upload would overwrite their values, and editing it would
+        # change the configurations that share them, in this or another project.
+        mm_new.anonymise_ids(include_variables = True)
 
         proj = app.project_provider.get_project(active_project_id)
         mm_new.name = naming.unique_name(mm_new.name, (x.name for x in proj.metamodels))
