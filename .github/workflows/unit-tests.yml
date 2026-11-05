@@ -18,7 +18,7 @@ jobs:
 
   unit-tests:
     needs: prepare-default-models
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PYTHONPATH: src
     steps:
