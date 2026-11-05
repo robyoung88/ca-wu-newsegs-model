@@ -143,9 +143,6 @@ def add_input_container_callbacks(app: NewsegsDash):
             supersection = container_id.get('supersection')
             section = container_id.get('section')
             
-            def _not_found(creator_type):
-                logger.exception('%s content creator not found for Container ID: %s', creator_type, container_id)
-
             if update_contents:
                 # set the intervals count to 0
                 trigger_id = copy.copy(container_id)
@@ -161,21 +158,26 @@ def add_input_container_callbacks(app: NewsegsDash):
                 content_creator = get_input_section_header_content_creator(
                     supersection, section, model_type
                 )
-                if content_creator is None:
-                    return _not_found('Input Section Header')
-                else:
-                    logger.info(
-                        'Creating Input Section Header contents using creator found for %s.%s.%s',
-                        supersection, section, model_type
-                    )
-                    callback_utils.update_property_by_id(
-                        container_id,
-                        'children',
-                        content_creator(active_project_id, app.project_provider),
-                        rval
-                    )
-            except KeyError as e:
-                _not_found('Input Section Header')
+            except KeyError:
+                content_creator = None
+            if content_creator is None:
+                # Not every section has a header (e.g. those of DSA, optimisation and PSA): leave it as it is
+                logger.debug(
+                    'Input Section Header content creator not found for %s.%s.%s; header left unchanged',
+                    supersection, section, model_type
+                )
+                continue
+
+            logger.info(
+                'Creating Input Section Header contents using creator found for %s.%s.%s',
+                supersection, section, model_type
+            )
+            callback_utils.update_property_by_id(
+                container_id,
+                'children',
+                content_creator(active_project_id, app.project_provider),
+                rval
+            )
 
         t1 = time.perf_counter()
         logger.info(f'Input Header(s) created in {t1 - t0:.3f}s')
