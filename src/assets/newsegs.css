@@ -416,36 +416,93 @@ div.results-header-button-container {
 
 /* DSA Configuration */
 
+/* The toggle, then the row, which opens to the group editor (components/dsa_group_editor.py) and takes the rest of the
+   pane's width */
 div.dsa-input-single-value-block {
-    display: block;
-    width: fit-content;
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
     margin: 4px 2px 4px 2px;
 }
 
 div.dsa-input-single-value-block > details {
-    display: inline-block;
-    width: auto;
-}
-
-div.dsa-input-single-value-block > details > div div {
-    display: inline-flex;
-    width: fit-content;
-    margin: 5px 2px 5px 2px;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 div.dsa-input-single-value-block > .dsa-toggle {
-    display: inline-flex;
-    width: fit-content;
-    vertical-align: top;
+    flex: 0 0 auto;
     margin-right: 10px;
 }
 
 .dsa-configuration-summary {
-    display: inline-flex;
+    display: list-item;
 }
 
-.dsa-configuration-summary > h4 {
+/* The header, as the summary was before it held the line of the groups; beside the marker, however long */
+div.dsa-configuration-header {
+    display: inline-flex;
+    max-width: calc(100% - 1.25rem);
+    vertical-align: top;
+}
+
+div.dsa-configuration-header > h4 {
     display: inline;
+}
+
+div.dsa-sharing-summary {
+    margin-left: 0.25rem;
+}
+
+span.dsa-bounds-differ {
+    margin-left: 0.75rem;
+    padding: 0 0.4rem;
+    border-radius: 0.75rem;
+    color: #664d03;
+    background-color: #fff3cd;
+}
+
+/* The editor's cells: the parameters, the bound type and the bounds, which wrap within a narrow pane */
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-parameters,
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-bounds {
+    display: flex;
+    flex: 1 1 8rem;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-width: 7rem;
+}
+
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-bound-type {
+    flex: 0 0 7.5rem;
+}
+
+/* The focussed row's bounds are in the container that update_dsa_input_contents redraws: laid out as the others' */
+div.group-editor-dsa div.dsa-group-bounds > span {
+    display: contents;
+}
+
+div.group-editor-dsa div.dsa-group-row input.dynamic-step-field {
+    width: 4.5rem !important;
+}
+
+div.group-editor-dsa div.dsa-group-row .input-group {
+    width: auto;
+    flex-wrap: nowrap;
+}
+
+div.group-editor-dsa div.dsa-group-row input.dynamic-step-field {
+    float: none;
+}
+
+/* The headings above the cells */
+div.group-editor-dsa div.group-editor-head > span:nth-child(1),
+div.group-editor-dsa div.group-editor-head > span:nth-child(3) {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+}
+
+div.group-editor-dsa div.group-editor-head > span:nth-child(2) {
+    flex: 0 0 7.5rem;
 }
 
 .dsa-configuration-summaryinfo {

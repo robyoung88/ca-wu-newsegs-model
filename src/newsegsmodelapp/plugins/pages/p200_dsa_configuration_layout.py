@@ -23,6 +23,7 @@ from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components.callbacks.action_callbacks import generate_post_action_requests
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
+from newsegsmodelapp.components.dsa_group_editor import count_variables_with_different_bounds
 
 from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
 from newsegsmodelapp.components import callback_utils, export, navigation
@@ -540,6 +541,25 @@ def add_dsa_run_callbacks(app: NewsegsDash):
     Args:
         app: The Dash app.
     """
+    @app.callback(
+        Output('dsa-run-bounds-note', 'children'),
+        Input('dsa-run-scope', 'value'),
+        Input('modal-dsa-confirm', 'is_open'),
+        State('active-project-id', 'data'),
+    )
+    def show_dsa_run_bounds_note(scope, is_open, active_project_id):
+        """For a DSA of all configurations, the number of variables whose bounds differ across them"""
+        if scope != 'project' or not is_open or active_project_id is None:
+            return None
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        var_uids = list(dict.fromkeys(uid for lmm in lproj.metamodels for uid in lmm.variables.values()))
+        variables = {x.id: x for x in provider.variable_provider.get_full_lightweight_variable(var_uids)}
+        n = count_variables_with_different_bounds(lproj, variables)
+        if not n:
+            return None
+        return f'{n} variable{"s have" if n != 1 else " has"} different bounds across configurations'
+
     if True:
         @app.callback(
             output = {

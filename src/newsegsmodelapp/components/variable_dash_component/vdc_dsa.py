@@ -1,48 +1,34 @@
 """Creation of the DSA input of a variable.
 """
 
-from typing import cast
-
 from newsegsmodelframework.newsegsvariable import variable
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 from newsegsmodelapp.components.variable_dash_component import vdc as var_dc
 
+_SCALAR_DISTRIBUTIONS = ('constant', 'numeric_constant', 'normal', 'beta', 'gamma')
+
 def create_dsa_input(
-    var: variable.Variable
+    var: variable.Variable | FullLightweightVariable,
+    summary_contents: list | None = None,
+    n_configurations: int = 1,
 ):
     """Create the DSA input of a variable.
 
-    Dispatches on the distribution of the variable. Nothing is created if the variable is not to be shown.
+    Nothing is created if the variable is not to be shown.
 
     Args:
         var: The variable.
+        summary_contents: The summary of how the configurations' Variables differ (see
+            `dsa_group_editor.create_dsa_sharing_summary_contents`).
+        n_configurations: The number of configurations of the project.
 
     Returns:
         The input, or nothing.
     """
     if not var.dsa_show:
         return []
-    match var.distribution:
-        case 'constant':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_constant
-        case 'numeric_constant':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_constant
-        case 'normal':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_normal
-        case 'beta':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_beta
-        case 'gamma':
-            is_scalar = True
-            creation_func = var_dc.create_dsa_input_scalar_gamma
-        case _:
-            raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
-    
-    if is_scalar:
-        var = cast(variable.NumericScalarVariable, var)
-        return creation_func(var)
-    else:
-        raise ValueError(f'Distribution {var.distribution.distribution} not currently supported')
+    distribution = var.distribution if isinstance(var, FullLightweightVariable) else var.distribution.distribution
+    if distribution not in _SCALAR_DISTRIBUTIONS:
+        raise ValueError(f'Distribution {distribution} not currently supported')
+    return var_dc.create_dsa_input_scalar(var, summary_contents, n_configurations) # pyright: ignore[reportArgumentType]
