@@ -13,6 +13,19 @@ Reusable Dash components, layouts and callbacks used by the pages.
 | `staleness`, `feedback` | Showing whether results are out of date, indicative energy balances, and the environmental conditions of a site |
 | `requesthandler` | Interface for creating and monitoring requests |
 
+## Names
+
+Users name projects, configurations and sites; the app encourages them to:
+
+* **Copies** of a project or configuration are named by
+  [`naming.copy_name`][newsegsmodelframework.util.naming.copy_name]: "Baseline (copy)", "Baseline (copy 2)", …, unique
+  in the project (or among projects). After a configuration is duplicated, its name box takes the focus with the name
+  selected, and is underlined while it has the focus. An uploaded configuration whose name is taken is named as a copy.
+* **Unnamed configurations and sites** show a hint in their name box, in sentence case
+  (`configuration_selector.CONFIGURATION_NAME_HINT`, `map.SITE_NAME_HINT`), with a short example where the box has room.
+  Elsewhere, an unnamed site is shown by its co-ordinates, "Site at 53.255, -3.477".
+* **Text users see** says "configuration", never "metamodel", which stays in the code and these docs.
+
 ## Styles and colours
 
 Dash serves every stylesheet in `src/assets`, so the app has one: `src/assets/newsegs.css`. It is built, not edited:

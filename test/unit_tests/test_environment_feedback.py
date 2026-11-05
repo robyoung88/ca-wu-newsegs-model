@@ -313,7 +313,8 @@ class TestStatus(unittest.TestCase):
             lmm.name = name
             lmms.append(lmm)
         sites = efc.other_sites(mock.Mock(metamodels = lmms), _SITE)
-        self.assertEqual([name for name, _ in sites], ['London', 'Config 4'])
+        # An unnamed site is named by its co-ordinates
+        self.assertEqual([name for name, _ in sites], ['London', 'Site at 52.000, -1.000'])
 
 class TestDrawItems(unittest.TestCase):
 

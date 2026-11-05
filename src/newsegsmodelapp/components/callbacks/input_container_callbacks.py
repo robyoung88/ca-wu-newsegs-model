@@ -49,7 +49,7 @@ def _create_text_field_values(
             case 'project-name':
                 text_values.append(proj.name)
             case 'site-name':
-                text_values.append(mm.model.location.name)
+                text_values.append(mm.model.location.display_name)
             case 'configuration-name':
                 text_values.append(mm.name)
             case _:

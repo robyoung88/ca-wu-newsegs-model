@@ -13,7 +13,7 @@ uses `sprakegeneration.NOMINAL_WT_HEIGHT`, the height of its default wind speed 
 class SprakeLocGeneration(SprakeGeneration):
     """Implementation of NewsegsGeneration for Sprake Location-Aware NewSEGS Model."""
 
-    _name = 'Sprake Location-Aware Generation Module.'
+    _name = 'Sprake Location-Aware Generation Module'
 
     @classmethod
     def from_none(cls) -> SprakeLocGeneration:
