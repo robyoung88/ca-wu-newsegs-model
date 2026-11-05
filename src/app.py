@@ -27,7 +27,7 @@ os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings, environment
 logger.info('Environment: %s', environment.get_environment())
 
-from newsegsmodelapp.components.navigation import DOCS_URL
+from newsegsmodelapp.components.navigation import DOCS_URL, add_navigation_callbacks
 DEFAULT_DOCS_PATH = APP_ROOT.parent / 'site' # Where `mkdocs build` puts the documentation
 
 # PLUGINS
@@ -331,6 +331,7 @@ def create_app(external_stylesheets = None) -> Dash:
 
     # Bind callbacks
     add_display_callbacks(app)
+    add_navigation_callbacks(app)
     #add_background_callbacks(app)
     add_input_container_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
