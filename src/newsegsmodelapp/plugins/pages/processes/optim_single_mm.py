@@ -8,6 +8,7 @@ from typing import Callable, cast
 
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
+from newsegsmodelapp.plugins.models.aaa_default.processes.output.optim_feedback import is_improvement
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
@@ -55,7 +56,8 @@ def execute_optim_single_mm_run(
 
     Saves an `optimisation_result` (see `optimisation_result`) for the feedback shown afterwards: whether the
     optimisation ran and succeeded, the statistic before and after, and how each variable changed. On success, the
-    optimised copy of the metamodel is added to the project, named "<name> - Opt" (made unique), and focussed.
+    optimised copy of the metamodel is added to the project, named "<name> - Opt" (made unique), and focussed, if
+    it improves on the statistic; otherwise the project and its focus are left as they were.
 
     Args:
         request: The request being executed.
@@ -137,7 +139,12 @@ def execute_optim_single_mm_run(
         progress = lambda x, y: progress_callback(x,y, 'Optimisation underway'),
         cancel_status = check_cancel_status,
     )
-    if opt.success:
+    improved = bool(opt.success) and is_improvement(
+        start_value,
+        optim.statistic_from_objective(stat, float(opt.fun)), # pyright: ignore[reportArgumentType]
+        optim.statistic_is_maximised(stat), # pyright: ignore[reportArgumentType]
+    )
+    if improved:
         mm_copy.name = naming.unique_name(mm.name + ' - Opt', (x.name for x in proj.metamodels))
         proj.metamodels.append(mm_copy) # pyright: ignore[reportAttributeAccessIssue]
         for k in vars:
@@ -151,7 +158,7 @@ def execute_optim_single_mm_run(
     new_parameters = {k.varid: mm_copy.variables[k.varid].parameters for k in vars}
 
     rval = optimisation_result(
-        mm, mm_copy, vars, stat, start_value, opt, original_parameters, new_parameters
+        mm, mm_copy if improved else None, vars, stat, start_value, opt, original_parameters, new_parameters
     )
 
     result_provider.upsert_result('optimisation_result', proj.table_config, rval, request = request)
@@ -163,7 +170,7 @@ def execute_optim_single_mm_run(
 
 def optimisation_result(
     mm: NewsegsMetaModel,
-    mm_copy: NewsegsMetaModel,
+    mm_copy: NewsegsMetaModel | None,
     variables: list[optim.OptimVariable],
     stat: str,
     start_value: float,
@@ -175,7 +182,7 @@ def optimisation_result(
 
     Args:
         mm: The metamodel optimised.
-        mm_copy: The copy of the metamodel which was varied; on success, it holds the optimal values.
+        mm_copy: The optimised copy of the metamodel added to the project, or None if none was added.
         variables: The variables varied.
         stat: The statistic optimised.
         start_value: The statistic before optimisation.
@@ -194,7 +201,8 @@ def optimisation_result(
             variables: For each variable, its `varid`, `label`, value `before` and `after` (of the parameter
                 varied), and its `lower` and `upper` bounds.
             metamodel_name: Name of the metamodel optimised.
-            new_metamodel_id, new_metamodel_name: The optimised copy added to the project; None on failure.
+            new_metamodel_id, new_metamodel_name: The optimised copy added to the project; None if none was
+                added, on failure or when the optimisation did not improve on the statistic.
             message: The message of the optimiser.
             opt, original_parameters, new_parameters, varids: The details, for diagnostics.
     """
@@ -218,8 +226,8 @@ def optimisation_result(
             for v in variables
         ],
         'metamodel_name': mm.name,
-        'new_metamodel_id': mm_copy.id if success else None,
-        'new_metamodel_name': mm_copy.name if success else None,
+        'new_metamodel_id': mm_copy.id if mm_copy is not None else None,
+        'new_metamodel_name': mm_copy.name if mm_copy is not None else None,
         'message': str(opt.message),
         'opt': opt,
         'original_parameters': original_parameters,
