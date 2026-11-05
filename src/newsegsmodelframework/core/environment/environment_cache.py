@@ -25,6 +25,7 @@ import diskcache
 import pandas as pd
 
 from config import settings
+from newsegsmodelframework.core.environment import environment_progress
 from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.timespan.timespan import TimeSpan
 
@@ -145,12 +146,14 @@ def get_or_set(
     compute: Callable[[], T],
     cache: diskcache.Cache | None = None,
     lock_key: Hashable | None = None,
+    description: str | None = None,
 ) -> T:
     """The cached value of a key, computing and caching it if absent.
 
     While the value is computed, the key is locked: other calls for the key, in any process,
     wait and then return the cached value, rather than computing it again. If the computation
-    raises, nothing is cached and a waiting call computes the value itself.
+    raises, nothing is cached and a waiting call computes the value itself. A call which waits
+    for another reports the wait (see `environment_progress.awaiting`).
 
     Args:
         key: Key of the entry, from `environment_cache_key`.
@@ -158,6 +161,8 @@ def get_or_set(
         cache: The cache; defaults to `get_environment_cache()`.
         lock_key: Key to lock while computing; defaults to `key`. Entries computed together
             should share a lock key, so that requests for either wait for the same computation.
+        description: What the entry holds, for the message of a wait for another computation,
+            e.g. 'wind speeds for (53.255, -3.477) at 10 m'.
 
     Returns:
         The value.
@@ -167,10 +172,20 @@ def get_or_set(
     value = cache.get(key, default = _MISSING)
     if value is not _MISSING:
         return value
-    with _lock(key if lock_key is None else lock_key, cache):
+    lock = _lock(key if lock_key is None else lock_key, cache)
+    if lock.locked():
+        with environment_progress.awaiting(
+            f'{description or "environmental data"}, already being fetched for another request'
+        ):
+            lock.acquire()
+    else:
+        lock.acquire()
+    try:
         # Another process may have computed the value while this one waited for the lock
         value = cache.get(key, default = _MISSING)
         if value is _MISSING:
             value = compute()
             cache.set(key, value)
+    finally:
+        lock.release()
     return value

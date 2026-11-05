@@ -11,6 +11,10 @@ requested. The horizon, from PVGIS, does not depend on time, so is keyed by the 
 If PVGIS or NEWA does not respond within its timeout (the `PVGIS_TIMEOUT_S` and `NEWA_TIMEOUT_S`
 settings), cannot be reached, or refuses the request, an `EnvironmentDataUnavailableError` is
 raised; nothing is cached, so the data are fetched again on the next request.
+
+Each request to a remote service, and each wait for data being fetched for another request, is
+reported to the code running the model, if it has asked for it (see `environment_progress`), with
+how long such requests usually take.
 """
 
 from typing import Callable, Sequence, TypeVar, cast, overload, override
@@ -22,7 +26,7 @@ import pvlib
 import requests
 
 from config import settings
-from newsegsmodelframework.core.environment import environment_cache
+from newsegsmodelframework.core.environment import environment_cache, environment_progress
 from newsegsmodelframework.core.environment.environment_servers import LOCAL_ENVIRONMENT_MEASURE, EnvironmentDataUnavailableError, NewsegsLocalEnvironment, RealArrayLike
 from newsegsmodelframework.core.location.location import AspectLocation, Location, RaisedLocation
 from newsegsmodelframework.core.timespan.timespan import RegTimeSpan, TimeSpan
@@ -33,13 +37,34 @@ T = TypeVar('T')
 # The columns of the PVGIS data that are served
 _PVGIS_COLUMNS = ['timestamp', 'poa_global', 'poa_direct', 'temp_air']
 
-def _fetch_or_raise(service: str, description: str, fetch: Callable[[], T]) -> T:
-    """Fetch data from a remote service, raising `EnvironmentDataUnavailableError` if it fails."""
+# How long requests usually take, for the messages of waits. From requests for 10 years of data:
+# NEWA has taken from about 1 to 8 minutes, and PVGIS a few seconds for each.
+NEWA_TIME_SERIES_DURATION = 'requests usually take 1 to 8 minutes'
+PVGIS_HOURLY_DURATION = 'requests usually take under a minute'
+PVGIS_HORIZON_DURATION = 'requests usually take a few seconds'
+
+def _fetch_or_raise(
+    service: str,
+    description: str,
+    fetch: Callable[[], T],
+    typical_duration: str | None = None,
+) -> T:
+    """Fetch data from a remote service, raising `EnvironmentDataUnavailableError` if it fails.
+
+    The request is reported as a wait for environmental data (see `environment_progress`).
+
+    Args:
+        service: Name of the service, e.g. 'NEWA'.
+        description: What is fetched, e.g. 'wind speeds for (53.255, -3.477) at 10 m'.
+        fetch: Function making the request.
+        typical_duration: How long such requests usually take, for the message of the wait.
+    """
     def unavailable(reason: str) -> EnvironmentDataUnavailableError:
         return EnvironmentDataUnavailableError(f'Unable to obtain {description} from {service}: {reason}')
 
     try:
-        return fetch()
+        with environment_progress.awaiting(f'{description} from {service}', typical_duration):
+            return fetch()
     except requests.Timeout as e:
         raise unavailable('the service did not respond in time') from e
     except requests.ConnectionError as e:
@@ -79,7 +104,7 @@ def _fetch_pvgis_data(
             raddatabase = 'PVGIS-ERA5',
             timeout = _pvgis_timeout()
         )
-    pvg_data, pvg_meta = _fetch_or_raise('PVGIS', description, fetch)
+    pvg_data, pvg_meta = _fetch_or_raise('PVGIS', description, fetch, PVGIS_HOURLY_DURATION)
 
     odata = (
         pvg_data
@@ -183,7 +208,8 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         return environment_cache.get_or_set(
             key,
             lambda: _fetch_pvgis_data(lat, lon, timespan.start, timespan.end - pd.Timedelta(0.5, 'h')),
-            cache = self.cache
+            cache = self.cache,
+            description = f'solar data for ({lat}, {lon})',
         )
 
     @override
@@ -201,7 +227,8 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
 
         speeds_key, _ = self._cache_key('wind_speeds', location, timespan)
         return environment_cache.get_or_set(
-            speeds_key, lambda: self._fetch_hourly_wind(location, timespan)[0], cache = self.cache
+            speeds_key, lambda: self._fetch_hourly_wind(location, timespan)[0], cache = self.cache,
+            description = self._wind_description(location),
         )
 
     @override
@@ -218,8 +245,14 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         directions_key, speeds_key = self._cache_key('wind_directions', location, timespan)
         return environment_cache.get_or_set(
             directions_key, lambda: self._fetch_hourly_wind(location, timespan)[1],
-            cache = self.cache, lock_key = speeds_key
+            cache = self.cache, lock_key = speeds_key,
+            description = self._wind_description(location),
         )
+
+    @staticmethod
+    def _wind_description(location: RaisedLocation) -> str:
+        lat, lon = environment_cache.round_location(location)
+        return f'wind speeds for ({lat}, {lon}) at {environment_cache.round_height(location.height_agl)} m'
 
     def _fetch_hourly_wind(self, location: RaisedLocation, timespan: TimeSpan) -> tuple[np.ndarray, np.ndarray]:
         """Fetch the hourly mean wind speeds and directions from NEWA.
@@ -235,14 +268,15 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
 
         wind_resource = _fetch_or_raise(
             'NEWA',
-            f'wind speeds for ({lat}, {lon}) at {height} m',
+            self._wind_description(location),
             lambda: wind_resource_helpers.get_wind_at_site(
                 lat, lon,
                 rng,
                 dt_start = timespan.start,
                 dt_stop = timespan.end,
                 site_heights = [height]
-            )
+            ),
+            NEWA_TIME_SERIES_DURATION,
         )
 
         # Convert to hourly mean; directions are averaged as unit vectors
@@ -278,11 +312,14 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
             horizon, _ = _fetch_or_raise(
                 'PVGIS',
                 f'the horizon of ({lat}, {lon})',
-                lambda: pvlib.iotools.get_pvgis_horizon(lat, lon, timeout = _pvgis_timeout())
+                lambda: pvlib.iotools.get_pvgis_horizon(lat, lon, timeout = _pvgis_timeout()),
+                PVGIS_HORIZON_DURATION,
             )
             return horizon
 
-        return environment_cache.get_or_set(key, fetch_horizon, cache = self.cache)
+        return environment_cache.get_or_set(
+            key, fetch_horizon, cache = self.cache, description = f'the horizon of ({lat}, {lon})'
+        )
 
     @override
     def get_wind_timestep(self) -> pd.Timedelta:
@@ -338,7 +375,8 @@ class HourlyPVGISNEWALocalEnv(NewsegsLocalEnvironment):
         pv_data = environment_cache.get_or_set(
             key,
             lambda: _fetch_pvgis_data(lat, lon, timespan.start, timespan.end, pitch, azimuth),
-            cache = self.cache
+            cache = self.cache,
+            description = f'solar data for ({lat}, {lon}) at pitch {pitch}, azimuth {azimuth}',
         )
         # The global flux on the plane: direct, diffuse and reflected
         return np.append(pv_data['poa_global'].at[0], pv_data['poa_global'].to_numpy())

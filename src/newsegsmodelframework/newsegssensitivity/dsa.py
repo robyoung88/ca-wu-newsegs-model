@@ -129,10 +129,11 @@ def run_dsa(
     mdl = mm.model
     fnc = mm.finance
 
+    # The central run, and a run at each bound of each selected variable
     n_calcs = 1
     for v in variables:
         if v.dsa_possible and v.dsa_selected:
-            n_calcs += 1
+            n_calcs += 2
     prog_i = 0
     if progress is not None:
         progress(prog_i, n_calcs)
@@ -181,14 +182,13 @@ def run_dsa(
                     results.append(
                         make_dsa_result(v.name, bound, str(v.get_dsa_value(bound)), mdl, fnc, statistics)
                     )
+                    if progress is not None:
+                        prog_i += 1
+                        progress(prog_i, n_calcs)
             finally:
                 v.dsa_focussed = False
                 v.update_model(mdl)
                 v.update_model(fnc)
-
-            if progress is not None:
-                prog_i += 1
-                progress(prog_i, n_calcs)
 
     for v in variables:
         v.dsa_active = False

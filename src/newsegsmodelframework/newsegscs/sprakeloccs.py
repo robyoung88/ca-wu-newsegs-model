@@ -60,7 +60,10 @@ class SprakeLocCS(SprakeCS):
         key = environment_cache.environment_cache_key(
             identity, measure, self.location, timespan, version = _DERIVATION_VERSION, **params
         )
-        return environment_cache.get_or_set(key, compute)
+        lat, lon = environment_cache.round_location(self.location)
+        return environment_cache.get_or_set(
+            key, compute, description = f'{measure.replace("_", " ")} for ({lat}, {lon})'
+        )
 
     def get_heating_degree_days(self, timespan: modtimespan.RegTimeSpan) -> pd.DataFrame:
         """Heating degree days of each day, from the air temperature at the location of the module.
