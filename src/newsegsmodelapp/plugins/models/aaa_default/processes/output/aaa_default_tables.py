@@ -23,6 +23,8 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 from newsegsmodelframework.newsegssensitivity import common as sensitivity, dsa, optim, psa
 
 from ..postprocess.methods import post_dsa_results
+from newsegsmodelutils.plots import optim as optim_plots
+
 from . import optim_feedback, result_tables_sprake
 from .get_result_list import get_result_list
 
@@ -894,7 +896,7 @@ def _trigger_plot_marginal_optim(
         mm, varid, stat, lower, upper, res
     )
 
-    fig = optim.statistic_across_margin_plot(plot_df, mm)
+    fig = optim_plots.statistic_across_margin_plot(plot_df, mm.variables[varid].name)
 
     result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig, request = request)
 

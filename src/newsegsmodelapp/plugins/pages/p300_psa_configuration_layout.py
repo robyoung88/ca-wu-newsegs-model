@@ -34,6 +34,7 @@ from newsegsmodelframework.newsegssensitivity import common as sensitivity, psa
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 from .processes.psa_process_components import psa_process_components
+from newsegsmodelapp.components.psa_plots import psa_plots
 
 PAGE_TYPE = 'psa'
 
@@ -862,7 +863,7 @@ def add_psa_run_callbacks(app: NewsegsDash):
         if psa_raw_data is None:
             rval['plot_header']['children'] = [html.Div(html.H3('No PSA Run'), className = 'd-flex justify-content-center w-100')]
             graph_type = graph_selection_dropdown['values'][0]
-            plot_funcs = psa.psa_plots.get(graph_type)
+            plot_funcs = psa_plots.get(graph_type)
             if plot_funcs is None:
                 rval['plot']['figures'] = []
             else:
@@ -884,7 +885,7 @@ def add_psa_run_callbacks(app: NewsegsDash):
                 
             full_draw = not graph_is_drawn
         
-        plot_funcs = psa.psa_plots.get(graph_type)
+        plot_funcs = psa_plots.get(graph_type)
         if plot_funcs is None:
             raise ValueError(f'Plot functions not found for graph_type {graph_type}')
     

@@ -84,6 +84,7 @@ nav:
     - Backend: app/backend.md
     - Components: app/components.md
     - Database: app/database.md
+  - Plotting utilities: utils.md
   - Supporting packages:
     - NEWA: support/newa.md
     - ADMD: support/admd.md

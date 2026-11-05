@@ -7,7 +7,6 @@ from typing import Callable, Sequence
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 from scipy import optimize as scipy_opt
 
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
@@ -315,32 +314,3 @@ def evaluate_statistic_across_margin(
     mm.finance.run()
 
     return odf
-
-def statistic_across_margin_plot(
-    plot_data,
-    mm: NewsegsMetaModel
-):
-    """Plot a statistic across a range of values of a variable.
-
-    Args:
-        plot_data: The result of `evaluate_statistic_across_margin`: the values of the variable and the statistic.
-        mm: The metamodel, used to label the axes.
-
-    Returns:
-        The line plot (a plotly figure).
-    """
-    fig = px.line(
-        plot_data,
-        x = plot_data.columns[0],
-        y = plot_data.columns[1]
-    )
-
-    fig.update_xaxes(
-        title = mm.variables[plot_data.columns[0]].name
-    )
-    fig.update_yaxes(
-        title = OPTIM_TARGET_STATISTIC_LABELS[plot_data.columns[1]]
-    )
-
-    return fig
-    
