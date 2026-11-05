@@ -111,6 +111,28 @@ class TestOptimRun(unittest.TestCase):
         self.assertNotEqual(optimised.optim_config.id, original.optim_config.id)
         self.assertEqual(optimised.optim_config.method, 'Powell')
 
+    def test_panel_saved_against_the_table_configuration(self):
+        # The panel shown after an optimisation is saved where the results container reads it:
+        # against the project's table configuration
+        from newsegsmodelapp.plugins.models.aaa_default.processes.output import aaa_default_tables
+        from newsegsmodelapp.registers import TableDrawRequest
+
+        result_provider = mock.MagicMock()
+        result_provider.get_result.return_value = (
+            {'success': True, 'opt': SimpleNamespace(success = True, message = 'Optimization terminated successfully.')}, 1
+        )
+        request = TableDrawRequest(project_id = self.proj.id, payload = json.dumps({'metamodel_id': self.mm.id}))
+        self.assertEqual(
+            aaa_default_tables._make_postopt_tables_sprake(
+                request, self.provider, result_provider, 1, lambda *args: None, lambda: False
+            ),
+            'ok'
+        )
+        result_type, component, _ = result_provider.upsert_result.call_args.args
+        self.assertEqual(result_type, 'table_postopt_metamodel')
+        self.assertEqual(component.id, self.proj.table_config.id)
+        self.assertTrue(hasattr(component, 'revision'))
+
     def test_invalid_bounds_are_reported(self):
         proj = self.provider.get_project(self.proj.id)
         mm = proj.metamodels[0]

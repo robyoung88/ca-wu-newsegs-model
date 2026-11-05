@@ -956,8 +956,9 @@ def _make_postopt_tables_sprake(
             str(opt),
         ]
 
+    # Saved against the table configuration, from which the results container reads it
     result_provider.upsert_result(
-        'table_postopt_metamodel', lproj.table_config.id, 
+        'table_postopt_metamodel', lproj.table_config,
         table_data, request=request
     )
 
