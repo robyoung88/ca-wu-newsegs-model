@@ -125,23 +125,32 @@ def generic_create_dsa_input_container_contents(
 
 def generic_create_psa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
-    variable_provider: FromDatabaseVariableProvider
+    variable_provider: FromDatabaseVariableProvider,
+    lproj: LightweightNewsegsProject | None = None,
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs for the probabilistic sensitivity analysis of a metamodel.
 
-    One PSA input for each variable of the metamodel.
+    One PSA input for each variable of the metamodel. Given the project, each input summarises how the configurations'
+    Variables of it differ, and can be opened to edit and move between them; the Variables of every configuration are
+    fetched in one call.
 
     Args:
-        lmm: The lightweight metamodel.
+        lmm: The lightweight metamodel (the focussed configuration).
         variable_provider: Provider of variables.
+        lproj: The lightweight project.
 
     Returns:
         List of components.
     """
+    from newsegsmodelapp.components.psa_group_editor import create_psa_sharing_summary_contents
+
+    metamodels = lproj.metamodels if lproj is not None else [lmm]
+    var_uids = list(dict.fromkeys(uid for x in metamodels for uid in x.variables.values()))
+    variables = {x.id: x for x in variable_provider.get_full_lightweight_variable(var_uids)}
     contents = []
-    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
-    for var in vars:
-        contents.append(create_psa_input(var))
+    for varid, var_uid in lmm.variables.items():
+        summary = create_psa_sharing_summary_contents(lproj, varid, variables) if lproj is not None else []
+        contents.append(create_psa_input(variables[var_uid], summary, len(metamodels)))
 
     return contents
 

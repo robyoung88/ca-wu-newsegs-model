@@ -19,7 +19,9 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
+from newsegsmodelapp.components.psa_group_editor import count_variables_with_different_distributions_or_sds
 from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
 from newsegsmodelapp.components import callback_utils, export, navigation, stats
 from newsegsmodelapp.dash_extension import NewsegsDash
@@ -443,6 +445,25 @@ def add_psa_run_callbacks(app: NewsegsDash):
     Args:
         app: The Dash app.
     """
+    @app.callback(
+        Output('psa-run-differences-note', 'children'),
+        Input('psa-run-scope', 'value'),
+        Input('modal-psa-confirm', 'is_open'),
+        State('active-project-id', 'data'),
+    )
+    def show_psa_run_differences_note(scope, is_open, active_project_id):
+        """For a PSA of all configurations, the number of variables whose distributions or SDs differ across them"""
+        if scope != 'project' or not is_open or active_project_id is None:
+            return None
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        var_uids = list(dict.fromkeys(uid for lmm in lproj.metamodels for uid in lmm.variables.values()))
+        variables = {x.id: x for x in provider.variable_provider.get_full_lightweight_variable(var_uids)}
+        n = count_variables_with_different_distributions_or_sds(lproj, variables)
+        if not n:
+            return None
+        return f'{n} variable{"s have" if n != 1 else " has"} different distributions or SDs across configurations'
+
     @app.callback(
         output = {
             'modal': {

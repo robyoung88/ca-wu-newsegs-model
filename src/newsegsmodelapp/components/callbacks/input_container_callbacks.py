@@ -22,6 +22,7 @@ from newsegsmodelapp.components.dsa_group_editor import (
     set_dsa_bound,
     set_dsa_bound_type,
 )
+from newsegsmodelapp.components.psa_group_editor import create_psa_sharing_summary_contents
 from newsegsmodelapp.components.input_components import (
     _signal_summary_refresh,
     count_differing_variables,
@@ -960,6 +961,10 @@ def add_input_container_callbacks(app: NewsegsDash):
             # With each group's bounds
             lvars = app.project_provider.variable_provider.get_full_lightweight_variable(var_uids)
             contents = create_dsa_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
+        elif triggered_id['supersection'] == 'psa':
+            # With each group's SD
+            lvars = app.project_provider.variable_provider.get_full_lightweight_variable(var_uids)
+            contents = create_psa_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
         else:
             lvars = app.project_provider.variable_provider.get_lightweight_variable(var_uids)
             contents = create_variable_sharing_summary_contents(lproj, varid, {x.id: x for x in lvars})
