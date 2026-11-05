@@ -2403,10 +2403,12 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
             # Fallback - get project from db, insert into cache.
             proj = super().get_project(project_id)
-            logger.debug(
-                'Adding Full Project %s to cache after database load, state is: %s',
-                project_id, get_project_critical_state(proj)
-            )
+            # The state is only built when it is logged, so that building it can't stop a project loading
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    'Adding Full Project %s to cache after database load, state is: %s',
+                    project_id, get_project_critical_state(proj)
+                )
             self._project_last_accessed[project_id] = new_modkey
             self._project_cache[project_id] = proj
         
@@ -2454,10 +2456,11 @@ class CachedFromDatabaseNewsegsProjectProvider(
                         rlist[idx] = cmpx
                         self._lightweight_project_cache[cmpx.id] = cmpx
                         self._lightweight_project_last_accessed[cmpx.id] = new_modkeys[idx]
-                        logger.debug(
-                            'Adding Lightweight Project ID = %s; to cache after database load, state:\n%s',
-                            cmpx.id, get_project_critical_state(cmpx)
-                        )
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logger.debug(
+                                'Adding Lightweight Project ID = %s; to cache after database load, state:\n%s',
+                                cmpx.id, get_project_critical_state(cmpx)
+                            )
                         jdx += 1
 
         if is_sequence:
@@ -2550,7 +2553,11 @@ def get_project_critical_state(project):
         mm_dict = {
             f'metamodel_{idx}': get_component_critical_state(mm),
             f'metamodel_{idx}.table_config': get_component_critical_state(mm.table_config),
-            f'metamodel_{idx}.optim_config': get_component_critical_state(mm.optim_config),
+            # A metamodel saved before it held optimisation settings has none until its next save (as left by
+            # migration 9eeaede183f3, and in snapshots taken before it)
+            f'metamodel_{idx}.optim_config': (
+                get_component_critical_state(mm.optim_config) if mm.optim_config is not None else None
+            ),
             f'model_{idx}': get_component_critical_state(mdl),
             f'model_{idx}.table_config': get_component_critical_state(mdl.table_config),
             f'model_{idx}.grid': get_component_critical_state(mdl.grid),
