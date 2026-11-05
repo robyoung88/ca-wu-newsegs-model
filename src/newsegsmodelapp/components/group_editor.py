@@ -18,7 +18,7 @@ import json
 import time
 from typing import Any, Sequence, cast
 
-from dash import dcc, html
+from dash import ctx, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import numpy as np
 
@@ -27,13 +27,14 @@ from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegs
 from newsegsmodelapp.components import callback_utils, staleness
 from newsegsmodelapp.components.icons import ICON_COLOUR_CLASSES, get_icon
 from newsegsmodelapp.components.input_components import (
+    VariableGroup,
     apply_parameter_change,
     format_variable_value,
     get_variable_groups,
     update_single_parameter,
     _signal_summary_refresh,
 )
-from newsegsmodelapp.components.variable_identification import VariableInstanceParameterComponentID
+from newsegsmodelapp.components.variable_identification import VariableGroupComponentID, VariableInstanceParameterComponentID
 from newsegsmodelapp.registers import (
     get_input_editor_content_creator,
     get_single_input_header_content_creator,
@@ -44,6 +45,7 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import make_varid
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
+from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
 
 NEW_VARIABLE = 'new'
 """The target of a move which gives the configuration its own copy of its Variable."""
@@ -160,19 +162,32 @@ def move_metamodels_to_group(
 # Layout
 # -----------------------------------------------
 
-def _row_id(varid: str, type_: str, purpose: str) -> VariableInstanceParameterComponentID:
+def _row_id(varid: str, type_: str, purpose: str, supersection: str = SUPERSECTION) -> VariableInstanceParameterComponentID:
     section, key, subindex = varid.rsplit('.', 2)
     return VariableInstanceParameterComponentID(
-        type = type_, purpose = purpose, supersection = SUPERSECTION, section = section, key = key,
+        type = type_, purpose = purpose, supersection = supersection, section = section, key = key,
         subindex = int(subindex) if subindex.isdigit() else subindex,
     )
 
-def group_value_input_id(varid: str, var_uid: str) -> dict:
-    """The id of the input of a group's value in the editor.
+def group_component_id(
+    varid: str,
+    var_uid: str,
+    supersection: str = SUPERSECTION,
+    purpose: str = 'group-value',
+    parameter_index: int = 0,
+) -> VariableGroupComponentID:
+    """The identification of an input of the editor for a group other than the focussed configuration's.
 
-    Not a `single-input-config`, so that `react_to_input_change` doesn't write the focussed value into it.
+    Its type is `group-value-input`, not `single-input-config`, so that `react_to_input_change` doesn't write the focussed
+    configuration's values into it. Its purpose chooses the handler: `group-value` for a parameter, and the DSA editor's
+    `group-dsaboundtype`, `group-dsa-bound-lower` and `group-dsa-bound-upper`.
     """
-    return {**_row_id(varid, 'group-value-input', 'group-value').as_dict(), 'var_uid': var_uid}
+    row = _row_id(varid, 'group-value-input', purpose, supersection)
+    return VariableGroupComponentID(**{**row.as_dict(), 'parameter_index': parameter_index, 'var_uid': var_uid})
+
+def group_value_input_id(varid: str, var_uid: str, supersection: str = SUPERSECTION, purpose: str = 'group-value', parameter_index: int = 0) -> dict:
+    """The id of an input of the editor for a group other than the focussed configuration's (see `group_component_id`)."""
+    return group_component_id(varid, var_uid, supersection, purpose, parameter_index).as_dict()
 
 def create_group_move_request_store(param_id: VariableInstanceParameterComponentID) -> dcc.Store:
     """Create the store of a row to which the browser writes a move: `{'mm_index', 'target'}`.
@@ -263,30 +278,65 @@ def create_group_editor_contents(varid: str, active_project_id: str, project_pro
                     className = 'group-editor-value-input',
                 ),
             ])
-        actions = [_insert_button(var_uid, label)]
-        if len(groups) > 1:
-            actions.append(html.Button(
-                html.I(className = 'bi bi-arrows-angle-expand'),
-                type = 'button',
-                className = 'group-editor-all',
-                title = 'Use for all',
-                **{'data-target': var_uid, 'data-label': label, 'aria-label': f'Use {label} for all configurations'},
-            ))
-        rows.append(html.Div(
-            [
-                html.Div(value, className = 'group-editor-value'),
-                # Wraps below the value as one, when it doesn't fit beside it
-                html.Div([
-                    html.Div([_icon_button(i, i == focussed_index) for i in group.metamodel_indices], className = 'group-editor-icons'),
-                    html.Div(actions, className = 'group-editor-actions'),
-                ], className = 'group-editor-side'),
-            ],
-            className = 'group-editor-row' + (' focussed' if is_focussed_group else ''),
-            **{'data-var-uid': var_uid, 'data-label': label, 'data-size': str(len(group.metamodel_indices))},
+        rows.append(create_group_row(
+            [html.Div(value, className = 'group-editor-value')],
+            group, focussed_index, label, len(groups),
         ))
 
+    return create_group_editor_frame(varid, SUPERSECTION, [html.Span('Value'), html.Span('Group')], rows)
+
+def create_group_row(cells: list, group: VariableGroup, focussed_index: int, label: str, n_groups: int, className: str = ''):
+    """Create a row of a group editor: its cells, then the group's configuration icons and its actions.
+
+    Args:
+        cells: The cells of the row: the group's values and settings.
+        group: The group.
+        focussed_index: Index of the focussed configuration.
+        label: Short description of the group's value, for the confirmations and labels of buttons.
+        n_groups: The number of groups of the variable; "Use for all" is offered when there are several.
+        className: Further classes of the row.
+
+    Returns:
+        The row.
+    """
+    var_uid = cast(str, group.var_uid)
+    actions = [_insert_button(var_uid, label)]
+    if n_groups > 1:
+        actions.append(html.Button(
+            html.I(className = 'bi bi-arrows-angle-expand'),
+            type = 'button',
+            className = 'group-editor-all',
+            title = 'Use for all',
+            **{'data-target': var_uid, 'data-label': label, 'aria-label': f'Use {label} for all configurations'},
+        ))
+    is_focussed_group = focussed_index in group.metamodel_indices
+    return html.Div(
+        [
+            *cells,
+            # Wraps below the cells as one, when it doesn't fit beside them
+            html.Div([
+                html.Div([_icon_button(i, i == focussed_index) for i in group.metamodel_indices], className = 'group-editor-icons'),
+                html.Div(actions, className = 'group-editor-actions'),
+            ], className = 'group-editor-side'),
+        ],
+        className = ' '.join(x for x in ('group-editor-row', 'focussed' if is_focussed_group else '', className) if x),
+        **{'data-var-uid': var_uid, 'data-label': label, 'data-size': str(len(group.metamodel_indices))},
+    )
+
+def create_group_editor_frame(varid: str, supersection: str, head: list, rows: list) -> list:
+    """Create a group editor from its rows: with a heading, the row for a new Variable and the confirmation.
+
+    Args:
+        varid: Id of the variable.
+        supersection: The supersection of the row (e.g. `deterministic`, `dsa`), whose move request store it writes to.
+        head: The headings of the columns.
+        rows: The rows of the groups (see `create_group_row`).
+
+    Returns:
+        The children of the row's `input-group-editor` container.
+    """
     # Shown only while a configuration is selected to be moved, or dragged (assets/group_editor.js)
-    rows.append(html.Div(
+    new_row = html.Div(
         [
             html.Div(html.Span('New Variable', className = 'group-editor-value-text'), className = 'group-editor-value'),
             html.Div([
@@ -296,13 +346,13 @@ def create_group_editor_contents(varid: str, active_project_id: str, project_pro
         ],
         className = 'group-editor-row new-value',
         **{'data-var-uid': NEW_VARIABLE},
-    ))
-
-    store_id = create_group_move_request_store(_row_id(varid, 'group-move-request', 'move')).id
+    )
+    store_id = create_group_move_request_store(_row_id(varid, 'group-move-request', 'move', supersection)).id
     return [html.Div(
         [
-            html.Div([html.Span('Value'), html.Span('Group')], className = 'group-editor-head'),
+            html.Div(head, className = 'group-editor-head'),
             *rows,
+            new_row,
             html.Div(
                 [
                     html.Span(className = 'group-editor-confirm-text'),
@@ -314,7 +364,7 @@ def create_group_editor_contents(varid: str, active_project_id: str, project_pro
                 role = 'alert',
             ),
         ],
-        className = 'group-editor',
+        className = f'group-editor group-editor-{supersection}',
         **{'data-move-store': json.dumps(store_id, sort_keys = True, separators = (',', ':'))},
     )]
 
@@ -333,25 +383,54 @@ def _redraw_editor(triggered_id: dict, calling_dict: dict, active_project_id: st
             creator = get_input_editor_content_creator(editor_id['supersection'], editor_id['section'], model_type)
             return_dict['editor_children'][idx] = creator(make_varid(**triggered_id), active_project_id, project_provider)
 
-def _feed_back_focussed(triggered_id, input_ids, header_ids, trigger_ids, lproj, provider, return_dict, now):
-    """Show the focussed configuration's new Variable in the row's main input, header and triggers"""
-    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
-    varid = make_varid(**triggered_id)
-    var = provider.variable_provider.get_lightweight_variable(lmm.variables[varid])
-    raw_parameters = (var.raw_parameter_0, var.raw_parameter_1)
-    for idx, id in enumerate(input_ids):
-        if id['purpose'] == 'parameter':
-            value = raw_parameters[id['parameter_index']]
+def _focussed_input_value(id: dict, var: FullLightweightVariable) -> Any:
+    """The value of an input of the focussed configuration's row, from its Variable, or `no_update` for others"""
+    match id['supersection'], id['purpose']:
+        case _, 'parameter':
+            value = (var.raw_parameter_0, var.raw_parameter_1)[id['parameter_index']]
             if isinstance(value, (list, tuple, np.ndarray)):
                 value = np.asarray(value).flat[id['vector_location']]
-            return_dict['input_values'][idx] = value
+            return value
+        case 'dsa', 'bound-lower':
+            return var.dsa_lower
+        case 'dsa', 'bound-upper':
+            return var.dsa_upper
+        # An unset optimisation bound is the limit of the input (see Variable.get_optim_bounds)
+        case 'optim', 'bound-lower':
+            return var.optim_min if var.optim_min is not None else var.interface_min
+        case 'optim', 'bound-upper':
+            return var.optim_max if var.optim_max is not None else var.interface_max
+        case 'optim', 'plot-intervals':
+            return var.optim_plot_intervals
+    return no_update
+
+def _feed_back_focussed(triggered_id, input_ids, header_ids, trigger_ids, lproj, provider, return_dict, now):
+    """Show the focussed configuration's new Variable in every part of its row: on the DSA page, the DSA and the
+    optimisation inputs, toggles and styling, as well as the headers and triggers"""
+    lmm = lproj.metamodels[lproj.focussed_metamodel_index]
+    varid = make_varid(**triggered_id)
+    var = cast(FullLightweightVariable, provider.variable_provider.get_full_lightweight_variable(lmm.variables[varid]))
+    for idx, id in enumerate(input_ids):
+        return_dict['input_values'][idx] = _focussed_input_value(id, var)
+
+    # The toggles and the optimisation row's styling, which a Variable of other selections changes
+    grouping = ctx.outputs_grouping if ctx.using_outputs_grouping else {}
+    selected = {'dsa-active': var.dsa_selected, 'toggle-optim-active': var.optim_selected}
+    for idx, output in enumerate(grouping.get('toggle_values', [])):
+        if output['id']['purpose'] in selected:
+            return_dict['toggle_values'][idx] = selected[output['id']['purpose']]
+    for idx, output in enumerate(grouping.get('optim_container_class', [])):
+        return_dict['optim_container_class'][idx] = (
+            'optim-input-single-value-block' + ('' if var.optim_selected else ' deselected')
+        )
+
     for idx, id in enumerate(header_ids):
         try:
             creator = get_single_input_header_content_creator(id['supersection'], id['section'], lmm.model.model_type)
         except KeyError:
             creator = None
         if creator:
-            return_dict['header_children'][idx] = creator(varid, lmm)
+            return_dict['header_children'][idx] = creator(varid, var)
     for idx in range(len(trigger_ids)):
         return_dict['trigger_data'][idx] = now
 

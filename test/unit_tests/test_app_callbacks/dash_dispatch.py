@@ -31,7 +31,7 @@ from typing import Any
 
 from dash.development.base_component import Component
 
-from newsegsmodelapp.registers import get_input_container_content_creator
+from newsegsmodelapp.registers import get_input_container_content_creator, get_input_editor_content_creator
 
 DEPENDENCIES_URL = '/_dash-dependencies'
 UPDATE_URL = '/_dash-update-component'
@@ -106,6 +106,7 @@ def render_input_containers(
     project_id: str,
     containers: Iterable[tuple[str, str | None]],
     model_type: str = 'sprake',
+    open_editors: bool = False,
 ) -> list[Component]:
     """The components with dictionary ids in input containers, as the app renders them.
 
@@ -115,6 +116,8 @@ def render_input_containers(
         containers: (supersection, section) of each container, e.g. `('deterministic', 'gen_input')` or
             `('dsa', None)`.
         model_type: The model type, which selects the content creators.
+        open_editors: Also build the editor of every row which builds it when opened (see
+            `create_lazy_input_details`), as opening each row does: e.g. the DSA rows' inputs.
 
     Returns:
         The components.
@@ -124,6 +127,12 @@ def render_input_containers(
         creator = get_input_container_content_creator(supersection, section, model_type)
         content = creator(project_id, project_provider)
         components.extend(x for x in iter_components(content) if isinstance(getattr(x, 'id', None), dict))
+    if open_editors:
+        for editor in [x for x in components if x.id.get('type') == 'input-group-editor']:
+            editor_creator = get_input_editor_content_creator(editor.id['supersection'], editor.id['section'], model_type)
+            varid = f"{editor.id['section']}.{editor.id['key']}.{editor.id['subindex']}"
+            content = editor_creator(varid, project_id, project_provider)
+            components.extend(x for x in iter_components(content) if isinstance(getattr(x, 'id', None), dict))
     return components
 
 @dataclass

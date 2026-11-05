@@ -159,3 +159,12 @@ class VariableInstanceParameterComponentID(VariableInstanceComponentID):
         obj.vector_location = vector_location
         obj.purpose = purpose
         return obj
+
+@dataclass
+class VariableGroupComponentID(VariableInstanceParameterComponentID):
+    """Identification of a component of the group editor for one instance (Variable) of a variable: adds its id.
+
+    The group editor's inputs for the groups other than the focussed configuration's are identified so, which keeps them
+    apart from the inputs of the focussed configuration (`single-input-config`).
+    """
+    var_uid: str = ''

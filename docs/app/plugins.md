@@ -176,6 +176,13 @@ writes the move to the row's `group-move-request` store. A drop moves nothing in
 editor, so the script never conflicts with the DOM that React owns. `react_to_input_change` passes moves, and edits of other groups' values (`group-value-input`),
 to the handlers in that module. Code that moves configurations between Variables should use `move_metamodels_to_group`,
 which keeps the junctions, revisions, staleness and orphaned Variables right.
+
+The DSA rows have a group editor too (`components/dsa_group_editor.py`), in which every group's parameters, bound type
+and bounds can be edited. Its focussed row holds the focussed configuration's usual inputs, so the existing handlers
+act on them; the other groups' inputs are `group-value-input`s carrying their Variable's id, with the purposes
+`group-value`, `group-dsaboundtype`, `group-dsa-bound-lower` and `group-dsa-bound-upper`. A change of a Variable's DSA
+settings should go through `set_dsa_bound` or `set_dsa_bound_type`, which save it and mark the DSA stale for the
+configurations using it.
 * Don't put interactive components in the `Summary`, since clicks on them are counted too.
 
 ### Processes
