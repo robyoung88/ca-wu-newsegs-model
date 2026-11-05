@@ -1,15 +1,29 @@
-
+from __future__ import annotations
 
 from typing import override
 
 from newsegsmodelframework.core.location.location import Location
-from newsegsmodelframework.newsegsgeneration.sprakegeneration import SprakeGeneration
+from newsegsmodelframework.newsegsgeneration.sprakegeneration import SprakeGeneration, get_sprake_ned100
+
+NOMINAL_WT_HEIGHT = 15.0
+"""Default hub height (m) of the wind turbine of the location-aware Sprake model. The Sprake model
+uses `sprakegeneration.NOMINAL_WT_HEIGHT`, the height of its default wind speed series."""
 
 
 class SprakeLocGeneration(SprakeGeneration):
     """Implementation of NewsegsGeneration for Sprake Location-Aware NewSEGS Model."""
 
     _name = 'Sprake Location-Aware Generation Module.'
+
+    @classmethod
+    def from_none(cls) -> SprakeLocGeneration:
+        """Create a location-aware Sprake generation module with the default wind turbine, at
+        `NOMINAL_WT_HEIGHT`, and PV.
+
+        Returns:
+            The generation module.
+        """
+        return cls(get_sprake_ned100(NOMINAL_WT_HEIGHT))
 
     @override
     @SprakeGeneration.location.setter

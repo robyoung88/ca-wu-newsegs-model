@@ -17,6 +17,7 @@ from newsegsmodelframework.core.timespan.timespan import SECONDS_TO_DAYS, RegTim
 from newsegsmodelframework.core.trackeddata import revision_dataclass
 from newsegsmodelframework.newsegsgeneration.newsegsgeneration import NewsegsGeneration
 from newsegsmodelframework.newsegsgeneration.sprakegeneration import get_sprake_ned100
+from newsegsmodelframework.newsegsgeneration import sprakelocgeneration
 from newsegsmodelframework.newsegsgeneration.sprakelocgeneration import SprakeLocGeneration
 from newsegsmodelframework.newsegscs.sprakeloccs import SprakeLocCS
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModelProperty
@@ -96,7 +97,7 @@ class SprakeLocModel(SprakeModel):
 
     @__init__.register(str)
     def _from_str(self, name: str, *args, **kwargs) -> None:
-        mod_gen = SprakeLocGeneration(get_sprake_ned100())
+        mod_gen = SprakeLocGeneration(get_sprake_ned100(sprakelocgeneration.NOMINAL_WT_HEIGHT))
         cast(RaisedLocation, mod_gen.generator.generators[1].location).height_agl = 2.
 
         kwargs.setdefault('loc', copy.copy(_DEFAULT_LOCATION))

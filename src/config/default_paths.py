@@ -25,6 +25,10 @@ ENV_CACHE_PATH, the persistent cache of environmental data (see
 `newsegsmodelframework.core.environment.environment_cache`), falls back to the user data
 directory, or to the system temporary directory in production, where docker-compose.yml
 keeps it on the database volume.
+
+BACKGROUND_CALLBACK_CACHE_PATH, where the background callbacks of the app (such as fetching
+the environmental data of a site) keep their jobs and results, holds nothing needed between runs,
+so falls back to the system temporary directory in every environment.
 """
 import os
 import sys
@@ -58,3 +62,5 @@ else:
     # The environment cache holds no data that cannot be fetched again, so may fall back
     # to the system temporary directory; docker-compose.yml keeps it on a volume.
     ENV_CACHE_PATH = str(Path(tempfile.gettempdir()) / 'newsegs_env_cache')
+
+BACKGROUND_CALLBACK_CACHE_PATH = str(Path(tempfile.gettempdir()) / 'newsegs_background_callbacks')

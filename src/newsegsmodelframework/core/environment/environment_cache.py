@@ -11,6 +11,12 @@ served the data (its class name and version), so that a new version of a server 
 data of an old one. Locations are rounded to 3 dp of latitude and longitude (about 100 m) and
 heights to the nearest metre, so that nearby requests share an entry; a server should fetch its
 data at the rounded location, so that the data does not depend on which request was made first.
+
+`get_or_set` holds a lock on a key while its value is computed, so that processes requesting the
+same data (such as a model run and the site feedback of the app) fetch it only once: the others
+wait for the value and then read it from the cache. `is_pending` says whether a key is being
+computed. A lock expires after `ENV_CACHE_LOCK_EXPIRE_S` seconds (default 1800), so that a process
+which stops while computing does not block the key indefinitely.
 """
 from functools import lru_cache
 from typing import Any, Callable, Hashable, TypeVar
@@ -23,6 +29,7 @@ from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.timespan.timespan import TimeSpan
 
 DEFAULT_SIZE_LIMIT = 2**30
+DEFAULT_LOCK_EXPIRE_S = 1800
 
 T = TypeVar('T')
 
@@ -79,7 +86,7 @@ def environment_cache_key(
     identity: CacheIdentity,
     measure: str,
     location: Location,
-    timespan: TimeSpan,
+    timespan: TimeSpan | None,
     height: float | None = None,
     **params: Hashable,
 ) -> tuple[Hashable, ...]:
@@ -89,7 +96,8 @@ def environment_cache_key(
         identity: Class name and version of the environment server serving the data.
         measure: Name of the data held, e.g. `'wind_speeds'` or `'heating_degree_days'`.
         location: Location of the data; rounded to 3 dp of latitude and longitude.
-        timespan: Time span of the data; its start and end form part of the key.
+        timespan: Time span of the data; its start and end form part of the key. None for data
+            which does not depend on time, such as the horizon.
         height: Height of the data above ground level, where appropriate; rounded to the nearest metre.
         **params: Any other parameters that the data depends on, such as a timestep or a plane
             orientation. Values should be simple types (`str`, `int`, `float`, `bool` or `None`).
@@ -101,8 +109,8 @@ def environment_cache_key(
         *identity,
         measure,
         *round_location(location),
-        _time_key(timespan.start),
-        _time_key(timespan.end),
+        None if timespan is None else _time_key(timespan.start),
+        None if timespan is None else _time_key(timespan.end),
         None if height is None else round_height(height),
         tuple(sorted(params.items())),
     )
@@ -110,17 +118,46 @@ def environment_cache_key(
 
 _MISSING = object()
 
+def _lock(key: Hashable, cache: diskcache.Cache) -> diskcache.Lock:
+    """The lock held on a key while its value is computed."""
+    return diskcache.Lock(
+        cache,
+        ('lock', key),
+        expire = float(settings.get('ENV_CACHE_LOCK_EXPIRE_S', DEFAULT_LOCK_EXPIRE_S)),
+    )
+
+def is_pending(key: Hashable, cache: diskcache.Cache | None = None) -> bool:
+    """Whether the value of a key is being computed, by this or another process.
+
+    Args:
+        key: Key of the entry, from `environment_cache_key`.
+        cache: The cache; defaults to `get_environment_cache()`.
+
+    Returns:
+        True if `get_or_set` is computing the value.
+    """
+    if cache is None:
+        cache = get_environment_cache()
+    return _lock(key, cache).locked()
+
 def get_or_set(
     key: Hashable,
     compute: Callable[[], T],
     cache: diskcache.Cache | None = None,
+    lock_key: Hashable | None = None,
 ) -> T:
     """The cached value of a key, computing and caching it if absent.
+
+    While the value is computed, the key is locked: other calls for the key, in any process,
+    wait and then return the cached value, rather than computing it again. If the computation
+    raises, nothing is cached and a waiting call computes the value itself.
 
     Args:
         key: Key of the entry, from `environment_cache_key`.
         compute: Function computing the value when it is not cached.
         cache: The cache; defaults to `get_environment_cache()`.
+        lock_key: Key to lock while computing; defaults to `key`. Entries computed together
+            should share a lock key, so that requests for either wait for the same computation.
 
     Returns:
         The value.
@@ -128,7 +165,12 @@ def get_or_set(
     if cache is None:
         cache = get_environment_cache()
     value = cache.get(key, default = _MISSING)
-    if value is _MISSING:
-        value = compute()
-        cache.set(key, value)
+    if value is not _MISSING:
+        return value
+    with _lock(key if lock_key is None else lock_key, cache):
+        # Another process may have computed the value while this one waited for the lock
+        value = cache.get(key, default = _MISSING)
+        if value is _MISSING:
+            value = compute()
+            cache.set(key, value)
     return value

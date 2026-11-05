@@ -104,6 +104,40 @@ class NewsegsLocalEnvironment(
         """Timestep for wind speed data."""
         ...
 
+    def get_wind_directions(
+        self,
+        location: RaisedLocation | Sequence[RaisedLocation],
+        timespan: TimeSpan,
+    ) -> RealArrayLike:
+        """Direction the wind blows from (degrees clockwise from north) for one or more locations,
+        at the times of `get_wind_speeds`.
+
+        Optional: used for feedback on the site, not by the models. The default raises
+        `NotImplementedError`.
+
+        Args:
+            location: Raised location or sequence of raised locations.
+            timespan: Time span for the requested data.
+
+        Returns:
+            RealArrayLike: Wind directions for the requested locations and times.
+        """
+        raise NotImplementedError(f'{type(self).__name__} does not serve wind directions')
+
+    def get_horizon(self, location: Location) -> pd.Series:
+        """Elevation (degrees) of the horizon around a location.
+
+        Optional: used for feedback on the site, not by the models. The default raises
+        `NotImplementedError`.
+
+        Args:
+            location: The location.
+
+        Returns:
+            pd.Series: Horizon elevations, indexed by azimuth (degrees clockwise from north).
+        """
+        raise NotImplementedError(f'{type(self).__name__} does not serve the horizon')
+
     @abstractmethod
     def get_air_density(
         self,

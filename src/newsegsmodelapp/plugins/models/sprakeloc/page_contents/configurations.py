@@ -6,13 +6,18 @@ back to the page's generic default, which has no cards, so each page must be reg
 
 The input fields, feedback graphs, postprocesses and tables need no registration: those of the
 `sprake` model type are also registered as the defaults, which other model types fall back to.
+
+The site configuration page also shows the feedback on the environmental conditions of the site
+(see `environment_feedback`), which the `sprake` model type, having a fixed environment, does not.
 """
 import copy
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.components.feedback import environmental_conditions
 
 # Ensure the `sprake` configurations are registered before they are copied
 from ...aaa_default.page_contents import configurations as _sprake_configurations  # noqa: F401
+from . import environment_feedback
 
 _SOURCE_MODEL_TYPE = 'sprake'
 _MODEL_TYPE = 'sprakeloc'
@@ -22,4 +27,8 @@ for _page_type in ('landing', 'site-config', 'dsa', 'psa'):
     config.model_type = _MODEL_TYPE
     if _page_type == 'landing':
         config.head_text = 'Sprake Location Aware Model'  # pyright: ignore[reportAttributeAccessIssue]
+    if _page_type == 'site-config':
+        config.layout_environment_feedback = lambda: environmental_conditions.create_environmental_conditions_card(  # pyright: ignore[reportAttributeAccessIssue]
+            environment_feedback.ITEMS
+        )
     registers.add_page_layout_configuration(config, _page_type, _MODEL_TYPE)
