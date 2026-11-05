@@ -101,8 +101,38 @@ erDiagram
         string component_type
         string variable_type
         string distribution
+        int parameterisation_index
+        string raw_parameter_0
+        string raw_parameter_1
+        string last_deterministic_value
+        bool dsa_show
+        bool dsa_selectable
+        bool dsa_selected
+        string dsa_bounds_type
+        string dsa_lower
+        string dsa_upper
+        string dsa_value_lower
+        string dsa_value_upper
+        bool psa_show
+        bool psa_selectable
+        bool psa_selected
+        string last_std
+        string psa_ci_lower
+        string psa_ci_upper
+        bool optim_show
+        bool optim_selectable
+        bool optim_selected
+        string optim_min
+        string optim_max
+        int optim_plot_intervals
         string payload
         string label
+        string icon_name
+        string unit
+        float interface_min
+        float interface_max
+        float interface_step
+        int formatter_dp
         bool retain
     }
 
@@ -121,6 +151,7 @@ erDiagram
     METAMODEL_VARIABLES {
         string metamodel_id PK, FK
         string variable_config_id PK, FK
+        int key_order
     }
 
     RESULTS {
@@ -197,13 +228,20 @@ erDiagram
     COMPONENT_CONFIGS ||--o{ RESULTS : "produces"
     PROJECTS ||--o{ REQUESTS : "requests"
     REQUESTS ||--o{ RUNS : "executed by"
-    RUNS ||--o{ RESULTS : "produces"
+    RUNS |o..o{ RESULTS : "produces (no FK)"
     PROJECTS ||--o{ SESSIONS : "active in"
-    METAMODELS ||--o{ PROCESS_STALENESS : "tracked per process"
+    METAMODELS |o..o{ PROCESS_STALENESS : "tracked per process (no FK)"
 ```
 
 ### Notes
 
+* Dotted lines are relationships without a foreign key.
+* `metamodel_variables.key_order` is the position of the variable's key (`{section}.{key}`, without the subindex)
+  among the metamodel's variables, so that they are loaded in the order they were saved. It is null for rows saved
+  before it was recorded, whose order is taken from the metamodel's payload.
+* `variable_configs` holds the settings of a variable for each analysis in columns of their own (`dsa_*`, `psa_*`,
+  `optim_*`), with its parameterisation (`parameterisation_index`, `raw_parameter_*`), the limits and formatting of
+  its input (`interface_*`, `formatter_dp`, `unit`, `icon_name`), and the full variable in `payload`.
 * `process_staleness` has no foreign key, so that deleting a metamodel is never blocked by its
   staleness rows. It records, per metamodel and per process (see `db_staleness.PROCESSES`), when
   the inputs relevant to the process last changed and when the last completed run began. A
@@ -233,6 +271,10 @@ so they refer to the rows *within the same snapshot*.
 
 ```mermaid
 erDiagram
+    PROJECTS {
+        string id PK
+    }
+
     SNAPSHOTS {
         int snapshot_id PK
         string project_id FK
@@ -315,6 +357,10 @@ erDiagram
     SNAPSHOTS ||--o{ SNAPSHOT_COMPONENT_CONFIGS : "contains"
     SNAPSHOTS ||--o{ SNAPSHOT_VARIABLE_CONFIGS : "contains"
     SNAPSHOTS ||--o{ SNAPSHOT_RESULTS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_PROJECT_METAMODELS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_PROJECT_VARIABLES : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_METAMODEL_VARIABLES : "contains"
+    PROJECTS ||--o{ SNAPSHOTS : "snapshotted as"
 
     SNAPSHOT_PROJECTS ||--o{ SNAPSHOT_PROJECT_METAMODELS : "contains"
     SNAPSHOT_METAMODELS ||--o{ SNAPSHOT_PROJECT_METAMODELS : "belongs to"
@@ -327,6 +373,7 @@ erDiagram
     SNAPSHOT_METAMODELS }o--|| SNAPSHOT_FM_CONFIGS : "uses"
     SNAPSHOT_COMPONENT_CONFIGS ||--o{ SNAPSHOT_RESULTS : "produces"
     SNAPSHOT_PROJECTS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "DSA, PSA and table configs"
+    SNAPSHOT_METAMODELS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "table and optimisation configs"
     SNAPSHOT_EM_CONFIGS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "module configs"
     SNAPSHOT_FM_CONFIGS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "module configs"
 ```

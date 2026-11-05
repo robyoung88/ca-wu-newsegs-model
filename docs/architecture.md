@@ -9,13 +9,16 @@ flowchart TB
         disp["Dispatcher (ZeroMQ)"]
         wrk["Workers"]
         store[("Results store")]
+        maint["Maintenance<br/>backups, pruning"]
         ui <--> db
         ui -. "requests" .-> db
-        db -. "claimed by" .-> disp
+        ui -. "sends requests" .-> disp
         disp --> wrk
+        wrk -- "runs, progress" --> db
         wrk --> store
-        wrk --> db
         ui --> store
+        maint --> db
+        maint --> store
     end
     subgraph fw["newsegsmodelframework"]
         direction TB
@@ -23,7 +26,8 @@ flowchart TB
         mm --> em["NewsegsModel<br/>(grid, generation, cs)"]
         mm --> fm["NewsegsFinance"]
         mm --> vars["Variables"]
-        proj --> sens["DSA / PSA / Optimisation"]
+        mm --> optim["Optimisation"]
+        proj --> sens["DSA / PSA"]
     end
     subgraph support["Supporting packages"]
         newa["newa"]
@@ -70,7 +74,8 @@ The application consists of:
   sessions. Result data are written to a results store on disk, and the database refers to them.
 
 The front end never runs a model itself. User actions create **requests** in the database.
-The dispatcher hands requests to **workers**, each worker records progress in a **run**, and
+The front end's action manager sends new requests to the dispatcher, which hands them to
+**workers**. Each worker records progress in a **run**, and
 writes results to the results store. The front end polls the database for progress and loads
 results from the results store when they are complete. Each completed run may trigger
 *postprocessing* and *table-drawing* requests (see [Application plugins](app/plugins.md)).
