@@ -29,19 +29,25 @@ flowchart TB
         mm --> optim["Optimisation"]
         proj --> sens["DSA / PSA"]
     end
+    subgraph utils["newsegsmodelutils"]
+        plots["Plots<br/>PSA, optimisation, wind resource"]
+    end
     subgraph support["Supporting packages"]
         newa["newa"]
         admd["admdspenmw"]
         cfg["config"]
     end
     app --> fw
+    app --> utils
+    utils --> fw
     fw --> support
     app --> cfg
 ```
 
 ## The framework (`newsegsmodelframework`)
 
-The framework knows nothing about the web application. It provides:
+The framework knows nothing about the web application, and draws no figures: it uses neither Dash nor any
+plotting library. It provides:
 
 * [`core`](framework/core.md) - the base classes: revision-tracked, serialisable
   *components* (`NewsegsComponent`), `NewsegsModule`, time spans, locations and the
@@ -61,6 +67,11 @@ The framework knows nothing about the web application. It provides:
 Every object that is configured by the user is a `NewsegsComponent` or `DataWithRevision`, and
 can therefore be serialised to and from a dictionary. The app stores these dictionaries in its
 database (see [Database](app/database.md)).
+
+## The plotting utilities (`newsegsmodelutils`)
+
+The [plotting utilities](utils.md) draw figures from the data of the framework, such as the plots of a PSA, for the
+app (and for scripts). They use the framework, but the framework does not use them.
 
 ## The application (`newsegsmodelapp`)
 

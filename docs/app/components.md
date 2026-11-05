@@ -11,6 +11,7 @@ Reusable Dash components, layouts and callbacks used by the pages.
 | `colours`, `icons` | The colour scheme of the app and its plots, and the icon library |
 | `project_selector`, `configuration_selector`, `map` | Selecting projects, configurations and sites |
 | `staleness`, `feedback` | Showing whether results are out of date, indicative energy balances, and the environmental conditions of a site |
+| `psa_plots` | The plots of the PSA page: their patches, controls and arguments, drawn by [`newsegsmodelutils`](../utils.md) |
 | `requesthandler` | Interface for creating and monitoring requests |
 
 ## Callbacks with several inputs

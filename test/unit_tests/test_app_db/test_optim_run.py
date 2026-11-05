@@ -245,7 +245,7 @@ class TestMarginalPlot(TestOptimRun):
         )
         with (
             mock.patch.object(optim, 'evaluate_statistic_across_margin') as evaluate,
-            mock.patch.object(optim, 'statistic_across_margin_plot'),
+            mock.patch.object(aaa_default_tables.optim_plots, 'statistic_across_margin_plot'),
         ):
             rval = aaa_default_tables._trigger_plot_marginal_optim(
                 request, self.provider, mock.MagicMock(), 1, lambda *args: None, lambda: False,

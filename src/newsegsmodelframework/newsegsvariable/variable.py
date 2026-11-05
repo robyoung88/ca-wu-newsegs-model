@@ -74,7 +74,7 @@ import json
 from typing import Any, Iterable, cast, Callable, Literal, Sequence, Sized, get_args, Union, overload, override
 import warnings
 
-from matplotlib.pylab import Generator
+from numpy.random import Generator
 import numpy as np
 from useful_types import SequenceNotStr
 from scipy.stats import gamma
