@@ -82,7 +82,7 @@ class ProjVarWatcher(RevisionNotifierProtocol):
 class NewsegsProject(TableOwningNewsegsComponent, RecoverableInMemoryVariableProvider):
     """A container and controller for metamodels and variables."""
     
-    _name = 'NewSEGS Project'
+    _name = 'Untitled project'
     _version = 'v0.0.1'
     _id_prefix = COMPONENT_PREFIXES['project']
 

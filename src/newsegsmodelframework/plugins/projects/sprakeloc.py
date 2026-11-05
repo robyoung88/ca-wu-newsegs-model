@@ -11,7 +11,7 @@ from typing import cast
 
 from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
-from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import FIRST_CONFIGURATION_NAME, NewsegsMetaModel
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
 
 from newsegsmodelframework import PACKAGEDIR, STATICDATA
@@ -97,6 +97,7 @@ def sprake_project_factory():
             fnc,
             variables = [proj.get_default_variable(x) for x in varids]
         )
+        mm.name = FIRST_CONFIGURATION_NAME
         _reset_revision(mm)
 
         proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]

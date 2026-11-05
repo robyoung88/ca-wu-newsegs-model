@@ -197,11 +197,7 @@ def other_sites(lproj: LightweightNewsegsProject, location: Location) -> list[tu
         if key in keys:
             continue
         keys.add(key)
-        # Named by the site, unless it has the default name, when by the configuration
-        site_name = getattr(loc, 'name', None)
-        if not site_name or site_name == Location._name: # pyright: ignore[reportPrivateUsage]
-            site_name = lmm.name
-        sites.append((site_name, Location(loc.lat, loc.lon)))
+        sites.append((loc.display_name, Location(loc.lat, loc.lon)))
     return sites
 
 def draw_items(

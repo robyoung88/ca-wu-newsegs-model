@@ -42,7 +42,7 @@ class Location(serialisation.StateSerialiseToDictMixin):
 
     The CRS is not currently exposed for write-editing.
     """
-    _name = 'Site'
+    _name = ''
     _crs = 'EPSG:4326'
 
     # Override of SerialiseToDictMixin _constructor_class
@@ -175,12 +175,19 @@ class Location(serialisation.StateSerialiseToDictMixin):
 
     @property
     def name(self) -> str:
-        """str: The name of the Location."""
+        """str: The name of the Location; empty until the user names it."""
         return self._name
 
     @name.setter
     def name(self, name: str) -> None:
         self._name = name    
+
+    @property
+    def display_name(self) -> str:
+        """str: The name to show the user: the name, or, while it has none, its co-ordinates (`Site at <lat>, <lon>`)."""
+        if self._name:
+            return self._name
+        return f'Site at {self._lat:.3f}, {self._lon:.3f}'
 
     def get_osgb(self) -> tuple[float, float]:
         """Location as OSGB36 co-ordinates

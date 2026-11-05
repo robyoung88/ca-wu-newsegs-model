@@ -97,6 +97,7 @@ def sprake_project_factory():
             fnc,
             variables = [proj.get_default_variable(x) for x in varids]
         )
+        mm.name = newsegsmetamodel.FIRST_CONFIGURATION_NAME
         _reset_revision(mm)
 
         proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]
