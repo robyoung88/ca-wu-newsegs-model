@@ -252,14 +252,43 @@ div.group-editor[data-selected] div.group-editor-row:not(.source) button.group-e
     display: inline-block;
 }
 
-/* The new Variable row only while an icon is selected, and not for a configuration already alone in its group */
+/* The new Variable row only while an icon is selected or dragged, and not for a configuration already alone in its
+   group */
 div.group-editor div.group-editor-row.new-value,
-div.group-editor[data-selected].source-alone div.group-editor-row.new-value {
+div.group-editor[data-selected].source-alone div.group-editor-row.new-value,
+div.group-editor[data-dragging].source-alone div.group-editor-row.new-value {
     display: none;
 }
 
-div.group-editor[data-selected] div.group-editor-row.new-value {
+div.group-editor[data-selected] div.group-editor-row.new-value,
+div.group-editor[data-dragging] div.group-editor-row.new-value {
     display: flex;
+}
+
+/* Dragging an icon (assets/group_editor.js): the rows it can be dropped on, and the one under the pointer */
+button.group-editor-icon[draggable="true"] {
+    cursor: grab;
+}
+
+span.group-editor-drop-label {
+    display: none;
+    color: #6c757d;
+    font-style: italic;
+}
+
+div.group-editor[data-dragging] span.group-editor-drop-label {
+    display: inline;
+}
+
+div.group-editor-row.drop-candidate {
+    outline: 1px dashed #86b7fe;
+    outline-offset: -1px;
+    border-radius: 0.375rem;
+}
+
+div.group-editor-row.drop-over {
+    outline: 2px solid #0d6efd;
+    background-color: #e7f1ff;
 }
 
 div.group-editor-confirm:not([hidden]) {
