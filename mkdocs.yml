@@ -64,11 +64,18 @@ plugins:
 
 nav:
   - Home: index.md
+  - Getting started:
+    - Install and run: getting-started/install.md
+  - User guide: user-guide.md
+  - Modelling principles:
+    - modelling/index.md
+    - Finance model: modelling/finance.md
   - Architecture: architecture.md
   - Docstring conventions: docstrings.md
   - Development and releases: development.md
   - Framework:
     - framework/index.md
+    - Model ecosystem: framework/model-ecosystem.md
     - Plugins: framework/plugins.md
     - Core components: framework/core.md
     - Modules: framework/modules.md
@@ -81,6 +88,7 @@ nav:
   - Application:
     - app/index.md
     - Plugins: app/plugins.md
+    - Callbacks: app/callbacks.md
     - Backend: app/backend.md
     - Components: app/components.md
     - Database: app/database.md

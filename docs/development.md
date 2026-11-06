@@ -109,6 +109,19 @@ If the input isn't rendered by a content creator, add a component for it to the 
 so that caches see the change as they would in the app. A handler that should make no change must also leave the
 database as it was: check with `database_state` and `assertNothingChanged`.
 
+## Documentation
+
+The documentation is built with [MkDocs](https://www.mkdocs.org) from the markdown in `docs/` and the docstrings in `src/`.
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs serve   # live preview at http://127.0.0.1:8000
+mkdocs build   # writes static HTML to site/
+```
+
+- On pushes to `main` the `publish documentation` workflow deploys the site to the `gh-pages` branch (GitHub Pages must be set to deploy from that branch).
+- The running app serves the built HTML from `site/` (or `DOCS_PATH`) at `/documentation/`; the Docker image builds it automatically.
+
 ## Releasing
 
 - **Prerelease.** Open a pull request from `development` to `canary`, and merge it with a merge commit (not squash or
@@ -132,3 +145,37 @@ Rulesets on the repository enforce this:
 - `canary`: no force pushes or deletion. Pull requests are not required, so that the `release` workflow can merge `main`
   back into it.
 - `development`: changes only through a squash-merged pull request; no force pushes or deletion.
+
+<!-- BEGIN TEMPORARY CI SECTION: Revisit or remove during the README refactor. -->
+## CI checks and generated model artifacts
+
+Pull requests targeting `development`, `canary` or `main` run the unit-test workflow. The
+workflow first regenerates the default model artifacts and checks them against
+the files in `data/`; it does not modify the pull request. PSA/DSA tests run
+separately on pushes to `main`. The Excel-based validation tests compare against
+results extracted from the validation workbook into `data/sprake_validation/`, so
+they run in CI without it. After the workbook changes, rerun
+`scripts/210_extract_sprake_validation_results.py` on a computer with access to it
+and commit the updated files.
+
+If generated artifacts differ from the checked-in files, the prerequisite
+check fails and uploads the generated files as the
+`generated-default-model-artifacts` workflow artifact. To retrieve them, open
+the failed workflow run from the pull request's **Checks** tab, then download
+the artifact from the run summary's **Artifacts** section. Update the
+corresponding files in `data/` and push the changes to the pull request; the
+check must pass before the pull request can merge.
+
+The artifact is available when generation reaches the comparison step. If
+generation fails earlier, generated files may not be available to download.
+<!-- END TEMPORARY CI SECTION -->
+
+## Profiling
+
+For profiling, use viztracer:
+
+```{bash}
+& C:\Users\Robert.Young\anaconda3\envs\ca-wu-newsegs-mod\python.exe -m viztracer --log_async --min_duration 500 -o trace.json c:/Users/Robert.Young/Dev/ca-wu-newsegs-model/src/app.py    
+```
+
+Results can be viewed at https://www.speedscope.app/ or https://ui.perfetto.dev/.
