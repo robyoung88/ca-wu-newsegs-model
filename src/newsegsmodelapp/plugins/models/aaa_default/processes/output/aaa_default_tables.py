@@ -894,9 +894,13 @@ def _trigger_plot_marginal_optim(
 
     stat = mm.optim_config.statistic
 
+    if check_cancel_status():
+        raise InterruptedError(f'Marginal plot {run_id} has been cancelled.')
+
     try:
         plot_df = optim.evaluate_statistic_across_margin(
-            mm, varid, stat, lower, upper, res, progress_callback = progress_callback
+            mm, varid, stat, lower, upper, res,
+            progress_callback = progress_callback, cancel_status = check_cancel_status,
         )
     finally:
         # The project in memory no longer matches the store (its revisions were incremented), so must not be reused

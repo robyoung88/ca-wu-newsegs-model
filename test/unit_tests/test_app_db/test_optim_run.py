@@ -272,7 +272,7 @@ class TestOptimRun(unittest.TestCase):
 class TestMarginalPlot(TestOptimRun):
     """The marginal plot of the statistic, with the evaluation replaced so that no model is run"""
 
-    def _plot(self, progress_callback = None, evaluate_side_effect = None):
+    def _plot(self, progress_callback = None, evaluate_side_effect = None, check_cancel_status = None):
         from newsegsmodelapp.plugins.models.aaa_default.processes.output import aaa_default_tables
         from newsegsmodelapp.registers import TableDrawRequest
         self.var.optim_plot_intervals = 50 # Beyond the limit of 20
@@ -286,9 +286,28 @@ class TestMarginalPlot(TestOptimRun):
             mock.patch.object(aaa_default_tables.optim_plots, 'statistic_across_margin_plot'),
         ):
             rval = aaa_default_tables._trigger_plot_marginal_optim(
-                request, self.provider, mock.MagicMock(), 1, progress_callback or (lambda *args: None), lambda: False,
+                request, self.provider, self.result_provider, 1, progress_callback or (lambda *args: None),
+                check_cancel_status or (lambda: False),
             )
         return rval, evaluate
+
+    def test_cancelled_before_the_plot_starts(self):
+        # (#184)
+        with self.assertRaises(InterruptedError):
+            self._plot(check_cancel_status = lambda: True)
+        self.result_provider.upsert_result.assert_not_called()
+
+    def test_cancelled_while_evaluating(self):
+        # The evaluation checks for cancellation, and no plot is saved when it is cancelled (#184)
+        def evaluate(*args, cancel_status, **kwargs):
+            if cancel_status():
+                raise InterruptedError('Marginal plot cancelled')
+            return mock.MagicMock()
+        # Not cancelled before the plot starts, but during it
+        check_cancel_status = mock.Mock(side_effect = [False, True])
+        with self.assertRaises(InterruptedError):
+            self._plot(evaluate_side_effect = evaluate, check_cancel_status = check_cancel_status)
+        self.result_provider.upsert_result.assert_not_called()
 
     def test_progress_reported(self):
         # The progress of the evaluation is reported to the run (#183)
@@ -361,6 +380,18 @@ class TestEvaluateAcrossMargin(unittest.TestCase):
             (3, 4, 'Restoring the configuration'),
             (3.5, 4, 'Restoring the configuration: Awaiting environmental data: wind speeds'),
         ])
+
+    def test_cancelled_between_points(self):
+        # Checked before each point: cancelled after the first, it stops before the second, and the variable is
+        # restored (#184)
+        cancel_status = mock.Mock(side_effect = [False, True])
+        with self.assertRaises(InterruptedError):
+            optim.evaluate_statistic_across_margin(
+                self.mm, 'v', 'net_present_value_discounted', 0., 10., 2, cancel_status = cancel_status,
+            )
+        self.assertEqual(self.mm.model.run.call_count, 1)
+        self.assertIs(self.mm.variables['v'], self.var)
+        self.assertEqual(self.var.parameters[0], 1.)
 
 
 class TestOptimBoundsCheck(unittest.TestCase):
