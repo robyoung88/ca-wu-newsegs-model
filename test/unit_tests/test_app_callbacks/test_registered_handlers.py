@@ -171,6 +171,15 @@ class TestToggleOptimActive(InputChangeTestCase):
         self.assertEqual(self.stale_marks(t0), {(x, 'optim') for x in self.metamodel_ids[:2]})
         self.assertIsNot(response.get(row_id('input-group-config-update-trigger', 'trigger', WIND, 'optim'), 'data'), NOT_UPDATED)
 
+    def test_selection_reaches_a_worker(self):
+        # A worker which has run the project holds it in its cache; the optimisation runs there
+        worker = self.worker_provider()
+        selected = self.stored_variable(WIND_VARID).optim_selected
+        self.dispatch(self.toggle, not selected, self.components)
+        self.assertEqual(
+            worker.get_project(self.project_id).metamodels[0].variables[WIND_VARID].optim_selected, not selected
+        )
+
     def test_unchanged_makes_no_update(self):
         selected = self.stored_variable(WIND_VARID).optim_selected
         before = self.database_state()

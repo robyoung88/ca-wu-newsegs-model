@@ -205,6 +205,23 @@ class TestOptimSettings(_SharedAndSeparate):
         self.assertEqual(self.stale_marks(t0), set())
         self.assertFalse(response.updated)
 
+    def test_settings_reach_a_worker(self):
+        # A worker which has run the project holds it in its cache; the optimisation and the marginal plot run there
+        worker = self.worker_provider()
+        plot_intervals = self.stored_variable(WIND_VARID).optim_plot_intervals + 3
+        for purpose, attribute, new in [
+            ('bound-lower', 'optim_min', 5.),
+            ('bound-upper', 'optim_max', 500.),
+            ('plot-intervals', 'optim_plot_intervals', plot_intervals),
+        ]:
+            with self.subTest(purpose = purpose):
+                self.dispatch(row_id('single-input-config', purpose, WIND, 'optim'), new, self.components)
+                var = worker.get_project(self.project_id).metamodels[0].variables[WIND_VARID]
+                self.assertEqual(getattr(var, attribute), new)
+        self.assertEqual(
+            worker.get_project(self.project_id).metamodels[0].variables[WIND_VARID].get_optim_bounds(), (5., 500.)
+        )
+
     def test_emptied_plot_intervals_makes_no_update(self):
         before = self.database_state()
         response = self.dispatch(row_id('single-input-config', 'plot-intervals', WIND, 'optim'), None, self.components)

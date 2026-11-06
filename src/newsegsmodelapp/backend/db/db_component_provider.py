@@ -2317,11 +2317,12 @@ class FromDatabaseNewsegsProjectProvider(
             res = conn.execute(stmt).scalar_one()
         return res
 
-    # REVIEW (unreferenced): no references to `touch_project` found in src/, scripts/ or data/.
     def touch_project(self, project_id: str):
-        """Update the modification stamp of a project, without changing it.
+        """Update the modification stamp of a project (`modified_order`), without changing it.
 
-        Used so that caches of the project are invalidated.
+        Caches of the project in every process, such as those of the workers, are checked against the stamp
+        (see `CachedFromDatabaseNewsegsProjectProvider`). A change saved to a part of the project outside its row,
+        such as a Variable, must touch the project, or the caches of other processes keep the project as it was.
 
         Args:
             project_id: Id of the project.
@@ -2331,7 +2332,7 @@ class FromDatabaseNewsegsProjectProvider(
             .where(self._table.c.id == project_id)
             .values(label=self._table.c.label)
         )
-        with read_transaction(self._get_engine(writer=True)) as conn:
+        with write_transaction(self._get_engine(writer=True)) as conn:
             conn.execute(stmt)
 
     def invalidate_cache_for_component(self, component_id):
