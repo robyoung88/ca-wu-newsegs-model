@@ -70,7 +70,7 @@ database (see [Database](app/database.md)).
 
 ## The plotting utilities (`newsegsmodelutils`)
 
-The [plotting utilities](utils.md) draw figures from the data of the framework, such as the plots of a PSA, for the
+The [plotting utilities](support/utils.md) draw figures from the data of the framework, such as the plots of a PSA, for the
 app (and for scripts). They use the framework, but the framework does not use them.
 
 ## The application (`newsegsmodelapp`)

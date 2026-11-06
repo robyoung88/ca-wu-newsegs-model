@@ -367,7 +367,7 @@ def create_project_selector():
                 [
                     dbc.Input(
                         id="input-snapshot-name",
-                        placeholder="Snapshot name, e.g. Before tariff change",
+                        placeholder="Snapshot name",
                         type="text",
                         size="sm",
                     ),
