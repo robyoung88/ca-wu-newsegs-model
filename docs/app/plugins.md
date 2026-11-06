@@ -189,6 +189,13 @@ A handler that saves a value shown on the site configuration page, or changes wh
 should set `return_dict['summary_refresh']`. That redraws the input's sharing summary and its card's label, which
 counts the inputs whose configurations differ.
 
+A handler that saves something a run depends on, outside the project's own row (a Variable, or a component such as
+the optimisation settings), must also update the project's row: with `provider.increment_revision(project_id)`, or
+`provider.touch_project(project_id)` to change only its modification stamp. The workers cache projects, and load one
+again only when its row changes (see `CachedFromDatabaseNewsegsProjectProvider`). `invalidate_cache_for_component`
+clears only the cache of the app's own process, so without it, a worker that has run the project before runs it with
+the old settings.
+
 ### Lazily built editors
 
 A row can build its editor only when it is opened, so that expensive content isn't built for every row of a page.
