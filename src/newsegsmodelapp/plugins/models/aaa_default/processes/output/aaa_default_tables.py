@@ -894,10 +894,9 @@ def _trigger_plot_marginal_optim(
 
     stat = mm.optim_config.statistic
 
-    # TODO: Add progress
     try:
         plot_df = optim.evaluate_statistic_across_margin(
-            mm, varid, stat, lower, upper, res
+            mm, varid, stat, lower, upper, res, progress_callback = progress_callback
         )
     finally:
         # The project in memory no longer matches the store (its revisions were incremented), so must not be reused
