@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ca_wu_newsegs_model"
-version = "0.0.1"
+# No version here: releases are versioned by their tags (see the semantic-release settings below). PEP 621
+# requires a version unless it is dynamic; setuptools builds the package, which nothing installs, as 0.0.0.
+dynamic = ["version"]
 authors = [
   { name="Robert Young", email="robert.young@wrexham.ac.uk" },
 ]
@@ -32,7 +34,7 @@ where = ["src"]
 # Releases (python-semantic-release), run by .github/workflows/release.yml
 # -----------------------------------------------------------------------------
 # The version is taken from the Conventional Commits since the last tag. Releases are tags and GitHub
-# Releases only: nothing is committed back, so `project.version` above is not updated.
+# Releases only: nothing is committed back.
 
 [tool.semantic_release]
 tag_format = "v{version}"
