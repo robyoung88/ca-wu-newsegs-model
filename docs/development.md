@@ -23,7 +23,7 @@ Work moves through three branches:
     | `docs:`, `test:`, `refactor:`, `ci:`, `chore:`, ... | none |
 
 3. The `unit tests` workflow runs on the pull request. It first regenerates the default model artifacts and compares
-   them with `data/` (see the README for retrieving them if they differ), then runs the unit tests, excluding the
+   them with `data/` (see [CI checks and generated model artifacts](#ci-checks-and-generated-model-artifacts) for retrieving them if they differ), then runs the unit tests, excluding the
    Excel validation and the PSA and DSA tests. Squash-merge the pull request.
 
 Every push to `development` builds the Docker image.
@@ -146,7 +146,6 @@ Rulesets on the repository enforce this:
   back into it.
 - `development`: changes only through a squash-merged pull request; no force pushes or deletion.
 
-<!-- BEGIN TEMPORARY CI SECTION: Revisit or remove during the README refactor. -->
 ## CI checks and generated model artifacts
 
 Pull requests targeting `development`, `canary` or `main` run the unit-test workflow. The
@@ -168,7 +167,6 @@ check must pass before the pull request can merge.
 
 The artifact is available when generation reaches the comparison step. If
 generation fails earlier, generated files may not be available to download.
-<!-- END TEMPORARY CI SECTION -->
 
 ## Profiling
 
