@@ -308,7 +308,6 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     ) -> tuple[Any, int] | tuple[None, None]:
         stmt = (
             sa.select(
-                self._table.c.result_id,
                 self._table.c.result_file,
                 self._table.c.component_config_revision,
             )
@@ -322,16 +321,13 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
 
         with read_transaction(self._get_engine()) as conn:
-            res = conn.execute(stmt)
-        if not res:
-            return None, None
-        result_rows = {row["result_id"]: dict(row) for row in res.mappings()}
-        if len(result_rows) == 0:
+            # Consume the rows before returning the connection, or its SQLite snapshot may stay open.
+            result_rows = conn.execute(stmt).mappings().all()
+        if not result_rows:
             return None, None
         
-        res_id = next(iter(result_rows))
-        file_name = result_rows[res_id]['result_file']
-        rrs = result_rows[res_id]['component_config_revision']
+        file_name = result_rows[0]['result_file']
+        rrs = result_rows[0]['component_config_revision']
 
         try:
             obj = load_result(Path(file_name))

@@ -12,6 +12,7 @@ last plotted, so a later plot of another variable is saved at the same revision.
   It's now saved at the stored revision.
 """
 import json
+from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 from unittest import mock
@@ -22,9 +23,8 @@ from newsegsmodelapp.backend.db.db_component_provider import (
     CachedFromDatabaseNewsegsProjectProvider, FromDatabaseNewsegsComponentProvider,
 )
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider, FromDatabaseResultProvider
-
 from newsegsmodelapp.plugins.models.aaa_default.processes.output import aaa_default_tables
-from newsegsmodelapp.registers import TableDrawRequest
+from newsegsmodelapp.registers import RunRequest, TableDrawRequest
 
 from .base import InputChangeTestCase
 
@@ -78,6 +78,65 @@ class TestResultSavedAgainAtTheSameRevision(_ResultsTestCase):
 
     def test_no_result(self):
         self.assertEqual(self.app_results.get_result(PLOT, self.table_config), (None, None))
+
+    def test_request_result_saved_by_worker_is_found_after_a_miss(self):
+        result_type = 'request_result_test'
+        request = RunRequest(request_id = 83)
+        self.assertEqual(
+            self.app_results.get_request_result(result_type, request.request_id, self.table_config),
+            (None, None),
+        )
+
+        self.worker.upsert_result(result_type, self.table_config, html.Div('result'), request = request)
+
+        result, revision = self.app_results.get_request_result(
+            result_type, request.request_id, self.table_config
+        )
+        self.assertEqual(result.children, 'result')
+        self.assertEqual(revision, self.table_config.revision)
+
+    def test_request_result_rows_are_read_before_connection_returns_to_pool(self):
+        transaction_open = False
+        expected_revision = self.table_config.revision
+
+        class Result:
+            def mappings(self):
+                if not transaction_open:
+                    raise AssertionError('Result rows were accessed after the read transaction ended')
+                return self
+
+            def all(self):
+                if not transaction_open:
+                    raise AssertionError('Result rows were accessed after the read transaction ended')
+                return [{
+                    'result_file': 'result-file',
+                    'component_config_revision': expected_revision,
+                }]
+
+        class Connection:
+            def execute(self, _stmt):
+                return Result()
+
+        @contextmanager
+        def read_transaction(_engine):
+            nonlocal transaction_open
+            transaction_open = True
+            try:
+                yield Connection()
+            finally:
+                transaction_open = False
+
+        with (
+            mock.patch('newsegsmodelapp.backend.db.db_result_provider.read_transaction', read_transaction),
+            mock.patch(
+                'newsegsmodelapp.backend.db.db_result_provider.load_result',
+                return_value = html.Div('result'),
+            ),
+        ):
+            result, revision = self.app_results.get_request_result('request_result_test', 83, self.table_config)
+
+        self.assertEqual(result.children, 'result')
+        self.assertEqual(revision, self.table_config.revision)
 
 class TestMarginalPlotDraw(_ResultsTestCase):
     """The draw procedure of the marginal plot, run as a worker runs it, and read back as the app reads it."""
