@@ -1154,6 +1154,8 @@ def add_optim_run_callbacks(app: NewsegsDash):
         setattr(optim_config, setting, value)
         provider._component_provider.upsert_component(optim_config, project_id = active_project_id)
         provider.invalidate_cache_for_component(active_project_id)
+        # The settings are read by the optimisation, in the workers
+        provider.touch_project(active_project_id)
         # Only the optimisation of the focussed configuration uses its settings
         db_staleness.mark_inputs_changed([mm_id], 'optim')
 
