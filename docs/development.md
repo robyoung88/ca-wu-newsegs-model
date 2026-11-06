@@ -19,7 +19,7 @@ Work moves through three branches:
     |---|---|
     | `fix: correct the export tariff` | patch |
     | `feat: add a location to the map` | minor |
-    | `feat!: change the project file format`, or a `BREAKING CHANGE: ...` footer in the description | major (minor while the version is below 1.0.0) |
+    | `feat!: change the project file format`, or a `BREAKING CHANGE: ...` footer in the description | major |
     | `docs:`, `test:`, `refactor:`, `ci:`, `chore:`, ... | none |
 
 3. The `unit tests` workflow runs on the pull request. It first regenerates the default model artifacts and compares

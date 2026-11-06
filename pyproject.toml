@@ -37,8 +37,8 @@ where = ["src"]
 [tool.semantic_release]
 tag_format = "v{version}"
 commit_parser = "conventional"
-allow_zero_version = true
-major_on_zero = false
+# Versions start at 1.0.0: with an earlier 0.x release, the next release is 1.0.0, whatever its commits
+allow_zero_version = false
 no_git_verify = false
 
 [tool.semantic_release.commit_parser_options]
