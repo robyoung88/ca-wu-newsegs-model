@@ -242,7 +242,7 @@ class TestPruneRequests(_PruningBase):
                 trigger_request_id = trigger, run_id = run_id if run_age is not None else None,
             ))
             if run_age is not None:
-                t = datetime.datetime.now() - datetime.timedelta(days = run_age)
+                t = tbls.utc_now() - datetime.timedelta(days = run_age)
                 conn.execute(tbls.runs.insert().values(
                     run_id = run_id, request_id = request_id, status = run_status, created_at = t, modified_at = t
                 ))
@@ -281,7 +281,7 @@ class TestPruneRequests(_PruningBase):
         import datetime
         self._request(1, 'FULFILLED', run_id = 12)
         self._request(2, 'AWAITING DISPATCH', run_age = None)
-        t = datetime.datetime.now() - datetime.timedelta(days = self.OLD)
+        t = tbls.utc_now() - datetime.timedelta(days = self.OLD)
         with self.engine.begin() as conn:
             conn.execute(tbls.runs.insert(), [
                 {'run_id': 11, 'request_id': 1, 'status': 'FAILED', 'created_at': t, 'modified_at': t},  # superseded: pruned

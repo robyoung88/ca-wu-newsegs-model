@@ -4,6 +4,7 @@ if not logging.getLogger().hasHandlers():
     import app_logging  # noqa: F401
 logger = logging.getLogger(__name__)
 
+import datetime
 import multiprocessing
 import time
 import zmq
@@ -26,7 +27,7 @@ os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 
 from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db import write_transaction
-from newsegsmodelapp.backend.db.db_tables import runs
+from newsegsmodelapp.backend.db.db_tables import runs, utc_now
 
 import newsegsmodelapp.register_plugins # Ensure this always gets imported  # noqa: F401
 from newsegsmodelapp.backend.worker import worker_process, POISON_PILL
@@ -189,12 +190,24 @@ def run_dispatcher(
             proxy_process.join(timeout = 1)
             
 def _cleanup_dead_jobs(engine, dead_interval_seconds: int) -> int:
+    """Mark as failed the runs that are calculating but haven't been updated for a time.
+
+    `runs.modified_at` is in UTC (`utc_now`), so is compared with a cutoff in UTC, whatever the host's timezone.
+
+    Args:
+        engine: The engine to write with.
+        dead_interval_seconds: Time since a run's last update after which it's dead.
+
+    Returns:
+        The number of runs marked as failed.
+    """
+    cutoff = utc_now() - datetime.timedelta(seconds = dead_interval_seconds)
     stmt = (
         sa.update(runs)
         .values(status = 'FAILED')
         .where(
             runs.c.status == 'CALCULATING',
-            (sa.func.strftime('%s', 'now') - sa.func.strftime('%s', runs.c.modified_at)) > dead_interval_seconds
+            runs.c.modified_at < cutoff,
         )
     )
 
