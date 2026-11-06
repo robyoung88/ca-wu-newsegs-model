@@ -1625,14 +1625,18 @@ class FromDatabaseNewsegsProjectProvider(
             obj._component_ids['table_config'] = row.table_config_id
             obj._component_ids['dsa_config'] = row.dsa_component_config_id
             obj._component_ids['psa_config'] = row.psa_component_config_id
-            # No need to update the focussed metamodel - as this is
-            # stored as an int, it should not be impacted so long
-            # as the order of metamodels is consistent.
-
             # The row is not enough for us to reassign metamodel uids
             # - need to go to the junction table
             metamodel_ids = self.list_project_metamodel_ids(obj.id)
             obj._metamodel_ids = metamodel_ids
+
+            # The focussed metamodel is the one in the row. Focussing a metamodel updates only the row
+            # (`focussed_metamodel_id`), not the payload, whose index is that of the last time the whole
+            # project was saved. Saving the project writes its focus back to the row, so a stale focus would
+            # also undo a later change of focus.
+            focussed_id = row._mapping.get('focussed_metamodel_id')
+            if focussed_id in metamodel_ids:
+                obj._focussed_metamodel = metamodel_ids.index(focussed_id)
 
             # Similarly, variable uids may have been modified.
             stmt = (
