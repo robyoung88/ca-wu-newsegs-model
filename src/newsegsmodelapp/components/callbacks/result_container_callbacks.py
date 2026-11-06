@@ -423,7 +423,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         """
         
         # Do not update if the toggle status has not changed, the project is the same,
-        # and the table revision number is the same.
+        # and the table drawn is of the project's table revision.
         logger.debug('Getting lightweight project - Updating Result Table Containers')
         lproj = app.project_provider.get_lightweight_project(active_project_id)
         table_rev = lproj.table_config.revision
@@ -475,7 +475,7 @@ def add_result_container_callbacks(app: NewsegsDash):
                 )
                 callback_utils.update_property_by_id(
                     container_id, 'data-rendered-project-table-revision',
-                    table_rev, rval
+                    contents_by_section_subindex[ss][2], rval
                 )
                 callback_utils.update_property_by_id(
                     container_id, 'data-rendered-ann-hori-state',
@@ -535,7 +535,9 @@ def add_result_container_callbacks(app: NewsegsDash):
                     rev, lproj.table_config.revision, section, subindex, key
                 )
                 stale = rev != lproj.table_config.revision
-                contents_by_section_subindex[ss] = res, stale
+                # The revision of the table drawn is recorded, not the project's, so that a stale table is drawn again
+                # once the table of the current revision is saved (#195)
+                contents_by_section_subindex[ss] = res, stale, rev
                 callback_utils.update_property_by_id(
                     container_id,
                     'children',
@@ -553,7 +555,7 @@ def add_result_container_callbacks(app: NewsegsDash):
                 )
                 callback_utils.update_property_by_id(
                     container_id, 'data-rendered-project-table-revision',
-                    table_rev, rval
+                    rev, rval
                 )
                 callback_utils.update_property_by_id(
                     container_id, 'data-rendered-ann-hori-state',

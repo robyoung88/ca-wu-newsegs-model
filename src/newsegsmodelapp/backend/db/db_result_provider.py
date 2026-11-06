@@ -212,8 +212,9 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     ) -> tuple[str, int] | tuple[None, None]:
         """The file of the latest result, and the revision of the parent it was saved for, without loading it.
 
-        The latest result saved for the revision, or, if stale results are allowed and there is none, the latest of the
-        earliest revision. Each result saved has a file of its own, so the file identifies the result.
+        The latest result saved for the revision. If stale results are allowed and there is none, the latest of the most
+        recent earlier revision (#195), or, if there is none earlier either, the latest of the earliest revision. Each
+        result saved has a file of its own, so the file identifies the result.
 
         Returns:
             The file and the revision, or `(None, None)` if there is no result.
@@ -249,30 +250,28 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 raise ValueError(f'If stale results are not allowed, the parent component or a nominated revision must be provided.')
             stmt = stmt.where(self._table.c.component_config_revision == revision)
 
-        file_name = None
-        rrs = None
         with read_transaction(self._get_engine()) as conn:
             # Fetch every row before looking through them: a result left part-read keeps SQLite's read transaction
             # open on the pooled connection, so later reads on it don't see later writes
             rows = conn.execute(stmt).fetchall()
-            for idx, row in enumerate(rows):
-                logger.debug(
-                    'Iterating results [%d]: Type = %s; Parent = %s; Revision = %s; Created at: %s',
-                    idx, result_type, getattr(parent_component, 'id', parent_component), row.component_config_revision, row.created_at
-                )
-                if idx == 0:
-                    
-                    file_name = row.result_file
-                    rrs = row.component_config_revision
-                if row.component_config_revision == revision:
-                    if idx != 0:
-                        file_name = row.result_file
-                        rrs = revision
-                    break
-
-        if file_name is None:
+        for idx, row in enumerate(rows):
+            logger.debug(
+                'Iterating results [%d]: Type = %s; Parent = %s; Revision = %s; Created at: %s',
+                idx, result_type, getattr(parent_component, 'id', parent_component), row.component_config_revision, row.created_at
+            )
+        if not rows:
             return None, None
-        return file_name, rrs
+
+        # The rows of each revision start with its latest. The most recent revision at or before the one asked for is
+        # that revision itself, if it has a result.
+        chosen = rows[0]
+        if revision is not None:
+            for row in rows:
+                if row.component_config_revision > revision:
+                    break
+                if row.component_config_revision != chosen.component_config_revision:
+                    chosen = row
+        return chosen.result_file, chosen.component_config_revision
 
     def _load_result_file(self, file_name: str) -> Any:
         """Load a result from its file; if the file is missing, remove its rows and return None."""
