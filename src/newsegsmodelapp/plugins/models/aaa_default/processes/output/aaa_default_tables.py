@@ -15,7 +15,7 @@ from dash import html
 import pandas as pd
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsComponentProvider, FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.components import stats
+from newsegsmodelapp.components import stats as results_stats
 from newsegsmodelapp.components.stats import tornado_plot
 from newsegsmodelapp.registers import RunRequest, TableDrawRequest, register_table_draw, register_table_draw_request, register_table_getter
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -23,7 +23,9 @@ from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsP
 from newsegsmodelframework.newsegssensitivity import common as sensitivity, dsa, optim, psa
 
 from ..postprocess.methods import post_dsa_results
-from . import result_tables_sprake
+from newsegsmodelutils.plots import optim as optim_plots
+
+from . import optim_feedback, result_tables_sprake
 from .get_result_list import get_result_list
 
 def _get_metamodel_from_proj_by_id(mm_id, lproj):
@@ -611,7 +613,7 @@ _DSA_VALUE_FORMATTER = {"function":  "params.value ? d3.format(',.2f')(params.va
 _DSA_LABEL_FORMATTER = {"function":  "params.value ? params.value : '-' "}
 
 def _dsa_statistic_grid(otable):
-    """AG grid of a table of one statistic of a DSA (from `stats.dsa_statistic_table`)"""
+    """AG grid of a table of one statistic of a DSA (from `results_stats.dsa_statistic_table`)"""
     formatters = {
         'variable': _DSA_LABEL_FORMATTER,
     }
@@ -635,7 +637,7 @@ def _draw_dsa_metamodel_grids(raw_table, table_component, stale, request, result
     for stat in sensitivity.DSA_STATISTIC_LABELS.keys():
         if stat not in available_statistics:
             continue
-        res = _dsa_statistic_grid(stats.dsa_statistic_table(raw_table, stat))
+        res = _dsa_statistic_grid(results_stats.dsa_statistic_table(raw_table, stat))
 
         result_provider.upsert_result(
             table_name + '_' + stat,
@@ -752,13 +754,13 @@ def _make_dsa_project_tables(
     return 'ok'
 
 def _dsa_comparison_grid(otable):
-    """AG grid of a table of one statistic of several comparators (from `stats.dsa_comparison_table`)"""
+    """AG grid of a table of one statistic of several comparators (from `results_stats.dsa_comparison_table`)"""
     comparators = list(otable.columns.get_level_values('comparator').unique())
     records = []
     for variable, row in otable.iterrows():
         rec = {'variable': variable}
         for i, comp in enumerate(comparators):
-            for bound in stats.DSA_BOUND_COLUMNS:
+            for bound in results_stats.DSA_BOUND_COLUMNS:
                 val = row[(comp, bound)]
                 rec[f'c{i}_{bound}'] = None if pd.isna(val) else float(val)
         records.append(rec)
@@ -767,7 +769,7 @@ def _dsa_comparison_grid(otable):
             'headerName': comp,
             'children': [
                 {'field': f'c{i}_{bound}', 'headerName': bound, 'valueFormatter': _DSA_VALUE_FORMATTER}
-                for bound in stats.DSA_BOUND_COLUMNS
+                for bound in results_stats.DSA_BOUND_COLUMNS
             ]
         }
         for i, comp in enumerate(comparators)
@@ -822,10 +824,10 @@ def _get_dsa_project_table(
                     for x in comparators if x in label_df.index.get_level_values('metamodel')
                 }
             color_indexes = {labels.get(x, x): available.index(x) for x in comparators}
-            return stats.multi_tornado_plot(
+            return results_stats.multi_tornado_plot(
                 dsa_dfs, stat, variables, label_dfs = label_dfs, color_indexes = color_indexes
             ), rev
-        otable = stats.dsa_comparison_table(dsa_dfs, stat, variables)
+        otable = results_stats.dsa_comparison_table(dsa_dfs, stat, variables)
         if otable.empty:
             return html.Div('No results for the chosen configurations and variables'), rev
         return _dsa_comparison_grid(otable), rev
@@ -849,8 +851,8 @@ def _get_dsa_project_table(
     pw_table, pw_labels = post_dsa_results.dsa_results_to_tables(pairwise.set_index(['variable', 'bound']))
     if subindex == 1:
         title = f'Incremental DSA variation: {labels.get(comparator, comparator)} vs {labels.get(reference, reference)}'
-        return stats.tornado_plot(pw_table, pw_labels, stat, variables, title = title), rev
-    return _dsa_statistic_grid(stats.dsa_statistic_table(pw_table, stat, variables)), rev
+        return results_stats.tornado_plot(pw_table, pw_labels, stat, variables, title = title), rev
+    return _dsa_statistic_grid(results_stats.dsa_statistic_table(pw_table, stat, variables)), rev
 
 TABLE_SECTION = 'table_optim_metamodel' # TODO: Improve this key
 _request_plot_marginal_optim = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
@@ -877,38 +879,24 @@ def _trigger_plot_marginal_optim(
     if varid is None or varid not in mm.variables:
         return 'variable missing'
 
-    # TODO: This needs replacing with a dedicated configuration one day.
-    if hasattr(proj.dsa_config, 'optim_config'):
-        raw_config = proj.dsa_config.optim_config
-    else:
-        raw_config = {}
+    var = mm.variables[varid]
+    optim.check_optim_bounds([var])
+    lower, upper = var.get_optim_bounds()
 
-    bounds_config = raw_config.get('bounds', {})
-    var_bounds = bounds_config.get(varid, {})
-
-    lower = var_bounds.get('lower', 0)
-    upper = var_bounds.get('upper', 10000)
-    res = var_bounds.get('intervals', 10)
-
-    if lower > upper:
-        temp = lower
-        lower = upper
-        upper = temp
-
-    res = int(res)
+    res = int(var.optim_plot_intervals)
     if res <= 0:
         res = 2
     if res > 20:
         res = 20
 
-    stat = run_config.get('statistic', 'net_present_value_discounted')
+    stat = mm.optim_config.statistic
 
     # TODO: Add progress
     plot_df = optim.evaluate_statistic_across_margin(
         mm, varid, stat, lower, upper, res
     )
 
-    fig = optim.statistic_across_margin_plot(plot_df, mm)
+    fig = optim_plots.statistic_across_margin_plot(plot_df, mm.variables[varid].name)
 
     result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig, request = request)
 
@@ -956,22 +944,15 @@ def _make_postopt_tables_sprake(
     if optdict is None:
         return 'missing'
 
-    if optdict['success']:
-        table_data = [
-            html.H4('Success'),
-            str(optdict['opt'])
-        ]
-    else:
-        opt = optdict['opt']
-        table_data = [
-            html.H4('Failure'),
-            f'Optimisation was not a success: {opt.message}' + \
-            '\n Try again with a different method, variables or bounds.' + \
-            str(opt),
-        ]
+    # A component, not a list: a list is saved as JSON, which would turn the components into text
+    table_data = html.Div(optim_feedback.create_optimisation_feedback(optdict))
 
+    # Saved against the table configuration, from which the results container reads it; the result
+    # provider needs its data-holding description, as do the other tables
+    component_provider = cast(FromDatabaseNewsegsComponentProvider, provider._component_provider)
+    table_component = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
     result_provider.upsert_result(
-        'table_postopt_metamodel', lproj.table_config.id, 
+        'table_postopt_metamodel', table_component,
         table_data, request=request
     )
 
@@ -1158,11 +1139,11 @@ def _psa_ceaf(psa_results, metamodel_ids, labels, available, statistic):
     """The cost-effectiveness acceptability frontier plot of the metamodels, discounted as the statistic"""
     discount = _psa_discount(statistic)
     ceac = psa.psa_ceac(
-        psa_results, metamodel_ids, stats.DEFAULT_BENEFIT_VALUES,
+        psa_results, metamodel_ids, results_stats.DEFAULT_BENEFIT_VALUES,
         cost_statistic = f'total_present_costs_{discount}',
         benefit_statistic = f'total_present_benefits_{discount}',
     )
-    return stats.psa_ceaf_plot(
+    return results_stats.psa_ceaf_plot(
         ceac,
         labels = {x: labels.get(x, x) for x in metamodel_ids},
         color_indexes = {x: available.index(x) for x in metamodel_ids},
@@ -1178,18 +1159,18 @@ def _get_psa_project_table(
 ):
     """Get the table (subindex 0) or plot (subindex 1) of a comparator view of a whole-project PSA.
 
-    The options are the view (`multiple` or `pairwise`), the statistic, the plot (see `stats.PSA_PROJECT_PLOTS`), the
+    The options are the view (`multiple` or `pairwise`), the statistic, the plot (see `results_stats.PSA_PROJECT_PLOTS`), the
     comparators of the multiple view, the comparator and reference of the pairwise view, and the variable of the
     marginal sensitivity plot.
     """
     view = table_options.get('view')
-    if view not in stats.PSA_PROJECT_PLOTS:
+    if view not in results_stats.PSA_PROJECT_PLOTS:
         return None, None
     subindex = int(table_options.get('subindex', 0))
     stat = table_options.get('statistic')
     plot = table_options.get('plot')
-    if plot not in stats.PSA_PROJECT_PLOTS[view]:
-        plot = next(iter(stats.PSA_PROJECT_PLOTS[view]))
+    if plot not in results_stats.PSA_PROJECT_PLOTS[view]:
+        plot = next(iter(results_stats.PSA_PROJECT_PLOTS[view]))
     variable = table_options.get('variable')
 
     lproj = project_provider.get_lightweight_project(active_project_id)
@@ -1211,34 +1192,34 @@ def _get_psa_project_table(
             summaries, _ = result_provider.get_result('postproc_psa_project_data', lproj.table_config, True)
             if summaries is None:
                 return None, None
-            otable = stats.psa_summary_comparison_table(
+            otable = results_stats.psa_summary_comparison_table(
                 {labels.get(x, x): summaries.xs(x, level = 'metamodel') for x in comparators
                  if x in summaries.index.get_level_values('metamodel')},
                 stat,
             )
             if otable.empty:
                 return html.Div('No results for the chosen configurations and statistic'), rev
-            return _psa_grid(otable.rename(columns = stats.PSA_SUMMARY_COLUMN_LABELS)), rev
+            return _psa_grid(otable.rename(columns = results_stats.PSA_SUMMARY_COLUMN_LABELS)), rev
 
         if stat not in psa_results.columns:
-            return stats._empty_psa_figure('The statistic is not in these PSA results - re-run the PSA'), rev
+            return results_stats._empty_psa_figure('The statistic is not in these PSA results - re-run the PSA'), rev
         match plot:
             case 'ceaf':
                 if len(comparators) < 2:
-                    return stats._empty_psa_figure('Choose at least two configurations to compare'), rev
+                    return results_stats._empty_psa_figure('Choose at least two configurations to compare'), rev
                 return _psa_ceaf(psa_results, comparators, labels, available, stat), rev
             case 'marginal':
                 if variable not in psa_results.columns:
-                    return stats._empty_psa_figure('Choose a variable drawn in the PSA'), rev
+                    return results_stats._empty_psa_figure('Choose a variable drawn in the PSA'), rev
                 # A configuration which does not vary the variable has no draws of it, and is left out of the plot
                 marginals = {
                     labels.get(x, x): psa.psa_marginal(psa_results.loc[psa_results['metamodel'] == x, :], variable, stat)
                     for x in comparators
                 }
-                return stats.psa_marginal_plot(marginals, variable, stat, color_indexes = color_indexes), rev
+                return results_stats.psa_marginal_plot(marginals, variable, stat, color_indexes = color_indexes), rev
             case _:
                 frames = {x: psa_results.loc[psa_results['metamodel'] == x, :] for x in comparators}
-                return stats.psa_distribution_plot(
+                return results_stats.psa_distribution_plot(
                     {labels.get(x, x): df.loc[~df['deterministic'].astype(bool), stat] for x, df in frames.items()},
                     stat,
                     deterministic = {
@@ -1270,9 +1251,9 @@ def _get_psa_project_table(
         sampled = pairwise.loc[~pairwise['deterministic'].astype(bool), statistics]
         summary['P(increase)'] = sampled.gt(0).mean(axis = 0).where(sampled.notna().any(axis = 0))
         otable = (
-            summary.loc[:, [x for x in stats.PSA_SUMMARY_COLUMNS if x in summary.columns] + ['P(increase)']]
+            summary.loc[:, [x for x in results_stats.PSA_SUMMARY_COLUMNS if x in summary.columns] + ['P(increase)']]
             .dropna(how = 'all', subset = ['Mean'])
-            .rename(columns = stats.PSA_SUMMARY_COLUMN_LABELS)
+            .rename(columns = results_stats.PSA_SUMMARY_COLUMN_LABELS)
             .rename(sensitivity.PSA_PAIRWISE_STATISTIC_LABELS)
             .rename_axis('Statistic')
             .reset_index()
@@ -1282,21 +1263,21 @@ def _get_psa_project_table(
     color_index = available.index(comparator)
     match plot:
         case 'plane':
-            return stats.psa_ce_plane_plot(
+            return results_stats.psa_ce_plane_plot(
                 pairwise, _psa_discount(stat), comparator_label, reference_label, color_index
             ), rev
         case 'ceaf':
             return _psa_ceaf(psa_results, [reference, comparator], labels, available, stat), rev
         case 'marginal':
             if variable not in pairwise.columns:
-                return stats._empty_psa_figure('Choose a variable drawn in the PSA'), rev
-            return stats.psa_marginal_plot(
+                return results_stats._empty_psa_figure('Choose a variable drawn in the PSA'), rev
+            return results_stats.psa_marginal_plot(
                 {versus: psa.psa_marginal(pairwise, variable, stat)}, variable, stat,
                 color_indexes = {versus: color_index},
             ), rev
         case _:
             det = pairwise.loc[pairwise['deterministic'].astype(bool), stat]
-            return stats.psa_distribution_plot(
+            return results_stats.psa_distribution_plot(
                 {versus: pairwise.loc[~pairwise['deterministic'].astype(bool), stat]},
                 stat,
                 deterministic = {versus: det.iloc[0]} if len(det) else None,

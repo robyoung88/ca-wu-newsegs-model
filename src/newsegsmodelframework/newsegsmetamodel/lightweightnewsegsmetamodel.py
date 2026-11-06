@@ -10,7 +10,7 @@ from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import Lightweig
 class LightweightNewsegsMetaModel(LightweightNewsegsComponent):
     """A description of a `NewsegsMetaModel` without the machinery to run it.
 
-    Holds the lightweight model, finance and variables, and the location, which is what is
+    Holds the lightweight model, finance, variables and optimisation settings, and the location, which is what is
     needed to display and edit a metamodel without constructing the full model.
     """
     name: str
@@ -19,3 +19,5 @@ class LightweightNewsegsMetaModel(LightweightNewsegsComponent):
     finance: LightweightNewsegsFinance 
     variables: TableModifyingObservableOrderedDict
     location: Location
+    optim_config: LightweightNewsegsComponent | None = None
+    """The optimisation settings; `None` if the metamodel was saved without them."""

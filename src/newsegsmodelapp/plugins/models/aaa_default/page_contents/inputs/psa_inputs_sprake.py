@@ -39,7 +39,7 @@ def _(
     lproj = provider.get_lightweight_project(proj_id)
     lmm = lproj.metamodels[lproj.focussed_metamodel_index]
     return generic_create_psa_input_container_contents(
-        lmm, provider.variable_provider
+        lmm, provider.variable_provider, lproj
     )
 
 @register_single_input_header_content_creator('psa', None, MODEL_TYPE)

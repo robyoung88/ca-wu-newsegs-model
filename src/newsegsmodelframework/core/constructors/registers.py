@@ -70,13 +70,24 @@ def get_subclasses_in_module(
     return odict
 
 def _import_modules(*names: str) -> list[ModuleType]:
-    """Import modules by name.
+    """Import modules by name, expanding each package into all of its submodules, recursively.
 
     The registries search the modules that define the classes, rather than the packages that
-    re-export them, so that the registries do not depend upon what the packages expose.
+    re-export them, so that the registries do not depend upon what the packages expose. Naming
+    a package means that modules later added to it are searched without needing to be listed.
     """
     import importlib
-    return [importlib.import_module(name) for name in names]
+    import pkgutil
+    modules = []
+    for name in names:
+        pymod = importlib.import_module(name)
+        if not hasattr(pymod, '__path__'):
+            modules.append(pymod)
+            continue
+        for modinfo in pkgutil.walk_packages(pymod.__path__, pymod.__name__ + '.'):
+            if not modinfo.ispkg:
+                modules.append(importlib.import_module(modinfo.name))
+    return modules
 
 _FW = 'newsegsmodelframework.'
 
@@ -131,27 +142,19 @@ def get_datawithrevision_register():
     Configuration data classes
     """
     from newsegsmodelframework.core import newsegscomponent
-    import newsegsmodelframework.newsegsvariable as newsegsvariable
     CONSTRUCTORS = {}
     for pymod in _import_modules(
-        _FW + 'core.newsegscomponent',
-        _FW + 'core.trackeddata',
-        _FW + 'core.generation.generators',
-        _FW + 'newsegsmodel.newsegsmodel',
-        _FW + 'newsegsmodel.sprakemodel',
-        _FW + 'newsegsfinance.newsegsfinance',
-        _FW + 'newsegsfinance.sprakefinance',
-        _FW + 'newsegsgrid.newsegsgrid',
-        _FW + 'newsegsgrid.sprakegrid',
-        _FW + 'newsegsgeneration.newsegsgeneration',
-        _FW + 'newsegsgeneration.sprakegeneration',
-        _FW + 'newsegscs.newsegscs',
-        _FW + 'newsegscs.sprakecs',
-        _FW + 'newsegsmetamodel.newsegsmetamodel',
-        _FW + 'newsegsproject.newsegsproject',
-        _FW + 'newsegssensitivity.dsa',
-        _FW + 'newsegssensitivity.psa',
-    ) + [newsegsvariable]:
+        _FW + 'core',
+        _FW + 'newsegsmodel',
+        _FW + 'newsegsfinance',
+        _FW + 'newsegsgrid',
+        _FW + 'newsegsgeneration',
+        _FW + 'newsegscs',
+        _FW + 'newsegsmetamodel',
+        _FW + 'newsegsproject',
+        _FW + 'newsegssensitivity',
+        _FW + 'newsegsvariable',
+    ):
         CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.DataWithRevision)
         )
@@ -168,15 +171,12 @@ def get_newsegscomponent_register():
     
     COMPONENT_CONSTRUCTORS = {}
     for pymod in _import_modules(
-        _FW + 'newsegsmodel.newsegsmodel',
-        _FW + 'newsegsmodel.sprakemodel',
-        _FW + 'newsegsfinance.newsegsfinance',
-        _FW + 'newsegsfinance.sprakefinance',
+        _FW + 'newsegsmodel',
+        _FW + 'newsegsfinance',
         _FW + 'core.newsegscomponent',
-        _FW + 'newsegssensitivity.dsa',
-        _FW + 'newsegssensitivity.psa',
-        _FW + 'newsegsmetamodel.newsegsmetamodel',
-        _FW + 'newsegsproject.newsegsproject',
+        _FW + 'newsegssensitivity',
+        _FW + 'newsegsmetamodel',
+        _FW + 'newsegsproject',
     ):
         COMPONENT_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegscomponent.NewsegsComponent)
@@ -199,12 +199,9 @@ def get_newsegsmodule_register():
 
     MODULE_CONSTRUCTORS = {}
     for pymod in _import_modules(
-        _FW + 'newsegsgeneration.newsegsgeneration',
-        _FW + 'newsegsgeneration.sprakegeneration',
-        _FW + 'newsegsgrid.newsegsgrid',
-        _FW + 'newsegsgrid.sprakegrid',
-        _FW + 'newsegscs.newsegscs',
-        _FW + 'newsegscs.sprakecs',
+        _FW + 'newsegsgeneration',
+        _FW + 'newsegsgrid',
+        _FW + 'newsegscs',
     ):
         MODULE_CONSTRUCTORS.update(
             get_subclasses_in_module(pymod, newsegsmodule.NewsegsModule)

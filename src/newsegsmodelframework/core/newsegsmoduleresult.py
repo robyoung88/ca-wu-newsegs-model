@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 import datetime
-from functools import lru_cache
 from typing import Sequence
 
 import numpy as np
@@ -112,16 +111,33 @@ class NewsegsModuleResult(metaclass = ABCMeta):
         Return the meter data as a pandas dataframe
 
         Caution - this implementation could become unweildy for large results
+
+        Cached on the result, so freed with it.
         """
-        return defer_meters_to_pandas(self)
+        return self._cached_frame('meters', defer_meters_to_pandas)
         
     def dsm_to_pandas(self) -> pd.DataFrame:
         """
         Return the dsm data as a pandas dataframe
 
         Caution - this implementation could become unweildy for large results
+
+        Cached on the result, so freed with it.
         """
-        return defer_dsm_to_pandas(self)
+        return self._cached_frame('dsm', defer_dsm_to_pandas)
+
+    def _cached_frame(self, name: str, convert) -> pd.DataFrame:
+        # A module-level cache keyed on the result kept the results of every run alive
+        cache = self.__dict__.setdefault('_frame_cache', {})
+        if name not in cache:
+            cache[name] = convert(self)
+        return cache[name]
+
+    def __getstate__(self) -> dict:
+        # The dataframes are derived from the arrays, so are not saved with the result
+        state = self.__dict__.copy()
+        state.pop('_frame_cache', None)
+        return state
 
     def __hash__(self):
         """The hash is dependent on the module uuid and run time."""
@@ -132,11 +148,10 @@ class NewsegsModuleResult(metaclass = ABCMeta):
             )
         )
 
-@lru_cache
 def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
     """Convert the meters of a result to a dataframe, with a column for each meter indexed by time.
 
-    Cached on the result.
+    Not cached: `NewsegsModuleResult.meters_to_pandas` caches it on the result.
 
     Args:
         res: The result.
@@ -155,11 +170,10 @@ def defer_meters_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
         columns = res.get_meter_names() # pyright: ignore[reportArgumentType]
     ) # type: ignore
 
-@lru_cache
 def defer_dsm_to_pandas(res: NewsegsModuleResult) -> pd.DataFrame:
     """Convert the DSM values of a result to a dataframe, with a column for each value indexed by time.
 
-    Cached on the result.
+    Not cached: `NewsegsModuleResult.dsm_to_pandas` caches it on the result.
 
     Args:
         res: The result.

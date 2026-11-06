@@ -7,7 +7,7 @@ import json
 from typing import Any, cast
 
 import dash
-from dash import ALL, Input, Output, State, dcc, html, ctx
+from dash import ALL, Input, Output, State, dcc, html
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 import numpy as np
@@ -18,6 +18,7 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
+from newsegsmodelframework.util import naming
 
 # -----------------------------------------------
 # Helper functions
@@ -182,7 +183,7 @@ def duplicate_project(
     rename_project(
         project_provider,
         new_proj.id,
-        new_proj.name + ' - Copy'
+        naming.copy_name(new_proj.name, project_provider.list_projects()['label'])
     )
     return new_proj.id
 
@@ -340,7 +341,7 @@ def create_project_selector():
                 [
                     dbc.Input(
                         id="input-project-name",
-                        placeholder="Project Name",
+                        placeholder="Project name",
                         type="text",
                         size="sm",
                     ),
@@ -366,7 +367,7 @@ def create_project_selector():
                 [
                     dbc.Input(
                         id="input-snapshot-name",
-                        placeholder="Snapshot Name",
+                        placeholder="Snapshot name",
                         type="text",
                         size="sm",
                     ),
@@ -390,7 +391,7 @@ def create_project_selector():
                 [
                     dbc.Select(
                         id="select-load-project",
-                        placeholder="Select existing project...",
+                        placeholder="Select a project",
                         size="sm",
                     ),
                     dbc.Button(
@@ -411,7 +412,7 @@ def create_project_selector():
                 [
                     dbc.Select(
                         id="select-load-snapshot",
-                        placeholder="Select snapshot...",
+                        placeholder="Select a snapshot",
                         size="sm",
                     ),
                     dbc.Button(
@@ -554,6 +555,29 @@ def create_project_selector():
 
 create_project_selector_block = create_project_selector
 
+_PROJECT_INPUT_IDS = {'select-load-project', 'input-project-name'}
+_SNAPSHOT_INPUT_IDS = {'select-load-snapshot', 'input-snapshot-name'}
+
+def ui_state_triggers(triggers: list[callback_utils.Trigger]) -> set[str]:
+    """The triggers of the project selector's state callback to act on.
+
+    Every trigger is considered, as several may fire together, such as the active project and the app state on a
+    change of page. A change of the active project resets the project and snapshot selectors and name inputs, and a
+    change of the app state the project ones, so changes of those inputs in the same call are ignored.
+
+    Args:
+        triggers: The triggers of the callback.
+
+    Returns:
+        The ids of the triggers to act on.
+    """
+    ids = {x.id for x in triggers if isinstance(x.id, str)}
+    if 'active-project-id' in ids:
+        ids -= _SNAPSHOT_INPUT_IDS
+    if ids & {'active-project-id', 'app-state'}:
+        ids -= _PROJECT_INPUT_IDS
+    return ids
+
 def add_project_selector_callbacks(app: NewsegsDash):
     """Bind the callbacks of the project selector.
 
@@ -667,8 +691,8 @@ def add_project_selector_callbacks(app: NewsegsDash):
 
         rval = callback_utils.create_noupdate_return()
 
-        triggered_id = ctx.triggered_id
-        if isinstance(triggered_id, str) and triggered_id == 'active-project-id':
+        triggered = ui_state_triggers(callback_utils.get_triggers())
+        if 'active-project-id' in triggered:
             rval['header_project_name'] = app.project_provider.get_component_metadata(active_project_id, 'label')['label']
 
             # Update snapshot selector
@@ -684,7 +708,7 @@ def add_project_selector_callbacks(app: NewsegsDash):
             _disable_snapshot_create_button(True, rval)
             _disable_snapshot_rename_button(True, rval)
             
-        if isinstance(triggered_id, str) and triggered_id in set(('active-project-id', 'app-state')):
+        if triggered & {'active-project-id', 'app-state'}:
             # Update project selector
             app_state = json.loads(app_state) if app_state else {}
             model_type = app_state.get('model_type', 'default')
@@ -699,27 +723,22 @@ def add_project_selector_callbacks(app: NewsegsDash):
             rval['input_project_name']['value'] = None
             _disable_project_rename_button(True, rval)
 
-        if isinstance(triggered_id, str):
-            match triggered_id:
-                case 'select-load-project':
-                    project_nominated = select_project is not None
-                    _disable_project_load_buttons(not(project_nominated), rval)
+        if 'select-load-project' in triggered:
+            project_nominated = select_project is not None
+            _disable_project_load_buttons(not(project_nominated), rval)
 
-                case 'select-load-snapshot':
-                    snapshot_nominated = select_snapshot is not None
-                    _disable_snapshot_load_buttons(not(snapshot_nominated), rval)
-                    new_snapshot_name = input_snapshot_name is not None and input_snapshot_name != ''
-                    _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
+        if 'input-project-name' in triggered:
+            new_project_name = input_project_name
+            _disable_project_rename_button((new_project_name is None or not new_project_name), rval)
 
-                case 'input-project-name':
-                    new_project_name = input_project_name
-                    _disable_project_rename_button((new_project_name is None or not new_project_name), rval)
-
-                case 'input-snapshot-name':
-                    new_snapshot_name = input_snapshot_name
-                    _disable_snapshot_create_button((new_snapshot_name is None or not new_snapshot_name), rval)
-                    snapshot_nominated = select_snapshot is not None
-                    _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
+        if triggered & {'select-load-snapshot', 'input-snapshot-name'}:
+            snapshot_nominated = select_snapshot is not None
+            new_snapshot_name = input_snapshot_name is not None and input_snapshot_name != ''
+            if 'select-load-snapshot' in triggered:
+                _disable_snapshot_load_buttons(not(snapshot_nominated), rval)
+            if 'input-snapshot-name' in triggered:
+                _disable_snapshot_create_button(not new_snapshot_name, rval)
+            _disable_snapshot_rename_button(not(snapshot_nominated and new_snapshot_name), rval)
 
         return rval
 
@@ -754,11 +773,12 @@ def add_project_selector_callbacks(app: NewsegsDash):
         active_project_id,
         **kwargs 
     ):
-        trig_val = callback_utils.get_triggered_value()
-        if not trig_val:
+        # The buttons fire together, with no clicks, when they are drawn: act on the one clicked
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
 
-        triggered = cast(dict, ctx.triggered_id)
+        triggered = cast(dict, clicked.id)
 
         app_state = kwargs.get('app_state')
         app_state = json.loads(app_state) if app_state else {}

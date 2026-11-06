@@ -16,6 +16,7 @@ x-app-environment: &app-environment
   DYNACONF_DB_PATH: /var/lib/sqlite_data/newsegs_db.db
   DYNACONF_RESULTS_STORE: /mnt/network_share/results_store
   DYNACONF_DB_BACKUP_PATH: /mnt/network_share/db_backups
+  DYNACONF_ENV_CACHE_PATH: /var/lib/sqlite_data/env_cache
 
 x-app-volumes: &app-volumes
   # 1. The Database Mount (local persistent block storage)

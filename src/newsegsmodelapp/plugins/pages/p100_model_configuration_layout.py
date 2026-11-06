@@ -21,7 +21,7 @@ from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import map
 from newsegsmodelapp.components import navigation
-from newsegsmodelapp.components.feedback import indicative_net_energy
+from newsegsmodelapp.components.feedback import environmental_conditions, indicative_net_energy
 
 from newsegsmodelapp.components.layouts import result_group_containers, results_header
 from newsegsmodelapp.components import configuration_selector
@@ -46,6 +46,11 @@ class ModelConfigurationLayoutConfiguration(LayoutConfiguration):
 
     layout_top_feedback: Callable[[], Any] = indicative_net_energy.create_indicative_net_energy_card
     width_top_feedback = 12
+
+    layout_environment_feedback: Callable[[], Any] | None = None
+    """The feedback on the environmental conditions of the site (see `environmental_conditions`).
+    None, the default, for model types without it; the button fetching the environmental data
+    is shown under the map only when it is set."""
 
     model_input_sections: Sequence[InputCardConfig] = field(default_factory=list)
     finance_input_sections: Sequence[InputCardConfig] = field(default_factory=list)
@@ -87,7 +92,30 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
                 
         )
 
-    site_details = [
+    # Model types without environmental feedback have its components hidden, for its callbacks
+    environment_feedback = [environmental_conditions.create_placeholder_layout()]
+    environment_data_button = []
+    if config.layout_environment_feedback is not None:
+        environment_feedback = [
+            dbc.Row(
+                dbc.Col(
+                    config.layout_environment_feedback(),
+                    width = 12
+                ),
+                class_name = 'mb-2',
+            )
+        ]
+        environment_data_button = [
+            dbc.Row(
+                dbc.Col(
+                    environmental_conditions.create_environment_data_button(),
+                    width = 'auto',
+                ),
+                justify = 'end',
+            )
+        ]
+
+    site_details = environment_feedback + [
         dbc.Row(
             dbc.Col(
                 config.layout_top_feedback(),
@@ -142,7 +170,7 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
         dbc.Row(
             config.layout_map()
         )
-    ] + site_details
+    ] + environment_data_button + site_details
     
 
     b1_contents = [

@@ -34,6 +34,7 @@ from newsegsmodelframework.core.trackeddata import RevisionNotifierMixin
 from newsegsmodelframework.newsegsfinance.lightweightnewsegsfinance import LightweightNewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.lightweightnewsegsmetamodel import LightweightNewsegsMetaModel
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.optim_component import OptimComponent
 from newsegsmodelframework.newsegsmodel.lightweightnewsegsmodel import LightweightNewsegsModel
 from newsegsmodelframework.newsegsproject.lightweightnewsegsproject import LightweightNewsegsProject
 from newsegsmodelframework.newsegsproject.newsegsproject import NewsegsProject
@@ -499,7 +500,8 @@ class FromDatabaseNewsegsComponentProvider(
                 sa.and_(
                     tbls.metamodels.c.id.not_in(ignore_ids),
                     (
-                        (tbls.metamodels.c.table_config_id == component_id)
+                        (tbls.metamodels.c.table_config_id == component_id) |
+                        (tbls.metamodels.c.optim_config_id == component_id)
                     )
                 )
             )
@@ -1053,6 +1055,7 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             'label',
 
             'table_config_id',
+            'optim_config_id',
             'em_config_id',
             'fm_config_id',
             'location',
@@ -1104,6 +1107,12 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             obj._model_id = row.em_config_id
             obj._finance_id = row.fm_config_id
             obj._component_ids['table_config'] = row.table_config_id
+            if row.optim_config_id is not None:
+                obj._component_ids['optim_config'] = row.optim_config_id
+            else:
+                # Saved before metamodels held optimisation settings: the default is used,
+                # and stored with the next upsert of the metamodel
+                obj._component_ids.pop('optim_config', None)
 
             var_stmt = self._metamodel_variable_select(obj.id)
             with read_transaction(self._get_engine()) as conn:
@@ -1168,6 +1177,11 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             )
         }
         metadata.update(child_components)
+        optim_config_id = metadata.pop('optim_config_id')
+        metadata['optim_config'] = (
+            self._component_provider.get_lightweight_component(optim_config_id)
+            if optim_config_id is not None else None
+        )
         em_child_ids = [
             metadata.pop(x) for x in (
                 'em_config_id',
@@ -1239,6 +1253,34 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
             RevisionNotifierMixin._set_notification_state(prevstate)
 
         return rval
+
+    def get_optim_config(self, metamodel_id: str, project_id: Optional[str] = None) -> OptimComponent:
+        """Get the optimisation settings of a metamodel, without constructing the metamodel.
+
+        A metamodel saved before it held optimisation settings is given the default
+        `OptimComponent`, which is stored and referenced from the metamodel.
+
+        Args:
+            metamodel_id: Id of the metamodel.
+            project_id: Id of the project of the metamodel, whose cache is invalidated if the default is stored.
+
+        Returns:
+            The optimisation settings.
+        """
+        with read_transaction(self._get_engine()) as conn:
+            optim_config_id = conn.execute(
+                sa.select(self._table.c.optim_config_id).where(self._table.c.id == metamodel_id)
+            ).scalar()
+        if optim_config_id is not None:
+            return cast(OptimComponent, self._component_provider.get_component(optim_config_id))
+
+        optim_config = OptimComponent()
+        self._component_provider.upsert_component(optim_config)
+        self.set_component_metadata(
+            metamodel_id, 'optim_config_id', optim_config.id,
+            increment_revision = False, project_id = project_id,
+        )
+        return optim_config
 
     def get_lightweight_metamodel(
         self, metamodel_id: str | SequenceNotStr[str]
@@ -1476,7 +1518,8 @@ class FromDatabaseNewsegsMetamodelProvider(FromDatabaseNewsegsComponentProvider)
 
         get_child_component_id_stmt = (
             sa.select(
-                self._table.c.table_config_id
+                self._table.c.table_config_id,
+                self._table.c.optim_config_id,
             )
             .where(self._table.c.id == component_id)
         )
@@ -2291,11 +2334,16 @@ class FromDatabaseNewsegsProjectProvider(
         with read_transaction(self._get_engine(writer=True)) as conn:
             conn.execute(stmt)
 
-USE_DATAVERSION = True
-"""Enable use of the database dataversion pragma to determine data staleness.
+    def invalidate_cache_for_component(self, component_id):
+        """Remove projects from the cache; this provider keeps none, so does nothing.
 
-Has been known to allow for the return of stale results.
-"""
+        Lets callers invalidate whichever provider they hold; `CachedFromDatabaseNewsegsProjectProvider` overrides it.
+
+        Args:
+            component_id: Id(s) of the component(s).
+        """
+        return
+
 
 class CachedFromDatabaseNewsegsProjectProvider(
     FromDatabaseNewsegsProjectProvider
@@ -2303,8 +2351,11 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
     """A `FromDatabaseNewsegsProjectProvider` which caches the projects it loads.
 
-    A cached project is returned if the database has not been written to since (SQLite `data_version`) or if the project's modification key is unchanged. Otherwise it is loaded
-    again. A lock prevents several threads loading the same project at once.
+    A cached project is returned if the project's modification key (`modified_order`, changed by every update of its
+    row) is unchanged. Otherwise it is loaded again. A lock prevents several threads loading the same project at once.
+
+    SQLite's `data_version` is not used: it is a count kept by each connection, so values from the pooled connections
+    can't be compared, and a match could return a stale project.
     """
     def _create_variable_provider(self) -> VariableProviderInterface:
         return CachedFromDatabaseVariableProvider(self._get_engine)
@@ -2313,11 +2364,9 @@ class CachedFromDatabaseNewsegsProjectProvider(
         super().__init__(get_engine)
         self._project_cache = LRUCache(maxsize = 5)
         self._project_last_accessed = {}
-        self._project_dataversions = LRUCache(maxsize = 30)
 
         self._lightweight_project_cache = LRUCache(maxsize = 10)
         self._lightweight_project_last_accessed = {}
-        self._lightweight_project_dataversions = LRUCache(maxsize = 30)
         
         # Create a lock to prevent a cache stampede at initial load
         self._lock = threading.Lock()
@@ -2337,21 +2386,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
     def get_project(self, project_id: str) -> NewsegsProject:
         logger.debug('Finding Full Project: %s', project_id)
         with self._lock:
-            if USE_DATAVERSION:
-                # Check if any writes to db have occurred; if not and project in cache, return immediately
-                existing_dv = self._project_dataversions.get(project_id)
-                with read_transaction(self._get_engine()) as conn:
-                    current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
-                
-                if existing_dv is not None and current_dv == existing_dv:
-                    proj = self._project_cache.get(project_id)
-                    if proj is not None:
-                        logger.debug(
-                            'Returning Full Project %s from cache due to unmodified dataversion - revision is %d, table revision is %d',
-                            project_id, proj.revision, proj.table_config.revision
-                        )
-                        return proj
-
             # Check the modification status of the project; if equal and project in cache, return from cache.
             new_modkey = self._get_project_modification_key(project_id)
             
@@ -2369,13 +2403,13 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
             # Fallback - get project from db, insert into cache.
             proj = super().get_project(project_id)
-            logger.debug(
-                'Adding Full Project %s to cache after database load, state is: %s',
-                project_id, get_project_critical_state(proj)
-            )
+            # The state is only built when it is logged, so that building it can't stop a project loading
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    'Adding Full Project %s to cache after database load, state is: %s',
+                    project_id, get_project_critical_state(proj)
+                )
             self._project_last_accessed[project_id] = new_modkey
-            if USE_DATAVERSION:
-                self._project_dataversions[project_id] = current_dv
             self._project_cache[project_id] = proj
         
         return proj
@@ -2389,19 +2423,6 @@ class CachedFromDatabaseNewsegsProjectProvider(
             is_sequence = True
 
         with self._lock:
-
-            if USE_DATAVERSION:
-                existing_dvs = [self._lightweight_project_dataversions.get(x) for x in project_id]
-                with read_transaction(self._get_engine()) as conn:
-                    current_dv = conn.execute(sa.text('PRAGMA data_version')).scalar()
-
-                if all(x is not None and x == current_dv for x in existing_dvs):
-                    rlist = [self._lightweight_project_cache.get(x) for x in project_id]
-                    if all(x is not None for x in rlist):
-                        if is_sequence:
-                            return rlist
-                        return rlist[0]
-
             new_modkeys = [self._get_project_modification_key(x) for x in project_id]
             
             rlist = []
@@ -2430,22 +2451,17 @@ class CachedFromDatabaseNewsegsProjectProvider(
                 components_from_db = super().get_lightweight_component(get_list)
                 jdx = 0
                 for idx, id_ in enumerate(rlist):
-                    if USE_DATAVERSION:
-                        self._lightweight_project_dataversions[project_id[idx]] = current_dv
                     if id_ is None:
                         cmpx = components_from_db[jdx]
                         rlist[idx] = cmpx
                         self._lightweight_project_cache[cmpx.id] = cmpx
                         self._lightweight_project_last_accessed[cmpx.id] = new_modkeys[idx]
-                        logger.debug(
-                            'Adding Lightweight Project ID = %s; to cache after database load, state:\n%s',
-                            cmpx.id, get_project_critical_state(cmpx)
-                        )
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logger.debug(
+                                'Adding Lightweight Project ID = %s; to cache after database load, state:\n%s',
+                                cmpx.id, get_project_critical_state(cmpx)
+                            )
                         jdx += 1
-            else:
-                if USE_DATAVERSION:
-                    for pid in project_id:
-                        self._lightweight_project_dataversions[pid] = current_dv
 
         if is_sequence:
             return rlist
@@ -2468,6 +2484,7 @@ class CachedFromDatabaseNewsegsProjectProvider(
 
         return olist
 
+    @override
     def invalidate_cache_for_component(self, component_id):
         """Remove projects from the cache.
 
@@ -2536,6 +2553,11 @@ def get_project_critical_state(project):
         mm_dict = {
             f'metamodel_{idx}': get_component_critical_state(mm),
             f'metamodel_{idx}.table_config': get_component_critical_state(mm.table_config),
+            # A metamodel saved before it held optimisation settings has none until its next save (as left by
+            # migration 9eeaede183f3, and in snapshots taken before it)
+            f'metamodel_{idx}.optim_config': (
+                get_component_critical_state(mm.optim_config) if mm.optim_config is not None else None
+            ),
             f'model_{idx}': get_component_critical_state(mdl),
             f'model_{idx}.table_config': get_component_critical_state(mdl.table_config),
             f'model_{idx}.grid': get_component_critical_state(mdl.grid),

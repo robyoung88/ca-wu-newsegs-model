@@ -1,79 +1,373 @@
-.page-top .dash-input-container{
-    display: inline-flex;
-    border-style: none;
-    background: transparent;
-    min-width: 400px;
-    width: auto;
-    font-size: 1.3rem;
+/* The stylesheet of the NewSEGS app.
+   BUILT by scripts/build_css.py from the colours of src/newsegsmodelapp/components/colours.py and the partials in
+   src/styles: edit those and rebuild, not this file. */
+
+/* The colours of components/colours.py */
+:root {
+    --ns-bg: #F3F5F8;
+    --ns-surface: #FFFFFF;
+    --ns-text: #212529;
+    --ns-muted: #6C757D;
+    --ns-brand: #432461;
+    --ns-brand-mid: #6A4C82;
+    --ns-brand-soft: #D9D2E0;
+    --ns-brand-subtle: #EFEBF3;
+    --ns-status-ok: #82FD45;
+    --ns-status-warning: #F3B248;
+    --ns-status-error: #E60233;
+    --ns-config-1: #E64550;
+    --ns-config-2: #034818;
+    --ns-config-3: #C58B03;
+    --ns-config-4: #01857F;
+    --ns-config-5: #762D43;
+    --ns-config-6: #B0501F;
+    --ns-config-7: #61A076;
+    --ns-config-8: #AAB167;
+    --ns-brand-rgb: 67, 36, 97;
+    --ns-brand-mid-rgb: 106, 76, 130;
 }
 
-.page-top .accordion-button{
-    padding: 10px;
+.config-colour-1 { color: var(--ns-config-1) !important; }
+.config-colour-2 { color: var(--ns-config-2) !important; }
+.config-colour-3 { color: var(--ns-config-3) !important; }
+.config-colour-4 { color: var(--ns-config-4) !important; }
+.config-colour-5 { color: var(--ns-config-5) !important; }
+.config-colour-6 { color: var(--ns-config-6) !important; }
+.config-colour-7 { color: var(--ns-config-7) !important; }
+.config-colour-8 { color: var(--ns-config-8) !important; }
+
+/* --- 00-bootstrap-theme.css --- */
+
+/* ==========================================================================
+   Bootstrap theme
+   Bootstrap 5.3 in the colours of the scheme: the off-white page, ClwydAlyn purple as `primary` and in borders.
+   ========================================================================== */
+
+:root {
+    --bs-primary: var(--ns-brand);
+    --bs-primary-rgb: var(--ns-brand-rgb);
+    --bs-primary-text-emphasis: var(--ns-brand);
+    --bs-primary-bg-subtle: var(--ns-brand-subtle);
+    --bs-primary-border-subtle: var(--ns-brand-soft);
+    --bs-link-color: var(--ns-brand);
+    --bs-link-color-rgb: var(--ns-brand-rgb);
+    --bs-link-hover-color: var(--ns-brand-mid);
+    --bs-link-hover-color-rgb: var(--ns-brand-mid-rgb);
+    --bs-border-color: var(--ns-brand-soft);
+    --bs-focus-ring-color: rgba(var(--ns-brand-rgb), 0.25);
+}
+
+body {
+    background-color: var(--ns-bg);
+}
+
+/* Bootstrap compiles the colours of these components, rather than taking them from --bs-primary */
+.btn-primary {
+    --bs-btn-bg: var(--ns-brand);
+    --bs-btn-border-color: var(--ns-brand);
+    --bs-btn-hover-bg: var(--ns-brand-mid);
+    --bs-btn-hover-border-color: var(--ns-brand-mid);
+    --bs-btn-active-bg: var(--ns-brand-mid);
+    --bs-btn-active-border-color: var(--ns-brand-mid);
+    --bs-btn-disabled-bg: var(--ns-brand);
+    --bs-btn-disabled-border-color: var(--ns-brand);
+    --bs-btn-focus-shadow-rgb: var(--ns-brand-rgb);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--ns-brand);
+    --bs-btn-border-color: var(--ns-brand);
+    --bs-btn-hover-bg: var(--ns-brand);
+    --bs-btn-hover-border-color: var(--ns-brand);
+    --bs-btn-active-bg: var(--ns-brand);
+    --bs-btn-active-border-color: var(--ns-brand);
+    --bs-btn-disabled-color: var(--ns-brand);
+    --bs-btn-disabled-border-color: var(--ns-brand);
+    --bs-btn-focus-shadow-rgb: var(--ns-brand-rgb);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+    border-color: var(--ns-brand-mid);
+    box-shadow: 0 0 0 0.25rem rgba(var(--ns-brand-rgb), 0.25);
+}
+
+.form-check-input:checked {
+    background-color: var(--ns-brand);
+    border-color: var(--ns-brand);
+}
+
+.progress,
+.progress-stacked {
+    --bs-progress-bar-bg: var(--ns-brand);
+}
+
+/* --- 10-layout.css --- */
+
+/* ==========================================================================
+   Layout
+   The four panes (components/layouts): stacked on narrow screens, side by side from 1200px.
+   ========================================================================== */
+
+/* Stacked: header A, content A, header B, content B */
+.dash-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.header-a1 { order: 1; }
+.header-b1 { order: 3; }
+.content-a2 { order: 2; }
+.content-b2 { order: 4; }
+
+/* Side by side (>= 1200px): two columns, each with its header above content that scrolls on its own */
+@media (min-width: 1200px) {
+    .dash-container {
+        display: grid;
+        grid-template-columns: 50% 1fr;
+        grid-template-rows: auto 1fr;
+        height: 100vh;
+        overflow: hidden; /* Only the panes scroll, not the page */
+    }
+
+    .header-a1 {
+        grid-column: 1;
+        grid-row: 1;
+        z-index: 2;
+    }
+
+    .content-a2 {
+        grid-column: 1;
+        grid-row: 2;
+        overflow-y: auto;
+        border-right: 1px solid var(--bs-border-color);
+    }
+
+    .header-b1 {
+        grid-column: 2;
+        grid-row: 1;
+        z-index: 2;
+    }
+
+    .content-b2 {
+        grid-column: 2;
+        grid-row: 2;
+        overflow-y: auto;
+    }
+}
+
+/* The header is a flex item, so make its Bootstrap row span the header */
+.header-a1 > .row {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+.header-a1 .page-top {
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: none;
+    width: auto;
+}
+
+/* A row of buttons which wrap, each the full width of the row when stacked, and their own width with the last at the
+   right once the row is wide enough */
+.auto-wrap-row {
+    container-type: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    width: 100%;
+}
+
+.auto-wrap-item {
+    display: flex;
+    flex: 1 1 calc(10% - 0.25rem);
+    justify-content: center;
+    min-width: max-content;
+}
+
+.auto-wrap-item .action-button {
+    width: 100%;
+}
+
+@container (min-width: 32rem) {
+    .auto-wrap-item {
+        flex: 0 0 auto;
+    }
+
+    .auto-wrap-item:last-child {
+        margin-left: auto;
+    }
+
+    .auto-wrap-item .action-button {
+        width: auto;
+    }
+}
+
+/* --- 20-navigation.css --- */
+
+/* ==========================================================================
+   Navigation
+   The navigation bar (components/navigation.py): a toggle button and a collapsible drawer of navigation buttons. The
+   drawer opens as a column while the panes are stacked, and as a row once they sit side by side (the breakpoint of the
+   layout). It opens to fit all of its buttons: --nav-button-count is set on the drawer by
+   create_navigation_component.
+   ========================================================================== */
+
+div.newsegs-navbar {
+    --nav-drawer-duration: 0.3s;
+    --nav-button-width: 58px;   /* .newsegs-nav-button width plus horizontal margins */
+    --nav-button-height: 42px;  /* button height plus vertical margins */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 10px;
 }
 
 .newsegs-nav-button {
     width: 48px;
-    margin: 2px 5px 2px 5px;
+    margin: 2px 5px;
 }
 
 .newsegs-options-button {
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    margin: 2px 5px 2px 5px;
+    margin: 2px 5px;
 }
 
-.newsegs-navbar-vertical .btn-block {
-    display: inline-block;
+.newsegs-nav-drawer {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    /* Hidden once collapsed, so the buttons cannot be reached with the keyboard */
+    visibility: hidden;
+    transition:
+        max-height var(--nav-drawer-duration) ease,
+        max-width var(--nav-drawer-duration) ease,
+        opacity var(--nav-drawer-duration) ease,
+        visibility 0s linear var(--nav-drawer-duration);
 }
 
-.newsegs-navbar-vertical {
-    display: inline;
-    border-color: #ccc;
-    border-radius: 10px;
-    border-style: solid;
-    border-width: 1px;
-    margin-top: 4px;
+div.newsegs-navbar.expanded .newsegs-nav-drawer {
+    max-height: calc(var(--nav-button-count, 6) * var(--nav-button-height));
+    opacity: 1;
+    visibility: visible;
+    transition:
+        max-height var(--nav-drawer-duration) ease,
+        max-width var(--nav-drawer-duration) ease,
+        opacity var(--nav-drawer-duration) ease,
+        visibility 0s;
 }
 
-/* Collapse behavior: shrink the navbar column (do not hide it) so the
-   remaining columns expand to consume whitespace. Add/remove `.collapsed`
-   on the `dbc.Col` element to toggle. */
-.newsegs-navbar-vertical{
-    transition: flex-basis .18s ease, width .18s ease, padding .18s ease;
-    min-width: 0; /* allow the column to shrink without forcing overflow */
+div.newsegs-navbar.expanded .newsegs-nav-toggle {
+    filter: brightness(85%);
 }
 
-/* When collapsed keep a compact visible navbar instead of fully hiding. */
-.newsegs-navbar-vertical.collapsed{
-    flex: 0 0 64px !important; /* compact width */
-    width: 64px !important;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
-    margin: 0 !important;
-    overflow: hidden !important;
+@media (min-width: 1200px) {
+    div.newsegs-navbar {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .newsegs-nav-drawer {
+        flex-direction: row;
+        max-height: none;
+        max-width: 0;
+    }
+
+    div.newsegs-navbar.expanded .newsegs-nav-drawer {
+        max-height: none;
+        max-width: calc(var(--nav-button-count, 6) * var(--nav-button-width));
+    }
 }
 
-/* Let the content column expand when the navbar is compacted. */
-.newsegs-navbar-vertical.collapsed + .col,
-.newsegs-navbar-vertical.collapsed + [class*="col-"]{
-    flex: 1 1 0% !important;
-    max-width: 100% !important;
+@media (prefers-reduced-motion: reduce) {
+    div.newsegs-navbar {
+        --nav-drawer-duration: 0s;
+    }
 }
 
-/* Ensure normal adjacent columns can flex when navbar is not collapsed. */
-.newsegs-navbar-vertical + .col,
-.newsegs-navbar-vertical + [class*="col-"]{
-    flex: 1 1 0%;
+/* --- 30-headers.css --- */
+
+/* ==========================================================================
+   Headers
+   The project selector (components/project_selector.py), the headers of results (components/layouts/results_header.py)
+   and their feedback strip.
+   ========================================================================== */
+
+.newsegs-project-selector .action-button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
 }
 
-/* Input containers */
+.newsegs-project-selector .toggle-controls {
+    align-self: end;
+}
+
+.newsegs-project-selector .header {
+    width: 100%;
+}
+
+.drawer-header {
+    background: var(--ns-surface);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.drawer-title {
+    margin-top: 8px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Full-width strip giving feedback: process staleness or progress */
+.feedback-strip {
+    display: flex;
+    width: 100%;
+    height: 8px;
+}
+
+/* Staleness indicators (components/staleness.py) */
+.staleness-indicator-ok {
+    background-color: var(--ns-status-ok);
+}
+
+.staleness-indicator-warning {
+    background-color: var(--ns-status-warning);
+}
+
+.staleness-indicator-error {
+    background-color: var(--ns-status-error);
+}
+
+/* --- 40-inputs.css --- */
+
+/* ==========================================================================
+   Inputs
+   The containers and cards of inputs (components/input_components.py), and how the configurations share an input.
+   ========================================================================== */
+
 .input-container {
     content-visibility: auto;
+    /* content-visibility clips painting to the container; let the focus glow of an input at its edge (Bootstrap's
+       0.25rem ring) extend beyond it */
+    overflow-clip-margin: 0.5rem;
 }
 
-
-/* Input fields */
 input.dynamic-step-field {
     float: right;
     width: 100px !important;
@@ -89,89 +383,264 @@ div.numeric-card-input details {
 }
 
 div.numeric-card-input details summary {
-    color: #cccccc;    
+    color: var(--ns-brand-soft);
 }
 
+/* How the configurations share an input: a link icon, or each group's configurations and value */
+div.variable-sharing-summary {
+    font-size: 0.8rem;
+    color: var(--ns-muted);
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+div.variable-sharing-summary .variable-sharing-group.focussed {
+    color: var(--ns-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+
+/* The number of inputs of a card whose configurations differ */
+span.input-card-label:not(:empty) {
+    margin-left: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    vertical-align: middle;
+    color: var(--ns-brand);
+    background-color: var(--ns-brand-subtle);
+}
+
+/* Setting the default flashes the button, then fades back */
 button.btn.set-default {
     transition: background-color 3.0s ease, color 3.0s ease;
 }
 
 button.btn.set-default:active {
-    background-color: #888888 !important;
-    color: #ddd !important;
-    border-color: #ddd !important;
+    background-color: var(--ns-brand-mid) !important;
+    color: var(--ns-surface) !important;
+    border-color: var(--ns-brand-mid) !important;
     transition: none;
 }
 
-/* Results header */
+/* --- 50-group-editor.css --- */
 
-.results-title-block {
-    flex: 0 1 auto;
-    float: 'left';
-    width: 320px;
-}
+/* ==========================================================================
+   Group editor
+   The editor of how the configurations share an input (components/group_editor.py, assets/group_editor.js): a row
+   for each group of configurations with the same value, with the group's configuration icons.
+   ========================================================================== */
 
-.configuration-selector-hdrcontainer {
-    flex: 1 1 auto;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    padding: 10px;
-    width: auto;
-}
-
-.annual-horizon-toggle-hdrcontainer {
-    flex: 0 1 auto;
-    /* padding-left: 10px; */
-    /* padding-right: 22px; */
-    display: inline-flex;
-    justify-content: flex-end;
-    align-items: center;
-    width: 300px;
-}
-
-.configuration-selector-row-button-container {
-    float: right;
-    padding: 0px;
-}
-
-.configuration-selector-row-name-input {
-    display: inline;
-    border: none;
-    outline: none;
-    padding: 5px 0;
-    height: auto;
-    line-height: 1.5;
-    background: transparent;
-}
-
-.upload-button {
-    display: inline-block;
-}
-
-div:has(> .upload-button) {
-    display: inline-block;
-}
-
-.optim-configuration-summary {
-    width: 100%;
+/* Not inline-flex, as the card's reset and default details are: the editor takes the card's width, below the summary */
+div.numeric-card-input details.group-editor-details {
     display: block;
+    width: 100%;
 }
 
+/* Open, the editor shows the groups, so the summary line gives way to a label which closes it */
+details.group-editor-details > summary .group-editor-close-label,
+details.group-editor-details[open] > summary .variable-sharing-summary {
+    display: none;
+}
+
+/* Beside the marker of the summary, not below it */
+details.group-editor-details > summary div.variable-sharing-summary {
+    display: inline;
+}
+
+details.group-editor-details[open] > summary .group-editor-close-label {
+    display: inline;
+    font-size: 0.8rem;
+    color: var(--ns-muted);
+}
+
+div.group-editor {
+    margin: 0.25rem 0 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* A row's icons and actions wrap below its value, together, only when they don't fit beside it. They end at the
+   right, and the actions have a fixed width, so the icons line up in every row. */
+div.group-editor-head,
+div.group-editor-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    padding: 0.15rem 0;
+}
+
+div.group-editor-head {
+    color: var(--ns-muted);
+    font-size: 0.75rem;
+}
+
+div.group-editor-head > span:first-child,
+div.group-editor-value {
+    flex: 1 1 7rem;
+    min-width: 7rem;
+}
+
+/* Above the icons, which end beside the actions */
+div.group-editor-head > span:last-child {
+    margin-right: calc(4rem + 0.5rem);
+}
+
+input.group-editor-value-input {
+    max-width: 8rem;
+}
+
+div.group-editor-row.pending {
+    opacity: 0.6;
+}
+
+div.group-editor-side {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+div.group-editor-icons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.15rem;
+}
+
+div.group-editor-actions {
+    display: flex;
+    flex: 0 0 4rem;
+    gap: 0.25rem;
+    justify-content: flex-end;
+}
+
+button.group-editor-icon,
+button.group-editor-insert,
+button.group-editor-all {
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    background: none;
+    padding: 0.05rem 0.3rem;
+    line-height: 1.2;
+}
+
+/* Positioned for the underline of the focussed configuration */
+button.group-editor-icon {
+    position: relative;
+}
+
+button.group-editor-icon:hover,
+button.group-editor-icon:focus-visible {
+    border-color: var(--ns-brand-mid);
+}
+
+/* The focussed configuration: underlined, as its group is in the sharing summary, and drawn to look like that
+   underline (1px, about 3px below the icon). A bar under the button, centred on the icon by the button's even padding,
+   so it neither moves the icon nor changes the height of the row. */
+button.group-editor-icon.focussed::after {
+    content: '';
+    position: absolute;
+    left: 0.3rem;
+    right: 0.3rem;
+    bottom: -2.25px;
+    height: 1px;
+    background-color: var(--ns-text);
+}
+
+button.group-editor-icon.selected {
+    background-color: var(--ns-brand-subtle);
+    border-color: var(--ns-brand);
+}
+
+button.group-editor-icon.ghost {
+    opacity: 0.4;
+}
+
+button.group-editor-insert,
+button.group-editor-all {
+    border-color: var(--bs-border-color);
+    color: var(--ns-muted);
+}
+
+/* Insert buttons only while an icon is selected, on the rows it can move to */
+button.group-editor-insert {
+    display: none;
+}
+
+div.group-editor[data-selected] div.group-editor-row:not(.source) button.group-editor-insert {
+    display: inline-block;
+}
+
+/* The new Variable row only while an icon is selected or dragged, and not for a configuration already alone in its
+   group */
+div.group-editor div.group-editor-row.new-value,
+div.group-editor[data-selected].source-alone div.group-editor-row.new-value,
+div.group-editor[data-dragging].source-alone div.group-editor-row.new-value {
+    display: none;
+}
+
+div.group-editor[data-selected] div.group-editor-row.new-value,
+div.group-editor[data-dragging] div.group-editor-row.new-value {
+    display: flex;
+}
+
+/* Dragging an icon: the rows it can be dropped on, and the one under the pointer */
+button.group-editor-icon[draggable="true"] {
+    cursor: grab;
+}
+
+span.group-editor-drop-label {
+    display: none;
+    color: var(--ns-muted);
+    font-style: italic;
+}
+
+div.group-editor[data-dragging] span.group-editor-drop-label {
+    display: inline;
+}
+
+div.group-editor-row.drop-candidate {
+    outline: 1px dashed var(--ns-brand-mid);
+    outline-offset: -1px;
+    border-radius: 0.375rem;
+}
+
+div.group-editor-row.drop-over {
+    outline: 2px solid var(--ns-brand);
+    background-color: var(--ns-brand-subtle);
+}
+
+div.group-editor-confirm:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.375rem;
+    background-color: var(--bs-warning-bg-subtle);
+}
+
+/* --- 60-analysis-inputs.css --- */
+
+/* ==========================================================================
+   Analysis inputs
+   The rows of inputs of the DSA, PSA and optimisation pages (components/variable_dash_component/vdc.py): a toggle,
+   then a row which opens to the group editor of the analysis (components/dsa_group_editor.py, psa_group_editor.py).
+   ========================================================================== */
+
+/* The header of a configuration page: its title, then its buttons at the right */
 div.configuration-header-title-container {
     float: left;
     width: 75%;
 }
 
-.configuration-header-title-container div {
-    display: inline-flex;
-}
-
+.configuration-header-title-container div,
 .configuration-header-title-container h4 {
-    display: inline-flex;
-}
-
-div.optim-configuration-summaryinfo {
     display: inline-flex;
 }
 
@@ -181,129 +650,167 @@ div.configuration-header-button-container {
     text-align: right;
 }
 
-div.results-header-title-container {
-    float: left;
-    width: 66%;
-}
+/* --------------------------------------------------------------------------
+   DSA and PSA
+   -------------------------------------------------------------------------- */
 
-div.results-header-button-container {
-    width: 33%;
-    float: right;
-    text-align: right;
-}
-
-/* DSA Configuration */
-
-div.dsa-input-single-value-block {
-    display: block;
-    width: fit-content;
-    margin: 4px 2px 4px 2px;
-}
-
-div.dsa-input-single-value-block > details {
-    display: inline-block;
-    width: auto;
-}
-
-div.dsa-input-single-value-block > details > div div {
-    display: inline-flex;
-    width: fit-content;
-    margin: 5px 2px 5px 2px;
-}
-
-div.dsa-input-single-value-block > .dsa-toggle {
-    display: inline-flex;
-    width: fit-content;
-    vertical-align: top;
-    margin-right: 10px;
-}
-
-.dsa-configuration-summary {
-    display: inline-flex;
-}
-
-.dsa-configuration-summary > h4 {
-    display: inline;
-}
-
-.dsa-configuration-summaryinfo {
-    display: inline-flex;
-    text-align: center;
-    align-items: baseline;
-    vertical-align: baseline;
-    margin-left: 10px;
-    font-size: 1.5rem;
-}
-
-.dsa-configuration-summaryinfo > span {
-    margin-left: 5px;
-    margin-right: 5px;
-}
-
-.dsa-configuration-summaryinfo-dsa-live-values {
-    font-size: 0.8em;
-}
-
-.deselected .dsa-configuration-summary {
-    filter: brightness(5);
-}
-
-/* PSA Configuration */
-
+/* The toggle, then the row, which takes the rest of the pane's width */
+div.dsa-input-single-value-block,
 div.psa-input-single-value-block {
-    display: block;
-    width: fit-content;
-    margin: 4px 2px 4px 2px;
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    margin: 4px 2px;
 }
 
+div.dsa-input-single-value-block > details,
 div.psa-input-single-value-block > details {
-    display: inline-block;
-    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-div.psa-input-single-value-block > details > div div {
-    display: inline-flex;
-    width: fit-content;
-    margin: 5px 2px 5px 2px;
-}
-
+div.dsa-input-single-value-block > .dsa-toggle,
 div.psa-input-single-value-block > .psa-toggle {
-    display: inline-flex;
-    width: fit-content;
-    vertical-align: top;
+    flex: 0 0 auto;
     margin-right: 10px;
 }
 
+.dsa-configuration-summary,
 .psa-configuration-summary {
-    display: inline-flex;
+    display: list-item;
 }
 
-.psa-configuration-summary > h4 {
-    display: inline;
-}
-
-.psa-configuration-summaryinfo {
-    display: inline-flex;
-    text-align: center;
-    align-items: baseline;
-    vertical-align: baseline;
-    margin-left: 10px;
-    font-size: 1.5rem;
-}
-
-.psa-configuration-summaryinfo > span {
-    margin-left: 5px;
-    margin-right: 5px;
-}
-
-.psa-configuration-summaryinfo-psa-live-values {
-    font-size: 0.8em;
-}
-
+.deselected .dsa-configuration-summary,
 .deselected .psa-configuration-summary {
     filter: brightness(5);
 }
 
+/* The header, beside the marker of the summary however long, and the line of the groups */
+div.dsa-configuration-header,
+div.psa-configuration-header {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    max-width: calc(100% - 1.25rem);
+    vertical-align: top;
+}
+
+div.dsa-configuration-header > h4,
+div.psa-configuration-header > h4 {
+    display: inline;
+}
+
+/* The values stay on one line, below a long label if they don't fit beside it */
+div.dsa-configuration-header > .dsa-configuration-summaryinfo,
+div.psa-configuration-header > .psa-configuration-summaryinfo {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+div.dsa-sharing-summary,
+div.psa-sharing-summary {
+    margin-left: 0.25rem;
+}
+
+/* The groups of an input differ in more than their values */
+span.dsa-bounds-differ,
+span.psa-distribution-differs {
+    margin-left: 0.75rem;
+    padding: 0 0.4rem;
+    border-radius: 0.75rem;
+    color: var(--bs-warning-text-emphasis);
+    background-color: var(--bs-warning-bg-subtle);
+}
+
+/* The current values of an input, beside its label */
+.dsa-configuration-summaryinfo,
+.psa-configuration-summaryinfo,
+div.optim-configuration-summaryinfo {
+    display: inline-flex;
+    text-align: center;
+    align-items: baseline;
+    vertical-align: baseline;
+    margin-left: 10px;
+    font-size: 1.5rem;
+}
+
+.dsa-configuration-summaryinfo > span,
+.psa-configuration-summaryinfo > span,
+div.optim-configuration-summaryinfo > span {
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.dsa-configuration-summaryinfo-dsa-live-values,
+.psa-configuration-summaryinfo-psa-live-values {
+    font-size: 0.8em;
+}
+
+/* The cells of the DSA group editor: the parameters, the bound type and the bounds, which wrap within a narrow pane */
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-parameters,
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-bounds {
+    display: flex;
+    flex: 1 1 8rem;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-width: 7rem;
+}
+
+div.group-editor-dsa div.dsa-group-row > div.dsa-group-bound-type {
+    flex: 0 0 7.5rem;
+}
+
+/* The focussed row's bounds are in the container that update_dsa_input_contents redraws: laid out as the others' */
+div.group-editor-dsa div.dsa-group-bounds > span {
+    display: contents;
+}
+
+/* The headings above the cells */
+div.group-editor-dsa div.group-editor-head > span:nth-child(1),
+div.group-editor-dsa div.group-editor-head > span:nth-child(3) {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+}
+
+div.group-editor-dsa div.group-editor-head > span:nth-child(2) {
+    flex: 0 0 7.5rem;
+}
+
+/* The cells of the PSA group editor: the distribution, each parameter and the confidence interval */
+div.group-editor-psa div.psa-group-row > div.psa-group-parameter {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+}
+
+div.group-editor-psa div.psa-group-row > div.psa-group-distribution,
+div.group-editor-psa div.psa-group-row > div.psa-group-ci {
+    flex: 0 0 6.5rem;
+}
+
+div.group-editor-psa div.group-editor-head > span:not(:last-child) {
+    flex: 1 1 8rem;
+    min-width: 7rem;
+    margin-right: 0;
+}
+
+div.group-editor-psa > div.distribution-label {
+    margin-bottom: 0.25rem;
+}
+
+/* The fields of both editors: narrow, in line, and not floated as elsewhere */
+div.group-editor-dsa div.dsa-group-row .input-group,
+div.group-editor-psa div.psa-group-row .input-group {
+    width: auto;
+    flex-wrap: nowrap;
+}
+
+div.group-editor-dsa div.dsa-group-row input.dynamic-step-field,
+div.group-editor-psa div.psa-group-row input.dynamic-step-field {
+    float: none;
+    width: 4.5rem !important;
+}
+
+/* The distribution of a PSA input */
 .distribution-label {
     display: inline-table !important;
     margin-top: 1px;
@@ -322,100 +829,9 @@ div.psa-input-single-value-block > .psa-toggle {
     font-weight: bold;
 }
 
-/* Optim Configuration */
-div.optim-input-single-value-block {
-    display: flex;
-    flex-grow: 1;
-    margin: 4px 2px 4px 2px;
-    padding: 2px 24px 2px 2px;
-}
-
-div.optim-input-single-value-block > div.optim-toggle {
-    display: inline-flex;
-}
-
-div.optim-input-single-value-block > details {
-    display: inline-block;
-    align-content: center;
-    flex-grow: 1;
-}
-
-div.optim-input-single-value-block > details > div {
-    align-content: center;
-}
-
-div.optim-input-single-value-block > details > div div {
-    display: inline-flex;
-    align-content: center;
-    /*width: fit-content;*/
-    margin: 5px 2px 5px 2px;
-}
-
-div.optim-input-single-value-block > details .input-group {
-    width: fit-content;
-}
-
-div.optim-input-single-value-block > .optim-toggle {
-    display: inline-flex;
-    width: fit-content;
-    vertical-align: top;
-    margin-right: 10px;
-}
-
-div.optim-input-single-value-block span {
-    display: inline-flex;
-}
-
-.optim-toggle-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    line-height: 1;
-}
-
-.optim-toggle-row .optim-opt-toggle {
-    display: inline-block;
-    margin-bottom: 15px;
-    margin-top: -0px;
-    margin-right: 12px;
-    padding-top: 0px;
-}
-
-summary.optim-configuration-summary {
-    display: inline-flex;
-    width: 100%;
-}
-
-summary.optim-configuration-summary > h4 {
-    display: inline;
-}
-
-div.optim-configuration-summaryinfo {
-    display: inline-flex;
-    text-align: center;
-    align-items: baseline;
-    vertical-align: baseline;
-    margin-left: 10px;
-    font-size: 1.5rem;
-}
-
-div.optim-configuration-summaryinfo > span {
-    margin-left: 5px;
-    margin-right: 5px;
-}
-
-div.optim-configuration-summaryinfo-optim-live-values {
-    font-size: 0.8em;
-}
-
-.deselected div.optim-configuration-summary {
-    filter: brightness(5);
-}
-
+/* The settings of a PSA (plugins/models/aaa_default/page_contents/inputs/psa_inputs_sprake.py) */
 .input-settings {
     display: block;
-    flex-wrap: wrap;
-    gap: 8px;
 }
 
 .input-toggle {
@@ -438,6 +854,7 @@ div.optim-configuration-summaryinfo-optim-live-values {
     display: inline-block;
 }
 
+/* Cancels a running DSA or PSA, over its progress */
 .background-callback-cancel-button {
     position: absolute;
     top: 33%;
@@ -451,18 +868,288 @@ div.optim-configuration-summaryinfo-optim-live-values {
     display: none !important;
 }
 
-.result-header-single-config.unfocussed{
+/* --------------------------------------------------------------------------
+   Optimisation
+   -------------------------------------------------------------------------- */
+
+div.optim-input-single-value-block {
+    display: flex;
+    flex-grow: 1;
+    margin: 4px 2px;
+    padding: 2px 24px 2px 2px;
+}
+
+div.optim-input-single-value-block > .optim-toggle {
+    display: inline-flex;
+    width: fit-content;
+    vertical-align: top;
+    margin-right: 10px;
+}
+
+div.optim-input-single-value-block > details {
+    display: inline-block;
+    align-content: center;
+    flex-grow: 1;
+}
+
+div.optim-input-single-value-block > details > div {
+    align-content: center;
+}
+
+div.optim-input-single-value-block > details > div div {
+    display: inline-flex;
+    align-content: center;
+    margin: 5px 2px;
+}
+
+div.optim-input-single-value-block > details .input-group {
+    width: fit-content;
+}
+
+div.optim-input-single-value-block span {
+    display: inline-flex;
+}
+
+summary.optim-configuration-summary {
+    display: inline-flex;
+    width: 100%;
+}
+
+summary.optim-configuration-summary > h4 {
+    display: inline;
+}
+
+.deselected summary.optim-configuration-summary {
+    filter: brightness(5);
+}
+
+/* The toggles of whether an input is positive or bounded */
+.optim-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+
+.optim-toggle-row .optim-opt-toggle {
+    display: inline-block;
+    margin-top: 0;
+    margin-right: 12px;
+    margin-bottom: 15px;
+    padding-top: 0;
+}
+
+/* --- 70-results.css --- */
+
+/* ==========================================================================
+   Results
+   The header of results with the configuration selector (components/layouts/results_header.py,
+   components/configuration_selector.py), the tables of results, and the overlay of results being calculated
+   (components/layouts/result_group_containers.py).
+   ========================================================================== */
+
+.results-title-block {
+    flex: 0 1 auto;
+    width: 320px;
+}
+
+.configuration-selector-hdrcontainer {
+    flex: 1 1 auto;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    width: auto;
+}
+
+.annual-horizon-toggle-hdrcontainer {
+    flex: 0 1 auto;
+    display: inline-flex;
+    justify-content: flex-end;
+    align-items: center;
+    width: 300px;
+}
+
+.configuration-selector-row-button-container {
+    float: right;
+    padding: 0;
+}
+
+.configuration-selector-row-name-input {
+    display: inline;
+    border: none;
+    outline: none;
+    padding: 5px 0;
+    height: auto;
+    line-height: 1.5;
+    background: transparent;
+}
+
+/* An underline shows which name is being edited, such as the name of a copy, which takes the focus to be named */
+.configuration-selector-row-name-input:focus-within {
+    box-shadow: inset 0 -2px 0 var(--ns-brand);
+}
+
+.upload-button,
+div:has(> .upload-button) {
+    display: inline-block;
+}
+
+div.results-header-title-container {
+    float: left;
+    width: 66%;
+}
+
+div.results-header-button-container {
+    width: 33%;
+    float: right;
+    text-align: right;
+}
+
+/* The header of a configuration's results: smaller unless focussed, and faded while out of date */
+.result-header-single-config.unfocussed {
     font-size: 0.75em;
 }
 
-.result-header-single-config.stale{
+.result-header-single-config.stale {
     filter: saturate(0.25);
-    color: #999;
+    color: var(--ns-muted);
 }
 
-/* Results tables */
-
-/* Override the unavoidable tr default with pd.DataFrame.to_html */
+/* pd.DataFrame.to_html sets the alignment of the rows: override it */
 table.dataframe tr {
     text-align: left !important;
+}
+
+/* Environmental feedback of a site other than the one selected */
+.environment-feedback-stale {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+}
+
+/* --------------------------------------------------------------------------
+   Calculating
+   -------------------------------------------------------------------------- */
+
+/* Bounds the overlay */
+.results-container {
+    position: relative;
+    min-height: 200px;
+}
+
+/* The content blurs, and can't be used, while calculating */
+.results-content {
+    transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+.results-container[data-status="CALCULATING"] .results-content {
+    filter: blur(4px);
+    opacity: 0.6;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* The overlay: hidden, and centred over the content while calculating */
+.results-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 10;
+}
+
+.results-overlay-title {
+    margin-top: 14px;
+    margin-bottom: 2px;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.results-overlay-subtext {
+    color: var(--ns-muted);
+    margin-bottom: 12px;
+}
+
+.results-progress {
+    width: 60%;
+    max-width: 320px;
+    height: 10px;
+    border-radius: 6px;
+}
+
+/* Calculating: the overlay shows, and takes the clicks and hovers over the content */
+.results-container[data-status="CALCULATING"] .results-overlay {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* Failed: a banner over the top of the content, which can still be used */
+.results-container[data-status="FAILED"] .results-overlay {
+    opacity: 1;
+    visibility: visible;
+    height: auto;
+    padding: 8px 16px;
+    background: var(--bs-danger-bg-subtle);
+    border: 1px solid var(--bs-danger-border-subtle);
+    border-radius: 6px;
+    pointer-events: auto;
+}
+
+.results-container[data-status="FAILED"] .results-overlay-title {
+    margin-top: 0;
+    color: var(--bs-danger-text-emphasis);
+}
+
+.results-container[data-status="FAILED"] .results-overlay-subtext {
+    margin-bottom: 0;
+    color: var(--bs-danger-text-emphasis);
+    text-align: center;
+}
+
+.results-container[data-status="FAILED"] .spinner,
+.results-container[data-status="FAILED"] .results-progress,
+.results-container[data-status="FAILED"] .results-overlay .btn {
+    display: none;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid var(--ns-brand-soft);
+    border-top-color: var(--ns-brand);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* --- 80-landing.css --- */
+
+/* ==========================================================================
+   Landing
+   The model selection page (plugins/pages/p000_model_selection_layout.py).
+   ========================================================================== */
+
+.landing-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.bi-newsegs-logo-mid {
+    display: inline-block;
+    width: 240px;
+    color: white;
 }

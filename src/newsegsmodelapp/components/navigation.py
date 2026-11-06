@@ -4,7 +4,7 @@ Functions for building navigation layouts
 
 from typing import Sequence
 
-from dash import html
+from dash import html, Input, Output, State
 from functools import partial
 
 from newsegsmodelapp import registers
@@ -13,6 +13,15 @@ import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 DOCS_URL = '/documentation/'
 """Where the app serves the documentation (see `documentation` in `app.py`)."""
+
+NAV_TOGGLE_ID = 'btn-nav-toggle'
+"""Id of the button which expands and collapses the navigation drawer."""
+
+NAV_DRAWER_ID = 'nav-drawer'
+"""Id of the navigation drawer holding the navigation buttons."""
+
+NAVBAR_CLASS = 'newsegs-navbar mt-1'
+NAVBAR_EXPANDED_CLASS = NAVBAR_CLASS + ' expanded'
 
 create_optionsbutton = partial(
     dbc.Button,
@@ -113,11 +122,33 @@ def create_navigator_buttons(
         ) for x in page_objs
     ] + [create_docs_button()]
 
+def create_nav_toggle():
+    """Create the button which expands and collapses the navigation drawer.
+
+    An `html.Button` styled as a Bootstrap button (like the navigation buttons), so that its
+    `aria-expanded` can be updated by `add_navigation_callbacks`.
+    """
+    return html.Button(
+        html.I(
+            className = icons.get_icon('nav-toggle', style_name = 'raw'),
+            style = {'display': 'inline'}
+        ),
+        id = NAV_TOGGLE_ID,
+        title = 'Navigation',
+        className = 'btn btn-secondary newsegs-navbar-button newsegs-nav-button newsegs-nav-toggle p-1',
+        n_clicks = 0,
+        **{'aria-expanded': 'false', 'aria-controls': NAV_DRAWER_ID},
+    )
+
 def create_navigation_component(
         model_type: str = 'default',
         pages: Sequence[str] | None = None,
     ):
-    """Create the navigation bar.
+    """Create the navigation bar: a toggle button and a collapsible drawer of navigation buttons.
+
+    The drawer is collapsed until the toggle is clicked. It opens as a row when the four-pane
+    layout is side by side and as a column when the panes are stacked (see
+    `src/styles/20-navigation.css`), sized to fit all of its buttons.
 
     Args:
         model_type: The model type (e.g. `sprake`); `default` for the fallback.
@@ -126,7 +157,43 @@ def create_navigation_component(
     Returns:
         The navigation bar.
     """
+    buttons = create_navigator_buttons(model_type, pages)
     return html.Div(
-        create_navigator_buttons(model_type, pages),
-        className = 'newsegs-navbar mt-1'
+        [
+            create_nav_toggle(),
+            html.Div(
+                buttons,
+                id = NAV_DRAWER_ID,
+                className = 'newsegs-nav-drawer',
+                # Sizes the open drawer to fit all the buttons, so that it animates to its full size
+                style = {'--nav-button-count': len(buttons)},
+            ),
+        ],
+        id = 'navbar',
+        className = NAVBAR_CLASS,
+    )
+
+def add_navigation_callbacks(app):
+    """Bind the callback which expands and collapses the navigation drawer.
+
+    Client side, as it only toggles a class.
+
+    Args:
+        app: The Dash app.
+    """
+    app.clientside_callback(
+        f"""
+        function(n_clicks, className) {{
+            const expanded = !(className || '').split(' ').includes('expanded');
+            return [
+                expanded ? '{NAVBAR_EXPANDED_CLASS}' : '{NAVBAR_CLASS}',
+                expanded ? 'true' : 'false',
+            ];
+        }}
+        """,
+        Output('navbar', 'className'),
+        Output(NAV_TOGGLE_ID, 'aria-expanded'),
+        Input(NAV_TOGGLE_ID, 'n_clicks'),
+        State('navbar', 'className'),
+        prevent_initial_call = True,
     )

@@ -29,7 +29,7 @@ STATISTICS = list(get_args(dsa.DSA_FLOAT_STATISTIC))
 
 
 def load_sprake_variables():
-    with open(_DATA_DIR / 'sprake-variable-config.json') as f:
+    with open(_DATA_DIR / 'sprake-validation-variable-config.json') as f:
         var_conf_list = json.load(f)
     return [variable.variable_from_dict(x) for x in var_conf_list]
 

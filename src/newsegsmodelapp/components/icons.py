@@ -11,6 +11,8 @@ from useful_types import SequenceNotStr
 
 from newsegsmodelframework.util import flatten_string_lists
 
+from newsegsmodelapp.components import colours
+
 DEFAULT_ICONS = {
     'latlon': 'bi bi-geo-alt',
     'osgb': 'bi bi-map',
@@ -60,6 +62,7 @@ DEFAULT_ICONS = {
     'config-6': 'bi bi-6-circle-fill',
     'config-7': 'bi bi-7-circle-fill',
     'config-8': 'bi bi-8-circle-fill',
+    'config-shared': 'bi bi-link-45deg',
     'config-duplicate': 'bi bi-copy',
     'config-remove': 'bi bi-dash-circle',
     'config-focus': 'bi bi-crosshair',
@@ -68,6 +71,7 @@ DEFAULT_ICONS = {
     'results-download': 'bi bi-table',
     'show-graph': 'bi bi-graph-up',
     'nav-options': 'bi bi-list',
+    'nav-toggle': 'bi bi-segmented-nav',
     'nav-help': 'bi bi-question-circle',
     'nav-landing': 'bi bi-card-text',
     'nav-system-config': 'bi bi-sliders2-vertical',
@@ -83,15 +87,8 @@ DEFAULT_ICONS = {
 
 }
 
-ICON_COLOUR_CLASSES = [
-    'text-primary',
-    'text-success',
-    'text-danger',
-    'text-warning',
-    'text-info',
-    'text-dark',
-    'text-secondary'
-]
+ICON_COLOUR_CLASSES = colours.CONFIG_COLOUR_CLASSES
+"""Classes colouring the icon of each configuration, in order (see `colours.CONFIG_COLOURS`)."""
 
 @overload
 def get_icon(

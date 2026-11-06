@@ -19,9 +19,11 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components.callbacks.action_callbacks import generate_post_action_requests
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
+from newsegsmodelapp.components.dsa_group_editor import count_variables_with_different_bounds
 
 from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
 from newsegsmodelapp.components import callback_utils, export, navigation
@@ -233,7 +235,7 @@ def create_dsa_project_results():
                         },
                         style = {
                             'minHeight': '590px',
-                            'border': '1px solid #dee2e6',
+                            'border': '1px solid var(--bs-border-color)',
                             'borderRadius': '0.5rem',
                             'backgroundColor': 'transparent'
                         }
@@ -297,7 +299,7 @@ def create_optim_configuration_editor(**kwargs):
                     html.H4('Optimisation statistic:'),
                     dcc.Dropdown(
                         options = [{'value': x, 'label': optim.OPTIM_TARGET_STATISTIC_LABELS[x]} for x in optim.OPTIM_TARGET_STATISTICS],
-                        value = optim.OPTIM_TARGET_STATISTICS[0],
+                        value = None, # Set to the focussed configuration's statistic when shown
                         searchable = False,
                         multi = False,
                         clearable = False,
@@ -320,7 +322,7 @@ def create_optim_configuration_editor(**kwargs):
                                 },
                                 style= {
                                     'height': '590px',
-                                    'border': '1px solid #dee2e6',
+                                    'border': '1px solid var(--bs-border-color)',
                                     'borderRadius': '0.5rem',
                                     'backgroundColor': 'transparent'
                                 }
@@ -484,7 +486,7 @@ def create_dsa_layout(config: DSAConfigurationLayoutConfiguration):
                                     },
                                     style= {
                                         'height': '590px',
-                                        'border': '1px solid #dee2e6',
+                                        'border': '1px solid var(--bs-border-color)',
                                         'borderRadius': '0.5rem',
                                         'backgroundColor': 'transparent'
                                     }
@@ -539,6 +541,25 @@ def add_dsa_run_callbacks(app: NewsegsDash):
     Args:
         app: The Dash app.
     """
+    @app.callback(
+        Output('dsa-run-bounds-note', 'children'),
+        Input('dsa-run-scope', 'value'),
+        Input('modal-dsa-confirm', 'is_open'),
+        State('active-project-id', 'data'),
+    )
+    def show_dsa_run_bounds_note(scope, is_open, active_project_id):
+        """For a DSA of all configurations, the number of variables whose bounds differ across them"""
+        if scope != 'project' or not is_open or active_project_id is None:
+            return None
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        var_uids = list(dict.fromkeys(uid for lmm in lproj.metamodels for uid in lmm.variables.values()))
+        variables = {x.id: x for x in provider.variable_provider.get_full_lightweight_variable(var_uids)}
+        n = count_variables_with_different_bounds(lproj, variables)
+        if not n:
+            return None
+        return f'{n} variable{"s have" if n != 1 else " has"} different bounds across configurations'
+
     if True:
         @app.callback(
             output = {
@@ -567,16 +588,12 @@ def add_dsa_run_callbacks(app: NewsegsDash):
             modal_close_button,
             dsa_prerun_button,
         ):
-            clicks = callback_utils.get_triggered_value()
-            if not clicks:
-                raise PreventUpdate
-            
-            trig_id = ctx.triggered_id
-            if trig_id is None:
+            clicked = callback_utils.get_clicked_trigger()
+            if clicked is None:
                 raise PreventUpdate
 
             rval = callback_utils.create_noupdate_return()
-            if trig_id == 'btn-dsa-prerun':
+            if clicked.id == 'btn-dsa-prerun':
                 rval['modal']['is_opens'] = True
             else:
                 rval['modal']['is_opens'] = False
@@ -625,12 +642,10 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         options,
         active_project_id,
     ):
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
-        click = callback_utils.get_triggered_value()
-        if not click:
-            raise PreventUpdate
+        trig_id = clicked.id
 
         rval = callback_utils.create_noupdate_return()
 
@@ -948,7 +963,7 @@ def add_dsa_run_callbacks(app: NewsegsDash):
         if reference not in mm_ids:
             rval['reference']['value'] = mm_ids[0] if mm_ids else None
 
-        if ctx.triggered_id == 'btn-dsa-filter-selected':
+        if callback_utils.has_trigger(callback_utils.get_triggers(), 'btn-dsa-filter-selected'):
             # Filter to the variables still selected for DSA in any configuration
             provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
             selected_names = set()
@@ -995,11 +1010,11 @@ def add_optim_run_callbacks(app: NewsegsDash):
         optim_prerun_button,
     ):
         
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
-        
-        if trig_id == 'btn-optim-prerun':
+
+        if clicked.id == 'btn-optim-prerun':
             return dict(modal = dict(is_open = True))
         else:
             return dict(modal = dict(is_open = False))
@@ -1013,43 +1028,23 @@ def add_optim_run_callbacks(app: NewsegsDash):
         ),
         state = dict(
             active_project_id = State('active-project-id', 'data'),
-            statistic = State(
-                {
-                    'type': 'result-table-option', 'purpose': 'statistic',
-                    'supersection': 'optim', 'section': 'tabledraw',
-                    'key': 'table_optim_metamodel', 'subindex': ALL # If we don't include the wildcard, we get complaints navigating away from the page.
-                },
-                'value'
-            ),
-            optim_method = State(
-                {
-                    'type': 'result-table-option', 'purpose': 'optim-method',
-                    'supersection': 'optim', 'section': 'run',
-                    'key': 'optim_run_metamodel', 'subindex': 0
-                },
-                'value'
-            )
         ),
         prevent_initial_call = True
     )
     def request_optim_run_metamodel(
         n_clicks,
         active_project_id,
-        **kwargs
     ):
         click = callback_utils.get_triggered_value()
         if not click:
             raise PreventUpdate
-        stat = kwargs.get('statistic')
-        if stat is not None and not isinstance(stat, str) and len(stat):
-            kwargs['statistic'] = stat[0]
 
+        # The method and statistic are read from the metamodel's optimisation settings
         request = app.request_handler.add_request(
             'optim_run_metamodel',
             active_project_id,
             app.project_provider,
             'run',
-            kwargs
         )
 
         return dict(trigger = request.request_id)
@@ -1069,28 +1064,16 @@ def add_optim_run_callbacks(app: NewsegsDash):
         ),
         state = dict(
             active_project_id = State('active-project-id', 'data'),
-            statistic = State(
-                {
-                    'type': 'result-table-option', 'purpose': 'statistic',
-                    'supersection': 'optim', 'section': 'tabledraw',
-                    'key': 'table_optim_metamodel', 'subindex': ALL # If we don't include the wildcard, we get complaints navigating away from the page.
-                },
-                'value'
-            ),
         ),
         prevent_initial_call = True,
     )
     def request_marginal_plot(
         n_clicks,
         active_project_id,
-        statistic,
     ):
         triggered_id = ctx.triggered_id
-        if triggered_id is None or statistic is None:
+        if triggered_id is None:
             raise PreventUpdate
-
-        if statistic is not None and not isinstance(statistic, str) and len(statistic):
-            statistic = statistic[0]
         
         if not isinstance(triggered_id, str) and triggered_id.get('type') == 'btn-action-optim-create-marginalplot':
             clicks = callback_utils.get_triggered_value()
@@ -1107,11 +1090,72 @@ def add_optim_run_callbacks(app: NewsegsDash):
             dict(
                 metamodel_id = app.project_provider.get_focussed_metamodel_id(active_project_id),
                 varid = triggered_id.get('varid'),
-                statistic = statistic,
             )
         )
 
         return dict(trigger = request.request_id)
+
+    # The method and statistic are held by the focussed configuration. The dropdowns are part of the
+    # static layout, so are refreshed when the project or the focussed configuration changes.
+    optim_setting_dropdowns = dict(
+        method = {
+            'type': 'result-table-option', 'purpose': 'optim-method',
+            'supersection': 'optim', 'section': 'run',
+            'key': 'optim_run_metamodel', 'subindex': ALL # If we don't include the wildcard, we get complaints navigating away from the page.
+        },
+        statistic = {
+            'type': 'result-table-option', 'purpose': 'statistic',
+            'supersection': 'optim', 'section': 'tabledraw',
+            'key': 'table_optim_metamodel', 'subindex': ALL
+        },
+    )
+
+    @app.callback(
+        output = {k: Output(v, 'value') for k, v in optim_setting_dropdowns.items()},
+        inputs = dict(
+            active_project_id = Input('active-project-id', 'data'),
+            # The dropdowns are drawn without a value, which is filled in when they appear
+            **{k + '_ids': Input(v, 'id') for k, v in optim_setting_dropdowns.items()},
+        ),
+    )
+    def show_optim_settings(active_project_id, method_ids, statistic_ids):
+        if active_project_id is None or not (method_ids or statistic_ids):
+            raise PreventUpdate
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        optim_config = provider.metamodel_provider.get_optim_config(
+            provider.get_focussed_metamodel_id(active_project_id), project_id = active_project_id
+        )
+        return dict(
+            method = [optim_config.method for _ in method_ids],
+            statistic = [optim_config.statistic for _ in statistic_ids],
+        )
+
+    @app.callback(
+        inputs = {k: Input(v, 'value') for k, v in optim_setting_dropdowns.items()},
+        state = dict(
+            active_project_id = State('active-project-id', 'data'),
+        ),
+        prevent_initial_call = True,
+    )
+    def save_optim_settings(method, statistic, active_project_id):
+        trig = ctx.triggered_id
+        value = callback_utils.get_triggered_value()
+        if trig is None or active_project_id is None or value is None:
+            raise PreventUpdate
+        setting = 'method' if trig['purpose'] == 'optim-method' else 'statistic'
+
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        mm_id = provider.get_focussed_metamodel_id(active_project_id)
+        optim_config = provider.metamodel_provider.get_optim_config(mm_id, project_id = active_project_id)
+        # Showing the settings sets the dropdowns, which should not count as a change
+        if getattr(optim_config, setting) == value:
+            raise PreventUpdate
+
+        setattr(optim_config, setting, value)
+        provider._component_provider.upsert_component(optim_config, project_id = active_project_id)
+        provider.invalidate_cache_for_component(active_project_id)
+        # Only the optimisation of the focussed configuration uses its settings
+        db_staleness.mark_inputs_changed([mm_id], 'optim')
 
     @app.callback(
         Output('active-project-id', 'data'),

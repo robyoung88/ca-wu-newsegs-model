@@ -59,8 +59,11 @@ def get_sprake_gamesa_126():
 
     return turbine
 
-def get_sprake_ned100():
+def get_sprake_ned100(hub_height: float = NOMINAL_WT_HEIGHT):
     """The Norvento nED 100 wind turbine of the Sprake model, with the power curve from the data directory.
+
+    Args:
+        hub_height: Height of the rotor centre (m).
 
     Returns:
         The turbine.
@@ -77,13 +80,13 @@ def get_sprake_ned100():
         .loc[:,['wind_speed','coeff_power']]
     )
     tloc = location.RaisedLocation.from_none()
-    tloc.height_agl = NOMINAL_WT_HEIGHT
+    tloc.height_agl = hub_height
     turbine = generation.WindTurbineElecGenerator.from_characteristics(
         cut_in=3.0,
         cut_out=20.0,
         rated_power=100.0,
         swept_area=np.pi*(0.5 * 24)**2,
-        hub_height=NOMINAL_WT_HEIGHT,
+        hub_height=hub_height,
         name="Norvento nED 100 (Sprake)",
         loc = tloc,
         cp_curve=cpcurve.to_numpy().T

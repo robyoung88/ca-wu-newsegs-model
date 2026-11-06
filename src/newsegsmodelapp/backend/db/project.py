@@ -69,6 +69,7 @@ def metamodel_to_raw_table_data(
         em_config_id = metamodel.model.id,
         fm_config_id = metamodel.finance.id,
         table_config_id = metamodel.table_config.id,
+        optim_config_id = metamodel.optim_config.id,
     )
     if hasattr(metamodel.model.consumption_storage ,'n_units'):
         odict['n_units'] = metamodel.model.consumption_storage.n_units # pyright: ignore[reportAttributeAccessIssue]

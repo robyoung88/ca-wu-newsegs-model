@@ -1,0 +1,86 @@
+/* ==========================================================================
+   Navigation
+   The navigation bar (components/navigation.py): a toggle button and a collapsible drawer of navigation buttons. The
+   drawer opens as a column while the panes are stacked, and as a row once they sit side by side (the breakpoint of the
+   layout). It opens to fit all of its buttons: --nav-button-count is set on the drawer by
+   create_navigation_component.
+   ========================================================================== */
+
+div.newsegs-navbar {
+    --nav-drawer-duration: 0.3s;
+    --nav-button-width: 58px;   /* .newsegs-nav-button width plus horizontal margins */
+    --nav-button-height: 42px;  /* button height plus vertical margins */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 10px;
+}
+
+.newsegs-nav-button {
+    width: 48px;
+    margin: 2px 5px;
+}
+
+.newsegs-options-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin: 2px 5px;
+}
+
+.newsegs-nav-drawer {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    /* Hidden once collapsed, so the buttons cannot be reached with the keyboard */
+    visibility: hidden;
+    transition:
+        max-height var(--nav-drawer-duration) ease,
+        max-width var(--nav-drawer-duration) ease,
+        opacity var(--nav-drawer-duration) ease,
+        visibility 0s linear var(--nav-drawer-duration);
+}
+
+div.newsegs-navbar.expanded .newsegs-nav-drawer {
+    max-height: calc(var(--nav-button-count, 6) * var(--nav-button-height));
+    opacity: 1;
+    visibility: visible;
+    transition:
+        max-height var(--nav-drawer-duration) ease,
+        max-width var(--nav-drawer-duration) ease,
+        opacity var(--nav-drawer-duration) ease,
+        visibility 0s;
+}
+
+div.newsegs-navbar.expanded .newsegs-nav-toggle {
+    filter: brightness(85%);
+}
+
+@media (min-width: 1200px) {
+    div.newsegs-navbar {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .newsegs-nav-drawer {
+        flex-direction: row;
+        max-height: none;
+        max-width: 0;
+    }
+
+    div.newsegs-navbar.expanded .newsegs-nav-drawer {
+        max-height: none;
+        max-width: calc(var(--nav-button-count, 6) * var(--nav-button-width));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    div.newsegs-navbar {
+        --nav-drawer-duration: 0s;
+    }
+}

@@ -14,10 +14,11 @@ import os
 from pathlib import Path
 import uuid
 
-from dash import Dash, Input, Output, State
+from dash import Dash, DiskcacheManager, Input, Output, State
 from dash import dcc, html, no_update
 import dash_bootstrap_components as dbc
 from flask import jsonify, send_from_directory
+import diskcache
 import sqlalchemy as sa
 import sqlite3
 
@@ -26,7 +27,9 @@ os.environ['ROOT_PATH_FOR_DYNACONF'] = str(APP_ROOT)
 from config import settings, environment
 logger.info('Environment: %s', environment.get_environment())
 
-from newsegsmodelapp.components.navigation import DOCS_URL
+from newsegsmodelapp.components.navigation import DOCS_URL, add_navigation_callbacks
+from newsegsmodelapp.components import colours
+colours.set_default_plot_template() # Before any figure is made, as those of plugins may be on import
 DEFAULT_DOCS_PATH = APP_ROOT.parent / 'site' # Where `mkdocs build` puts the documentation
 
 # PLUGINS
@@ -49,13 +52,15 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import project_selector as project_selector
 from newsegsmodelapp.components import CONFIGURATION_UPDATE_TRIGGER_ID
 from newsegsmodelapp.components.callbacks.input_container_callbacks import add_input_container_callbacks
+from newsegsmodelapp.components.callbacks.environment_feedback_callbacks import add_environment_feedback_callbacks
 from newsegsmodelapp.components import map
+from newsegsmodelapp.components.feedback import environmental_conditions
 
 RESULTS_STORE = Path(str(settings['RESULTS_STORE']))
 if not RESULTS_STORE.exists():
     RESULTS_STORE.mkdir(parents=True, exist_ok=True)
 
-AVAILABLE_MODELS = ['sprake', 'sprake-localised']
+AVAILABLE_MODELS = ['sprake', 'sprakeloc']
 
 BOOTSTRAP_STYLESHEETS = [dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
@@ -110,6 +115,8 @@ def serve_layout():
         # Set when process staleness may have changed outside the input-group update triggers
         dcc.Store(id = 'staleness-update-trigger', data = 0, storage_type = 'memory'),
         dcc.Store(id = 'ongoing-actions', data = [], storage_type = 'memory'),
+        # Messages of the runs abandoned since the last batch of jobs started, shown as failures
+        dcc.Store(id = 'failed-actions', data = [], storage_type = 'memory'),
         dcc.Interval(id = 'progress-poll-interval', interval = settings.get('PROGRESS_POLL_INTERVAL', 1000), n_intervals = 0, disabled = False),
         dcc.Interval(id = 'feedback-graph-interval', interval = 100, n_intervals = 1, max_intervals = 1, disabled = False),
         dcc.Interval(id = 'delayed-result-container-refill-interval', interval = 1000, n_intervals = 1, max_intervals = 1, disabled = False),
@@ -270,13 +277,18 @@ def create_app(external_stylesheets = None) -> Dash:
         project_provider = project_provider,
         results_provider = results_provider,
         request_handler = request_handler,
-        #background_callback_manager = background_callback_manager,
+        background_callback_manager = DiskcacheManager(
+            diskcache.Cache(str(settings.get('BACKGROUND_CALLBACK_CACHE_PATH')))
+        ),
     )
 
     app.layout = serve_layout
     default_app_state = {'model_selection': 'default'} 
     app.validation_layout = html.Div(
-        [serve_layout()] + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
+        [serve_layout()]
+        + [page.layout(page.default_configuration) for page in registers.PAGE_REGISTER.values()] # pyright: ignore[reportArgumentType]
+        # Shown only for model types with environmental feedback, which the defaults have not
+        + [environmental_conditions.create_placeholder_layout()]
     )
 
     server = app.server
@@ -321,10 +333,12 @@ def create_app(external_stylesheets = None) -> Dash:
 
     # Bind callbacks
     add_display_callbacks(app)
+    add_navigation_callbacks(app)
     #add_background_callbacks(app)
     add_input_container_callbacks(app)
     project_selector.add_project_selector_callbacks(app)
     map.add_site_selector_callbacks(app)
+    add_environment_feedback_callbacks(app)
     add_configuration_selector_callbacks(app)
     add_action_callbacks(app)
     add_result_container_callbacks(app)
@@ -359,6 +373,8 @@ if __name__ == '__main__':
     debug = environment.is_development()
     app.run(
         host = '0.0.0.0', port = 8050, debug = debug, use_reloader = False, threaded = True,
+        # dynaconf loads .env (see config/config.py), so Flask need not load it again
+        load_dotenv = False,
         # Circular-callback validation expands every pattern-matching id over all
         # wildcard values in the browser, which blocks the initial page load for
         # about a minute. Set DASH_VALIDATE_CALLBACKS=true to check for cycles.

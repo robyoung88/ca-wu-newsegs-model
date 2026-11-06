@@ -39,6 +39,7 @@ unknown model types.
 ```python
 from newsegsmodelframework.newsegsproject import NewsegsProject
 from newsegsmodelframework.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import FIRST_CONFIGURATION_NAME
 from newsegsmodelframework.plugins.registers import register_project_factory
 
 MODEL_TYPE = 'mymodel'
@@ -59,9 +60,15 @@ def my_project_factory() -> NewsegsProject:
         model, finance,
         variables = [project.get_default_variable(x) for x in varids]
     )
+    metamodel.name = FIRST_CONFIGURATION_NAME
     project.metamodels.append(metamodel)
     return project
 ```
+
+Users see the names of the project and its configurations, so leave the project with its default name,
+"Untitled project", and name the first configuration `FIRST_CONFIGURATION_NAME` ("Baseline"). The model's site
+should have no name unless it's a real place: an unnamed site is shown by its co-ordinates
+([`Location.display_name`][newsegsmodelframework.core.location.location.Location.display_name]).
 
 `plugins/projects/sprake.py` is the worked example: it loads the validated Sprake model and
 finance configurations and default variables from the `data/` directory.

@@ -7,6 +7,7 @@ Modules:
     environment_servers: The base classes `NewsegsLocalEnvironment` and `NewsegsWiderEnvironment`.
     inmem_env_servers: Implementations which hold their data in memory.
     dummy_env_servers: Implementations which provide placeholder data.
+    environment_progress: Reporting waits for environmental data to the code running a model.
 """
 from .environment_servers import NewsegsLocalEnvironment, NewsegsWiderEnvironment
 __all__ = [

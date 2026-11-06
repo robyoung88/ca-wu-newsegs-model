@@ -8,6 +8,7 @@ Modules:
     newsegsmetamodel: The full `NewsegsMetaModel` and its configuration.
     lightweightnewsegsmetamodel: `LightweightNewsegsMetaModel`, a description of a metamodel
         without the machinery to run it.
+    optim_component: `OptimComponent`, the method and statistic of the optimisation of a metamodel.
 """
 from .newsegsmetamodel import NewsegsMetaModel
 __all__ = ['NewsegsMetaModel']

@@ -21,6 +21,84 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.registers import get_result_container_content_creator, get_result_section_header_content_creator
 
 
+_UPDATE_ALL_TRIGGER_TYPES = {'annual-horizon-toggle'}
+"""Types of the triggers which change every result, so that all are redrawn."""
+
+REFILL_INTERVAL_ID = 'delayed-result-container-refill-interval'
+"""The interval which refills the result tables after a change of project: reset to 0, then ticks to 1."""
+
+def ids_to_update(
+    triggered: list[dict],
+    target_ids: list[dict],
+    target_type: str,
+    target_purpose: str,
+) -> tuple[list[dict], set[tuple[str, str]]]:
+    """The ids of the result containers or headers to redraw for the triggers of a callback.
+
+    Every trigger is considered, as several may fire together, such as a post-action trigger and the
+    refill interval after a run (see `callback_utils.ids_to_update`). The annual/horizon toggle
+    redraws every target.
+
+    Args:
+        triggered: `ctx.triggered`.
+        target_ids: The ids of the containers or headers of the callback.
+        target_type: Type of the ids of the targets, e.g. 'result-table'.
+        target_purpose: Purpose of the ids of the targets, e.g. 'container'.
+
+    Returns:
+        The ids to redraw, and the (section, key) of each table whose options were changed.
+    """
+    triggers = callback_utils.get_triggers(triggered)
+    option_changed = {
+        (x.id['section'], x.id['key']) for x in triggers # pyright: ignore[reportIndexIssue, reportCallIssue, reportArgumentType]
+        if x.type == 'result-table-option' and 'section' in x.id and 'key' in x.id
+    }
+    ids = callback_utils.ids_to_update(
+        triggers, target_ids, target_type, target_purpose, update_all_types = _UPDATE_ALL_TRIGGER_TYPES
+    )
+    return ids, option_changed
+
+def result_table_triggers(triggered: list[dict]) -> list[dict] | None:
+    """The triggers of the result tables callback to act on: all but the refill interval, unless it ticks to 1.
+
+    The interval is reset to 0 on a change of project and ticks to 1 after, so only the tick redraws. Other
+    triggers which fire with the reset (such as post-action triggers) are still acted on.
+
+    Args:
+        triggered: `ctx.triggered`.
+
+    Returns:
+        The entries of `ctx.triggered` to act on (an empty list on the initial call, which redraws every table), or
+        None if there is nothing to act on.
+    """
+    kept = []
+    initial_call = True
+    for entry in triggered:
+        id_, _ = callback_utils.parse_prop_id(entry.get('prop_id', '.'))
+        if id_ is None:
+            continue
+        initial_call = False
+        if id_ == REFILL_INTERVAL_ID and entry.get('value') != 1:
+            continue
+        kept.append(entry)
+    if initial_call:
+        return []
+    return kept or None
+
+def only_project_changed(triggers: list[callback_utils.Trigger]) -> bool:
+    """Whether the active project is the only trigger of the result containers callback.
+
+    Then only the containers drawn for another project are redrawn. A change of page or layout, alone or with the
+    project, redraws every container.
+
+    Args:
+        triggers: The triggers of the callback.
+
+    Returns:
+        Whether only the active project triggered the callback.
+    """
+    return bool(triggers) and all(x.id == 'active-project-id' for x in triggers)
+
 def add_result_container_callbacks(app: NewsegsDash):
     """
     Callbacks to populate output containers.
@@ -78,8 +156,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         t0 = time.perf_counter()
 
         # Do not update layout if only redrawing the existing project
-        triggered_id = ctx.triggered_id
-        is_project_trigger = (triggered_id == 'active-project-id')
+        is_project_trigger = only_project_changed(callback_utils.get_triggers())
 
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
@@ -172,25 +249,12 @@ def add_result_container_callbacks(app: NewsegsDash):
         if len(rval) == 0:
             raise PreventUpdate
 
-        trig_id = ctx.triggered_id
-        update_all_headers = isinstance(trig_id, str) or trig_id is None or trig_id['type'] == 'annual-horizon-toggle'
-
-        if update_all_headers:
-            headers_for_update = [x['id'] for x in ctx.outputs_grouping['containers']]
-        else:
-            headers_for_update = []
-            for trig in ctx.triggered:
-                trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
-                trig['purpose'] = 'header'
-                trig['type'] = 'result-section-header'
-                del trig['subindex']
-                del trig['supersection']
-                headers_for_update.extend(
-                    [
-                        x['id'] for x in ctx.outputs_grouping['containers']
-                        if callback_utils.intersection_values_match(trig, x['id'])
-                    ]
-                )
+        headers_for_update, _ = ids_to_update(
+            ctx.triggered,
+            [x['id'] for x in ctx.outputs_grouping['containers']],
+            target_type = 'result-section-header',
+            target_purpose = 'header',
+        )
 
         if not headers_for_update:
             return rval
@@ -198,20 +262,21 @@ def add_result_container_callbacks(app: NewsegsDash):
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
 
-        contents_by_section = {}
+        # Headers of the same section and key (e.g. on different pages) share their contents
+        contents_by_section_key = {}
         ann_hori_toggle = ann_hori_toggle[0] if len(ann_hori_toggle) else False
 
         for container_id in headers_for_update:
             section = container_id['section']
-            if section in contents_by_section:
+            key = container_id['key']
+            if (section, key) in contents_by_section_key:
                 callback_utils.update_property_by_id(
                     container_id,
                     'children',
-                    contents_by_section[section],
+                    contents_by_section_key[(section, key)],
                     rval
                 )
                 continue
-            key = container_id['key']
             content_creator = get_result_section_header_content_creator(
                 key, section, model_type
             )
@@ -224,7 +289,7 @@ def add_result_container_callbacks(app: NewsegsDash):
             contents = content_creator(
                 active_project_id, app.project_provider, app.results_provider, ann_hori_toggle
             )
-            contents_by_section[section] = contents
+            contents_by_section_key[(section, key)] = contents
             callback_utils.update_property_by_id(
                 container_id,
                 'children',
@@ -329,36 +394,21 @@ def add_result_container_callbacks(app: NewsegsDash):
         if active_project_id is None or container_ids is None or not len(container_ids):
             raise PreventUpdate
 
-        trig_id = ctx.triggered_id
         # The interval is reset to 0 on project change and then ticks to 1; only act on the tick
-        if isinstance(trig_id, str) and trig_id == 'delayed-result-container-refill-interval':
-            if callback_utils.get_triggered_value() != 1:
-                raise PreventUpdate
+        triggered = result_table_triggers(ctx.triggered)
+        if triggered is None:
+            raise PreventUpdate
 
         t0 = time.perf_counter()
         rval = callback_utils.create_noupdate_return()
 
-        update_all_tables = isinstance(trig_id, str) or trig_id == None
         # Tables whose options were changed must be redrawn even if the revision is unchanged
-        option_changed_tables = set()
-        if update_all_tables:
-            tables_for_update = [x['id'] for x in ctx.outputs_grouping['table']]
-        else:
-            tables_for_update = []
-            for trig in ctx.triggered:
-                trig = json.loads(trig['prop_id'].rsplit('.',1)[0])
-                if trig.get('type') == 'result-table-option':
-                    option_changed_tables.add((trig['section'], trig['key']))
-                trig['purpose'] = 'container'
-                trig['type'] = 'result-table'
-                del trig['subindex']
-                del trig['supersection']
-                tables_for_update.extend(
-                    [
-                        x['id'] for x in ctx.outputs_grouping['table'] 
-                        if callback_utils.intersection_values_match(trig, x['id'])
-                    ]
-                )
+        tables_for_update, option_changed_tables = ids_to_update(
+            triggered,
+            [x['id'] for x in ctx.outputs_grouping['table']],
+            target_type = 'result-table',
+            target_purpose = 'container',
+        )
         if not tables_for_update:
             return rval
 

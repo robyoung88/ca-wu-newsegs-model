@@ -108,6 +108,7 @@ def run_dispatcher(
         workers_stop[idx] = wstop_event
 
     logger.info('Supervisor online. Monitoring workers...')
+    HEARTBEAT_FILE.parent.mkdir(parents = True, exist_ok = True)
     last_cleaned = time.time()
     try:
         # The supervisor loop

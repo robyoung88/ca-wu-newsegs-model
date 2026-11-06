@@ -1,0 +1,20 @@
+{
+    "wind_production_sum": 444318.62180934666,
+    "pv_production_sum": 2163800.7255881056,
+    "total_production_sum": 6606.986943681547,
+    "units_to_storage_sum": 1839224.9827795941,
+    "units_from_storage_sum": 1620272.4970189258,
+    "units_lost_storage_sum": 220946.2495934893,
+    "appliance_consumption_sum": 3775756.840000184,
+    "dhw_consumption_sum": 1645597.9011200313,
+    "sh_consumption_sum": 1756702.0799999598,
+    "ev_consumption_sum": 263376.0348859978,
+    "net_export_sum": 814233.8017719061,
+    "net_import_sum": 1867632.199856687,
+    "total_cost_undiscounted": 2702519.2699498404,
+    "total_cost_discounted": 2500822.603275282,
+    "total_benefits_undiscounted": 2295249.6548388544,
+    "total_benefits_discounted": 1975243.8344594287,
+    "npv_undiscounted": -407269.61511098593,
+    "npv_discounted": -525578.7688158532
+}

@@ -5,13 +5,14 @@ logger = logging.getLogger(__name__)
 import copy
 from dataclasses import dataclass, field
 import json
-from typing import Any, Callable, Optional, Protocol, cast
+from typing import Any, Callable, Optional, Protocol, Sequence, cast
 
 from dash.development.base_component import Component as DashComponent
 from useful_types import SequenceNotStr
 
 from newsegsmodelapp.components.serialisable_dataclass import SerialisableDataclass
 from newsegsmodelapp.types import LayoutConfiguration, Page
+from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject import NewsegsProjectProviderInterface
 from newsegsmodelframework.newsegsvariable.lightweight_variable import FullLightweightVariable
@@ -175,7 +176,8 @@ Handler functions take:
     input_ids [list[dict]] - a list of the ids of the associated Input html elements
     header_ids [list[dict]] - a list of the ids of the associated header container html elements
     trigger_ids [list[dict]] - a list of the ids of the associated trigger dcc.Store elements
-    calling_dict [dict[str, Any]] - a dict of other keyword arguments to the calling function
+    calling_dict [dict[str, Any]] - a dict of other keyword arguments to the calling function: the values of the
+        other inputs, `editor_ids` (the ids of the associated `input-group-editor` containers) and `app_state`
     active_project_id [str]
     project_provider [NewsegsProjectProviderInterface]
     return_dict [dict[str, Any]] - A dict of updates to output components of input_container_callbacks.react_to_input_change
@@ -184,6 +186,8 @@ It should return (modified) return_dict including:
     input_values
     header_children
     trigger_data
+    editor_children
+    summary_refresh - set when a value is saved or the sharing changes, to redraw the sharing summary
 and any other elements that are included in the call.
 """
 
@@ -918,6 +922,79 @@ def get_input_container_content_creator(
     )
 
 
+INPUT_EDITOR_CONTENT_CREATORS: dict[
+    tuple[str, str | None, str],
+    Callable[[
+        str,
+        str,
+        NewsegsProjectProviderInterface
+    ], list[DashComponent]]] = {}
+"""Register of functions to create the content of an input's editor, built when its row is opened.
+
+Keyed by a tuple of:
+    supersection [str] - e.g. dsa, deterministic
+    section [str | None] - e.g. gen_input
+    model_type [str]
+
+Functions take the variable id, the active project id and the project provider, and return the children of the
+`input-group-editor` container (see `components.input_components.create_lazy_input_details`).
+"""
+
+def register_input_editor_content_creator(supersection: str, section: str | None, model_type: str):
+    """Decorator which registers a function which creates the content of an input's editor.
+
+    Keyed by the supersection, the section (`None` for all) and the model type. See `INPUT_EDITOR_CONTENT_CREATORS` for the arguments and return of the function.
+
+    A function registered for a model type other than `default` is also registered as the `default` for the key, if there is none yet, so that other model types fall back to it. Raises `KeyError` if a function is already registered for the key under a model type other than `default`.
+
+    Args:
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+
+    Returns:
+        The decorator.
+    """
+    section = section if section else 'ALL'
+    key = (supersection, section, model_type)
+    def decorated(func):
+        if model_type != 'default':
+            if key in INPUT_EDITOR_CONTENT_CREATORS:
+                raise KeyError(f'Input editor content creation function already exists for {key}')
+        INPUT_EDITOR_CONTENT_CREATORS[key] = func
+        key_default = (key[0], key[1], 'default')
+        if key_default not in INPUT_EDITOR_CONTENT_CREATORS:
+            INPUT_EDITOR_CONTENT_CREATORS[key_default] = func
+        return func
+    return decorated
+
+def get_input_editor_content_creator(
+    supersection: str,
+    section: str | None,
+    model_type: str = 'default'
+) -> Callable[[str, str, NewsegsProjectProviderInterface], list[DashComponent]]:
+    """Get the function which creates the content of an input's editor.
+
+    If there is nothing for the exact key, falls back to the `default` model type, then the generic section (`ALL`), then both. Raises `KeyError` if nothing is found.
+
+    Args:
+        supersection: The supersection (e.g. the page or group of inputs).
+        section: The section.
+        model_type: The model type (e.g. `sprake`); `default` for the fallback.
+
+    Returns:
+        The function.
+    """
+    getter = _three_param_key_getter_with_fallback(
+        INPUT_EDITOR_CONTENT_CREATORS,
+        return_type_description = 'input editor content creation function'
+    )
+    return cast(
+        Callable[[str, str, NewsegsProjectProviderInterface], list[DashComponent]],
+        getter(supersection, section, model_type)
+    )
+
+
 INPUT_SECTION_HEADER_CONTENT_CREATORS: dict[
     tuple[str, str | None, str],
     Callable[[
@@ -1263,3 +1340,121 @@ def get_feedback_graph_artist(figure_key: str, model_type: str = 'default'):
     key = (figure_key, 'default')
     return FEEDBACK_GRAPH_ARTISTS[key]
 
+
+# -------------------------------------------------------------------------
+# ENVIRONMENTAL FEEDBACK
+# -------------------------------------------------------------------------
+
+class EnvironmentDataSource(Protocol):
+    """The environmental data shown as feedback on a site, for a model type.
+
+    The data are fetched on request (by the user), not when a site is chosen, as fetching is
+    slow; once fetched they are cached, so that the artists can draw them.
+
+    Each method takes the location of the site and the focussed metamodel (a `NewsegsMetaModel`).
+    The location is that of the site selector, which the metamodel may not yet hold. The data
+    should be those that a run of the metamodel at the site uses (such as at the heights of its
+    generators, and over its run period), so that they are fetched once for both.
+    """
+    def is_available(self, location: Location, metamodel: Any) -> bool:
+        """Whether all the data for a site are cached, so that the feedback can be drawn."""
+        ...
+
+    def is_pending(self, location: Location, metamodel: Any) -> bool:
+        """Whether the data for a site are being fetched, by this or another process."""
+        ...
+
+    def fetch(self, location: Location, metamodel: Any) -> None:
+        """Fetch and cache the data for a site.
+
+        Raises:
+            EnvironmentDataUnavailableError: if the data cannot be obtained.
+        """
+        ...
+
+ENVIRONMENT_DATA_SOURCES: dict[str, EnvironmentDataSource] = {}
+"""Register of the sources of environmental feedback data, keyed by model type.
+
+A model type without a source shows no environmental feedback.
+"""
+
+def register_environment_data_source(source: EnvironmentDataSource, model_type: str):
+    """Register the source of environmental feedback data of a model type.
+
+    Raises `KeyError` if one is already registered for the model type.
+
+    Args:
+        source: The data source.
+        model_type: The model type (e.g. `sprakeloc`).
+    """
+    if model_type in ENVIRONMENT_DATA_SOURCES:
+        raise KeyError(f'Environment data source already exists for model type {model_type}')
+    ENVIRONMENT_DATA_SOURCES[model_type] = source
+
+def get_environment_data_source(model_type: str) -> EnvironmentDataSource | None:
+    """Get the source of environmental feedback data of a model type.
+
+    Args:
+        model_type: The model type.
+
+    Returns:
+        The data source; None if the model type has none.
+    """
+    return ENVIRONMENT_DATA_SOURCES.get(model_type)
+
+EnvironmentFeedbackArtist = Callable[[Location, Sequence[tuple[str, Location]], Any], Any]
+"""Draws an item of environmental feedback from cached data. Takes the location of the site, the
+names and locations of the other sites of the project, and the focussed metamodel, and returns the
+children of the item.
+"""
+
+ENVIRONMENT_FEEDBACK_ARTISTS: dict[tuple[str, str], EnvironmentFeedbackArtist] = {}
+"""Register of functions drawing the items of environmental feedback.
+
+Keyed by a tuple of:
+    item key [str]
+    model_type [str]
+"""
+
+def register_environment_feedback_artist(item_key: str, model_type: str):
+    """Decorator which registers a function which draws an item of environmental feedback.
+
+    The function must draw only from cached data: it is called once the data source of the model
+    type says the data are available.
+
+    A function registered for a model type other than `default` is also registered as the
+    `default` for the key, if there is none yet. Raises `KeyError` if a function is already
+    registered for the key under a model type other than `default`.
+
+    Args:
+        item_key: Key of the item.
+        model_type: The model type (e.g. `sprakeloc`); `default` for the fallback.
+
+    Returns:
+        The decorator.
+    """
+    key = (item_key, model_type)
+    def decorated(func: EnvironmentFeedbackArtist):
+        if model_type != 'default' and key in ENVIRONMENT_FEEDBACK_ARTISTS:
+            raise KeyError(f'Environment feedback artist already exists for key {key}')
+        ENVIRONMENT_FEEDBACK_ARTISTS[key] = func
+        ENVIRONMENT_FEEDBACK_ARTISTS.setdefault((item_key, 'default'), func)
+        return func
+    return decorated
+
+def get_environment_feedback_artist(item_key: str, model_type: str = 'default') -> EnvironmentFeedbackArtist:
+    """Get the function which draws an item of environmental feedback.
+
+    Falls back to the `default` model type. Raises `KeyError` if there is none.
+
+    Args:
+        item_key: Key of the item.
+        model_type: The model type.
+
+    Returns:
+        The function.
+    """
+    artist = ENVIRONMENT_FEEDBACK_ARTISTS.get((item_key, model_type))
+    if artist:
+        return artist
+    return ENVIRONMENT_FEEDBACK_ARTISTS[(item_key, 'default')]
