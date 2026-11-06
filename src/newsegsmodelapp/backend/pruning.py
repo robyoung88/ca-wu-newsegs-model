@@ -351,8 +351,8 @@ def _run_time(run: sa.Table | sa.Alias) -> sa.ColumnElement:
 
 
 def _cutoff(retention_days: float) -> datetime.datetime:
-    # runs.modified_at is written with datetime.datetime.now
-    return datetime.datetime.now() - datetime.timedelta(days = retention_days)
+    # runs.modified_at and runs.created_at are both in UTC (see db_tables.utc_now)
+    return tbls.utc_now() - datetime.timedelta(days = retention_days)
 
 
 def _prunable_requests_stmt(cutoff: datetime.datetime) -> sa.Select:
