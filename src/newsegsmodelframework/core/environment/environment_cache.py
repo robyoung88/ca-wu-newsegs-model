@@ -15,11 +15,18 @@ data at the rounded location, so that the data does not depend on which request 
 `get_or_set` holds a lock on a key while its value is computed, so that processes requesting the
 same data (such as a model run and the site feedback of the app) fetch it only once: the others
 wait for the value and then read it from the cache. `is_pending` says whether a key is being
-computed. A lock expires after `ENV_CACHE_LOCK_EXPIRE_S` seconds (default 1800), so that a process
-which stops while computing does not block the key indefinitely.
+computed. The holder of a lock renews it while computing, and a lock expires
+`ENV_CACHE_LOCK_EXPIRE_S` seconds (default 120) after it was last renewed: a process which stops
+while computing (such as a worker when the stack is stopped) blocks the key only until then,
+however long a computation takes. A lock records a token of its holder, so that a holder whose
+lock expired does not renew or release the lock of another.
 """
 from functools import lru_cache
+import threading
+import time
 from typing import Any, Callable, Hashable, TypeVar
+
+import uuid
 
 import diskcache
 import pandas as pd
@@ -30,7 +37,7 @@ from newsegsmodelframework.core.location.location import Location
 from newsegsmodelframework.core.timespan.timespan import TimeSpan
 
 DEFAULT_SIZE_LIMIT = 2**30
-DEFAULT_LOCK_EXPIRE_S = 1800
+DEFAULT_LOCK_EXPIRE_S = 120
 
 T = TypeVar('T')
 
@@ -119,9 +126,56 @@ def environment_cache_key(
 
 _MISSING = object()
 
-def _lock(key: Hashable, cache: diskcache.Cache) -> diskcache.Lock:
+class _ComputeLock:
+    """A lock on a key of the cache, shared between processes, renewed while held.
+
+    Like `diskcache.Lock`, the lock is an entry of the cache, which expires. While held, a thread renews its
+    expiry every quarter of it, so that the lock expires soon after its holder stops, however long it is held.
+    The entry holds a token of the holder: a holder whose lock expired, and was taken by another, neither
+    renews nor releases the other's.
+    """
+
+    def __init__(self, cache: diskcache.Cache, key: Hashable, expire: float):
+        self._cache = cache
+        self._key = key
+        self._expire = expire
+        self._token: str | None = None
+        self._stop_renewal: threading.Event | None = None
+
+    def acquire(self):
+        """Wait for the lock and take it."""
+        token = uuid.uuid4().hex
+        while not self._cache.add(self._key, token, expire = self._expire, retry = True):
+            time.sleep(0.001)
+        self._token = token
+        self._stop_renewal = threading.Event()
+        threading.Thread(
+            target = self._renew, args = (token, self._stop_renewal), daemon = True, name = 'environment-cache-lock'
+        ).start()
+
+    def _renew(self, token: str, stop: threading.Event):
+        while not stop.wait(self._expire / 4):
+            with self._cache.transact(retry = True):
+                if self._cache.get(self._key, retry = True) != token:
+                    return
+                self._cache.touch(self._key, self._expire, retry = True)
+
+    def release(self):
+        """Release the lock, if still held."""
+        if self._stop_renewal is not None:
+            self._stop_renewal.set()
+        token, self._token, self._stop_renewal = self._token, None, None
+        with self._cache.transact(retry = True):
+            if token is not None and self._cache.get(self._key, retry = True) == token:
+                self._cache.delete(self._key, retry = True)
+
+    def locked(self) -> bool:
+        """Whether the lock is held, by any process."""
+        return self._key in self._cache
+
+def _lock(key: Hashable, cache: diskcache.Cache) -> _ComputeLock:
     """The lock held on a key while its value is computed."""
-    return diskcache.Lock(
+    return _ComputeLock(
         cache,
         ('lock', key),
         expire = float(settings.get('ENV_CACHE_LOCK_EXPIRE_S', DEFAULT_LOCK_EXPIRE_S)),

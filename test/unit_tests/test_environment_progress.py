@@ -8,6 +8,7 @@ uses its own cache in a temporary directory.
 """
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -67,6 +68,27 @@ class TestEnvironmentProgress(unittest.TestCase):
                 with environment_progress.awaiting('wind speeds'):
                     raise RuntimeError
         self.assertEqual(messages[-1], None)
+
+    def test_long_wait_reported_again(self):
+        # A wait is reported again while it lasts, so that the run waiting is seen to be alive (#183)
+        messages = []
+        with mock.patch.object(environment_progress, 'WAIT_REPORT_INTERVAL_S', 0.05):
+            with environment_progress.reporting_waits(messages.append):
+                with environment_progress.awaiting('outer'):
+                    time.sleep(0.2)
+                    with environment_progress.awaiting('inner'):
+                        time.sleep(0.2)
+            n_reported = len(messages)
+            time.sleep(0.2)
+        outer, inner = 'Awaiting environmental data: outer', 'Awaiting environmental data: inner'
+        self.assertGreaterEqual(messages.count(outer), 3)
+        self.assertGreaterEqual(messages.count(inner), 3)
+        # Each again report is of the wait under way, and nothing is reported after the waits end
+        self.assertEqual(messages[-1], None)
+        self.assertEqual(len(messages), n_reported)
+        first_inner, last_inner = messages.index(inner), len(messages) - 1 - messages[::-1].index(inner)
+        self.assertEqual(set(messages[first_inner:last_inner + 1]), {inner})
+        self.assertEqual(messages[last_inner + 1:], [outer, None])
 
     def test_reporter_errors_do_not_stop_the_fetch(self):
         reporter = mock.Mock(side_effect = RuntimeError('database locked'))

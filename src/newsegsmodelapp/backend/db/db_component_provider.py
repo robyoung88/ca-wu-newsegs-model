@@ -1625,14 +1625,18 @@ class FromDatabaseNewsegsProjectProvider(
             obj._component_ids['table_config'] = row.table_config_id
             obj._component_ids['dsa_config'] = row.dsa_component_config_id
             obj._component_ids['psa_config'] = row.psa_component_config_id
-            # No need to update the focussed metamodel - as this is
-            # stored as an int, it should not be impacted so long
-            # as the order of metamodels is consistent.
-
             # The row is not enough for us to reassign metamodel uids
             # - need to go to the junction table
             metamodel_ids = self.list_project_metamodel_ids(obj.id)
             obj._metamodel_ids = metamodel_ids
+
+            # The focussed metamodel is the one in the row. Focussing a metamodel updates only the row
+            # (`focussed_metamodel_id`), not the payload, whose index is that of the last time the whole
+            # project was saved. Saving the project writes its focus back to the row, so a stale focus would
+            # also undo a later change of focus.
+            focussed_id = row._mapping.get('focussed_metamodel_id')
+            if focussed_id in metamodel_ids:
+                obj._focussed_metamodel = metamodel_ids.index(focussed_id)
 
             # Similarly, variable uids may have been modified.
             stmt = (
@@ -2317,11 +2321,12 @@ class FromDatabaseNewsegsProjectProvider(
             res = conn.execute(stmt).scalar_one()
         return res
 
-    # REVIEW (unreferenced): no references to `touch_project` found in src/, scripts/ or data/.
     def touch_project(self, project_id: str):
-        """Update the modification stamp of a project, without changing it.
+        """Update the modification stamp of a project (`modified_order`), without changing it.
 
-        Used so that caches of the project are invalidated.
+        Caches of the project in every process, such as those of the workers, are checked against the stamp
+        (see `CachedFromDatabaseNewsegsProjectProvider`). A change saved to a part of the project outside its row,
+        such as a Variable, must touch the project, or the caches of other processes keep the project as it was.
 
         Args:
             project_id: Id of the project.
@@ -2331,7 +2336,7 @@ class FromDatabaseNewsegsProjectProvider(
             .where(self._table.c.id == project_id)
             .values(label=self._table.c.label)
         )
-        with read_transaction(self._get_engine(writer=True)) as conn:
+        with write_transaction(self._get_engine(writer=True)) as conn:
             conn.execute(stmt)
 
     def invalidate_cache_for_component(self, component_id):

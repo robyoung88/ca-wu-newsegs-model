@@ -868,6 +868,9 @@ def _trigger_plot_marginal_optim(
     # NB - use full representation of project, as variables must be syncronised
     # Set partial calling options into the store so that the plotter can get them
     proj = project_provider.get_project(request.project_id)
+    # The plot is saved at the revision of the table config as stored, which the app looks it up by. Running the
+    # model across the margin increments the revisions of the project in memory, without saving them.
+    table_revision = project_provider.get_lightweight_project(request.project_id).table_config.revision
 
     run_config = json.loads(request.payload)
     mm_id = run_config.get('metamodel_id')
@@ -891,14 +894,24 @@ def _trigger_plot_marginal_optim(
 
     stat = mm.optim_config.statistic
 
-    # TODO: Add progress
-    plot_df = optim.evaluate_statistic_across_margin(
-        mm, varid, stat, lower, upper, res
-    )
+    if check_cancel_status():
+        raise InterruptedError(f'Marginal plot {run_id} has been cancelled.')
+
+    try:
+        plot_df = optim.evaluate_statistic_across_margin(
+            mm, varid, stat, lower, upper, res,
+            progress_callback = progress_callback, cancel_status = check_cancel_status,
+        )
+    finally:
+        # The project in memory no longer matches the store (its revisions were incremented), so must not be reused
+        # from this process's cache
+        project_provider.invalidate_cache_for_component(proj.id)
 
     fig = optim_plots.statistic_across_margin_plot(plot_df, mm.variables[varid].name)
 
-    result_provider.upsert_result('plot_marginal_optim', proj.table_config, fig, request = request)
+    result_provider.upsert_result(
+        'plot_marginal_optim', proj.table_config, fig, request = request, revision = table_revision
+    )
 
     return 'ok'
     

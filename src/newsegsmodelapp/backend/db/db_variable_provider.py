@@ -564,8 +564,7 @@ class FromDatabaseVariableProvider(VariableManagerInterface):
         """
         stmt = sa.select(tbls.variable_configs.c.varid).distinct()
         with read_transaction(self._get_engine()) as conn:
-            varids = conn.scalars(stmt)
-        return tuple(varids)
+            return tuple(conn.scalars(stmt))
 
     @override
     def upsert_variable(self, var: Variable | Sequence[Variable], force: bool = False):

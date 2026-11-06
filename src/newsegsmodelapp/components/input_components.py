@@ -770,6 +770,8 @@ def _set_variable_optim_active(
     varprovider.set_variable_metadata(var.id, 'optim_selected', var.optim_selected)
 
     provider.invalidate_cache_for_component(lproj.id)
+    # The selection is read by the optimisation, in the workers
+    provider.touch_project(lproj.id)
     db_staleness.mark_inputs_changed(staleness.metamodels_using_variable(lproj, varuid), 'optim')
     
     now = time.time_ns()

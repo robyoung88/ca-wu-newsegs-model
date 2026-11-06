@@ -258,12 +258,15 @@ def evaluate_statistic_across_margin(
     stat: str,
     lower: float,
     upper: float,
-    resolution: int    
+    resolution: int,
+    progress_callback: Callable[[float, float, str], None] | None = None,
+    cancel_status: Callable[[], bool] | None = None,
 ) -> pd.DataFrame:
     """Evaluate a statistic across a range of values of one variable, for a marginal plot.
 
     The first parameter of the variable is set to `resolution + 1` evenly spaced values from `lower` to `upper`, and the
-    NewSEGS Energy Model and finance model are run for each. The original variable is restored afterwards.
+    NewSEGS Energy Model and finance model are run for each. The original variable is restored afterwards, and the
+    models are run again with it, unless cancelled.
 
     Args:
         mm: The metamodel.
@@ -272,10 +275,19 @@ def evaluate_statistic_across_margin(
         lower: Lowest value of the parameter.
         upper: Highest value of the parameter.
         resolution: Number of intervals between the lowest and highest values.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message. Called
+            before each point, e.g. 'Point 3 of 11', and before the run restoring the configuration, with the
+            progress of each run within it, such as waits for environmental data.
+        cancel_status: Function returning whether cancellation has been requested; checked before each point.
 
     Returns:
         Dataframe of the values of the parameter (a column named for the varid) and of the statistic.
+
+    Raises:
+        InterruptedError: if cancellation is requested.
     """
+    if cancel_status is None:
+        cancel_status = lambda: False
     # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
 
@@ -285,32 +297,43 @@ def evaluate_statistic_across_margin(
     par0 = list(mm.variables[varid].parameters)
 
     param_range = np.linspace(lower, upper, resolution + 1, dtype = np.float64)
-    
-    def statfunc(x) -> float:
-        if len(par0) == 1:
-            mm.variables[varid].set_parameters(x)
+    # Each point, then the run restoring the configuration
+    total = len(param_range) + 1
+
+    def run(step: int, message: str):
+        if progress_callback is None:
+            mm.model.run()
         else:
-            par0[0] = x
-            mm.variables[varid].set_parameters(*par0)
-        mm.update_model_from_variable_deterministic(varid)
-        mm.model.run()
+            progress_callback(step, total, message)
+            # The progress of the model run within this step, such as waits for environmental data
+            def model_progress(fraction: float, model_message: str):
+                progress_callback(step + fraction, total, f'{message}: {model_message}')
+            mm.model.run(progress_callback = model_progress) # pyright: ignore[reportCallIssue]
         mm.finance.run()
-        return _optim_float_statistic_mapper(stat, mm.model, mm.finance, False) # pyright: ignore[reportArgumentType]
-    
-    oarray = np.asarray(map(statfunc, param_range))
-    #oarray = np.apply_along_axis(statfunc, 0, param_range)
-    
-    # Caution! map appears to be lazy, and if we don't use oarray until after we reset
-    # the metamodel variables, it will run the map THEN and leave the metamodel
-    # with the end of the range set.
+
+    values = []
+    try:
+        for i, x in enumerate(param_range):
+            if cancel_status():
+                raise InterruptedError('Marginal plot cancelled')
+            if len(par0) == 1:
+                mm.variables[varid].set_parameters(x)
+            else:
+                par0[0] = x
+                mm.variables[varid].set_parameters(*par0)
+            mm.update_model_from_variable_deterministic(varid)
+            run(i, f'Point {i + 1} of {len(param_range)}')
+            values.append(_optim_float_statistic_mapper(stat, mm.model, mm.finance, False)) # pyright: ignore[reportArgumentType]
+    finally:
+        # Restored whether or not the evaluation completes
+        mm.variables[varid] = var_hold
+        mm.update_model_from_variable_deterministic(varid)
+
     odf = pd.DataFrame({
         varid: param_range,
-        stat: oarray,
+        stat: np.asarray(values, dtype = np.float64),
     })
 
-    mm.variables[varid] = var_hold
-    mm.update_model_from_variable_deterministic(varid)
-    mm.model.run()
-    mm.finance.run()
+    run(len(param_range), 'Restoring the configuration')
 
     return odf
