@@ -24,7 +24,8 @@ Work moves through three branches:
 
 3. The `unit tests` workflow runs on the pull request. It first regenerates the default model artifacts and compares
    them with `data/` (see [CI checks and generated model artifacts](#ci-checks-and-generated-model-artifacts) for retrieving them if they differ), then runs the unit tests, excluding the
-   Excel validation and the PSA and DSA tests. Squash-merge the pull request.
+   PSA and DSA tests. The Excel validation tests run too, from the results extracted into `data/sprake_validation/`.
+   Squash-merge the pull request.
 
 Every push to `development` builds the Docker image.
 
