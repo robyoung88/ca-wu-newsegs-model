@@ -174,8 +174,8 @@ generation fails earlier, generated files may not be available to download.
 
 For profiling, use viztracer:
 
-```{bash}
-& python.exe -m viztracer --log_async --min_duration 500 -o trace.json src/app.py    
+```bash
+python -m viztracer --log_async --min_duration 500 -o trace.json src/app.py
 ```
 
 Results can be viewed at https://www.speedscope.app/ or https://ui.perfetto.dev/.
