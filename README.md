@@ -58,13 +58,12 @@ Read more, including running without Docker, environment variables and storage l
 ## Use the app
 
 1. **Choose a model type** on the model selection page.
-2. **Configure a scheme** on the site configuration page. Results update for the configuration in focus.
+2. **Configure a scheme** on the site configuration page.
 3. **Compare configurations** by adding more to the project.
-4. **Test sensitivity** on the DSA and PSA pages.
+4. **Optimise generation and storage** by checking the sensitivity of the site to differing quantities and searching for the highest value solution on the DSA page.
+5. **Test sensitivity** on the DSA and PSA pages.
 
 ![The site configuration page](docs/assets/user-guide/site-config.png)
-
-<!-- TODO(Rob): confirm these steps match the intended workflow. -->
 
 Read more: [user guide](docs/user-guide.md)
 

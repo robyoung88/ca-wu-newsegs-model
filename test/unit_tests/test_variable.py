@@ -1,5 +1,5 @@
 """
-Unit tests for newsegsbrowser/variable.
+Unit tests for newsegsmodelframework.newsegsvariable.variable.
 """
 
 import copy
