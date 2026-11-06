@@ -562,6 +562,8 @@ def add_input_container_callbacks(app: NewsegsDash):
 
                         provider.variable_provider.upsert_variable(var)
                         provider.invalidate_cache_for_component(lproj.id)
+                        # The settings are read by the optimisation and the marginal plot, in the workers
+                        provider.touch_project(lproj.id)
 
                         # Plot intervals only set the resolution of the marginal plot
                         if trigger_id['purpose'] != 'plot-intervals':

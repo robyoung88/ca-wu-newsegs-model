@@ -125,6 +125,16 @@ class InputChangeTestCase(unittest.TestCase):
             self.project_id, 'focussed_metamodel_id', lproj.metamodels[mm_index].id, increment_revision = False
         )
 
+    def worker_provider(self) -> CachedFromDatabaseNewsegsProjectProvider:
+        """A cached project provider of its own, holding the project, as a worker's holds it after a run.
+
+        A change made through the app must reach it: the worker runs whatever its cached project holds.
+        """
+        from newsegsmodelapp.backend import db
+        worker = CachedFromDatabaseNewsegsProjectProvider(db.get_engine)
+        worker.get_project(self.project_id)
+        return worker
+
     def make_independent(self, mm_index: int, varid: str) -> str:
         """Give a configuration its own instance of a variable, copied from the one it shares.
 
