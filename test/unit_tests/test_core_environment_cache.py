@@ -4,7 +4,11 @@ Unit tests for core/environment/environment_cache and its use by HourlyPVGISNEWA
 The PVGIS and NEWA fetches are replaced by fakes, so that the tests run offline, and each test
 uses its own cache in a temporary directory.
 """
+import os
+from pathlib import Path
 import pickle
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -187,11 +191,84 @@ class TestGetOrSetLock(TemporaryCacheTestCase):
     def test_lock_expires(self):
         # A lock left by a process which stopped while computing does not block the key
         with mock.patch.object(environment_cache, 'settings', {'ENV_CACHE_LOCK_EXPIRE_S': 0.1}):
-            environment_cache._lock(('a',), self.cache).acquire()
+            lock = environment_cache._lock(('a',), self.cache)
+            lock.acquire()
+            lock._stop_renewal.set() # pyright: ignore[reportOptionalMemberAccess] - as when its holder stops
             self.assertTrue(environment_cache.is_pending(('a',), self.cache))
             time.sleep(0.2)
             self.assertFalse(environment_cache.is_pending(('a',), self.cache))
             self.assertEqual(environment_cache.get_or_set(('a',), lambda: 1, cache = self.cache), 1)
+
+    # A holder renews its lock while it computes, so that the lock can expire soon after a holder stops (#182),
+    # however long a computation takes
+
+    def test_default_expiry_is_short(self):
+        # A NEWA fetch can take 8 minutes, but a stopped holder must not block the data for longer than a few
+        from config import settings
+        self.assertLessEqual(float(settings.get('ENV_CACHE_LOCK_EXPIRE_S', environment_cache.DEFAULT_LOCK_EXPIRE_S)), 300)
+        self.assertLessEqual(environment_cache.DEFAULT_LOCK_EXPIRE_S, 300)
+
+    def test_lock_renewed_while_computing(self):
+        # A computation lasting several times the expiry keeps the key locked throughout, and is not repeated
+        started, release = threading.Event(), threading.Event()
+        compute = self._slow_compute(started, release)
+        with mock.patch.object(environment_cache, 'settings', {'ENV_CACHE_LOCK_EXPIRE_S': 0.4}):
+            thread = threading.Thread(
+                target = environment_cache.get_or_set, args = (('a',), compute), kwargs = {'cache': self.cache}
+            )
+            thread.start()
+            self.assertTrue(started.wait(5))
+            for _ in range(6):
+                time.sleep(0.25)
+                self.assertTrue(environment_cache.is_pending(('a',), self.cache))
+            threading.Timer(0.2, release.set).start()
+            self.assertEqual(environment_cache.get_or_set(('a',), compute, cache = self.cache), 1)
+            thread.join(10)
+        compute.assert_called_once()
+        self.assertFalse(environment_cache.is_pending(('a',), self.cache))
+
+    def test_release_keeps_the_lock_of_another_holder(self):
+        # A holder whose lock expired, and was taken by another, does not release the other's
+        with mock.patch.object(environment_cache, 'settings', {'ENV_CACHE_LOCK_EXPIRE_S': 0.1}):
+            first = environment_cache._lock(('a',), self.cache)
+            first.acquire()
+            self.cache.touch(('lock', ('a',)), 0.01) # As if the holder had stopped renewing it
+            time.sleep(0.05)
+            second = environment_cache._lock(('a',), self.cache)
+            second.acquire()
+            first.release()
+            self.assertTrue(environment_cache.is_pending(('a',), self.cache))
+            second.release()
+            self.assertFalse(environment_cache.is_pending(('a',), self.cache))
+
+    def test_holder_stopped_while_computing(self):
+        # A process killed while computing leaves its lock, which expires and is then taken by the next request
+        script = (
+            'import sys, time\n'
+            'import diskcache\n'
+            'from newsegsmodelframework.core.environment import environment_cache\n'
+            'def compute():\n'
+            '    print("started", flush = True)\n'
+            '    time.sleep(60)\n'
+            'environment_cache.get_or_set(("a",), compute, cache = diskcache.Cache(sys.argv[1]))\n'
+        )
+        env = dict(os.environ, DYNACONF_ENV_CACHE_LOCK_EXPIRE_S = '1')
+        env['PYTHONPATH'] = os.pathsep.join([str(Path(environment_cache.__file__).parents[3]), env.get('PYTHONPATH', '')])
+        proc = subprocess.Popen(
+            [sys.executable, '-c', script, self._dir.name], stdout = subprocess.PIPE, text = True, env = env,
+        )
+        try:
+            self.assertEqual(proc.stdout.readline().strip(), 'started') # pyright: ignore[reportOptionalMemberAccess]
+            self.assertTrue(environment_cache.is_pending(('a',), self.cache))
+        finally:
+            proc.kill()
+            proc.wait(10)
+            proc.stdout.close() # pyright: ignore[reportOptionalMemberAccess]
+        self.assertTrue(environment_cache.is_pending(('a',), self.cache))
+        started = time.monotonic()
+        with mock.patch.object(environment_cache, 'settings', {'ENV_CACHE_LOCK_EXPIRE_S': 1}):
+            self.assertEqual(environment_cache.get_or_set(('a',), lambda: 2, cache = self.cache), 2)
+        self.assertLess(time.monotonic() - started, 5)
 
 def _fake_wind_at_site(lat, lon, rng, dt_start, dt_stop, site_heights):
     times = pd.date_range(dt_start, dt_stop, freq = '30min')
