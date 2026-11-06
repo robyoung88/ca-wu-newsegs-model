@@ -19,12 +19,13 @@ A metamodel can be run deterministically, or analysed with deterministic (DSA) o
 
 ## Software structure
 
-The software is split into three groups of Python packages (all under `src/`):
+The software is split into four groups of Python packages (all under `src/`):
 
 | Package | Purpose | Documentation |
 |---|---|---|
 | `newsegsmodelframework` | The modelling framework: models, modules, finance, variables, metamodels, projects, sensitivity analysis and statistics. Has no dependency on the web app. | [Framework](framework/index.md) |
 | `newsegsmodelapp` | The [Dash](https://dash.plotly.com) web application, the database it relies upon and the background workers that run the models. Depends on the framework. | [Application](app/index.md) |
+| `newsegsmodelutils` | What the framework and the application share but neither owns: at present, the functions that draw figures from the framework's data. Uses the framework, but not the app. | [Plotting utilities](support/utils.md) |
 | `newa`, `admdspenmw`, `config` | Supporting packages: New European Wind Atlas access, After Diversity Maximum Demand calculation and application settings. | [Supporting packages](support/newa.md) |
 
 Both the framework and the application are extended by **plugins**: the framework with new
@@ -34,6 +35,7 @@ together.
 
 ## Where to start
 
+* To use the app: [User guide](user-guide.md).
 * To understand how the pieces fit together: [Architecture](architecture.md).
 * To add a new kind of model: [Framework plugins](framework/plugins.md), then [Application plugins](app/plugins.md).
 * To understand what is stored by the app: [Database](app/database.md).
