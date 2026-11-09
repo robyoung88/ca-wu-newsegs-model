@@ -32,27 +32,20 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 
 DISPATCHSERVER = settings['DISPATCHSERVERS'][1]#'zmq-dispatcher'#
 FRONTENDPORT = settings['FRONTENDPORT']
-REQUEST_RETRIES = 1
 
 
 def send_to_dispatcher(
-    payload, 
-    retries: int = REQUEST_RETRIES,
+    payload,
     server_address: Optional[str] = None,
     frontend_port: Optional[str] = None
-) -> dict:
+):
     """Send a request to the dispatcher over ZeroMQ, and wait for its reply.
 
     Retries up to `retries` times if the dispatcher does not reply within the timeout.
 
     Args:
-        payload: The request to send; pickled.
-        retries: Number of times to retry the dispatcher before giving up.
-
-    Returns:
-        The reply of the dispatcher (the run information), or None if the request was refused or the dispatcher could not be reached.
+        payload: The request to send after pickling.
     """
-    JOB_DISPATCH_TIMEOUT = settings.get('JOB_DISPATCH_TIMEOUT_MS', 200)
     server_address = DISPATCHSERVER if server_address is None else server_address
     frontend_port = FRONTENDPORT if frontend_port is None else frontend_port
 
@@ -60,36 +53,17 @@ def send_to_dispatcher(
         sock.connect(f'tcp://{server_address}:{frontend_port}')
 
     context = zmq.Context()
-    socket = context.socket(zmq.REQ)
+    socket = context.socket(zmq.DEALER)
+    socket.setsockopt(zmq.LINGER, -1)
 
     _reconnect(socket)
 
     payload_bytes = pickle.dumps(payload)
 
-    socket.send(payload_bytes)
-    retries_left = retries
-    while True:
-        if (socket.poll(JOB_DISPATCH_TIMEOUT) & zmq.POLLIN) != 0:
-            reply_bytes = socket.recv()
-            try:
-                reply_data = pickle.loads(reply_bytes)
-                break
-            except Exception as e:
-                logging.error('Received malformed reply from worker: %s', reply_bytes, exc_info = True)
+    socket.send_multipart([b"", payload_bytes])
 
-        retries_left -= 1
-        socket.setsockopt(zmq.LINGER, 0)
-        socket.close()
-        if retries_left == 0:
-            logger.error('Job dispatch timed out')
-            return None
-        logger.warning('No response from job server, retrying...')
-
-        socket = context.socket(zmq.REQ)
-        _reconnect(socket)
-        socket.send(payload_bytes)
-
-    return reply_data
+    # Immediately close; do not block, waiting for a synchronous reply
+    socket.close()
 
 def _local_run_any(
     runner, request, engine, project_provider, results_provider
@@ -219,7 +193,10 @@ def spawn_job(
     request: registers.RunRequest,
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface,
-) -> int | None:
+    request_handler: RequestHandlerInterface,
+    server_address: Optional[str] = None,
+    frontend_port: Optional[str] = None
+) -> None:
     """Start the run of a request: send it to the dispatcher if it is a background procedure, otherwise run it in the app.
 
     If the dispatcher refuses a background request its run id is cleared and its status is not changed.
@@ -228,6 +205,8 @@ def spawn_job(
         request: The request which triggered the procedure.
         project_provider: Provider of projects, metamodels and variables.
         results_provider: Provider of results.
+        server_address: (optional) address of the zmq broker
+        frontend_port: (optional) frontend port of the zmq proxy
 
     Returns:
         The id of the run, or None if the request was not started.
@@ -238,24 +217,20 @@ def spawn_job(
     )
 
     if request.background_procedure:
-        run_info = send_to_dispatcher(request)
-        if run_info is None:
-            logger.info(
-                'Background Request refused by Dispatcher for Request ID = %d; Type = %s;',
-                request.request_id, request.request_type
-            )
-            # Request will have unmodified status, but clear any run id present to prevent confusion
-            request.run_id = -1
-            return None
-        else:
-            logger.info(
-                'Background Request sent to Dispatcher for Request ID = %d; Type = %s; Run ID = %d; has been assigned. Job was prexisting = %s',
-                request.request_id, request.request_type, run_info['job_id'], run_info['prexisting']
-            )
-            # Update the request status in sync with db
-            request.run_id = run_info['job_id']
-            request.status = 'DISPATCHED'
-            return run_info['job_id']
+        # Mark the request as sent immediately before sending - do not wait until after in case
+        # we have contention with the worker picking it up
+
+        server_address = DISPATCHSERVER if server_address is None else server_address
+        frontend_port = FRONTENDPORT if frontend_port is None else frontend_port
+        
+        request_handler.set_request_status(
+            request.request_id,
+            'AWAITING WORKER',
+        )
+        send_to_dispatcher(request, server_address, frontend_port)
+
+        return None
+
     else:
         match request.request_class:
             case 'run':
@@ -290,9 +265,9 @@ def spawn_job(
                 run_id, request.trigger_request_id
             )
             request.run_id = run_id
-            # Only mark as DISPATCHED, as the completed run needs handling before FULFILLED
-            request.status = 'DISPATCHED'
-        return run_id
+            # Only mark as PROCESSING, as the completed run needs handling before FULFILLED
+            request.status = 'PROCESSING'
+        return 
 
 def generate_post_action_requests(
     original_request: registers.RunRequest | Sequence[registers.RunRequest],
@@ -521,28 +496,33 @@ def add_action_callbacks(app: NewsegsDash):
                     req.request_id, req.request_type
                 )
                 
-                run_id = spawn_job(req, app.project_provider, app.results_provider)
-                
-                if run_id:
-                    logger.debug(
-                        'Appending to ongoing actions: Newly spawned Run [Run ID = %d;] for Request ID = %d; Type = %s;',
-                        run_id, req.request_id, req.request_type
-                    )
+                spawn_job(
+                    req, 
+                    app.project_provider, app.results_provider, app.request_handler
+                )
 
-                    ongoing_actions.add(run_id)
-                    new_jobs = True
-                
-                else:
-                    logger.warning(
-                        'Unable to Spawn Run for Request ID = %d; Type = %s; '
-                        'Should be retried on next run through.',
+            # These requests have not yet been picked up, and should be checked to see if it's worth
+            # retrying
+            slow_requests = app.request_handler.get_slow_requests()
+            if slow_requests:
+                for req in slow_requests:
+                    logger.info(
+                        'Action Manager handling Request ID = %d; Type = %s; as Slow Request, will spawn job.',
                         req.request_id, req.request_type
                     )
-                    
-                    retry_spawns = True
+                    spawn_job(
+                        req, 
+                        app.project_provider, app.results_provider, app.request_handler
+                    )          
+            
+            # Pull the active requests again so we can check if we need to keep the trigger open
+            request_list = app.request_handler.get_active_requests()
 
             # Pull the run list from the request list - this should match the ongoing actions list
-            ongoing_run_ids = [x.run_id for x in request_list if x.status == 'DISPATCHED']
+            ongoing_run_ids = [x.run_id for x in request_list if x.status == 'PROCESSING']
+
+            # Keep trigger open if we have any not being run
+            retry_spawns = len(ongoing_run_ids) != len(request_list)
 
             if set(ongoing_run_ids) != ongoing_actions:
                 s_req = set(ongoing_run_ids)

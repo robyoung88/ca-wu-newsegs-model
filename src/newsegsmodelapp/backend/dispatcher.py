@@ -75,6 +75,7 @@ def run_dispatcher(
         db_path: str | None = None,
         stop_event = None,
         clean_interval_s = 60,
+        worker_ready_queue = None,
     ):
     """Supervisor to the proxy and workers"""
 
@@ -102,7 +103,7 @@ def run_dispatcher(
         wstop_event = ctx.Event()
         p = ctx.Process(
             target = worker_process,
-            args = (idx, worker_server, backendport, db_path, wstop_event)
+            args = (idx, worker_server, backendport, db_path, wstop_event, worker_ready_queue)
         )
         p.start()
         workers[idx] = p
@@ -124,7 +125,7 @@ def run_dispatcher(
                     wstop_event = ctx.Event()
                     p = ctx.Process(
                         target = worker_process,
-                        args = (idx, worker_server, backendport, db_path, wstop_event)
+                        args = (idx, worker_server, backendport, db_path, wstop_event, worker_ready_queue)
                     )
                     p.start()
                     workers[idx] = p

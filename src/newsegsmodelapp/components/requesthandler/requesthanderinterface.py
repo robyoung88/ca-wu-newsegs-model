@@ -57,7 +57,9 @@ class RequestHandlerInterface(metaclass = ABCMeta):
         Requests will either have status:
             - "AWAITING DISPATCH" (i.e. requiring a new run generated)
             or
-            - "DISPATCHED" (i.e. with a run assigned and without having processed a completion of that run)
+            - "AWAITING WORKER" (i.e. dispatched to await a worker, but without a run generated)
+            or
+            - "PROCESSING" (i.e. with a run assigned and without having processed a completion of that run)
         """
 
     # REVIEW (unreferenced): no references to `get_new_requests` found in src/, scripts/ or data/.

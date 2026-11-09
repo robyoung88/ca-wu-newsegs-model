@@ -511,7 +511,8 @@ runs = sa.Table(
 
 REQUEST_STATUS = Literal[
     'AWAITING DISPATCH',
-    'DISPATCHED',
+    'AWAITING WORKER',
+    'PROCESSING',
     'FAILED',
     'CANCELLED',
     'FULFILLED',
@@ -541,6 +542,9 @@ requests = sa.Table(
 
     sa.Column('retry_number', sa.Integer, default = 0),
     sa.Column('max_retries', sa.Integer, default = 5),
+    
+    # In UTC, as created_at (see utc_now). Do not use server_onupdate, as not all backends can handle it.
+    sa.Column('modified_at', sa.DateTime, default = utc_now, onupdate = utc_now),
 )
 
 # -----------------------------------------------------------------------------

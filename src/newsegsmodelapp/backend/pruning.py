@@ -67,7 +67,7 @@ from newsegsmodelapp.backend.db.db import write_transaction, read_transaction
 logger = logging.getLogger(__name__)
 
 # Statuses of a request that may still be followed by steps that read its results.
-ACTIVE_REQUEST_STATUSES = ('AWAITING DISPATCH', 'DISPATCHED')
+ACTIVE_REQUEST_STATUSES = ('AWAITING DISPATCH', 'AWAITING WORKER', 'PROCESSING')
 FINISHED_REQUEST_STATUSES = ('FAILED', 'CANCELLED', 'FULFILLED')
 
 # Finished requests and runs younger than this are kept, so that the interface can still poll them.

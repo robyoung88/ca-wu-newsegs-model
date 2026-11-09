@@ -68,7 +68,7 @@ def generate_claim_ticket(
                 sa.update(tbls.requests)
                 .where(tbls.requests.c.request_id == request.request_id)
                 .values(
-                    status="DISPATCHED",
+                    status="PROCESSING",
                     run_id=run_id
                 )
             )

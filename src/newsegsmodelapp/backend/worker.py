@@ -10,6 +10,7 @@ from sqlalchemy.exc import OperationalError
 from typing import cast
 
 import zmq
+from zmq.utils.monitor import recv_monitor_message
 
 from pathlib import Path
 
@@ -41,7 +42,8 @@ def worker_process(
     server: str = DISPATCHSERVER, 
     port: str = BACKENDPORT, 
     db_path: str | None = None, 
-    stop_event = None
+    stop_event = None,
+    ready_queue = None,
 ):
     """The main loop of a worker process.
 
@@ -55,10 +57,12 @@ def worker_process(
         port: Port on which the dispatcher serves workers.
         db_path: Path of the database file; the default if None.
         stop_event: Event which, when set, tells the worker to stop.
+        ready_queue: Optional queue receiving the worker ID after it connects and before it waits for dispatch.
     """
     context = zmq.Context()
-    socket = context.socket(zmq.REP)
+    socket = context.socket(zmq.DEALER)
     socket.setsockopt(zmq.RCVTIMEO, settings.get('WORKER_RECEIVE_TIMEOUT_MS', -1))
+    monitor_socket = socket.get_monitor_socket() if ready_queue is not None else None
     socket.connect(f'tcp://{server}:{port}')
 
     logger.info('Worker %d listening on %s:%s', worker_id, server, port)
@@ -70,6 +74,18 @@ def worker_process(
     result_provider = CachedFromDatabaseResultProvider(db.get_engine, RESULTS_STORE)
 
     try: # Alive try - ensure that 'finally' runs even if we don't go into the while
+        if monitor_socket is not None:
+            poller = zmq.Poller()
+            poller.register(monitor_socket, zmq.POLLIN)
+            while True:
+                if dict(poller.poll(1000)).get(monitor_socket) == zmq.POLLIN:
+                    event = recv_monitor_message(monitor_socket)
+                    if event['event'] == zmq.EVENT_CONNECTED:
+                        ready_queue.put(worker_id)
+                        break
+                if stop_event is not None and stop_event.is_set():
+                    return
+
         while stop_event is None or not stop_event.is_set():
             try: # Receive try
                 frames = socket.recv_multipart()
@@ -87,40 +103,7 @@ def worker_process(
 
                 job_id, job_exists = generate_claim_ticket(write_engine, request)
 
-                response_data = {
-                    'status': 'started',
-                    'worker': worker_id if not job_exists else None,
-                    'job_id': job_id,
-                    'prexisting': job_exists
-                }
-
-                response_bytes = pickle.dumps(response_data)
-
-                retries = 5
-                # TODO: Sort out this mess. What's it to do with the database?
-                
-                while retries > 0:
-                    try:
-                        socket.send_multipart(client_envelope + [response_bytes])
-                        send_completed = True
-                        break
-                    except OperationalError:
-                        retries -= 1
-                        continue
-                    except Exception as e:
-                        raise e
-                else:
-                    send_completed = False
-
-                if not send_completed:
-                    try:
-                        socket.setsockopt(zmq.LINGER, 0)
-                        socket.close()
-                    except:
-                        pass
-                    socket = context.socket(zmq.REP)
-                    socket.connect(f'tcp://{server}:{port}')
-                    raise ValueError(f'Cannot send claim ticket back to client - database is unresponsive.')
+                # There is now no need to pass data back to the client - it has already closed the socket.
 
                 if job_exists:
                     # Loop back
@@ -223,5 +206,7 @@ def worker_process(
         logger.info('Worker %d disposing engines and closing sockets.', worker_id)
         write_engine.dispose()
         read_engine.dispose()
+        if monitor_socket is not None:
+            monitor_socket.close()
         socket.close()
         context.term()

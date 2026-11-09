@@ -114,7 +114,7 @@ class TestPruneResults(_PruningBase):
         self._result(5, 'cmp-a', 'grid', self._file('res-5.json'))
         with self.engine.begin() as conn:
             conn.execute(tbls.requests.insert().values(
-                request_id = 7, project_id = 'prj-1', status = 'DISPATCHED'
+                request_id = 7, project_id = 'prj-1', status = 'PROCESSING'
             ))
             conn.execute(
                 tbls.component_configs.update()
@@ -222,7 +222,7 @@ class TestPruneConfigurations(_PruningBase):
     def test_skipped_while_request_active(self):
         from newsegsmodelapp.backend.pruning import prune_orphan_configurations
         with self.engine.begin() as conn:
-            conn.execute(tbls.requests.insert().values(request_id = 1, project_id = 'prj-1', status = 'DISPATCHED'))
+            conn.execute(tbls.requests.insert().values(request_id = 1, project_id = 'prj-1', status = 'PROCESSING'))
 
         self.assertEqual(prune_orphan_configurations(self.engine), {})
         self.assertIn('metam-orphan', self._rows(tbls.metamodels))
@@ -266,7 +266,7 @@ class TestPruneRequests(_PruningBase):
         self._request(5, 'FULFILLED')                       # pruned: no results
         self._request(6, 'FAILED', run_age = self.NEW)      # kept: too recent
         self._request(7, 'FULFILLED')                       # kept: chain has an active request
-        self._request(8, 'DISPATCHED', trigger = 7)         # kept: active
+        self._request(8, 'PROCESSING', trigger = 7)         # kept: active
         self._request(9, 'FAILED')                          # kept: largest id
         self._result(1, 'cmp-a', 'grid', self._file('res-1.json'), request_id = 3)
 
