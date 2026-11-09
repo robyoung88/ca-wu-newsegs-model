@@ -107,6 +107,7 @@ class TestOptimRun(unittest.TestCase):
             'varid': self.varid, 'label': self.var.label,
             'before': float(self.original_parameters[0]), 'after': 20., 'lower': 10., 'upper': 20.,
         }])
+        self.assertEqual(result['metamodel_id'], self.mm.id)
         self.assertEqual(result['metamodel_name'], self.mm.name)
         self.assertEqual(result['new_metamodel_name'], self.mm.name + ' - Opt')
         proj = self.provider.get_project(self.proj.id)
@@ -172,6 +173,7 @@ class TestOptimRun(unittest.TestCase):
             self.assertEqual(self._run(), optim_single_mm.NO_VARIABLES_MESSAGE)
         run.assert_not_called()
         self.assertEqual(self._saved_result()['status'], 'not_run')
+        self.assertEqual(self._saved_result()['metamodel_id'], self.mm.id)
 
     def test_settings_are_passed_to_the_optimiser(self):
         with mock.patch.object(optim, 'run_optimisation', side_effect = self._fake_optimisation) as run:

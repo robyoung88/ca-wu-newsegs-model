@@ -908,6 +908,8 @@ def _trigger_plot_marginal_optim(
         project_provider.invalidate_cache_for_component(proj.id)
 
     fig = optim_plots.statistic_across_margin_plot(plot_df, mm.variables[varid].name)
+    # Saved on the project, of which there is one plot: names the configuration it shows
+    fig.update_layout(meta = {'metamodel_id': mm_id})
 
     result_provider.upsert_result(
         'plot_marginal_optim', proj.table_config, fig, request = request, revision = table_revision
@@ -928,6 +930,10 @@ def _plot_marginal_optim(
     fig, rev = result_provider.get_result(
         'plot_marginal_optim', lproj.table_config,
     )
+    # A plot saved before plots named their configuration has no meta, and is shown for every configuration
+    meta = fig.layout.meta if fig is not None else None
+    if meta and meta.get('metamodel_id') != lproj.focussed_metamodel_id:
+        return None, None
 
     return fig, rev
 
@@ -970,6 +976,25 @@ def _make_postopt_tables_sprake(
     )
 
     return 'ok'
+
+@register_table_getter(TABLE_SECTION, MODEL_TYPE)
+def _get_postopt_metamodel_table(
+    active_project_id: str,
+    table_options: dict,
+    project_provider: NewsegsProjectProviderInterface,
+    result_provider: NewsegsResultProviderInterface
+):
+    """The feedback of the project's optimisation, shown for the configuration optimised and its optimised copy.
+
+    A result saved before results named their configuration has no `metamodel_id`, and is shown for every configuration.
+    """
+    lproj = project_provider.get_lightweight_project(active_project_id)
+    optdict, _ = result_provider.get_result('optimisation_result', lproj.table_config)
+    owner = optdict.get('metamodel_id') if optdict else None
+    if owner is not None and lproj.focussed_metamodel_id not in (owner, optdict.get('new_metamodel_id')): # pyright: ignore[reportOptionalMemberAccess]
+        return None, None
+
+    return result_provider.get_result('table_postopt_metamodel', lproj.table_config)
 
 TABLE_SECTION = 'table_psa_metamodel'
 _request_table_draw_psa_metamodel = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
