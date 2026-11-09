@@ -5,7 +5,7 @@ optimisation bounds and plot resolution.
 import json
 
 from .base import InputChangeTestCase, cached_variant
-from .dash_dispatch import NOT_UPDATED, variable_id
+from .dash_dispatch import NOT_UPDATED, _matches, dispatch_callback, get_callback_spec, variable_id
 
 # Selected for the DSA, with bounds relative to its value
 CAPEX = ('gen_costs', 'wind_capex_per_kw')
@@ -143,6 +143,46 @@ class TestDsaActive(_SharedAndSeparate):
         )
         self.assertFalse(response.updated)
         self.assertNothingChanged(before)
+
+class TestDsaRowAppearance(_SharedAndSeparate):
+    """`update_dsa_input_contents`: a deselected row is faded, whether or not its editor has been built"""
+    varid = CAPEX_VARID
+    toggle = row_id('input-toggle', 'dsa-active', CAPEX, 'dsa')
+    trigger = row_id('input-group-config-update-trigger', 'trigger', CAPEX, 'dsa')
+    container = row_id('input-component', 'input-group-container', CAPEX, 'dsa')
+    bounds = row_id('input-component', 'bounds-container', CAPEX, 'dsa')
+
+    def _toggled(self, open_editors: bool):
+        """Toggle the row and return its update, as the browser does when the toggle has written the row's trigger"""
+        components = self.page(('dsa', None), open_editors = open_editors)
+        selected = self.stored_variable(CAPEX_VARID).dsa_selected
+        data = self.dispatch(self.toggle, not selected, components).get(self.trigger, 'data')
+        response = dispatch_callback(
+            self.client, get_callback_spec(self.client, 'input-component', 'children'), self.trigger, data, components,
+            stores = {'active-project-id': self.project_id, 'app-state': json.dumps({'model_type': 'sprake'})},
+        )
+        return response, not selected
+
+    def _check_toggled_twice(self, open_editors: bool):
+        for _ in range(2):
+            response, selected = self._toggled(open_editors)
+            self.assertEqual('deselected' not in response.get(self.container, 'className').split(), selected)
+
+    def test_row_never_opened(self):
+        self._check_toggled_twice(open_editors = False)
+
+    def test_row_opened(self):
+        self._check_toggled_twice(open_editors = True)
+
+    def test_bounds_only_redrawn_when_built(self):
+        self.assertIs(self._toggled(open_editors = False)[0].get(self.bounds, 'children'), NOT_UPDATED)
+        self.assertIsNot(self._toggled(open_editors = True)[0].get(self.bounds, 'children'), NOT_UPDATED)
+
+    def test_row_never_opened_matches_first_output(self):
+        # The Dash renderer calls the callback for a row with a component matching its first output
+        first_output = get_callback_spec(self.client, 'input-component', 'children').outputs[0][0]
+        components = self.page(('dsa', None), open_editors = False)
+        self.assertTrue(any(_matches(first_output, x.id, self.trigger) for x in components))
 
 class TestOptimSettings(_SharedAndSeparate):
     """`bound-lower`, `bound-upper` and `plot-intervals` in the `optim` supersection"""

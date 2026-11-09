@@ -114,7 +114,7 @@ class TestPruneResults(_PruningBase):
         self._result(5, 'cmp-a', 'grid', self._file('res-5.json'))
         with self.engine.begin() as conn:
             conn.execute(tbls.requests.insert().values(
-                request_id = 7, project_id = 'prj-1', status = 'DISPATCHED'
+                request_id = 7, project_id = 'prj-1', status = 'PROCESSING'
             ))
             conn.execute(
                 tbls.component_configs.update()
@@ -222,7 +222,7 @@ class TestPruneConfigurations(_PruningBase):
     def test_skipped_while_request_active(self):
         from newsegsmodelapp.backend.pruning import prune_orphan_configurations
         with self.engine.begin() as conn:
-            conn.execute(tbls.requests.insert().values(request_id = 1, project_id = 'prj-1', status = 'DISPATCHED'))
+            conn.execute(tbls.requests.insert().values(request_id = 1, project_id = 'prj-1', status = 'PROCESSING'))
 
         self.assertEqual(prune_orphan_configurations(self.engine), {})
         self.assertIn('metam-orphan', self._rows(tbls.metamodels))
@@ -242,7 +242,7 @@ class TestPruneRequests(_PruningBase):
                 trigger_request_id = trigger, run_id = run_id if run_age is not None else None,
             ))
             if run_age is not None:
-                t = datetime.datetime.now() - datetime.timedelta(days = run_age)
+                t = tbls.utc_now() - datetime.timedelta(days = run_age)
                 conn.execute(tbls.runs.insert().values(
                     run_id = run_id, request_id = request_id, status = run_status, created_at = t, modified_at = t
                 ))
@@ -266,7 +266,7 @@ class TestPruneRequests(_PruningBase):
         self._request(5, 'FULFILLED')                       # pruned: no results
         self._request(6, 'FAILED', run_age = self.NEW)      # kept: too recent
         self._request(7, 'FULFILLED')                       # kept: chain has an active request
-        self._request(8, 'DISPATCHED', trigger = 7)         # kept: active
+        self._request(8, 'PROCESSING', trigger = 7)         # kept: active
         self._request(9, 'FAILED')                          # kept: largest id
         self._result(1, 'cmp-a', 'grid', self._file('res-1.json'), request_id = 3)
 
@@ -281,7 +281,7 @@ class TestPruneRequests(_PruningBase):
         import datetime
         self._request(1, 'FULFILLED', run_id = 12)
         self._request(2, 'AWAITING DISPATCH', run_age = None)
-        t = datetime.datetime.now() - datetime.timedelta(days = self.OLD)
+        t = tbls.utc_now() - datetime.timedelta(days = self.OLD)
         with self.engine.begin() as conn:
             conn.execute(tbls.runs.insert(), [
                 {'run_id': 11, 'request_id': 1, 'status': 'FAILED', 'created_at': t, 'modified_at': t},  # superseded: pruned

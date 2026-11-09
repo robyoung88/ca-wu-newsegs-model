@@ -44,6 +44,45 @@ class _ResultsTestCase(InputChangeTestCase):
         component_provider = cast(FromDatabaseNewsegsComponentProvider, self.provider._component_provider)
         self.table_config = component_provider.get_lightweight_dataholding_component(lproj.table_config.id)
 
+class TestStaleResult(_ResultsTestCase):
+    """With no result at the revision asked for, the most recent earlier result is returned (#195)"""
+
+    TABLE = 'table_finance_so_benefits_ann'
+
+    def save(self, label: str, revision: int):
+        self.worker.upsert_result(self.TABLE, self.table_config, html.Div(label), revision = revision)
+
+    def shown(self) -> tuple[str, int]:
+        res, rev = self.app_results.get_result(self.TABLE, self.table_config)
+        return res.children, rev
+
+    def test_most_recent_earlier_revision(self):
+        r = self.table_config.revision
+        self.save('two configurations', r - 3)
+        self.save('three configurations, first', r - 1)
+        self.save('three configurations', r - 1)
+        # Saved at a revision of the project in a worker's memory, above the stored one (as in #177)
+        self.save('ahead', r + 2)
+        self.assertEqual(self.shown(), ('three configurations', r - 1))
+
+        # The result at the revision asked for, once there is one
+        self.save('current', r)
+        self.assertEqual(self.shown(), ('current', r))
+
+    def test_only_later_revisions(self):
+        # As before: the latest result of the earliest revision
+        r = self.table_config.revision
+        self.save('ahead by 2', r + 2)
+        self.save('ahead by 1', r + 1)
+        self.assertEqual(self.shown(), ('ahead by 1', r + 1))
+
+    def test_revision_given(self):
+        r = self.table_config.revision
+        self.save('earlier', r - 2)
+        self.save('later', r)
+        res, rev = self.app_results.get_result(self.TABLE, self.table_config, revision = r - 1)
+        self.assertEqual((res.children, rev), ('earlier', r - 2))
+
 class TestResultSavedAgainAtTheSameRevision(_ResultsTestCase):
 
     def shown(self, allow_stale: bool = True) -> str:
@@ -163,6 +202,7 @@ class TestMarginalPlotDraw(_ResultsTestCase):
     def shown_label(self) -> str:
         fig, rev = self.app_results.get_result(PLOT, self.table_config)
         self.assertEqual(rev, self.table_config.revision)
+        self.assertEqual(fig.layout.meta, {'metamodel_id': self.metamodel_ids[0]})
         return fig.layout.xaxis.title.text
 
     def test_each_plot_is_shown(self):

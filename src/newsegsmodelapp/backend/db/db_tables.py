@@ -6,6 +6,15 @@ import uuid6
 
 import sqlalchemy as sa
 
+def utc_now() -> datetime.datetime:
+    """The current time in UTC, without a timezone, as SQLite's `CURRENT_TIMESTAMP` (and so `server_default = now()`)
+    records it.
+
+    Times compared with each other, or with SQLite's `'now'`, must all be recorded in one timezone, whatever the host's
+    timezone.
+    """
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo = None)
+
 L_VARIABLE_UID = 38
 L_COMPONENT_UID = 42
 
@@ -485,7 +494,8 @@ runs = sa.Table(
 
     # Automatic run health columns
     sa.Column('created_at', sa.DateTime, server_default = sa.func.now()),
-    sa.Column('modified_at', sa.DateTime, default = datetime.datetime.now, onupdate = datetime.datetime.now), # Do not use server_onupdate, as not all backends can handle it.
+    # In UTC, as created_at (see utc_now). Do not use server_onupdate, as not all backends can handle it.
+    sa.Column('modified_at', sa.DateTime, default = utc_now, onupdate = utc_now),
     
     # Run feedback
     sa.Column('progress', sa.Float, default = 0.0),
@@ -501,7 +511,8 @@ runs = sa.Table(
 
 REQUEST_STATUS = Literal[
     'AWAITING DISPATCH',
-    'DISPATCHED',
+    'AWAITING WORKER',
+    'PROCESSING',
     'FAILED',
     'CANCELLED',
     'FULFILLED',
@@ -531,6 +542,9 @@ requests = sa.Table(
 
     sa.Column('retry_number', sa.Integer, default = 0),
     sa.Column('max_retries', sa.Integer, default = 5),
+    
+    # In UTC, as created_at (see utc_now). Do not use server_onupdate, as not all backends can handle it.
+    sa.Column('modified_at', sa.DateTime, default = utc_now, onupdate = utc_now),
 )
 
 # -----------------------------------------------------------------------------

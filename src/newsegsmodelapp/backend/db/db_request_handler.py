@@ -1,7 +1,10 @@
 """The request handler: creation and monitoring of requests for background procedures in the requests table.
 """
 from dataclasses import asdict
+import datetime
 import logging
+
+from newsegsmodelapp.backend.db.db_tables import utc_now
 logger = logging.getLogger(__name__)
 
 import json
@@ -15,6 +18,8 @@ from newsegsmodelapp.components.requesthandler.requesthanderinterface import Req
 from newsegsmodelapp.backend.db import tables as tbls
 from newsegsmodelapp.registers import RunRequest
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
+
+SLOW_REQUEST_TIMEOUT_SECONDS = 30
 
 _REQUEST_REGISTERS = {
     'run': registers.RUN_REQUEST_REGISTER,
@@ -216,7 +221,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         self,
         active_project_id: str | None = None
     ) -> list[registers.RunRequest]:
-        stmt = self._table.select().where(self._table.c.status.in_(['AWAITING DISPATCH', 'DISPATCHED']))
+        stmt = self._table.select().where(self._table.c.status.in_(['AWAITING DISPATCH', 'AWAITING WORKER', 'PROCESSING']))
         if active_project_id:
             stmt = stmt.where(
                 self._table.c.project_id == active_project_id
@@ -289,7 +294,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         else:
             are_dispatched = [not x is None for x in run_id]
 
-        status = ['DISPATCHED' if x else 'AWAITING DISPATCH' for x in are_dispatched]
+        status = ['PROCESSING' if x else 'AWAITING DISPATCH' for x in are_dispatched]
 
         data = [
             {'_id': id_, 'run_id_': r_id_, 'status_': status_}
@@ -308,7 +313,7 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
         write_with_retries(self._get_engine(writer = True), stmt, data)
         if logger.level <= logging.DEBUG:
             for rq_id, rn_id in zip(request_id, run_id):
-                logger.debug('Marked as DISPATCHED: Request ID = %d; Run ID = %d;', rq_id, rn_id)
+                logger.debug('Marked as PROCESSING: Request ID = %d; Run ID = %d;', rq_id, rn_id)
 
     @override
     def mark_completed(self, request_id: int | Sequence[int], completed: bool = True):
@@ -361,6 +366,29 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
 
         return False
 
+    def get_slow_requests(
+            self,
+            active_project_id: str | None = None,
+            timeout_seconds: int = SLOW_REQUEST_TIMEOUT_SECONDS
+        ) -> list[registers.RunRequest]:
+        """Find all requests that have been waiting for a worker for too long"""
+        cutoff = utc_now() - datetime.timedelta(seconds = timeout_seconds)
+        stmt = (
+            self._table.select()
+            .where(
+                self._table.c.status == 'AWAITING WORKER',
+                self._table.c.modified_at < cutoff
+            )
+        )
+        if active_project_id:
+            stmt = stmt.where(
+                self._table.c.project_id == active_project_id
+            )
+
+        with read_transaction(self._get_engine(writer = False)) as conn:
+            rows = conn.execute(stmt).fetchall()
+        return [self._database_row_to_request(x) for x in rows]
+
     def cancel_requests(
         self, request_id: Optional[int | Sequence[int]] = None, chain: bool = True
     ) -> list[int]:
@@ -379,7 +407,8 @@ class FromDatabaseRequestHandler(RequestHandlerInterface):
             .where(
                 self._table.c.status.in_([
                     'AWAITING DISPATCH',
-                    'DISPATCHED',
+                    'AWAITING WORKER',
+                    'PROCESSING',
                 ])
             )
         )
