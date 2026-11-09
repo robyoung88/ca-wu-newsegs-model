@@ -90,7 +90,7 @@ def execute_optim_single_mm_run(
     if len(selected) == 0:
         result_provider.upsert_result(
             'optimisation_result', proj.table_config,
-            {'status': 'not_run', 'success': False, 'message': NO_VARIABLES_MESSAGE},
+            {'status': 'not_run', 'success': False, 'message': NO_VARIABLES_MESSAGE, 'metamodel_id': mm.id},
             request = request,
         )
         return NO_VARIABLES_MESSAGE
@@ -200,7 +200,7 @@ def optimisation_result(
             final_value: The best value of the statistic found, with its natural sign.
             variables: For each variable, its `varid`, `label`, value `before` and `after` (of the parameter
                 varied), and its `lower` and `upper` bounds.
-            metamodel_name: Name of the metamodel optimised.
+            metamodel_id, metamodel_name: The metamodel optimised.
             new_metamodel_id, new_metamodel_name: The optimised copy added to the project; None if none was
                 added, on failure or when the optimisation did not improve on the statistic.
             message: The message of the optimiser.
@@ -225,6 +225,7 @@ def optimisation_result(
             }
             for v in variables
         ],
+        'metamodel_id': mm.id,
         'metamodel_name': mm.name,
         'new_metamodel_id': mm_copy.id if mm_copy is not None else None,
         'new_metamodel_name': mm_copy.name if mm_copy is not None else None,

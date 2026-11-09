@@ -700,19 +700,20 @@ def add_input_container_callbacks(app: NewsegsDash):
         return rval
 
     @app.callback(
+        # First, as it is always on the page: the bounds are in the row's editor, which isn't built until it is opened
         Output({
-            'type': 'input-component', 
-            'supersection': 'dsa', 'purpose': 'bounds-container',
-            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
-            'parameter_index': ALL, 'vector_location': ALL},
-            'children'
-        ),
-        Output({
-            'type': 'input-component', 
+            'type': 'input-component',
             'supersection': 'dsa', 'purpose': 'input-group-container',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL},
             'className'
+        ),
+        Output({
+            'type': 'input-component',
+            'supersection': 'dsa', 'purpose': 'bounds-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'children'
         ),
 
         Input({
@@ -728,7 +729,14 @@ def add_input_container_callbacks(app: NewsegsDash):
         State('active-project-id', 'data'),
         State('app-state', 'data'),
         State({
-            'type': 'input-component', 
+            'type': 'input-component',
+            'supersection': 'dsa', 'purpose': 'input-group-container',
+            'section': MATCH, 'key': MATCH, 'subindex': MATCH,
+            'parameter_index': ALL, 'vector_location': ALL},
+            'id'
+        ),
+        State({
+            'type': 'input-component',
             'supersection': 'dsa', 'purpose': 'bounds-container',
             'section': MATCH, 'key': MATCH, 'subindex': MATCH,
             'parameter_index': ALL, 'vector_location': ALL},
@@ -741,7 +749,8 @@ def add_input_container_callbacks(app: NewsegsDash):
         input_group_triggers,
         active_project_id,
         app_state,
-        container_ids
+        container_ids,
+        bounds_container_ids,
     ):
         if not len(container_ids) or active_project_id is None:
             raise PreventUpdate
@@ -774,8 +783,8 @@ def add_input_container_callbacks(app: NewsegsDash):
         )
 
         rval = (
-            [bounds_input] * len(container_ids),
-            [cn] * len(container_ids)
+            [cn] * len(container_ids),
+            [bounds_input] * len(bounds_container_ids)
         )
         
         t1 = time.perf_counter()

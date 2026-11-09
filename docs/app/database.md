@@ -253,6 +253,10 @@ erDiagram
 * `variable_configs.component_version` is the version of the `Variable` class that saved the
   row, null if it was saved before versions were recorded. As with the other components, the
   payload records the version too, and a payload newer than the app supports is rejected.
+* The times of `runs` are in UTC, without a timezone: `created_at` is filled in by SQLite, and `modified_at` by the
+  app (`db_tables.utc_now`). The dispatcher marks a run as failed once `modified_at` is older than
+  `DEAD_CALCULATION_INTERVAL_SECONDS`, and pruning compares both with a cutoff in UTC, so both work whatever the host's
+  timezone. `projects.modified_at` is still in local time.
 * `requests` are created by the front end (from the actions in the app) and picked up by the
   dispatcher; each request is executed as one or more `runs` by a worker. The run carries the
   progress and cancellation flag that the front end polls.
