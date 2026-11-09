@@ -202,6 +202,7 @@ class TestMarginalPlotDraw(_ResultsTestCase):
     def shown_label(self) -> str:
         fig, rev = self.app_results.get_result(PLOT, self.table_config)
         self.assertEqual(rev, self.table_config.revision)
+        self.assertEqual(fig.layout.meta, {'metamodel_id': self.metamodel_ids[0]})
         return fig.layout.xaxis.title.text
 
     def test_each_plot_is_shown(self):

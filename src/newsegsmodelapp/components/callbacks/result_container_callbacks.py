@@ -27,6 +27,9 @@ _UPDATE_ALL_TRIGGER_TYPES = {'annual-horizon-toggle'}
 REFILL_INTERVAL_ID = 'delayed-result-container-refill-interval'
 """The interval which refills the result tables after a change of project: reset to 0, then ticks to 1."""
 
+EMPTY_FIGURE = {'data': [], 'layout': {}}
+"""What a result figure shows when there is no result, as when the page is first drawn."""
+
 def ids_to_update(
     triggered: list[dict],
     target_ids: list[dict],
@@ -329,6 +332,11 @@ def add_result_container_callbacks(app: NewsegsDash):
                 'supersection': ALL, 'section': ALL,
                 'key': ALL, 'subindex': ALL
             }, 'data-rendered-ann-hori-state'),
+            data_rendered_metamodel_id = Output({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-metamodel-id'),
         ),
         inputs = dict(
             postaction_triggers = Input({
@@ -377,8 +385,13 @@ def add_result_container_callbacks(app: NewsegsDash):
                 'supersection': ALL, 'section': ALL,
                 'key': ALL, 'subindex': ALL
             }, 'data-rendered-ann-hori-state'),
+            rendered_metamodel_ids =  State({
+                'type': 'result-table', 'purpose': 'container',
+                'supersection': ALL, 'section': ALL,
+                'key': ALL, 'subindex': ALL
+            }, 'data-rendered-metamodel-id'),
         ),
-        prevent_initial_call = False, 
+        prevent_initial_call = False,
     )
     def update_result_section_contents(
         table_options,
@@ -389,6 +402,7 @@ def add_result_container_callbacks(app: NewsegsDash):
         rendered_project_ids,
         rendered_project_table_revisions,
         rendered_ann_hori_states,
+        rendered_metamodel_ids,
         **kwargs
     ):
         if active_project_id is None or container_ids is None or not len(container_ids):
@@ -440,6 +454,9 @@ def add_result_container_callbacks(app: NewsegsDash):
         rendered_ann_hori_state = {
             (k['section'], k['key']) : v for k, v in zip(container_ids, rendered_ann_hori_states)
         }
+        rendered_metamodel = {
+            (k['section'], k['key']) : v for k, v in zip(container_ids, rendered_metamodel_ids)
+        }
 
         options_per_table = {}
         for id, val in zip(table_options['ids'], table_options['values']):
@@ -450,10 +467,21 @@ def add_result_container_callbacks(app: NewsegsDash):
             section = container_id['section']
             key = container_id['key']
             lookup = (section, key)
+
+            # Find any custom table providers for this table / model
+            table_getter = None
+            try:
+                table_getter = registers.get_table_getter(key, model_type)
+            except KeyError:
+                pass
+
             if lookup not in option_changed_tables and rendered_ann_hori_state.get(lookup) is not None and rendered_ann_hori_state[lookup] == ann_hori_toggle:
                 if rendered_project.get(lookup) is not None and rendered_project[lookup] == active_project_id:
                     if rendered_revision.get(lookup) is not None and rendered_revision[lookup] == table_rev:
-                        continue
+                        # A getter may read the focussed configuration's results, and a change of focus keeps the
+                        # project and its revision (#187); the conventional lookup reads the project's
+                        if table_getter is None or rendered_metamodel.get(lookup) == lproj.focussed_metamodel_id:
+                            continue
 
             subindex = int(container_id.get('subindex'))
             ss = (section, key, subindex)
@@ -481,18 +509,16 @@ def add_result_container_callbacks(app: NewsegsDash):
                     container_id, 'data-rendered-ann-hori-state',
                     ann_hori_toggle, rval
                 )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-metamodel-id',
+                    lproj.focussed_metamodel_id, rval
+                )
                 continue
-            
+
             opts = options_per_table.get(lookup, {})
 
-            # 1) Find any custom table providers for this table / model
             table_name = key
-            table_getter = None
-            try:
-                table_getter = registers.get_table_getter(table_name, model_type)
-            except KeyError:
-                pass
-
+            # 1) Use any custom table provider found above
             if table_getter is not None:
                 logger.debug(
                     'Updating Result Table Container using custom getter: Section: %s; Subindex: %s; Key: %s;',
@@ -560,6 +586,10 @@ def add_result_container_callbacks(app: NewsegsDash):
                 callback_utils.update_property_by_id(
                     container_id, 'data-rendered-ann-hori-state',
                     ann_hori_toggle, rval
+                )
+                callback_utils.update_property_by_id(
+                    container_id, 'data-rendered-metamodel-id',
+                    lproj.focussed_metamodel_id, rval
                 )
 
             else:
@@ -693,6 +723,9 @@ def add_result_container_callbacks(app: NewsegsDash):
                 )
                 contents_by_section_subindex[ss] = res
                 return_contents[idx] = res
+            else:
+                # Figures can't record what they were drawn for: the one shown may be of another configuration (#187)
+                return_contents[idx] = EMPTY_FIGURE
         t1 = time.perf_counter()
         logger.info(f'Result Figure for {section}, {subindex}, {key} created in {t1 - t0:.3f}s')
 

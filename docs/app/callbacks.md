@@ -224,7 +224,8 @@ flowchart TB
 4. The `postaction-trigger` stores are inputs of the callbacks that show results.
    `update_result_section_contents` redraws the tables that match the trigger, using the table getters registered
    for the model type. It skips a table whose rendered project, table revision and annual/horizon state are
-   unchanged, unless its options changed.
+   unchanged, unless its options changed or, for a table with a getter, the focussed configuration changed.
+   `update_result_figure_contents` empties a figure when its getter has no result.
 
 `cancel_job` cancels every request when a `cancel-job-button` is clicked.
 
