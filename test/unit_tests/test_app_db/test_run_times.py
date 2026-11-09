@@ -8,6 +8,7 @@ stuck run was marked dead an hour late; behind UTC, a working run was marked dea
 import datetime
 import os
 from pathlib import Path
+import sys
 import tempfile
 import time
 import unittest
@@ -57,16 +58,19 @@ class _InTimezone(unittest.TestCase):
 
 class _CleanupTests(_InTimezone):
 
+    @unittest.skipIf(sys.platform =="win32", reason="No tzset on windows - only used in tests.")
     def test_local_time_differs_from_utc(self):
         # Check the timezone is in effect, so that the tests below test it
         offset = datetime.datetime.now() - utc_now()
         self.assertAlmostEqual(offset.total_seconds() / 3600, self.expected_offset_h, places = 1)
 
+    @unittest.skipIf(sys.platform =="win32", reason="No tzset on windows - only used in tests.")
     def test_working_run_is_kept(self):
         run_id = self.add_run()
         self.assertEqual(dispatcher._cleanup_dead_jobs(self.engine, DEAD_INTERVAL_S), 0)
         self.assertEqual(self.status(run_id), 'CALCULATING')
 
+    @unittest.skipIf(sys.platform =="win32", reason="No tzset on windows - only used in tests.")
     def test_stuck_run_is_marked_dead(self):
         stuck = self.add_run(modified_at = utc_now() - datetime.timedelta(seconds = DEAD_INTERVAL_S + 60))
         working = self.add_run(modified_at = utc_now() - datetime.timedelta(seconds = DEAD_INTERVAL_S - 60))
@@ -74,11 +78,13 @@ class _CleanupTests(_InTimezone):
         self.assertEqual(self.status(stuck), 'FAILED')
         self.assertEqual(self.status(working), 'CALCULATING')
 
+    @unittest.skipIf(sys.platform =="win32", reason="No tzset on windows - only used in tests.")
     def test_runs_not_calculating_are_left(self):
         run_id = self.add_run(status = 'SUCCESS', modified_at = utc_now() - datetime.timedelta(hours = 2))
         self.assertEqual(dispatcher._cleanup_dead_jobs(self.engine, DEAD_INTERVAL_S), 0)
         self.assertEqual(self.status(run_id), 'SUCCESS')
 
+    @unittest.skipIf(sys.platform =="win32", reason="No tzset on windows - only used in tests.")
     def test_modified_at_and_created_at_agree(self):
         # created_at is filled in by SQLite (UTC), modified_at by the app: both must be in UTC
         run_id = self.add_run()
@@ -88,6 +94,7 @@ class _CleanupTests(_InTimezone):
             ).one()
         self.assertLess(abs((modified - created).total_seconds()), 5)
 
+    @unittest.skipIf(sys.platform =="win32", reason="No tzset on windows - only used in tests.")
     def test_pruning_cutoff_is_in_utc(self):
         expected = utc_now() - datetime.timedelta(days = 1)
         self.assertLess(abs((pruning._cutoff(1) - expected).total_seconds()), 5)
