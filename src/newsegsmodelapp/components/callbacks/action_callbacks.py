@@ -409,7 +409,7 @@ def add_action_callbacks(app: NewsegsDash):
                 request.trigger_request_id,
             )
 
-            return spawn_job(request, app.project_provider, app.results_provider)
+            return spawn_job(request, app.project_provider, app.results_provider, app.request_handler)
         else:
             logger.warning(
                 'Action Manager ABANDONING Request ID: %d; Type: %s; ' 
@@ -620,25 +620,7 @@ def add_action_callbacks(app: NewsegsDash):
                             'Action Manager handling Request ID: %d; Type: %s; as New Request (Child), will spawn job.',
                             new_request.request_id, new_request.request_type
                         )
-                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
-                        
-                        if new_run_id:
-                            # Not strictly true, but the extend happens below
-                            logger.debug(
-                                'Appending to ongoing actions: Newly spawned Run [Run ID = %d] for Request ID = %d; ' 
-                                'Type = %s; Child of Triggering Request ID = %d;',
-                                new_run_id, new_request.request_id, new_request.request_type, new_request.trigger_request_id,
-                            )
-
-                            spawned_actions.append(new_run_id)
-                        else:
-                            logger.warning(
-                                'Unable to Spawn Run for Request ID = %d; Type = %s; Child of Triggering Request ID = %d;'
-                                'Should be retried on next run through.',
-                                new_request.request_id, new_request.request_type, new_request.trigger_request_id
-                            )
-
-                            retry_spawns = True
+                        spawn_job(new_request, app.project_provider, app.results_provider, app.request_handler)
 
                     logger.info(
                         'Action Manager marking Runs with Run IDs %s as having spawned all necessary children.',
