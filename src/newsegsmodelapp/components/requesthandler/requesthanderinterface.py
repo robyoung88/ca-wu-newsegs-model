@@ -6,6 +6,14 @@ from typing import Optional, Sequence, overload
 from newsegsmodelapp import registers
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 
+
+class RequestCancelledError(BaseException):
+    """Raised (as an exception which is not caught by ordinary handlers) when a request has been 
+    cancelled prior to its claim ticket being raised, so the run should not be spawned.
+    """
+    pass
+
+
 class RequestHandlerInterface(metaclass = ABCMeta):
     """Manages the creation, status updating, and deletion of (run) requests"""
 

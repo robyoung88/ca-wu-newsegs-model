@@ -8,7 +8,7 @@ import copy
 import json
 import pickle
 
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 from dash import ALL, Input, NoUpdate, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 import zmq
 
 from config import settings
-from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestHandlerInterface
+from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestCancelledError, RequestHandlerInterface
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelapp import registers
@@ -37,7 +37,9 @@ REQUEST_RETRIES = 1
 
 def send_to_dispatcher(
     payload, 
-    retries: int = REQUEST_RETRIES
+    retries: int = REQUEST_RETRIES,
+    server_address: Optional[str] = None,
+    frontend_port: Optional[str] = None
 ) -> dict:
     """Send a request to the dispatcher over ZeroMQ, and wait for its reply.
 
@@ -51,10 +53,16 @@ def send_to_dispatcher(
         The reply of the dispatcher (the run information), or None if the request was refused or the dispatcher could not be reached.
     """
     JOB_DISPATCH_TIMEOUT = settings.get('JOB_DISPATCH_TIMEOUT_MS', 200)
+    server_address = DISPATCHSERVER if server_address is None else server_address
+    frontend_port = FRONTENDPORT if frontend_port is None else frontend_port
+
+    def _reconnect(sock: zmq.Socket):
+        sock.connect(f'tcp://{server_address}:{frontend_port}')
+
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
 
-    socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
+    _reconnect(socket)
 
     payload_bytes = pickle.dumps(payload)
 
@@ -78,7 +86,7 @@ def send_to_dispatcher(
         logger.warning('No response from job server, retrying...')
 
         socket = context.socket(zmq.REQ)
-        socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
+        _reconnect(socket)
         socket.send(payload_bytes)
 
     return reply_data
@@ -86,7 +94,11 @@ def send_to_dispatcher(
 def _local_run_any(
     runner, request, engine, project_provider, results_provider
 ):
-    job_id, job_exists = generate_claim_ticket(engine, request)
+    try:
+        job_id, job_exists = generate_claim_ticket(engine, request)
+    except RequestCancelledError:
+        logger.info('Request ID = %d; is has been cancelled prior to run', request.request_id)
+        return None
     if job_exists:
         logger.info('Request ID = %d; is being fulfilled by an existing Run ID = %d', request.request_id, job_id)
     try:

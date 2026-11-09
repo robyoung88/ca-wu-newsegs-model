@@ -188,13 +188,21 @@ def worker_process(
                 except Exception as e:
                     if not is_retryable(e):
                         prevent_request_retry(write_engine, request.request_id)
-                    set_status_failed(write_engine, job_id, str(e))
-                    logger.warning(
-                        'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d; Triggering Request ID = %d;',
-                        worker_id, rq.request_type, rq.request_id,
-                        job_id, rq.trigger_request_id,
-                        exc_info = True
-                    )
+                    if job_id is None:
+                        logger.warning(
+                            'Worker %d did not start procedure %s for Request ID = %d; Triggering Request ID = %d;',
+                            worker_id, rq.request_type, rq.request_id,
+                            rq.trigger_request_id,
+                            exc_info = True
+                        )
+                    else:
+                        set_status_failed(write_engine, job_id, str(e))
+                        logger.warning(
+                            'Worker %d Failed procedure %s for Request ID = %d; Run ID = %d; Triggering Request ID = %d;',
+                            worker_id, rq.request_type, rq.request_id,
+                            job_id, rq.trigger_request_id,
+                            exc_info = True
+                        )
             
             except (zmq.Again, RunAlreadyExistsError):
                 # Timeout hit (no message in 1 sec). Re-evaluate stop_event loop condition.

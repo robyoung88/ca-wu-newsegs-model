@@ -2,6 +2,8 @@
 """
 import logging
 from typing import Sequence
+
+from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestCancelledError
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +24,14 @@ def generate_claim_ticket(
         'status': 'CALCULATING'
     }
 
+    request_cancelled_stmt = (
+        sa.select(tbls.requests.c.request_id)
+        .where(
+            tbls.requests.c.request_id == request.request_id,
+            tbls.requests.c.status.in_(['CANCELLED'])            
+        )
+    )
+
     run_exists_stmt = (
         sa.select(tbls.runs.c.run_id)
         .where(
@@ -37,6 +47,10 @@ def generate_claim_ticket(
     )
 
     with write_transaction(engine) as conn:
+        cancelled = conn.execute(request_cancelled_stmt).scalar()
+        if cancelled:
+            raise RequestCancelledError
+        
         existing = conn.execute(run_exists_stmt).scalar()
         if existing:
             return existing, True
