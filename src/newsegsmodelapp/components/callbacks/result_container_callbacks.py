@@ -426,9 +426,15 @@ def add_result_container_callbacks(app: NewsegsDash):
         if not tables_for_update:
             return rval
 
+        # Tables whose post-action trigger fired: their results have just been saved
+        result_saved_tables = {
+            (x.id['section'], x.id['key']) for x in callback_utils.get_triggers(triggered) # pyright: ignore[reportIndexIssue, reportCallIssue, reportArgumentType]
+            if x.type == 'postaction-trigger'
+        }
+
         app_state = json.loads(app_state) if app_state else {}
         model_type = app_state.get('model_type', 'default')
-        
+
         contents_by_section_subindex = {}
         """
         Local store for contents to prevent redrawing within single call, keyed
@@ -475,7 +481,11 @@ def add_result_container_callbacks(app: NewsegsDash):
             except KeyError:
                 pass
 
-            if lookup not in option_changed_tables and rendered_ann_hori_state.get(lookup) is not None and rendered_ann_hori_state[lookup] == ann_hori_toggle:
+            # A getter may read results saved at a revision other than the project's (a configuration's), or saved
+            # again at the same one (a DSA run again with other bounds), so the revision recorded doesn't show
+            # that its table is still the one drawn: draw it whenever its results have just been saved (#206)
+            getter_result_saved = table_getter is not None and lookup in result_saved_tables
+            if not getter_result_saved and lookup not in option_changed_tables and rendered_ann_hori_state.get(lookup) is not None and rendered_ann_hori_state[lookup] == ann_hori_toggle:
                 if rendered_project.get(lookup) is not None and rendered_project[lookup] == active_project_id:
                     if rendered_revision.get(lookup) is not None and rendered_revision[lookup] == table_rev:
                         # A getter may read the focussed configuration's results, and a change of focus keeps the

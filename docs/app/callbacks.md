@@ -219,12 +219,15 @@ flowchart TB
    requests to the dispatcher, reads the progress of the runs under way, and shows it in the `results-container`
    overlays. It retries failed runs, up to their limit, and reports those that can't be retried in `failed-actions`.
 3. When a run completes, `manage_actions` appends the request to the `postaction-trigger` store for its request type,
-   creates the requests of its [post-actions](plugins.md#processes) (postprocessing, then table drawing) and starts
-   them. It disables the poll interval once nothing is under way.
+   and to those of any other tables it drew (the `also_draws` of `register_table_draw`: the table draw of a
+   whole-project DSA or PSA also draws each configuration's tables). It creates the requests of its [post-actions](plugins.md#processes) (postprocessing, then table drawing) and starts
+   them. It disables the poll interval once no request is active. A request just created has no run until a worker
+   claims it, so the interval keeps going, and the results show as calculating, until the last post-action completes.
 4. The `postaction-trigger` stores are inputs of the callbacks that show results.
    `update_result_section_contents` redraws the tables that match the trigger, using the table getters registered
    for the model type. It skips a table whose rendered project, table revision and annual/horizon state are
-   unchanged, unless its options changed or, for a table with a getter, the focussed configuration changed.
+   unchanged, unless its options changed or, for a table with a getter, the focussed configuration changed or the
+   table's own trigger fired.
    `update_result_figure_contents` empties a figure when its getter has no result.
 
 `cancel_job` cancels every request when a `cancel-job-button` is clicked.
