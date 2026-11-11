@@ -157,11 +157,19 @@ def create_dsa_project_options():
                 clearable = False,
             )),
             html.Div(
-                labelled('Configurations:', dcc.Dropdown(
-                    options = [], value = [], multi = True,
-                    id = _dsa_project_option_id('comparators'),
-                    placeholder = 'All configurations',
-                )),
+                [
+                    labelled('Configurations:', dcc.Dropdown(
+                        options = [], value = [], multi = True,
+                        id = _dsa_project_option_id('comparators'),
+                        placeholder = 'All configurations',
+                    )),
+                    dbc.Switch(
+                        id = _dsa_project_option_id('centered'),
+                        label = 'Center tornado on each configuration's deterministic value',
+                        value = False,
+                        class_name = 'mb-2',
+                    ),
+                ],
                 id = 'dsa-multiple-options',
                 style = {'display': 'none'},
             ),
