@@ -1334,6 +1334,7 @@ def multi_tornado_plot(
     label_dfs: Mapping[str, pd.DataFrame] | None = None,
     color_indexes: Mapping[str, int] | None = None,
     title: str = 'Lower and Upper DSA variation by configuration',
+    centered: bool = False,
 ):
     """Draw a tornado plot of the results of the DSAs of several comparators, grouped by variable.
 
@@ -1349,6 +1350,8 @@ def multi_tornado_plot(
         color_indexes: Index of the color of each comparator in `COMPARATOR_COLORS`, so that a comparator keeps its
             color whatever the selection; by default the order of `dsa_dfs`.
         title: Title of the plot.
+        centered: Show the variations from the central value of each configuration (so that all the bars start at
+            zero), rather than the absolute values of the statistic.
 
     Returns:
         The figure.
@@ -1393,11 +1396,12 @@ def multi_tornado_plot(
             return texts
 
         for bound, bound_values, pattern in (('lower', lower, '/'), ('upper', upper, '')):
+            variation = bound_values - central
             fig.add_trace(
                 go.Bar(
-                    x = bound_values - central,
+                    x = variation,
                     y = order,
-                    base = central,
+                    base = 0 if centered else central,
                     orientation = 'h',
                     offsetgroup = comparator,
                     legendgroup = comparator,
@@ -1409,13 +1413,20 @@ def multi_tornado_plot(
                         line = dict(color = 'white', width = 1),
                     ),
                     hovertext = hover(bound),
-                    hovertemplate = '%{hovertext}<br>' + bound.capitalize() + ' result: %{x:,.2f} from central<extra></extra>',
+                    customdata = bound_values,
+                    hovertemplate = (
+                        '%{hovertext}<br>' + bound.capitalize() + ' result: %{customdata:,.2f}'
+                        '<br>Variation from central: %{x:,.2f}<extra></extra>'
+                    ),
                 )
             )
 
     fig.update_layout(
         title = title,
-        xaxis_title = DSA_ALL_STATISTIC_LABELS.get(statistic, statistic),
+        xaxis_title = (
+            f'Change in {DSA_ALL_STATISTIC_LABELS.get(statistic, statistic)} from the central value'
+            if centered else DSA_ALL_STATISTIC_LABELS.get(statistic, statistic)
+        ),
         yaxis_title = 'Variable',
         barmode = 'group',
         template = colours.PLOT_TEMPLATES,
@@ -1424,6 +1435,8 @@ def multi_tornado_plot(
         legend = dict(orientation = 'h', yanchor = 'bottom', y = 1.0, xanchor = 'left', x = 0),
     )
     fig.update_yaxes(autorange = 'reversed')
+    if centered:
+        fig.add_vline(x = 0, line_color = colours.PLOT_EMPHASIS, line_width = 1)
 
     return fig
 
