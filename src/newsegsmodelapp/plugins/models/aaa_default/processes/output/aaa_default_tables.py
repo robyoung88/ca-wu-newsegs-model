@@ -825,7 +825,8 @@ def _get_dsa_project_table(
                 }
             color_indexes = {labels.get(x, x): available.index(x) for x in comparators}
             return results_stats.multi_tornado_plot(
-                dsa_dfs, stat, variables, label_dfs = label_dfs, color_indexes = color_indexes
+                dsa_dfs, stat, variables, label_dfs = label_dfs, color_indexes = color_indexes,
+                centered = bool(table_options.get('centered')),
             ), rev
         otable = results_stats.dsa_comparison_table(dsa_dfs, stat, variables)
         if otable.empty:
