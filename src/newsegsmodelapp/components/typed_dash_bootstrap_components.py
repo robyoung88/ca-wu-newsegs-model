@@ -24,6 +24,7 @@ Navbar: Any = dbc.Navbar
 Progress: type[dbc._components.Progress]  = dbc.Progress
 Row: Any = dbc.Row
 Select: Any = dbc.Select
+Switch: Any = dbc.Switch
 Table: Any = dbc.Table
 Toast: Any = dbc.Toast
 Tooltip: Any = dbc.Tooltip
