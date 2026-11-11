@@ -165,7 +165,7 @@ def create_dsa_project_options():
                     )),
                     dbc.Switch(
                         id = _dsa_project_option_id('centered'),
-                        label = 'Center tornado on each configuration's deterministic value',
+                        label = "Center tornado on each configuration's deterministic value",
                         value = False,
                         class_name = 'mb-2',
                     ),
