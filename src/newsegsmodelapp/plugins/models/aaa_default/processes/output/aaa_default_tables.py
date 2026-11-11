@@ -703,7 +703,7 @@ def _dsa_project_labels(lproj) -> dict[str, str]:
         for i, lmm in enumerate(lproj.metamodels)
     }
 
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_dsa_project'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_dsa_project'], also_draws = ['table_dsa_metamodel'])
 def _make_dsa_project_tables(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,
@@ -1113,7 +1113,7 @@ def _get_psa_metamodel_table(
 TABLE_SECTION = 'table_psa_project'
 _request_table_draw_psa_project = register_table_draw_request(TABLE_SECTION)(_table_draw_request_factory(TABLE_SECTION))
 
-@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_psa_project'])
+@register_table_draw(TABLE_SECTION, MODEL_TYPE, ['postproc_psa_project'], also_draws = ['table_psa_metamodel'])
 def _make_psa_project_tables(
     request: TableDrawRequest,
     project_provider: NewsegsProjectProviderInterface,

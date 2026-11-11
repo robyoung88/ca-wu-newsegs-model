@@ -77,12 +77,15 @@ class TestFocusWithoutResults(InputChangeTestCase):
         config = self.components.get_lightweight_dataholding_component(self.lproj.metamodels[mm_index].table_config.id)
         self.results.upsert_result(CONFIG_TABLE, config, html.Div(label), revision = self.revision)
 
-    def refill(self, key: str):
-        """The tick of the refill interval which follows a change of focus; returns the table, if redrawn"""
+    def refill(self, key: str, trigger: str | dict = REFILL_INTERVAL_ID):
+        """The tick of the refill interval which follows a change of focus, or another trigger; returns the table, if redrawn"""
+        components = [html.Div(id = table_id(key), **self.rendered[key])]
+        if isinstance(trigger, dict):
+            components.append(html.Div(id = trigger))
         response = dispatch_callback(
             self.client, get_callback_spec(self.client, 'result-table', 'children'),
-            trigger = REFILL_INTERVAL_ID, value = 1,
-            components = [html.Div(id = table_id(key), **self.rendered[key])],
+            trigger = trigger, value = 1,
+            components = components,
             stores = self.stores,
         )
         children = response.get(table_id(key), 'children')
@@ -122,6 +125,14 @@ class TestFocusWithoutResults(InputChangeTestCase):
         self.save_for_configuration(0, 'first')
         self.refill(CONFIG_TABLE)
         self.assertEqual(self.refill(CONFIG_TABLE), NOT_UPDATED)
+
+    def test_table_saved_again_at_the_same_revision_is_redrawn(self):
+        # A DSA run again, e.g. with other bounds, saves its table at the revision of the one drawn (#206)
+        self.save_for_configuration(0, 'first')
+        self.assertEqual(self.refill(CONFIG_TABLE), 'first')
+
+        self.save_for_configuration(0, 'run again')
+        self.assertEqual(self.refill(CONFIG_TABLE, FIGURE_TRIGGER_ID), 'run again')
 
     def test_project_table_not_redrawn_on_focus(self):
         # Read from the project, so the same whichever configuration is focussed

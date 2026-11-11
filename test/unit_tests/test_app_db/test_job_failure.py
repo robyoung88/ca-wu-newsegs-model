@@ -87,24 +87,24 @@ class TestResultsStatus(unittest.TestCase):
 
     def test_calculating(self):
         self.assertEqual(
-            results_status([1], ['an earlier failure'], True, '1 jobs underway.'),
+            results_status(True, ['an earlier failure'], True, '1 jobs underway.'),
             ('CALCULATING', 'Computing...', '1 jobs underway.')
         )
         self.assertEqual(
-            results_status([1], [], False, '1 jobs underway.'),
+            results_status(True, [], False, '1 jobs underway.'),
             ('CALCULATING', no_update, '1 jobs underway.')
         )
 
     def test_failed(self):
-        status, title, subtitle = results_status([], ['Unable to obtain wind speeds from NEWA'], False, no_update)
+        status, title, subtitle = results_status(False, ['Unable to obtain wind speeds from NEWA'], False, no_update)
         self.assertEqual(status, 'FAILED')
         self.assertEqual(title, 'A job failed')
         self.assertEqual(subtitle, 'Unable to obtain wind speeds from NEWA')
 
     def test_failed_messages_not_repeated(self):
-        status, title, subtitle = results_status([], ['a', 'b', 'a'], False, no_update)
+        status, title, subtitle = results_status(False, ['a', 'b', 'a'], False, no_update)
         self.assertEqual(title, '3 jobs failed')
         self.assertEqual(subtitle, 'a | b')
 
     def test_idle(self):
-        self.assertEqual(results_status([], [], False, no_update), ('IDLE', no_update, no_update))
+        self.assertEqual(results_status(False, [], False, no_update), ('IDLE', no_update, no_update))

@@ -605,9 +605,27 @@ Function returns:
     Status message ('ok')
 """
 
+TABLE_DRAW_ALSO_DRAWS: dict[str, set[str]] = {}
+"""The other table sections whose tables a table draw procedure saves, by its own table section.
+
+When the procedure completes, the tables of these sections are redrawn too (see `get_table_sections_drawn`).
+"""
+
+def get_table_sections_drawn(request_type: str) -> set[str]:
+    """The sections whose results are shown again when a request completes: its own, and any others it draws.
+
+    Args:
+        request_type: The type of the completed request, e.g. the table section of a table draw.
+
+    Returns:
+        The sections, which are the keys of the post-action triggers to set.
+    """
+    return {request_type} | TABLE_DRAW_ALSO_DRAWS.get(request_type, set())
+
 def register_table_draw(
     name: str, model_type: str = 'default',
-    triggers: SequenceNotStr[str] = []
+    triggers: SequenceNotStr[str] = [],
+    also_draws: SequenceNotStr[str] = [],
 ):
     """Decorator which registers a procedure which draws the data of a table.
 
@@ -619,6 +637,8 @@ def register_table_draw(
         name: Name of the object.
         model_type: The model type (e.g. `sprake`); `default` for the fallback.
         triggers: Names of the requests whose completion triggers the procedure.
+        also_draws: Other table sections whose tables the procedure saves, e.g. those of each configuration saved by
+            the table draw of a whole project. They are redrawn when the procedure completes, as its own are.
 
     Returns:
         The decorator.
@@ -626,10 +646,14 @@ def register_table_draw(
     key = (name, model_type)
     if isinstance(triggers, str):
         triggers = [triggers]
+    if isinstance(also_draws, str):
+        also_draws = [also_draws]
     def decorated(func):
         if model_type != 'default':
             if key in TABLE_DRAW_REGISTER:
                 raise KeyError(f'Table draw artist already exists for key {key}')
+        if also_draws:
+            TABLE_DRAW_ALSO_DRAWS.setdefault(name, set()).update(also_draws)
         def wrapped(request: RunRequest, *args, **kwargs):
             logger.info(
                 'Table draw procedure %s for Request ID = %d; initiated - Run ID = %d; Triggering Request ID = %d; Project ID = %s;', 
