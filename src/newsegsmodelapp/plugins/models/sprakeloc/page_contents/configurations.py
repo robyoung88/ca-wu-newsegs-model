@@ -11,9 +11,13 @@ The site configuration page also shows the feedback on the environmental conditi
 (see `environment_feedback`), which the `sprake` model type, having a fixed environment, does not.
 """
 import copy
+import os
 
 from newsegsmodelapp import registers
 from newsegsmodelapp.components.feedback import environmental_conditions
+
+from newsegsmodelapp import STATICDATA
+TEXT_DIR = STATICDATA / 'model_text'
 
 # Ensure the `sprake` configurations are registered before they are copied
 from ...aaa_default.page_contents import configurations as _sprake_configurations  # noqa: F401
@@ -27,6 +31,10 @@ for _page_type in ('landing', 'site-config', 'dsa', 'psa'):
     config.model_type = _MODEL_TYPE
     if _page_type == 'landing':
         config.head_text = 'Sprake Location Aware Model'  # pyright: ignore[reportAttributeAccessIssue]
+        with open(os.path.join(TEXT_DIR, 'sprakeloc', 'sprakeloc_landing_body.md'), encoding='utf-8') as f:
+            config.body_text = f.readlines()
+        with open(os.path.join(TEXT_DIR, 'sprakeloc', 'sprakeloc_landing_assumptions.md'), encoding='utf-8') as f:
+            config.assumptions_text = f.readlines()
     if _page_type == 'site-config':
         config.layout_environment_feedback = lambda: environmental_conditions.create_environmental_conditions_card(  # pyright: ignore[reportAttributeAccessIssue]
             environment_feedback.ITEMS
