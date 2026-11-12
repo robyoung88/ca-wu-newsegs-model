@@ -21,45 +21,79 @@
 
 ### Wind Turbine Generators
 
--	Electrical power production will be characterised by power curve describing mean net electrical output power over mean hub height wind speeds. Discrepancies between averaging periods and measurement technologies for input hub height wind speed will be permitted. Extrapolation of hub height wind speed from measurements or estimates other heights and/or locations will be permitted.
--	Array effects will not be explicitly modelled, but may be expressed by a loss function conditional upon mean wind direction and speed applied per WTG.
--	Effects of local micro-geography upon wind speed, e.g. ridgeline speed-up, will not be explicitly modelled, though may be captured by input data. Effects of land use upon wind shear profile may be represented by a single aerodynamic roughness length per wind direction sector.
--	These roughness lengths are not time-varying, and cannot describe the effect of growing trees or crops, or of the varying roughness of the sea surface.
--	Wind shear profiles will assume a neutral atmosphere at all times.
--	Variations around a mean wind speed within an averaging period may be represented by a Markov-chain process (Ma, Fouladirad, and Grall 2018).
--	Decorrelation of power production due to (local) geographical dispersion of WTGs will not be modelled.
--	The impact of wind speed variation on electrical power production may be modelled by a first-order dynamic model of spinning mass within the WTG under the assumption of locally linear torque response to wind speed.
--	Loss of performance of the WTG due to component aging may be represented by a single scalar reduction in conversion efficiency at all wind speeds (nb - rated capacity may be reached, but at a higher wind speed, under these conditions). This performance loss is to be conditional only upon the number of hours since commissioning of the WTG. It may have stochastic components, but must be monotonically decreasing or stable.
--	No catastrophic failure of any WTG component leading to loss of generation will be possible, either due to manufacturing defect or acquired damage.
--	Loss of conversion efficiency due to controller error (e.g. yaw misalignment) will not be explicitly modelled, but may inform the WTG aging performance loss coefficient.
--	Parasitic losses during still or pre-cut-in conditions will not be modelled; net electrical energy transfer will be assumed to always flow from the turbine to the take-off point.
--	Any necessary voltage transformation from generation voltage to distribution / storage voltage will incur an additional energy loss at the WTG transformer. Losses will be assumed proportional to the rate of electrical energy export. No parasitic losses will be modelled at zero export or (unmodelled) net import. Metering of WTG output will occur across the output terminals of this transformer, if present.
--	Maintenance windows may be pre-specified per WTG, with a priority order assigned to each WTG and a number of available maintenance and inspection crews. Once the maintenance window opens, wind turbines will be shut down and serviced in priority order in post-hoc evaluated periods of wind speeds below a nominated threshold.
--	Routine service of WTGs will not be assumed to have any direct impact on WTG performance beyond the shut-down period.
--	Reactive service and replacement of WTG components will not be possible within the model, but may be pre-specified as deterministic service windows outside of the normal service season. Loss of production waiting for a weather window cannot be explicitly modelled; in order to approximate the impact of such a failure, an initial service to “remove” the WTG from the modelled system with a very high weather window threshold should be scheduled, followed by scheduling of a new service window with a more realistic window criterion to represent reactive maintenance, during which a “new” WTG should be installed. A function allowing for the transfer of service life from one WTG to another across this window will be provided, allowing for the new WTG to have the same aging as the previous. This method will be particularly useful for modelling the impact on total energy production of electrical trips requiring on-site reset. Partial failure of a WTG requiring reactive maintenance cannot be modelled.
+-	Electrical power production is characterised by a power curve describing mean net electrical output power over mean hub height wind speeds. Discrepancies between averaging periods and measurement technologies for input hub height wind speed will be permitted. Extrapolation of hub height wind speed from measurements or estimates other heights and/or locations will be permitted.
+
+-	Array effects are not modelled.
+
+-	Effects of local micro-geography upon wind speed, e.g. ridgeline speed-up, are not be explicitly modelled, though may be captured by input data if the features are of large enough scale. Effects of land use upon wind shear profile are be represented by wind direction, speed and stability conditional power law exponents.
+
+-	These power law exponents and the implied surface roughness lengths are not time-varying, and cannot describe the effect of growing trees or crops, or of the varying roughness of the sea surface.
+
+-	Wind shear profiles use the power law and so assume a neutral atmosphere at all times.
+
+-	Variations around a mean wind speed within an averaging period are not considered.
+
+-	Decorrelation of power production due to (local) geographical dispersion of WTGs is not modelled (and due to timescale of averaging, would not be influential over a single site).
+
+-	The impact of wind speed variation on electrical power production is not modelled.
+
+-	Loss of performance of the WTG due to component aging is not modelled.
+
+-	No catastrophic failure of any WTG component leading to loss of generation is possible, either due to manufacturing defect or acquired damage.
+
+-	Loss of conversion efficiency due to controller error (e.g. yaw misalignment) is not explicitly modelled, but may inform the WTG Cp curve.
+
+-	Parasitic losses during still or pre-cut-in conditions are not modelled; net electrical energy transfer is assumed to always flow from the turbine to the take-off point.
+
+-	Any necessary voltage transformation from generation voltage to distribution / storage voltage will be expected to incur an additional energy loss at the WTG transformer, but this is assumed captured by the Cp curve of the nominated turbine.
+
+-	No maintenance windows are modelled.
+
+-	Routine service of WTGs is notassumed to have any impact on WTG performance.
+
+-	Reactive service and replacement of WTG components is not modelled.
+
 -	The IEC wind classification of the generation site is not assumed known, and validated extrapolative models or local measurements should be used to ensure the wind conditions are suitable for any specific model of generator selected, particularly as this may affect the device warrantee.
 
 ### Solar PV generation systems:
 
--	Electrical power will be characterised by module efficiency in response to horizontal plane irradiation, based upon assumptions of direct/diffuse ratio and attenuation due to humidity content and considerate of module azimuth and elevation.
--	Estimation of the diffuse to global irradiation ratio will be per the model of Munoz et al.(Muñoz, Ballantyne, and Stone 2022)
--	Estimation of the diffuse irradiative flux on an inclined plane under an anisotropic sky dome will be per the model of Muneer.(Muneer 1990)
--	Shallow-angle losses shall be estimated per the model of Martin and Ruiz.(Martin and Ruiz 2001)
--	Losses in module efficiency/maximum power as a result of elevated module temperature and/or low irradiance shall be estimated per the model of Huld et al.(Huld et al. 2011) These models may be superceded by information from manufacturer datasheets.
--	Module temperature shall be estimated using the model of Faiman(David Faiman 2008) as fitted by Koehl et al (Koehl et al. 2011).
--	Module aging shall be modelled by assuming a monotonic decrease in peak power production under STC.
--	No impact of changes in spectrum from STC conditions shall be modelled unless using PVGIS module output estimates.
--	Maximum power point tracking is assumed to apply at the module level; combined control of multiple modules with heterogenous MPPs will not be modelled.
--	Modules may be grouped to a single inverter for the calculation of inverter losses and minimum power for inverter power export.
--	Parasitic losses due to inverters shall be modelled as a constant rate during night-time hours and a secondary constant rate during daytime hours, until net export occurs.
--	Inverter losses under net export conditions shall be modelled as a function of electrical input power and (optionally) air temperature.
--	Module shading shall be modelled using horizon files indicating occulusion directions and solar elevation angles, which will be applied assuming that the sun is a point source and the modules are point receivers.
--	Module array self-shading shall not be modelled.
--	Module occlusion due to precipitation or dirt shall not be modelled.
--	The impact of cleaning cycles on performance will not be modelled directly, but should be reflected in the long-term degredation of performance and costs included in ongoing O&M costs.
--	Local thermal conditions around the modules shall not be modelled directly, but the efficiency function can be made dependent upon air temperature, wind speed and direction.
--	The peak capacity of the modules may be modified by an aging function dependent only upon time from connection of the module to the supply system.
--	The impact of sub-module shading on performance or lifespan (i.e. hotspotting) will not be modelled.
+-	Electrical power is characterised by module efficiency in response to horizontal plane irradiation, based upon assumptions of direct/diffuse ratio and attenuation due to humidity content and considerate of module azimuth and elevation.
+
+-	Estimation of the diffuse to global irradiation ratio is per the model of Munoz et al.[Muñoz, Ballantyne, and Stone 2022](https://www.sciencedirect.com/science/article/pii/S0360544221030693)
+
+-	Estimation of the diffuse irradiative flux on an inclined plane under an anisotropic sky dome is per the model of Muneer.[Muneer 1990](https://journals.sagepub.com/doi/10.1177/014362449001100405)
+
+-	Shallow-angle losses are estimated per the model of Martin and Ruiz.[Martin and Ruiz 2001](https://www.sciencedirect.com/science/article/abs/pii/S0927024800004086)
+
+-	Losses in module efficiency/maximum power as a result of elevated module temperature and/or low irradiance are estimated per the model of Huld et al. [Huld et al. 2011](https://www.sciencedirect.com/science/article/abs/pii/S0927024811004442).
+
+-	Module temperature is estimated using the model of Faiman [David Faiman 2008](https://onlinelibrary.wiley.com/doi/10.1002/pip.813) as fitted by Koehl et al [Koehl et al. 2011](https://www.sciencedirect.com/science/article/abs/pii/S0927024811000304).
+
+-	Module aging is not modelled.
+
+-	No impact of changes in spectrum from STC conditions is modelled.
+
+-	Maximum power point tracking is assumed to apply at the module level; combined control of multiple modules with heterogenous MPPs is not be modelled.
+
+-	Modules are grouped to a single inverter for the calculation of inverter losses and minimum power for inverter power export.
+
+-	Parasitic losses due to inverters are modelled as a constant rate during night-time hours and a secondary constant rate during daytime hours, until net export occurs.
+
+-	Inverter losses under net export conditions sare modelled as a function of electrical input power and air temperature.
+
+-	Module shading is modelled using horizon files indicating occulusion directions and solar elevation angles, which will be applied assuming that the sun is a point source and the modules are point receivers.
+
+-	Module array self-shading is not modelled.
+
+-	Module occlusion due to precipitation or dirt is not modelled.
+
+-	The impact of cleaning cycles on performance is not modelled.
+
+-	Local thermal conditions around the modules is not modelled directly, but the efficiency function is dependent upon air temperature, and wind speed.
+
+-	The peak capacity of the modules is not modified by aging.
+
+-	The impact of sub-module shading on performance or lifespan (i.e. hotspotting) is not modelled.
 
 ## Consumption
 

@@ -1,7 +1,7 @@
 """
 Create a landing layout for an app.
 """
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
 from dash import dcc, html
@@ -67,7 +67,7 @@ def create_landing_layout(config: LandingLayoutConfiguration):
             width = 'auto',
         ),
         dbc.Col(
-            config.layout_top(),
+            config.layout_top(**(asdict(config))),
             class_name = 'page-top',
         ) 
     ])
