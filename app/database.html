@@ -1,0 +1,1911 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation supporting NewSEGS Energy Modelling software.">
+      
+      
+      
+      
+        <link rel="prev" href="components.html">
+      
+      
+        <link rel="next" href="../support/utils.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Database - NewSEGS Energy Modelling Software</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#application-database" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="NewSEGS Energy Modelling Software" class="md-header__button md-logo" aria-label="NewSEGS Energy Modelling Software" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NewSEGS Energy Modelling Software
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Database
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/robyoung88/ca-wu-newsegs-model" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    robyoung88/ca-wu-newsegs-model
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="NewSEGS Energy Modelling Software" class="md-nav__button md-logo" aria-label="NewSEGS Energy Modelling Software" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NewSEGS Energy Modelling Software
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/robyoung88/ca-wu-newsegs-model" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    robyoung88/ca-wu-newsegs-model
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/install.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install and run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../modelling/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modelling principles
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modelling principles
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelling/finance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docstrings.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docstring conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development and releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../framework/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Framework
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Framework
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/model-ecosystem.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model ecosystem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/core.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/modules.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/model.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/finance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/variable.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variable
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/metamodel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metamodel and Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/stats-sensitivity.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics and Sensitivity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/util.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Application
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="callbacks.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="components.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="database.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#live-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Live tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting packages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Supporting packages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/utils.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plotting utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/newa.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NEWA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/admd.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADMD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#live-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Live tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="application-database">Application database<a class="headerlink" href="#application-database" title="Permanent link">&para;</a></h1>
+<p>The <code>newsegsmodelapp</code> Dash app stores configurations, results metadata, job requests and
+sessions in a SQLite database. The tables are defined with SQLAlchemy in
+<code>newsegsmodelapp.backend.db.db_tables</code> and migrated with Alembic (<code>alembic/versions</code>).</p>
+<p>Large result payloads are not stored in the database: the <code>results</code> table records the
+<code>result_file</code> in the results store, and the database holds only the metadata needed to find it.</p>
+<h2 id="live-tables">Live tables<a class="headerlink" href="#live-tables" title="Permanent link">&para;</a></h2>
+<p>Identifiers for variables and components are text (<code>prefix + uuid</code>), not integers. The
+<code>component_configs</code> table holds the configuration of every individual model module (grid,
+generation, consumption/storage, tables...). The <code>em_configs</code>, <code>fm_configs</code>, <code>metamodels</code> and
+<code>projects</code> tables compose these into the structure described in
+<a href="../framework/metamodel.html">Metamodel</a>.</p>
+<pre class="mermaid"><code>erDiagram
+    PROJECTS {
+        string id PK
+        string dsa_component_config_id FK
+        string psa_component_config_id FK
+        string table_config_id FK
+        string focussed_metamodel_id FK
+        string model_type
+        string model_version
+        string payload
+        int revision
+        string label
+        bool retain
+        datetime created_at
+        datetime modified_at
+        string modified_order
+    }
+
+    METAMODELS {
+        string id PK
+        string em_config_id FK
+        string fm_config_id FK
+        string table_config_id FK
+        string optim_config_id FK
+        string payload
+        int revision
+        string label
+        bool retain
+        string location
+        float lat
+        float lon
+        float n_units
+    }
+
+    EM_CONFIGS {
+        string id PK
+        string grid_config_id FK
+        string generation_config_id FK
+        string cs_config_id FK
+        string modeldata_config_id FK
+        string table_config_id FK
+        string model_class
+        string model_version
+        string model_type
+        string payload
+        int revision
+        string label
+        bool retain
+    }
+
+    FM_CONFIGS {
+        string id PK
+        string financedata_config_id FK
+        string table_config_id FK
+        string model_class
+        string model_version
+        string payload
+        int revision
+        string label
+        bool retain
+    }
+
+    COMPONENT_CONFIGS {
+        string id PK
+        string component_type
+        string component_class
+        string component_version
+        string payload
+        int revision
+        int last_result_id
+        string label
+        bool retain
+    }
+
+    VARIABLE_CONFIGS {
+        string id PK
+        string varid
+        string interface_section
+        string interface_key
+        int interface_subindex
+        int revision
+        string component_version
+        string component_type
+        string variable_type
+        string distribution
+        int parameterisation_index
+        string raw_parameter_0
+        string raw_parameter_1
+        string last_deterministic_value
+        bool dsa_show
+        bool dsa_selectable
+        bool dsa_selected
+        string dsa_bounds_type
+        string dsa_lower
+        string dsa_upper
+        string dsa_value_lower
+        string dsa_value_upper
+        bool psa_show
+        bool psa_selectable
+        bool psa_selected
+        string last_std
+        string psa_ci_lower
+        string psa_ci_upper
+        bool optim_show
+        bool optim_selectable
+        bool optim_selected
+        string optim_min
+        string optim_max
+        int optim_plot_intervals
+        string payload
+        string label
+        string icon_name
+        string unit
+        float interface_min
+        float interface_max
+        float interface_step
+        int formatter_dp
+        bool retain
+    }
+
+    PROJECT_METAMODELS {
+        string project_id PK, FK
+        string metamodel_id PK, FK
+        datetime created_at
+        string created_order
+    }
+
+    PROJECT_VARIABLES {
+        string project_id PK, FK
+        string variable_config_id PK, FK
+    }
+
+    METAMODEL_VARIABLES {
+        string metamodel_id PK, FK
+        string variable_config_id PK, FK
+        int key_order
+    }
+
+    RESULTS {
+        int result_id PK
+        string component_config_id FK
+        int request_id
+        int run_id
+        string component_type
+        string component_class
+        string component_version
+        int component_config_revision
+        string result_type
+        string result_file
+        bool retain
+        datetime created_at
+    }
+
+    REQUESTS {
+        int request_id PK
+        string project_id FK
+        string request_type
+        string request_class
+        string request_label
+        int trigger_request_id
+        string trigger_request_type
+        int run_id
+        string model_type
+        string payload
+        string status
+        bool background_procedure
+        int retry_number
+        int max_retries
+    }
+
+    RUNS {
+        int run_id PK
+        int request_id FK
+        string status
+        float progress
+        string progress_message
+        bool cancel_requested
+        datetime created_at
+        datetime modified_at
+    }
+
+    SESSIONS {
+        string session_id PK
+        string active_project_id FK
+    }
+
+    PROCESS_STALENESS {
+        string metamodel_id PK
+        string process PK
+        bigint inputs_changed_ns
+        bigint last_run_ns
+    }
+
+    PROJECTS ||--o{ PROJECT_METAMODELS : "contains"
+    METAMODELS ||--o{ PROJECT_METAMODELS : "belongs to"
+    PROJECTS ||--o{ PROJECT_VARIABLES : "has default variables"
+    VARIABLE_CONFIGS ||--o{ PROJECT_VARIABLES : "informs"
+    METAMODELS ||--o{ METAMODEL_VARIABLES : "has variables"
+    VARIABLE_CONFIGS ||--o{ METAMODEL_VARIABLES : "informs"
+    PROJECTS }o--o| METAMODELS : "focusses"
+
+    METAMODELS }o--|| EM_CONFIGS : "uses"
+    METAMODELS }o--|| FM_CONFIGS : "uses"
+
+    PROJECTS }o--o| COMPONENT_CONFIGS : "DSA, PSA and table configs"
+    METAMODELS }o--o| COMPONENT_CONFIGS : "table and optimisation configs"
+    EM_CONFIGS }o--o| COMPONENT_CONFIGS : "grid, generation, cs, modeldata, table configs"
+    FM_CONFIGS }o--o| COMPONENT_CONFIGS : "financedata and table configs"
+
+    COMPONENT_CONFIGS ||--o{ RESULTS : "produces"
+    PROJECTS ||--o{ REQUESTS : "requests"
+    REQUESTS ||--o{ RUNS : "executed by"
+    RUNS |o..o{ RESULTS : "produces (no FK)"
+    PROJECTS ||--o{ SESSIONS : "active in"
+    METAMODELS |o..o{ PROCESS_STALENESS : "tracked per process (no FK)"</code></pre>
+<h3 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Dotted lines are relationships without a foreign key.</li>
+<li><code>metamodel_variables.key_order</code> is the position of the variable's key (<code>{section}.{key}</code>, without the subindex)
+  among the metamodel's variables, so that they are loaded in the order they were saved. It is null for rows saved
+  before it was recorded, whose order is taken from the metamodel's payload.</li>
+<li><code>variable_configs</code> holds the settings of a variable for each analysis in columns of their own (<code>dsa_*</code>, <code>psa_*</code>,
+  <code>optim_*</code>), with its parameterisation (<code>parameterisation_index</code>, <code>raw_parameter_*</code>), the limits and formatting of
+  its input (<code>interface_*</code>, <code>formatter_dp</code>, <code>unit</code>, <code>icon_name</code>), and the full variable in <code>payload</code>.</li>
+<li><code>process_staleness</code> has no foreign key, so that deleting a metamodel is never blocked by its
+  staleness rows. It records, per metamodel and per process (see <code>db_staleness.PROCESSES</code>), when
+  the inputs relevant to the process last changed and when the last completed run began. A
+  process is stale when its inputs changed after its last run started.</li>
+<li><code>metamodels.optim_config_id</code> is the <code>OptimComponent</code> holding the method and statistic of
+  optimisation. It is null for metamodels saved before it existed; they are given the default
+  component when loaded. The bounds of optimisation are held by each variable, in the
+  <code>optim_min</code>, <code>optim_max</code> and <code>optim_plot_intervals</code> columns of <code>variable_configs</code>.</li>
+<li><code>variable_configs.component_version</code> is the version of the <code>Variable</code> class that saved the
+  row, null if it was saved before versions were recorded. As with the other components, the
+  payload records the version too, and a payload newer than the app supports is rejected.</li>
+<li>The times of <code>runs</code> are in UTC, without a timezone: <code>created_at</code> is filled in by SQLite, and <code>modified_at</code> by the
+  app (<code>db_tables.utc_now</code>). The dispatcher marks a run as failed once <code>modified_at</code> is older than
+  <code>DEAD_CALCULATION_INTERVAL_SECONDS</code>, and pruning compares both with a cutoff in UTC, so both work whatever the host's
+  timezone. <code>projects.modified_at</code> is still in local time.</li>
+<li><code>requests</code> are created by the front end (from the actions in the app) and picked up by the
+  dispatcher; each request is executed as one or more <code>runs</code> by a worker. The run carries the
+  progress and cancellation flag that the front end polls.</li>
+<li><code>results.request_id</code> and <code>results.run_id</code> are for convenience and are deliberately not foreign
+  keys.</li>
+<li>Users, groups and read/write access to projects are planned (see the <code>TODO</code> in
+  <code>db_tables.projects</code>) but are not yet implemented.</li>
+</ul>
+<h2 id="snapshot-tables">Snapshot tables<a class="headerlink" href="#snapshot-tables" title="Permanent link">&para;</a></h2>
+<p>A snapshot freezes a copy of a project - its metamodels, models, components, variables and
+results - so that it can be restored later. Each live table <code>x</code> has a <code>snapshot_x</code> twin
+whose primary key is extended with <code>snapshot_id</code>, and whose remaining columns are cloned from
+the live table (without its foreign keys). Foreign keys between snapshot tables are composite,
+so they refer to the rows <em>within the same snapshot</em>.</p>
+<pre class="mermaid"><code>erDiagram
+    PROJECTS {
+        string id PK
+    }
+
+    SNAPSHOTS {
+        int snapshot_id PK
+        string project_id FK
+        string label
+        datetime created_at
+    }
+
+    SNAPSHOT_PROJECTS {
+        int snapshot_id PK, FK
+        string id PK
+        string dsa_component_config_id FK
+        string psa_component_config_id FK
+        string table_config_id FK
+    }
+
+    SNAPSHOT_METAMODELS {
+        int snapshot_id PK, FK
+        string id PK
+        string em_config_id FK
+        string fm_config_id FK
+        string table_config_id FK
+        string optim_config_id FK
+    }
+
+    SNAPSHOT_EM_CONFIGS {
+        int snapshot_id PK, FK
+        string id PK
+        string grid_config_id FK
+        string generation_config_id FK
+        string cs_config_id FK
+        string modeldata_config_id FK
+        string table_config_id FK
+    }
+
+    SNAPSHOT_FM_CONFIGS {
+        int snapshot_id PK, FK
+        string id PK
+        string financedata_config_id FK
+        string table_config_id FK
+    }
+
+    SNAPSHOT_COMPONENT_CONFIGS {
+        int snapshot_id PK, FK
+        string id PK
+    }
+
+    SNAPSHOT_VARIABLE_CONFIGS {
+        int snapshot_id PK, FK
+        string id PK
+    }
+
+    SNAPSHOT_RESULTS {
+        int snapshot_id PK, FK
+        int result_id PK
+        string component_config_id FK
+    }
+
+    SNAPSHOT_PROJECT_METAMODELS {
+        int snapshot_id PK, FK
+        string project_id PK, FK
+        string metamodel_id PK, FK
+    }
+
+    SNAPSHOT_PROJECT_VARIABLES {
+        int snapshot_id PK, FK
+        string project_id PK, FK
+        string variable_config_id PK, FK
+    }
+
+    SNAPSHOT_METAMODEL_VARIABLES {
+        int snapshot_id PK, FK
+        string metamodel_id PK, FK
+        string variable_config_id PK, FK
+    }
+
+    SNAPSHOTS ||--o{ SNAPSHOT_PROJECTS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_METAMODELS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_EM_CONFIGS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_FM_CONFIGS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_COMPONENT_CONFIGS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_VARIABLE_CONFIGS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_RESULTS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_PROJECT_METAMODELS : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_PROJECT_VARIABLES : "contains"
+    SNAPSHOTS ||--o{ SNAPSHOT_METAMODEL_VARIABLES : "contains"
+    PROJECTS ||--o{ SNAPSHOTS : "snapshotted as"
+
+    SNAPSHOT_PROJECTS ||--o{ SNAPSHOT_PROJECT_METAMODELS : "contains"
+    SNAPSHOT_METAMODELS ||--o{ SNAPSHOT_PROJECT_METAMODELS : "belongs to"
+    SNAPSHOT_PROJECTS ||--o{ SNAPSHOT_PROJECT_VARIABLES : "has default variables"
+    SNAPSHOT_VARIABLE_CONFIGS ||--o{ SNAPSHOT_PROJECT_VARIABLES : "informs"
+    SNAPSHOT_METAMODELS ||--o{ SNAPSHOT_METAMODEL_VARIABLES : "has variables"
+    SNAPSHOT_VARIABLE_CONFIGS ||--o{ SNAPSHOT_METAMODEL_VARIABLES : "informs"
+
+    SNAPSHOT_METAMODELS }o--|| SNAPSHOT_EM_CONFIGS : "uses"
+    SNAPSHOT_METAMODELS }o--|| SNAPSHOT_FM_CONFIGS : "uses"
+    SNAPSHOT_COMPONENT_CONFIGS ||--o{ SNAPSHOT_RESULTS : "produces"
+    SNAPSHOT_PROJECTS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "DSA, PSA and table configs"
+    SNAPSHOT_METAMODELS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "table and optimisation configs"
+    SNAPSHOT_EM_CONFIGS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "module configs"
+    SNAPSHOT_FM_CONFIGS }o--o| SNAPSHOT_COMPONENT_CONFIGS : "module configs"</code></pre>
+<p><code>snapshots.project_id</code> refers to the live <code>projects</code> table, so a project can be reverted to any
+of its snapshots.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.indexes", "content.code.copy", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/app-link.js"></script>
+      
+    
+  </body>
+</html>

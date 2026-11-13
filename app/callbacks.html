@@ -1,0 +1,2202 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation supporting NewSEGS Energy Modelling software.">
+      
+      
+      
+      
+        <link rel="prev" href="plugins.html">
+      
+      
+        <link rel="next" href="backend.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Callbacks - NewSEGS Energy Modelling Software</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#callbacks" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="NewSEGS Energy Modelling Software" class="md-header__button md-logo" aria-label="NewSEGS Energy Modelling Software" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NewSEGS Energy Modelling Software
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Callbacks
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/robyoung88/ca-wu-newsegs-model" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    robyoung88/ca-wu-newsegs-model
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="NewSEGS Energy Modelling Software" class="md-nav__button md-logo" aria-label="NewSEGS Energy Modelling Software" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NewSEGS Energy Modelling Software
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/robyoung88/ca-wu-newsegs-model" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    robyoung88/ca-wu-newsegs-model
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/install.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install and run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../modelling/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modelling principles
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modelling principles
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelling/finance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docstrings.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docstring conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development and releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../framework/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Framework
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Framework
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/model-ecosystem.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model ecosystem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/core.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/modules.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/model.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/finance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/variable.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variable
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/metamodel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metamodel and Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/stats-sensitivity.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics and Sensitivity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/util.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Application
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="callbacks.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#shared-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared stores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-a-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading a page
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Loading a page">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#active-project-id-as-a-refresh-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        active-project-id as a refresh signal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component ids
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component ids">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#input-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variable-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variable inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other ids
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-an-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing an input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runs-and-post-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runs and post-actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#callbacks-with-several-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callbacks with several inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing callbacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="components.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="database.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting packages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Supporting packages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/utils.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plotting utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/newa.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NEWA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/admd.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADMD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#shared-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared stores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-a-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading a page
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Loading a page">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#active-project-id-as-a-refresh-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        active-project-id as a refresh signal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component ids
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component ids">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#input-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variable-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variable inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other ids
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-an-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing an input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runs-and-post-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runs and post-actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#callbacks-with-several-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callbacks with several inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing callbacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="callbacks">Callbacks<a class="headerlink" href="#callbacks" title="Permanent link">&para;</a></h1>
+<p>The app is a multi-page <a href="https://dash.plotly.com/">Plotly Dash</a> app. Its pages are built from containers that callbacks
+fill, so that one layout serves every model type. This page describes the stores that pages share, the ids that
+callbacks match, and the chains of callbacks that draw the inputs and results and run the model.</p>
+<p>Callbacks are bound once, by <code>create_app</code> in <code>src/app.py</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Module</th>
+<th>Callbacks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_display_callbacks</code></td>
+<td><code>app.py</code></td>
+<td>Session, routing, the active project</td>
+</tr>
+<tr>
+<td><code>add_navigation_callbacks</code></td>
+<td><code>components/navigation.py</code></td>
+<td>The navigation drawer</td>
+</tr>
+<tr>
+<td><code>add_input_container_callbacks</code></td>
+<td><code>components/callbacks/input_container_callbacks.py</code></td>
+<td>Input headers and containers, input changes, text fields, feedback graphs, sharing summaries</td>
+</tr>
+<tr>
+<td><code>add_project_selector_callbacks</code></td>
+<td><code>components/project_selector.py</code></td>
+<td>Creating, loading, renaming and deleting projects and snapshots</td>
+</tr>
+<tr>
+<td><code>add_site_selector_callbacks</code></td>
+<td><code>components/map.py</code></td>
+<td>The site map and its inputs</td>
+</tr>
+<tr>
+<td><code>add_environment_feedback_callbacks</code></td>
+<td><code>components/callbacks/environment_feedback_callbacks.py</code></td>
+<td>The environmental conditions of a site</td>
+</tr>
+<tr>
+<td><code>add_configuration_selector_callbacks</code></td>
+<td><code>components/configuration_selector.py</code></td>
+<td>Focusing, renaming, duplicating, removing, uploading and downloading configurations</td>
+</tr>
+<tr>
+<td><code>add_action_callbacks</code></td>
+<td><code>components/callbacks/action_callbacks.py</code></td>
+<td>Starting and monitoring runs, cancelling jobs</td>
+</tr>
+<tr>
+<td><code>add_result_container_callbacks</code></td>
+<td><code>components/callbacks/result_container_callbacks.py</code></td>
+<td>Result containers, headers and tables, and whether results are out of date</td>
+</tr>
+<tr>
+<td><code>add_result_timeseries_callbacks</code></td>
+<td><code>components/callbacks/timeseries_callbacks.py</code></td>
+<td>The timeseries of the focussed configuration</td>
+</tr>
+<tr>
+<td><code>Page.attach_callbacks</code></td>
+<td>each page in <code>plugins/pages</code></td>
+<td>The page's own callbacks, e.g. its run buttons and dialogs</td>
+</tr>
+</tbody>
+</table>
+<p><code>app.validation_layout</code> holds the layout of every page, so Dash accepts callbacks for components that only some pages
+have.</p>
+<h2 id="shared-stores">Shared stores<a class="headerlink" href="#shared-stores" title="Permanent link">&para;</a></h2>
+<p><code>serve_layout</code> (in <code>app.py</code>) puts these components in the root of the layout, outside <code>page-content</code>, so they persist
+across pages:</p>
+<table>
+<thead>
+<tr>
+<th>Id</th>
+<th>Kind</th>
+<th>Holds</th>
+<th>Set by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td><code>dcc.Location</code></td>
+<td>The path, <code>/{model_type}/{page}</code></td>
+<td>The navigation buttons</td>
+</tr>
+<tr>
+<td><code>page-content</code></td>
+<td><code>html.Div</code></td>
+<td>The page</td>
+<td><code>display_page</code></td>
+</tr>
+<tr>
+<td><code>session-id</code></td>
+<td><code>Store</code> (local)</td>
+<td>The browser's session id, <code>sess-&lt;uuid&gt;</code></td>
+<td><code>initialise_session_id</code>, on first visit</td>
+</tr>
+<tr>
+<td><code>app-state</code></td>
+<td><code>Store</code> (session)</td>
+<td>JSON: <code>current_page</code>, <code>session_id</code> and <code>model_type</code></td>
+<td><code>display_page</code>, only when it changes</td>
+</tr>
+<tr>
+<td><code>active-project-id</code></td>
+<td><code>Store</code> (session)</td>
+<td>The id of the session's project</td>
+<td><code>fetch_active_project_id</code>, and callbacks that change the project (see below)</td>
+</tr>
+<tr>
+<td><code>trigger-check-requests</code></td>
+<td><code>Store</code></td>
+<td>A timestamp</td>
+<td>The run buttons, after writing a request</td>
+</tr>
+<tr>
+<td><code>staleness-update-trigger</code></td>
+<td><code>Store</code></td>
+<td>A timestamp</td>
+<td>Callbacks that may change whether results are out of date outside the input triggers, e.g. a change of site</td>
+</tr>
+<tr>
+<td><code>ongoing-actions</code>, <code>failed-actions</code></td>
+<td><code>Store</code></td>
+<td>The ids of the runs under way; the messages of failed runs</td>
+<td><code>manage_actions</code></td>
+</tr>
+<tr>
+<td><code>progress-poll-interval</code></td>
+<td><code>Interval</code></td>
+<td>Polls the runs</td>
+<td>Enabled by <code>manage_actions</code> while runs are under way</td>
+</tr>
+<tr>
+<td><code>delayed-result-container-refill-interval</code></td>
+<td><code>Interval</code></td>
+<td>Refills the result tables after a change of project</td>
+<td>Reset to 0 when the project changes; ticks to 1</td>
+</tr>
+<tr>
+<td><code>feedback-graph-interval</code></td>
+<td><code>Interval</code></td>
+<td>Redraws the feedback graphs</td>
+<td>Reset to 0 when an input changes</td>
+</tr>
+<tr>
+<td><code>postaction-trigger</code> stores</td>
+<td><code>Store</code></td>
+<td>The requests completed, as JSON</td>
+<td><code>manage_actions</code> (see <a href="#runs-and-post-actions">Runs</a>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>layout-update-trigger</code> and <code>trigger-check-stale</code> are also in the layout, and are inputs of several callbacks, but no
+callback sets them, so they fire only when the app loads. <code>configuration-update-trigger</code>
+(<code>components.CONFIGURATION_UPDATE_TRIGGER_ID</code>) is in the layout but used by no callback.</p>
+<h2 id="loading-a-page">Loading a page<a class="headerlink" href="#loading-a-page" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TB
+    url["url.pathname"] --&gt; display["display_page"]
+    display --&gt; content["page-content"]
+    display --&gt; state["app-state"]
+    session["session-id"] --&gt; fetch["fetch_active_project_id"]
+    state --&gt; fetch
+    fetch --&gt; project["active-project-id"]
+    project --&gt; headers["update_input_header_contents"]
+    headers --&gt;|"reset to 0"| hydration["input-container-hydration-interval"]
+    hydration --&gt;|"ticks to 1"| hydrate["hydrate_input_container"]
+    project --&gt; results["update_output_container_contents"]
+    project --&gt;|"reset to 0"| refill["delayed-result-container-refill-interval"]
+    refill --&gt;|"ticks to 1"| tables["update_result_section_contents"]
+    project --&gt; text["update_generic_text_contents"]
+    project --&gt; stale["update_staleness_feedback"]</code></pre>
+<ol>
+<li><strong>Routing.</strong> <code>display_page</code> reads the model type from the first part of the path, and the page from the rest.
+   <code>/</code> and <code>/model-selection</code>, and any path whose model type isn't in <code>AVAILABLE_MODELS</code>, show the model selection
+   page. The page is looked up in <code>PAGE_REGISTER</code> and its <code>layout</code> is called with the layout configuration registered
+   for the page and model type (see <a href="plugins.html#pages">Plugins</a>). <code>app-state</code> is written only when it changes, so that
+   its listeners don't fire for nothing.</li>
+<li><strong>The project.</strong> <code>fetch_active_project_id</code> asks the project provider for the session's project of the model type
+   (<code>get_session_project_id</code>) and writes it to <code>active-project-id</code>. A session with no project of the model type, such
+   as a new browser, gets the latest project of the type, or a new one if there is none.</li>
+<li><strong>Filling the page.</strong> A change of <code>active-project-id</code> starts the callbacks that fill the containers:</li>
+<li>the input section headers, which also reset each input container's hydration interval to 0. When it ticks to 1,
+     <code>hydrate_input_container</code> builds the container's inputs. Building them on the tick, not on the reset, means
+     each container is built once;</li>
+<li>the result containers, and, through the refill interval, the result tables;</li>
+<li>the generic text fields, such as the project name in a header;</li>
+<li>the indicators of out-of-date results.</li>
+</ol>
+<h3 id="active-project-id-as-a-refresh-signal"><code>active-project-id</code> as a refresh signal<a class="headerlink" href="#active-project-id-as-a-refresh-signal" title="Permanent link">&para;</a></h3>
+<p>Callbacks that change the project, but not which project is active, write the same id back to <code>active-project-id</code> to
+redraw the page. Renaming, duplicating, focusing, removing and uploading configurations do this, as do renaming a
+project and creating or deleting snapshots. <code>update_output_container_contents</code> skips the containers already drawn for
+the project when the project is its only trigger, using their <code>data-rendered-project-id</code>.</p>
+<h2 id="component-ids">Component ids<a class="headerlink" href="#component-ids" title="Permanent link">&para;</a></h2>
+<p>Callbacks match components by pattern-matching (dictionary) ids. The ids that are shared between components and
+callbacks are:</p>
+<h3 id="input-containers">Input containers<a class="headerlink" href="#input-containers" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Id keys</th>
+<th>Component</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input-container</code></td>
+<td><code>supersection</code>, <code>section</code></td>
+<td>The container of a section's inputs, filled by its input container content creator</td>
+</tr>
+<tr>
+<td><code>input-section-header</code></td>
+<td><code>supersection</code>, <code>section</code></td>
+<td>The section's header, filled by its header content creator, if it has one</td>
+</tr>
+<tr>
+<td><code>input-container-hydration-interval</code></td>
+<td><code>supersection</code>, <code>section</code></td>
+<td>The interval which builds the container</td>
+</tr>
+<tr>
+<td><code>input-card-label</code></td>
+<td><code>supersection</code>, <code>section</code></td>
+<td>The label of a section's card</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>supersection</code> is the page or group of inputs (<code>deterministic</code>, <code>dsa</code>, <code>psa</code>, <code>optim</code>), and the <code>section</code> the
+group of variables, e.g. <code>gen_input</code>.</p>
+<h3 id="variable-inputs">Variable inputs<a class="headerlink" href="#variable-inputs" title="Permanent link">&para;</a></h3>
+<p>Every component of a variable's input has an id made by <code>VariableInstanceParameterComponentID</code>
+(<code>components/variable_identification.py</code>), with the keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>What the component is (below)</td>
+</tr>
+<tr>
+<td><code>supersection</code></td>
+<td>The page or group of inputs</td>
+</tr>
+<tr>
+<td><code>purpose</code></td>
+<td>What it changes, e.g. <code>parameter</code>, <code>bound-lower</code>, <code>value-reset</code>; the input handlers are registered by purpose</td>
+</tr>
+<tr>
+<td><code>section</code>, <code>key</code>, <code>subindex</code></td>
+<td>The variable: together they make its varid, <code>{section}.{key}.{subindex}</code></td>
+</tr>
+<tr>
+<td><code>parameter_index</code>, <code>vector_location</code></td>
+<td>Which parameter of the variable, and the position within an array parameter</td>
+</tr>
+</tbody>
+</table>
+<p>The ids of the other groups in a group editor (<code>group-value-input</code>) add <code>var_uid</code>, the id of their Variable.</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Component</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>single-input-config</code></td>
+<td>An input of a parameter, bound or setting</td>
+</tr>
+<tr>
+<td><code>input-dropdown</code>, <code>input-toggle</code>, <code>input-action-button</code>, <code>input-summary</code></td>
+<td>Other inputs of a variable: dropdowns, toggles, buttons (e.g. reset), and the summary of a row whose clicks open its editor</td>
+</tr>
+<tr>
+<td><code>group-value-input</code>, <code>group-move-request</code></td>
+<td>The group editor's inputs of other groups, and its moves between groups</td>
+</tr>
+<tr>
+<td><code>single-input-header</code></td>
+<td>The header of a variable's input</td>
+</tr>
+<tr>
+<td><code>input-group-editor</code></td>
+<td>The container of a row's editor, built when the row is opened</td>
+</tr>
+<tr>
+<td><code>input-group-config-update-trigger</code></td>
+<td>A store set when the variable's configuration is saved</td>
+</tr>
+<tr>
+<td><code>variable-summary-refresh-trigger</code></td>
+<td>A store set to redraw the variable's sharing summary</td>
+</tr>
+</tbody>
+</table>
+<h3 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h3>
+<p>Result components have ids with the keys <code>type</code>, <code>purpose</code>, <code>supersection</code>, <code>section</code>, <code>key</code> and <code>subindex</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Purpose</th>
+<th>Component</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>result-container</code></td>
+<td><code>container</code></td>
+<td>A result, filled by its result container content creator, keyed by <code>key</code> and <code>section</code></td>
+</tr>
+<tr>
+<td><code>result-section-header</code></td>
+<td><code>header</code></td>
+<td>A result section's header</td>
+</tr>
+<tr>
+<td><code>result-table</code></td>
+<td><code>container</code></td>
+<td>A table or figure drawn from a stored table (<code>section</code> is <code>tabledraw</code>, <code>key</code> the table)</td>
+</tr>
+<tr>
+<td><code>result-table-option</code></td>
+<td>the option, e.g. <code>statistic</code></td>
+<td>An option of a table, which redraws it</td>
+</tr>
+<tr>
+<td><code>postaction-trigger</code></td>
+<td><code>trigger</code></td>
+<td>A store set when a request completes (<code>supersection</code> is <code>global</code>, <code>section</code> is <code>run</code>, <code>postprocess</code> or <code>tabledraw</code>, and <code>key</code> the request type)</td>
+</tr>
+</tbody>
+</table>
+<p>The containers of a group of results, made by <code>layouts.result_group_containers.create_results_container</code>, have ids
+<code>{'type': ..., 'section': ..., 'supersection': ...}</code> with the types <code>results-container</code> (whose <code>data-status</code> shows
+whether runs are under way), <code>results-content</code>, <code>results-overlay-text</code>, <code>results-overlay-subtext</code> and
+<code>results-progress-bar</code>.</p>
+<h3 id="other-ids">Other ids<a class="headerlink" href="#other-ids" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Id</th>
+<th>Component</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{'type': 'generic_text', 'section': ..., 'key': ...}</code></td>
+<td>A text field filled from the project, by <code>key</code>: <code>project-name</code>, <code>site-name</code> or <code>configuration-name</code></td>
+</tr>
+<tr>
+<td><code>{'type': 'config-name-input' \| 'config-focus-btn' \| 'config-hdrfocus-btn' \| 'config-dup-btn' \| 'config-remove-btn' \| 'config-download-btn' \| 'config-upload', 'index': n}</code></td>
+<td>The configuration selector's inputs and buttons, for configuration <code>n</code></td>
+</tr>
+<tr>
+<td><code>{'type': 'action-button-ps', 'key': ...}</code></td>
+<td>The project selector's buttons</td>
+</tr>
+<tr>
+<td><code>{'type': 'annual-horizon-toggle', 'page': ...}</code></td>
+<td>The toggle between results per year and to the horizon</td>
+</tr>
+<tr>
+<td><code>{'type': 'feedback-graph', 'section': ..., 'key': ...}</code></td>
+<td>A feedback graph, drawn by the artist registered for its <code>key</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="changing-an-input">Changing an input<a class="headerlink" href="#changing-an-input" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TB
+    input["A variable's input"] --&gt; react["react_to_input_change"]
+    react --&gt;|"purpose"| handler["Registered input handler"]
+    react --&gt; values["single-input-config values"]
+    react --&gt; header["single-input-header"]
+    react --&gt; trigger["input-group-config-update-trigger"]
+    react --&gt; editor["input-group-editor"]
+    react --&gt; summary["variable-summary-refresh-trigger"]
+    trigger --&gt; sectionheader["update_input_header_contents"]
+    trigger --&gt; stale["update_staleness_feedback"]
+    trigger --&gt;|"reset to 0"| feedback["feedback-graph-interval"] --&gt; graphs["update_feedback_graphs"]
+    summary --&gt; sharing["update_variable_sharing_summary"]</code></pre>
+<p><code>react_to_input_change</code> receives almost every change to a variable's input. Its inputs and outputs use <code>MATCH</code> on
+<code>section</code>, <code>key</code> and <code>subindex</code>, so each call is for one variable. It handles the DSA bounds (<code>bound-lower</code>,
+<code>bound-upper</code>), the optimisation bounds and plot resolution (<code>plot-intervals</code>), the DSA bound type (<code>dsaboundtype</code>)
+and the DSA selection (<code>dsa-active</code>) itself. It passes every other purpose to the handler registered for it, looked up
+by purpose, component type and model type (see <a href="plugins.html#input-handlers">Input handlers</a>). The registered handlers
+include <code>parameter</code> (a value), <code>value-reset</code>, <code>value-set-default</code>, <code>toggle-optim-active</code>, <code>psa-active</code>,
+<code>psa-settings</code>, <code>group-editor-toggle</code> (opening a row) and the group editors' <code>group-value</code>, <code>move</code> and
+<code>group-dsa...</code> purposes.</p>
+<p>The callback ignores a call in which several of its inputs fire. That happens only when new components are drawn,
+not when the user changes something.</p>
+<p>A handler returns its updates in <code>return_dict</code>. Setting the <code>trigger_data</code> of the variable's
+<code>input-group-config-update-trigger</code> stores signals that the variable was saved: the section header is redrawn, the
+indicators of out-of-date results are updated, and the feedback graphs are redrawn. Setting <code>summary_refresh</code> redraws
+the variable's sharing summary.</p>
+<h2 id="runs-and-post-actions">Runs and post-actions<a class="headerlink" href="#runs-and-post-actions" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TB
+    button["A run button"] --&gt; request["register_run_request function"]
+    request --&gt;|"writes a request"| db[("requests")]
+    button --&gt; check["trigger-check-requests"]
+    check --&gt; manage["manage_actions"]
+    poll["progress-poll-interval"] --&gt; manage
+    manage --&gt;|"sends"| dispatcher["Dispatcher and workers"]
+    manage --&gt;|"on completion"| postaction["postaction-trigger stores"]
+    manage --&gt;|"child requests"| db
+    manage --&gt; overlay["results-container overlays"]
+    postaction --&gt; tables["update_result_section_contents"]
+    postaction --&gt; headers["update_result_section_header_contents"]
+    postaction --&gt; stale["update_staleness_feedback"]
+    postaction --&gt; timeseries["show_model_timeseries"]</code></pre>
+<ol>
+<li>A run button's callback (in the page's <code>attach_callbacks</code>) calls the function registered with
+   <code>register_run_request</code> for the action, which writes a request to the database. It then sets
+   <code>trigger-check-requests</code>.</li>
+<li><code>manage_actions</code> runs on <code>trigger-check-requests</code> and on each tick of <code>progress-poll-interval</code>. It sends new
+   requests to the dispatcher, reads the progress of the runs under way, and shows it in the <code>results-container</code>
+   overlays. It retries failed runs, up to their limit, and reports those that can't be retried in <code>failed-actions</code>.</li>
+<li>When a run completes, <code>manage_actions</code> appends the request to the <code>postaction-trigger</code> store for its request type,
+   and to those of any other tables it drew (the <code>also_draws</code> of <code>register_table_draw</code>: the table draw of a
+   whole-project DSA or PSA also draws each configuration's tables). It creates the requests of its <a href="plugins.html#processes">post-actions</a> (postprocessing, then table drawing) and starts
+   them. It disables the poll interval once no request is active. A request just created has no run until a worker
+   claims it, so the interval keeps going, and the results show as calculating, until the last post-action completes.</li>
+<li>The <code>postaction-trigger</code> stores are inputs of the callbacks that show results.
+   <code>update_result_section_contents</code> redraws the tables that match the trigger, using the table getters registered
+   for the model type. It skips a table whose rendered project, table revision and annual/horizon state are
+   unchanged, unless its options changed or, for a table with a getter, the focussed configuration changed or the
+   table's own trigger fired.
+   <code>update_result_figure_contents</code> empties a figure when its getter has no result.</li>
+</ol>
+<p><code>cancel_job</code> cancels every request when a <code>cancel-job-button</code> is clicked.</p>
+<h2 id="callbacks-with-several-inputs">Callbacks with several inputs<a class="headerlink" href="#callbacks-with-several-inputs" title="Permanent link">&para;</a></h2>
+<p>Several inputs of a callback can fire in the same call, such as a post-action trigger and the refill interval after a
+run. <code>ctx.triggered_id</code> and <code>callback_utils.get_triggered_value()</code> give only the first, so callbacks with several
+inputs use the helpers in <code>callback_utils</code> to consider every trigger (see
+<a href="components.html#callbacks-with-several-inputs">Components</a>).</p>
+<h2 id="testing-callbacks">Testing callbacks<a class="headerlink" href="#testing-callbacks" title="Permanent link">&para;</a></h2>
+<p><code>test/unit_tests/test_app_callbacks/dash_dispatch.py</code> posts requests to <code>/_dash-update-component</code> through the Flask
+test client, as the browser does, so that Dash itself resolves the callback, its pattern matching and <code>ctx</code>. See
+<a href="../development.html#adding-a-test-of-an-input-handler">Adding a test of an input handler</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.indexes", "content.code.copy", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/app-link.js"></script>
+      
+    
+  </body>
+</html>

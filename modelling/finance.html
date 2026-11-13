@@ -1,0 +1,1860 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation supporting NewSEGS Energy Modelling software.">
+      
+      
+      
+      
+        <link rel="prev" href="index.html">
+      
+      
+        <link rel="next" href="../architecture.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Finance model - NewSEGS Energy Modelling Software</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#finance-model" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="NewSEGS Energy Modelling Software" class="md-header__button md-logo" aria-label="NewSEGS Energy Modelling Software" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NewSEGS Energy Modelling Software
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Finance model
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/robyoung88/ca-wu-newsegs-model" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    robyoung88/ca-wu-newsegs-model
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="NewSEGS Energy Modelling Software" class="md-nav__button md-logo" aria-label="NewSEGS Energy Modelling Software" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NewSEGS Energy Modelling Software
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/robyoung88/ca-wu-newsegs-model" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    robyoung88/ca-wu-newsegs-model
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/install.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install and run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modelling principles
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modelling principles
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance model
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="finance.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#perspectives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Perspectives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Perspectives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Owner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#landlord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landlord
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Landlord">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-of-resident-affordability-threshold-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example of resident affordability threshold analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docstrings.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docstring conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development and releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../framework/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Framework
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Framework
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/model-ecosystem.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model ecosystem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/core.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/modules.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/model.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/finance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/variable.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variable
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/metamodel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metamodel and Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/stats-sensitivity.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics and Sensitivity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../framework/util.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../app/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Application
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app/plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app/callbacks.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app/backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app/components.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app/database.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting packages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Supporting packages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/utils.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plotting utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/newa.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NEWA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/admd.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADMD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#perspectives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Perspectives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Perspectives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Owner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#landlord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landlord
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Landlord">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-of-resident-affordability-threshold-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example of resident affordability threshold analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="finance-model">Finance model<a class="headerlink" href="#finance-model" title="Permanent link">&para;</a></h1>
+<p>The NewSEGS Finance model (Finance) transforms the configuration and results of a previously <code>run</code> NewSEGS Energy Model into financial values and statistics relevant to comparing the performance of NewSEGS schemes from the perspective of a System Owner (SO).</p>
+<h2 id="perspectives">Perspectives<a class="headerlink" href="#perspectives" title="Permanent link">&para;</a></h2>
+<p>There are a number of perspectives that can be considered for cost-benefit analysis (CBA) of a NewSEGS scheme.</p>
+<h3 id="system-owner">System Owner<a class="headerlink" href="#system-owner" title="Permanent link">&para;</a></h3>
+<p>The System Owner (SO) perspective encapsulates the generation, storage, distribution, metering, energy purchase and resale aspects of the scheme and is conceptually easy to value, as the majority of aspects have a direct monetary cost and the majority of benefits are also direct.</p>
+<p><strong>Costs</strong></p>
+<ul>
+<li>Generation<ul>
+<li>One-off costs of planning</li>
+<li>Capital cost of equipment</li>
+<li>One-off or ongoing costs of site leases</li>
+<li>One-off costs of installation and commissioning</li>
+<li>Ongoing costs of operation and maintenance</li>
+<li>Periodic costs of replacement or decomissioning</li>
+<li>One-off costs of environmental impact mitigation</li>
+<li>Ongoing costs of environmental impact mitigation</li>
+</ul>
+</li>
+<li>Storage<ul>
+<li>One-off costs of planning</li>
+<li>Capital cost of equipment</li>
+<li>One-off or ongoing costs of site leases</li>
+<li>One-off costs of installation and commissioning</li>
+<li>Ongoing costs of operation and maintenance</li>
+<li>Periodic costs of replacement or decomissioning</li>
+<li>One-off costs of environmental impact mitigation</li>
+<li>Ongoing costs of environmental impact mitigation</li>
+</ul>
+</li>
+<li>Distribution<ul>
+<li>One-off costs of planning</li>
+<li>Capital cost of equipment</li>
+<li>One-off costs of installation and commissioning</li>
+<li>Ongoing costs of operation and maintenance</li>
+<li>Periodic costs of replacement or decomissioning</li>
+<li>One-off costs of environmental impact mitigation</li>
+<li>Ongoing costs of environmental impact mitigation</li>
+</ul>
+</li>
+<li>Metering and Billing<ul>
+<li>Capital cost of equipment</li>
+<li>One-off costs of installation and commissioning</li>
+<li>Ongoing costs of operation and maintenance</li>
+<li>Periodic costs of replacement</li>
+<li>Ongoing costs of meter reading and billing</li>
+<li>Ongoing costs of customer service</li>
+</ul>
+</li>
+<li>Electricity purchase<ul>
+<li>One-off costs of site connection planning</li>
+<li>One-off costs of site connection installation and commissioning</li>
+<li>Periodic cost of access to supply</li>
+<li>Variable periodic cost of electricity consumed</li>
+<li>Variable periodic cost of power factor compensation</li>
+<li>Periodic cost of contract (re)negotiation</li>
+</ul>
+</li>
+<li>Electricity market participation<ul>
+<li>One-off costs to enrol in relevant markets</li>
+<li>Periodic cost to administer market participation and control storage charging/dispatch</li>
+</ul>
+</li>
+</ul>
+<p><strong>Benefits</strong>
+- Residential sales
+    - Periodic revenue from fixed (standing) charges
+    - Periodic variable revenue per unit electricity sold
+- Export sales
+    - Periodic variable revenue per unit electricity sold
+    - Periodic variable revenue per unit capacity provided (capacity markets)
+- Residuals
+    - Value of generation equipment
+    - Value of storage equipment
+    - Value of distribution equipment
+    - Value of metering equipment
+- Grants
+    - Grants for installation of renewables on social housing</p>
+<p>The quantity of residential sales is not necessarily fixed for a site under fixed environmental conditions; there may exist "rebound" effects tending to increase the quantity of electrical energy units used in response to a decrease in unit price or perceived reduction in environmental cost for each unit produced. These effects may be nonlinear, time-varying and subject to saturation points; e.g. resident behaviour changing to demand a higher mean internal temperature of their household in response to lower energy prices will have a hard threshold at a temperature beyond which any increases would become uncomfortable, and a soft threshold at a temperature beyond which any increases have no effect on comfort (i.e. the bounds of the "Goldilocks zone"). Changes in residential consumer behaviour will almost always result in a change to the marginal price of electricity supplied, as the proportion of imported versus on-site generated energy, and the quantity of energy available for export, will vary, even if the generation and storage scheme is varied proportionally due to the variable nature of the generation resource and the non-uniform application of the demand rebound.</p>
+<p>The rebound effect, whilst being complex, is capable of representation within the NewSEGS model.</p>
+<h3 id="resident">Resident<a class="headerlink" href="#resident" title="Permanent link">&para;</a></h3>
+<p>The Resident perspective considers only the consumption of electricity within the site. It does not encompass other costs of accommodation, including rent, as there is not a feasible mechanism whereby benefits accrued by the SO can be translated directly into rent corrections; i.e. all other costs are assumed fixed.</p>
+<p>The primary benefit of a NewSEGS scheme to a resident is the supply of electrical energy. Under the assumptions of this model, this supply is invariant regardless of generation and storage composition or electricity market participation. In addition, it is assumed that there is no impact on any other benefit to the residential consumer, such as:</p>
+<ul>
+<li>Reliability of supply.</li>
+<li>Efficacy and flexibility of billing and payment.</li>
+<li>Provision of customer service.</li>
+<li>Ethical benefits from participation in a community-level low-carbon energy project.</li>
+</ul>
+<p>Therefore CBA from the resident perspective cannot be fully defined and is a simple problem of cost minimisation, which may be achieved through two vectors:</p>
+<ul>
+<li>Reduction in residential demand</li>
+<li>Reduction in fixed and/or variable costs of supply</li>
+</ul>
+<p>Reduction in demand can itself be achieved through changes to multiple factors, such as:</p>
+<ul>
+<li>Behavioural (i.e. energy intensity of occupation)</li>
+<li>Occupational (i.e. quantity of building-time occupied)</li>
+<li>Appliance (i.e. reduction of energy intensity of tasks through equipment)</li>
+<li>Building fabric (i.e. reduction of energy intensity of occupation through reduced heat loss/gain)</li>
+</ul>
+<p>At least a proportion of all of these factors can be influenced by actions of the Landlord; however, the costs incurred by such action at not encapsulated within the Resident perspective. The costs of Resident actions to reduce demand are considered out of scope for the NewSEGS model, though they may have an impact on the marginal cost of electricity under a NewSEGS scheme, which may be reflected in the price of electricity to the residents after mediation by the SO. As these actions are not costed, from the Resident perspective within this model, demand modifying changes cannot be considered part of any optimisation problem.</p>
+<p>Reduction in fixed and/or variable costs of supply are determined by the pricing structure and valuation of supply from the SO. Dependent on the financial requirements of the SO, these may be more or less decoupled from the marginal cost of supply to the SO; however, in the limit of minimum cost to the resident, price will be set to cover this cost only.</p>
+<p>Therefore, within this model, optimisation of the NewSEGS system for cost minimisation to the resident requires minimisation of the cost to the SO of supply to residents. The problem is therefore best tackled from the SO perspective. After optimisation and assuming no further price-responsive changes in demand, the final cost to residents can be determined by choosing price values that satisfy the minimum financial requirements of the SO.</p>
+<h3 id="landlord">Landlord<a class="headerlink" href="#landlord" title="Permanent link">&para;</a></h3>
+<p>The Landlord perspective considers the costs and benefits associated with the building assets and rent. The Landlord may also be SO, but even if they are not, the value of the NewSEGS scheme to the SO might be expected (under ideal competitive scenarios) to be reflected as a benefit to the Landlord through the price of compensation to the landlord; e.g. the price of the lease for generation siting.</p>
+<p>Registered Social Landlords (RSLs) do not operate within an idealised competitive environment. Rent cannot increase and decrease in response to resident competition for residences, demand exceeds supply such that less desirable residences are not less valuable due to lower occupancy, and geography is not a commodity, so it is impossible to consider residences fully exchangeable. As such, it is a challenge to incorporate the Landlord perspective in a CBA without making substantial assumptions.</p>
+<p><strong>Costs</strong></p>
+<ul>
+<li>Buildings<ul>
+<li>One-off cost of materials for construction</li>
+<li>One-off cost of labour for construction</li>
+<li>Ongoing cost of maintenance</li>
+</ul>
+</li>
+<li>Appliances<ul>
+<li>One-off cost for purchase</li>
+<li>Ongoing cost of maintenance</li>
+<li>Periodic cost of replacement</li>
+</ul>
+</li>
+<li>Administration<ul>
+<li>Ongoing cost of support of residents interacting with NewSEGS</li>
+</ul>
+</li>
+</ul>
+<p><strong>Benefits</strong></p>
+<ul>
+<li>NewSEGS value<ul>
+<li>Via lease or directly from net revenue</li>
+</ul>
+</li>
+<li>Rent<ul>
+<li>Successfully paid rent (not modelled)</li>
+</ul>
+</li>
+<li>Grants<ul>
+<li>Grants for energy-efficient building</li>
+</ul>
+</li>
+</ul>
+<p>The quantity of successfully paid rent might be considered to be influenced by several factors:</p>
+<ul>
+<li>Resident income</li>
+<li>Resident cost of living (including energy costs)</li>
+<li>Occupancy (number of units, proportion of units occupied - itself dependent upon demand level for property types in a location, and the turn-around time for a property which may partially depend on its ease of maintenance)</li>
+</ul>
+<p>This model is principally concerned with the second factor, though the potential impact of any modelled technologies on the third should be considered. Reductions to the resident cost of living may be achieved by improvements to the building fabric or appliances (at cost to the landlord) or lower pricing of electricity supply, which may be achieved by lowering the marginal cost of supply, or reduction in the operating margin of the supplier and thus profitability of the SO.</p>
+<p>However, the response of the proportion of rent successfully paid is expected to be highly non-linear in response to changes in the cost of energy at an individual household level, with a strong threshold effect between the rent being considered "affordable" and "not affordable". The impact of the NewSEGS scheme on the quantity of successfully paid rent is not modelled.</p>
+<p>In the absence of this dependent variable, the only aspects determining the financial performance of the NewSEGS scheme from the perspective of the Landlord are the costs of building, the profitability of the SO, and any grants that might be incurred.</p>
+<p>Less efficient buildings with higher energy requirements will tend to scale the profitability of a NewSEGS scheme to a SO provided that there is space available, grid access, and regulatory permission for sufficient generation and storage; i.e. if a small scheme is already profitable, then provision of a greater quantity of electricity to demand within that captive market will increase profitability. This may not always be true if the demand increases occurs disproportionately at times when the generation/storage system is not providing energy or if generator or storage cost does not increase linearly, but may be considered an approximate rule-of-thumb.</p>
+<p>Therefore, it can be seen that under this framework, the Landlord perspective contains a perverse incentive to lower building costs by decreasing the energy efficiency of the buildings, which is then subject to a positive reinforcement by increasing value to the SO (and therefore the landlord) of supply of a greater number of units of electricity to residents. The effect of this on residents does not feed through to the Landlord under the present assumptions.</p>
+<p>Even if they were, due to the expected nonlinearity in the rent payment response, an optimal system from the Landlord point of view would be one in which all tenants were spending their individual maximum possible amount on rent and energy.</p>
+<p>It should therefore be considered that there are other non-monetary incentives and benefits to lowering the cost of living for tenants, not least the social obligations of a RSL.</p>
+<p>To avoid these perverse incentives, the Landlord perspective is not to be considered a traditional Benefits-Cost opimisation problem. Rather, an appropriate problem to solve would be:</p>
+<blockquote>
+<p>"What is the most cost-effective way for a Landlord to achieve a specified cost of energy for its tenants?"</p>
+</blockquote>
+<p>As an example, a target level of affordability may be to consider buildings constructed to Passivhaus standard being supplied by regulated domestic electricity suppliers on standard tariffs. If the Landlord was to instead construct to a lower insulation standard, then tenants would be subject to higher energy costs, but a NewSEGS scheme could be used to supply electricity at a rate low enough to negate the difference. A cost-effective NewSEGS scheme at this rate would be self-sufficient and could attract funding if presented to a suitable SO; if not cost-effective, then the Landlord would have to part-fund the scheme, returning their costs towards or above the level of building to the higher insulation standard, in order to maintain the same level of energy affordability for their tenants.</p>
+<h4 id="example-of-resident-affordability-threshold-analysis">Example of resident affordability threshold analysis<a class="headerlink" href="#example-of-resident-affordability-threshold-analysis" title="Permanent link">&para;</a></h4>
+<p><em>Please note that these numbers are indicative only, using a generic site composition and resource profile</em>.</p>
+<p>Consider a site of 50 units, with mean GFA of 90 m² and mean heat loss parameter (HLP) of 0.3 W/m²/K. Over ten years, it is estimated by the model that these consume 3,463,550 units of electricity at a cost of £1,101,755 from registered domestic suppliers. There is no generation or storage on site.</p>
+<p>If instead the units were built to a HLP of 0.8 W/m²/K, the consumption would increase to 4,718,337 units and costs would increase by 36% to £1,500,900. By applying a discount of 26.5% (i.e 1 - 1,101,755/1,500,900) to electricity sold on site, costs to residents will return to £1,101,755, but the SO would have to cover that cost - assuming that the discount also applies to EV charging prices, then the undiscounted NPV to the SO decreases to -£410,312.</p>
+<p>From a simple financial perspective to this limited ten-year horizon, if the money saved by the Landlord by building to the 0.8 HLP standard instead of the 0.3 standard exceeds £8,206 per unit, then they could take that money, fund the SO to make-up the difference in energy bills, and still be in profit; however, after the ten years have expired, they still have lower standard housing stock, and their tenants will continue to require subsidy to keep energy bills at the existing level.</p>
+<p>A more sustainable alternative would be to invest in self-generation instead; investment in a 300 kWp solar array and 466 kWh BESS might increase the NPV to -£128,283, reducing the necessary subsidy to £2,566 per housing unit over the first ten years, assuming that the Landlord receives full SO benefits. However, this relatively high NPV does come at the expense of increased capital expenditure - approximately £480,000 for the generators and BESS (the majority of which for the PV generators, which would cover only 17.5% of winter consumption, but 94.5% of summer consumption), or £9,600 per housing unit; a higher lump-sum than the £8,206 spread out over ten years required for the without-NewSEGS project, and still requiring £2,566 per housing unit over ten years additional subsidy.</p>
+<p>As a general rule for renewable energy generators, once installed, it is cost-effective to keep them running until maintenance costs become prohibitive, as the economics of them are dominated by the up-front cost and the marginal cost of generation is virtually nil. Therefore, up to the lifespan of the generator, increases in financial time horizon will tend to increase the NPV of a generation project. "Subsidy" of supply with active generation may therefore be considered just another aspect of project finance from this perspective, provided that a positive NPV occurs when considering a horizon of the project lifetime. Sale of electricity at heavy discount can occur, even if that electricity has had to be purchased at a higher rate, under the assumption that future profits will recoup these losses. For this reason, the system is sensitive to assumptions regarding discounting the future value of benefits or costs.</p>
+<p>The low marginal cost of generation suggests that almost any level of price discount could be sustained provided that the equipment lasts long enough and maintenance is cheap enough. If the sale price to residents drops below the sale price to the grid, then this does not necessarily imply any great change in the system control strategy - the SO will incur large losses whenever it has to import electricity to sell at the heavily reduced rate, and so self-consumption is always preferred.</p>
+<p>Practically, however, the limited lifespan of project assets and the dimishing future value of money does impose a relatively high limit on the lowest possible price for supply under a NewSEGS scheme.</p>
+<p>Under the assumption that PV may be installed at a rate of £1,365 / kWp (see the initial site report and <a href="https://www.gov.uk/government/statistics/solar-pv-cost-data">Department for Energy Security and Net Zero</a>) with ongoing costs 1% of initial costs per year and a mean capacity factor of 12% over a lifetime of 25 years and ignoring inverter replacement, the mean sale price of electricity could not be below £0.06493 for break-even; with a 3.5% discount rate, this increases to £0.08911. If requiring pay-back within 10 years, a mean price of £0.1428 is required, or £0.1638 with 3.5% discounting for both costs and benefits. These latter numbers are substantially greater than the expected sale rate for site exports, making storage particularly valuable for PV as peak production rarely occurs with peak consumption.</p>
+<p>For small/medium scale wind, assuming a cost of £5,400 per kW of installed capacity (see the initial site report and <a href="https://energysavingtrust.org.uk/advice/wind-turbines/">Energy Saving Trust 2024</a>) with ongoing costs 4% of initial costs per year and a mean capacity factor of 25% over a lifetime of 25 years, the mean sale price of electricity could not be below £0.1973 / kWh for break-even, and with a 3.5% discount on both costs and benefits, this increases to £0.2432 / kWh, higher than the target residential price in our HLP = 0.8 example. Under a 10 year horizon, payback requires £0.3452 / kWh, or £0.3851 / kWh with discounting at 3.5%. This is substantially higher than the price of electricity available from public supply; even with perfect storage capable of ensuring that all wind generation was consumed on site (by default, a higher proportion than PV due to the correlation of generation and load, but still imperfect) it would not have achieved payback within ten years if selling with <em>no</em> discount to the residents.</p>
+<p>What this implies from the Landlord perspective is that trading between energy efficiency and NewSEGS project value is not unlimited or without compromise.</p>
+<ul>
+<li>High insulation, no NewSEGS:<ul>
+<li>Higher one-off costs to Landlord for building.</li>
+<li>Low level of consumption by residents, but high per-unit cost, resulting in moderate energy costs. Asymptotic lower limit to consumption due to appliance, hot water, lighting use.</li>
+<li>No one-off costs for SO for generation/storage construction.</li>
+<li>No ongoing costs for SO.</li>
+<li>High residual value of building due to fabric quality.</li>
+<li>No residual value of NewSEGS.</li>
+</ul>
+</li>
+<li>Low insulation, no NewSEGS:<ul>
+<li>Lower one-off costs to Landlord for building</li>
+<li>High level of consumption by residents, but moderated per-unit cost, financed by savings from building but with no long-term recovery mechanism and with potential to exceed savings.</li>
+<li>No one-off costs for SO for generation/storage construction.</li>
+<li>No ongoing costs for SO.</li>
+<li>Low residual value of building due to fabric quality.</li>
+<li>No residual value of NewSEGS. </li>
+</ul>
+</li>
+<li>Low insulation, NewSEGS:<ul>
+<li>Lower one-off costs to Landlord for building</li>
+<li>High level of consumption by residents, but moderated per-unit cost. Dependent on relative savings from building and one-off costs from NewSEGS (if SO), moderated cost may be part-funded by savings or additional finance. Long-term recovery by sale of generated electricity, limited by lifespan of generation equipment and required level of tariff. Buildings will require several generations of NewSEGS equipment over lifespan.</li>
+<li>High one-off costs for SO for generation/storage construction.</li>
+<li>Ongoing costs for SO</li>
+<li>Low residual value of building due to fabric quality.</li>
+<li>Residual value of NewSEGS up to lifespan of project.</li>
+</ul>
+</li>
+<li>High insulation, NewSEGS:<ul>
+<li>High one-off costs to Landlord for building</li>
+<li>Low level of consumption by residents, lightly moderated per-unit cost.</li>
+<li>High one-off costs for SO for generation/storage construction.</li>
+<li>Ongoing costs for SO</li>
+<li>High residual value of building due to fabric quality.</li>
+<li>Residual value of NewSEGS up to lifespan of project.</li>
+</ul>
+</li>
+</ul>
+<p>It should also be considered that, in the case of a separate Landlord and SO, the enticement for the SO to participate in the more heavily subsidised schemes is weaker. It is envisaged that in these scenarios, the SO is offered the opportunity to lease generation and storage sites and access the private wire network in order to supply the residents of the scheme, under obligation to price energy supplied at a discount relative to other suppliers, as necessary to meet the resident affordability criterion and therefore higher in less-efficient buildings. As demonstrated above, the higher the discount, the longer the payback period for generation equipment. Once all costs to the SO are considered and after considering the number of units required to be imported, it may be economically unattractive or even infeasible for the SO to undertake the project without some additional funding (i.e. from the Landlord, sourced from savings made in the building fabric, potentially even after waiving any lease fees).</p>
+<h2 id="provisions">Provisions<a class="headerlink" href="#provisions" title="Permanent link">&para;</a></h2>
+<p>A Finance Model provides the following values, both undiscounted and after application of a cost or benefit discount rate:</p>
+<ul>
+<li>Timeseries:<ul>
+<li>Resident receipts</li>
+<li>EV charging receipts</li>
+<li>Exported electricity receipts</li>
+<li>All receipts</li>
+<li>Import costs</li>
+<li>Generation O&amp;M costs</li>
+<li>Storage O&amp;M costs</li>
+<li>Billing O&amp;M costs</li>
+<li>Other O&amp;M costs</li>
+<li>Generation Capex</li>
+<li>Storage Capex</li>
+<li>Distribution Capex</li>
+<li>Metering Capex</li>
+<li>Other Capex</li>
+<li>All Capex</li>
+<li>All costs</li>
+</ul>
+</li>
+<li>Present Values:<ul>
+<li>Total benefits</li>
+<li>Total costs</li>
+<li>Benefit:Cost ratio</li>
+<li>Net Present Value</li>
+</ul>
+</li>
+<li>Other statistics:<ul>
+<li>Simple payback time</li>
+</ul>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.indexes", "content.code.copy", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/app-link.js"></script>
+      
+    
+  </body>
+</html>
