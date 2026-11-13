@@ -9,13 +9,16 @@ flowchart TB
         disp["Dispatcher (ZeroMQ)"]
         wrk["Workers"]
         store[("Results store")]
+        maint["Maintenance<br/>backups, pruning"]
         ui <--> db
         ui -. "requests" .-> db
-        db -. "claimed by" .-> disp
+        ui -. "sends requests" .-> disp
         disp --> wrk
+        wrk -- "runs, progress" --> db
         wrk --> store
-        wrk --> db
         ui --> store
+        maint --> db
+        maint --> store
     end
     subgraph fw["newsegsmodelframework"]
         direction TB
@@ -23,7 +26,11 @@ flowchart TB
         mm --> em["NewsegsModel<br/>(grid, generation, cs)"]
         mm --> fm["NewsegsFinance"]
         mm --> vars["Variables"]
-        proj --> sens["DSA / PSA / Optimisation"]
+        mm --> optim["Optimisation"]
+        proj --> sens["DSA / PSA"]
+    end
+    subgraph utils["newsegsmodelutils"]
+        plots["Plots<br/>PSA, optimisation, wind resource"]
     end
     subgraph support["Supporting packages"]
         newa["newa"]
@@ -31,13 +38,16 @@ flowchart TB
         cfg["config"]
     end
     app --> fw
+    app --> utils
+    utils --> fw
     fw --> support
     app --> cfg
 ```
 
 ## The framework (`newsegsmodelframework`)
 
-The framework knows nothing about the web application. It provides:
+The framework knows nothing about the web application, and draws no figures: it uses neither Dash nor any
+plotting library. It provides:
 
 * [`core`](framework/core.md) - the base classes: revision-tracked, serialisable
   *components* (`NewsegsComponent`), `NewsegsModule`, time spans, locations and the
@@ -58,6 +68,11 @@ Every object that is configured by the user is a `NewsegsComponent` or `DataWith
 can therefore be serialised to and from a dictionary. The app stores these dictionaries in its
 database (see [Database](app/database.md)).
 
+## The plotting utilities (`newsegsmodelutils`)
+
+The [plotting utilities](support/utils.md) draw figures from the data of the framework, such as the plots of a PSA, for the
+app (and for scripts). They use the framework, but the framework does not use them.
+
 ## The application (`newsegsmodelapp`)
 
 The application consists of:
@@ -70,7 +85,8 @@ The application consists of:
   sessions. Result data are written to a results store on disk, and the database refers to them.
 
 The front end never runs a model itself. User actions create **requests** in the database.
-The dispatcher hands requests to **workers**, each worker records progress in a **run**, and
+The front end's action manager sends new requests to the dispatcher, which hands them to
+**workers**. Each worker records progress in a **run**, and
 writes results to the results store. The front end polls the database for progress and loads
 results from the results store when they are complete. Each completed run may trigger
 *postprocessing* and *table-drawing* requests (see [Application plugins](app/plugins.md)).

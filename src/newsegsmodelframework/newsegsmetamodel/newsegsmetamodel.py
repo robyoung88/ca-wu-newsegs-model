@@ -15,6 +15,7 @@ from newsegsmodelframework.core.newsegsmodelinterface import NewsegsModelInterfa
 from newsegsmodelframework.core.serialisedtrackeddata import SerialisedConfigurationMixin
 from newsegsmodelframework.core.trackeddata import ComponentProperty, DataWithRevision, RevisionNotifierProtocol, SubscriptionRevisionNotifierMixin, TableModifyingComponentOrderedDictProperty, TableModifyingObservableOrderedDict, revision_dataclass
 from newsegsmodelframework.core import NewsegsComponent, TableConfigNewsegsComponent
+from newsegsmodelframework.newsegsmetamodel.optim_component import OptimComponent
 from newsegsmodelframework.newsegsvariable import variable
 from newsegsmodelframework.newsegsvariable.update_variable import update_variable
 from newsegsmodelframework.newsegsvariable.variableprovider import VariableProviderInterface
@@ -99,6 +100,9 @@ class MMVarWatcher(RevisionNotifierProtocol):
         # Otherwise, do nothing
 
 
+FIRST_CONFIGURATION_NAME = 'Baseline'
+"""The name of the first configuration of a new project, which can't be moved or removed."""
+
 @revision_dataclass
 class NewsegsMetaModelConfig(DataWithRevision):
     """Configuration of a `NewsegsMetaModel`.
@@ -117,6 +121,7 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     - A reference to a NewsegsFinance which itself references the NewsegsModel
     - A series of Variables which locate the values in the NewsegsModel and
       NewsegsFinance
+    - An OptimComponent holding the method and statistic of optimisation
 
     The metamodel can be set into a state:
 
@@ -141,8 +146,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
     finance_id: str
     checked_out: bool = False
 
-    _name = 'NewSEGS MetaModel'
-    _version = '0.0.1'
+    _name = 'Configuration'
+    _version = '0.1.0'
     _id_prefix = COMPONENT_PREFIXES['metamodel']
     _last_modified: datetime.datetime = datetime.datetime.now()
 
@@ -154,6 +159,8 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     model = ComponentProperty(default = None, oftype = NewsegsModelInterface)
     finance = ComponentProperty(default = None, oftype = NewsegsFinanceInterface)
+    optim_config = ComponentProperty(default = OptimComponent, oftype = OptimComponent)
+    """The optimisation settings; a metamodel saved without them is given the defaults."""
 
     variables = TableModifyingComponentOrderedDictProperty(oftype = variable.Variable)
     _variables_last_model_sync: dict
@@ -170,11 +177,13 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
         finance: NewsegsFinanceInterface,
         variables: MutableSequence[variable.Variable] = [],
         table_config: Optional[TableConfigNewsegsComponent] = None,
+        optim_config: Optional[OptimComponent] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
         
         self.table_config = table_config or TableConfigNewsegsComponent()
+        self.optim_config = optim_config or OptimComponent()
         self.watcher = MMVarWatcher(self)
 
         self.model = model
@@ -504,6 +513,15 @@ class NewsegsMetaModel(TableOwningNewsegsComponent):
 
     @override
     def _post_update_from_dict(self):
+        # A representation of the metamodel (`to_dict_repr`, as in a configuration file) holds its variables, which
+        # the update sets directly, leaving them a plain dict. They are set again through the `variables` property, so
+        # that they are held in an observable dictionary to which the table configuration and the watcher subscribe,
+        # as when they are reattached from the database. (Only `update` reaches here: `__setstate__`, used to copy and
+        # unpickle, restores the observable dictionary itself.)
+        variables = self.__dict__.get('_variables')
+        if variables is not None and not isinstance(variables, TableModifyingObservableOrderedDict):
+            del self.__dict__['_variables']
+            self.variables = dict(variables)
         try:
             if self.finance.model is None or self.finance.model is not self.model:
                 self.finance.set_model(self.model, dirty = False)

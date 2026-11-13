@@ -498,8 +498,36 @@ class SprakeCS(NewsegsCS):
         atts = ['storage_capacity', 'storage_rte']
         return {k: getattr(self, k) for k in atts}
 
+    def get_spaceheat_consumption(self, timespan: modtimespan.RegTimeSpan) -> np.ndarray:
+        """Electricity consumption for space heating at each timestep.
+
+        From the heating degree day series of the Sprake model, offset so that
+        `timeseries_hdd_start` falls at `timeseries_model_start`, and repeated as necessary.
+
+        Args:
+            timespan: The period of time, with the timestep of the model.
+
+        Returns:
+            Array of consumption.
+        """
+        spaceheat_timespan = modtimespan.OffsetRegTimeSpan(
+            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
+            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[-1],
+            timestep = timespan.timestep
+        )
+
+        # In this context, 'local' is the heating degree day ts, and remote is the model ts
+        spaceheat_timespan.set_offset(
+            local_start = self.timeseries_hdd_start,
+            remote_start = self.timeseries_model_start
+        )
+
+        spaceheat_datetimes = spaceheat_timespan.to_pandas()[spaceheat_timespan.get_local_index(timespan)]
+
+        return np.asarray(sprake_spaceheat_consumption(spaceheat_datetimes, **self.get_sh_params()))
+
     def run(
-        self, 
+        self,
         timespan: modtimespan.TimeSpan,
         run_start: datetime.datetime | None = None
     ) -> SprakeCSResult:
@@ -530,25 +558,7 @@ class SprakeCS(NewsegsCS):
         cons_arr[0,:] = sprake_appliance_consumption(datetimes, **self.get_appliance_params())
         cons_arr[3,:] = sprake_ev_consumption(datetimes, **self.get_ev_params())
         cons_arr[1,:] = sprake_dhw_consumption(datetimes, **self.get_dhw_params())
-
-        # The space heating requires a little more finess, simply because the time series may require repetition
-        shp = self.get_sh_params()
-        
-        spaceheat_timespan = modtimespan.OffsetRegTimeSpan(
-            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[0],
-            TIMESERIES_DEGREE_DAYS['timestamp'].iloc[-1],
-            timestep = timespan.timestep
-        )
-
-        # In this context, 'local' is the heating degree day ts, and remote is the model ts
-        spaceheat_timespan.set_offset(
-            local_start = self.timeseries_hdd_start,
-            remote_start = self.timeseries_model_start
-        )
-
-        spaceheat_datetimes = spaceheat_timespan.to_pandas()[spaceheat_timespan.get_local_index(timespan)]
-        
-        cons_arr[2,:] = sprake_spaceheat_consumption(spaceheat_datetimes, **shp)
+        cons_arr[2,:] = self.get_spaceheat_consumption(timespan)
 
         stor_arr = np.empty(len(datetimes), dtype=np.float64)
         # Generation

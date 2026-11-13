@@ -1,10 +1,141 @@
 """Helpers for Dash callbacks, such as finding the value of the component that triggered a callback.
+
+Several inputs of a callback can fire in the same call. Dash then lists them all in `ctx.triggered`, but
+`ctx.triggered_id` and `get_triggered_value` give only the first. A callback with several inputs should consider every
+trigger, with `get_triggers`, `get_clicked_trigger` or `ids_to_update`.
 """
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 import json
 from typing import Any
 
 import dash
 from dash import ctx, no_update
+
+# -----------------------------------------------
+# Triggers
+# -----------------------------------------------
+
+@dataclass(frozen = True)
+class Trigger:
+    """An input of a callback which fired: an entry of `ctx.triggered`, with its id parsed.
+
+    Attributes:
+        id: The id of the component: a string, or the dictionary of a pattern-matching id.
+        property: The property which changed.
+        value: Its new value.
+    """
+    id: str | dict[str, Any]
+    property: str
+    value: Any
+
+    @property
+    def type(self) -> str | None:
+        """The type of a pattern-matching id, or None for a string id."""
+        return self.id.get('type') if isinstance(self.id, dict) else None
+
+    def is_pattern(self) -> bool:
+        """Whether the id is a pattern-matching (dictionary) id."""
+        return isinstance(self.id, dict)
+
+def parse_prop_id(prop_id: str) -> tuple[str | dict[str, Any] | None, str]:
+    """The id and property of a `prop_id` of `ctx.triggered`.
+
+    Args:
+        prop_id: `<id>.<property>`, where the id is JSON if a pattern-matching id; `.` on the initial call.
+
+    Returns:
+        The id (a dictionary for a pattern-matching id; None on the initial call) and the property.
+    """
+    id_text, _, prop = prop_id.rpartition('.')
+    if not id_text:
+        return None, prop
+    if id_text.startswith('{'):
+        try:
+            return json.loads(id_text), prop
+        except ValueError:
+            pass
+    return id_text, prop
+
+def get_triggers(triggered: Iterable[dict] | None = None) -> list[Trigger]:
+    """Every input which triggered the callback, in the order of `ctx.triggered`.
+
+    Args:
+        triggered: The entries of `ctx.triggered`; by default those of the current callback.
+
+    Returns:
+        The triggers; empty on the initial call, when Dash gives a single entry with an empty id.
+    """
+    if triggered is None:
+        triggered = ctx.triggered
+    triggers = []
+    for entry in triggered:
+        id_, prop = parse_prop_id(entry.get('prop_id', '.'))
+        if id_ is None:
+            continue
+        triggers.append(Trigger(id_, prop, entry.get('value')))
+    return triggers
+
+def has_trigger(triggers: Iterable[Trigger], id_: str) -> bool:
+    """Whether the component with a string id is among the triggers."""
+    return any(x.id == id_ for x in triggers)
+
+def get_clicked_trigger(triggers: Sequence[Trigger] | None = None) -> Trigger | None:
+    """The one trigger with a value, as of a button clicked, for a callback with several buttons as inputs.
+
+    Buttons fire together when they are drawn, with no clicks, so the triggers without a value are ignored. Two
+    buttons can't be clicked at once, so if several triggers have a value, which was clicked is unknown.
+
+    Args:
+        triggers: The triggers; by default those of the current callback.
+
+    Returns:
+        The trigger, or None if none, or several, have a value.
+    """
+    if triggers is None:
+        triggers = get_triggers()
+    clicked = [x for x in triggers if x.value]
+    return clicked[0] if len(clicked) == 1 else None
+
+def ids_to_update(
+    triggers: Iterable[Trigger],
+    target_ids: Sequence[dict[str, Any]],
+    target_type: str,
+    target_purpose: str,
+    update_all_types: Iterable[str] = (),
+    ignored_keys: Iterable[str] = ('subindex', 'supersection'),
+) -> list[dict[str, Any]]:
+    """The ids of the targets of a callback (e.g. containers) to redraw for its triggers.
+
+    Every trigger is considered. A trigger with a string id (e.g. an interval, or a store such as the active
+    project), with a type in `update_all_types`, or with no `section`, redraws every target; so does the initial call
+    (no triggers). Otherwise the targets redrawn are those whose id agrees with the trigger's, apart from its type,
+    purpose and `ignored_keys`.
+
+    Args:
+        triggers: The triggers (see `get_triggers`).
+        target_ids: The ids of the targets.
+        target_type: Type of the ids of the targets, e.g. 'result-table'.
+        target_purpose: Purpose of the ids of the targets, e.g. 'container'.
+        update_all_types: Types of the triggers which redraw every target.
+        ignored_keys: Keys of the triggers' ids not compared with the targets'.
+
+    Returns:
+        The ids to redraw, each once, in the order of `target_ids`.
+    """
+    triggers = list(triggers)
+    update_all_types = set(update_all_types)
+    ignored_keys = set(ignored_keys)
+    if not triggers:
+        return list(target_ids)
+    matches = []
+    for trig in triggers:
+        if not trig.is_pattern() or trig.type in update_all_types or 'section' not in trig.id:
+            return list(target_ids)
+        match = {k: v for k, v in trig.id.items() if k not in ignored_keys} # pyright: ignore[reportAttributeAccessIssue]
+        match.update(type = target_type, purpose = target_purpose)
+        matches.append(match)
+    return [x for x in target_ids if any(intersection_values_match(m, x) for m in matches)]
 
 def get_options(
     option_ids: list[dict[str, str]],
@@ -89,6 +220,9 @@ def get_variable_keyed_data(
 def get_triggered_value() -> Any:
     """
     In the context of a Dash callback, return the value of the prop that triggered the callback.
+
+    Only the first trigger is considered: where several inputs may fire together, use `get_triggers` or
+    `get_clicked_trigger`.
 
     Returns `None` if triggered on creation.
     Returns:

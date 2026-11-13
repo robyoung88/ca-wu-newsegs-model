@@ -1,0 +1,37 @@
+name: build
+
+# Builds the production Docker image when development, canary or main changes, to check that it builds.
+# The image is not pushed anywhere.
+
+on:
+  push:
+    branches:
+      - development
+      - canary
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-image:
+    name: docker-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

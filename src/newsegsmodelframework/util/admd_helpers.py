@@ -1,14 +1,12 @@
 """Helpers for running the ADMD calculation (`admdspenmw`) with Hamilton.
 """
-import os
-from pathlib import Path
-libdir = Path(__file__).parent.parent.absolute()
-os.chdir(libdir)
+from functools import cache
+
 from hamilton import registry; registry.disable_autoload
 from hamilton import driver
+
 import admdspenmw as admdcalc
 from admdspenmw.model_config import default_model_config
-from functools import cache
 
 @cache
 def _get_default_admd_model_driver() -> driver.Driver:

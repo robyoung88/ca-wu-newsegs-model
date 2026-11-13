@@ -17,6 +17,7 @@ from config import settings
 from newsegsmodelapp import registers
 from newsegsmodelapp.backend import dispatcher
 from newsegsmodelapp.backend.db.db import read_transaction
+from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelapp.backend.db.db_result_provider import FromDatabaseResultProvider
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 
@@ -114,14 +115,11 @@ class TestProxy(unittest.TestCase):
 
         payload_bytes = pickle.dumps(payload)
         socket.send(payload_bytes)
-        
-        reply_bytes = socket.recv()
-        reply_data = pickle.loads(reply_bytes)
 
         socket.close()
         context.term()
 
-        return reply_data
+        return 
 
     def test_dispatched_process(self):
         import newsegsmodelapp.register_plugins
@@ -130,16 +128,21 @@ class TestProxy(unittest.TestCase):
         from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
         
         proj_provider = FromDatabaseNewsegsProjectProvider(db.get_engine)
+        request_handler = FromDatabaseRequestHandler(db.get_engine)
         result_provider = FromDatabaseResultProvider(db.get_engine, self.test_dir)
         proj = PROJECT_FACTORIES['sprake']()
         proj_provider.add_component(proj)
 
-        request_creator = registers.RUN_REQUEST_REGISTER['deterministic_run_metamodel']
-        request = request_creator(proj.id, proj_provider)
+        request = request_handler.add_request('deterministic_run_metamodel', proj.id, proj_provider, 'run')
+        
+        self.send_to_dispatcher(request)
 
-        prox_resp = self.send_to_dispatcher(request)
-        self.assertEqual(prox_resp.get('status'), 'started')
-        job_id = prox_resp['job_id']
+        while True:
+            request_status = request_handler.get_request(request.request_id)
+            if request_status.run_id != -1:
+                job_id = request_status.run_id
+                break
+            
         if isinstance(job_id, int):
             job_id = [job_id,]
         

@@ -10,6 +10,7 @@ flowchart LR
     metamodel --> model["NewsegsModel"]
     metamodel --> finance["NewsegsFinance"]
     metamodel --> variables["Variables"]
+    metamodel -->|"owns"| optim["OptimComponent"]
     finance -->|"reads results of"| model
     model --> grid["NewsegsGrid"]
     model --> gen["NewsegsGeneration"]

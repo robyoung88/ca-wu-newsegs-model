@@ -2,10 +2,11 @@
 Unit tests for newsegsmodelframework/core/trackeddata.
 """
 from dataclasses import dataclass, asdict
+import threading
 from typing import Optional
 import unittest
 
-from newsegsmodelframework.core.trackeddata import revision_dataclass, DataWithRevision
+from newsegsmodelframework.core.trackeddata import revision_dataclass, DataWithRevision, RevisionNotifierMixin
 
 @revision_dataclass
 class Node(DataWithRevision):
@@ -103,3 +104,83 @@ class TestRevisionIncrements(unittest.TestCase):
 
 
     #def test_chained_increments(self):
+class TestNotificationStateThreads(unittest.TestCase):
+    """The notification state is held for each thread: loading components disables it only in the loading thread.
+
+    A process-wide state let a load in one thread (e.g. one request of the Dash server) hide the changes made in
+    another, and overlapping loads could restore it in the wrong order, leaving it disabled for the whole process.
+    """
+
+    def setUp(self):
+        self.node, _ = create_parent_and_child()
+        self.node._syncronise()
+
+    def run_in_thread(self, target):
+        errors = []
+        def wrapped():
+            try:
+                target()
+            except BaseException as e:  # Reraised in the test's thread
+                errors.append(e)
+        thread = threading.Thread(target = wrapped)
+        thread.start()
+        return thread, errors
+
+    def join(self, thread, errors):
+        thread.join(timeout = 10)
+        self.assertFalse(thread.is_alive())
+        if errors:
+            raise errors[0]
+
+    def test_disabled_in_this_thread(self):
+        prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+        try:
+            self.node.val += 1
+            self.assertEqual(self.node.revision, 0)
+        finally:
+            RevisionNotifierMixin._set_notification_state(prevstate)
+        self.node.val += 1
+        self.assertEqual(self.node.revision, 1)
+
+    def test_disabled_in_another_thread_does_not_hide_changes(self):
+        disabled, done = threading.Event(), threading.Event()
+        def load():
+            prevstate = RevisionNotifierMixin._set_notification_state('disabled')
+            disabled.set()
+            done.wait(timeout = 10)
+            RevisionNotifierMixin._set_notification_state(prevstate)
+
+        thread, errors = self.run_in_thread(load)
+        try:
+            self.assertTrue(disabled.wait(timeout = 10))
+            self.node.val += 1
+            self.assertEqual(self.node.revision, 1)
+        finally:
+            done.set()
+            self.join(thread, errors)
+
+    def test_overlapping_loads_leave_notification_enabled(self):
+        # A disables, B disables, A restores, B restores: B must not restore A's disabled state
+        a_set, b_set, a_restored = threading.Event(), threading.Event(), threading.Event()
+        previous = {}
+        def load_a():
+            previous['a'] = RevisionNotifierMixin._set_notification_state('disabled')
+            a_set.set()
+            b_set.wait(timeout = 10)
+            RevisionNotifierMixin._set_notification_state(previous['a'])
+            a_restored.set()
+        def load_b():
+            a_set.wait(timeout = 10)
+            previous['b'] = RevisionNotifierMixin._set_notification_state('disabled')
+            b_set.set()
+            a_restored.wait(timeout = 10)
+            RevisionNotifierMixin._set_notification_state(previous['b'])
+
+        threads = [self.run_in_thread(load_a), self.run_in_thread(load_b)]
+        for thread, errors in threads:
+            self.join(thread, errors)
+
+        self.assertEqual(previous, {'a': 'broadcast', 'b': 'broadcast'})
+        self.assertEqual(RevisionNotifierMixin._get_notification_state(), 'broadcast')
+        self.node.val += 1
+        self.assertEqual(self.node.revision, 1)

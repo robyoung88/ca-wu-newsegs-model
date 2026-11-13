@@ -11,6 +11,7 @@ from typing import Callable
 
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
+from newsegsmodelapp.plugins.pages.processes.progress_messages import runs_progress_message
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework import newsegssensitivity
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
@@ -29,7 +30,7 @@ def _(project_id: str, project_provider: NewsegsProjectProviderInterface, config
     mm_id = project_provider.get_focussed_metamodel_id(project_id)
     return DSARunMetamodelRunRequest(
         project_id = project_id,
-        request_label = 'DSA run for single metamodel - ' + str(datetime.datetime.now()),
+        request_label = 'DSA run for one configuration - ' + str(datetime.datetime.now()),
         payload = json.dumps({
             'metamodel_id': mm_id
         })
@@ -85,19 +86,11 @@ def execute_dsa_single_mm_run(
         if check_cancel_status():
             raise InterruptedError(f'DSA process {run_id} has been cancelled.')
 
-        t1 = time.time_ns()
-        tot_secs = (t1 - t0) * 1e-9
-        if step > 0:
-            per_iter = tot_secs / step
-            msg = f'DSA: Run {step} of {total}, {per_iter:.1f} sec/run. Elapsed time: {tot_secs:.0f} seconds.'
-        else:
-            msg = f'DSA: Run {step} of {total}. Elapsed time: {tot_secs:.0f} seconds.'
-
-        progress_callback(step, total, msg)
+        tot_secs = (time.time_ns() - t0) * 1e-9
+        progress_callback(step, total, runs_progress_message('DSA', step, total, tot_secs))
 
     def deterministic_progress_callback(step, total, message):
-        msg = 'DSA: Reference run'
-        progress_callback(0, 1, msg)
+        progress_callback(step, total, 'DSA: Reference run - ' + message)
 
     # By running the deterministic through this process, the module revisions will
     # be correctly modified

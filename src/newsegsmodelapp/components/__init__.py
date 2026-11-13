@@ -7,6 +7,7 @@ Modules:
     constants: Constants shared by the components.
     navigation: The navigation bar, including the link to this documentation.
     icons: The icon library.
+    colours: The colour scheme of the app and its plots.
     project_selector: Choosing and managing projects and snapshots.
     configuration_selector: Choosing and managing the configurations (metamodels) of a project.
     map: The site selector.

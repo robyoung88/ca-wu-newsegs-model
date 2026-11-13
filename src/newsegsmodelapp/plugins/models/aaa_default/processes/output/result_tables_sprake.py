@@ -21,7 +21,7 @@ import dash_ag_grid as dag
 import pandas as pd
 
 from newsegsmodelapp.components.layouts import results_table
-from newsegsmodelapp.components import stats as newsegsbrowser_stats
+from newsegsmodelapp.components import stats as results_stats
 
 def _as_data_list(data) -> list:
     """Results for a single configuration, or a list of them, as a list"""
@@ -42,30 +42,30 @@ def create_wind_results(wind_data=None, annual=True) -> dag.AgGrid:
     wind_data = _as_data_list(wind_data)
 
     if (annual):
-        ann_gen = newsegsbrowser_stats.stat_description_records(
+        ann_gen = results_stats.stat_description_records(
             wind_data,
             ['generator_meter_summary','wind_export'],
             'Wind production (kWh/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
     else:
-        ann_gen = newsegsbrowser_stats.stat_description_records(
+        ann_gen = results_stats.stat_description_records(
             wind_data,
             ['generator_meter_summary', 'wind_export'],
             'Wind production (kWh)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
 
-    hours_in_range = newsegsbrowser_stats.stat_description_compound_records(
+    hours_in_range = results_stats.stat_description_compound_records(
         wind_data,
         'wind_production_categorised',
         'Hours in range',
-        newsegsbrowser_stats.hours_in_range_formatter
+        results_stats.hours_in_range_formatter
     )
 
-    longest_hours_below_5 = newsegsbrowser_stats.event_and_daterange_records(
+    longest_hours_below_5 = results_stats.event_and_daterange_records(
         wind_data,
         'wind_continuous_hours_below_5pc',
         r"Longest continuous hours <5%",
@@ -73,7 +73,7 @@ def create_wind_results(wind_data=None, annual=True) -> dag.AgGrid:
         '{:,.1f}'.format
     )
 
-    longest_hours_above_95 = newsegsbrowser_stats.event_and_daterange_records(
+    longest_hours_above_95 = results_stats.event_and_daterange_records(
         wind_data,
         'wind_continuous_hours_above_95pc',
         r"Longest continuous hours ≥95%",
@@ -82,19 +82,19 @@ def create_wind_results(wind_data=None, annual=True) -> dag.AgGrid:
     )
 
     if (annual):
-        direct_sc = newsegsbrowser_stats.self_consumption_records(
+        direct_sc = results_stats.self_consumption_records(
             wind_data,
             ['self-consumption','yearly'],
             r'Wind-only self-consumption potential (kWh/yr (% production))',
-            stat_list = newsegsbrowser_stats.ANNUAL_SC_STATS,
+            stat_list = results_stats.ANNUAL_SC_STATS,
             index_filter='wind_export'
         )
     else:
-        direct_sc = newsegsbrowser_stats.self_consumption_records(
+        direct_sc = results_stats.self_consumption_records(
             wind_data,
             ['self-consumption','horizon'],
             r'Wind-only self-consumption potential (kWh (% production))',
-            stat_list = newsegsbrowser_stats.HORIZON_SC_STATS,
+            stat_list = results_stats.HORIZON_SC_STATS,
             index_filter='wind_export'
         )
 
@@ -118,23 +118,23 @@ def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
     pv_data = _as_data_list(pv_data)
 
     if (annual):
-        ann_gen = newsegsbrowser_stats.stat_description_records(
+        ann_gen = results_stats.stat_description_records(
             pv_data,
             ['generator_meter_summary','solar_export'],
             'PV production (kWh/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
     else:
-        ann_gen = newsegsbrowser_stats.stat_description_records(
+        ann_gen = results_stats.stat_description_records(
             pv_data,
             ['generator_meter_summary','solar_export'],
             'PV production (kWh)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
 
-    max_day = newsegsbrowser_stats.event_and_date_records(
+    max_day = results_stats.event_and_date_records(
         pv_data,
         'max_solar_day',
         r'Maximum daily production (kWh)',
@@ -142,7 +142,7 @@ def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
         '{:,.1f}'.format
     )
 
-    min_day = newsegsbrowser_stats.event_and_date_records(
+    min_day = results_stats.event_and_date_records(
         pv_data,
         'min_solar_day',
         r'Minimum daily production (kWh)',
@@ -150,28 +150,28 @@ def create_pv_results(pv_data=None, annual=True) -> dag.AgGrid:
         '{:,.1f}'.format
     )
 
-    days_in_range = newsegsbrowser_stats.stat_description_compound_records(
+    days_in_range = results_stats.stat_description_compound_records(
         pv_data,
         'pv_production_categorised',
         r'Daily production distribution as % of max [kWh range] days (%days)',
-        stat_formatter = newsegsbrowser_stats.days_in_range_formatter,
-        stat_list = newsegsbrowser_stats.DEFAULT_DAYS_IN_RANGE_STATS
+        stat_formatter = results_stats.days_in_range_formatter,
+        stat_list = results_stats.DEFAULT_DAYS_IN_RANGE_STATS
     )
 
     if (annual):
-        direct_sc = newsegsbrowser_stats.self_consumption_records(
+        direct_sc = results_stats.self_consumption_records(
             pv_data,
             ['self-consumption','yearly'],
             r'PV-only self-consumption potential (kWh/yr (% production))',
-            stat_list = newsegsbrowser_stats.ANNUAL_SC_STATS,
+            stat_list = results_stats.ANNUAL_SC_STATS,
             index_filter = 'solar_export'
         )
     else:
-        direct_sc = newsegsbrowser_stats.self_consumption_records(
+        direct_sc = results_stats.self_consumption_records(
             pv_data,
             ['self-consumption','horizon'],
             r'PV-only self-consumption potential (kWh (% production))',
-            stat_list = newsegsbrowser_stats.HORIZON_SC_STATS,
+            stat_list = results_stats.HORIZON_SC_STATS,
             index_filter='solar_export'
         )
 
@@ -192,23 +192,23 @@ def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid
     gen_data = _as_data_list(gen_data)
 
     if (annual):
-        ann_gen = newsegsbrowser_stats.stat_description_records(
+        ann_gen = results_stats.stat_description_records(
             gen_data,
             ['generator_meter_summary','generation_export'],
             'Production (kWh/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
     else:
-        ann_gen = newsegsbrowser_stats.stat_description_records(
+        ann_gen = results_stats.stat_description_records(
             gen_data,
             ['generator_meter_summary','generation_export'],
             'Production (kWh/yr)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
 
-    max_day = newsegsbrowser_stats.event_and_date_records(
+    max_day = results_stats.event_and_date_records(
         gen_data,
         'max_generation_day',
         r'Maximum daily production (kWh)',
@@ -216,7 +216,7 @@ def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid
         lambda x: '{:,.1f}'.format(x)
     )
 
-    min_day = newsegsbrowser_stats.event_and_date_records(
+    min_day = results_stats.event_and_date_records(
         gen_data,
         'min_generation_day',
         r'Minimum daily production (kWh)',
@@ -224,27 +224,27 @@ def create_combined_generation_results(gen_data=None, annual=True) -> dag.AgGrid
         lambda x: '{:,.1f}'.format(x)
     )
 
-    days_in_range = newsegsbrowser_stats.stat_description_compound_records(
+    days_in_range = results_stats.stat_description_compound_records(
         gen_data,
         'generation_production_categorised',
         r'Daily production distribution (% of max) [kWh range] days (%days)',
-        stat_formatter = newsegsbrowser_stats.days_in_range_formatter,
-        stat_list = newsegsbrowser_stats.DEFAULT_DAYS_IN_RANGE_STATS)
+        stat_formatter = results_stats.days_in_range_formatter,
+        stat_list = results_stats.DEFAULT_DAYS_IN_RANGE_STATS)
 
     if (annual):
-        direct_sc = newsegsbrowser_stats.self_consumption_records(
+        direct_sc = results_stats.self_consumption_records(
             gen_data,
             ['self-consumption','yearly'],
             r'Without storage self-consumption potential (kWh/yr (% production))',
-            stat_list = newsegsbrowser_stats.ANNUAL_SC_STATS,
+            stat_list = results_stats.ANNUAL_SC_STATS,
             index_filter='generation_export'
         )
     else:
-        direct_sc = newsegsbrowser_stats.self_consumption_records(
+        direct_sc = results_stats.self_consumption_records(
             gen_data,
             ['self-consumption','horizon'],
             r'Without storage self-consumption potential (kWh/yr (% production))',
-            stat_list = newsegsbrowser_stats.HORIZON_SC_STATS,
+            stat_list = results_stats.HORIZON_SC_STATS,
             index_filter='generation_export'
         )
 
@@ -265,108 +265,108 @@ def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
     stor_data = _as_data_list(stor_data)
 
     if (annual):
-        to_stor = newsegsbrowser_stats.stat_description_records(
+        to_stor = results_stats.stat_description_records(
             stor_data,
             ['to_stor_meter_summary', 'storage_import'],
             'Units to storage (kWh/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
-        from_stor = newsegsbrowser_stats.stat_description_records(
+        from_stor = results_stats.stat_description_records(
             stor_data,
             ['from_stor_meter_summary', 'storage_export'],
             'Units from storage (kWh/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
-        loss_stor = newsegsbrowser_stats.stat_description_records(
+        loss_stor = results_stats.stat_description_records(
             stor_data,
             ['loss_stor_meter_summary', 'storage_loss'],
             'Units lost (kWh/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
 
-        charge_cycles = newsegsbrowser_stats.stat_description_records(
+        charge_cycles = results_stats.stat_description_records(
             stor_data,
             ['no_charge_cycles', 'charge_cycles'],
             'Effective charge cycles (N/yr)',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}')
 
-        hrs_min_soc = newsegsbrowser_stats.stat_description_parallel_records(
+        hrs_min_soc = results_stats.stat_description_parallel_records(
             stor_data,
             'stor_hours_at_min',
             r'Hours at min SoC (hrs/yr, (%))',
             'hrs_at_min_soc',
             'prop_hrs_at_min_soc',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS
         )
 
-        hrs_max_soc = newsegsbrowser_stats.stat_description_parallel_records(
+        hrs_max_soc = results_stats.stat_description_parallel_records(
             stor_data,
             'stor_hours_at_max',
             r'Hours at max SoC (hrs/yr, (%))',
             'hrs_at_max_soc',
             'prop_hrs_at_max_soc',
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS
         )
     else:
-        to_stor = newsegsbrowser_stats.stat_description_records(
+        to_stor = results_stats.stat_description_records(
             stor_data,
             ['to_stor_meter_summary', 'storage_import'],
             'Units to storage (kWh)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
-        from_stor = newsegsbrowser_stats.stat_description_records(
+        from_stor = results_stats.stat_description_records(
             stor_data,
             ['from_stor_meter_summary', 'storage_export'],
             'Units from storage (kWh)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
-        loss_stor = newsegsbrowser_stats.stat_description_records(
+        loss_stor = results_stats.stat_description_records(
             stor_data,
             ['loss_stor_meter_summary', 'storage_loss'],
             'Units lost (kWh)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
 
-        charge_cycles = newsegsbrowser_stats.stat_description_records(
+        charge_cycles = results_stats.stat_description_records(
             stor_data,
             ['no_charge_cycles','charge_cycles'],
             'Effective charge cycles (N)',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}')
 
-        hrs_min_soc = newsegsbrowser_stats.stat_description_parallel_records(
+        hrs_min_soc = results_stats.stat_description_parallel_records(
             stor_data,
             'stor_hours_at_min',
             r'Hours at min SoC (hrs, (%))',
             'hrs_at_min_soc',
             'prop_hrs_at_min_soc',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS
+            stat_list = results_stats.TOTAL_DEFAULT_STATS
         )
 
-        hrs_max_soc = newsegsbrowser_stats.stat_description_parallel_records(
+        hrs_max_soc = results_stats.stat_description_parallel_records(
             stor_data,
             'stor_hours_at_max',
             r'Hours at max SoC (hrs, (%))',
             'hrs_at_max_soc',
             'prop_hrs_at_max_soc',
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS
+            stat_list = results_stats.TOTAL_DEFAULT_STATS
         )
 
-    longest_hrs_min_soc = newsegsbrowser_stats.event_and_daterange_records(
+    longest_hrs_min_soc = results_stats.event_and_daterange_records(
         stor_data,
         'max_continuous_hours_min_soc',
         r'Longest continuous hours at min SoC',
         'hours',
         '{:,.1f}'.format)
 
-    longest_hrs_max_soc = newsegsbrowser_stats.event_and_daterange_records(
+    longest_hrs_max_soc = results_stats.event_and_daterange_records(
         stor_data,
         'max_continuous_hours_max_soc',
         r'Longest continuous hours at max SoC',
@@ -374,7 +374,7 @@ def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
         '{:,.1f}'.format
     )
 
-    max_charge_rate = newsegsbrowser_stats.event_and_date_records(
+    max_charge_rate = results_stats.event_and_date_records(
         stor_data,
         'max_charge_rate_time',
         r'Maximum charge rate (kW)',
@@ -383,7 +383,7 @@ def create_stor_results(stor_data=None, annual=True) -> dag.AgGrid:
         trimdate=9
     )
 
-    max_discharge_rate = newsegsbrowser_stats.event_and_date_records(
+    max_discharge_rate = results_stats.event_and_date_records(
         stor_data,
         'max_discharge_rate_time',
         r'Maximum discharge rate (kW)',
@@ -411,16 +411,16 @@ def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
 
     if annual:
         psd = partial(
-            newsegsbrowser_stats.stat_description_records,
+            results_stats.stat_description_records,
             data_list = cons_data,
-            stat_list = newsegsbrowser_stats.ANNUAL_DEFAULT_STATS,
+            stat_list = results_stats.ANNUAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
     else:
         psd = partial(
-            newsegsbrowser_stats.stat_description_records,
+            results_stats.stat_description_records,
             data_list = cons_data,
-            stat_list = newsegsbrowser_stats.TOTAL_DEFAULT_STATS,
+            stat_list = results_stats.TOTAL_DEFAULT_STATS,
             fmt='{:,.0f}'
         )
 
@@ -488,7 +488,7 @@ def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
             stat_label='Site consumption (kWh)'
         )
 
-    max_day = newsegsbrowser_stats.event_and_date_records(
+    max_day = results_stats.event_and_date_records(
         cons_data,
         'max_consumption_day',
         r'Maximum daily consumption (kWh)',
@@ -496,7 +496,7 @@ def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
         '{:,.1f}'.format
     )
 
-    min_day = newsegsbrowser_stats.event_and_date_records(
+    min_day = results_stats.event_and_date_records(
         cons_data,
         'min_consumption_day',
         r'Minimum daily consumption (kWh)',
@@ -504,14 +504,14 @@ def create_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
         '{:,.1f}'.format
     )
 
-    admd = newsegsbrowser_stats.single_stat_records(
+    admd = results_stats.single_stat_records(
         cons_data,
         'admd_calculated',
         'ADMD - calculated (kW)',
         'value',
         fmt='{:,.0f}'
     )
-    max_demand = newsegsbrowser_stats.event_and_date_records(
+    max_demand = results_stats.event_and_date_records(
         cons_data,
         'admd_observed',
         'Maximum demand (kW)',
@@ -537,47 +537,47 @@ def create_seasonal_cons_results(cons_data=None, annual=True) -> dag.AgGrid:
     cons_data = _as_data_list(cons_data)
 
     if (annual):
-        weekday_sitecons = newsegsbrowser_stats.seasonal_consumption_records(
+        weekday_sitecons = results_stats.seasonal_consumption_records(
             cons_data,
             ['seasonal_consumption','wd'],
             r'Weekday site demand (kWh/yr | kWh/day)',
-            stat_list = newsegsbrowser_stats.ANNUAL_CONS_STATS
+            stat_list = results_stats.ANNUAL_CONS_STATS
         )
 
-        sat_sitecons = newsegsbrowser_stats.seasonal_consumption_records(
+        sat_sitecons = results_stats.seasonal_consumption_records(
             cons_data,
             ['seasonal_consumption','sat'],
             r'Saturday site demand (kWh/yr | kWh/day)',
-            stat_list = newsegsbrowser_stats.ANNUAL_CONS_STATS
+            stat_list = results_stats.ANNUAL_CONS_STATS
         )
 
-        sun_sitecons = newsegsbrowser_stats.seasonal_consumption_records(
+        sun_sitecons = results_stats.seasonal_consumption_records(
             cons_data,
             ['seasonal_consumption','sun'],
             r'Sunday/holiday site demand (kWh/yr | kWh/day)',
-            stat_list = newsegsbrowser_stats.ANNUAL_CONS_STATS
+            stat_list = results_stats.ANNUAL_CONS_STATS
         )
 
     else:
-        weekday_sitecons = newsegsbrowser_stats.seasonal_consumption_records(
+        weekday_sitecons = results_stats.seasonal_consumption_records(
             cons_data,
             ['seasonal_consumption','wd'],
             r'Weekday site demand (kWh | kWh/day)',
-            stat_list = newsegsbrowser_stats.HORIZON_CONS_STATS
+            stat_list = results_stats.HORIZON_CONS_STATS
         )
 
-        sat_sitecons = newsegsbrowser_stats.seasonal_consumption_records(
+        sat_sitecons = results_stats.seasonal_consumption_records(
             cons_data,
             ['seasonal_consumption','sat'],
             r'Saturday site demand (kWh | kWh/day)',
-            stat_list = newsegsbrowser_stats.HORIZON_CONS_STATS
+            stat_list = results_stats.HORIZON_CONS_STATS
         )
 
-        sun_sitecons = newsegsbrowser_stats.seasonal_consumption_records(
+        sun_sitecons = results_stats.seasonal_consumption_records(
             cons_data,
             ['seasonal_consumption','sun'],
             r'Sunday/holiday site demand (kWh | kWh/day)',
-            stat_list = newsegsbrowser_stats.HORIZON_CONS_STATS
+            stat_list = results_stats.HORIZON_CONS_STATS
         )
 
     records = weekday_sitecons + sat_sitecons + sun_sitecons
@@ -598,11 +598,11 @@ def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
     net_data = _as_data_list(net_data)
 
     if (annual):
-        meter_stats = newsegsbrowser_stats.present_single_stat_per_row(
+        meter_stats = results_stats.present_single_stat_per_row(
             net_data,
             'meter_summaries',
             ['grid_export', 'grid_import', 'storage_loss', 'peak_grid_export', 'peak_grid_import'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_ANNUAL,
+            statistic_names = results_stats.DEFAULT_STATISTICS_ANNUAL,
             fmt='{:,.0f}',
             variable_mapper = {
                 'grid_export' : 'Export to grid (kWh/yr)',
@@ -614,11 +614,11 @@ def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
         )
 
     else:
-        meter_stats = newsegsbrowser_stats.present_single_stat_per_row(
+        meter_stats = results_stats.present_single_stat_per_row(
             net_data,
             'meter_summaries',
             ['grid_export', 'grid_import', 'storage_loss', 'peak_grid_export', 'peak_grid_import'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+            statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
             fmt='{:,.0f}',
             variable_mapper = {
                 'grid_export' : 'Export to grid (kWh)',
@@ -629,7 +629,7 @@ def create_net_results(net_data=None, annual=True) -> dag.AgGrid:
             }
         )
 
-    records = newsegsbrowser_stats.dataframe_records(meter_stats)
+    records = results_stats.dataframe_records(meter_stats)
 
     return _create_grid(records, len(net_data), 'table_net', annual)
 
@@ -647,55 +647,55 @@ def create_seasonal_net_results(net_data=None, annual=True) -> dag.AgGrid:
     net_data = _as_data_list(net_data)
 
     if (annual):
-        export_stats = newsegsbrowser_stats.present_paired_seasonal_stats(
+        export_stats = results_stats.present_paired_seasonal_stats(
             net_data,
             'export_seasonal_statistics',
             'export_seasonal_statistics_normalised',
             ['grid_export', 'peak_grid_export'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_ANNUAL,
+            statistic_names = results_stats.DEFAULT_STATISTICS_ANNUAL,
             variable_mapper = {
                 'grid_export': r'Export to grid (kWh/yr (% production))',
                 'peak_grid_export': r'Exports 5pm-8pm (kWh/yr (% production))'
             }
         )
 
-        import_stats = newsegsbrowser_stats.present_paired_seasonal_stats(
+        import_stats = results_stats.present_paired_seasonal_stats(
             net_data,
             'import_seasonal_statistics',
             'import_seasonal_statistics_normalised',
             ['grid_import', 'peak_grid_import'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_ANNUAL,
+            statistic_names = results_stats.DEFAULT_STATISTICS_ANNUAL,
             variable_mapper = {
                 'grid_import': r'Import from grid (kWh/yr (% consumption))',
                 'peak_grid_import': r'Imports 5pm-8pm (kWh/yr (% consumption))'
             }
         )
     else:
-        export_stats = newsegsbrowser_stats.present_paired_seasonal_stats(
+        export_stats = results_stats.present_paired_seasonal_stats(
             net_data,
             'export_seasonal_statistics',
             'export_seasonal_statistics_normalised',
             ['grid_export', 'peak_grid_export'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+            statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
             variable_mapper = {
                 'grid_export': r'Export to grid (kWh (% production))',
                 'peak_grid_export': r'Exports 5pm-8pm (kWh (% production))'
             }
         )
 
-        import_stats = newsegsbrowser_stats.present_paired_seasonal_stats(
+        import_stats = results_stats.present_paired_seasonal_stats(
             net_data,
             'import_seasonal_statistics',
             'import_seasonal_statistics_normalised',
             ['grid_import', 'peak_grid_import'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+            statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
             variable_mapper = {
                 'grid_import': r'Import from grid (kWh (% consumption))',
                 'peak_grid_import': r'Imports 5pm-8pm (kWh (% consumption))'
             }
         )
 
-    records = newsegsbrowser_stats.dataframe_records(pd.concat([
+    records = results_stats.dataframe_records(pd.concat([
         export_stats,
         import_stats
     ]))
@@ -716,11 +716,11 @@ def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
     econ_data = _as_data_list(econ_data)
 
     if (annual):
-        receipt_stats = newsegsbrowser_stats.present_single_stat_per_row(
+        receipt_stats = results_stats.present_single_stat_per_row(
             econ_data,
             'undiscounted_receipts_summaries',
             ['receipts_resident', 'receipts_resident_perunit', 'receipts_ev', 'receipts_exports'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_ANNUAL,
+            statistic_names = results_stats.DEFAULT_STATISTICS_ANNUAL,
             fmt='{:,.0f}',
             variable_mapper = {
                 'receipts_resident': 'Resident receipts (£/yr)',
@@ -730,11 +730,11 @@ def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
             }
         )
     else:
-        receipt_stats = newsegsbrowser_stats.present_single_stat_per_row(
+        receipt_stats = results_stats.present_single_stat_per_row(
             econ_data,
             'undiscounted_receipts_summaries',
             ['receipts_resident', 'receipts_resident_perunit', 'receipts_ev', 'receipts_exports'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+            statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
             fmt='{:,.0f}',
             variable_mapper = {
                 'receipts_resident': 'Undiscounted resident receipts (£)',
@@ -744,14 +744,14 @@ def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
             }
         )
 
-    total_benefits = newsegsbrowser_stats.present_single_scalar(
+    total_benefits = results_stats.present_single_scalar(
         econ_data,
         'present_benefits_undiscounted',
         'Present benefits (undiscounted) (£)',
         'Total'
     )
 
-    total_benefits_discounted = newsegsbrowser_stats.present_paired_scalars(
+    total_benefits_discounted = results_stats.present_paired_scalars(
         econ_data,
         'present_benefits_discounted',
         'benefits_discount_rate',
@@ -760,7 +760,7 @@ def create_so_benefits_results(econ_data=None, annual=True) -> dag.AgGrid:
         fmt='{:,.2f} (@{:,.1%})'
     )
 
-    records = newsegsbrowser_stats.dataframe_records(pd.concat([
+    records = results_stats.dataframe_records(pd.concat([
         receipt_stats,
         total_benefits,
         total_benefits_discounted
@@ -782,11 +782,11 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
     econ_data = _as_data_list(econ_data)
 
     if (annual):
-        recurring_stats = newsegsbrowser_stats.present_single_stat_per_row(
+        recurring_stats = results_stats.present_single_stat_per_row(
             econ_data,
             'undiscounted_variable_costs_summaries',
             ['import_costs', 'om_costs_gen', 'om_costs_stor', 'variable_costs'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_ANNUAL,
+            statistic_names = results_stats.DEFAULT_STATISTICS_ANNUAL,
             fmt='{:,.0f}',
             variable_mapper = {
                 'import_costs': 'Import costs (£/yr)',
@@ -797,11 +797,11 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
         )
 
     else:
-        recurring_stats = newsegsbrowser_stats.present_single_stat_per_row(
+        recurring_stats = results_stats.present_single_stat_per_row(
             econ_data,
             'undiscounted_variable_costs_summaries',
             ['import_costs', 'om_costs_gen', 'om_costs_stor', 'variable_costs'],
-            statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+            statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
             fmt='{:,.0f}',
             variable_mapper = {
                 'import_costs': 'Undiscounted import costs (£)',
@@ -811,11 +811,11 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
             }
         )
 
-    capex_stats = newsegsbrowser_stats.present_single_stat_per_row(
+    capex_stats = results_stats.present_single_stat_per_row(
         econ_data,
         'undiscounted_capex_summaries',
         ['capex_costs_gen', 'capex_costs_stor', 'capex_costs_dist', 'capex_costs_metering', 'capex_costs_total'],
-        statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+        statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
         fmt='{:,.0f}',
         variable_mapper = {
             'capex_costs_gen': 'Capital costs - generation (£)',
@@ -826,14 +826,14 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
         }
     )
 
-    total_costs = newsegsbrowser_stats.present_single_scalar(
+    total_costs = results_stats.present_single_scalar(
         econ_data,
         'present_costs_undiscounted',
         'Present costs (undiscounted) (£)',
         'Total'
     )
 
-    total_costs_discounted = newsegsbrowser_stats.present_paired_scalars(
+    total_costs_discounted = results_stats.present_paired_scalars(
         econ_data,
         'present_costs_discounted',
         'costs_discount_rate',
@@ -842,7 +842,7 @@ def create_so_costs_results(econ_data=None, annual=True) -> dag.AgGrid:
         fmt='{:,.2f} (@{:,.1%})'
     )
 
-    records = newsegsbrowser_stats.dataframe_records(pd.concat([
+    records = results_stats.dataframe_records(pd.concat([
         recurring_stats,
         capex_stats,
         total_costs,
@@ -864,11 +864,11 @@ def create_so_value_results(econ_data=None, annual=True) -> dag.AgGrid:
     """
     econ_data = _as_data_list(econ_data)
 
-    simple_stats = newsegsbrowser_stats.present_single_stat_per_row(
+    simple_stats = results_stats.present_single_stat_per_row(
         econ_data,
         'value_summaries',
         ['benefit_cost_ratio_undiscounted', 'net_present_value_undiscounted', 'simple_payback_time_yrs'],
-        statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+        statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
         fmt='{:,.2f}',
         variable_mapper = {
             'benefit_cost_ratio_undiscounted': 'Benefits/Costs (undiscounted)',
@@ -877,13 +877,13 @@ def create_so_value_results(econ_data=None, annual=True) -> dag.AgGrid:
         }
     )
 
-    compound_stats = newsegsbrowser_stats.present_single_stat_per_row_plus_paired_scalars(
+    compound_stats = results_stats.present_single_stat_per_row_plus_paired_scalars(
         econ_data,
         'value_summaries',
         ['benefit_cost_ratio_discounted', 'net_present_value_discounted'],
         'benefits_discount_rate',
         'costs_discount_rate',
-        statistic_names = newsegsbrowser_stats.DEFAULT_STATISTICS_HORIZON,
+        statistic_names = results_stats.DEFAULT_STATISTICS_HORIZON,
         variable_mapper = {
             'benefit_cost_ratio_discounted': 'Benefits/Costs (benefit discount / cost discount)',
             'net_present_value_discounted': 'Net Present Value (£) (benefit discount / cost discount)',
@@ -899,6 +899,6 @@ def create_so_value_results(econ_data=None, annual=True) -> dag.AgGrid:
     if len(out_table) >= 5:
         out_table = out_table.iloc[[0,3,1,4,2],:]
 
-    records = newsegsbrowser_stats.dataframe_records(out_table)
+    records = results_stats.dataframe_records(out_table)
 
     return _create_grid(records, len(econ_data), 'table_finance_so_value', annual)

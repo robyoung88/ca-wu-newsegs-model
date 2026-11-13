@@ -45,7 +45,7 @@ class FullLightweightVariable(DataWithRevision):
 
     Holds which analyses the variable is selectable and selected for and is shown on, the DSA bounds
     and the values at those bounds, the standard deviation and confidence interval for PSA, and the
-    limits for optimisation.
+    bounds and marginal plot resolution for optimisation.
     """
     parameterisation_index: int
     component_type: str
@@ -71,6 +71,7 @@ class FullLightweightVariable(DataWithRevision):
     optim_selected: bool = False
     optim_min: Any | None = None
     optim_max: Any | None = None
+    optim_plot_intervals: int = 10
 
     @property
     def configuration_type(self) -> str:

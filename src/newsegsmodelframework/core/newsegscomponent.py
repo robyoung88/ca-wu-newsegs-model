@@ -38,6 +38,26 @@ _STATE_EXCLUDES = Literal[
     'excluded_and_components'
 ]
 
+UNVERSIONED_COMPONENT_VERSION = '0.0.1'
+"""The version assumed of a serialised component which does not record one (i.e. saved before versions were recorded)."""
+
+def parse_component_version(version: str) -> tuple[int, ...]:
+    """Convert a version string, such as `'0.1.0'` or `'v0.0.1'`, to a tuple of integers for comparison.
+
+    Args:
+        version: The version string.
+
+    Returns:
+        The parts of the version as integers.
+
+    Raises:
+        ValueError: If the version is not of the form `[v]major.minor.patch`.
+    """
+    try:
+        return tuple(int(x) for x in str(version).lstrip('v').split('.'))
+    except ValueError:
+        raise ValueError(f'Unrecognised component version: {version}') from None
+
 class NewsegsComponent(
     SerialisedConfigurationMixin,
     metaclass = ABCMeta
@@ -116,6 +136,24 @@ class NewsegsComponent(
     def _prepare_object_state(self):
         super()._prepare_object_state()
         self.update_component_id_dict()
+
+    @override
+    def _get_state_class_values(self):
+        values = super()._get_state_class_values()
+        values['version'] = self._version
+        return values
+
+    @override
+    def _preupdate_from_dict(self, config):
+        # A dictionary without a version was saved before versions were recorded; it is loaded
+        # with the defaults of anything added since. A newer version cannot be understood.
+        version = config.pop('version', UNVERSIONED_COMPONENT_VERSION)
+        if parse_component_version(version) > parse_component_version(self._version):
+            raise ValueError(
+                f'{type(self).__name__} was saved at version {version}, which is newer than the version '
+                f'this app supports ({self._version}). Update the app to load it.'
+            )
+        super()._preupdate_from_dict(config)
 
     def to_dict_repr(self) -> dict[str, Any]:
         """A dictionary reproduction of the component including child components (not references)."""

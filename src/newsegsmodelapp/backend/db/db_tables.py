@@ -6,6 +6,15 @@ import uuid6
 
 import sqlalchemy as sa
 
+def utc_now() -> datetime.datetime:
+    """The current time in UTC, without a timezone, as SQLite's `CURRENT_TIMESTAMP` (and so `server_default = now()`)
+    records it.
+
+    Times compared with each other, or with SQLite's `'now'`, must all be recorded in one timezone, whatever the host's
+    timezone.
+    """
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo = None)
+
 L_VARIABLE_UID = 38
 L_COMPONENT_UID = 42
 
@@ -56,6 +65,7 @@ variable_configs = sa.Table(
     sa.Column('interface_key', sa.String),
     sa.Column('interface_subindex', sa.Integer),
     sa.Column('revision', sa.Integer), # The revision number - incremented on modification of _config
+    sa.Column('component_version', sa.String, nullable = True), # Null if saved before versions were recorded
     sa.Column('component_type', sa.String),
     sa.Column('variable_type', sa.String),
     sa.Column('distribution', sa.String),
@@ -86,6 +96,7 @@ variable_configs = sa.Table(
     sa.Column('optim_selected', sa.Boolean, default = False),
     sa.Column('optim_min', sa.String, nullable = True),
     sa.Column('optim_max', sa.String, nullable = True),
+    sa.Column('optim_plot_intervals', sa.Integer, default = 10),
 
     sa.Column('payload', sa.String),
 
@@ -277,6 +288,10 @@ metamodels = sa.Table(
     sa.Column('em_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('em_configs.id')),
     sa.Column('fm_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('fm_configs.id')),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID), sa.ForeignKey('component_configs.id')),
+    sa.Column(
+        'optim_config_id', sa.String(L_COMPONENT_UID),
+        sa.ForeignKey('component_configs.id', name = 'fk_metamodels_optim_config_id'), nullable = True
+    ),
     sa.Column('payload', sa.String, default = '{}'),
     sa.Column('revision', sa.Integer, default = 0),
     sa.Column('label', sa.String, nullable = True),
@@ -295,6 +310,7 @@ snapshot_metamodels = sa.Table(
     sa.Column('em_config_id', sa.String(L_COMPONENT_UID)),
     sa.Column('fm_config_id', sa.String(L_COMPONENT_UID)),
     sa.Column('table_config_id', sa.String(L_COMPONENT_UID)),
+    sa.Column('optim_config_id', sa.String(L_COMPONENT_UID), nullable = True),
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'em_config_id'],
         ['snapshot_em_configs.snapshot_id', 'snapshot_em_configs.id']
@@ -306,6 +322,11 @@ snapshot_metamodels = sa.Table(
     sa.ForeignKeyConstraint(
         ['snapshot_id', 'table_config_id'],
         ['snapshot_component_configs.snapshot_id', 'snapshot_component_configs.id']
+    ),
+    sa.ForeignKeyConstraint(
+        ['snapshot_id', 'optim_config_id'],
+        ['snapshot_component_configs.snapshot_id', 'snapshot_component_configs.id'],
+        name = 'fk_snapshot_metamodels_optim_config_id'
     ),
     *clone_columns_except_pk(metamodels)
 )
@@ -473,7 +494,8 @@ runs = sa.Table(
 
     # Automatic run health columns
     sa.Column('created_at', sa.DateTime, server_default = sa.func.now()),
-    sa.Column('modified_at', sa.DateTime, default = datetime.datetime.now, onupdate = datetime.datetime.now), # Do not use server_onupdate, as not all backends can handle it.
+    # In UTC, as created_at (see utc_now). Do not use server_onupdate, as not all backends can handle it.
+    sa.Column('modified_at', sa.DateTime, default = utc_now, onupdate = utc_now),
     
     # Run feedback
     sa.Column('progress', sa.Float, default = 0.0),
@@ -489,7 +511,8 @@ runs = sa.Table(
 
 REQUEST_STATUS = Literal[
     'AWAITING DISPATCH',
-    'DISPATCHED',
+    'AWAITING WORKER',
+    'PROCESSING',
     'FAILED',
     'CANCELLED',
     'FULFILLED',
@@ -519,6 +542,9 @@ requests = sa.Table(
 
     sa.Column('retry_number', sa.Integer, default = 0),
     sa.Column('max_retries', sa.Integer, default = 5),
+    
+    # In UTC, as created_at (see utc_now). Do not use server_onupdate, as not all backends can handle it.
+    sa.Column('modified_at', sa.DateTime, default = utc_now, onupdate = utc_now),
 )
 
 # -----------------------------------------------------------------------------

@@ -13,7 +13,8 @@ def create_input_card(
 ):
     """Create a card to hold inputs.
 
-    The body is an input container, filled by callbacks with the inputs registered for the supersection and section.
+    The body is an input container, filled by callbacks with the inputs registered for the supersection and section. The
+    title has a label counting the inputs whose configurations differ, which stays visible when the inputs are collapsed.
 
     Args:
         supersection: The supersection (e.g. the page or group of inputs).
@@ -32,7 +33,14 @@ def create_input_card(
     return dbc.Card([
         dbc.CardBody([
             html.H2(
-                title, 
+                [
+                    *title,
+                    # The number of inputs whose configurations differ, outside the collapsible inputs
+                    html.Span(
+                        id = {'type': 'input-card-label', 'supersection': supersection, 'section': section},
+                        className = 'input-card-label',
+                    ),
+                ],
                 className='card-title'
             ),
 

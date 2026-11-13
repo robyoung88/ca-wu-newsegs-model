@@ -1,10 +1,13 @@
 """
 Create a landing layout for an app.
 """
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+import re
 from typing import Any, Callable
 
 from dash import dcc, html
+import dash_ag_grid as dag
+import pandas as pd
 
 from newsegsmodelapp.components import navigation
 from newsegsmodelapp import registers
@@ -50,6 +53,58 @@ class LandingLayoutConfiguration(registers.LayoutConfiguration):
     body_text: str|list[str] = 'Some text'
     model_diagram: str | Callable[[], Any] = ''
     assumptions_text: str|list[str] = '# Assumptions\nSome assumptions text'
+    default_values_table: pd.DataFrame = field(default_factory = lambda: pd.DataFrame.from_dict({}))
+
+_URL_PATTERN = re.compile(r'https?://[^\s<>]+')
+
+# Shares of the table width taken by the last two columns; the other columns split the rest
+_LAST_COLUMNS_WIDTHS = (33, 25)
+
+def _link_last_column(table: pd.DataFrame) -> pd.DataFrame:
+    """Turn the URLs in the last column of a table into Markdown autolinks.
+
+    Args:
+        table: The table.
+
+    Returns:
+        A copy of the table, with its last column as Markdown.
+    """
+    if table.empty:
+        return table
+    table = table.copy()
+    last = table.columns[-1]
+    table[last] = table[last].map(
+        lambda text: _URL_PATTERN.sub(r'<\g<0>>', text) if isinstance(text, str) else text
+    )
+    return table
+
+def _default_values_column_defs(table: pd.DataFrame) -> list[dict[str, Any]]:
+    """Create the column definitions of the default values table.
+
+    The last two columns take fixed shares of the table width, and the last column renders as Markdown so its
+    links can be followed.
+
+    Args:
+        table: The default values table.
+
+    Returns:
+        The column definitions.
+    """
+    columns = list(table.columns)
+    if len(columns) < 2:
+        return [{'field': column} for column in columns]
+    other_width = (100 - sum(_LAST_COLUMNS_WIDTHS)) / (len(columns) - 2)
+    column_defs: list[dict[str, Any]] = [{'field': column, 'flex': other_width} for column in columns[:-2]]
+    column_defs.append({'field': columns[-2], 'flex': _LAST_COLUMNS_WIDTHS[0]})
+    column_defs.append({
+        'field': columns[-1],
+        'flex': _LAST_COLUMNS_WIDTHS[1],
+        'cellRenderer': 'markdown',
+        'linkTarget': '_blank',
+        # Long URLs have no spaces to wrap at
+        'cellStyle': {'overflowWrap': 'anywhere'},
+    })
+    return column_defs
 
 def create_landing_layout(config: LandingLayoutConfiguration):
 
@@ -67,7 +122,7 @@ def create_landing_layout(config: LandingLayoutConfiguration):
             width = 'auto',
         ),
         dbc.Col(
-            config.layout_top(),
+            config.layout_top(**(asdict(config))),
             class_name = 'page-top',
         ) 
     ])
@@ -97,6 +152,21 @@ def create_landing_layout(config: LandingLayoutConfiguration):
         ),
     ])
 
+    default_values = dbc.Col([
+        dbc.Row(html.H3('Default values')),
+        dbc.Row(
+            dag.AgGrid(
+                id='default_values_table',
+                rowData = _link_last_column(config.default_values_table).to_dict('records'),
+                # AG Grid shows its loading overlay until column definitions are set
+                columnDefs = _default_values_column_defs(config.default_values_table),
+                # Wrap long text and grow each row to fit it
+                defaultColDef = {'wrapText': True, 'autoHeight': True},
+                dashGridOptions={'domLayout':'autoHeight'}
+            )
+        )
+    ])
+
     return html.Div(
         [
             header,
@@ -104,8 +174,10 @@ def create_landing_layout(config: LandingLayoutConfiguration):
             dbc.Container([
                 dbc.Row([
                     body,
-                    
                     assumptions
+                ]),
+                dbc.Row([
+                    default_values,
                 ]),
             ])
         ]

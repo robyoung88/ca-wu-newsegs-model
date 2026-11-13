@@ -31,6 +31,17 @@ WIDER_ENVIRONMENT_MEASURE = Literal[
     'horizontal_solar_flux'
 ]
 
+class EnvironmentDataUnavailableError(RuntimeError):
+    """Raised when an environment server cannot obtain its data, such as when a remote service
+    does not respond or refuses the request.
+
+    The message is intended for the user, so should say which data could not be obtained and why.
+    """
+    retryable = False
+    """Whether running again immediately may succeed. Remote services that have not responded
+    within their timeout are unlikely to have recovered, so runs failing with this error are not
+    retried by the app."""
+
 class NewsegsLocalEnvironment(
     serialisation.StateSerialiseToDictMixin,
     metaclass = ABCMeta
@@ -61,6 +72,16 @@ class NewsegsLocalEnvironment(
         """
         self._name = name
 
+    @property
+    def cache_identity(self) -> tuple[str, str] | None:
+        """Class name and version of the provider, identifying its data in the persistent
+        environment cache (see `environment_cache`).
+
+        None, the default, when its data must not be cached persistently, such as data held in
+        memory that may be changed without changing the version of the provider.
+        """
+        return None
+
     @abstractmethod
     def get_wind_speeds(
         self, 
@@ -82,6 +103,40 @@ class NewsegsLocalEnvironment(
     def get_wind_timestep(self) -> pd.Timedelta:
         """Timestep for wind speed data."""
         ...
+
+    def get_wind_directions(
+        self,
+        location: RaisedLocation | Sequence[RaisedLocation],
+        timespan: TimeSpan,
+    ) -> RealArrayLike:
+        """Direction the wind blows from (degrees clockwise from north) for one or more locations,
+        at the times of `get_wind_speeds`.
+
+        Optional: used for feedback on the site, not by the models. The default raises
+        `NotImplementedError`.
+
+        Args:
+            location: Raised location or sequence of raised locations.
+            timespan: Time span for the requested data.
+
+        Returns:
+            RealArrayLike: Wind directions for the requested locations and times.
+        """
+        raise NotImplementedError(f'{type(self).__name__} does not serve wind directions')
+
+    def get_horizon(self, location: Location) -> pd.Series:
+        """Elevation (degrees) of the horizon around a location.
+
+        Optional: used for feedback on the site, not by the models. The default raises
+        `NotImplementedError`.
+
+        Args:
+            location: The location.
+
+        Returns:
+            pd.Series: Horizon elevations, indexed by azimuth (degrees clockwise from north).
+        """
+        raise NotImplementedError(f'{type(self).__name__} does not serve the horizon')
 
     @abstractmethod
     def get_air_density(

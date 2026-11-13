@@ -27,9 +27,10 @@ def update_variable(
         - bool - The deterministic value of the Variable has been impacted
         - bool - The DSA value(s) of the Variable has/have been impacted
         - bool - The PSA values(s) of the Variable has/have been impacted
-        - tuple[Param, ...] - The set of parameters now held by the Variable
+        - tuple[Param, ...] - The set of (raw) parameters now held by the Variable
     """
-    old_params = var.parameters
+    # Raw parameters, which set_parameters takes; it would misread those of the distribution
+    old_params = var.raw_parameters
     old_value = var.deterministic_value
     old_std = var.get_std()
     old_dsa_low = var.get_dsa_value('lower', True)
@@ -39,7 +40,7 @@ def update_variable(
     if not is_ok:
         var.set_parameters(*old_params)
         return False, True, True, True, old_params
-    
+
     if var.dsa_show:
         try:
             dsa_changed = (

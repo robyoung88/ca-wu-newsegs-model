@@ -1,0 +1,123 @@
+name: release
+
+# Merges into canary make a prerelease (vX.Y.Z-canary.N), after the unit tests; merges into main make a
+# release (vX.Y.Z), after the PSA and DSA tests.
+# python-semantic-release works out the version from the Conventional Commits since the last tag,
+# then creates the tag and the GitHub Release. Nothing is committed back to the branch.
+#
+# After a run on main, canary is brought up to main (see sync-canary).
+# A tag pushed by hand (vX.Y.Z) also makes a GitHub Release, if it has none.
+
+on:
+  push:
+    branches:
+      - main
+      - canary
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Canary: the unit tests. Main and release tags: the PSA and DSA tests (the unit tests ran on the PR into main).
+  unit-tests:
+    if: github.ref_name == 'canary'
+    uses: ./.github/workflows/unit-tests.yml
+
+  enhanced-unit-tests:
+    if: github.ref_name != 'canary'
+    uses: ./.github/workflows/enhanced-unit-tests.yml
+
+  semantic-release:
+    # Runs when whichever test job applies has passed, and the other was skipped
+    if: >-
+      !cancelled() && github.ref_type == 'branch'
+      && !contains(needs.*.result, 'failure') && contains(needs.*.result, 'success')
+    needs: [unit-tests, enhanced-unit-tests]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      # Stop if the branch has moved on since this run started, so that an older commit is not released
+      - name: Check the branch head
+        run: |
+          git fetch origin "${{ github.ref_name }}"
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
+            echo "::warning::${{ github.ref_name }} has moved on; the later run will make the release."
+            echo "stale=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Version, tag and release
+        if: env.stale != 'true'
+        id: release
+        uses: python-semantic-release/python-semantic-release@v10
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit: false
+          changelog: false
+          tag: true
+          push: true
+          vcs_release: true
+
+      - name: Summary
+        if: env.stale != 'true'
+        run: |
+          if [ "${{ steps.release.outputs.released }}" = "true" ]; then
+            echo "Released ${{ steps.release.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No release: no feat, fix or breaking commits since the last tag." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  sync-canary:
+    # Promotions are merge commits, so the merge commit on main (which carries the release tag) is not
+    # on canary. Bring canary up to main, or canary's next prerelease would be counted from the previous
+    # release. This is a fast-forward, or a merge if canary has moved on; it is never a force push.
+    if: github.ref_type == 'branch' && github.ref_name == 'main'
+    needs: semantic-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: canary
+          fetch-depth: 0
+
+      - name: Merge main into canary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --ff --no-edit origin/main
+          git push origin HEAD:canary
+
+  manual-tag-release:
+    if: github.ref_type == 'tag'
+    needs: enhanced-unit-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $TAG already exists."
+            exit 0
+          fi
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes $prerelease

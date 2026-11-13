@@ -19,7 +19,9 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from newsegsmodelapp import registers
+from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
+from newsegsmodelapp.components.psa_group_editor import count_variables_with_different_distributions_or_sds
 from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
 from newsegsmodelapp.components import callback_utils, export, navigation, stats
 from newsegsmodelapp.dash_extension import NewsegsDash
@@ -32,6 +34,7 @@ from newsegsmodelframework.newsegssensitivity import common as sensitivity, psa
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 from .processes.psa_process_components import psa_process_components
+from newsegsmodelapp.components.psa_plots import psa_plots
 
 PAGE_TYPE = 'psa'
 
@@ -254,7 +257,7 @@ def create_psa_project_results():
                         },
                         style = {
                             'minHeight': '590px',
-                            'border': '1px solid #dee2e6',
+                            'border': '1px solid var(--bs-border-color)',
                             'borderRadius': '0.5rem',
                             'backgroundColor': 'transparent'
                         }
@@ -393,7 +396,7 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
                                             },
                                             style= {
                                                 'height': '590px',
-                                                'border': '1px solid #dee2e6',
+                                                'border': '1px solid var(--bs-border-color)',
                                                 'borderRadius': '0.5rem',
                                                 'backgroundColor': 'transparent'
                                             }
@@ -437,12 +440,48 @@ def create_psa_layout(config: PSAConfigurationLayoutConfiguration):
         b2_contents,
     )
 
+def psa_plot_triggers(triggers: list[callback_utils.Trigger]) -> tuple[bool, str | None]:
+    """What the triggers of the PSA plot callback ask for: every trigger is considered, as several may fire together.
+
+    A change of the active project or of the plot type redraws the plot and its controls. New results and changes of
+    the plot's controls update the plot drawn (which the callback redraws if the plot type isn't drawn yet).
+
+    Args:
+        triggers: The triggers of the callback.
+
+    Returns:
+        Whether to redraw the plot and its controls, and the plot type chosen, if it changed.
+    """
+    plot_type_changes = [x for x in triggers if x.is_pattern() and x.id.get('purpose') == 'plot-type'] # pyright: ignore[reportAttributeAccessIssue]
+    full_draw = bool(plot_type_changes) or any(not x.is_pattern() for x in triggers)
+    graph_type = next((x.value for x in plot_type_changes if x.value), None)
+    return full_draw, graph_type
+
 def add_psa_run_callbacks(app: NewsegsDash):
     """Bind the callbacks which run, cancel, download and upload the PSA.
 
     Args:
         app: The Dash app.
     """
+    @app.callback(
+        Output('psa-run-differences-note', 'children'),
+        Input('psa-run-scope', 'value'),
+        Input('modal-psa-confirm', 'is_open'),
+        State('active-project-id', 'data'),
+    )
+    def show_psa_run_differences_note(scope, is_open, active_project_id):
+        """For a PSA of all configurations, the number of variables whose distributions or SDs differ across them"""
+        if scope != 'project' or not is_open or active_project_id is None:
+            return None
+        provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
+        lproj = provider.get_lightweight_project(active_project_id)
+        var_uids = list(dict.fromkeys(uid for lmm in lproj.metamodels for uid in lmm.variables.values()))
+        variables = {x.id: x for x in provider.variable_provider.get_full_lightweight_variable(var_uids)}
+        n = count_variables_with_different_distributions_or_sds(lproj, variables)
+        if not n:
+            return None
+        return f'{n} variable{"s have" if n != 1 else " has"} different distributions or SDs across configurations'
+
     @app.callback(
         output = {
             'modal': {
@@ -466,16 +505,12 @@ def add_psa_run_callbacks(app: NewsegsDash):
         modal_close_button,
         psa_prerun_button,
     ):
-        clicks = callback_utils.get_triggered_value()
-        if not clicks:
-            raise PreventUpdate
-        
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
 
         rval = callback_utils.create_noupdate_return()
-        if trig_id == 'btn-psa-prerun':
+        if clicked.id == 'btn-psa-prerun':
             rval['modal']['is_opens'] = True
         else:
             rval['modal']['is_opens'] = False
@@ -525,12 +560,10 @@ def add_psa_run_callbacks(app: NewsegsDash):
         options,
         active_project_id,
     ):
-        trig_id = ctx.triggered_id
-        if trig_id is None:
+        clicked = callback_utils.get_clicked_trigger()
+        if clicked is None:
             raise PreventUpdate
-        click = callback_utils.get_triggered_value()
-        if not click:
-            raise PreventUpdate
+        trig_id = clicked.id
 
         rval = callback_utils.create_noupdate_return()
         
@@ -819,8 +852,8 @@ def add_psa_run_callbacks(app: NewsegsDash):
         if len(plot_container['ids']) == 0 or len(graph_selection_dropdown['values']) == 0:
             raise PreventUpdate
         
-        trig = ctx.triggered_id
-        if trig is None:
+        triggers = callback_utils.get_triggers()
+        if not triggers:
             raise PreventUpdate
         
         proj = app.project_provider.get_project(active_project_id)
@@ -830,20 +863,14 @@ def add_psa_run_callbacks(app: NewsegsDash):
         if psa_raw_data is None:
             rval['plot_header']['children'] = [html.Div(html.H3('No PSA Run'), className = 'd-flex justify-content-center w-100')]
             graph_type = graph_selection_dropdown['values'][0]
-            plot_funcs = psa.psa_plots.get(graph_type)
+            plot_funcs = psa_plots.get(graph_type)
             if plot_funcs is None:
                 rval['plot']['figures'] = []
             else:
                 rval['plot']['figures'] = plot_funcs['draw'](None)
             return rval
         
-        graph_type = None
-        full_draw = False
-        if isinstance(trig, str) or trig.get('purpose') == 'plot-type':
-            # Need to do a full graph refresh
-            full_draw = True
-            if not isinstance(trig, str):
-                graph_type = callback_utils.get_triggered_value()
+        full_draw, graph_type = psa_plot_triggers(triggers)
         
         if graph_type is None:
             graph_type = graph_selection_dropdown['values'][0]
@@ -858,7 +885,7 @@ def add_psa_run_callbacks(app: NewsegsDash):
                 
             full_draw = not graph_is_drawn
         
-        plot_funcs = psa.psa_plots.get(graph_type)
+        plot_funcs = psa_plots.get(graph_type)
         if plot_funcs is None:
             raise ValueError(f'Plot functions not found for graph_type {graph_type}')
     

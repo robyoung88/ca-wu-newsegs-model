@@ -1,6 +1,7 @@
 """Project plugin for the `sprake` model type.
 
-Registers `sprake_project_factory`, which creates a project of the Sprake NewSEGS Energy Model.
+Registers `sprake_project_factory`, which creates a project of configurations of the Sprake 
+NewSEGS Model.
 """
 import json
 import os
@@ -30,7 +31,7 @@ def _create_default_model() -> newsegsmodel.NewsegsModel:
     with open(
         os.path.join(
             STATICDATA, 
-            'sprakemodel-validation-config.pickle'
+            'sprake-model-config.pickle'
         ), 
     'rb') as f:
         mdl_conf = cast(newsegsmodel.NewsegsModel, pickle.load(f))
@@ -39,21 +40,19 @@ def _create_default_model() -> newsegsmodel.NewsegsModel:
         mdl_conf.generation.generator.chain_syncronise()
         
     return mdl_conf
-    #return sprakemodel.SprakeModel.from_dict(mdl_conf)
 
 def _create_default_finance() -> newsegsfinance.NewsegsFinance:
     # Load finance configuration
     with open(
         os.path.join(
             STATICDATA,
-            'sprakemodel-validation-finance-config.pickle'
+            'sprake-finance-config.pickle'
         ),
     'rb') as f:
         fnc_conf = cast(newsegsfinance.NewsegsFinance, pickle.load(f))
         fnc_conf.anonymise_ids()
         _reset_revision(fnc_conf)
     return fnc_conf
-    #return sprakefinance.SprakeFinance.from_dict(fnc_conf)
 
 def _create_default_variables() -> list[variable.Variable]:
     with open(os.path.join(STATICDATA, 'sprake-variable-config.json')) as f:
@@ -98,6 +97,7 @@ def sprake_project_factory():
             fnc,
             variables = [proj.get_default_variable(x) for x in varids]
         )
+        mm.name = newsegsmetamodel.FIRST_CONFIGURATION_NAME
         _reset_revision(mm)
 
         proj.metamodels.append(mm) # pyright: ignore[reportAttributeAccessIssue]

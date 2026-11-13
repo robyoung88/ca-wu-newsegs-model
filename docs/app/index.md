@@ -33,8 +33,8 @@ src/
 1. A user acts on a page (for example presses *run*). A callback calls the *run request*
    function registered for that action, which creates a `RunRequest` that is written to the
    `requests` table.
-2. The **dispatcher** claims `AWAITING DISPATCH` requests and forwards them over ZeroMQ to a
-   **worker**.
+2. The front end's **action manager** (`manage_actions`, in `components/callbacks/action_callbacks.py`) picks up
+   `AWAITING DISPATCH` requests and sends them over ZeroMQ to the **dispatcher**, which hands each to a **worker**.
 3. The worker creates a `run`, looks up the *run procedure* registered for the request type and
    executes it, updating the run's progress and checking whether cancellation has been requested.
    Results are written to the results store and recorded in `results`.

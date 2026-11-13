@@ -1,13 +1,14 @@
-"""Helpers for wind resource assessment from the New European Wind Atlas: wind speeds at a site and heights,
-compass point categories, and wind rose, energy rose and wind speed profile plots.
+"""Helpers for wind resource assessment from the New European Wind Atlas: wind speeds at a site and heights, and
+compass point categories.
+
+The wind rose, energy rose and wind speed profile plots are in `newsegsmodelutils.plots.wind_resource`.
 """
+import datetime
 import itertools
+from typing import Any, Literal, Sequence, overload
+
 import numpy as np
 import pandas as pd
-
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-import seaborn as sns
 
 from newa import get_newa_micro_point, get_newa_meso_ts_point
 from scipy.stats import weibull_min
@@ -160,17 +161,65 @@ def get_alphas(wd_10, ws_10, alpha_dist):
 
     return (idf.set_index(['wd_10_cat','ws_10_cat']).join(alpha_dist)['alpha'].values)
 
-def get_wind_at_site(lat, lon,
-                     rng,
-                     meso_reference_height=50,
-                     micro_reference_height=50,
-                     dt_start='2005-01-01T00:00:00',
-                     dt_stop='2022-12-31T23:30:00',
-                     site_heights = EVAL_HEIGHTS,
-                     #site_cps = CPS,
-                     return_working = False
-                     ):
-    
+NewaDatetime = str | datetime.datetime | pd.Timestamp
+"""A datetime accepted by `get_wind_at_site`: a string, `datetime.datetime` or `pd.Timestamp`."""
+
+_NEWA_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+
+def to_newa_datetime_string(dt: NewaDatetime) -> str:
+    """Format a datetime as the New European Wind Atlas API requires, e.g. `'2005-01-01T00:00:00'`.
+
+    The API takes UTC times without a timezone, to the second, so a timezone-aware datetime is converted to UTC
+    and a naive one is taken to be UTC already.
+
+    Args:
+        dt: The datetime; a string is parsed by `pd.Timestamp`.
+
+    Returns:
+        The formatted datetime.
+    """
+    ts = pd.Timestamp(dt)
+    if ts.tz is not None:
+        ts = ts.tz_convert('UTC').tz_localize(None)
+    return ts.strftime(_NEWA_DATETIME_FORMAT)
+
+@overload
+def get_wind_at_site(
+    lat: float, lon: float,
+    rng: np.random.Generator,
+    meso_reference_height: float = ...,
+    micro_reference_height: float = ...,
+    dt_start: NewaDatetime = ...,
+    dt_stop: NewaDatetime = ...,
+    site_heights: Sequence[float] = ...,
+    return_working: Literal[False] = ...
+) -> pd.DataFrame: ...
+
+@overload
+def get_wind_at_site(
+    lat: float, lon: float,
+    rng: np.random.Generator,
+    meso_reference_height: float = ...,
+    micro_reference_height: float = ...,
+    dt_start: NewaDatetime = ...,
+    dt_stop: NewaDatetime = ...,
+    site_heights: Sequence[float] = ...,
+    *,
+    return_working: Literal[True]
+) -> dict[str, Any]: ...
+
+def get_wind_at_site(
+    lat: float, lon: float,
+    rng: np.random.Generator,
+    meso_reference_height: float = 50,
+    micro_reference_height: float = 50,
+    dt_start: NewaDatetime = '2005-01-01T00:00:00',
+    dt_stop: NewaDatetime = '2022-12-31T23:30:00',
+    site_heights: Sequence[float] = EVAL_HEIGHTS,
+    #site_cps = CPS,
+    return_working: bool = False
+) -> pd.DataFrame | dict[str, Any]:
+
     """Wind speeds at a site, at heights, from the New European Wind Atlas.
 
     Takes the mesoscale wind speed series at the reference height and maps its Weibull distribution onto the microscale Weibull distribution of the site, then scales the result to each site height by the power law with a shear exponent which depends upon the wind direction and speed.
@@ -178,11 +227,11 @@ def get_wind_at_site(lat, lon,
     Args:
         lat: Latitude (degrees).
         lon: Longitude (degrees).
-        rng: Random number generator.
+        rng: Random number generator, which resolves ties when the wind speeds are sorted.
         meso_reference_height: Height (m) of the mesoscale data used as reference.
         micro_reference_height: Height (m) of the microscale data used as reference.
-        dt_start: Start of the period.
-        dt_stop: End of the period.
+        dt_start: Start of the period; see `to_newa_datetime_string`.
+        dt_stop: End of the period; see `to_newa_datetime_string`.
         site_heights: Heights (m) at which to give the wind speeds.
         return_working: Return the intermediate data as well.
 
@@ -190,9 +239,9 @@ def get_wind_at_site(lat, lon,
         The wind speed series at each height; with `return_working`, a dictionary which also holds the intermediate data.
     """
     meso_data = get_newa_meso_ts_point(lat, lon,
-                                       height=meso_reference_height, 
-                                       dt_start=dt_start, 
-                                       dt_stop=dt_stop,
+                                       height=meso_reference_height,
+                                       dt_start=to_newa_datetime_string(dt_start),
+                                       dt_stop=to_newa_datetime_string(dt_stop),
                                        variables=['wind_speed',
                                                   'wind_from_direction_10m',
                                                   'wind_speed_10m',
@@ -281,209 +330,3 @@ def get_wind_at_site(lat, lon,
         }
     else :
         return odata
-
-WIND_ROSE_BINS = [0,3,6,9,12,18,24,50]
-clrs = sns.color_palette("husl", len(WIND_ROSE_BINS)-1)
-ws_cats = pd.cut([], WIND_ROSE_BINS).categories
-windrose_catcols = dict(zip(ws_cats, clrs))
-
-# REVIEW (unreferenced): no references to `draw_wind_rose` found in src/, scripts/ or data/.
-def draw_wind_rose(wind_speeds, wind_directions, height_agl=None, figsize=(6.5,4)):
-    """Draw a landscape wind rose with legend to the right and a note box.
-
-    Parameters
-    - wind_speeds: array-like of wind speeds
-    - wind_directions: array-like of wind directions (degrees)
-    - height_agl: optional height above ground level (m) to report in note box
-    - figsize: tuple for figure size (width, height)
-    """
-    idf = pd.DataFrame({
-        'speed': wind_speeds,
-        'direction': wind_directions
-    }) \
-        .assign(ws_bin = lambda df: pd.cut(df['speed'], WIND_ROSE_BINS),
-                wd_bin = lambda df: bearing_to_category(df['direction']))
-
-    mean_speed = idf['speed'].mean()
-
-    pdf = idf.groupby(['wd_bin','ws_bin'])['speed'].agg('count')/len(idf)
-    pdf = pdf.to_frame().rename(columns={'speed':'prop'}) \
-        .reset_index()\
-        .assign(cumprop=lambda df: df.groupby('wd_bin')['prop'].cumsum())\
-        .set_index('wd_bin')\
-        .join(BEARING_POLAR_ANGLES.set_index('bearing_cat'))
-
-    fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(1,3,(1,2), projection='polar')
-    ax_leg = fig.add_subplot(1,3,3)
-    ax_leg.axis('off')
-
-    ax.set_theta_zero_location('N')
-    ax.set_theta_direction(-1)
-
-    width = 2.0*np.pi / len(BEARING_POLAR_ANGLES)
-
-    for cat in reversed(ws_cats):
-        pdata = pdf.loc[pdf['ws_bin']==cat,:]
-        if (len(pdata)>0):
-            ax.bar(pdata['theta'],
-                   pdata['cumprop'],
-                   width=width,
-                   linewidth=1,
-                   edgecolor='k',
-                   color=windrose_catcols[cat],
-                   alpha=0.7)
-
-    ax.set_xticks(np.linspace(0, 2*np.pi, len(BEARING_POLAR_ANGLES), endpoint=False))
-    ax.set_xticklabels(BEARING_POLAR_ANGLES['bearing_cat'].values)
-
-    ax_leg.text(0.5, 0.95, "Proportion of year with wind from direction", ha='center', va='center', fontsize=10,
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    # Build legend on the right-hand axis
-    legend_patches = [Patch(facecolor=windrose_catcols[cat], edgecolor='k', label=str(cat)) for cat in ws_cats]
-    ax_leg.legend(handles=legend_patches, title='Wind speed bin', frameon=False,
-                  loc='center')
-
-    # Add note box with height and mean wind speed
-    note_lines = []
-    if height_agl is not None:
-        note_lines.append(f"Height AGL: {height_agl} m")
-    note_lines.append(f"Mean wind speed: {mean_speed:.2f} m/s")
-    note_text = "\n".join(note_lines)
-    ax_leg.text(0.5, 0.05, note_text, ha='center', va='center', fontsize=10,
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-
-    plt.tight_layout()
-    return fig
-
-POWER_BINS = [0,0.001,0.25,0.5,0.75,0.999, 1.0]
-clrs = sns.color_palette("husl", len(POWER_BINS)-1)
-power_cats = pd.cut([], POWER_BINS).categories
-power_cat_labels = dict(zip(power_cats,['< Cut-in',r'0%-25%',r'25%-50%',r'50%-75%',r'75%-100%','Max/Rated'] ))
-power_catcols = dict(zip(power_cats, clrs))
-
-# REVIEW (unreferenced): no references to `draw_energy_rose` found in src/, scripts/ or data/.
-def draw_energy_rose(wind_powers,
-                     wind_directions,
-                     height_agl=None, 
-                     figsize=(6.5,4)):
-    """Draw a landscape energy rose with legend to the right and a note box.
-
-    Parameters
-    - wind_powers: array-like of specific power per half hour
-    - wind_directions: array-like of wind directions (degrees)
-    - height_agl: optional height above ground level (m) to report in note box
-    - figsize: tuple for figure size (width, height)
-    """
-    idf = pd.DataFrame({
-        'power': wind_powers,
-        'direction': wind_directions
-    })
-
-    max_power = idf.power.max()
-
-    idf = idf.assign(
-        norm_power = lambda df: df['power'] / max_power,
-        power_bin = lambda df: pd.cut(df['norm_power'], POWER_BINS),
-        wd_bin = lambda df: bearing_to_category(df['direction']),
-        energy = lambda df: 0.5 * df['power'] # Assume half-hourly and in kW
-        )
-
-    n_years = len(idf) / (2 * 8760)
-    total_energy = idf.energy.sum()
-    ann_energy = total_energy / n_years
-    
-    pdf = idf.groupby(['wd_bin','power_bin'])['energy'].agg('sum')/total_energy
-    pdf = pdf.to_frame().rename(columns={'energy':'prop'}) \
-        .reset_index()\
-        .assign(cumprop=lambda df: df.groupby('wd_bin')['prop'].cumsum())\
-        .set_index('wd_bin')\
-        .join(BEARING_POLAR_ANGLES.set_index('bearing_cat'))
-
-    fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(1,3,(1,2), projection='polar')
-    ax_leg = fig.add_subplot(1,3,3)
-    ax_leg.axis('off')
-
-    ax.set_theta_zero_location('N')
-    ax.set_theta_direction(-1)
-
-    width = 2.0*np.pi / len(BEARING_POLAR_ANGLES)
-
-    for cat in reversed(power_cats):
-        pdata = pdf.loc[pdf['power_bin']==cat,:]
-        if (len(pdata)>0):
-            ax.bar(pdata['theta'],
-                   pdata['cumprop'],
-                   width=width,
-                   linewidth=1,
-                   edgecolor='k',
-                   color=power_catcols[cat],
-                   alpha=0.7)
-
-    ax.set_xticks(np.linspace(0, 2*np.pi, len(BEARING_POLAR_ANGLES), endpoint=False))
-    ax.set_xticklabels(BEARING_POLAR_ANGLES['bearing_cat'].values)
-
-    ax_leg.text(0.5, 0.95, "Proportion of energy from direction", ha='center', va='center', fontsize=10,
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    # Build legend on the right-hand axis
-    legend_patches = [Patch(facecolor=power_catcols[cat], edgecolor='k', label=power_cat_labels[cat]) for cat in power_cats]
-    ax_leg.legend(handles=legend_patches, title='Normalised power', loc='center', frameon=False)
-
-    # Add note box with height and mean wind speed
-    note_lines = []
-    if height_agl is not None:
-        note_lines.append(f"Height AGL: {height_agl} m")
-    note_lines.append(f"Annual specific energy: {ann_energy:.2f} kWh/m²")
-    note_text = "\n".join(note_lines)
-    ax_leg.text(0.5, 0.05, note_text, ha='center', va='center', fontsize=10,
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-
-    plt.tight_layout()
-    return fig
-
-# Variation of wind speed with height
-SOURCE_DICT = {
-    'meso': 'NEWA Meso-scale',
-    'micro': 'NEWA Micro-scale',
-    'extrap': 'Vertically extrapolated'
-}
-
-# REVIEW (unreferenced): no references to `wind_speed_profile_box` found in src/, scripts/ or data/.
-def wind_speed_profile_box(profile_data, figsize=(6,4)):
-    """Create a transposed box plot of wind speed versus height.
-
-    - y axis is height (m)
-    - x axis is speed (m/s)
-    - boxes are coloured by `source` and dodged to avoid overlap.
-    - legend entries are relabelled using ``SOURCE_DICT``.
-    """
-    # use gridspec-like spacing by reducing top margin to keep legend clear
-    fig, ax = plt.subplots(figsize=figsize)
-    fig.subplots_adjust(top=0.2)  # reserve upper ~1/6 for legend
-    # ensure consistent ordering of sources using SOURCE_DICT keys
-    hue_order = list(SOURCE_DICT.keys())
-    sns.boxplot(
-        data=profile_data,
-        x='speed',
-        y='height',
-        hue='source',
-        dodge=True,
-        ax=ax,
-        orient='h',
-        showmeans=True,
-        hue_order=hue_order
-    )
-    ax.set_ylabel('Height (m)')
-    ax.invert_yaxis()
-    ax.set_xlabel('Wind speed (m/s)')
-
-    # relabel legend entries
-    handles, labels = ax.get_legend_handles_labels()
-    new_labels = [SOURCE_DICT.get(lbl, lbl) for lbl in labels]
-    # place legend above the axes, centred, outside plot
-    ax.legend(handles, new_labels, title='Source', loc='upper center',
-              bbox_to_anchor=(0.5, 1.15), ncol=len(new_labels), frameon=False)
-
-    plt.tight_layout()
-    return fig

@@ -11,7 +11,8 @@ from typing import Callable, cast
 
 from newsegsmodelapp.backend.db import db_staleness
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.plugins.pages.processes.common_deterministic import deterministic_run_metamodel
+from newsegsmodelapp.plugins.pages.processes.common_deterministic import DETERMINISTIC_STEPS, deterministic_run_metamodel
+from newsegsmodelapp.plugins.pages.processes.progress_messages import runs_progress_message
 from newsegsmodelapp.registers import RunRequest, register_run_procedure, register_run_request
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
@@ -103,7 +104,7 @@ def execute_psa_project_run(
     seed = int(seed) if seed is not None and seed != '' else seed
 
     n_mm = len(metamodels)
-    n_steps = n_mm * 4 - 1
+    n_steps = n_mm * DETERMINISTIC_STEPS
     def deterministic_progress_callback(step, total, message):
         progress_callback(step, n_steps, 'PSA: Reference run - ' + message)
 
@@ -111,7 +112,7 @@ def execute_psa_project_run(
         deterministic_run_metamodel(
             mm, proj, request, project_provider, result_provider, run_id,
             deterministic_progress_callback, check_cancel_status,
-            start_step = i*3,
+            start_step = i * DETERMINISTIC_STEPS,
             total_steps = n_steps,
             sequence_number = i + 1,
             run_started_ns = started_ns,
@@ -124,13 +125,7 @@ def execute_psa_project_run(
             raise InterruptedError(f'PSA process {run_id} has been cancelled.')
 
         tot_secs = (time.time_ns() - t0) * 1e-9
-        if step > 0:
-            per_iter = tot_secs / step
-            msg = f'PSA (all configurations): Run {step} of {total}, {per_iter:.1f} sec/run. Elapsed time: {tot_secs:.0f} seconds.'
-        else:
-            msg = f'PSA (all configurations): Run {step} of {total}. Elapsed time: {tot_secs:.0f} seconds.'
-
-        progress_callback(step, total, msg)
+        progress_callback(step, total, runs_progress_message('PSA (all configurations)', step, total, tot_secs))
 
     psa_results = psa.run_psa_multiple(
         metamodels,

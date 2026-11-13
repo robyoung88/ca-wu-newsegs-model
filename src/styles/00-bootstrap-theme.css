@@ -1,0 +1,64 @@
+/* ==========================================================================
+   Bootstrap theme
+   Bootstrap 5.3 in the colours of the scheme: the off-white page, ClwydAlyn purple as `primary` and in borders.
+   ========================================================================== */
+
+:root {
+    --bs-primary: var(--ns-brand);
+    --bs-primary-rgb: var(--ns-brand-rgb);
+    --bs-primary-text-emphasis: var(--ns-brand);
+    --bs-primary-bg-subtle: var(--ns-brand-subtle);
+    --bs-primary-border-subtle: var(--ns-brand-soft);
+    --bs-link-color: var(--ns-brand);
+    --bs-link-color-rgb: var(--ns-brand-rgb);
+    --bs-link-hover-color: var(--ns-brand-mid);
+    --bs-link-hover-color-rgb: var(--ns-brand-mid-rgb);
+    --bs-border-color: var(--ns-brand-soft);
+    --bs-focus-ring-color: rgba(var(--ns-brand-rgb), 0.25);
+}
+
+body {
+    background-color: var(--ns-bg);
+}
+
+/* Bootstrap compiles the colours of these components, rather than taking them from --bs-primary */
+.btn-primary {
+    --bs-btn-bg: var(--ns-brand);
+    --bs-btn-border-color: var(--ns-brand);
+    --bs-btn-hover-bg: var(--ns-brand-mid);
+    --bs-btn-hover-border-color: var(--ns-brand-mid);
+    --bs-btn-active-bg: var(--ns-brand-mid);
+    --bs-btn-active-border-color: var(--ns-brand-mid);
+    --bs-btn-disabled-bg: var(--ns-brand);
+    --bs-btn-disabled-border-color: var(--ns-brand);
+    --bs-btn-focus-shadow-rgb: var(--ns-brand-rgb);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--ns-brand);
+    --bs-btn-border-color: var(--ns-brand);
+    --bs-btn-hover-bg: var(--ns-brand);
+    --bs-btn-hover-border-color: var(--ns-brand);
+    --bs-btn-active-bg: var(--ns-brand);
+    --bs-btn-active-border-color: var(--ns-brand);
+    --bs-btn-disabled-color: var(--ns-brand);
+    --bs-btn-disabled-border-color: var(--ns-brand);
+    --bs-btn-focus-shadow-rgb: var(--ns-brand-rgb);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+    border-color: var(--ns-brand-mid);
+    box-shadow: 0 0 0 0.25rem rgba(var(--ns-brand-rgb), 0.25);
+}
+
+.form-check-input:checked {
+    background-color: var(--ns-brand);
+    border-color: var(--ns-brand);
+}
+
+.progress,
+.progress-stacked {
+    --bs-progress-bar-bg: var(--ns-brand);
+}

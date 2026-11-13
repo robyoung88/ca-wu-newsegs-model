@@ -3,44 +3,27 @@ Functions and classes for finding optimal system configurations
 """
 import copy
 from dataclasses import dataclass
-from typing import Callable, Literal, Sequence, get_args
+from typing import Callable, Sequence
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 from scipy import optimize as scipy_opt
 
 from newsegsmodelframework.newsegsfinance.newsegsfinance import NewsegsFinance
 from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaModel
+from newsegsmodelframework.newsegsmetamodel.optim_component import ( # noqa: F401 - re-exported for the pages
+    OPTIM_TARGET_STATISTIC as _OPTIM_TARGET_STATISTIC,
+    OPTIM_TARGET_STATISTICS,
+    OPTIM_TARGET_STATISTIC_LABELS,
+    OPTIMISATION_METHODS,
+)
 from newsegsmodelframework.newsegsmodel.newsegsmodel import NewsegsModel
-
-_OPTIM_TARGET_STATISTIC = Literal[
-    'net_present_value_discounted',
-    'net_present_value_undiscounted',
-]
-
-OPTIM_TARGET_STATISTICS = get_args(_OPTIM_TARGET_STATISTIC)
+from newsegsmodelframework.newsegsvariable.variable import Variable
 
 _MAXIMISE_OPTIM_TARGET_STATISTICS = [
     'net_present_value_discounted',
     'net_present_value_undiscounted',
 ]
-
-OPTIM_TARGET_STATISTIC_LABELS = {
-    'net_present_value_undiscounted': 'NPV (undiscounted)',
-    'net_present_value_discounted': 'NPV (discounted)'
-}
-
-_OPTIMISATION_METHODS = Literal[
-    'Nelder-Mead',
-    'L-BFGS-B',
-    'TNC',
-    'SLSQP',
-    'Powell'
-]
-
-OPTIMISATION_METHODS = get_args(_OPTIMISATION_METHODS)
-
 """
 Statistics in this list will be inverted for minimization
 """
@@ -67,6 +50,42 @@ def _optim_float_statistic_mapper(
     
     raise ValueError(f'stat {stat} is not known as an optimisation statistic')
 
+def evaluate_statistic(mm: NewsegsMetaModel, stat: _OPTIM_TARGET_STATISTIC) -> float:
+    """The value of an optimisation statistic of a metamodel at its current parameters.
+
+    Runs the NewSEGS Energy Model and the finance model, after bringing the models up to date with
+    the variables.
+
+    Args:
+        mm: The metamodel.
+        stat: The statistic.
+
+    Returns:
+        The value of the statistic, e.g. the NPV (£).
+    """
+    mm.sync_model_with_changed_variables_deterministic()
+    mm.model.run()
+    mm.finance.run()
+    return _optim_float_statistic_mapper(stat, mm.model, mm.finance, do_optim = False)
+
+def statistic_from_objective(stat: _OPTIM_TARGET_STATISTIC, objective: float) -> float:
+    """The value of an optimisation statistic from the value of the objective minimised for it.
+
+    Statistics which are maximised, such as the NPV, are minimised as their negative.
+
+    Args:
+        stat: The statistic.
+        objective: The value of the objective, such as `fun` of the result of `run_optimisation`.
+
+    Returns:
+        The value of the statistic.
+    """
+    return -objective if stat in _MAXIMISE_OPTIM_TARGET_STATISTICS else objective
+
+def statistic_is_maximised(stat: _OPTIM_TARGET_STATISTIC) -> bool:
+    """Whether an optimisation statistic is maximised, rather than minimised."""
+    return stat in _MAXIMISE_OPTIM_TARGET_STATISTICS
+
 @dataclass
 class OptimVariable:
     """Specification of a variable to vary in an optimisation.
@@ -85,6 +104,50 @@ class OptimVariable:
     lower: float = -np.inf
     upper: float = np.inf
     param_index: int = 0
+
+class InvalidOptimBoundsError(ValueError):
+    """Raised when variables to be optimised have bounds that cannot be used.
+
+    The message is intended for the user, and names the variables and their problems.
+    """
+    retryable = False
+    """Running again gives the same result until the bounds are changed, so the app does not retry."""
+
+def optim_bounds_problem(var: Variable) -> str | None:
+    """Why the optimisation bounds of a variable cannot be used, if they cannot.
+
+    Args:
+        var: The variable.
+
+    Returns:
+        A description of the problem, or `None` if the bounds are valid.
+    """
+    lower, upper = var.get_optim_bounds()
+    if lower is None and upper is None:
+        return 'no lower or upper bound'
+    if lower is None:
+        return 'no lower bound'
+    if upper is None:
+        return 'no upper bound'
+    if not lower < upper: # pyright: ignore[reportOperatorIssue]
+        return f'lower bound {lower} is not below upper bound {upper}'
+    return None
+
+def check_optim_bounds(variables: Sequence[Variable]) -> None:
+    """Check that the optimisation bounds of the variables can be used.
+
+    Args:
+        variables: The variables.
+
+    Raises:
+        InvalidOptimBoundsError: Naming every variable whose bounds cannot be used.
+    """
+    problems = [
+        f'{var.label} ({problem})' for var in variables
+        if (problem := optim_bounds_problem(var)) is not None
+    ]
+    if problems:
+        raise InvalidOptimBoundsError('Invalid optimisation bounds: ' + '; '.join(problems))
 
 def run_optimisation(
     mm: NewsegsMetaModel,
@@ -105,7 +168,8 @@ def run_optimisation(
         variables: The variables to vary.
         target: The statistic to maximise.
         progress: Function reporting progress, called with the iteration and a count one or two larger; the total is not known in advance.
-        cancel_status: Function returning whether cancellation has been requested; checked after each iteration.
+        cancel_status: Function returning whether cancellation has been requested; checked before each run of the
+            models, so that the optimisation stops within one run whatever the method.
         method: The scipy optimisation method.
 
     Returns:
@@ -153,6 +217,11 @@ def run_optimisation(
             mm.update_model_from_variable_deterministic(var.varid)
 
     def optfunc(x, *args) -> float:
+        # Cancellation is checked here rather than in the callback: scipy ignores a callback returning True, and
+        # some methods (e.g. Powell) run the models many times in each iteration. Raising from the objective stops
+        # every method, and propagates out of `minimize`.
+        if cancel_status():
+            raise InterruptedError('Optimisation cancelled')
         setpars(x, mm)
         mm.model.run()
         mm.finance.run()
@@ -161,13 +230,10 @@ def run_optimisation(
     cback_count = 0
     def cback(intermediate_result: scipy_opt.OptimizeResult):
         nonlocal cback_count
-        
+
         cback_count += 1
         progress(cback_count, cback_count + 2)
-        if cancel_status():
-            return True
-            #raise StopIteration(f'Optimisation process has been cancelled.')
-    
+
     if do_bound:
         bounds = []
         for var, trans in zip(variables, transforms):
@@ -192,12 +258,15 @@ def evaluate_statistic_across_margin(
     stat: str,
     lower: float,
     upper: float,
-    resolution: int    
+    resolution: int,
+    progress_callback: Callable[[float, float, str], None] | None = None,
+    cancel_status: Callable[[], bool] | None = None,
 ) -> pd.DataFrame:
     """Evaluate a statistic across a range of values of one variable, for a marginal plot.
 
     The first parameter of the variable is set to `resolution + 1` evenly spaced values from `lower` to `upper`, and the
-    NewSEGS Energy Model and finance model are run for each. The original variable is restored afterwards.
+    NewSEGS Energy Model and finance model are run for each. The original variable is restored afterwards, and the
+    models are run again with it, unless cancelled.
 
     Args:
         mm: The metamodel.
@@ -206,10 +275,19 @@ def evaluate_statistic_across_margin(
         lower: Lowest value of the parameter.
         upper: Highest value of the parameter.
         resolution: Number of intervals between the lowest and highest values.
+        progress_callback: Function reporting progress: takes the progress, the total, and a message. Called
+            before each point, e.g. 'Point 3 of 11', and before the run restoring the configuration, with the
+            progress of each run within it, such as waits for environmental data.
+        cancel_status: Function returning whether cancellation has been requested; checked before each point.
 
     Returns:
         Dataframe of the values of the parameter (a column named for the varid) and of the statistic.
+
+    Raises:
+        InterruptedError: if cancellation is requested.
     """
+    if cancel_status is None:
+        cancel_status = lambda: False
     # Ensure models are up-to-date
     mm.sync_model_with_changed_variables_deterministic()
 
@@ -219,61 +297,43 @@ def evaluate_statistic_across_margin(
     par0 = list(mm.variables[varid].parameters)
 
     param_range = np.linspace(lower, upper, resolution + 1, dtype = np.float64)
-    
-    def statfunc(x) -> float:
-        if len(par0) == 1:
-            mm.variables[varid].set_parameters(x)
+    # Each point, then the run restoring the configuration
+    total = len(param_range) + 1
+
+    def run(step: int, message: str):
+        if progress_callback is None:
+            mm.model.run()
         else:
-            par0[0] = x
-            mm.variables[varid].set_parameters(*par0)
-        mm.update_model_from_variable_deterministic(varid)
-        mm.model.run()
+            progress_callback(step, total, message)
+            # The progress of the model run within this step, such as waits for environmental data
+            def model_progress(fraction: float, model_message: str):
+                progress_callback(step + fraction, total, f'{message}: {model_message}')
+            mm.model.run(progress_callback = model_progress) # pyright: ignore[reportCallIssue]
         mm.finance.run()
-        return _optim_float_statistic_mapper(stat, mm.model, mm.finance, False) # pyright: ignore[reportArgumentType]
-    
-    oarray = np.asarray(map(statfunc, param_range))
-    #oarray = np.apply_along_axis(statfunc, 0, param_range)
-    
-    # Caution! map appears to be lazy, and if we don't use oarray until after we reset
-    # the metamodel variables, it will run the map THEN and leave the metamodel
-    # with the end of the range set.
+
+    values = []
+    try:
+        for i, x in enumerate(param_range):
+            if cancel_status():
+                raise InterruptedError('Marginal plot cancelled')
+            if len(par0) == 1:
+                mm.variables[varid].set_parameters(x)
+            else:
+                par0[0] = x
+                mm.variables[varid].set_parameters(*par0)
+            mm.update_model_from_variable_deterministic(varid)
+            run(i, f'Point {i + 1} of {len(param_range)}')
+            values.append(_optim_float_statistic_mapper(stat, mm.model, mm.finance, False)) # pyright: ignore[reportArgumentType]
+    finally:
+        # Restored whether or not the evaluation completes
+        mm.variables[varid] = var_hold
+        mm.update_model_from_variable_deterministic(varid)
+
     odf = pd.DataFrame({
         varid: param_range,
-        stat: oarray,
+        stat: np.asarray(values, dtype = np.float64),
     })
 
-    mm.variables[varid] = var_hold
-    mm.update_model_from_variable_deterministic(varid)
-    mm.model.run()
-    mm.finance.run()
+    run(len(param_range), 'Restoring the configuration')
 
     return odf
-
-def statistic_across_margin_plot(
-    plot_data,
-    mm: NewsegsMetaModel
-):
-    """Plot a statistic across a range of values of a variable.
-
-    Args:
-        plot_data: The result of `evaluate_statistic_across_margin`: the values of the variable and the statistic.
-        mm: The metamodel, used to label the axes.
-
-    Returns:
-        The line plot (a plotly figure).
-    """
-    fig = px.line(
-        plot_data,
-        x = plot_data.columns[0],
-        y = plot_data.columns[1]
-    )
-
-    fig.update_xaxes(
-        title = mm.variables[plot_data.columns[0]].name
-    )
-    fig.update_yaxes(
-        title = OPTIM_TARGET_STATISTIC_LABELS[plot_data.columns[1]]
-    )
-
-    return fig
-    

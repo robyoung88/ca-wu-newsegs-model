@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ca_wu_newsegs_model"
-version = "0.0.1"
+# No version here: releases are versioned by their tags (see the semantic-release settings below). PEP 621
+# requires a version unless it is dynamic; setuptools builds the package, which nothing installs, as 0.0.0.
+dynamic = ["version"]
 authors = [
   { name="Robert Young", email="robert.young@wrexham.ac.uk" },
 ]
@@ -27,3 +29,30 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# -----------------------------------------------------------------------------
+# Releases (python-semantic-release), run by .github/workflows/release.yml
+# -----------------------------------------------------------------------------
+# The version is taken from the Conventional Commits since the last tag. Releases are tags and GitHub
+# Releases only: nothing is committed back.
+
+[tool.semantic_release]
+tag_format = "v{version}"
+commit_parser = "conventional"
+# Versions start at 1.0.0: with an earlier 0.x release, the next release is 1.0.0, whatever its commits
+allow_zero_version = false
+no_git_verify = false
+
+[tool.semantic_release.commit_parser_options]
+# Pick up each Conventional Commit listed in the body of a squash merge
+parse_squash_commits = true
+ignore_merge_commits = true
+
+[tool.semantic_release.branches.main]
+match = "^main$"
+prerelease = false
+
+[tool.semantic_release.branches.canary]
+match = "^canary$"
+prerelease = true
+prerelease_token = "canary"

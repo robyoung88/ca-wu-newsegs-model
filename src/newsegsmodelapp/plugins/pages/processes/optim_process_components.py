@@ -61,7 +61,7 @@ def optim_process_components(**kwargs):
                 html.H3('Optimisation method:'),
                 dcc.Dropdown(
                     options = optim.OPTIMISATION_METHODS,
-                    value = optim.OPTIMISATION_METHODS[0],
+                    value = None, # Set to the focussed configuration's method when shown
                     searchable = False,
                     multi = False,
                     clearable = False,
@@ -70,7 +70,6 @@ def optim_process_components(**kwargs):
                         'supersection': 'optim', 'section': 'run',
                         'key': 'optim_run_metamodel', 'subindex': 0
                     },
-                    persistence = True
                 ),
             ]), # pyright: ignore[reportCallIssue]
             dbc.ModalFooter([

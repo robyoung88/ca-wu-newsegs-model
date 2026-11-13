@@ -1,10 +1,20 @@
 """Components which require both input_compoents and variable_dash_component"""
 
 import dash
+from dash import html
 from dash_bootstrap_components._components.Row import Row as dbc_Row
 
 from newsegsmodelapp.backend.db.db_variable_provider import FromDatabaseVariableProvider
-from newsegsmodelapp.components.input_components import create_blank_single_input_header_element, create_input_group_config_update_trigger, create_numeric_card_variable_parameter_input, get_variable_sharing_status
+from newsegsmodelapp.components.group_editor import create_group_move_request_store
+from newsegsmodelapp.components.input_components import (
+    create_blank_single_input_header_element,
+    create_input_group_config_update_trigger,
+    create_lazy_input_details,
+    create_numeric_card_variable_parameter_input,
+    create_variable_sharing_summary,
+    create_variable_sharing_summary_contents,
+    create_variable_summary_refresh_trigger,
+)
 from newsegsmodelapp.components.variable_dash_component.vdc_dsa import create_dsa_input
 from newsegsmodelapp.components.variable_dash_component.vdc_psa import create_psa_input
 from newsegsmodelapp.components.variable_dash_component.vdc_optim import create_optim_input
@@ -22,7 +32,8 @@ def generic_create_deterministic_input_container_contents(
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs of a section for the deterministic run of a metamodel.
 
-    One input for each variable of the metamodel whose interface section is `section`.
+    One input for each variable of the metamodel whose interface section is `section`, with a summary of how the
+    configurations of the project share it. The variables of every configuration are fetched in one call.
 
     Args:
         section: The section.
@@ -34,9 +45,10 @@ def generic_create_deterministic_input_container_contents(
         List of components.
     """
     contents = []
-    var_uids = list(lmm.variables.values())
-    lwvars = variableprovider.get_lightweight_variable(var_uids)
-    for varid, lvar in zip(lmm.variables.keys(), lwvars):
+    var_uids = list(dict.fromkeys(uid for x in lproj.metamodels for uid in x.variables.values()))
+    lwvars = {x.id: x for x in variableprovider.get_lightweight_variable(var_uids)}
+    for varid, var_uid in lmm.variables.items():
+        lvar = lwvars[var_uid]
         if lvar.interface_section == section: # and lvar.configuration_show: # TODO: Add configuration_show into lighweight variable
             #if not isinstance(var, variable.ScalarVariable):
             #    raise TypeError(f'Cannot handle variables of type {type(var)}')
@@ -46,7 +58,18 @@ def generic_create_deterministic_input_container_contents(
                 type = 'single-input-config',
                 supersection = 'deterministic',
             )
-            var_sharing_status = get_variable_sharing_status(lproj, lmm, varid) # pyright: ignore[reportArgumentType]
+            sharing_summary = create_variable_sharing_summary(
+                paramid, create_variable_sharing_summary_contents(lproj, varid, lwvars)
+            )
+            if len(lproj.metamodels) > 1:
+                # Opening the summary builds the group editor, which edits and moves between the groups
+                sharing_summary = html.Div([
+                    create_lazy_input_details(
+                        [sharing_summary, html.Span('Hide groups', className = 'group-editor-close-label')],
+                        paramid, className = 'group-editor-details',
+                    ),
+                    create_group_move_request_store(paramid),
+                ])
             contents.append(
                 dbc_Row([
                     create_blank_single_input_header_element(paramid),
@@ -59,10 +82,10 @@ def generic_create_deterministic_input_container_contents(
                         min = lvar.interface_min,
                         max = lvar.interface_max,
                         step = lvar.interface_step if lvar.interface_step else 1,
-                        status_text= var_sharing_status[0], 
-                        status_colour = var_sharing_status[1],
+                        sharing_summary = sharing_summary,
                     ),
                     create_input_group_config_update_trigger(paramid), # pyright: ignore[reportCallIssue]
+                    create_variable_summary_refresh_trigger(paramid),
                 ]
                 ) # type: ignore
             )
@@ -71,45 +94,63 @@ def generic_create_deterministic_input_container_contents(
 
 def generic_create_dsa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
-    variable_provider: FromDatabaseVariableProvider
+    variable_provider: FromDatabaseVariableProvider,
+    lproj: LightweightNewsegsProject | None = None,
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs for the deterministic sensitivity analysis of a metamodel.
 
-    One DSA input for each variable of the metamodel.
+    One DSA input for each variable of the metamodel. Given the project, each input summarises how the configurations'
+    Variables of it differ, and can be opened to edit and move between them; the Variables of every configuration are
+    fetched in one call.
 
     Args:
-        lmm: The lightweight metamodel.
+        lmm: The lightweight metamodel (the focussed configuration).
         variable_provider: Provider of variables.
+        lproj: The lightweight project.
 
     Returns:
         List of components.
     """
+    from newsegsmodelapp.components.dsa_group_editor import create_dsa_sharing_summary_contents
+
+    metamodels = lproj.metamodels if lproj is not None else [lmm]
+    var_uids = list(dict.fromkeys(uid for x in metamodels for uid in x.variables.values()))
+    variables = {x.id: x for x in variable_provider.get_full_lightweight_variable(var_uids)}
     contents = []
-    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
-    for var in vars:
-        contents.append(create_dsa_input(var))
+    for varid, var_uid in lmm.variables.items():
+        summary = create_dsa_sharing_summary_contents(lproj, varid, variables) if lproj is not None else []
+        contents.append(create_dsa_input(variables[var_uid], summary, len(metamodels)))
 
     return contents
 
 def generic_create_psa_input_container_contents(
     lmm: LightweightNewsegsMetaModel,
-    variable_provider: FromDatabaseVariableProvider
+    variable_provider: FromDatabaseVariableProvider,
+    lproj: LightweightNewsegsProject | None = None,
 ) -> list[dash.development.base_component.Component]:
     """Create the inputs for the probabilistic sensitivity analysis of a metamodel.
 
-    One PSA input for each variable of the metamodel.
+    One PSA input for each variable of the metamodel. Given the project, each input summarises how the configurations'
+    Variables of it differ, and can be opened to edit and move between them; the Variables of every configuration are
+    fetched in one call.
 
     Args:
-        lmm: The lightweight metamodel.
+        lmm: The lightweight metamodel (the focussed configuration).
         variable_provider: Provider of variables.
+        lproj: The lightweight project.
 
     Returns:
         List of components.
     """
+    from newsegsmodelapp.components.psa_group_editor import create_psa_sharing_summary_contents
+
+    metamodels = lproj.metamodels if lproj is not None else [lmm]
+    var_uids = list(dict.fromkeys(uid for x in metamodels for uid in x.variables.values()))
+    variables = {x.id: x for x in variable_provider.get_full_lightweight_variable(var_uids)}
     contents = []
-    vars = variable_provider.get_full_lightweight_variable(list(lmm.variables.values()))
-    for var in vars:
-        contents.append(create_psa_input(var))
+    for varid, var_uid in lmm.variables.items():
+        summary = create_psa_sharing_summary_contents(lproj, varid, variables) if lproj is not None else []
+        contents.append(create_psa_input(variables[var_uid], summary, len(metamodels)))
 
     return contents
 

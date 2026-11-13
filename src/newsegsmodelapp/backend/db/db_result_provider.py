@@ -203,14 +203,22 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
             result_type, parent_component.id, parent_component.revision, new_request_id
         )
 
-    @override
-    def get_result(
+    def _find_result_file(
         self,
         result_type: str,
-        parent_component: NewsegsComponent | str,
+        parent_component: NewsegsComponent | LightweightNewsegsComponent | str,
         allow_stale: bool = True,
         revision: Optional[int] = None,
-    ) -> tuple[Any, int] | tuple[None, None]:
+    ) -> tuple[str, int] | tuple[None, None]:
+        """The file of the latest result, and the revision of the parent it was saved for, without loading it.
+
+        The latest result saved for the revision. If stale results are allowed and there is none, the latest of the most
+        recent earlier revision (#195), or, if there is none earlier either, the latest of the earliest revision. Each
+        result saved has a file of its own, so the file identifies the result.
+
+        Returns:
+            The file and the revision, or `(None, None)` if there is no result.
+        """
         
         stmt = (
             sa.select(
@@ -226,9 +234,11 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
         else:
             stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
             
+        # The latest result of each revision first; the id breaks ties of results saved at the same time
         stmt = stmt.order_by(
             self._table.c.component_config_revision,
-            self._table.c.created_at.desc()
+            self._table.c.created_at.desc(),
+            self._table.c.result_id.desc(),
         )
 
         if revision is None:
@@ -240,35 +250,53 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 raise ValueError(f'If stale results are not allowed, the parent component or a nominated revision must be provided.')
             stmt = stmt.where(self._table.c.component_config_revision == revision)
 
-        file_name = None
         with read_transaction(self._get_engine()) as conn:
-            result = conn.execute(stmt)
-            for idx, row in enumerate(result):
-                logger.debug(
-                    'Iterating results [%d]: Type = %s; Parent = %s; Revision = %s; Created at: %s',
-                    idx, result_type, parent_component.id, row.component_config_revision, row.created_at
-                )
-                if idx == 0:
-                    
-                    file_name = row.result_file
-                    rrs = row.component_config_revision
-                if row.component_config_revision == revision:
-                    if idx != 0:
-                        file_name = row.result_file
-                        rrs = revision
-                    break
-
-        if file_name is None:
+            # Fetch every row before looking through them: a result left part-read keeps SQLite's read transaction
+            # open on the pooled connection, so later reads on it don't see later writes
+            rows = conn.execute(stmt).fetchall()
+        for idx, row in enumerate(rows):
+            logger.debug(
+                'Iterating results [%d]: Type = %s; Parent = %s; Revision = %s; Created at: %s',
+                idx, result_type, getattr(parent_component, 'id', parent_component), row.component_config_revision, row.created_at
+            )
+        if not rows:
             return None, None
 
+        # The rows of each revision start with its latest. The most recent revision at or before the one asked for is
+        # that revision itself, if it has a result.
+        chosen = rows[0]
+        if revision is not None:
+            for row in rows:
+                if row.component_config_revision > revision:
+                    break
+                if row.component_config_revision != chosen.component_config_revision:
+                    chosen = row
+        return chosen.result_file, chosen.component_config_revision
+
+    def _load_result_file(self, file_name: str) -> Any:
+        """Load a result from its file; if the file is missing, remove its rows and return None."""
         try:
-            obj = load_result(Path(file_name))
+            return load_result(Path(file_name))
         except FileNotFoundError:
             with write_transaction(self._get_engine(writer = True)) as conn:
                 conn.execute(sa.delete(self._table).where(self._table.c.result_file == file_name))
+            return None
+
+    @override
+    def get_result(
+        self,
+        result_type: str,
+        parent_component: NewsegsComponent | str,
+        allow_stale: bool = True,
+        revision: Optional[int] = None,
+    ) -> tuple[Any, int] | tuple[None, None]:
+        file_name, rrs = self._find_result_file(result_type, parent_component, allow_stale, revision)
+        if file_name is None:
             return None, None
-        
-        return (obj, rrs)
+        obj = self._load_result_file(file_name)
+        if obj is None:
+            return None, None
+        return (obj, rrs) # pyright: ignore[reportReturnType]
 
     @override
     def get_request_result(
@@ -279,7 +307,6 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
     ) -> tuple[Any, int] | tuple[None, None]:
         stmt = (
             sa.select(
-                self._table.c.result_id,
                 self._table.c.result_file,
                 self._table.c.component_config_revision,
             )
@@ -293,16 +320,13 @@ class FromDatabaseResultProvider(NewsegsResultProviderInterface):
                 stmt = stmt.where(self._table.c.component_config_id == parent_component.id)
 
         with read_transaction(self._get_engine()) as conn:
-            res = conn.execute(stmt)
-        if not res:
-            return None, None
-        result_rows = {row["result_id"]: dict(row) for row in res.mappings()}
-        if len(result_rows) == 0:
+            # Consume the rows before returning the connection, or its SQLite snapshot may stay open.
+            result_rows = conn.execute(stmt).mappings().all()
+        if not result_rows:
             return None, None
         
-        res_id = next(iter(result_rows))
-        file_name = result_rows[res_id]['result_file']
-        rrs = result_rows[res_id]['component_config_revision']
+        file_name = result_rows[0]['result_file']
+        rrs = result_rows[0]['component_config_revision']
 
         try:
             obj = load_result(Path(file_name))
@@ -417,6 +441,8 @@ class CachedFromDatabaseResultProvider(
     def __init__(self, get_engine: Callable[[], sa.Engine], result_store: Path):
         super().__init__(get_engine, result_store)
         self._result_cache = LRUCache(maxsize = 128)
+        self._result_file_cache = LRUCache(maxsize = 128)
+        """Results loaded by `get_result`, by their file."""
         self._run_to_revision_lookup = LRUCache(maxsize = 128)
 
     @override
@@ -427,45 +453,23 @@ class CachedFromDatabaseResultProvider(
         allow_stale: bool = True,
         revision: Optional[int] = None,
     ) -> tuple[Any, int] | tuple[None, None]:
+        """The latest result, as `FromDatabaseResultProvider.get_result`, loaded from the cache if it has been before.
 
-        if isinstance(parent_component, str):
-            result_key = (result_type, parent_component, revision)
-        else:
-            if revision is None:
-                result_key = (result_type, parent_component.id, parent_component.revision)
-            else:
-                result_key = (result_type, parent_component.id, revision)
-
-        logger.debug(
-            'Finding result: Type = %s, Parent = %s, Revision = %s',
-            *result_key
-        )
-        if result_key in self._result_cache:
-            logger.debug(
-                'Returning result: Type = %s, Parent = %s, Revision = %s from cache',
-                *result_key
-            )
-            return self._result_cache[result_key], result_key[2] # pyright: ignore[reportReturnType]
-
-        obj, rrs = super().get_result(
-            result_type, parent_component, allow_stale, revision
-        )
+        The result is looked up in the database on each call, and cached by its file. A result may be saved again for
+        the same revision of its parent, e.g. the optimisation's marginal plot of another variable, so caching by the
+        revision would return the result first loaded.
+        """
+        file_name, rrs = self._find_result_file(result_type, parent_component, allow_stale, revision)
+        if file_name is None:
+            logger.debug('Unable to find result: Type = %s, Parent = %s', result_type, parent_component)
+            return None, None
+        if file_name in self._result_file_cache:
+            logger.debug('Returning result: Type = %s, File = %s from cache', result_type, file_name)
+            return self._result_file_cache[file_name], rrs # pyright: ignore[reportReturnType]
+        obj = self._load_result_file(file_name)
         if obj is None:
-            logger.debug(
-                'Unable to find result: Type = %s, Parent = %s, Revision = %s',
-                *result_key
-            )
-        if rrs is None or rrs != result_key[2]:
-            logger.debug(
-                'Returning stale result for: Type = %s, Parent = %s, Revision = %s - provided revision is %s;',
-                *result_key, rrs
-            )
-        if obj is not None and rrs == result_key[2]:
-            logger.debug(
-                'Returning result: Type = %s, Parent = %s, Revision = %s from store',
-                *result_key
-            )
-            self._result_cache[result_key] = obj
+            return None, None
+        self._result_file_cache[file_name] = obj
         return (obj, rrs) # pyright: ignore[reportReturnType]
 
     @override

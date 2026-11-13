@@ -8,7 +8,7 @@ import copy
 import json
 import pickle
 
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 from dash import ALL, Input, NoUpdate, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 import zmq
 
 from config import settings
-from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestHandlerInterface
+from newsegsmodelapp.components.requesthandler.requesthanderinterface import RequestCancelledError, RequestHandlerInterface
 from newsegsmodelframework.core.newsegsresultprovider import NewsegsResultProviderInterface
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelapp import registers
@@ -24,7 +24,7 @@ from newsegsmodelapp.backend import db
 from newsegsmodelapp.backend.db.db_jobs import generate_claim_ticket
 from newsegsmodelapp.backend.db.db import read_transaction
 from newsegsmodelapp.backend.db import db_tables as tbls
-from newsegsmodelapp.backend.db.db_jobs import set_status_completed
+from newsegsmodelapp.backend.db.db_jobs import is_retryable, prevent_request_retry, set_status_completed
 from newsegsmodelapp.backend.worker import set_status_failed
 from newsegsmodelapp.components import callback_utils
 from newsegsmodelapp.dash_extension import NewsegsDash
@@ -32,61 +32,47 @@ from newsegsmodelapp.dash_extension import NewsegsDash
 
 DISPATCHSERVER = settings['DISPATCHSERVERS'][1]#'zmq-dispatcher'#
 FRONTENDPORT = settings['FRONTENDPORT']
-REQUEST_RETRIES = 1
 
 
 def send_to_dispatcher(
-    payload, 
-    retries: int = REQUEST_RETRIES
-) -> dict:
+    payload,
+    server_address: Optional[str] = None,
+    frontend_port: Optional[str] = None
+):
     """Send a request to the dispatcher over ZeroMQ, and wait for its reply.
 
     Retries up to `retries` times if the dispatcher does not reply within the timeout.
 
     Args:
-        payload: The request to send; pickled.
-        retries: Number of times to retry the dispatcher before giving up.
-
-    Returns:
-        The reply of the dispatcher (the run information), or None if the request was refused or the dispatcher could not be reached.
+        payload: The request to send after pickling.
     """
-    JOB_DISPATCH_TIMEOUT = settings.get('JOB_DISPATCH_TIMEOUT_MS', 200)
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
+    server_address = DISPATCHSERVER if server_address is None else server_address
+    frontend_port = FRONTENDPORT if frontend_port is None else frontend_port
 
-    socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
+    def _reconnect(sock: zmq.Socket):
+        sock.connect(f'tcp://{server_address}:{frontend_port}')
+
+    context = zmq.Context()
+    socket = context.socket(zmq.DEALER)
+    socket.setsockopt(zmq.LINGER, -1)
+
+    _reconnect(socket)
 
     payload_bytes = pickle.dumps(payload)
 
-    socket.send(payload_bytes)
-    retries_left = retries
-    while True:
-        if (socket.poll(JOB_DISPATCH_TIMEOUT) & zmq.POLLIN) != 0:
-            reply_bytes = socket.recv()
-            try:
-                reply_data = pickle.loads(reply_bytes)
-                break
-            except Exception as e:
-                logging.error('Received malformed reply from worker: %s', reply_bytes, exc_info = True)
+    socket.send_multipart([b"", payload_bytes])
 
-        retries_left -= 1
-        socket.setsockopt(zmq.LINGER, 0)
-        socket.close()
-        if retries_left == 0:
-            logger.error('Job dispatch timed out')
-            return None
-        logger.warning('No response from job server, retrying...')
-
-        socket = context.socket(zmq.REQ)
-        socket.connect(f'tcp://{DISPATCHSERVER}:{FRONTENDPORT}')
-        socket.send(payload_bytes)
-
-    return reply_data
+    # Immediately close; do not block, waiting for a synchronous reply
+    socket.close()
 
 def _local_run_any(
     runner, request, engine, project_provider, results_provider
 ):
-    job_id, job_exists = generate_claim_ticket(engine, request)
+    try:
+        job_id, job_exists = generate_claim_ticket(engine, request)
+    except RequestCancelledError:
+        logger.info('Request ID = %d; is has been cancelled prior to run', request.request_id)
+        return None
     if job_exists:
         logger.info('Request ID = %d; is being fulfilled by an existing Run ID = %d', request.request_id, job_id)
     try:
@@ -105,6 +91,8 @@ def _local_run_any(
         return job_id
     except Exception as e:
         logger.exception('Local run Run ID: %d; has failed with exception', job_id, exc_info = True)
+        if not is_retryable(e):
+            prevent_request_retry(engine, request.request_id)
         set_status_failed(engine, job_id, str(e))
         return job_id
 
@@ -205,7 +193,10 @@ def spawn_job(
     request: registers.RunRequest,
     project_provider: NewsegsProjectProviderInterface,
     results_provider: NewsegsResultProviderInterface,
-) -> int | None:
+    request_handler: RequestHandlerInterface,
+    server_address: Optional[str] = None,
+    frontend_port: Optional[str] = None
+) -> None:
     """Start the run of a request: send it to the dispatcher if it is a background procedure, otherwise run it in the app.
 
     If the dispatcher refuses a background request its run id is cleared and its status is not changed.
@@ -214,6 +205,8 @@ def spawn_job(
         request: The request which triggered the procedure.
         project_provider: Provider of projects, metamodels and variables.
         results_provider: Provider of results.
+        server_address: (optional) address of the zmq broker
+        frontend_port: (optional) frontend port of the zmq proxy
 
     Returns:
         The id of the run, or None if the request was not started.
@@ -224,24 +217,20 @@ def spawn_job(
     )
 
     if request.background_procedure:
-        run_info = send_to_dispatcher(request)
-        if run_info is None:
-            logger.info(
-                'Background Request refused by Dispatcher for Request ID = %d; Type = %s;',
-                request.request_id, request.request_type
-            )
-            # Request will have unmodified status, but clear any run id present to prevent confusion
-            request.run_id = -1
-            return None
-        else:
-            logger.info(
-                'Background Request sent to Dispatcher for Request ID = %d; Type = %s; Run ID = %d; has been assigned. Job was prexisting = %s',
-                request.request_id, request.request_type, run_info['job_id'], run_info['prexisting']
-            )
-            # Update the request status in sync with db
-            request.run_id = run_info['job_id']
-            request.status = 'DISPATCHED'
-            return run_info['job_id']
+        # Mark the request as sent immediately before sending - do not wait until after in case
+        # we have contention with the worker picking it up
+
+        server_address = DISPATCHSERVER if server_address is None else server_address
+        frontend_port = FRONTENDPORT if frontend_port is None else frontend_port
+        
+        request_handler.set_request_status(
+            request.request_id,
+            'AWAITING WORKER',
+        )
+        send_to_dispatcher(request, server_address, frontend_port)
+
+        return None
+
     else:
         match request.request_class:
             case 'run':
@@ -276,9 +265,9 @@ def spawn_job(
                 run_id, request.trigger_request_id
             )
             request.run_id = run_id
-            # Only mark as DISPATCHED, as the completed run needs handling before FULFILLED
-            request.status = 'DISPATCHED'
-        return run_id
+            # Only mark as PROCESSING, as the completed run needs handling before FULFILLED
+            request.status = 'PROCESSING'
+        return 
 
 def generate_post_action_requests(
     original_request: registers.RunRequest | Sequence[registers.RunRequest],
@@ -371,6 +360,34 @@ def _get_run_statuses(
         return {}
     return {x[0]: dict(x._mapping) for x in result}
 
+def results_status(
+    calculating: bool,
+    failure_messages: Sequence[str],
+    new_jobs: bool,
+    progress_message: str | NoUpdate,
+) -> tuple[str, str | NoUpdate, str | NoUpdate]:
+    """The status of the results containers, and the title and subtitle of their overlay.
+
+    While requests are active the containers are `CALCULATING`. Once none are, they are `FAILED` if
+    any run of the batch was abandoned, showing why, or else `IDLE`.
+
+    Args:
+        calculating: Whether any request is active: being run, or waiting to be.
+        failure_messages: Messages of the runs abandoned since the batch started.
+        new_jobs: Whether new runs have been spawned.
+        progress_message: Message of the progress of the runs underway.
+
+    Returns:
+        The status, title and subtitle.
+    """
+    if calculating:
+        return 'CALCULATING', 'Computing...' if new_jobs else no_update, progress_message
+    if failure_messages:
+        title = 'A job failed' if len(failure_messages) == 1 else f'{len(failure_messages)} jobs failed'
+        # Retries of the same request may fail in the same way
+        return 'FAILED', title, ' | '.join(dict.fromkeys(failure_messages))
+    return 'IDLE', no_update, progress_message
+
 def add_action_callbacks(app: NewsegsDash):
 
     """Bind the callbacks which turn user actions into requests, start them, monitor their progress and trigger their post-actions.
@@ -392,7 +409,7 @@ def add_action_callbacks(app: NewsegsDash):
                 request.trigger_request_id,
             )
 
-            return spawn_job(request, app.project_provider, app.results_provider)
+            return spawn_job(request, app.project_provider, app.results_provider, app.request_handler)
         else:
             logger.warning(
                 'Action Manager ABANDONING Request ID: %d; Type: %s; ' 
@@ -410,6 +427,7 @@ def add_action_callbacks(app: NewsegsDash):
             'key': ALL, 'subindex': 0
         }, 'data', allow_duplicate = True),
         Output('ongoing-actions', 'data'),
+        Output('failed-actions', 'data'),
         Output('progress-poll-interval', 'disabled'),
         Output({'type': 'results-container', 'supersection': ALL, 'section': ALL}, 'data-status'),
         Output({'type': 'results-overlay-text', 'section': ALL, 'supersection': ALL}, 'children', allow_duplicate = True),
@@ -420,6 +438,7 @@ def add_action_callbacks(app: NewsegsDash):
         Input('progress-poll-interval', 'n_intervals'),
 
         State('ongoing-actions', 'data'),
+        State('failed-actions', 'data'),
         State({
             'type': 'postaction-trigger', 'purpose': 'trigger',
             'supersection': 'global', 'section': ALL,
@@ -433,6 +452,7 @@ def add_action_callbacks(app: NewsegsDash):
         poll_intervals,
 
         ongoing_actions: list[int],
+        failure_messages: list[str],
         postaction_trigger_ids,
         container_ids,
     ):
@@ -440,15 +460,19 @@ def add_action_callbacks(app: NewsegsDash):
         if not haslock:
             raise PreventUpdate
         try:
-            trigger_id = ctx.triggered_id
-            # Do not run if triggered by creation of page elements
-            if trigger_id is None or len(ctx.triggered) > 1:
+            # Either trigger (a request, or the poll) asks for the same check, so it is run once whichever fire
+            triggers = callback_utils.get_triggers()
+            if not triggers:
                 raise PreventUpdate
-            logger.debug('Action manager triggered by %s', trigger_id)
+            logger.debug('Action manager triggered by %s', [x.id for x in triggers])
             logger.debug('Ongoing actions at start of manager are: %s', ongoing_actions)
 
             postaction_trigger_returns: list[Any] = [no_update] * len(postaction_trigger_ids)
+            # A new batch of jobs, started with none underway, clears the failures of the last
+            batch_starting = len(ongoing_actions) == 0
             ongoing_actions = set(ongoing_actions)
+            failures_before = list(failure_messages or [])
+            failure_messages = list(failures_before)
             failed_actions = []
             completed_actions = []
             spawned_actions = []
@@ -472,28 +496,30 @@ def add_action_callbacks(app: NewsegsDash):
                     req.request_id, req.request_type
                 )
                 
-                run_id = spawn_job(req, app.project_provider, app.results_provider)
-                
-                if run_id:
-                    logger.debug(
-                        'Appending to ongoing actions: Newly spawned Run [Run ID = %d;] for Request ID = %d; Type = %s;',
-                        run_id, req.request_id, req.request_type
-                    )
+                spawn_job(
+                    req, 
+                    app.project_provider, app.results_provider, app.request_handler
+                )
 
-                    ongoing_actions.add(run_id)
-                    new_jobs = True
-                
-                else:
-                    logger.warning(
-                        'Unable to Spawn Run for Request ID = %d; Type = %s; '
-                        'Should be retried on next run through.',
+            # These requests have not yet been picked up, and should be checked to see if it's worth
+            # retrying
+            slow_requests = app.request_handler.get_slow_requests()
+            if slow_requests:
+                for req in slow_requests:
+                    logger.info(
+                        'Action Manager handling Request ID = %d; Type = %s; as Slow Request, will spawn job.',
                         req.request_id, req.request_type
                     )
-                    
-                    retry_spawns = True
+                    spawn_job(
+                        req, 
+                        app.project_provider, app.results_provider, app.request_handler
+                    )          
+            
+            # Pull the active requests again, as spawning changes their statuses
+            request_list = app.request_handler.get_active_requests()
 
             # Pull the run list from the request list - this should match the ongoing actions list
-            ongoing_run_ids = [x.run_id for x in request_list if x.status == 'DISPATCHED']
+            ongoing_run_ids = [x.run_id for x in request_list if x.status == 'PROCESSING']
 
             if set(ongoing_run_ids) != ongoing_actions:
                 s_req = set(ongoing_run_ids)
@@ -543,8 +569,9 @@ def add_action_callbacks(app: NewsegsDash):
                         
                         else:
                             # Return of a negative indicates no more retries available;
-                            # Request should already be marked as CANCELLED so for now do nothing
-                            pass
+                            # Request should already be marked as CANCELLED, so report the failure
+                            message = run_statuses.get(request.run_id, {}).get('progress_message')
+                            failure_messages.append(message or f'{request.request_type} failed without a message')
 
                     for run_id in failed_run_ids:
                         logger.debug('Removing Failed Run from list of ongoing actions: Run ID = %d;', run_id)
@@ -564,10 +591,11 @@ def add_action_callbacks(app: NewsegsDash):
                             request.request_id, request.request_type, request.run_id,
                         )
 
-                        # Set triggers
-                        request_type =  request.request_type
+                        # Set triggers: the request's own, and those of any other tables it drew, such as
+                        # each configuration's tables drawn with a whole project's (#206)
+                        sections_drawn = registers.get_table_sections_drawn(request.request_type)
                         for idx, id in enumerate(postaction_trigger_ids):
-                            if id['key'] == request_type:
+                            if id['key'] in sections_drawn:
                                 logger.info('Setting postaction trigger: %s', id['key'])
                                 if isinstance(postaction_trigger_returns[idx], NoUpdate):
                                     postaction_trigger_returns[idx] = [json.dumps(request.as_dict())]
@@ -590,25 +618,7 @@ def add_action_callbacks(app: NewsegsDash):
                             'Action Manager handling Request ID: %d; Type: %s; as New Request (Child), will spawn job.',
                             new_request.request_id, new_request.request_type
                         )
-                        new_run_id = spawn_job(new_request, app.project_provider, app.results_provider)
-                        
-                        if new_run_id:
-                            # Not strictly true, but the extend happens below
-                            logger.debug(
-                                'Appending to ongoing actions: Newly spawned Run [Run ID = %d] for Request ID = %d; ' 
-                                'Type = %s; Child of Triggering Request ID = %d;',
-                                new_run_id, new_request.request_id, new_request.request_type, new_request.trigger_request_id,
-                            )
-
-                            spawned_actions.append(new_run_id)
-                        else:
-                            logger.warning(
-                                'Unable to Spawn Run for Request ID = %d; Type = %s; Child of Triggering Request ID = %d;'
-                                'Should be retried on next run through.',
-                                new_request.request_id, new_request.request_type, new_request.trigger_request_id
-                            )
-
-                            retry_spawns = True
+                        spawn_job(new_request, app.project_provider, app.results_provider, app.request_handler)
 
                     logger.info(
                         'Action Manager marking Runs with Run IDs %s as having spawned all necessary children.',
@@ -644,20 +654,29 @@ def add_action_callbacks(app: NewsegsDash):
                         prog_ = 0.
 
             new_jobs = new_jobs or len(spawned_actions)
+            if batch_starting and new_jobs:
+                failure_messages = [m for m in failure_messages if m not in failures_before]
 
             logger.debug('Ongoing actions at end of manager are: %s', ongoing_run_ids)
+
+            # Requests still active, read now that completed runs are handled: they include the children just
+            # created, which have no run until a worker claims them. Polling must go on until none are left, or
+            # the completion of the children is never handled and their own post-actions never start (#206).
+            requests_active = retry_spawns or len(app.request_handler.get_active_requests()) > 0
 
         finally:
             action_manager_lock.release()
 
+        status, title, subtitle = results_status(requests_active, failure_messages, new_jobs, mess_)
         return (
             postaction_trigger_returns,
             ongoing_run_ids,
-            not(retry_spawns) and len(ongoing_run_ids) == 0,
-            (['CALCULATING'] if len(ongoing_run_ids) > 0 else ['IDLE']) * len(container_ids),
-            (['Computing...'] if new_jobs else [no_update]) * len(container_ids),
+            failure_messages,
+            not requests_active,
+            [status] * len(container_ids),
+            [title] * len(container_ids),
             [prog_] * len(container_ids),
-            [mess_] * len(container_ids),
+            [subtitle] * len(container_ids),
         )
 
     @app.callback(

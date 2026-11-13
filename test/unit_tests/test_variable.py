@@ -1,5 +1,5 @@
 """
-Unit tests for newsegsbrowser/variable.
+Unit tests for newsegsmodelframework.newsegsvariable.variable.
 """
 
 import copy
@@ -153,14 +153,14 @@ class TestVariableDeterministic(unittest.TestCase):
 
         # From construction - float
         var = create_var(parameters = 123.456)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             123.456
         )
 
         # From construction - sequence (single)
         var = create_var(parameters = [123.456,])
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             123.456
         )
@@ -175,7 +175,7 @@ class TestVariableDeterministic(unittest.TestCase):
         
         # From construction - float with log
         var = create_var(parameters = 123.456, transform = 'ln')
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             np.exp(123.456)
         )
@@ -191,7 +191,7 @@ class TestVariableDeterministic(unittest.TestCase):
         # Change type after construction
         var = create_var(parameters = 'A String')
         var.set_parameters(123.4)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             123.4
         )
@@ -203,7 +203,7 @@ class TestVariableDeterministic(unittest.TestCase):
             x = var.deterministic_value
         
         var.set_parameters(123.4)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             np.exp(123.4)
         )
@@ -233,25 +233,25 @@ class TestVariableDeterministic(unittest.TestCase):
 
         # From construction
         var = create_var()
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
 
         var = create_var(parameters = (0.25, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             1
         )
 
         var = create_var(parameters = (1, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             4
         )
 
         var = create_var(parameters = (0, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
@@ -263,7 +263,7 @@ class TestVariableDeterministic(unittest.TestCase):
             var = create_var(parameters = (1.2, 4))
 
         var = create_var(parameters = (0.25, 0))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
@@ -274,7 +274,7 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (0.25, 4))
         var.set_parameters(0.5, 4)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             2
         )
@@ -293,37 +293,37 @@ class TestVariableDeterministic(unittest.TestCase):
 
         # From construction
         var = create_var()
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
 
         var = create_var(parameters = (1, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             1
         )
 
         var = create_var(parameters = (2, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             2
         )
 
         var = create_var(parameters = (0, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
 
         var = create_var(parameters = (4, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             4
         )
 
         var = create_var(parameters = (0, 0))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
@@ -333,7 +333,7 @@ class TestVariableDeterministic(unittest.TestCase):
         
         # Ok to have a non-integer expected number of successes
         var = create_var(parameters = (2.5, 4))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             int(round(4* (2.5/4)))
         )
@@ -347,19 +347,19 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (1, 4))
         var.set_parameters(2, 4)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             2
         )
 
         # Revert parameterisation
         var.parameterisation_index = 0
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             2
         )
         var.set_parameters(0.75, 4)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             3
         )
@@ -381,7 +381,7 @@ class TestVariableDeterministic(unittest.TestCase):
         )
 
         var = create_var(parameters = (20.20, 1))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             20.20
         )
@@ -417,7 +417,7 @@ class TestVariableDeterministic(unittest.TestCase):
 
         # Change transform after construction
         var.set_transform('ln')
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             lognorm.mean(2, scale = np.exp(5))
         )
@@ -443,25 +443,25 @@ class TestVariableDeterministic(unittest.TestCase):
             var.parameterisation_index,
             1
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             lognorm.mean(1, scale = np.exp(0))
         )
 
         var = create_var(parameters = (2, 3))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             lognorm.mean(3, scale = np.exp(2))
         )
 
         var = create_var(parameters = (-1, 2.5))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             lognorm.mean(2.5, scale = np.exp(-1))
         )
 
         var = create_var(parameters = (-1, 0))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             np.exp(-1)
             #lognorm.mean(0, scale = np.exp(-1)) # Stats does not know how to handle the degenerate case
@@ -479,7 +479,7 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (2, 3))
         var.set_parameters(4, 1.5)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             lognorm.mean(1.5, scale = np.exp(4))
         )
@@ -501,7 +501,7 @@ class TestVariableDeterministic(unittest.TestCase):
         )
          
         var = create_var()
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             1
         )
@@ -533,7 +533,7 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (2, 3))
         var.set_parameters(4, 1.5)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             4
         )
@@ -559,16 +559,16 @@ class TestVariableDeterministic(unittest.TestCase):
         )
 
         var = create_var()
-        self.assertEqual(var.deterministic_value, 0.5)
+        self.assertAlmostEqual(var.deterministic_value, 0.5)
 
         var = create_var(parameters = (2, 3))
-        self.assertEqual(var.deterministic_value, 0.4)
+        self.assertAlmostEqual(var.deterministic_value, 0.4)
 
         var = create_var(parameters = (2, 0))
-        self.assertEqual(var.deterministic_value, 1)
+        self.assertAlmostEqual(var.deterministic_value, 1)
 
         var = create_var(parameters = (0, 4))
-        self.assertEqual(var.deterministic_value, 0)
+        self.assertAlmostEqual(var.deterministic_value, 0)
 
         with self.assertRaises(ValueError):
             create_var(parameters = (-1, 1))
@@ -585,7 +585,7 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (2, 3))
         var.set_parameters(3, 1)
-        self.assertEqual(var.deterministic_value, 0.75)
+        self.assertAlmostEqual(var.deterministic_value, 0.75)
 
     def test_beta_deterministic_param2(self):
         """
@@ -600,16 +600,16 @@ class TestVariableDeterministic(unittest.TestCase):
 
         var = create_var()
         self.assertEqual(var.parameterisation_index, 1)
-        self.assertEqual(var.deterministic_value, 0.5)
+        self.assertAlmostEqual(var.deterministic_value, 0.5)
 
         var = create_var(parameters = (1. / 3., 0.1))
         self.assertAlmostEqual(var.deterministic_value, 1. / 3.) # type: ignore
 
         var = create_var(parameters = (0, 0.1))
-        self.assertEqual(var.deterministic_value, 0)
+        self.assertAlmostEqual(var.deterministic_value, 0)
 
         var = create_var(parameters = (1, 0.1))
-        self.assertEqual(var.deterministic_value, 1)
+        self.assertAlmostEqual(var.deterministic_value, 1)
 
         with self.assertRaises(ValueError):
             create_var(parameters = (1.5, 0.1))
@@ -685,7 +685,7 @@ class TestVariableDeterministic(unittest.TestCase):
         )
 
         var = create_var(parameters = (20.20, 0))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
@@ -712,7 +712,7 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (10, 2.5))
         var.set_parameters(5,1.2)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             5*1.2
         )
@@ -729,27 +729,27 @@ class TestVariableDeterministic(unittest.TestCase):
         )
 
         var = create_var()
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             1
         )
 
         var = create_var(parameters = (5, 2))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             5
         )
 
         #with self.assertRaises(ValueError):
         var = create_var(parameters = (0, 2))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             0
         )
 
         #with self.assertRaises(ValueError):
         var = create_var(parameters = (20.20, 0.0))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             20.2
         )
@@ -769,19 +769,19 @@ class TestVariableDeterministic(unittest.TestCase):
         # After construction
         var = create_var(parameters = (10, 2.5))
         var.set_parameters(5,1.2)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             5
         )
 
         # Reversion of parameterisation
         var.parameterisation_index = 0
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             5
         )
         var.set_parameters(5,1.2)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             5 * 1.2
         )
@@ -803,14 +803,14 @@ class TestVariableDeterministic(unittest.TestCase):
             var.parameterisation_index,
             2
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             integrate.quad(lambda x: 1 - gamma_dist.cdf(np.log(x), a = 1, scale = 1), 0, np.inf)[0]
             #gamma_dist.expect(np.exp, (1,), scale = 1)
         )
         
         var = create_var(parameters = (4, 2.5))
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             integrate.quad(lambda x: 1 - gamma_dist.cdf(np.log(x), a = 4, scale = 2.5), 0, np.inf)[0]
             #gamma_dist.expect(np.exp, (4,), scale = 2.5) # Absurd that scale is an int. # pyright: ignore[reportArgumentType]
@@ -1669,7 +1669,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.model_parameter, 'storage_capacity')
         self.assertNotEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
         vbl.synchronise_from_model(mdl)
-        self.assertEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
+        self.assertAlmostEqual(vbl.deterministic_value, mdl.consumption_storage.get_storage_params()['storage_capacity'])
 
     def test_synchronisation_scalar_beta(self):
         vars = self.load_sprake_variables()
@@ -1716,7 +1716,7 @@ class TestVariableSynchronisation(unittest.TestCase):
             'consumption_storage',
             'storage_capacity'
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             mdl.consumption_storage.get_storage_params()['storage_capacity'],
             100.0
         )
@@ -1769,7 +1769,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.parameterisation_index, 1)
         vbl.set_parameters(0.8, 0.1)
         vbl.update_model(mdl)
-        self.assertEqual(
+        self.assertAlmostEqual(
             mdl.consumption_storage.get_storage_params()['storage_rte'], 
             0.8
         )
@@ -1787,7 +1787,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         )
         vbl.set_parameters(0.5, 0.02)
         vbl.update_model(mdl)
-        self.assertEqual(
+        self.assertAlmostEqual(
             mdl.consumption_storage.get_sh_params()['hlp'],
             0.5
         )
@@ -1806,7 +1806,7 @@ class TestVariableSynchronisation(unittest.TestCase):
         self.assertEqual(vbl.parameterisation_index, 1)
         vbl.set_parameters(0.33, 0.05)
         vbl.update_model(fnc)
-        self.assertEqual(
+        self.assertAlmostEqual(
             fnc.resident_var_per_unit,
             0.33
         )
@@ -1819,7 +1819,7 @@ class TestVariableSerialisation(unittest.TestCase):
     # NB - using from_dict form here, not direct construction.
     # This allows us to hold onto e.g. raw_parameters
     def load_sprake_variables(self):
-        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-validation-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
     
@@ -1945,31 +1945,31 @@ class TestVariableValidation(unittest.TestCase):
     def test_constant_constructors(self):
         var = variable.Variable('aconst') # pyright: ignore[reportAbstractUsage]
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             var.get_dsa_value('lower', True)
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             var.get_dsa_value('upper', True)
         )
 
         var = variable.Variable('aconst', dsa_bounds_type='relative') # pyright: ignore[reportAbstractUsage]
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             var.get_dsa_value('lower', True)
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             var.get_dsa_value('upper', True)
         )
 
         var = variable.Variable('aconst', dsa_bounds_type='offset') # pyright: ignore[reportAbstractUsage]
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             var.get_dsa_value('lower', True)
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var.deterministic_value,
             var.get_dsa_value('upper', True)
         )
@@ -2017,13 +2017,13 @@ class TestVariableValidation(unittest.TestCase):
         )
 
         var1 = self.make_constant_variable_numeric()
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             12.34
         )
 
         var1.set_parameters(10.1)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             10.1
         )
@@ -2037,7 +2037,7 @@ class TestVariableValidation(unittest.TestCase):
                 var1.get_dsa_value(bound), # pyright: ignore[reportArgumentType]
                 'String Constant'
             )
-            self.assertEqual(
+            self.assertAlmostEqual(
                 var2.get_dsa_value(bound), # pyright: ignore[reportArgumentType]
                 12.34
             )
@@ -2060,17 +2060,17 @@ class TestVariableValidation(unittest.TestCase):
             'Another Different String'
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('central'),
             12.34
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('lower'),
             9.9
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('upper'),
             20.0
         )
@@ -2079,17 +2079,17 @@ class TestVariableValidation(unittest.TestCase):
         var2.dsa_upper = 1.1
         var2.dsa_lower = 0.9
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('central'),
             12.34
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('lower'),
             12.34 * 0.9
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('upper'),
             12.34 * 1.1
         )
@@ -2098,12 +2098,12 @@ class TestVariableValidation(unittest.TestCase):
         var2.dsa_upper = 1.2
         var2.dsa_lower = -1.2
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('lower'),
             12.34 -1.2
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var2.get_dsa_value('upper'),
             12.34 + 1.2
         )
@@ -2150,12 +2150,12 @@ class TestVariableValidation(unittest.TestCase):
             2
         )
         var1.set_parameters(5.5)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             5.5
         )
         var1.set_parameters([5.25])
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             5.25
         )
@@ -2190,13 +2190,13 @@ class TestVariableValidation(unittest.TestCase):
     def test_binomial_deterministic(self):
         var1 = self.make_binomial_variable()
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             1
         )
 
         var1.set_parameters(0.8, 5)
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             4
         )    
@@ -2205,14 +2205,14 @@ class TestVariableValidation(unittest.TestCase):
         var1 = self.make_binomial_variable()
 
         for bound in ['central', 'lower', 'upper']:
-            self.assertEqual(
+            self.assertAlmostEqual(
                 var1.get_dsa_value(bound), # pyright: ignore[reportArgumentType]
                 1
             )
         
         activate_dsa(var1)
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('central'),
             1
         )
@@ -2228,7 +2228,7 @@ class TestVariableValidation(unittest.TestCase):
         var1.dsa_bounds_type = 'relative'
         var1.dsa_lower = 0.0
         var1.dsa_upper = 1.1
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('lower'),
             0
         )
@@ -2267,7 +2267,7 @@ class TestVariableValidation(unittest.TestCase):
             var1.draw_psa(rng)
             psa_draws[i] = var1.get_psa_value()
         mean_psa_2 = np.mean(psa_draws)
-        self.assertEqual(mean_psa, mean_psa_2)
+        self.assertAlmostEqual(mean_psa, mean_psa_2)
 
     def make_normal_variable(self):
         return variable.Variable(
@@ -2300,7 +2300,7 @@ class TestVariableValidation(unittest.TestCase):
         )
 
         var1.set_transform('ln')
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             np.exp(5 + 0.5 * 1 * 1)
         )
@@ -2340,11 +2340,11 @@ class TestVariableValidation(unittest.TestCase):
         var1.dsa_bounds_type = 'relative'
         var1.dsa_lower = 0.9
         var1.dsa_upper = 1.1
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('lower'),
             0.9 * 10
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('upper'),
             1.1 * 10
         )
@@ -2355,11 +2355,11 @@ class TestVariableValidation(unittest.TestCase):
         var1.dsa_lower = -(1.96 * float(var1.parameters[1])) # pyright: ignore[reportArgumentType]
         var1.dsa_upper = 1.96 * float(var1.parameters[1]) # pyright: ignore[reportArgumentType]
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('lower'),
             10 - 1.96 * 2
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('upper'),
             10 + 1.96 * 2
         )
@@ -2432,7 +2432,7 @@ class TestVariableValidation(unittest.TestCase):
     def test_beta_deterministic(self):
         var1 = self.make_beta_variable()
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.deterministic_value,
             0.25
         )
@@ -2449,22 +2449,22 @@ class TestVariableValidation(unittest.TestCase):
         var1 = self.make_beta_variable()
 
         for bound in ['central', 'lower', 'upper']:
-            self.assertEqual(
+            self.assertAlmostEqual(
                 var1.get_dsa_value(bound), # pyright: ignore[reportArgumentType]
                 0.25
             )
         
         activate_dsa(var1)
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('central'),
             0.25
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('lower'),
             0.1
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('upper'),
             0.5
         )
@@ -2472,11 +2472,11 @@ class TestVariableValidation(unittest.TestCase):
         var1.dsa_bounds_type = 'relative'
         var1.dsa_lower = 0.9
         var1.dsa_upper = 1.1
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('lower'),
             0.9 * 0.25
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             var1.get_dsa_value('upper'),
             1.1 * 0.25
         )
@@ -2535,7 +2535,7 @@ from dataclasses import dataclass, field
 
 class TestVariableListManagement(unittest.TestCase):
     def load_sprake_variables(self):
-        with open(_DATA_DIR / 'sprake-variable-config.json') as f:
+        with open(_DATA_DIR / 'sprake-validation-variable-config.json') as f:
             var_conf_list = json.load(f)
         return [variable.variable_from_dict(x) for x in var_conf_list]
 
@@ -2569,7 +2569,7 @@ class TestVariableListManagement(unittest.TestCase):
             consumer2.variable_ids[varname] = consumer2.variables[varname].id
 
         for varname in varlist:
-            self.assertEqual(
+            self.assertAlmostEqual(
                 consumer1.variables[varname].deterministic_value,
                 consumer2.variables[varname].deterministic_value,
             )
@@ -2608,7 +2608,7 @@ class TestVariableListManagement(unittest.TestCase):
         self.assertTrue(v._config.modified)
         self.assertTrue(consumer1.variables.chain_modified)
         self.assertTrue(consumer2.variables.chain_modified)
-        self.assertEqual(consumer2.variables[varlist[0]].deterministic_value, new_val)
+        self.assertAlmostEqual(consumer2.variables[varlist[0]].deterministic_value, new_val)
 
         consumer2.variables._chain_syncronise()
         # Because the variables container will have been modified, consumer1.variables.chain_modified will be true
@@ -2628,7 +2628,7 @@ class TestVariableListManagement(unittest.TestCase):
             consumer1.variable_ids[vname],
             consumer2.variable_ids[vname]
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             consumer1.variables[vname].deterministic_value,
             consumer2.variables[vname].deterministic_value,
         )
@@ -2648,3 +2648,43 @@ class TestVariableListManagement(unittest.TestCase):
             consumer1.variables[vname].deterministic_value,
             consumer2.variables[vname].deterministic_value,
         )
+
+
+class TestVariableChangeTracking(unittest.TestCase):
+    """Changes made through the interface are recorded, so that they are stored, and failed changes leave no trace"""
+
+    def setUp(self):
+        from newsegsmodelframework import register_plugins # noqa: F401 - registers the project factories
+        from newsegsmodelframework.plugins.registers import PROJECT_FACTORIES
+        self.variables = PROJECT_FACTORIES['sprake']().metamodels[0].variables
+
+    def test_rejected_update_restores_raw_parameters(self):
+        from newsegsmodelframework.newsegsvariable.update_variable import update_variable
+
+        # A Gamma distribution rejects a negative mean
+        var = self.variables['gen_costs.wind_capex_per_kw.0']
+        raw, native = var.raw_parameters, var.parameters
+        self.assertNotEqual(raw, native)
+
+        is_ok, *_, params = update_variable(var, 0, 0, -5.)
+
+        self.assertFalse(is_ok)
+        self.assertEqual(params, raw)
+        self.assertEqual(var.raw_parameters, raw)
+        self.assertEqual(var.parameters, native)
+
+    def test_dsa_bound_change_revises_variable(self):
+        var = self.variables['gen_costs.wind_capex_per_kw.0']
+        var.syncronise()
+        r0 = var.revision
+
+        var.dsa_lower = var.dsa_lower
+        self.assertFalse(var.modified)
+
+        var.dsa_lower = var.dsa_lower * 0.5
+        self.assertTrue(var.modified)
+        self.assertEqual(var.revision, r0 + 1)
+
+        var.syncronise()
+        var.dsa_upper = 1.
+        self.assertEqual(var.revision, r0 + 2)

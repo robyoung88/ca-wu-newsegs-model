@@ -4,17 +4,53 @@ The application has no knowledge of any particular model. Everything specific is
 **plugins**: Python modules that, on import, add entries to the registries in
 [`newsegsmodelapp.registers`][newsegsmodelapp.registers].
 
-`newsegsmodelapp.register_plugins` imports all the plugins, and is imported by `app.py`, the
-dispatcher and the workers, so that every process sees the same registries:
+## How plugins are loaded and used
 
-1. everything under `newsegsmodelapp.plugins.pages` - **pages must be loaded first**, since
-   models configure the pages;
-2. everything under `newsegsmodelapp.plugins.models`;
-3. the modules in `newsegsmodelapp.components`.
+```mermaid
+flowchart TB
+    subgraph load["On import (app, dispatcher and workers)"]
+        direction TB
+        fw["newsegsmodelframework.register_plugins<br/>project factories"]
+        pages["plugins/pages<br/>pages and their processes"]
+        models["plugins/models<br/>page configurations, contents and processing per model type"]
+        comps["components<br/>input handlers"]
+        fw --> pages --> models --> comps
+    end
+    load -->|"decorators and add_ functions fill"| reg[("registers")]
+    reg --> create["create_app: validation layout and page callbacks, from PAGE_REGISTER"]
+    reg --> runtime["At run time: callbacks and workers look up by key and model type"]
+```
 
-Plugins are found by walking the package, so adding a module in the right place is all that is
-needed. The framework's own [project plugins](../framework/plugins.md) are loaded separately by
-`app.py` (`import newsegsmodelframework.register_plugins`).
+1. **Loading.** `newsegsmodelapp.register_plugins` imports every module under `newsegsmodelapp.plugins.pages`, then
+   every module under `newsegsmodelapp.plugins.models`, then the modules directly in `newsegsmodelapp.components`.
+   Pages must be loaded first, since model plugins configure them. Plugins are found by walking the packages
+   (`pkgutil.walk_packages`), in alphabetical order, so adding a module in the right place is all that's needed. The
+   module is imported by `app.py`, the dispatcher and the workers, so that every process has the same registries. The
+   framework's own [project plugins](../framework/plugins.md) are loaded separately, by
+   `import newsegsmodelframework.register_plugins`.
+2. **Registering.** Importing a plugin runs its decorators (e.g. `@register_input_container_content_creator`) and
+   `add_` calls (e.g. `add_page`), which add its functions and objects to the registers. A key may be registered once
+   for each model type: registering it again raises an error.
+3. **Building the app.** `create_app` builds the validation layout from the layouts of every page in
+   `PAGE_REGISTER`, and calls each page's `attach_callbacks` (see [Callbacks](callbacks.md)).
+4. **Looking up.** Callbacks and workers look up what to call by its key and the model type of the page (from the
+   `app-state` store) or of the request. A model type registers only what it changes, and falls back to the defaults
+   for the rest.
+
+### Defaults and fallbacks
+
+The first function registered for a key under a model type other than `default` is also registered as the `default`
+for the key. Other model types then fall back to it. Plugins are imported in alphabetical order, so the directory that
+provides the defaults is named `aaa_default`, to be imported first.
+
+| Registers | Looked up by | Fallbacks, in order |
+|---|---|---|
+| Input container, editor and section header content creators; single input header and result content creators | (supersection or key, section, model type) | the `default` model type; the generic section (`ALL`); both |
+| Page layout configurations | (page, model type) | a copy of the page's default configuration |
+| Input handlers | (purpose, component type, model type) | the `default` model type; any component type |
+| Postprocess and table draw procedures, table getters and subindex maps, feedback graph and environment feedback artists | (name, model type) | the `default` model type |
+| Environment data sources | model type | none: a model type without one has no environmental feedback |
+| Run requests and procedures, postprocess and table draw requests | request type | none |
 
 ## Directory structure
 
@@ -24,9 +60,10 @@ newsegsmodelapp/plugins/
 │   ├── p000_model_selection_layout.py     # /model-selection  (and /)
 │   ├── p010_landing_layout.py             # /{model}/landing
 │   ├── p100_model_configuration_layout.py # /{model}/site-config
-│   ├── p200_dsa_configuration_layout.py   # /{model}/dsa
+│   ├── p200_dsa_configuration_layout.py   # /{model}/dsa, with optimisation
 │   ├── p300_psa_configuration_layout.py   # /{model}/psa
-│   └── processes/                         # run requests & procedures launched from pages
+│   └── processes/                         # run requests and procedures launched from pages
+│       ├── common_deterministic.py        # the deterministic run of a configuration, shared by the others
 │       ├── deterministic_single_mm.py
 │       ├── deterministic_run_project.py
 │       ├── dsa_single_mm.py
@@ -34,28 +71,29 @@ newsegsmodelapp/plugins/
 │       ├── psa_single_mm.py
 │       ├── psa_run_project.py             # whole-project PSA (every configuration, sharing each draw)
 │       ├── optim_single_mm.py
-│       └── ...
+│       ├── *_process_components.py        # settings components of the DSA, PSA and optimisation
+│       └── progress_messages.py
 └── models/
-    └── aaa_default/                       # one directory per model type (or group of them)
-        ├── page_contents/
-        │   ├── configurations.py          # page layout configurations for the model type
-        │   ├── inputs/                    # input sections, per page (deterministic, dsa, psa, optim)
-        │   └── results/                   # result sections
-        ├── processes/
-        │   ├── run/
-        │   ├── postprocess/               # results -> interface results
-        │   │   └── methods/
-        │   └── output/                    # table drawing and table getters
-        │       └── methods/
-        └── utils/                         # e.g. feedback graph artists
+    ├── aaa_default/                       # the defaults, and the sprake model type
+    │   ├── page_contents/
+    │   │   ├── configurations.py          # page layout configurations for the model type
+    │   │   ├── inputs/                    # input sections, per page (deterministic, dsa, psa, optim)
+    │   │   └── results/                   # result sections
+    │   ├── processes/
+    │   │   ├── run/
+    │   │   ├── postprocess/               # results -> interface results
+    │   │   │   └── methods/
+    │   │   └── output/                    # table drawing and table getters, optimisation feedback
+    │   └── utils/                         # e.g. feedback graph artists
+    └── sprakeloc/                         # the sprakeloc model type: only what differs from the defaults
+        └── page_contents/
+            ├── configurations.py
+            └── environment_feedback.py    # environmental feedback data source and artists
 ```
 
 !!! note "Why `aaa_default`?"
-    When a registry is keyed by `model_type`, the first function registered for a key is
-    **also registered as the `'default'`** for that key, and is used when no function is
-    registered for the model type in use. Plugins are imported in alphabetical order, so the
-    directory that provides the defaults is named `aaa_...` to be imported first.
-    `aaa_default` currently serves the `sprake` model type.
+    The directory that provides the defaults must be imported first (see
+    [Defaults and fallbacks](#defaults-and-fallbacks)). `aaa_default` currently serves the `sprake` model type.
 
 ## Pages
 
@@ -106,7 +144,9 @@ registers.add_page(my_page)
 * `attach_callbacks` is called once from `create_app` to bind the page's Dash callbacks.
 * Navigation buttons are created from the pages in `PAGE_REGISTER`. A model type chooses which
   appear, and in what order, with the `pages` argument of
-  `navigation.create_navigation_component`.
+  `navigation.create_navigation_component`. The buttons sit in a drawer, collapsed until the
+  navigation toggle is clicked; it opens as a row when the panes are side by side and as a
+  column when they are stacked.
 * The `pNNN_` prefix of the page modules is only a convention to set the import order.
 
 ## Models
@@ -125,6 +165,121 @@ def create_dsa_inputs(...): ...         # builds the Dash components for the inp
 @register_result_container_content_creator(KEY, SECTION, 'sprake')
 def create_results(...): ...            # builds the Dash components for a result
 ```
+
+### Input handlers
+
+`react_to_input_change` (in `components/callbacks/input_container_callbacks.py`) receives almost every change to an
+input. An input's id gives its `type`, `purpose`, `supersection`, and the `section`, `key` and `subindex` of its
+variable. The callback handles the DSA bounds, bound type and selection, and the optimisation bounds and plot
+resolution itself. It passes every other purpose to the handler registered for it:
+
+```python
+@register_input_handler('my-purpose', 'input-toggle')        # purpose, component type (None for any)
+def handle_my_purpose(triggered_id, input_ids, header_ids, trigger_ids, calling_dict,
+                      active_project_id, project_provider, return_dict):
+    ...                                  # save the change, mark what it makes stale
+    return return_dict                   # with any input_values, header_children and trigger_data set
+```
+
+The handler is looked up for the purpose, the component type and the model type in the `app-state` store. It falls
+back to the `default` model type, then to any component type. A purpose with no handler makes no update. Each handler
+should have a [callback test](../development.md#adding-a-test-of-an-input-handler).
+
+A handler that saves a value shown on the site configuration page, or changes which configurations share a Variable,
+should set `return_dict['summary_refresh']`. That redraws the input's sharing summary and its card's label, which
+counts the inputs whose configurations differ.
+
+A handler that saves something a run depends on, outside the project's own row (a Variable, or a component such as
+the optimisation settings), must also update the project's row: with `provider.increment_revision(project_id)`, or
+`provider.touch_project(project_id)` to change only its modification stamp. The workers cache projects, and load one
+again only when its row changes (see `CachedFromDatabaseNewsegsProjectProvider`). `invalidate_cache_for_component`
+clears only the cache of the app's own process, so without it, a worker that has run the project before runs it with
+the old settings.
+
+### Lazily built editors
+
+A row can build its editor only when it is opened, so that expensive content isn't built for every row of a page.
+`html.Details` doesn't report `open` to callbacks, so the row counts the clicks on its summary instead.
+`input_components.create_lazy_input_details` makes the row: a `Details` holding a `Summary`, an empty
+`input-group-editor` container, and a hidden `single-input-config` anchor. Dash only calls the callback for a row with a
+component matching its first output, and the editor's own inputs don't exist until it's built. When a click opens the row, `react_to_input_change` calls the editor content creator
+registered for its supersection and section, and puts what it returns in the container:
+
+```python
+@register_input_editor_content_creator('dsa', None, 'sprake')    # supersection, section (None for all), model type
+def create_dsa_editor(varid, active_project_id, project_provider) -> list[Component]:
+    ...                                  # the children of the editor container
+```
+
+Reopening the row builds the editor again, so it shows the current values. Closing it builds nothing.
+
+* Redraw only the children of the editor container, never the `Details` or `Summary`, or the count of clicks and the
+  open state will disagree. Rebuilding the whole input container is safe.
+
+The deterministic inputs use this for their group editor (`components/group_editor.py`). Opening an input's sharing
+summary shows every group's value, and buttons that move configurations between groups. Selecting a configuration and
+choosing where to move it, or dragging its icon to a row, happens in the browser (`assets/group_editor.js`), which
+writes the move to the row's `group-move-request` store. A drop moves nothing in the page: the server redraws the
+editor, so the script never conflicts with the DOM that React owns. `react_to_input_change` passes moves, and edits of other groups' values (`group-value-input`),
+to the handlers in that module. Code that moves configurations between Variables should use `move_metamodels_to_group`,
+which keeps the junctions, revisions, staleness and orphaned Variables right.
+
+The DSA rows have a group editor too (`components/dsa_group_editor.py`), in which every group's parameters, bound type
+and bounds can be edited. Its focussed row holds the focussed configuration's usual inputs, so the existing handlers
+act on them; the other groups' inputs are `group-value-input`s carrying their Variable's id, with the purposes
+`group-value`, `group-dsaboundtype`, `group-dsa-bound-lower` and `group-dsa-bound-upper`. A change of a Variable's DSA
+settings should go through `set_dsa_bound` or `set_dsa_bound_type`, which save it and mark the DSA stale for the
+configurations using it.
+
+The PSA rows follow the same pattern (`components/psa_group_editor.py`): the editor shows the distribution, and each
+group's Mean and SD (or Value, for a constant) and confidence interval. The other groups' parameters are edited through
+the `group-value` handler. The PSA's selection and its project settings (samples, seed, draws) aren't grouped.
+* Don't put interactive components in the `Summary`, since clicks on them are counted too.
+
+### Environmental feedback
+
+The site configuration page can show plots and tables of the environmental conditions at the site, to help compare
+sites. It is shown for a model type when its layout configuration sets `layout_environment_feedback`, usually to
+`create_environmental_conditions_card` with a list of `EnvironmentFeedbackItem`s (see
+`plugins/models/sprakeloc/page_contents/configurations.py`). A "Get environmental data" button then appears under the
+map. Other model types have the components hidden.
+
+Fetching the data is slow, so it happens only when the user clicks the button. A model type registers a data source,
+which says whether the data of a site are cached or being fetched, and fetches them. It also registers an artist for
+each item, which draws from the cache only:
+
+```python
+class MyEnvironmentData:
+    def is_available(self, location, metamodel) -> bool: ...   # all the data are cached
+    def is_pending(self, location, metamodel) -> bool: ...     # another process is fetching them
+    def fetch(self, location, metamodel) -> None: ...          # fetches and caches them
+
+register_environment_data_source(MyEnvironmentData(), 'sprakeloc')
+
+@register_environment_feedback_artist('wind-rose', 'sprakeloc')     # item key, model type
+def draw_wind_rose(location, sites, metamodel) -> Component:   # sites: names and locations of the project's other sites
+    ...                                  # the children of the item
+```
+
+`metamodel` is the focussed configuration, loaded in full. The data should be what a run of it at the site requests,
+such as at the heights of its generators and over its run period, so that the feedback and runs share the cached
+data.
+
+The callbacks are in `components/callbacks/environment_feedback_callbacks.py`:
+
+* **Status.** Runs when the site location changes. If the data aren't cached, the feedback of the previous site stays,
+  greyed out, with a badge saying why. It checks only that a location is set; validating the location is left to the
+  map.
+* **Fetch.** A background callback, using the `DiskcacheManager` set up in `app.py`, with its jobs under
+  `BACKGROUND_CALLBACK_CACHE_PATH`. Its result holds only the error, if any; the data go to the environment cache.
+* **Draw.** Runs once the data are ready and the panel is open, and doesn't draw again for the same site.
+
+The environment cache locks data while they're fetched (see `environment_cache.get_or_set`). If a model run needs data
+that the feedback is fetching, or the other way round, it waits for that fetch and doesn't start another.
+
+For `sprakeloc`, the data are taken from the focussed configuration: its run period, the wind at the height of its
+turbine, and the wind at the height of its PV array (which runs also request). A run after the feedback then fetches
+nothing.
 
 ### Processes
 
@@ -155,19 +310,36 @@ are in `plugins/models/<model>/processes`.
 Every procedure receives the progress and cancellation callbacks from the worker. Return `'ok'` on
 success.
 
+The model run reports its own progress through an optional `progress_callback(fraction, message)` argument of
+`run`: the module it is running, and any wait for environmental data. The deterministic run (`common_deterministic`)
+adds these to its "Running model" step. A first run at a new site may say, for example:
+
+```
+Running model - config 1: Running the generation module - Awaiting environmental data: wind speeds for
+(53.255, -3.477) at 10 m from NEWA (requests usually take 1 to 8 minutes)
+```
+
+The environment server reports each wait (see `environment_progress`), including a wait for data that another request,
+such as the site's environmental feedback, is already fetching. The typical durations in the messages are constants
+in `pvgis_newa_env_servers`.
+
 ### Registers
 
 | Register | Added to with | Keyed by |
 |---|---|---|
 | `PAGE_REGISTER` | `add_page` | page id |
 | `PAGE_LAYOUT_CONFIGURATION_REGISTER` | `add_page_layout_configuration` | page id, model type |
+| `PAGE_LAYOUT_CONFIGURATION_CLASS_REGISTER` | `add_page_layout_configuration_class` | page id |
 | `INPUT_HANDLERS` | `register_input_handler` | purpose, component type, model type |
 | `INPUT_CONTAINER_CONTENT_CREATORS` | `register_input_container_content_creator` | supersection, section, model type |
+| `INPUT_EDITOR_CONTENT_CREATORS` | `register_input_editor_content_creator` | supersection, section, model type |
 | `INPUT_SECTION_HEADER_CONTENT_CREATORS` | `register_input_section_header_content_creator` | supersection, section, model type |
 | `SINGLE_INPUT_HEADER_CONTENT_CREATORS` | `register_single_input_header_content_creator` | supersection, section, model type |
 | `RESULT_CONTAINER_CONTENT_CREATORS` | `register_result_container_content_creator` | key, section, model type |
 | `RESULT_SECTION_HEADER_CONTENT_CREATORS` | `register_result_section_header_content_creator` | key, section, model type |
 | `FEEDBACK_GRAPH_ARTISTS` | `register_feedback_graph_artist` | figure key, model type |
+| `ENVIRONMENT_DATA_SOURCES` | `register_environment_data_source` | model type |
+| `ENVIRONMENT_FEEDBACK_ARTISTS` | `register_environment_feedback_artist` | item key, model type |
 | `RUN_REQUEST_REGISTER` | `register_run_request` | request type |
 | `RUN_PROCEDURE_REGISTER` | `register_run_procedure` | request type |
 | `POSTPROCESS_REQUEST_REGISTER` | `register_postprocess_request` | postprocess type |

@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from plotly_resampler import FigureResampler
 
 from newsegsmodelapp.backend.db.db_component_provider import FromDatabaseNewsegsProjectProvider
-from newsegsmodelapp.components import callback_utils
+from newsegsmodelapp.components import callback_utils, colours
 from newsegsmodelapp.dash_extension import NewsegsDash
 
 
@@ -139,12 +139,30 @@ def _build_figure(mdl) -> FigureResampler | None:
         )
 
     fig.update_layout(
+        template = colours.PLOT_TEMPLATES,
         height = 250,
         margin = {'l': 5, 'r': 5, 't': 5, 'b': 0},
         legend_y = 0,
         legend_yanchor = 'bottom'
     )
     return fig
+
+ZOOM_REQUEST_ID = 'timeseries-zoom-request'
+"""The store of the date range to zoom the timeseries to, set by clicking a result grid's cell."""
+
+def timeseries_triggers(triggers: list[callback_utils.Trigger]) -> tuple[bool, bool]:
+    """What the triggers of the timeseries callback ask for: every trigger is considered, as several may fire together.
+
+    Args:
+        triggers: The triggers of the callback.
+
+    Returns:
+        Whether the results changed (the generation table was redrawn), so the plot is rebuilt, and whether a zoom was
+        requested.
+    """
+    results_changed = any(x.is_pattern() and x.id.get('key') == 'table_generation' for x in triggers) # pyright: ignore[reportAttributeAccessIssue]
+    zoom_requested = callback_utils.has_trigger(triggers, ZOOM_REQUEST_ID)
+    return results_changed, zoom_requested
 
 def add_result_timeseries_callbacks(app: NewsegsDash):
     """Bind the callbacks which draw the timeseries graphs of results.
@@ -225,8 +243,7 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
         if active_project_id is None:
             raise PreventUpdate
 
-        triggered_id = ctx.triggered_id
-        results_changed = isinstance(triggered_id, dict) and triggered_id.get('key') == 'table_generation'
+        results_changed, zoom_requested = timeseries_triggers(callback_utils.get_triggers())
 
         if container_style.get('display') == 'none':
             if results_changed:
@@ -234,7 +251,7 @@ def add_result_timeseries_callbacks(app: NewsegsDash):
                 return no_update, None, no_update
             raise PreventUpdate
 
-        zoom_range = zoom_request.get('range') if triggered_id == 'timeseries-zoom-request' and zoom_request else None
+        zoom_range = zoom_request.get('range') if zoom_requested and zoom_request else None
 
         provider = cast(FromDatabaseNewsegsProjectProvider, app.project_provider)
         logger.debug('Getting lightweight project - Showing model timeseries')
