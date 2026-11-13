@@ -361,18 +361,18 @@ def _get_run_statuses(
     return {x[0]: dict(x._mapping) for x in result}
 
 def results_status(
-    ongoing_run_ids: Sequence[int],
+    calculating: bool,
     failure_messages: Sequence[str],
     new_jobs: bool,
     progress_message: str | NoUpdate,
 ) -> tuple[str, str | NoUpdate, str | NoUpdate]:
     """The status of the results containers, and the title and subtitle of their overlay.
 
-    While runs are underway the containers are `CALCULATING`. Once none are, they are `FAILED` if
+    While requests are active the containers are `CALCULATING`. Once none are, they are `FAILED` if
     any run of the batch was abandoned, showing why, or else `IDLE`.
 
     Args:
-        ongoing_run_ids: Ids of the runs underway.
+        calculating: Whether any request is active: being run, or waiting to be.
         failure_messages: Messages of the runs abandoned since the batch started.
         new_jobs: Whether new runs have been spawned.
         progress_message: Message of the progress of the runs underway.
@@ -380,7 +380,7 @@ def results_status(
     Returns:
         The status, title and subtitle.
     """
-    if len(ongoing_run_ids) > 0:
+    if calculating:
         return 'CALCULATING', 'Computing...' if new_jobs else no_update, progress_message
     if failure_messages:
         title = 'A job failed' if len(failure_messages) == 1 else f'{len(failure_messages)} jobs failed'
@@ -515,14 +515,11 @@ def add_action_callbacks(app: NewsegsDash):
                         app.project_provider, app.results_provider, app.request_handler
                     )          
             
-            # Pull the active requests again so we can check if we need to keep the trigger open
+            # Pull the active requests again, as spawning changes their statuses
             request_list = app.request_handler.get_active_requests()
 
             # Pull the run list from the request list - this should match the ongoing actions list
             ongoing_run_ids = [x.run_id for x in request_list if x.status == 'PROCESSING']
-
-            # Keep trigger open if we have any not being run
-            retry_spawns = len(ongoing_run_ids) != len(request_list)
 
             if set(ongoing_run_ids) != ongoing_actions:
                 s_req = set(ongoing_run_ids)
@@ -594,10 +591,11 @@ def add_action_callbacks(app: NewsegsDash):
                             request.request_id, request.request_type, request.run_id,
                         )
 
-                        # Set triggers
-                        request_type =  request.request_type
+                        # Set triggers: the request's own, and those of any other tables it drew, such as
+                        # each configuration's tables drawn with a whole project's (#206)
+                        sections_drawn = registers.get_table_sections_drawn(request.request_type)
                         for idx, id in enumerate(postaction_trigger_ids):
-                            if id['key'] == request_type:
+                            if id['key'] in sections_drawn:
                                 logger.info('Setting postaction trigger: %s', id['key'])
                                 if isinstance(postaction_trigger_returns[idx], NoUpdate):
                                     postaction_trigger_returns[idx] = [json.dumps(request.as_dict())]
@@ -661,15 +659,20 @@ def add_action_callbacks(app: NewsegsDash):
 
             logger.debug('Ongoing actions at end of manager are: %s', ongoing_run_ids)
 
+            # Requests still active, read now that completed runs are handled: they include the children just
+            # created, which have no run until a worker claims them. Polling must go on until none are left, or
+            # the completion of the children is never handled and their own post-actions never start (#206).
+            requests_active = retry_spawns or len(app.request_handler.get_active_requests()) > 0
+
         finally:
             action_manager_lock.release()
 
-        status, title, subtitle = results_status(ongoing_run_ids, failure_messages, new_jobs, mess_)
+        status, title, subtitle = results_status(requests_active, failure_messages, new_jobs, mess_)
         return (
             postaction_trigger_returns,
             ongoing_run_ids,
             failure_messages,
-            not(retry_spawns) and len(ongoing_run_ids) == 0,
+            not requests_active,
             [status] * len(container_ids),
             [title] * len(container_ids),
             [prog_] * len(container_ids),

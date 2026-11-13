@@ -8,7 +8,7 @@ The model adheres to the general NewSEGS structure; however, there are some nota
 
 - The Grid module is not used at all. Due to the simple pricing assumptions for import/export electricity and simple storage charge and dispatch rules, there is no requirement for pricing signals from the wider grid.
 
-- Generated electricity is consumed by site consumers before it can influence the control strategy of the storage unit. Due to the single, simple storage charge and dispatch algorithm in use, this is adequate, as the only signal required by the storage unit for control is the quantity of over/under production, and not the absolute rate of production.
+- Generated electricity is consumed by site consumers before it can influence the control strategy of the storage unit. Due to the single, simple storage charge and dispatch algorithm in use, this is adequate, as the only signal required by the storage unit for control is the quantity of over/under production, and not the absolute rate of production or any price signalling from the Grid module.
 
 ### Key information
 
@@ -25,7 +25,7 @@ The time horizon of the model is 10 years.
 Generation occurs at two point generators 
 
 - A point Wind Energy Converter at nominal height equivalent to the informing wind timeseries.
-- A point south-facing PV array pitched at 30° from horizontal.
+- A point south-facing PV array pitched at 35° from horizontal.
 
 These point generators are assumed able to scale arbitrarily with proportional energy yield increases.
 

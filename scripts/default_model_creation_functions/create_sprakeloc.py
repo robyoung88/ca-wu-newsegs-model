@@ -26,7 +26,7 @@ def create_energy_model():
     mdl.consumption_storage.storage_capacity = 1200.
 
     mdl.consumption_storage.n_units = 50.
-    mdl.consumption_storage.hlp = 0.9
+    mdl.consumption_storage.hlp = 1.05
     mdl.consumption_storage.gfa = 81
     mdl.consumption_storage.ev_per_unit = 0.2
 
@@ -125,6 +125,9 @@ def create_variable_list(mdl, fnc):
     ]:
         vd[vn].dsa_bounds_type = 'interval'
         vd[vn].set_parameters(vd[vn].deterministic_value, 0.2 * vd[vn].deterministic_value)
+
+    for var in variables:
+        var.replace_default_parameters()
 
     return variables
 
