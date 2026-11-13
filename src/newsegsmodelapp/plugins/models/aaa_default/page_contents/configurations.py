@@ -7,6 +7,7 @@ import copy
 from typing import cast
 
 import dash
+import pandas as pd
 
 from newsegsmodelapp import registers
 from newsegsmodelapp import STATICDATA
@@ -56,6 +57,7 @@ with open(os.path.join(TEXT_DIR, 'sprake', 'sprake_landing_assumptions.md'), enc
     config.assumptions_text = f.readlines()
 
 config.model_diagram = lambda: dash.get_asset_url('fig/metamodel-block-diagram-sprake-bw.svg')
+config.default_values_table = pd.read_csv(os.path.join(TEXT_DIR, 'sprake','sprake_model_input_assumptions.csv'), encoding='utf-8-sig')
 
 registers.add_page_layout_configuration(config, _PAGE_TYPE, _MODEL_TYPE)
 

@@ -107,6 +107,9 @@ def create_variable_list(mdl, fnc):
     ]:
         vd[vn].dsa_bounds_type = 'interval'
         vd[vn].set_parameters(vd[vn].deterministic_value, 0.2 * vd[vn].deterministic_value)
+    
+    for var in variables:
+        var.replace_default_parameters()
 
     return variables
 
