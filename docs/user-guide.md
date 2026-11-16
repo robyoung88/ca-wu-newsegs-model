@@ -115,3 +115,18 @@ with their distributions. *Run PSA* runs the configurations for each draw.
 
 The results are shown as plots, chosen from the list above them, such as a scatter of costs and benefits, and as
 tables. As for the DSA, *Multiple* and *Pairwise* compare configurations.
+
+### Downloading results
+
+The download button beside the results of each page (the table icon) downloads its results: the deterministic
+results on the site configuration page, and the DSA or PSA results on theirs. The table icon of a configuration in
+the list of configurations downloads that configuration's deterministic results. Choose:
+
+- **Configurations:** the focussed configuration (or the configuration whose button you clicked), or every
+  configuration of the project.
+- **Format:** *csv* gives a file per configuration, zipped when there are several; *xlsx* gives one workbook, with a
+  sheet per configuration.
+- **Contents:** whether to include each configuration as a *.json* file, which the DSA and PSA pages can upload again
+  with its results. The download is then a zip.
+
+Configurations without results are left out, and named in a message.

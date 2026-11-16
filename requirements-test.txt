@@ -5,6 +5,7 @@ scipy
 pyproj
 pvlib
 openpyxl
+xlsxwriter
 dynaconf
 diskcache
 sqlalchemy

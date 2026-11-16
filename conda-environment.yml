@@ -48,5 +48,6 @@ dependencies:
   - schedule
   - uuid6
   - openpyxl
+  - xlsxwriter
   - fasteners
   - gunicorn=23.0.0

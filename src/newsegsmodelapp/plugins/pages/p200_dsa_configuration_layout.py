@@ -26,7 +26,7 @@ from newsegsmodelapp.components.configuration_selector import create_header_meta
 from newsegsmodelapp.components.dsa_group_editor import count_variables_with_different_bounds
 
 from newsegsmodelapp.components.layouts.page_layouts import fourpane_layout
-from newsegsmodelapp.components import callback_utils, export, navigation
+from newsegsmodelapp.components import callback_utils, navigation
 
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import icons
@@ -607,94 +607,6 @@ def add_dsa_run_callbacks(app: NewsegsDash):
                 rval['modal']['is_opens'] = False
             return rval
         
-    @app.callback(
-        output = {
-            'modal': {
-                'is_opens': Output('modal-dsa-download-confirm', 'is_open')
-            },
-            'download': {
-                'datas': Output('download-dsa-result', 'data')
-            },
-        },
-        inputs = {
-            'results_download_button': {
-                'n_clicks': Input('btn-dsa-download-confirm-ok', 'n_clicks'),
-            },
-            'modal_close_button': {
-                'n_clicks': Input('btn-dsa-download-confirm-abort', 'n_clicks')
-                
-            },
-            'results_predownload_button': {
-                'n_clicks': Input('btn-dsa-result-predownload', 'n_clicks'),
-            },
-        },
-        state = {
-            'options': {
-                'values': State(
-                    {'type': 'dsa-result-download-option', 'key': ALL},
-                    'value'
-                ),
-                'ids': State(
-                    {'type': 'dsa-result-download-option', 'key': ALL},
-                    'id'
-                )
-            },
-            'active_project_id': State('active-project-id', 'data'),
-        },
-        prevent_initial_call = True,
-    )
-    def confirm_dsa_results_download(
-        results_download_button,
-        modal_close_button,
-        results_predownload_button,
-        options,
-        active_project_id,
-    ):
-        clicked = callback_utils.get_clicked_trigger()
-        if clicked is None:
-            raise PreventUpdate
-        trig_id = clicked.id
-
-        rval = callback_utils.create_noupdate_return()
-
-        if isinstance(trig_id, str):
-            match trig_id:
-                case 'btn-dsa-download-confirm-ok':
-                    rval['modal']['is_opens'] = False
-                    opts = callback_utils.get_options_nopage(
-                        options['ids'],
-                        options['values'],
-                        ['contents-option', 'format-option']
-                    )
-    
-                    to_export = export.export_results(
-                        'dsa',
-                        app.project_provider,
-                        app.results_provider,
-                        active_project_id,
-                        contents_option = opts.get('contents-option', 'result'),
-                        format_option = opts.get('format-option', 'csv'),
-                        result_level = 'metamodel',
-                    )
-                    
-                    if to_export is not None:
-                        rval['download']['datas'] = to_export
-
-                case 'btn-dsa-result-predownload':
-                    rval['modal']['is_opens'] = True
-
-                case _:
-                    rval['modal']['is_opens'] = False
-        else:
-            match trig_id.get('type'):
-                case 'results-predownload-btn':
-                    rval['modal']['is_opens'] = True
-                    return rval
-            
-                case _:
-                    rval['modal']['is_opens'] = False
-        return rval
-    
     @app.callback(
         output = dict(
             active_project_id = Output('active-project-id', 'data', allow_duplicate = True),

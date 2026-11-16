@@ -1,9 +1,21 @@
-"""Export of results of the deterministic run, DSA and PSA, for download.
+"""Export of the results of the deterministic run, DSA and PSA of configurations, for download.
+
+The results of one configuration, or of several, are exported as csv or xlsx:
+
+- One configuration: a single `<config>-<type>-results.csv` or `.xlsx`.
+- Several configurations as csv: a zip of one `<config>-<type>-results.csv` per configuration.
+- Several configurations as xlsx: one workbook, `<project>-<type>-results.xlsx`, with a sheet per configuration.
+
+With the configurations included, the download is a zip of the results and a `<config>-config.json` per
+configuration, which the DSA and PSA pages can upload again.
 """
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 import io
 import json
-import tempfile
-from typing import Any, Literal, Optional
+import logging
+import re
+from typing import Any, Literal
 import zipfile
 
 from dash import dcc
@@ -15,227 +27,278 @@ from newsegsmodelframework.newsegsmetamodel.newsegsmetamodel import NewsegsMetaM
 from newsegsmodelframework.newsegsproject.newsegsprojectprovider import NewsegsProjectProviderInterface
 from newsegsmodelframework.util import jsonfuncs
 
+logger = logging.getLogger(__name__)
+
+ResultType = Literal['det', 'dsa', 'psa']
+FormatOption = Literal['csv', 'xlsx']
+
+RESULT_TYPE_LABELS: dict[str, str] = {'det': 'deterministic', 'dsa': 'DSA', 'psa': 'PSA'}
+"""The name of each type of result, as shown to the user."""
+
+_RESULT_TABLES = {'dsa': 'dsa_single_metamodel', 'psa': 'psa_single_metamodel'}
+
+_SHEET_NAME_MAX = 31
+_SHEET_NAME_INVALID = re.compile(r'[\[\]:*?/\\]')
+
 def metamodel_to_config_file(mm: NewsegsMetaModel) -> dict[str, Any]:
     """
     Encapsulate a model and finance configuration in a dictionary.
     """
-    
+
     odict = {
         'config_name': mm.name,
         'metamodel': mm.to_dict_repr(),
     }
     return odict
 
+@dataclass
+class ResultsExport:
+    """The download of the results of configurations, and which configurations it holds.
+
+    Attributes:
+        download: The data for a `dcc.Download`, or None if no configuration has results.
+        exported: Names of the configurations whose results are in the download.
+        missing: Names of the configurations without results, which were left out.
+    """
+    download: dict[str, Any] | None = None
+    exported: list[str] = field(default_factory = list)
+    missing: list[str] = field(default_factory = list)
+
 def _get_metamodel_deterministic_raw_data(metamodel: NewsegsMetaModel) -> pd.DataFrame | None:
-    
+    """The deterministic results of a metamodel, whose results have been reattached, as one frame; None if it has none."""
     try:
-        gen_res = metamodel.model.get_generation_result()
-        grid_res = metamodel.model.get_grid_result()
-        cs_res = metamodel.model.get_consumption_storage_result()
+        results = [
+            metamodel.model.get_generation_result(),
+            metamodel.model.get_grid_result(),
+            metamodel.model.get_consumption_storage_result(),
+        ]
     except AttributeError:
         return None
-    
-    all_frames = [
-        gen_res.meters_to_pandas(),
-        gen_res.dsm_to_pandas(),
-        grid_res.meters_to_pandas(),
-        grid_res.dsm_to_pandas(),
-        cs_res.meters_to_pandas(),
-        cs_res.dsm_to_pandas()
-    ]
+
+    all_frames = []
+    for res in results:
+        if res is None:
+            continue
+        all_frames += [res.meters_to_pandas(), res.dsm_to_pandas()]
 
     all_frames = [x for x in all_frames if not x.empty]
-    if not len(all_frames):
+    if not all_frames:
         return None
-    elif len(all_frames) == 1:
-        return all_frames[0]
-    else:
-        odf = all_frames[0]
-        for j in range(1, len(all_frames)):
-            odf = odf.join(all_frames[j])
 
+    odf = all_frames[0]
+    for frame in all_frames[1:]:
+        odf = odf.join(frame)
     return odf
 
+def get_result_frame(
+    result_type: ResultType,
+    metamodel: NewsegsMetaModel,
+    result_provider: NewsegsResultProviderInterface,
+) -> pd.DataFrame | None:
+    """The results of a type for a metamodel, as stored; stale results are included.
+
+    Args:
+        result_type: The type of analysis: `det`, `dsa` or `psa`.
+        metamodel: The metamodel.
+        result_provider: Provider of results.
+
+    Returns:
+        The results, or None if the metamodel has none.
+    """
+    match result_type:
+        case 'det':
+            metamodel.model.reattach_results(result_provider)
+            return _get_metamodel_deterministic_raw_data(metamodel)
+        case 'dsa' | 'psa':
+            result_data, _ = result_provider.get_result(_RESULT_TABLES[result_type], metamodel.table_config, True)
+            if result_data is None:
+                return None
+            assert isinstance(result_data, pd.DataFrame)
+            return result_data
+        case _:
+            raise ValueError(f'result_type not recognised: {result_type}')
+
+def _strip_tz(df: pd.DataFrame) -> pd.DataFrame:
+    """The frame without time zones on its index and datetime columns, which Excel can't hold."""
+    index = df.index
+    tz_columns = [c for c in df.columns if getattr(df[c].dtype, 'tz', None) is not None]
+    if getattr(index, 'tz', None) is None and not tz_columns:
+        return df
+    df = df.copy()
+    if getattr(index, 'tz', None) is not None:
+        df.index = index.tz_localize(None) # pyright: ignore[reportAttributeAccessIssue]
+    for c in tz_columns:
+        df[c] = df[c].dt.tz_localize(None)
+    return df
+
+def sheet_names(names: Sequence[str]) -> list[str]:
+    """Names of worksheets for the names given: valid in Excel, and unique.
+
+    Characters that Excel does not allow are replaced, names are cut to 31 characters, and a name that is taken
+    (ignoring case, as Excel does) is numbered.
+
+    Args:
+        names: The names, e.g. of configurations.
+
+    Returns:
+        The sheet names, in the same order.
+    """
+    taken: set[str] = set()
+    out = []
+    for name in names:
+        base = _SHEET_NAME_INVALID.sub('_', str(name)).strip().strip("'") or 'Sheet'
+        candidate = base[:_SHEET_NAME_MAX]
+        n = 1
+        while candidate.lower() in taken:
+            n += 1
+            suffix = f' ({n})'
+            candidate = base[:_SHEET_NAME_MAX - len(suffix)] + suffix
+        taken.add(candidate.lower())
+        out.append(candidate)
+    return out
+
+def _unique_file_stubs(names: Sequence[str]) -> list[str]:
+    """File names (without extension) for the names given: valid, and unique."""
+    taken: set[str] = set()
+    out = []
+    for name in names:
+        base = pathvalidate.sanitize_filename(str(name)) or 'configuration'
+        candidate = base
+        n = 1
+        while candidate.lower() in taken:
+            n += 1
+            candidate = f'{base} ({n})'
+        taken.add(candidate.lower())
+        out.append(candidate)
+    return out
+
+def _csv_bytes(df: pd.DataFrame) -> bytes:
+    return df.to_csv().encode('utf-8')
+
+def _xlsx_bytes(frames: Sequence[pd.DataFrame], names: Sequence[str]) -> bytes:
+    buffer = io.BytesIO()
+    # xlsxwriter writes the deterministic results of a configuration in about two thirds of the time of openpyxl
+    with pd.ExcelWriter(buffer, engine = 'xlsxwriter') as writer:
+        for df, sheet in zip(frames, sheet_names(names)):
+            # Unmerged index cells, so that every row of a multi-level index reads back with its labels
+            _strip_tz(df).to_excel(writer, sheet_name = sheet, merge_cells = False)
+    return buffer.getvalue()
+
+def _config_json(mm: NewsegsMetaModel) -> str:
+    # As the DSA and PSA uploads read it: the metamodel itself
+    return json.dumps(mm.to_dict_repr(), cls = jsonfuncs.NumpyEncoder, sort_keys = False, indent = 4)
+
+def build_download(
+    result_type: ResultType,
+    results: Sequence[tuple[str, pd.DataFrame]],
+    format_option: FormatOption,
+    project_name: str,
+    configurations: Sequence[NewsegsMetaModel] = (),
+) -> dict[str, Any]:
+    """The data for a `dcc.Download` of the results of configurations.
+
+    Args:
+        result_type: The type of analysis: `det`, `dsa` or `psa`.
+        results: The name of each configuration, and its results.
+        format_option: `csv` or `xlsx`.
+        project_name: Name of the project, which names the download of several configurations.
+        configurations: Configurations to include as json; none to leave them out.
+
+    Returns:
+        The data for the download.
+    """
+    if format_option not in ('csv', 'xlsx'):
+        raise ValueError(f'format_option not recognised: {format_option}')
+    if not results:
+        raise ValueError('No results to download')
+
+    names = [name for name, _ in results]
+    frames = [df for _, df in results]
+    stubs = _unique_file_stubs(names)
+    suffix = f'-{result_type}-results'
+
+    if len(results) == 1:
+        download_stub = stubs[0] + suffix
+    else:
+        download_stub = (pathvalidate.sanitize_filename(project_name) or 'project') + suffix
+
+    # The files of the results
+    files: list[tuple[str, bytes]]
+    if format_option == 'xlsx':
+        files = [(f'{download_stub}.xlsx', _xlsx_bytes(frames, names))]
+    else:
+        files = [(f'{stub}{suffix}.csv', _csv_bytes(df)) for stub, df in zip(stubs, frames)]
+
+    if len(files) == 1 and not configurations:
+        file_name, content = files[0]
+        return dcc.send_bytes(content, filename = file_name)
+
+    config_stubs = _unique_file_stubs([mm.name for mm in configurations])
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode = 'w', compression = zipfile.ZIP_DEFLATED) as archive:
+        for file_name, content in files:
+            archive.writestr(file_name, content)
+        for stub, mm in zip(config_stubs, configurations):
+            archive.writestr(f'{stub}-config.json', _config_json(mm))
+    return dcc.send_bytes(zip_buffer.getvalue(), filename = f'{download_stub}.zip')
+
 def export_results(
-    result_type: Literal['dsa','psa','det'],
+    result_type: ResultType,
     project_provider: NewsegsProjectProviderInterface,
     result_provider: NewsegsResultProviderInterface,
     project_id: str,
-    metamodel_id: Optional[str] = None,
-    contents_option: str = 'result',
-    format_option: str = 'csv',
-    result_level: Optional[str] = None,
-):
-    """Export the results of a deterministic run, or a DSA or PSA, of a project.
+    metamodel_ids: Sequence[str] | None = None,
+    format_option: FormatOption = 'csv',
+    include_configuration: bool = False,
+) -> ResultsExport:
+    """Export the results of a deterministic run, DSA or PSA of configurations of a project.
 
-    Raises `NotImplementedError` for combinations that are not yet supported, such as DSA at project level.
+    Configurations without results are left out. Raises `KeyError` if a metamodel is not in the project.
 
     Args:
         result_type: The type of analysis: `det`, `dsa` or `psa`.
         project_provider: Provider of projects, metamodels and variables.
         result_provider: Provider of results.
         project_id: Id of the project.
-        metamodel_id: Id of the metamodel.
-        contents_option: What to export.
-        format_option: The format of the file.
-        result_level: The level of the results (project or metamodel).
+        metamodel_ids: Ids of the metamodels, in the order to export them; by default the focussed one.
+        format_option: `csv` or `xlsx`.
+        include_configuration: Whether to include each configuration exported, as json.
 
     Returns:
-        The data to download.
+        The download, and the configurations exported and left out.
     """
+    if result_type not in RESULT_TYPE_LABELS:
+        raise ValueError(f'result_type not recognised: {result_type}')
+
     proj = project_provider.get_project(project_id)
-    match result_type:
-        case 'dsa':
-            result_level = 'project' if result_level is None else result_level
-            match result_level:
-                case 'project':
-                    raise NotImplementedError(f'DSA at project level not yet supported')
-                case 'metamodel':
-                    if metamodel_id is None:
-                        metamodel_id = project_provider.get_focussed_metamodel_id(project_id)
-                    mm = proj.get_metamodel_by_id(metamodel_id)
-                    result_data, result_revision = result_provider.get_result(
-                        'dsa_single_metamodel', mm.table_config, True
-                    )
-                    if result_data is None:
-                        return None
-                    stale = result_revision != mm.table_config.revision
-                    assert isinstance(result_data, pd.DataFrame)
-                case _:
-                    raise ValueError(f'result_level not recognised: {result_level}')
-        case 'psa':
-            result_level = 'project' if result_level is None else result_level
-            match result_level:
-                case 'project':
-                    raise NotImplementedError(f'PSA at project level not yet supported')
-                case 'metamodel':
-                    if metamodel_id is None:
-                        metamodel_id = project_provider.get_focussed_metamodel_id(project_id)
-                    mm = proj.get_metamodel_by_id(metamodel_id)
-                    result_data, result_revision = result_provider.get_result(
-                        'psa_single_metamodel', mm.table_config, True
-                    )
-                    if result_data is None:
-                        return None
-                    stale = result_revision != mm.table_config.revision
-                    assert isinstance(result_data, pd.DataFrame)
-                case _:
-                    raise ValueError(f'result_level not recognised: {result_level}')
-        case 'det':
-            result_level = 'metamodel' if result_level is None else result_level
-            match result_level:
-                case 'project':
-                    raise NotImplementedError('Deterministic results export for full project not yet supported')
-                case 'metamodel':
-                    if metamodel_id is None:
-                        metamodel_id = project_provider.get_focussed_metamodel_id(project_id)
-                    mm = proj.get_metamodel_by_id(metamodel_id)
-                    stale = mm.model.reattach_results(result_provider)
+    if metamodel_ids is None:
+        metamodel_ids = [project_provider.get_focussed_metamodel_id(project_id)]
 
-                    result_data = _get_metamodel_deterministic_raw_data(mm)
-                    if result_data is None:
-                        return None
-                    assert isinstance(result_data, pd.DataFrame)
-                case _:
-                    raise ValueError(f'result_level not recognised: {result_level}')
-        case _:
-            raise ValueError(f'result_type not recognised: {result_type}')
-    
-    def _strip_index_tz(df):
-        index = df.index
-        if getattr(index, 'tz', None) is not None:
-            df = df.copy()
-            df.index = index.tz_localize(None)
-        return df
+    rval = ResultsExport()
+    results: list[tuple[str, pd.DataFrame]] = []
+    exported_mms: list[NewsegsMetaModel] = []
+    for mm_id in metamodel_ids:
+        mm = proj.get_metamodel_by_id(mm_id)
+        frame = get_result_frame(result_type, mm, result_provider)
+        if frame is None or frame.empty:
+            rval.missing.append(mm.name)
+            continue
+        results.append((mm.name, frame))
+        exported_mms.append(mm)
+        rval.exported.append(mm.name)
 
-    def _make_project_filename_stub():
-        proj_metadata = project_provider.get_component_metadata(project_id, 'label')
-        proj_name = proj_metadata.get('label')
-        return f'{proj_name}-{result_type}-results'
+    if not results:
+        return rval
 
-    def _make_metamodel_filename_stub(metamodel_id):
-        mm_metadata = project_provider.metamodel_provider.get_component_metadata(metamodel_id, 'label')
-        mm_name = mm_metadata.get('label')
-        return f'{mm_name}-{result_type}-results'
-
-    match result_level:
-        case 'project':
-            file_name_stub = _make_project_filename_stub()
-        case 'metamodel':
-            file_name_stub = _make_metamodel_filename_stub(metamodel_id)
-
-    match contents_option:
-        case 'result':
-            out_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.{format_option}')
-        case 'result_and_config':
-            out_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.zip')
-        case _:
-            raise ValueError(f'contents_option not recognised: {contents_option}')
-    
-    match contents_option:
-        case 'result':
-            match format_option:
-                case 'csv':
-                    return dcc.send_data_frame(result_data.to_csv, out_fn)
-                case 'xlsx':
-                    result_data_for_export = _strip_index_tz(result_data)
-                    return dcc.send_data_frame(
-                        result_data_for_export.to_excel,
-                        out_fn,
-                        sheet_name = f'{result_type} results'
-                    )
-                case _:
-                    raise ValueError(f'format_option not recognised: {format_option}')
-        case 'result_and_config':
-            result_fn = pathvalidate.sanitize_filename(f'{file_name_stub}.{format_option}')
-            match format_option:
-                case 'csv':
-                    results_mode = 'w+b'
-                case 'xlsx':
-                    results_mode = 'w+b'
-                case _:
-                    raise ValueError(f'format_option not recognised: {format_option}')
-
-            match result_level:
-                case 'project':
-                    config_dict = proj.to_dict_repr()
-                    config_file_name = f'{proj.name}-config.json'
-                case 'metamodel':
-                    config_dict = mm.to_dict_repr()
-                    config_file_name = f'{mm.name}-config.json'
-                case _:
-                    raise ValueError(f'result_level not recognised: {result_level}')
-            
-            with tempfile.TemporaryFile(mode = results_mode, suffix = result_fn) as resultsfile:
-                match format_option:
-                    case 'csv':
-                        result_data.to_csv(resultsfile)
-                    case 'xlsx':
-                        result_data_for_export = _strip_index_tz(result_data)
-                        result_data_for_export.to_excel(resultsfile, sheet_name = f'{result_type} results')
-                resultsfile.seek(0)
-
-                with tempfile.TemporaryFile(mode = 'w+', suffix = '.json') as configfile:
-                    json.dump(
-                        config_dict,
-                        configfile,
-                        cls = jsonfuncs.NumpyEncoder,
-                        sort_keys = False, indent = 4
-                    )
-                    configfile.seek(0)
-
-                    with io.BytesIO() as zip_buffer:
-                        with zipfile.ZipFile(zip_buffer, mode = 'w', compression = zipfile.ZIP_DEFLATED) as ziparchive:
-                            ziparchive.writestr(result_fn, resultsfile.read())
-                            ziparchive.writestr(
-                                pathvalidate.sanitize_filename(
-                                    config_file_name
-                                ),
-                                configfile.read()
-                            )
-                        zip_buffer.seek(0)
-                        return dcc.send_bytes(
-                            lambda buffer: buffer.write(zip_buffer.getvalue()),
-                            filename = out_fn
-                        )
-                    
+    rval.download = build_download(
+        result_type,
+        results,
+        format_option,
+        project_name = proj.name,
+        configurations = exported_mms if include_configuration else (),
+    )
+    logger.info(
+        'Exported %s results of project %s as %s. Configurations: %s; Without results: %s; Configuration included: %s',
+        result_type, project_id, format_option, rval.exported, rval.missing, include_configuration,
+    )
+    return rval
