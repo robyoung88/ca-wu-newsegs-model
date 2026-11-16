@@ -5,6 +5,7 @@ import dash_daq as daq
 
 from newsegsmodelapp.components.configuration_selector import create_header_metamodel_input_container
 from newsegsmodelapp.components import icons
+from newsegsmodelapp.components.results_download import create_results_download_button
 from newsegsmodelapp.components.staleness import create_staleness_indicator
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
@@ -65,6 +66,20 @@ def create_results_header(page_type, **kwargs):
                                         },
                                         title = 'Run all configurations',
                                     ), 
+
+                                    # Download results button
+                                    create_results_download_button(
+                                        'det',
+                                        className = 'p-2',
+                                        style = {
+                                            "boxSizing": "border-box",
+                                            "width": "42px",
+                                            "height": "42px",
+                                            'margin-left': '5px',
+                                            'border-radius': '50%',
+                                            'display': 'inline',
+                                        },
+                                    ),
                                 ],
                             ),
                             className = 'results-title-block'
@@ -148,16 +163,7 @@ def create_results_header_dsa(**kwargs):
             title = 'Start DSA run',
             disabled = False,
         ), 
-        dbc.Button(
-            html.I(
-                className = icons.get_icon('results-download', style_name = 'raw'),
-                style = {'display': 'inline'}
-            ),
-            color = 'secondary',
-            id = 'btn-dsa-result-predownload',
-            outline = True,
-            title = 'Download DSA results',
-        ), 
+        create_results_download_button('dsa'),
         dcc.Upload(
             dbc.Button(
                 html.I(
@@ -219,17 +225,7 @@ def create_results_header_psa(**kwargs):
             id = 'btn-psa-prerun',
             disabled = False,
         ), 
-        dbc.Button(
-            html.I(
-                className = icons.get_icon('results-download', style_name = 'raw'),
-                style = {'display': 'inline'}
-            ),
-            color = 'secondary',
-            id = 'btn-psa-result-predownload',
-            #id = {'type': 'results-predownload-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
-            outline = True,
-            title = 'Download PSA results',
-        ), 
+        create_results_download_button('psa'),
         dcc.Upload(
             dbc.Button(
                 html.I(

@@ -2,6 +2,7 @@
 """
 from dash import dcc, html
 
+from newsegsmodelapp.components.results_download import create_results_download_components
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
 
 def psa_process_components(**kwargs):
@@ -54,48 +55,4 @@ def psa_process_components(**kwargs):
             id = 'modal-psa-confirm',
             is_open = False
         ),
-        dbc.Modal(
-            [
-                dbc.ModalHeader(dbc.ModalTitle('Download PSA results')),
-                dbc.ModalBody([
-                    html.H3('Download contents:'),
-                    dcc.RadioItems(
-                        [
-                            {'label': 'Results only', 'value': 'result'},
-                            {'label': 'Results and model configuration', 'value': 'result_and_config'}
-                        ],
-                        'result',
-                        id = {'type': 'psa-result-download-option', 'key': 'contents-option'}
-                    ),
-                    html.H3('Result format:'),
-                    dcc.RadioItems(
-                        [
-                            {'label': 'Comma separated variables (.csv)', 'value': 'csv'},
-                            {'label': 'Microsoft® Excel® Spreadsheet (.xlsx)', 'value': 'xlsx'},
-                        ],
-                        'csv',
-                        id = {'type': 'psa-result-download-option', 'key': 'format-option'}
-                    )
-                ]),
-                dbc.ModalFooter([
-                    dbc.Button(
-                        'OK',
-                        #id = {'type': 'results-download-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa'},
-                        id = 'btn-psa-download-confirm-ok',
-                        n_clicks = 0
-                    ),
-                    dbc.Button(
-                        'Cancel', 
-                        #id = {'type': 'modal-close-btn', 'page': kwargs.get('page_type', 'None'), 'key': 'psa-download-confirm'},
-                        id = 'btn-psa-download-confirm-abort',
-                        className = 'ms-auto',
-                        n_clicks = 0
-                    )
-                ]),
-            ],
-            #id = {'type': 'modal-confirm', 'page': kwargs.get('page_type', 'None'), 'key':'psa-download-confirm'},
-            id = 'modal-psa-download-confirm',
-            is_open = False
-        ),
-        dcc.Download(id = 'download-psa-result')
-    ]
+    ] + create_results_download_components('psa')

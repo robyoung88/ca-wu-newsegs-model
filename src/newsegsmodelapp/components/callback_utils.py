@@ -137,56 +137,6 @@ def ids_to_update(
         matches.append(match)
     return [x for x in target_ids if any(intersection_values_match(m, x) for m in matches)]
 
-def get_options(
-    option_ids: list[dict[str, str]],
-    option_values: list[Any],
-    page: str,
-    keys: list[str]
-) -> dict[str, Any]:
-    """
-    Get matched values from paired lists of id dictionaries and values.
-
-    Matches on keys 'page' (always) and 'key' (as member of key list).
-
-    Args:
-        option_ids (list[dict[str, str]]): List of dictionaries containing 'page' and 'key' keys with string values.
-        option_values (list[Any]): List of equal length to option_ids containing the matched option values.
-        page (str): Value required for 'page' in `option_ids`.
-        keys (list[str]): Strings to be found in 'key' key within `option_ids`. Form the keys of the returned dict.
-
-    Returns:
-        dict[str, Any]: key:value pairs for any of the keys found in the `option_ids` list on the correct page.
-    """
-    odict = {}
-    for id, val in zip(option_ids, option_values):
-        if id.get('page') == page and id.get('key') in keys:
-            odict[id['key']] = val
-    return odict
-
-def get_options_nopage(
-    option_ids: list[dict[str, str]],
-    option_values: list[Any],
-    keys: list[str]
-) -> dict[str, Any]:
-    """
-    Get matched values from paired lists of id dictionaries and values.
-
-    Matches on 'key' (as member of key list).
-
-    Args:
-        option_ids (list[dict[str, str]]): List of dictionaries containing 'page' and 'key' keys with string values.
-        option_values (list[Any]): List of equal length to option_ids containing the matched option values.
-        keys (list[str]): Strings to be found in 'key' key within `option_ids`. Form the keys of the returned dict.
-
-    Returns:
-        dict[str, Any]: key:value pairs for any of the keys found in the `option_ids` list on the correct page.
-    """
-    odict = {}
-    for id, val in zip(option_ids, option_values):
-        if id.get('key') in keys:
-            odict[id['key']] = val
-    return odict
-
 # REVIEW (unreferenced): no references to `get_variable_keyed_data` found in src/, scripts/ or data/.
 def get_variable_keyed_data(
     section: str,

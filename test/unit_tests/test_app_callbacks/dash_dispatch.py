@@ -267,6 +267,7 @@ def dispatch_callback(
         value: The new value of the property.
         components: The components on the page; those matching each wildcard are sent.
         stores: Values of the dependencies with string ids (e.g. `{'active-project-id': ...}`); others are None.
+            Dependencies with dictionary ids take the values of their components on the page.
         also_triggered: (id, value) of other components whose properties changed in the same request.
 
     Returns:
@@ -309,7 +310,14 @@ def dispatch_callback(
             return entries
         entry = {'id': pattern, 'property': prop}
         if with_values:
-            entry['value'] = changed.get((stringify_id(pattern), prop), stores.get(pattern))
+            key = (stringify_id(pattern), prop)
+            if key in changed:
+                entry['value'] = changed[key]
+            elif isinstance(pattern, dict):
+                # A component with a dictionary id but no wildcard: its value on the page
+                entry['value'] = next((_component_value(c, prop) for c in components if c.id == pattern), None)
+            else:
+                entry['value'] = stores.get(pattern)
         return entry
 
     payload = {

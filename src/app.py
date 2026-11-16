@@ -41,6 +41,7 @@ from newsegsmodelapp.backend.db.db import init_db
 from newsegsmodelapp.backend.db.db_request_handler import FromDatabaseRequestHandler
 from newsegsmodelapp.backend.db.db_result_provider import CachedFromDatabaseResultProvider
 from newsegsmodelapp.components.configuration_selector import add_configuration_selector_callbacks
+from newsegsmodelapp.components.results_download import add_results_download_callbacks
 from newsegsmodelapp.components.callbacks.action_callbacks import add_action_callbacks
 from newsegsmodelapp.components.callbacks.result_container_callbacks import add_result_container_callbacks
 from newsegsmodelapp.components.callbacks.timeseries_callbacks import add_result_timeseries_callbacks
@@ -340,6 +341,7 @@ def create_app(external_stylesheets = None) -> Dash:
     map.add_site_selector_callbacks(app)
     add_environment_feedback_callbacks(app)
     add_configuration_selector_callbacks(app)
+    add_results_download_callbacks(app)
     add_action_callbacks(app)
     add_result_container_callbacks(app)
     add_result_timeseries_callbacks(app)

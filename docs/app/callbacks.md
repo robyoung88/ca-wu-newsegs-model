@@ -15,6 +15,7 @@ Callbacks are bound once, by `create_app` in `src/app.py`:
 | `add_site_selector_callbacks` | `components/map.py` | The site map and its inputs |
 | `add_environment_feedback_callbacks` | `components/callbacks/environment_feedback_callbacks.py` | The environmental conditions of a site |
 | `add_configuration_selector_callbacks` | `components/configuration_selector.py` | Focusing, renaming, duplicating, removing, uploading and downloading configurations |
+| `add_results_download_callbacks` | `components/results_download.py` | The dialogs which download the deterministic, DSA and PSA results of one or all configurations |
 | `add_action_callbacks` | `components/callbacks/action_callbacks.py` | Starting and monitoring runs, cancelling jobs |
 | `add_result_container_callbacks` | `components/callbacks/result_container_callbacks.py` | Result containers, headers and tables, and whether results are out of date |
 | `add_result_timeseries_callbacks` | `components/callbacks/timeseries_callbacks.py` | The timeseries of the focussed configuration |
@@ -155,6 +156,8 @@ whether runs are under way), `results-content`, `results-overlay-text`, `results
 |---|---|
 | `{'type': 'generic_text', 'section': ..., 'key': ...}` | A text field filled from the project, by `key`: `project-name`, `site-name` or `configuration-name` |
 | `{'type': 'config-name-input' \| 'config-focus-btn' \| 'config-hdrfocus-btn' \| 'config-dup-btn' \| 'config-remove-btn' \| 'config-download-btn' \| 'config-upload', 'index': n}` | The configuration selector's inputs and buttons, for configuration `n` |
+| `{'type': 'results-download-open', 'result': 'det' \| 'dsa' \| 'psa', 'target': ...}` | A button which opens the download dialog of a type of result, for the focussed configuration (`target` is `focussed`) or a configuration by its id |
+| `{'type': 'results-download-modal' \| 'results-download-scope' \| 'results-download-format' \| 'results-download-include' \| 'results-download-ok' \| 'results-download-cancel' \| 'results-download-target' \| 'results-download' \| 'results-download-feedback', 'result': ...}` | The download dialog of a type of result, its options and buttons, its target, its `dcc.Download`, and its feedback toast (see `components/results_download.py`) |
 | `{'type': 'action-button-ps', 'key': ...}` | The project selector's buttons |
 | `{'type': 'annual-horizon-toggle', 'page': ...}` | The toggle between results per year and to the horizon |
 | `{'type': 'feedback-graph', 'section': ..., 'key': ...}` | A feedback graph, drawn by the artist registered for its `key` |

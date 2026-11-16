@@ -24,7 +24,7 @@ from newsegsmodelapp.components import navigation
 from newsegsmodelapp.components.feedback import environmental_conditions, indicative_net_energy
 
 from newsegsmodelapp.components.layouts import result_group_containers, results_header
-from newsegsmodelapp.components import configuration_selector
+from newsegsmodelapp.components import configuration_selector, results_download
 from newsegsmodelapp.dash_extension import NewsegsDash
 from newsegsmodelapp.components import icons
 import newsegsmodelapp.components.typed_dash_bootstrap_components as dbc
@@ -174,7 +174,8 @@ def create_model_configuration_layout(config: ModelConfigurationLayoutConfigurat
     
 
     b1_contents = [
-        config.layout_results_header()
+        config.layout_results_header(),
+        *results_download.create_results_download_components('det'),
     ]
 
     b2_contents = [

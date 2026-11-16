@@ -2323,6 +2323,19 @@ package:
       sha256: 93807369ab91f230cf9e6e2a237eaa812492fe00face5b38068735858fba954f
     category: main
     optional: false
+  - name: xlsxwriter
+    version: 3.2.9
+    manager: conda
+    platform: win-64
+    dependencies:
+      python: '>=3.10'
+    url:
+      https://conda.anaconda.org/conda-forge/noarch/xlsxwriter-3.2.9-pyhd8ed1ab_0.conda
+    hash:
+      md5: fa127b9f29f64174437524d0d61432f4
+      sha256: 6ed46549d156bc109803f43fd0c336bc4604aabdeee3de2a6e8ce3eff25b1a60
+    category: main
+    optional: false
   - name: zipp
     version: 4.1.0
     manager: conda
