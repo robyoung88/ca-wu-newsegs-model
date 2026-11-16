@@ -62,6 +62,8 @@ docker compose up --build --detach
 
 This runs the Dash app under gunicorn (configured in `gunicorn.conf.py`) with `NEWSEGS_ENV=production`, using the code baked into the image. The dozzle log viewer and the sqlite-web database browser are not started.
 
+The image (`newsegs-app:latest`) is built once, by the `dash-app` service; the dispatcher and maintenance services run the same image. To start one of them on its own, build the image first with `docker compose build dash-app`.
+
 For development, layer `docker-compose.dev.yml` on top. This sets `NEWSEGS_ENV=development`, mounts the working copy for live code changes, runs the Flask development server with debug tools, and adds dozzle (port 9090) and sqlite-web (port 9080):
 
 ```

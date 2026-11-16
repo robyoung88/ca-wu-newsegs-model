@@ -27,8 +27,12 @@ x-app-volumes: &app-volumes
   - ${HOST_NETWORK_SHARE_PATH:-./mock_network_drive}:/mnt/network_share
 
 services:
+  # Only dash-app builds the image; the other services run the same image. Building it once per
+  # service would export, and with the containerd image store unpack, the same multi-GB layers
+  # three times.
   dash-app:
     build: .
+    image: &app-image newsegs-app:latest
     command: gunicorn --config gunicorn.conf.py app:server
     ports:
       - "8050:8050"
@@ -46,7 +50,9 @@ services:
     restart: unless-stopped
 
   zmq-dispatcher:
-    build: .
+    image: *app-image
+    # Built by dash-app; never pulled from a registry
+    pull_policy: never
     command: python src/newsegsmodelapp/backend/dispatcher.py
     environment: *app-environment
     volumes: *app-volumes
@@ -58,7 +64,9 @@ services:
     restart: unless-stopped
 
   maintenance-cron:
-    build: .
+    image: *app-image
+    # Built by dash-app; never pulled from a registry
+    pull_policy: never
     command: python src/newsegsmodelapp/backend/maintenance.py
     environment: *app-environment
     volumes: *app-volumes
